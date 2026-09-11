@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import type { Config } from './config.js';
@@ -7,6 +9,12 @@ import { ProjectsService } from './projectsBank/service.js';
 import type { KV } from './store.js';
 
 export type AppDeps = { config: Config; kv: KV };
+
+/** Length plus a short hash: lets the owner compare the deployed key with the local one without exposing it. */
+function keyFingerprint(key: string | undefined): string | null {
+  if (!key) return null;
+  return `${key.length}:${createHash('sha256').update(key).digest('hex').slice(0, 8)}`;
+}
 
 function errorStatus(error: unknown): number {
   const statusCode =
@@ -34,7 +42,10 @@ export async function buildApp({ config, kv }: AppDeps): Promise<{ app: FastifyI
     ok: true,
     env: config.APP_ENV,
     time: new Date().toISOString(),
-    projectsBank: projects.status(),
+    projectsBank: {
+      ...projects.status(),
+      ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.PB_FEED_KEY) } : {}),
+    },
   }));
 
   await app.register(projectsRoutes, { service: projects });
