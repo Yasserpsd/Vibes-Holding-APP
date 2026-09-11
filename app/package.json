@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/ibm-plex-sans-arabic": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
+    "@tanstack/react-query": "^5.102.8",
     "expo": "~57.0.22",
     "expo-constants": "~57.0.18",
     "expo-font": "~57.0.4",
@@ -15,6 +16,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
     "expo-updates": "~57.0.22",
+    "expo-web-browser": "~57.0.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -24,8 +26,8 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
-    "typescript": "~6.0.3",
-    "eslint-config-expo": "~57.0.2"
+    "eslint-config-expo": "~57.0.2",
+    "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",

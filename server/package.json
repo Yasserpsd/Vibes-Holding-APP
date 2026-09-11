@@ -1,0 +1,30 @@
+{
+  "name": "investors-club-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API server for the Investors Club app (Vibes Holding). Test environment.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "seed": "tsx src/cli/seed.ts",
+    "feed:inspect": "tsx src/cli/inspect-feed.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.12.4",
+    "pg": "^8.23.0",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

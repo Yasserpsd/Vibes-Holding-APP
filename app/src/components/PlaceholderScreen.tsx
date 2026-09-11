@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,18 +10,21 @@ const clubLogo = require('../../assets/images/club-logo.png');
 type Props = {
   title: string;
   description: string;
+  children?: ReactNode;
 };
 
-export function PlaceholderScreen({ title, description }: Props) {
+export function PlaceholderScreen({ title, description, children }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
         <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>قيد الإنشاء</Text>
-        </View>
+        {children ?? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>قيد الإنشاء</Text>
+          </View>
+        )}
       </View>
       <Text style={styles.footer}>
         {env.isProduction ? `الإصدار ${env.appVersion}` : `نسخة تجريبية · الإصدار ${env.appVersion}`}

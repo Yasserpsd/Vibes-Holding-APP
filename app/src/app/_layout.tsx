@@ -5,16 +5,33 @@ import {
   IBMPlexSansArabic_700Bold,
   useFonts,
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { ensureRTL } from '@/i18n/rtl';
-import { colors } from '@/theme/tokens';
+import { colors, fonts } from '@/theme/tokens';
 
 ensureRTL();
 SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 60_000, retry: 1 },
+  },
+});
+
+const detailHeader = {
+  headerShown: true,
+  headerStyle: { backgroundColor: colors.surface },
+  headerTintColor: colors.gold,
+  headerTitleStyle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textPrimary },
+  headerTitleAlign: 'center' as const,
+  headerBackButtonDisplayMode: 'minimal' as const,
+  headerShadowVisible: false,
+};
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -35,7 +52,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -44,7 +61,9 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: 'المشروع' }} />
+        <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
       </Stack>
-    </>
+    </QueryClientProvider>
   );
 }
