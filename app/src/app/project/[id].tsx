@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { useProject } from '@/api/queries';
@@ -11,6 +11,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const query = useProject(id);
   const project = query.data?.project;
@@ -64,10 +65,22 @@ export default function ProjectScreen() {
             <AppButton label="صفحة الشريك الذهبي" icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
           ) : null}
 
+          <AppButton
+            label="اسأل المستشار عن هذا المشروع"
+            icon="sparkles-outline"
+            variant="outline"
+            onPress={() =>
+              router.navigate({
+                pathname: '/(tabs)/advisor',
+                params: { ctxType: 'project', ctxId: String(project.id), ctxTitle: project.title, ctxNonce: String(Date.now()) },
+              })
+            }
+          />
+
           <View style={styles.noteCard}>
             <Ionicons name="lock-closed-outline" size={20} color={colors.goldLight} />
             <Text style={styles.noteText}>
-              بيانات التواصل مع المؤسس وملف العرض متاحة لأعضاء النادي بعد فتح المشروع. تسجيل الدخول والعضوية في تحديث قادم.
+              بيانات التواصل مع المؤسس وملف العرض متاحة لأعضاء النادي بعد فتح المشروع. فتح المشاريع من التطبيق في تحديث قادم.
             </Text>
           </View>
         </ScrollView>

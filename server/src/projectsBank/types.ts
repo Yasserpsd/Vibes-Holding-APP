@@ -64,4 +64,6 @@ export type ProjectsFilters = {
 export type FeedSnapshot = {
   projects: PublicProject[];
   fetchedAt: string;
+  /** Project id → public page on vibesholding.com. Server-side only: sent to the hub as screen context, never to the app. */
+  pageUrls?: Record<string, string>;
 };

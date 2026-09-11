@@ -99,6 +99,12 @@ function asIsoDate(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/** The project page on the web, kept on the server for the advisor context (never part of the public view). */
+export function pageUrlOf(raw: unknown): string | null {
+  if (!isRecord(raw)) return null;
+  return asUrl(raw.url ?? raw.link ?? raw.permalink);
+}
+
 /**
  * Builds the public view of a feed item. Every field is picked explicitly,
  * so the raw object (and its private fields) can never be spread through.

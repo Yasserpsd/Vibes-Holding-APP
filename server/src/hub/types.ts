@@ -32,8 +32,34 @@ export type HubContact = {
   pending_pay: 0 | 1;
 };
 
+/** One row of the hub's `messages` table as `poll` / `history` return it (`history_rows()` / `op_poll()`). */
+export type HubMessage = {
+  id: number;
+  /** user = the member, assistant = the AI, human = a staff reply from the hub console, system = hub notice. */
+  role: string;
+  content: string;
+  /** Reply widgets chosen by the workflow (`expand_actions()`): quick_replies, link, open_page, card, video, prefill_form… */
+  actions: unknown[];
+  image?: string;
+  audio?: string;
+  by?: string;
+  at: string;
+};
+
+/** `gate_payload()`: why the hub refused to answer (membership, daily limit, rate, site cap, contact). */
+export type HubGate = {
+  type: string;
+  text?: string;
+  card?: unknown;
+  mgmt?: string;
+  needs_account?: 0 | 1;
+  saudi?: 0 | 1;
+  days?: number;
+};
+
 export type HubOp =
   | 'ping'
+  | 'config'
   | 'register'
   | 'resend_code'
   | 'verify'
@@ -43,7 +69,10 @@ export type HubOp =
   | 'profile'
   | 'reset_request'
   | 'reset_confirm'
-  | 'delete_account';
+  | 'delete_account'
+  | 'message'
+  | 'poll'
+  | 'history';
 
 export type HubBody = Record<string, unknown>;
 
@@ -56,6 +85,21 @@ export type HubResponse = {
   sent?: boolean;
   text?: string;
   contact?: HubContact | null;
+  /** `config`: `widget_config()` — bot name, welcome text, menu, membership card, link library… */
+  config?: Record<string, unknown>;
+  /** `message` */
+  message_id?: number;
+  waiting?: boolean;
+  gated?: boolean;
+  gate?: HubGate;
+  human?: boolean;
+  image_url?: string;
+  audio_url?: string;
+  transcript?: string;
+  /** `poll` / `history` */
+  messages?: HubMessage[];
+  timeout?: boolean;
+  cfg_rev?: number;
 };
 
 /** A hub error keeps the plugin's code and Arabic message so the app can show them as they are. */

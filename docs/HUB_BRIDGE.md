@@ -1,4 +1,4 @@
-# Hub bridge — accounts, OTP, login, membership status
+# Hub bridge — accounts, OTP, login, membership status, AI advisor
 
 How the app server talks to the vcmem.com hub (WordPress, plugin **Vibes AI Assistant** in hub mode). Written from the plugin source (v2.4.0, `includes/class-vai-hub.php`); nothing here is guessed.
 
@@ -17,7 +17,7 @@ Each tenant site identifies a visitor by a `uuid` (any string of letters, digits
 - generates one hub `uuid` per app session (`app-<random uuid>`), logs in with it, and stores it hashed together with an opaque app token (`session:<sha256(token)>` in the `kv` table, expiry `SESSION_DAYS`, default 180);
 - never shows the hub uuid or the site key to the app. The app only holds its own Bearer token (expo-secure-store).
 
-## 2. Hub operations used (all existing except the last one)
+## 2. Hub operations used (all in plugin 2.4.0 except `delete_account`)
 | Op | Purpose | Notes |
 |---|---|---|
 | `register` | create an account (name, country, phone, email, password, persona, bio, job_title) | hub sends the 6-digit e-mail code (30 min); creates/merges the contact bound to the uuid |
@@ -29,6 +29,10 @@ Each tenant site identifies a visitor by a `uuid` (any string of letters, digits
 | `logout` | drop the visitor row for the uuid | |
 | `reset_request` / `reset_confirm` | forgot password (6-digit e-mail code, 20 min) | |
 | `delete_account` | **new in plugin 2.4.1** | password required; wipes personal data, messages, visitors, tokens, sessions and leads of the contact; payment rows stay; e-mails the team |
+| `config` | `widget_config()`: bot name, welcome text, quick menu, membership card, link library, `voice` flag | read by the advisor service every 30 minutes; the membership card and the membership/payment links feed the app's block list |
+| `message` | send a member message: `message`, optional `page_url` + `page_title` (screen context), `ip`; `image` / `audio` data URLs (≤ 4 MB / ≤ 6 MB, not used by the app yet) | stores the user row, forwards to the n8n workflow, answers `{ message_id, waiting }`; `gated: true` + `gate` (membership / daily / rate / site_cap) when the hub refuses; `{ ok: false, error: "n8n" }` (HTTP 200) when the workflow is unreachable |
+| `poll` | replies after a message id (`after`) | assistant, human (staff console) and system rows, plus `waiting`, `timeout`, `human` |
+| `history` | last 40 rows of the account's conversation | the hub stores messages per contact, not per site: the app shows the same conversation as the websites |
 
 Errors come back as WordPress `WP_Error` JSON (`code`, `message` in Arabic, `data.status`). The server forwards code and message to the app unchanged, except `unauthorized` (bad site key → `hub_config`, 502) and unknown ops (`hub_not_supported`, 501, shown while the hub still runs plugin 2.4.0).
 
@@ -45,10 +49,17 @@ Errors come back as WordPress `WP_Error` JSON (`code`, `message` in Arabic, `dat
 | `PATCH /api/me` | Bearer | `{ me }` |
 | `POST /api/auth/logout` | Bearer | `{ ok }` |
 | `DELETE /api/me` (`{ password }`) | Bearer | `{ ok }` |
+| `GET /api/advisor/history` | Bearer | `{ messages, profile: { botName, welcome, suggestions }, me }` |
+| `POST /api/advisor/message` (`{ text, context?: { type: "project", id } }`) | Bearer | `{ messageId, waiting, human, gate, me }`; hub errors keep their code and Arabic text |
+| `GET /api/advisor/poll?after=<id>` | Bearer | `{ messages, waiting, timeout, human, me }` |
 
 `me` = `{ id, name, email, phone, persona, personaLabel, bio, jobTitle, company, city, website, social, avatarUrl, verified, isAdmin, membership: { status: unactivated | active | expired, daysLeft, endDate, aiDailyLimit, aiDailyLeft } }`.
 
 All `/api/*` answers carry `Cache-Control: no-store`. Auth endpoints have a small per-IP limiter on top of the hub's own limits. Pending tokens live 30 minutes (the hub code's lifetime).
+
+`messages[]` = `{ id, role: user | assistant | staff | system, text, at, by, image, audio, actions[] }`. `server/src/advisor/sanitize.ts` filters every reply before it reaches the app (CLAUDE.md rule 3): the hub's membership card becomes a `{ type: "membership" }` action (the app opens its own membership screen); links to the membership page and any Paymob / checkout / pay URL are removed from the text, from `link` / `open_page` actions and from service cards; the hub's gate texts (which sell the web membership) are replaced by app texts; web-only widgets (`prefill_form`, `scroll_to`, `handoff`, `request_contact`, `admin`) are dropped. Kept: `quick_replies`, `link`, `video`, service `card` (title, price, bullets, details link). The block list comes from the hub `config` (membership card buttons + link-library entries about العضوية / الدفع) plus fixed rules, cached 30 minutes.
+
+Project context («اسأل المستشار» on a project page): the app sends `context: { type: "project", id }`; the server turns it into `page_title` (title + رقم المشروع) and `page_url` = the project's public page on vibesholding.com, which the hub uses for `page_excerpt()` (synced knowledge). That URL stays server-side (`ProjectsService.pageUrl()`, stored in the feed snapshot) and is never part of the public project.
 
 ## 4. Environment rules (test vs production)
 - `APP_ENV=test` (now): **login is admitted for hub admins only** (`role=admin` and `admin_verified`, CLAUDE.md rule 9). A non-admin login is logged out of the hub again and answered `403 admin_only`.
@@ -63,9 +74,10 @@ Variables: `HUB_MODE` (`live` | `mock`; default `live` when `HUB_SITE_KEY` is se
 3. Check `https://vibes-holding-app-production.up.railway.app/health` → `hub.mode: "live"`, `hub.registrationOpen: false`, `hub.adminOnly: true`.
 4. Sign in from the app with an existing hub **admin** account (e-mail or phone + password).
 5. Upload plugin **2.4.1** (`vibes-ai-assistant-2.4.1.zip`, next to the original zip on the owner's D: drive; diff in `docs/hub-plugin/`) through WordPress → Plugins → Add New → Upload → Replace current. The only change is the `delete_account` op and the version number; nothing else in the plugin moves. Until then the app's «حذف الحساب» answers «هذه الخدمة غير متاحة حاليًا».
+6. Vibes AI → **التوجيهات والروابط**: add a directive for the app site (the workflow receives `site.host` = the host chosen in step 1), for example: «إذا كان الموقع هو تطبيق نادي المستثمرين فلا تذكر أسعار العضوية ولا روابط الدفع أو الاشتراك؛ وجّه العضو إلى شاشة العضوية داخل التطبيق». The server already removes membership and payment links, but the wording of the replies comes from the workflow.
 
 ## 6. Later milestones on the same bridge
-- M4 AI advisor: `message`, `poll`, `history` (same uuid → same conversation as the websites).
+- Advisor voice and image: `message` already accepts `audio` (data URL, Arabic only, transcribed by the hub) and `image` (jpeg/png/webp data URL); the app needs native modules (expo-audio, expo-image-picker) and therefore a new APK before they can be used.
 - M7 store purchase → hub membership activation: needs a new server-to-server op (`activate_member`) in the plugin; `set_member()` already exists inside the hub.
 - Push on staff replies: a webhook from the hub to this server (new plugin code).
 - Projects Bank unlocks: separate endpoint in the Projects Bank plugin (brief §2.2).

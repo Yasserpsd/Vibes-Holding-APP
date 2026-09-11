@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Config } from '../config.js';
 import type { KV } from '../store.js';
 import { fetchFeedItems } from './feed.js';
-import { toPublicProject } from './mapper.js';
+import { pageUrlOf, toPublicProject } from './mapper.js';
 import { normalizeForSearch } from './text.js';
 import type {
   FeedSnapshot,
@@ -33,6 +33,7 @@ export class ProjectsService {
   private items: IndexedProject[] = [];
   private fetchedAt: string | null = null;
   private lastError: string | null = null;
+  private pageUrls = new Map<number, string>();
   private timer: NodeJS.Timeout | null = null;
   private inflight: Promise<void> | null = null;
 
@@ -40,7 +41,7 @@ export class ProjectsService {
 
   async start(): Promise<void> {
     const snapshot = await this.deps.kv.get<FeedSnapshot>(SNAPSHOT_KEY);
-    if (snapshot) this.load(snapshot.projects, snapshot.fetchedAt);
+    if (snapshot) this.load(snapshot.projects, snapshot.fetchedAt, snapshot.pageUrls ?? {});
 
     if (!this.deps.config.PB_FEED_KEY) {
       this.deps.log.warn('PB_FEED_KEY is not set: Projects Bank sync is disabled');
@@ -69,12 +70,18 @@ export class ProjectsService {
   private async doRefresh(): Promise<void> {
     try {
       const rawItems = await fetchFeedItems(this.deps.config);
-      const projects = rawItems
-        .map((item) => toPublicProject(item))
-        .filter((project): project is PublicProject => project !== null);
+      const projects: PublicProject[] = [];
+      const pageUrls: Record<string, string> = {};
+      for (const item of rawItems) {
+        const project = toPublicProject(item);
+        if (!project) continue;
+        projects.push(project);
+        const pageUrl = pageUrlOf(item);
+        if (pageUrl) pageUrls[String(project.id)] = pageUrl;
+      }
       const fetchedAt = new Date().toISOString();
-      this.load(projects, fetchedAt);
-      await this.deps.kv.set(SNAPSHOT_KEY, { projects, fetchedAt } satisfies FeedSnapshot);
+      this.load(projects, fetchedAt, pageUrls);
+      await this.deps.kv.set(SNAPSHOT_KEY, { projects, fetchedAt, pageUrls } satisfies FeedSnapshot);
       this.lastError = null;
       this.deps.log.info({ count: projects.length, skipped: rawItems.length - projects.length }, 'Projects Bank feed refreshed');
     } catch (error) {
@@ -83,9 +90,15 @@ export class ProjectsService {
     }
   }
 
-  private load(projects: PublicProject[], fetchedAt: string): void {
+  private load(projects: PublicProject[], fetchedAt: string, pageUrls: Record<string, string>): void {
     this.items = projects.map((project) => ({ project, search: buildSearchText(project) }));
     this.fetchedAt = fetchedAt;
+    this.pageUrls = new Map(Object.entries(pageUrls).map(([id, url]) => [Number(id), url]));
+  }
+
+  /** The project's public web page, for the advisor's screen context only. */
+  pageUrl(id: number): string | null {
+    return this.pageUrls.get(id) ?? null;
   }
 
   status(): { count: number; updatedAt: string | null; lastError: string | null } {
