@@ -10,9 +10,18 @@ const envSchema = z.object({
   PB_FEED_URL: z.string().min(1).default('https://vibesholding.com/wp-json/pb/v1/projects'),
   PB_FEED_KEY: z.string().min(1).optional(),
   PB_REFRESH_MINUTES: z.coerce.number().positive().default(10),
+  // vcmem.com hub (Vibes AI Assistant plugin). The server is registered there as a tenant site.
+  HUB_MODE: z.enum(['live', 'mock']).optional(),
+  HUB_URL: z.string().url().default('https://vcmem.com'),
+  HUB_SITE_KEY: z.string().min(20).optional(),
+  // In the test environment registrations on the live hub stay closed unless the owner opens them.
+  HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('0'),
+  SESSION_DAYS: z.coerce.number().int().positive().default(180),
 });
 
-export type Config = z.infer<typeof envSchema>;
+type Env = z.infer<typeof envSchema>;
+export type HubMode = 'live' | 'mock';
+export type Config = Omit<Env, 'HUB_MODE'> & { HUB_MODE: HubMode };
 
 /** Loads server/.env when present. Real environments (Railway) use variables only. */
 export function loadDotEnv(): void {
@@ -33,5 +42,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
     throw new Error(`Invalid environment: ${issues.join('; ')}`);
   }
-  return parsed.data;
+  const env = parsed.data;
+  // Without a site key the hub cannot be called, so local runs fall back to the mock hub.
+  const hubMode: HubMode = env.HUB_MODE ?? (env.HUB_SITE_KEY ? 'live' : 'mock');
+  if (hubMode === 'live' && !env.HUB_SITE_KEY) {
+    throw new Error('Invalid environment: HUB_MODE=live requires HUB_SITE_KEY');
+  }
+  if (hubMode === 'mock' && env.APP_ENV === 'production') {
+    throw new Error('Invalid environment: the mock hub is not allowed in production');
+  }
+  return { ...env, HUB_MODE: hubMode };
 }

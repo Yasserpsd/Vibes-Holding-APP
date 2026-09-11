@@ -1,0 +1,108 @@
+diff -ru plugin/vibes-ai-assistant/includes/class-vai-hub.php plugin-2.4.1/vibes-ai-assistant/includes/class-vai-hub.php
+--- plugin/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-09 19:29:18.000000000 +0300
++++ plugin-2.4.1/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-11 21:28:36.172468800 +0300
+@@ -585,7 +585,7 @@
+ 		$op = $req->get_param( 'op' );
+ 		nocache_headers();
+ 
+-		$site_ops = array( 'config', 'message', 'poll', 'identify', 'member', 'token', 'claim', 'history', 'knowledge', 'ping', 'register', 'login', 'logout', 'account', 'reset_request', 'reset_confirm', 'profile', 'verify', 'resend_code', 'member_status' );
++		$site_ops = array( 'config', 'message', 'poll', 'identify', 'member', 'token', 'claim', 'history', 'knowledge', 'ping', 'register', 'login', 'logout', 'account', 'reset_request', 'reset_confirm', 'profile', 'verify', 'resend_code', 'member_status', 'delete_account' );
+ 		$tool_ops = array( 'reply', 'search', 'page', 'projects', 'form', 'services', 'contact' );
+ 
+ 		if ( in_array( $op, $site_ops, true ) ) {
+@@ -2098,6 +2098,74 @@
+ 		return array( 'ok' => true );
+ 	}
+ 
++	/** Server-to-server (Investors Club app): the account holder deletes their own account. Personal data and conversations are wiped; payment records stay. */
++	private static function op_delete_account( $site, $d ) {
++		global $wpdb;
++		list( $c ) = self::resolve_contact( $site, isset( $d['uuid'] ) ? $d['uuid'] : '', false );
++		if ( ! $c || empty( $c->pass_hash ) ) {
++			return vai_error( 'no_account', 'سجّل الدخول أولًا', 401 );
++		}
++		if ( self::too_many_attempts( 'delete_' . $c->id, 6 ) ) {
++			return vai_error( 'rate', 'محاولات كثيرة — حاول بعد قليل', 429 );
++		}
++		$pass = isset( $d['password'] ) && is_string( $d['password'] ) ? $d['password'] : '';
++		if ( $pass === '' || ! wp_check_password( $pass, $c->pass_hash ) ) {
++			return vai_error( 'bad_login', 'كلمة المرور غير صحيحة', 401 );
++		}
++		$label = $c->name . ' / ' . vai_phone_local( $c->phone_norm ?: $c->phone ) . ' / ' . $c->email . ( (int) $c->is_member ? ' (عضو مدفوع)' : '' ) . ' — من ' . ( $site ? $site->host : '' );
++		foreach ( array( 'messages', 'visitors', 'tokens', 'sessions', 'leads' ) as $t ) {
++			$wpdb->delete( self::t( $t ), array( 'contact_id' => $c->id ) );
++		}
++		$wpdb->update(
++			self::t( 'contacts' ),
++			array(
++				'name'              => 'حساب محذوف',
++				'phone'             => '',
++				'phone_norm'        => '',
++				'email'             => '',
++				'email_norm'        => '',
++				'stage'             => 0,
++				'is_member'         => 0,
++				'memo'              => null,
++				'msg_count'         => 0,
++				'reply_count'       => 0,
++				'sites'             => null,
++				'last_page'         => null,
++				'lead_type'         => '',
++				'notes'             => null,
++				'ip_hash'           => '',
++				'pass_hash'         => '',
++				'reset_code'        => '',
++				'reset_expires'     => null,
++				'avatar_url'        => '',
++				'company'           => '',
++				'city'              => '',
++				'bio'               => null,
++				'job_title'         => '',
++				'website'           => '',
++				'social'            => null,
++				'verified'          => 0,
++				'verify_code'       => '',
++				'verify_expires'    => null,
++				'role'              => 'member',
++				'admin_code'        => '',
++				'admin_verified'    => 0,
++				'member_started_at' => null,
++				'member_days'       => 0,
++				'member_welcomed'   => 0,
++				'persona'           => '',
++			),
++			array( 'id' => $c->id )
++		);
++		$emails = array_filter( array_map( 'trim', explode( ',', (string) vai_opt( 'notify_email', get_option( 'admin_email' ) ) ) ) );
++		foreach ( $emails as $e ) {
++			if ( is_email( $e ) ) {
++				self::mail( $e, '[Vibes AI] حذف حساب من التطبيق: ' . $c->name, "حذف العضو حسابه بنفسه من تطبيق نادي المستثمرين.\n\n" . $label . "\nالتاريخ: " . vai_riyadh( vai_now() ) . " (الرياض)\n\nحُذفت بياناته الشخصية ومحادثاته؛ سجلات الدفع محفوظة كما هي." );
++			}
++		}
++		return array( 'ok' => true );
++	}
++
+ 	private static function send_welcome_email( $c ) {
+ 		if ( ! $c->email ) {
+ 			return;
+diff -ru plugin/vibes-ai-assistant/vibes-ai-assistant.php plugin-2.4.1/vibes-ai-assistant/vibes-ai-assistant.php
+--- plugin/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-09 19:28:14.000000000 +0300
++++ plugin-2.4.1/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-11 21:28:36.173468100 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: مساعد منظومة ڤايبز الذكي — ويدجت محادثة يعمل على كل مواقع المنظومة (وضع «موقع تابع») + قاعدة بيانات وداشبورد مركزية (وضع «الهب») + ربط بعقل n8n.
+- * Version:     2.4.0
++ * Version:     2.4.1
+  * Author:      Vibes Holding
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.4.0' );
++define( 'VAI_VERSION', '2.4.1' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

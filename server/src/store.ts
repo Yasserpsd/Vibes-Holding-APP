@@ -1,12 +1,13 @@
 import pg from 'pg';
 
 /**
- * Small key/value store for server-driven content and cached feed snapshots.
+ * Small key/value store for server-driven content, cached feed snapshots and app sessions.
  * Postgres on Railway; in-memory fallback for local runs without DATABASE_URL.
  */
 export interface KV {
   get<T>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -19,6 +20,10 @@ export class MemoryKV implements KV {
 
   async set(key: string, value: unknown): Promise<void> {
     this.map.set(key, structuredClone(value));
+  }
+
+  async delete(key: string): Promise<void> {
+    this.map.delete(key);
   }
 
   async close(): Promise<void> {
@@ -57,6 +62,10 @@ export class PgKV implements KV {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
       [key, JSON.stringify(value)],
     );
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.pool.query('DELETE FROM kv WHERE key = $1', [key]);
   }
 
   async close(): Promise<void> {

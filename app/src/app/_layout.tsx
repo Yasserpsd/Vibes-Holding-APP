@@ -11,6 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { AuthProvider } from '@/auth/AuthProvider';
 import { ensureRTL } from '@/i18n/rtl';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -53,17 +54,25 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.black },
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: 'المشروع' }} />
-        <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
-      </Stack>
+      <AuthProvider>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.black },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: 'المشروع' }} />
+          <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
+          <Stack.Screen name="membership" options={{ ...detailHeader, title: 'العضوية' }} />
+          <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: 'الملف الشخصي' }} />
+          <Stack.Screen name="auth/login" options={{ ...detailHeader, title: 'تسجيل الدخول' }} />
+          <Stack.Screen name="auth/register" options={{ ...detailHeader, title: 'إنشاء حساب' }} />
+          <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: 'رمز التفعيل' }} />
+          <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: 'استعادة كلمة المرور' }} />
+        </Stack>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
