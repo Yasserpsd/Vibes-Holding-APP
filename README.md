@@ -44,12 +44,12 @@ npm install
 
 Endpoints: `GET /health`, `GET /api/projects?q=&sector=&stage=&sort=latest|views|discover|golden&page=&limit=`, `GET /api/projects/filters`, `GET /api/projects/:id`, `GET /api/golden`. Founder contact fields never leave the server.
 
-Without `DATABASE_URL` the server keeps content in memory (fine locally). Without `PB_FEED_KEY` the Projects Bank list stays empty.
+Without `DATABASE_URL` the server keeps content in memory (fine locally). Without `PB_FEED_KEY` the Projects Bank list stays empty. Without `HUB_SITE_KEY` the server runs the mock hub (`HUB_MODE=mock`: e-mail code 123456, every account counts as an admin); the real hub needs the site key, see `docs/HUB_BRIDGE.md`.
 
 ### Railway (test environment)
 
 1. Create a Railway project with an environment named `test`, a service deployed from this GitHub repo with **Root Directory** `server`, and add the **PostgreSQL** plugin (it injects `DATABASE_URL`).
-2. Service variables: `APP_ENV=test`, `PB_FEED_KEY=<the feed key>`, optionally `PB_REFRESH_MINUTES=10`. Railway sets `PORT` itself.
+2. Service variables: `APP_ENV=test`, `PB_FEED_KEY=<the feed key>`, optionally `PB_REFRESH_MINUTES=10`; for real accounts `HUB_SITE_KEY=<site key from the hub «المواقع» page>` and `HUB_MODE=live` (`docs/HUB_BRIDGE.md`). Railway sets `PORT` itself.
 3. Generate a public domain for the service and check `https://<domain>/health`.
 4. Put that URL in `app/.env` as `EXPO_PUBLIC_API_URL` (also in `app/eas.json` under the development and preview profiles) before running `eas update` or a build.
 

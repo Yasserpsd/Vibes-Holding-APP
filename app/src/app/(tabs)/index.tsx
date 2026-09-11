@@ -2,22 +2,26 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '@/auth/AuthProvider';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { status, me } = useAuth();
+  const greeting = status === 'signedIn' && me ? `أهلًا ${me.name}.` : '';
   return (
-    <PlaceholderScreen title="الرئيسية" description="واجهة النادي: العروض، فرص الشراكة، وخدمات الأعضاء.">
+    <PlaceholderScreen title="الرئيسية" description={`${greeting} واجهة النادي: العروض، فرص الشراكة، وخدمات الأعضاء.`.trim()}>
       <View style={styles.links}>
         <HomeLink icon="star" label="المشاريع الذهبية" hint="الشركات التي تحمل علامة V" onPress={() => router.push('/golden')} />
         <HomeLink icon="briefcase" label="بنك المشاريع" hint="تصفّح فرص الشراكة" onPress={() => router.push('/projects')} />
+        <HomeLink icon="ribbon" label="العضوية السنوية" hint="المزايا وحالة عضويتك" onPress={() => router.push('/membership')} />
       </View>
     </PlaceholderScreen>
   );
 }
 
-type HomeLinkProps = { icon: 'star' | 'briefcase'; label: string; hint: string; onPress: () => void };
+type HomeLinkProps = { icon: 'star' | 'briefcase' | 'ribbon'; label: string; hint: string; onPress: () => void };
 
 function HomeLink({ icon, label, hint, onPress }: HomeLinkProps) {
   return (

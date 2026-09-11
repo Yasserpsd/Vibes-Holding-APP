@@ -1,15 +1,16 @@
 import { buildApp } from './app.js';
 import { loadConfig, loadDotEnv } from './config.js';
 import { ensureGoldenSeed } from './content/golden.js';
+import { ensureMembershipSeed } from './content/membership.js';
 import { createKV } from './store.js';
 
 loadDotEnv();
 const config = loadConfig();
 const kv = await createKV(config.DATABASE_URL);
-const seeded = await ensureGoldenSeed(kv);
+const seeded = { golden: await ensureGoldenSeed(kv), membership: await ensureMembershipSeed(kv) };
 const { app, projects } = await buildApp({ config, kv });
 
-app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded }, 'storage ready');
+app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded, hub: config.HUB_MODE }, 'storage ready');
 await projects.start();
 
 const shutdown = async (signal: string): Promise<void> => {

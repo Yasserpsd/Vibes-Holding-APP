@@ -1,0 +1,221 @@
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+
+import type { HubMode } from '../config.js';
+import { MOCK_CODE } from '../hub/mock.js';
+import { COUNTRIES, EMAIL_POLICY_TEXT, PHONE_POLICY_TEXT } from '../hub/phone.js';
+import { HubError } from '../hub/types.js';
+import { RateLimiter } from './rateLimit.js';
+import { AuthError, PERSONAS, type AuthService } from './service.js';
+import type { SessionRecord } from './sessions.js';
+
+export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode };
+
+const personaSchema = z.enum(['entrepreneur', 'investor', 'neutral']);
+const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
+const codeSchema = z.string().trim().regex(/^\d{6}$/, 'الرمز 6 أرقام');
+const loginFieldSchema = z.string().trim().min(3).max(190);
+const pendingTokenSchema = z.string().min(32).max(128);
+
+const registerSchema = z.object({
+  name: z.string().trim().min(2, 'الاسم مطلوب').max(120),
+  country: z.string().trim().toLowerCase().max(5).default('sa'),
+  phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
+  email: z.string().trim().min(5, 'البريد الإلكتروني مطلوب').max(190),
+  password: passwordSchema,
+  persona: personaSchema,
+  bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
+  jobTitle: z.string().trim().max(150).optional(),
+});
+const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
+const verifySchema = pendingSchema.extend({ code: codeSchema });
+const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
+const resetRequestSchema = z.object({ login: loginFieldSchema });
+const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, password: passwordSchema });
+const profileSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    jobTitle: z.string().trim().max(150),
+    company: z.string().trim().max(190),
+    city: z.string().trim().max(120),
+    website: z.string().trim().max(300),
+    bio: z.string().trim().max(600),
+    social: z.string().trim().max(800),
+    password: passwordSchema,
+  })
+  .partial();
+const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
+const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
+
+type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
+
+/** Hub and auth errors answer with their own status and Arabic message; anything else is unexpected. */
+function guard(handler: Handler): Handler {
+  return async (request, reply) => {
+    try {
+      return await handler(request, reply);
+    } catch (error) {
+      if (error instanceof AuthError || error instanceof HubError) {
+        return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
+      }
+      throw error;
+    }
+  };
+}
+
+function parse<T>(schema: z.ZodType<T>, input: unknown, reply: FastifyReply): T | null {
+  const result = schema.safeParse(input);
+  if (result.success) return result.data;
+  const message = result.error.issues[0]?.message;
+  void reply.code(400).send({
+    error: { code: 'invalid', message: message && /[؀-ۿ]/.test(message) ? message : 'البيانات غير مكتملة أو غير صحيحة' },
+  });
+  return null;
+}
+
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode }) => {
+  const limiter = new RateLimiter();
+  const WINDOW = 15 * 60_000;
+
+  const limited = (name: string, limit: number, request: FastifyRequest, reply: FastifyReply): boolean => {
+    if (limiter.hit(`${name}:${request.ip}`, limit, WINDOW)) return false;
+    void reply.code(429).send({ error: { code: 'rate', message: 'محاولات كثيرة، حاول بعد قليل' } });
+    return true;
+  };
+
+  const requireSession = async (request: FastifyRequest, reply: FastifyReply): Promise<{ token: string; session: SessionRecord } | null> => {
+    const header = request.headers.authorization ?? '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    const session = token ? await service.authenticate(token) : null;
+    if (!session) {
+      void reply.code(401).send({ error: { code: 'unauthorized', message: 'سجّل الدخول أولًا' } });
+      return null;
+    }
+    return { token, session };
+  };
+
+  app.get('/api/auth/config', async () => ({
+    countries: COUNTRIES.map((country) => ({
+      code: country.code,
+      name: country.name,
+      dial: country.dial,
+      flag: country.flag,
+      example: country.example,
+      pattern: country.local.source,
+    })),
+    personas: PERSONAS,
+    phonePolicy: PHONE_POLICY_TEXT,
+    emailPolicy: EMAIL_POLICY_TEXT,
+    registrationOpen: service.registrationOpen,
+    adminOnly: service.adminOnly,
+    hubMode,
+    testCode: hubMode === 'mock' ? MOCK_CODE : null,
+  }));
+
+  app.post(
+    '/api/auth/register',
+    guard(async (request, reply) => {
+      if (limited('register', 6, request, reply)) return;
+      const body = parse(registerSchema, request.body, reply);
+      if (!body) return;
+      return service.register(body, request.ip);
+    }),
+  );
+
+  app.post(
+    '/api/auth/resend',
+    guard(async (request, reply) => {
+      if (limited('resend', 6, request, reply)) return;
+      const body = parse(pendingSchema, request.body, reply);
+      if (!body) return;
+      return service.resend(body.pendingToken, request.ip);
+    }),
+  );
+
+  app.post(
+    '/api/auth/verify',
+    guard(async (request, reply) => {
+      if (limited('verify', 12, request, reply)) return;
+      const body = parse(verifySchema, request.body, reply);
+      if (!body) return;
+      return service.verify(body.pendingToken, body.code, request.ip);
+    }),
+  );
+
+  app.post(
+    '/api/auth/login',
+    guard(async (request, reply) => {
+      if (limited('login', 12, request, reply)) return;
+      const body = parse(loginSchema, request.body, reply);
+      if (!body) return;
+      return service.login(body.login, body.password, request.ip);
+    }),
+  );
+
+  app.post(
+    '/api/auth/reset/request',
+    guard(async (request, reply) => {
+      if (limited('reset', 6, request, reply)) return;
+      const body = parse(resetRequestSchema, request.body, reply);
+      if (!body) return;
+      await service.requestReset(body.login, request.ip);
+      return { ok: true };
+    }),
+  );
+
+  app.post(
+    '/api/auth/reset/confirm',
+    guard(async (request, reply) => {
+      if (limited('reset', 6, request, reply)) return;
+      const body = parse(resetConfirmSchema, request.body, reply);
+      if (!body) return;
+      await service.confirmReset(body.login, body.code, body.password, request.ip);
+      return { ok: true };
+    }),
+  );
+
+  app.post(
+    '/api/auth/logout',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      await service.logout(auth.token, auth.session);
+      return { ok: true };
+    }),
+  );
+
+  app.get(
+    '/api/me',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const query = meQuerySchema.safeParse(request.query);
+      const me = await service.me(auth.session, query.success && query.data.fresh === '1');
+      return { me };
+    }),
+  );
+
+  app.patch(
+    '/api/me',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const body = parse(profileSchema, request.body, reply);
+      if (!body) return;
+      const me = await service.updateProfile(auth.session, body);
+      return { me };
+    }),
+  );
+
+  app.delete(
+    '/api/me',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const body = parse(deleteSchema, request.body, reply);
+      if (!body) return;
+      await service.deleteAccount(auth.token, auth.session, body.password);
+      return { ok: true };
+    }),
+  );
+};

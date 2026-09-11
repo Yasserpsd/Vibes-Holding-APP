@@ -2,13 +2,19 @@ import { createHash } from 'node:crypto';
 
 import Fastify, { type FastifyInstance } from 'fastify';
 
+import { authRoutes } from './auth/routes.js';
+import { AuthService } from './auth/service.js';
+import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { contentRoutes } from './content/routes.js';
+import { LiveHubClient } from './hub/client.js';
+import { MockHubClient } from './hub/mock.js';
+import type { HubClient } from './hub/types.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import type { KV } from './store.js';
 
-export type AppDeps = { config: Config; kv: KV };
+export type AppDeps = { config: Config; kv: KV; hub?: HubClient };
 
 /** Length plus a short hash: lets the owner compare the deployed key with the local one without exposing it. */
 function keyFingerprint(key: string | undefined): string | null {
@@ -22,7 +28,7 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
-export async function buildApp({ config, kv }: AppDeps): Promise<{ app: FastifyInstance; projects: ProjectsService }> {
+export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: FastifyInstance; projects: ProjectsService }> {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -37,6 +43,13 @@ export async function buildApp({ config, kv }: AppDeps): Promise<{ app: FastifyI
   });
 
   const projects = new ProjectsService({ kv, config, log: app.log });
+  const hubClient: HubClient =
+    hub ??
+    (config.HUB_MODE === 'live' && config.HUB_SITE_KEY
+      ? new LiveHubClient({ url: config.HUB_URL, siteKey: config.HUB_SITE_KEY, log: app.log })
+      : new MockHubClient());
+  const sessions = new SessionStore(kv, config.SESSION_DAYS);
+  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log });
 
   app.get('/health', async () => ({
     ok: true,
@@ -47,10 +60,18 @@ export async function buildApp({ config, kv }: AppDeps): Promise<{ app: FastifyI
       ...projects.status(),
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.PB_FEED_KEY) } : {}),
     },
+    hub: {
+      mode: hubClient.mode,
+      host: new URL(config.HUB_URL).host,
+      registrationOpen: auth.registrationOpen,
+      adminOnly: auth.adminOnly,
+      ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
+    },
   }));
 
   await app.register(projectsRoutes, { service: projects });
   await app.register(contentRoutes, { kv });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
