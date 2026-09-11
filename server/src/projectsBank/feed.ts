@@ -29,10 +29,21 @@ export async function fetchFeedBody(config: Config, path = ''): Promise<unknown>
     headers: { accept: 'application/json', 'user-agent': 'investors-club-server/0.1' },
     signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`Projects Bank feed responded with HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Projects Bank feed responded with HTTP ${response.status}${await errorDetail(response)}`);
   return response.json();
 }
 
 export async function fetchFeedItems(config: Config): Promise<unknown[]> {
   return extractItems(await fetchFeedBody(config));
+}
+
+/** WordPress error bodies carry a code and a message; both are safe to log (the key is never echoed). */
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { code?: unknown; message?: unknown };
+    const parts = [body.code, body.message].filter((part): part is string => typeof part === 'string' && part !== '');
+    return parts.length > 0 ? ` (${parts.join(': ')})` : '';
+  } catch {
+    return '';
+  }
 }
