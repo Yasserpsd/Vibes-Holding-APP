@@ -43,11 +43,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     predictiveBackGestureEnabled: false,
   },
-  web: {
-    favicon: './assets/favicon.png',
-    bundler: 'metro',
-    output: 'static',
-  },
+  // Mobile only: keeps expo export and eas update from bundling a web build.
+  platforms: ['ios', 'android'],
   plugins: [
     'expo-router',
     'expo-font',
