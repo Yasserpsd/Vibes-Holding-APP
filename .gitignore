@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Environment files (secrets live only in env vars, never in git)
+.env
+.env.*
+!.env.example
+
+# Expo / EAS
+.expo/
+.expo-shared/
+expo-env.d.ts
+dist/
+web-build/
+
+# Native build output
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+/app/android/
+/app/ios/
+
+# Server build output
+/server/dist/
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.tsbuildinfo
