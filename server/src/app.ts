@@ -41,6 +41,7 @@ export async function buildApp({ config, kv }: AppDeps): Promise<{ app: FastifyI
   app.get('/health', async () => ({
     ok: true,
     env: config.APP_ENV,
+    storage: config.DATABASE_URL ? 'postgres' : 'memory',
     time: new Date().toISOString(),
     projectsBank: {
       ...projects.status(),
