@@ -12,11 +12,15 @@ import { contentRoutes } from './content/routes.js';
 import { LiveHubClient } from './hub/client.js';
 import { MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
+import { KeywordClassifier, type Classifier } from './news/classify.js';
+import { OpenAIClassifier } from './news/openai.js';
+import { newsRoutes } from './news/routes.js';
+import { NewsService } from './news/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import type { KV } from './store.js';
 
-export type AppDeps = { config: Config; kv: KV; hub?: HubClient };
+export type AppDeps = { config: Config; kv: KV; hub?: HubClient; classifier?: Classifier; fetchImpl?: typeof fetch };
 
 /** Length plus a short hash: lets the owner compare the deployed key with the local one without exposing it. */
 function keyFingerprint(key: string | undefined): string | null {
@@ -30,7 +34,7 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
-export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: FastifyInstance; projects: ProjectsService }> {
+export async function buildApp({ config, kv, hub, classifier, fetchImpl }: AppDeps): Promise<{ app: FastifyInstance; projects: ProjectsService; news: NewsService }> {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -52,7 +56,14 @@ export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: Fas
       : new MockHubClient());
   const sessions = new SessionStore(kv, config.SESSION_DAYS);
   const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log });
-  const advisor = new AdvisorService({ hub: hubClient, projects, log: app.log });
+  // News: OpenAI labels the items when a key is set; otherwise keywords. Neither writes a word of news.
+  const newsClassifier: Classifier =
+    classifier ??
+    (config.OPENAI_API_KEY
+      ? new OpenAIClassifier({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log })
+      : new KeywordClassifier());
+  const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl });
+  const advisor = new AdvisorService({ hub: hubClient, projects, news, log: app.log });
 
   app.get('/health', async () => ({
     ok: true,
@@ -70,12 +81,14 @@ export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: Fas
       adminOnly: auth.adminOnly,
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },
+    news: news.status(),
   }));
 
   await app.register(projectsRoutes, { service: projects });
   await app.register(contentRoutes, { kv });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
+  await app.register(newsRoutes, { service: news, auth });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -92,5 +105,5 @@ export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: Fas
     });
   });
 
-  return { app, projects };
+  return { app, projects, news };
 }

@@ -8,7 +8,10 @@ import type { AdvisorService } from './service.js';
 
 export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService };
 
-const contextSchema = z.object({ type: z.literal('project'), id: z.number().int().positive() });
+const contextSchema = z.union([
+  z.object({ type: z.literal('project'), id: z.number().int().positive() }),
+  z.object({ type: z.literal('news'), id: z.string().regex(/^[a-f0-9]{16}$/) }),
+]);
 const messageSchema = z.object({
   text: z.string().trim().min(1, 'اكتب رسالتك أولًا').max(4000, 'الرسالة طويلة، الحد 4000 حرف'),
   context: contextSchema.nullish(),

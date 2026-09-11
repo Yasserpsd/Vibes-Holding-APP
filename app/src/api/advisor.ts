@@ -26,7 +26,7 @@ export type AdvisorMessage = {
 export type AdvisorGateType = 'membership' | 'daily' | 'rate' | 'site_cap' | 'contact' | 'other';
 export type AdvisorGate = { type: AdvisorGateType; text: string; membership: boolean; expired: boolean };
 export type AdvisorProfile = { botName: string; welcome: string; suggestions: string[] };
-export type AdvisorContext = { type: 'project'; id: number };
+export type AdvisorContext = { type: 'project'; id: number } | { type: 'news'; id: string };
 
 export type HistoryResult = { messages: AdvisorMessage[]; profile: AdvisorProfile; me: Me | null };
 export type SendResult = { messageId: number | null; waiting: boolean; human: boolean; gate: AdvisorGate | null; me: Me | null };
