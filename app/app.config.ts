@@ -10,6 +10,8 @@ const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
 const BASE_APP_ID = 'com.vcmem.investorsclub';
 const APP_ID = IS_PRODUCTION ? BASE_APP_ID : `${BASE_APP_ID}.preview`;
 const BRAND_BLACK = '#0B0B0B';
+// Public value: the test API. Production gets its URL from EXPO_PUBLIC_API_URL only.
+const TEST_API_URL = 'https://vibes-holding-app-production.up.railway.app';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -62,8 +64,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: { typedRoutes: true },
   extra: {
     appEnv: APP_ENV,
-    // Public value only. Filled in when the M2 server exists (EXPO_PUBLIC_API_URL per EAS profile).
-    apiBaseUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+    // Public value only. EXPO_PUBLIC_API_URL (EAS environment or app/.env) wins; test builds and
+    // updates fall back to the test server so a publish without the variable still works.
+    apiBaseUrl: process.env.EXPO_PUBLIC_API_URL ?? (IS_PRODUCTION ? '' : TEST_API_URL),
     supportsRTL: true,
     forcesRTL: true,
     eas: { projectId: EAS_PROJECT_ID },

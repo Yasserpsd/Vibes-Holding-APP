@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
@@ -17,10 +17,23 @@ type Props = {
 };
 
 /** Asks for the account password before a sensitive action (account deletion). */
-export function PasswordPrompt({ visible, title, message, confirmLabel, busy = false, error, onConfirm, onCancel }: Props) {
-  const [password, setPassword] = useState('');
+export function PasswordPrompt({ visible, ...sheet }: Props) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={sheet.onCancel}>
+      {/* The sheet is mounted only while the modal shows, so every opening starts with an empty field. */}
+      <PromptSheet {...sheet} />
+    </Modal>
+  );
+}
+
+function PromptSheet({ title, message, confirmLabel, busy = false, error, onConfirm, onCancel }: Omit<Props, 'visible'>) {
+  const [password, setPassword] = useState('');
+  const confirm = () => {
+    if (!busy) onConfirm(password);
+  };
+  return (
+    // The sheet moves above the keyboard so the confirm button stays reachable while typing.
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Pressable style={styles.backdrop} onPress={busy ? undefined : onCancel}>
         <Pressable style={styles.sheet} onPress={() => undefined}>
           <Text style={styles.title}>{title}</Text>
@@ -30,22 +43,26 @@ export function PasswordPrompt({ visible, title, message, confirmLabel, busy = f
             latin
             secureTextEntry
             autoCapitalize="none"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={confirm}
             value={password}
             onChangeText={setPassword}
             error={error ?? null}
             editable={!busy}
           />
           <View style={styles.actions}>
-            <AppButton label={busy ? 'جارٍ التنفيذ…' : confirmLabel} onPress={() => (busy ? undefined : onConfirm(password))} style={styles.danger} />
+            <AppButton label={busy ? 'جارٍ التنفيذ…' : confirmLabel} onPress={confirm} style={styles.danger} />
             <AppButton label="إلغاء" variant="outline" onPress={onCancel} />
           </View>
         </Pressable>
       </Pressable>
-    </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: spacing.lg },
   sheet: {
     gap: spacing.md,

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { Membership, MembershipContent } from '@/api/auth';
+import { formatArabicDate } from '@/lib/format';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -42,7 +43,7 @@ export function MembershipStatusCard({ membership, texts, activationNote }: Prop
       {membership?.status === 'active' ? (
         <View style={styles.meta}>
           {membership.daysLeft !== null ? <Text style={styles.metaText}>{`المتبقي ${membership.daysLeft} يومًا`}</Text> : null}
-          {membership.endDate ? <Text style={styles.metaText}>{`تنتهي في ${membership.endDate}`}</Text> : null}
+          {membership.endDate ? <Text style={styles.metaText}>{`تنتهي في ${formatArabicDate(membership.endDate)}`}</Text> : null}
           {membership.aiDailyLeft !== null ? (
             <Text style={styles.metaText}>{`رصيد المستشار اليوم: ${membership.aiDailyLeft} من ${membership.aiDailyLimit}`}</Text>
           ) : null}
