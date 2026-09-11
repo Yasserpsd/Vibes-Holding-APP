@@ -1,10 +1,15 @@
+import { requireOptionalNativeModule } from 'expo';
+
 type SecureStoreModule = typeof import('expo-secure-store');
 
 const TOKEN_KEY = 'investorsclub.session';
 
 // expo-secure-store is native. Binaries built before it was added (the M1 APK) do not contain
-// it, so it is loaded lazily; without it the session lives in memory for the current launch only.
+// it. The native module registry is checked first: requiring the package when the module is
+// missing is reported by React Native as a fatal error before any try/catch can run, which
+// closes the app. Without it the session lives in memory for the current launch only.
 function loadSecureStore(): SecureStoreModule | null {
+  if (!requireOptionalNativeModule('ExpoSecureStore')) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const module = require('expo-secure-store') as SecureStoreModule;
