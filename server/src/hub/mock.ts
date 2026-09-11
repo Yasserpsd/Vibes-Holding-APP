@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { EMAIL_POLICY_TEXT, normEmail, normPhone, phoneIntl, phoneLocal } from './phone.js';
+import { MockChat } from './mockChat.js';
 import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, type HubResponse } from './types.js';
 
 /**
@@ -51,6 +52,12 @@ export class MockHubClient implements HubClient {
   private nextId = 1;
   private readonly contacts = new Map<number, MockContact>();
   private readonly visitors = new Map<string, number>();
+  private readonly chat: MockChat;
+
+  /** options.replyDelayMs: how long a canned chat reply stays hidden (the real workflow takes a few seconds). */
+  constructor(options: { replyDelayMs?: number } = {}) {
+    this.chat = new MockChat(options.replyDelayMs ?? 1500);
+  }
 
   async call(op: HubOp, body: HubBody): Promise<HubResponse> {
     switch (op) {
@@ -82,6 +89,21 @@ export class MockHubClient implements HubClient {
         return this.resetConfirm(body);
       case 'delete_account':
         return this.deleteAccount(body);
+      case 'config':
+        return this.chat.config();
+      case 'message': {
+        const contact = this.byUuid(body);
+        if (!contact || !contact.passHash) throw new HubError('bad_uuid', 'معرّف الزائر غير صحيح', 400);
+        return this.chat.message(contact.id, this.publicContact(contact), body);
+      }
+      case 'poll': {
+        const contact = this.byUuid(body);
+        return this.chat.poll(contact?.id ?? null, contact ? this.publicContact(contact) : null, body);
+      }
+      case 'history': {
+        const contact = this.byUuid(body);
+        return this.chat.history(contact?.id ?? null, contact ? this.publicContact(contact) : null);
+      }
       default:
         throw new HubError('not_found', 'عملية غير معروفة', 404);
     }
@@ -252,6 +274,7 @@ export class MockHubClient implements HubClient {
       if (id === contact.id) this.visitors.delete(uuid);
     }
     this.contacts.delete(contact.id);
+    this.chat.forget(contact.id);
     return { ok: true };
   }
 

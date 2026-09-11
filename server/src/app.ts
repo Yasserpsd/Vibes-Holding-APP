@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import Fastify, { type FastifyInstance } from 'fastify';
 
+import { advisorRoutes } from './advisor/routes.js';
+import { AdvisorService } from './advisor/service.js';
 import { authRoutes } from './auth/routes.js';
 import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
@@ -50,6 +52,7 @@ export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: Fas
       : new MockHubClient());
   const sessions = new SessionStore(kv, config.SESSION_DAYS);
   const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log });
+  const advisor = new AdvisorService({ hub: hubClient, projects, log: app.log });
 
   app.get('/health', async () => ({
     ok: true,
@@ -72,6 +75,7 @@ export async function buildApp({ config, kv, hub }: AppDeps): Promise<{ app: Fas
   await app.register(projectsRoutes, { service: projects });
   await app.register(contentRoutes, { kv });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
+  await app.register(advisorRoutes, { service: advisor, auth });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });

@@ -4,10 +4,9 @@ import { z } from 'zod';
 import type { HubMode } from '../config.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, PHONE_POLICY_TEXT } from '../hub/phone.js';
-import { HubError } from '../hub/types.js';
+import { guard, parse, sessionGuard } from './guard.js';
 import { RateLimiter } from './rateLimit.js';
-import { AuthError, PERSONAS, type AuthService } from './service.js';
-import type { SessionRecord } from './sessions.js';
+import { PERSONAS, type AuthService } from './service.js';
 
 export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode };
 
@@ -47,32 +46,6 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
-
-/** Hub and auth errors answer with their own status and Arabic message; anything else is unexpected. */
-function guard(handler: Handler): Handler {
-  return async (request, reply) => {
-    try {
-      return await handler(request, reply);
-    } catch (error) {
-      if (error instanceof AuthError || error instanceof HubError) {
-        return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
-      }
-      throw error;
-    }
-  };
-}
-
-function parse<T>(schema: z.ZodType<T>, input: unknown, reply: FastifyReply): T | null {
-  const result = schema.safeParse(input);
-  if (result.success) return result.data;
-  const message = result.error.issues[0]?.message;
-  void reply.code(400).send({
-    error: { code: 'invalid', message: message && /[؀-ۿ]/.test(message) ? message : 'البيانات غير مكتملة أو غير صحيحة' },
-  });
-  return null;
-}
-
 export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
@@ -82,17 +55,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     void reply.code(429).send({ error: { code: 'rate', message: 'محاولات كثيرة، حاول بعد قليل' } });
     return true;
   };
-
-  const requireSession = async (request: FastifyRequest, reply: FastifyReply): Promise<{ token: string; session: SessionRecord } | null> => {
-    const header = request.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-    const session = token ? await service.authenticate(token) : null;
-    if (!session) {
-      void reply.code(401).send({ error: { code: 'unauthorized', message: 'سجّل الدخول أولًا' } });
-      return null;
-    }
-    return { token, session };
-  };
+  const requireSession = sessionGuard(service);
 
   app.get('/api/auth/config', async () => ({
     countries: COUNTRIES.map((country) => ({
