@@ -29,17 +29,19 @@ const project = (overrides: Partial<PublicProject>): PublicProject => ({
   isGolden: false,
   featuredOrder: null,
   goldenPartnerUrl: null,
+  hasPitchDeck: false,
+  contactRule: null,
   viewsCount: 0,
-  publishedAt: null,
+  modifiedAt: null,
   ...overrides,
 });
 
 const snapshot: FeedSnapshot = {
   fetchedAt: '2026-09-11T00:00:00.000Z',
   projects: [
-    project({ id: 1, title: 'تطبيق توصيل', sector: { slug: 'tech', name: 'تقنية' }, viewsCount: 5, publishedAt: '2026-01-01T00:00:00.000Z' }),
-    project({ id: 2, title: 'مطعم', titleEn: 'Restaurant', sector: { slug: 'food', name: 'أغذية' }, viewsCount: 50, publishedAt: '2026-02-01T00:00:00.000Z' }),
-    project({ id: 3, title: 'مصنع', isGolden: true, featuredOrder: 1, viewsCount: 9, publishedAt: '2025-12-01T00:00:00.000Z' }),
+    project({ id: 1, title: 'تطبيق توصيل', sector: { slug: 'tech', name: 'تقنية' }, viewsCount: 5, modifiedAt: '2026-01-01T00:00:00.000Z' }),
+    project({ id: 2, title: 'مطعم', titleEn: 'Restaurant', sector: { slug: 'food', name: 'أغذية' }, viewsCount: 50, modifiedAt: '2026-02-01T00:00:00.000Z' }),
+    project({ id: 3, title: 'مصنع', isGolden: true, featuredOrder: 1, viewsCount: 9, modifiedAt: '2025-12-01T00:00:00.000Z' }),
   ],
 };
 

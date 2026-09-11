@@ -74,3 +74,51 @@ test('converts html to text', () => {
   assert.equal(htmlToText('<ul><li>أ</li><li>ب</li></ul>'), '• أ\n• ب');
   assert.equal(htmlToText('a&nbsp;b &#1575; &#x628;'), 'a b ا ب');
 });
+
+test('maps the live feed shape (projects-directory-pro v38)', () => {
+  const project = toPublicProject({
+    id: 7324,
+    number: 243,
+    title: 'شركة المجتمع الافتراضي',
+    title_en: 'VC',
+    url: 'https://vibesholding.com/projects/vc/',
+    image: 'https://vibesholding.com/wp-content/uploads/cover.webp',
+    sector: 'تقنية المعلومات',
+    project_stage: 'مرحلة تحقيق الدخل ( Cash Flow )',
+    golden: true,
+    partner_url: 'http://vcmem.com/offer',
+    contact_rule: 'golden_direct',
+    modified: '2026-09-02T09:50:44+00:00',
+    meta: {
+      project_number: '243',
+      company_name: 'شركة المجتمع الافتراضي',
+      founder_name: 'سالم',
+      project_details: 'نص التفاصيل',
+      excerpt: '',
+      is_featured: '1',
+      golden_partner_url: 'http://vcmem.com/offer',
+      has_pitch_deck: '1',
+      views_count: '436',
+    },
+  });
+  assert.ok(project);
+  assert.equal(project.number, '243');
+  assert.equal(project.titleEn, 'VC');
+  assert.equal(project.image, 'https://vibesholding.com/wp-content/uploads/cover.webp');
+  assert.deepEqual(project.sector, { slug: 'تقنية-المعلومات', name: 'تقنية المعلومات' });
+  assert.equal(project.stage?.slug, 'مرحلة-تحقيق-الدخل-cash-flow');
+  assert.equal(project.isGolden, true);
+  assert.equal(project.goldenPartnerUrl, 'http://vcmem.com/offer');
+  assert.equal(project.hasPitchDeck, true);
+  assert.equal(project.contactRule, 'golden_direct');
+  assert.equal(project.modifiedAt, '2026-09-02T09:50:44.000Z');
+  assert.equal(project.excerpt, 'نص التفاصيل');
+  assert.equal(project.viewsCount, 436);
+  assert.equal(JSON.stringify(project).includes('/projects/vc/'), false, 'web page url must not be exposed');
+});
+
+test('treats an empty stage as no stage', () => {
+  const project = toPublicProject({ id: 1, title: 'x', project_stage: '', sector: 'اخري' });
+  assert.equal(project?.stage, null);
+  assert.equal(project?.sector?.slug, 'اخري');
+});

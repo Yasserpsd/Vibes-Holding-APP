@@ -74,7 +74,7 @@ function asUrlList(value: unknown): string[] {
 }
 
 function slugify(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, '-');
+  return name.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
 }
 
 function asTerm(value: unknown): Term | null {
@@ -144,10 +144,12 @@ export function toPublicProject(raw: unknown): PublicProject | null {
     gallery,
     sector: asTerm(raw.sector ?? raw.sectors ?? readField(raw, 'sector')),
     stage: asTerm(raw.project_stage ?? raw.stage ?? raw.stages ?? readField(raw, 'project_stage')),
-    isGolden: asBoolean(readField(raw, 'is_featured')),
+    isGolden: asBoolean(raw.golden ?? readField(raw, 'is_featured')),
     featuredOrder: asNumber(readField(raw, 'featured_order')),
-    goldenPartnerUrl: asUrl(readField(raw, 'golden_partner_url')),
+    goldenPartnerUrl: asUrl(raw.partner_url ?? readField(raw, 'golden_partner_url')),
+    hasPitchDeck: asBoolean(readField(raw, 'has_pitch_deck')),
+    contactRule: asString(raw.contact_rule),
     viewsCount: asNumber(readField(raw, 'views_count')) ?? 0,
-    publishedAt: asIsoDate(raw.date_gmt ?? raw.date ?? raw.post_date ?? raw.published_at ?? raw.created_at),
+    modifiedAt: asIsoDate(raw.modified ?? raw.modified_gmt ?? raw.date_gmt ?? raw.date),
   };
 }

@@ -25,8 +25,10 @@ export type PublicProject = {
   isGolden: boolean;
   featuredOrder: number | null;
   goldenPartnerUrl: string | null;
+  hasPitchDeck: boolean;
+  contactRule: string | null;
   viewsCount: number;
-  publishedAt: string | null;
+  modifiedAt: string | null;
 };
 
 export const PROJECT_SORTS = ['latest', 'views', 'discover', 'golden'] as const;

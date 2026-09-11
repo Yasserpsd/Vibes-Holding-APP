@@ -166,7 +166,7 @@ function sortOptions(map: Map<string, FilterOption>): FilterOption[] {
 }
 
 function byLatest(a: PublicProject, b: PublicProject): number {
-  return (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') || b.id - a.id;
+  return (b.modifiedAt ?? '').localeCompare(a.modifiedAt ?? '') || b.id - a.id;
 }
 
 function sortProjects(projects: PublicProject[], sort: ProjectsSort): PublicProject[] {
