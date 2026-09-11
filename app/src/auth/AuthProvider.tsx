@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('guest');
     await saveToken(null);
     queryClient.removeQueries({ queryKey: ['me'] });
+    // Interests belong to the account: the next member on this device must not inherit them.
+    queryClient.removeQueries({ queryKey: ['news', 'prefs'] });
   }, [queryClient]);
 
   useEffect(() => {

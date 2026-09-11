@@ -67,6 +67,9 @@ export default function RootLayout() {
           <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
           <Stack.Screen name="membership" options={{ ...detailHeader, title: 'العضوية' }} />
           <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: 'الملف الشخصي' }} />
+          <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: 'الخبر' }} />
+          <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: 'قرارات وأنظمة المملكة' }} />
+          <Stack.Screen name="news/interests" options={{ ...detailHeader, title: 'اهتماماتي' }} />
           <Stack.Screen name="auth/login" options={{ ...detailHeader, title: 'تسجيل الدخول' }} />
           <Stack.Screen name="auth/register" options={{ ...detailHeader, title: 'إنشاء حساب' }} />
           <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: 'رمز التفعيل' }} />

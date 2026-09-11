@@ -14,9 +14,15 @@ import { colors, spacing } from '@/theme/tokens';
 type ContextParams = { ctxType?: string; ctxId?: string; ctxTitle?: string; ctxNonce?: string };
 
 function incomingContext(params: ContextParams): (ChatContext & { key: string }) | null {
+  const key = `${params.ctxType ?? ''}:${params.ctxId ?? ''}:${params.ctxNonce ?? ''}`;
+  if (params.ctxType === 'news') {
+    const id = params.ctxId ?? '';
+    if (!/^[a-f0-9]{16}$/.test(id)) return null;
+    return { key, type: 'news', id, title: params.ctxTitle?.trim() || 'خبر' };
+  }
   const id = Number(params.ctxId);
   if (params.ctxType !== 'project' || !Number.isInteger(id) || id <= 0) return null;
-  return { key: `${id}:${params.ctxNonce ?? ''}`, id, title: params.ctxTitle?.trim() || `مشروع ${id}` };
+  return { key, type: 'project', id, title: params.ctxTitle?.trim() || `مشروع ${id}` };
 }
 
 export default function AdvisorScreen() {
@@ -30,7 +36,7 @@ export default function AdvisorScreen() {
   const incoming = incomingContext(params);
   if (incoming && incoming.key !== handledKey) {
     setHandledKey(incoming.key);
-    setContext({ id: incoming.id, title: incoming.title });
+    setContext(incoming.type === 'news' ? { type: 'news', id: incoming.id, title: incoming.title } : { type: 'project', id: incoming.id, title: incoming.title });
   }
 
   if (status === 'loading') {

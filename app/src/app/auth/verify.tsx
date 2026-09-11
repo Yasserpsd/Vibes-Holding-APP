@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
+import { newsApi } from '@/api/news';
 import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -11,12 +13,13 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { fonts } from '@/theme/tokens';
 
-type Params = { pendingToken?: string; email?: string; text?: string };
+type Params = { pendingToken?: string; email?: string; text?: string; interests?: string };
 
 export default function VerifyScreen() {
-  const { pendingToken, email, text } = useLocalSearchParams<Params>();
+  const { pendingToken, email, text, interests } = useLocalSearchParams<Params>();
   const router = useRouter();
   const { signIn } = useAuth();
+  const queryClient = useQueryClient();
   const { data: config } = useAuthConfig();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,12 @@ export default function VerifyScreen() {
     setError(null);
     try {
       const result = await authApi.verify(pendingToken, code);
+      // Interests chosen at signup are saved before the session is announced, so mounted screens
+      // (the news tab) load them on their first request; a failure here must not block the account.
+      const chosen = (interests ?? '').split(',').filter(Boolean);
+      if (chosen.length > 0) await newsApi.savePrefs(chosen, result.token).catch(() => undefined);
       await signIn(result.token, result.me);
+      void queryClient.invalidateQueries({ queryKey: ['news'] });
       finish();
     } catch (cause) {
       setError(errorMessage(cause));

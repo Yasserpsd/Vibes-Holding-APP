@@ -19,7 +19,8 @@ import { useAdvisorChat } from './useAdvisorChat';
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
 const IOS_TAB_BAR_HEIGHT = 49;
 
-export type ChatContext = { id: number; title: string };
+/** Screen context sent with each message until dismissed: a project or a news item. */
+export type ChatContext = { type: 'project'; id: number; title: string } | { type: 'news'; id: string; title: string };
 type Props = { context: ChatContext | null; onClearContext: () => void };
 type Item = { message: AdvisorMessage; dayLabel: string | null };
 
@@ -69,7 +70,7 @@ export function AdvisorChat({ context, onClearContext }: Props) {
   const submit = async (text: string) => {
     if (!text.trim() || chat.sending) return;
     setDraft('');
-    const accepted = await chat.send(text, context ? { type: 'project', id: context.id } : null);
+    const accepted = await chat.send(text, context ? (context.type === 'project' ? { type: 'project', id: context.id } : { type: 'news', id: context.id }) : null);
     if (!accepted) setDraft((current) => current || text);
   };
 
@@ -140,7 +141,7 @@ export function AdvisorChat({ context, onClearContext }: Props) {
         ) : null}
         {context ? (
           <View style={styles.context}>
-            <Ionicons name="briefcase-outline" size={16} color={colors.gold} />
+            <Ionicons name={context.type === 'news' ? 'newspaper-outline' : 'briefcase-outline'} size={16} color={colors.gold} />
             <Text style={styles.contextText} numberOfLines={1}>{`الموضوع: ${context.title}`}</Text>
             <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel="إزالة الموضوع">
               <Ionicons name="close-circle" size={18} color={colors.textMuted} />

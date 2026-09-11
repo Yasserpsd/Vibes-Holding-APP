@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
+import { useNewsTopics } from '@/api/news';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -23,20 +24,25 @@ type Form = {
   persona: Persona | '';
   bio: string;
   jobTitle: string;
+  /** News interests (optional): saved with the account right after the code is verified. */
+  interests: string[];
 };
 
-const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '' };
+const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', interests: [] };
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
+  const topics = useNewsTopics();
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
-  const set = (key: keyof Form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: Exclude<keyof Form, 'interests'>) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const toggleInterest = (key: string) =>
+    setForm((current) => ({ ...current, interests: current.interests.includes(key) ? current.interests.filter((item) => item !== key) : [...current.interests, key] }));
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
@@ -65,7 +71,10 @@ export default function RegisterScreen() {
         bio: form.bio.trim(),
         jobTitle: form.jobTitle.trim() || undefined,
       });
-      router.push({ pathname: '/auth/verify', params: { pendingToken: result.pendingToken, email: result.email, text: result.text } });
+      router.push({
+        pathname: '/auth/verify',
+        params: { pendingToken: result.pendingToken, email: result.email, text: result.text, interests: form.interests.join(',') },
+      });
     } catch (cause) {
       setSubmitError(errorMessage(cause));
     } finally {
@@ -157,6 +166,16 @@ export default function RegisterScreen() {
       </View>
       <FormField label="نبذة مختصرة عنك" multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder="مجالك، خبرتك، أو ما تبحث عنه في النادي" />
       <FormField label="المسمى الوظيفي (اختياري)" value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+      {topics.data && topics.data.topics.length > 0 ? (
+        <View style={styles.group}>
+          <Text style={styles.label}>اهتماماتك في الأخبار (اختياري)</Text>
+          <View style={styles.chips}>
+            {topics.data.topics.map((topic) => (
+              <Chip key={topic.key} label={topic.label} selected={form.interests.includes(topic.key)} onPress={() => toggleInterest(topic.key)} />
+            ))}
+          </View>
+        </View>
+      ) : null}
       {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
       <AppButton label={busy ? 'جارٍ إنشاء الحساب…' : 'إنشاء الحساب'} icon="person-add-outline" onPress={() => void submit()} />
       <Text style={styles.footnote}>بعد إنشاء الحساب يصلك رمز تفعيل على بريدك الإلكتروني.</Text>

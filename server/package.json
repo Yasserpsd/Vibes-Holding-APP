@@ -17,6 +17,7 @@
     "feed:inspect": "tsx src/cli/inspect-feed.ts"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.11.1",
     "fastify": "^5.12.4",
     "pg": "^8.23.0",
     "zod": "^4.6.2"

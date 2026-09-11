@@ -17,6 +17,14 @@ const envSchema = z.object({
   // In the test environment registrations on the live hub stay closed unless the owner opens them.
   HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('0'),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),
+  // News engine: 0 disables polling (tests); items older than NEWS_MAX_AGE_DAYS are dropped.
+  NEWS_REFRESH_MINUTES: z.coerce.number().nonnegative().default(20),
+  NEWS_MAX_AGE_DAYS: z.coerce.number().positive().default(10),
+  // Cap on freshly fetched items per run: bounds page fetches and AI calls.
+  NEWS_MAX_NEW_PER_RUN: z.coerce.number().int().positive().default(200),
+  // Optional. Without a key the keyword classifier labels the news (classification only, never writing).
+  OPENAI_API_KEY: z.string().min(20).optional(),
+  OPENAI_MODEL: z.string().min(1).default('gpt-4.1-mini'),
 });
 
 type Env = z.infer<typeof envSchema>;

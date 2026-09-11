@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 type Params = Record<string, string | number | boolean | undefined | null>;
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type RequestOptions = { params?: Params; body?: unknown; token?: string | null };
 
 // The auth provider registers the current session token and a handler for rejected sessions.

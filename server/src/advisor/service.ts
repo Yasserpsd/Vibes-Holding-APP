@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { toMe, type Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import type { HubClient, HubContact } from '../hub/types.js';
+import type { NewsService } from '../news/service.js';
 import type { ProjectsService } from '../projectsBank/service.js';
 import { BlockList, blockListFromConfig, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
 
@@ -13,14 +14,14 @@ const DEFAULT_WELCOME = 'حياك الله في نادي المستثمرين. �
 /** Quick-menu entries that invite a web payment are not offered in the app. */
 const PAYMENT_TALK = /ادفع|دفع|اشترك/;
 
-export type AdvisorContext = { type: 'project'; id: number };
+export type AdvisorContext = { type: 'project'; id: number } | { type: 'news'; id: string };
 export type AdvisorProfile = { botName: string; welcome: string; suggestions: string[] };
 export type HistoryResult = { messages: AdvisorMessage[]; profile: AdvisorProfile; me: Me | null };
 export type SendResult = { messageId: number | null; waiting: boolean; human: boolean; gate: AdvisorGate | null; me: Me | null };
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 type Settings = AdvisorProfile & { block: BlockList };
-type Deps = { hub: HubClient; projects: ProjectsService; log: FastifyBaseLogger };
+type Deps = { hub: HubClient; projects: ProjectsService; news: NewsService; log: FastifyBaseLogger };
 
 const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const meOf = (contact: HubContact | null | undefined): Me | null => (contact && contact.has_account ? toMe(contact) : null);
@@ -75,8 +76,12 @@ export class AdvisorService {
     };
   }
 
-  /** Screen context sent with a message («اسأل المستشار»): the project's public page, as the web widget does on a page. */
+  /** Screen context sent with a message («اسأل المستشار»): the project's public page or the news article, as the web widget does on a page. */
   private pageOf(context: AdvisorContext | null): { url: string; title: string } {
+    if (context?.type === 'news') {
+      const page = this.deps.news.pageOf(context.id);
+      return page ? { url: page.url, title: page.title.slice(0, 200) } : { url: '', title: '' };
+    }
     const project = context ? this.deps.projects.get(context.id) : null;
     if (!context || !project) return { url: '', title: '' };
     const number = project.number ? ` (مشروع رقم ${project.number})` : '';
