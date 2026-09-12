@@ -64,6 +64,18 @@ const SAUDI = pattern(['السعودية', 'سعودي', 'المملكة', 'ال
 /** Another country's decision reported by a Saudi outlet is not a Saudi decision. */
 const FOREIGN = pattern(['الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان', 'سلطنة', 'مصر', 'الأردن', 'العراق', 'سوريا', 'لبنان', 'تركيا', 'إيران', 'أمريكا', 'أمريكي', 'الولايات المتحدة', 'أوروبا', 'أوروبي', 'بريطانيا', 'بريطاني', 'فرنسا', 'ألمانيا', 'الصين', 'الهند', 'اليابان', 'روسيا', 'الفيدرالي', 'uae', 'emirates', 'kuwait', 'qatar', 'bahrain', 'oman', 'egypt', 'jordan', 'iraq', 'turkey', 'iran', 'europe', 'u.s.', 'federal reserve', 'china', 'india', 'japan', 'russia']);
 
+/**
+ * Applied to every classifier's answer: the fixed decisions section never carries sports, protocol,
+ * condolences, condemnations or another country's decisions, whatever the model said.
+ */
+export function decisionGuard(item: ClassifyInput, topics: TopicKey[]): boolean {
+  if (topics.includes('sports') || SPORTS.test(item.title)) return false;
+  if (NOISE.test(item.title) && !BUSINESS.test(item.title)) return false;
+  const text = `${item.title} ${item.snippet ?? ''}`;
+  const saudi = SAUDI.test(text);
+  return saudi || (item.tier !== 'global' && !FOREIGN.test(text));
+}
+
 function clamp(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }

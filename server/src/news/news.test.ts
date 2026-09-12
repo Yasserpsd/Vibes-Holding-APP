@@ -5,7 +5,7 @@ import { buildApp } from '../app.js';
 import { loadConfig } from '../config.js';
 import { MockHubClient } from '../hub/mock.js';
 import { MemoryKV } from '../store.js';
-import { classifyByKeywords } from './classify.js';
+import { classifyByKeywords, decisionGuard } from './classify.js';
 import { findDuplicate, similarity, titleTokens } from './dedupe.js';
 import { extractMeta } from './page.js';
 import { canonicalUrl, parseFeed } from './rss.js';
@@ -90,6 +90,16 @@ test('keyword classifier flags Saudi decisions, hides sports without money and o
   assert.ok(weather.relevance < 30);
   const foreign = classifyByKeywords({ id: '5', title: 'الإمارات تقر نظام ضريبة جديد', snippet: null, source: 'العربية', tier: 'saudi', lang: 'ar', hint: null });
   assert.equal(foreign.decision, false);
+});
+
+test('the decision guard drops statements, sports and foreign decisions whatever the model said', () => {
+  const input = (title: string, tier: 'official' | 'saudi' | 'global' = 'official') => ({ id: 'x', title, snippet: null, source: 'واس', tier, lang: 'ar' as const, hint: null });
+  assert.equal(decisionGuard(input('المملكة تدين بأشد العبارات الاستهداف الذي تعرض له خط أنابيب'), []), false);
+  assert.equal(decisionGuard(input('جدة تستضيف منافسات كأس الخليج لكرة القدم'), ['sports']), false);
+  assert.equal(decisionGuard(input('«المركزي» الروسي يبقي الفائدة عند 14 %', 'saudi'), ['finance']), false);
+  assert.equal(decisionGuard(input('الديوان الملكي: وفاة صاحب السمو الملكي الأمير'), []), false);
+  assert.equal(decisionGuard(input('وزارة السياحة تعلن تحديث أربع لوائح تنظيمية'), ['tourism']), true);
+  assert.equal(decisionGuard(input('Saudi Arabia approves new investment law', 'global'), ['economy']), true);
 });
 
 test('finds the same story across outlets', () => {

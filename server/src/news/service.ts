@@ -4,7 +4,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import type { KV } from '../store.js';
-import { MIN_RELEVANCE, type Classifier, type ClassifyInput } from './classify.js';
+import { MIN_RELEVANCE, decisionGuard, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
 import { fetchArticle, type PageMeta } from './page.js';
 import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
@@ -231,10 +231,12 @@ export class NewsService {
     const labels = await this.deps.classifier.classify(inputs);
     return items.map((item, index) => {
       const label = labels[index];
-      if (!label) return { ...item, hidden: true };
+      const input = inputs[index];
+      if (!label || !input) return { ...item, hidden: true };
+      const decision = label.decision && decisionGuard(input, label.topics);
       const sportsOnly = label.topics.includes('sports') && !label.businessAngle;
-      const offTopic = !label.decision && label.relevance < MIN_RELEVANCE;
-      return { ...item, ...label, hidden: sportsOnly || offTopic };
+      const offTopic = !decision && label.relevance < MIN_RELEVANCE;
+      return { ...item, ...label, decision, hidden: sportsOnly || offTopic };
     });
   }
 
