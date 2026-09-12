@@ -12,10 +12,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AuthProvider } from '@/auth/AuthProvider';
+import { PushRegistrar } from '@/components/PushRegistrar';
 import { ensureRTL } from '@/i18n/rtl';
+import { installNotificationHandler } from '@/lib/notifications';
 import { colors, fonts } from '@/theme/tokens';
 
 ensureRTL();
+installNotificationHandler();
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
@@ -55,6 +58,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PushRegistrar />
         <StatusBar style="light" />
         <Stack
           screenOptions={{

@@ -3,7 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { authApi, type Me } from '@/api/auth';
 import { ApiError, setAuthToken, setUnauthorizedHandler } from '@/api/client';
+import { pushApi } from '@/api/push';
 import { loadToken, saveToken } from '@/auth/storage';
+import { currentPushToken } from '@/lib/notifications';
+import { resetPurchases } from '@/lib/purchases';
 
 export type AuthStatus = 'loading' | 'guest' | 'signedIn';
 
@@ -31,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearLocal = useCallback(async () => {
     tokenRef.current = null;
     setAuthToken(null);
+    // The store identity belongs to the account too (RevenueCat app user id).
+    void resetPurchases();
     setMeState(null);
     setStatus('guest');
     await saveToken(null);
@@ -87,6 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const token = tokenRef.current;
+    // This device stops receiving the account's notifications; the request needs the session token, so it goes first.
+    const pushToken = currentPushToken();
+    if (token && pushToken) {
+      try {
+        await pushApi.unregister(pushToken, token);
+      } catch {
+        // Still registered on the server: the next login on this device takes the token over.
+      }
+    }
     await clearLocal();
     if (token) {
       try {

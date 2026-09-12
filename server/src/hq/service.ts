@@ -7,6 +7,7 @@ import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { getHqContent, type HqContent } from '../content/hq.js';
 import type { Notifier, VisitLike } from '../mail/notify.js';
+import type { PushService } from '../push/service.js';
 import type { KV } from '../store.js';
 
 /**
@@ -76,7 +77,7 @@ export type HqOverview = {
 
 export type BookInput = { date: string; time: string; purpose: string; note: string };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier };
+type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier; push: PushService };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
@@ -333,7 +334,9 @@ export class HqService {
       this.deps.log.info({ visit: visit.id, status, adminId: admin.id }, 'hq visit decided');
       return visit;
     });
-    this.deps.notifier.hqVisitDecided(this.toMail(visit, content), status, admin.name);
+    const mail = this.toMail(visit, content);
+    this.deps.notifier.hqVisitDecided(mail, status, admin.name);
+    this.deps.push.hqVisitDecided({ id: visit.id, contactId: visit.contactId, date: visit.date, time: visit.time, endTime: mail.endTime, adminNote: visit.adminNote }, status);
     return this.toAdmin(visit, content, now);
   }
 

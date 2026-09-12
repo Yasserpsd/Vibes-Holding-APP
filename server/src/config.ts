@@ -52,6 +52,17 @@ const envSchema = z.object({
   NOTIFY_EMAIL: z.string().min(3).optional(),
   // Store purchases: the RevenueCat webhook carries this Authorization header value verbatim.
   REVENUECAT_WEBHOOK_AUTH: z.string().min(10).optional(),
+  // RevenueCat public SDK keys (they ship in the app) and, optionally, the REST secret key for /api/membership/sync.
+  REVENUECAT_PUBLIC_KEY_ANDROID: z.string().min(10).optional(),
+  REVENUECAT_PUBLIC_KEY_IOS: z.string().min(10).optional(),
+  REVENUECAT_SECRET_KEY: z.string().min(20).optional(),
+  REVENUECAT_ENTITLEMENT: z.string().min(1).default('membership'),
+  STORE_MEMBERSHIP_PRODUCT: z.string().min(1).default('club_membership_annual'),
+  // Store review needs the terms and privacy pages next to the subscription price.
+  STORE_TERMS_URL: z.string().url().optional(),
+  STORE_PRIVACY_URL: z.string().url().optional(),
+  // Expo push service: optional access token when "enhanced push security" is on for the Expo project.
+  EXPO_PUSH_ACCESS_TOKEN: z.string().min(10).optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

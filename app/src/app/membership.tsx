@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { StorePurchaseCard } from '@/components/StorePurchaseCard';
 import { iconFor } from '@/lib/icons';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -45,6 +46,7 @@ export default function MembershipScreen() {
         activationNote={data.activationNote}
         title={data.title}
       />
+      {status === 'signedIn' ? <StorePurchaseCard title={data.title} /> : null}
       {status === 'guest' ? <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
 
       {data.groups.map((group) => (

@@ -10,6 +10,10 @@ const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
 const BASE_APP_ID = 'com.vcmem.investorsclub';
 const APP_ID = IS_PRODUCTION ? BASE_APP_ID : `${BASE_APP_ID}.preview`;
 const BRAND_BLACK = '#0B0B0B';
+const BRAND_GOLD = '#C9A227';
+// Firebase config for Android push (FCM): path from an EAS file variable on builds; locally, the same
+// variable in app/.env pointing at the git-ignored google-services.json.
+const GOOGLE_SERVICES = process.env.GOOGLE_SERVICES_JSON;
 // Public value: the test API. Production gets its URL from EXPO_PUBLIC_API_URL only.
 const TEST_API_URL = 'https://vibes-holding-app-production.up.railway.app';
 
@@ -44,6 +48,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/images/adaptive-icon.png',
     },
     predictiveBackGestureEnabled: false,
+    ...(GOOGLE_SERVICES ? { googleServicesFile: GOOGLE_SERVICES } : {}),
   },
   // Mobile only: keeps expo export and eas update from bundling a web build.
   platforms: ['ios', 'android'],
@@ -60,6 +65,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     ['expo-localization', { supportsRTL: true, forcesRTL: true }],
+    // Member notifications: white club mark on the brand gold (Android small icon), one default channel.
+    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: BRAND_GOLD, defaultChannel: 'default' }],
   ],
   experiments: { typedRoutes: true },
   extra: {
