@@ -30,7 +30,7 @@ export type LivePaymobOptions = {
   baseUrl: string;
   secretKey: string;
   publicKey: string;
-  integrationIds: number[];
+  integrationIds: (number | string)[];
   log: FastifyBaseLogger;
   /** Test environment only: attach the gateway status and body to the 502 so the failure can be read from the response. */
   exposeGatewayErrors?: boolean;
@@ -119,11 +119,14 @@ export class MockPaymob implements PaymobGateway {
   }
 }
 
-export function parseIntegrationIds(value: string | undefined): number[] {
+/** `PAYMOB_INTEGRATION_ID`: comma-separated integration ids (numbers) and/or Paymob method names such as `card`, `apple_pay`, `stc_pay`. */
+export function parseIntegrationIds(value: string | undefined): (number | string)[] {
   return (value ?? '')
     .split(',')
-    .map((entry) => Number.parseInt(entry.trim(), 10))
-    .filter((entry) => Number.isInteger(entry) && entry > 0);
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => (/^\d+$/.test(entry) ? Number(entry) : entry))
+    .filter((entry) => (typeof entry === 'number' ? Number.isInteger(entry) && entry > 0 : /^[a-z_]+$/.test(entry)));
 }
 
 /** Sanitized shape of a Paymob key for /health in the test environment: only the fixed public prefix
