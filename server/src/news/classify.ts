@@ -62,7 +62,7 @@ const CABINET = pattern(['مجلس الوزراء يوافق', 'مجلس الو�
 const AUTHORITY = pattern(['السعودية', 'سعودي', 'المملكة', 'هيئة', 'وزارة', 'وزير', 'البنك المركزي', 'ساما', 'مجلس', 'أمانة', 'الجهات المختصة', 'saudi', 'kingdom', 'ministry', 'authority', 'cabinet', 'sama', 'cma', 'zatca', 'misa', 'monsha']);
 const SAUDI = pattern(['السعودية', 'سعودي', 'المملكة', 'الرياض', 'جدة', 'الدمام', 'saudi', 'kingdom', 'riyadh', 'jeddah', 'dammam']);
 /** Another country's decision reported by a Saudi outlet is not a Saudi decision. */
-const FOREIGN = pattern(['الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان', 'سلطنة', 'مصر', 'الأردن', 'العراق', 'سوريا', 'لبنان', 'تركيا', 'إيران', 'أمريكا', 'أمريكي', 'الولايات المتحدة', 'أوروبا', 'أوروبي', 'بريطانيا', 'بريطاني', 'فرنسا', 'ألمانيا', 'الصين', 'الهند', 'اليابان', 'روسيا', 'الفيدرالي', 'uae', 'emirates', 'kuwait', 'qatar', 'bahrain', 'oman', 'egypt', 'jordan', 'iraq', 'turkey', 'iran', 'europe', 'u.s.', 'federal reserve', 'china', 'india', 'japan', 'russia']);
+const FOREIGN = pattern(['الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان', 'سلطنة', 'مصر', 'الأردن', 'العراق', 'سوريا', 'لبنان', 'تركيا', 'إيران', 'أمريكا', 'أمريكي', 'الولايات المتحدة', 'أوروبا', 'أوروبي', 'بريطانيا', 'بريطاني', 'فرنسا', 'ألمانيا', 'الصين', 'الهند', 'اليابان', 'روسيا', 'الفيدرالي', 'روسي', 'صيني', 'هندي', 'ياباني', 'تركي', 'إيراني', 'إماراتي', 'كويتي', 'قطري', 'بحريني', 'عماني', 'مصري', 'أردني', 'عراقي', 'سوري', 'لبناني', 'فرنسي', 'ألماني', 'الأوروبي', 'uae', 'emirates', 'kuwait', 'qatar', 'bahrain', 'oman', 'egypt', 'jordan', 'iraq', 'turkey', 'iran', 'europe', 'u.s.', 'federal reserve', 'china', 'india', 'japan', 'russia']);
 
 /**
  * Applied to every classifier's answer: the fixed decisions section never carries sports, protocol,
