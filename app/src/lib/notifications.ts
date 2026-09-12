@@ -53,7 +53,6 @@ export async function obtainPushToken(): Promise<PushDevice | null> {
       await notifications.setNotificationChannelAsync('default', {
         name: 'إشعارات النادي',
         importance: notifications.AndroidImportance.MAX,
-        sound: 'default',
         vibrationPattern: [0, 250, 250, 250],
       });
     }
