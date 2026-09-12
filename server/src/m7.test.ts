@@ -48,7 +48,11 @@ async function signUp(email: string, phone: string): Promise<string> {
   return verified.json().token as string;
 }
 
-const lastMail = () => mailer.sent[mailer.sent.length - 1];
+const lastMail = () => {
+  const mail = mailer.sent.at(-1);
+  if (!mail) throw new Error('no mail was sent');
+  return mail;
+};
 
 let memberToken = '';
 let unactivatedToken = '';
@@ -107,7 +111,7 @@ test('service requests e-mail the management before the WhatsApp handover', asyn
 
 test('HQ: booking, decisions and cancellations e-mail the management; the pass carries the holder name', async () => {
   const hq = await get('/api/hq', memberToken);
-  const [first, second] = hq.json().days as { date: string }[];
+  const [first, second] = hq.json().days as [{ date: string }, { date: string }];
   const purpose = hq.json().content.purposes[0] as string;
 
   const booked = await post('/api/hq/visits', { date: first.date, time: '18:00', purpose, note: 'اجتماع مع شريك' }, memberToken);
