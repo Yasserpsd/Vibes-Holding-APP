@@ -116,6 +116,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
           publicKey: config.PAYMOB_PUBLIC_KEY,
           integrationIds: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID),
           log: app.log,
+          exposeGatewayErrors: config.APP_ENV !== 'production',
           fetchImpl,
         })
       : new MockPaymob(config.PUBLIC_URL));

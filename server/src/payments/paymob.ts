@@ -32,6 +32,8 @@ export type LivePaymobOptions = {
   publicKey: string;
   integrationIds: number[];
   log: FastifyBaseLogger;
+  /** Test environment only: attach the gateway status and body to the 502 so the failure can be read from the response. */
+  exposeGatewayErrors?: boolean;
   fetchImpl?: typeof fetch;
 };
 
@@ -41,7 +43,7 @@ export class LivePaymob implements PaymobGateway {
   constructor(private readonly options: LivePaymobOptions) {}
 
   async createIntention(input: IntentionInput): Promise<Intention> {
-    const { baseUrl, secretKey, publicKey, integrationIds, log } = this.options;
+    const { baseUrl, secretKey, publicKey, integrationIds, log, exposeGatewayErrors } = this.options;
     const fetchImpl = this.options.fetchImpl ?? fetch;
     const person = {
       first_name: input.customer.firstName || 'Member',
@@ -74,11 +76,11 @@ export class LivePaymob implements PaymobGateway {
       text = await response.text();
     } catch (error) {
       log.error({ err: error }, 'paymob intention request failed');
-      throw new RequestError('gateway', 'تعذّر الاتصال ببوابة الدفع، حاول بعد قليل', 502);
+      throw new RequestError('gateway', 'تعذّر الاتصال ببوابة الدفع، حاول بعد قليل', 502, exposeGatewayErrors ? { reason: String(error) } : undefined);
     }
     if (!response.ok) {
       log.error({ status: response.status, body: text.slice(0, 600) }, 'paymob intention refused');
-      throw new RequestError('gateway', 'تعذّر بدء عملية الدفع، حاول بعد قليل', 502);
+      throw new RequestError('gateway', 'تعذّر بدء عملية الدفع، حاول بعد قليل', 502, exposeGatewayErrors ? { status: response.status, body: text.slice(0, 600) } : undefined);
     }
     let data: { id?: string | number; intention_order_id?: string | number; client_secret?: string };
     try {

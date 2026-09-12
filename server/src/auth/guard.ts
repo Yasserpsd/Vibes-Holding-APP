@@ -13,6 +13,7 @@ export class RequestError extends Error {
     readonly code: string,
     message: string,
     readonly status = 400,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'RequestError';
@@ -26,7 +27,7 @@ export function guard(handler: Handler): Handler {
       return await handler(request, reply);
     } catch (error) {
       if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) {
-        return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
+        return reply.code(error.status).send({ error: { code: error.code, message: error.message, ...(error instanceof RequestError && error.details !== undefined ? { details: error.details } : {}) } });
       }
       throw error;
     }
