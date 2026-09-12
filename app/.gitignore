@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase / push credentials: uploaded as EAS file variables, never committed.
+google-services.json
+GoogleService-Info.plist

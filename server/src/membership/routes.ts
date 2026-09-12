@@ -1,14 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify';
 
-import { adminGuard, guard } from '../auth/guard.js';
+import { adminGuard, guard, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import type { MembershipService } from './service.js';
 
 export type MembershipRoutesOptions = { service: MembershipService; auth: AuthService; webhookAuth: string | undefined };
 
-/** RevenueCat posts every purchase event here with the configured Authorization header value. */
+/** Store settings for the app, RevenueCat's webhook, the post-purchase sync and the admin list. */
 export const membershipRoutes: FastifyPluginAsync<MembershipRoutesOptions> = async (app, { service, auth, webhookAuth }) => {
+  const requireSession = sessionGuard(auth);
   const requireAdmin = adminGuard(auth);
+
+  // Public SDK keys and product ids only; the app configures RevenueCat from this answer.
+  app.get('/api/membership/store', async () => service.storeConfig());
 
   app.post(
     '/api/webhooks/revenuecat',
@@ -19,6 +23,16 @@ export const membershipRoutes: FastifyPluginAsync<MembershipRoutesOptions> = asy
       if (!accepted) return reply.code(401).send({ error: { code: 'unauthorized', message: 'bad webhook authorization' } });
       const event = await service.handleRevenueCat(request.body);
       return { ok: true, activation: event.activation, reason: event.reason };
+    }),
+  );
+
+  // After a purchase or restore the app asks the server to re-read the membership (never trusting its own store result).
+  app.post(
+    '/api/membership/sync',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      return await service.sync(current.session);
     }),
   );
 

@@ -27,6 +27,8 @@ import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
+import { pushRoutes } from './push/routes.js';
+import { PushService } from './push/service.js';
 import type { KV } from './store.js';
 import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './videos/blurbs.js';
 import { videosRoutes } from './videos/routes.js';
@@ -55,7 +57,7 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService };
 
 export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
   const app = Fastify({
@@ -105,7 +107,9 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
         })
       : new LogMailer(app.log));
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
-  const hq = new HqService({ kv, log: app.log, notifier });
+  // Member push notifications (Expo push service); tokens come from the app after login.
+  const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
+  const hq = new HqService({ kv, log: app.log, notifier, push });
   // Payments: Paymob intentions for real-world services; the mock gateway stands in until the test keys exist.
   const paymob: PaymobGateway =
     gateway ??
@@ -125,10 +129,29 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     log: app.log,
     gateway: paymob,
     notifier,
+    push,
     hmacSecret: paymob.mode === 'live' && config.PAYMOB_HMAC_SECRET ? config.PAYMOB_HMAC_SECRET : MOCK_HMAC_SECRET,
     publicUrl: config.PUBLIC_URL,
   });
-  const membership = new MembershipService({ kv, log: app.log, hub: hubClient, auth, notifier, appEnv: config.APP_ENV });
+  const membership = new MembershipService({
+    kv,
+    log: app.log,
+    hub: hubClient,
+    auth,
+    notifier,
+    push,
+    appEnv: config.APP_ENV,
+    fetchImpl,
+    store: {
+      productId: config.STORE_MEMBERSHIP_PRODUCT,
+      entitlement: config.REVENUECAT_ENTITLEMENT,
+      androidKey: config.REVENUECAT_PUBLIC_KEY_ANDROID,
+      iosKey: config.REVENUECAT_PUBLIC_KEY_IOS,
+      secretKey: config.REVENUECAT_SECRET_KEY,
+      termsUrl: config.STORE_TERMS_URL,
+      privacyUrl: config.STORE_PRIVACY_URL,
+    },
+  });
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
 
   app.get('/health', async () => ({
@@ -155,6 +178,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
       ...(config.APP_ENV === 'test' ? { keys: paymobKeyMode(config.PAYMOB_SECRET_KEY), secret: paymobKeyShape(config.PAYMOB_SECRET_KEY), public: paymobKeyShape(config.PAYMOB_PUBLIC_KEY), hmacLength: config.PAYMOB_HMAC_SECRET?.length ?? 0, baseUrl: config.PAYMOB_BASE_URL, integrations: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID) } : {}),
     },
     membership: membership.status(),
+    push: push.status(),
   }));
 
   await app.register(projectsRoutes, { service: projects });
@@ -166,6 +190,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
+  await app.register(pushRoutes, { service: push, auth });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -182,5 +207,5 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     });
   });
 
-  return { app, projects, news, videos, payments, notifier };
+  return { app, projects, news, videos, payments, notifier, membership, push };
 }

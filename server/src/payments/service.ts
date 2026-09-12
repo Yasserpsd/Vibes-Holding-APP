@@ -6,6 +6,7 @@ import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { priceFor, toPublicService, type ServicesContent } from '../content/services.js';
 import type { Notifier, PaymentLike } from '../mail/notify.js';
+import type { PushService } from '../push/service.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
 import type { PaymobGateway } from './paymob.js';
@@ -71,7 +72,7 @@ export type AdminPayment = PublicPayment & Pick<Payment, 'contactId' | 'name' | 
 
 export type RedirectResult = { payment: PublicPayment | null; verified: boolean; gatewaySuccess: boolean | null };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway; notifier: Notifier; hmacSecret: string; publicUrl: string };
+type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string };
 
 function isoDaysAgo(now: number, days: number): string {
   return new Date(now - days * 86_400_000).toISOString();
@@ -265,6 +266,10 @@ export class PaymentsService {
       this.deps.log.info({ payment: result.payment.id, status: result.payment.status }, 'payment updated from the gateway callback');
       if (result.payment.status === 'paid') this.deps.notifier.paymentPaid(this.toMail(result.payment));
       else this.deps.notifier.paymentFailed(this.toMail(result.payment));
+      if (result.payment.status === 'paid' || result.payment.status === 'failed') {
+        const { id, contactId, serviceTitle, amount, currency, status } = result.payment;
+        this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });
+      }
     }
     return { ok: true, id: result.payment.id, status: result.payment.status };
   }
