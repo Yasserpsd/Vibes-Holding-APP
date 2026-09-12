@@ -78,7 +78,7 @@ export default function PaymentScreen() {
       {payment.status === 'created' ? <AppButton label="فتح صفحة الدفع" icon="card-outline" onPress={() => void reopen()} /> : null}
       {payment.status === 'created' ? <AppButton label="تحديث الحالة" variant="outline" icon="refresh-outline" onPress={() => void refetch()} /> : null}
       {payment.status === 'failed' ? (
-        <AppButton label="المحاولة مرة أخرى" icon="refresh-outline" onPress={() => router.navigate({ pathname: '/service/[key]', params: { key: payment.serviceKey } })} />
+        <AppButton label="المحاولة مرة أخرى" icon="refresh-outline" onPress={() => router.navigate({ pathname: '/service/[key]', params: { key: payment.serviceKey, answers: JSON.stringify(Object.fromEntries(payment.answers.map((answer) => [answer.key, answer.value]))) } })} />
       ) : null}
       <AppButton label="كل مدفوعاتي" variant="outline" icon="receipt-outline" onPress={() => router.navigate('/payments')} />
     </Screen>

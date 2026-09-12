@@ -17,18 +17,25 @@ export function formatArabicDate(isoDate: string): string {
   return month ? `${Number(match[3])} ${month} ${match[1]}` : isoDate;
 }
 
-/** "قبل 5 دقائق" / "قبل 3 ساعات" / "أمس" / a spelled-out date for anything older. */
+/** Arabic counted noun: singular and dual without a numeral (ساعة، ساعتين), 3 to 10 with the plural (5 ساعات), 11 and up with the singular (15 ساعة). */
+function arabicCount(count: number, singular: string, dual: string, plural: string): string {
+  if (count === 1) return singular;
+  if (count === 2) return dual;
+  return `${formatNumber(count)} ${count <= 10 ? plural : singular}`;
+}
+
+/** "قبل 5 دقائق" / "قبل ساعتين" / "أمس" / a spelled-out date for anything older. */
 export function formatRelativeTime(iso: string, now: number = Date.now()): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return '';
   const minutes = Math.round((now - then) / 60_000);
   if (minutes < 1) return 'الآن';
-  if (minutes < 60) return `قبل ${formatNumber(minutes)} ${minutes === 1 ? 'دقيقة' : minutes === 2 ? 'دقيقتين' : minutes <= 10 ? 'دقائق' : 'دقيقة'}`;
+  if (minutes < 60) return `قبل ${arabicCount(minutes, 'دقيقة', 'دقيقتين', 'دقائق')}`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `قبل ${formatNumber(hours)} ${hours === 1 ? 'ساعة' : hours === 2 ? 'ساعتين' : hours <= 10 ? 'ساعات' : 'ساعة'}`;
+  if (hours < 24) return `قبل ${arabicCount(hours, 'ساعة', 'ساعتين', 'ساعات')}`;
   const days = Math.round(hours / 24);
   if (days === 1) return 'أمس';
-  if (days < 7) return `قبل ${formatNumber(days)} أيام`;
+  if (days < 7) return `قبل ${arabicCount(days, 'يوم', 'يومين', 'أيام')}`;
   return formatArabicDate(new Date(then).toISOString());
 }
 

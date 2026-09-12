@@ -144,6 +144,10 @@ test('payments: services are paid through the gateway; only the signed callback 
   const notPayable = await post('/api/payments', { serviceKey: 'studio', answers: {} }, memberToken);
   assert.equal(notPayable.statusCode, 403);
 
+  const incomplete = await post('/api/payments', { serviceKey: 'pitch-deck', answers: { project: 'مشروعي' } }, unactivatedToken);
+  assert.equal(incomplete.statusCode, 400, incomplete.body);
+  assert.ok(incomplete.json().error.message.includes('مرحلة المشروع'), incomplete.body);
+
   const listPrice = await post('/api/payments', { serviceKey: 'pitch-deck', answers: { project: 'مشروعي', stage: 'فكرة' } }, unactivatedToken);
   assert.equal(listPrice.statusCode, 200, listPrice.body);
   const first = listPrice.json().payment;
@@ -152,7 +156,7 @@ test('payments: services are paid through the gateway; only the signed callback 
   assert.ok(lastMail().subject.includes('بدء دفع من التطبيق: تصميم Pitch Deck'), lastMail().subject);
   assert.ok(lastMail().text.includes('اسم المشروع: مشروعي'), lastMail().text);
 
-  const memberPrice = await post('/api/payments', { serviceKey: 'pitch-deck', answers: { project: 'مشروع العضو' } }, memberToken);
+  const memberPrice = await post('/api/payments', { serviceKey: 'pitch-deck', answers: { project: 'مشروع العضو', stage: 'توسّع' } }, memberToken);
   assert.equal(memberPrice.statusCode, 200, memberPrice.body);
   const second = memberPrice.json().payment;
   assert.deepEqual([second.amount, second.memberPrice], [2500, true]);
@@ -205,7 +209,7 @@ test('payments: services are paid through the gateway; only the signed callback 
   assert.equal(mine.json().payments.length, 1);
 
   // Mock gateway page: the same signed callback, then the signed redirect to the return page.
-  const meetup = await post('/api/payments', { serviceKey: 'meetup', answers: { topic: 'فرص التجزئة' } }, memberToken);
+  const meetup = await post('/api/payments', { serviceKey: 'meetup', answers: { topic: 'فرص التجزئة', date: 'النصف الثاني من أكتوبر' } }, memberToken);
   const third = meetup.json().payment;
   const page = await get(`/pay/mock/${third.id}`);
   assert.equal(page.statusCode, 200);

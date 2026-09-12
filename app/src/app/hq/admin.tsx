@@ -85,7 +85,7 @@ export default function HqAdminScreen() {
       <FormField label="الرمز" value={code} onChangeText={setCode} latin autoCapitalize="none" placeholder="VCHQ:…" />
       <AppButton label="تحقق" icon="qr-code-outline" onPress={() => void verify()} />
       {verifyResult ? (
-        <Notice tone={verifyResult.valid ? 'success' : 'warning'} text={verifyResult.visit ? `${verifyResult.text} · ${verifyResult.visit.name} · ${verifyResult.visit.date} ${verifyResult.visit.time}` : verifyResult.text} />
+        <Notice tone={verifyResult.valid ? 'success' : 'warning'} text={verifyResult.visit ? `${verifyResult.text} · ${verifyResult.visit.name} · ${WEEKDAYS[new Date(`${verifyResult.visit.date}T00:00:00Z`).getUTCDay()] ?? ''} ${formatArabicDate(verifyResult.visit.date)} · ${verifyResult.visit.time}` : verifyResult.text} />
       ) : null}
     </Screen>
   );

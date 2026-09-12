@@ -36,7 +36,9 @@ export default function PassScreen() {
     <Screen>
       <View style={styles.ticket}>
         <View style={styles.head}>
-          <Image source={require('../../../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
+          <View style={styles.logoBadge}>
+            <Image source={require('../../../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
+          </View>
           <View style={styles.headText}>
             <Text style={styles.club}>نادي المستثمرين</Text>
             <Text style={styles.kind}>بطاقة دخول المقر · الرياض</Text>
@@ -95,7 +97,9 @@ const NOTCH = 22;
 const styles = StyleSheet.create({
   ticket: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface, overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.gold },
-  logo: { width: 44, height: 44 },
+  // The logo is drawn for dark backgrounds: a black badge keeps it readable on the gold header.
+  logoBadge: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 40, height: 40 },
   headText: { flex: 1, gap: 2 },
   club: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.black, textAlign: 'right' },
   kind: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.black, textAlign: 'right', opacity: 0.8 },

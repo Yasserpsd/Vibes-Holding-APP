@@ -23,12 +23,13 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /** One service: what it is, what it costs, and the action (in-app payment, WhatsApp handover, web form, advisor, HQ, Projects Bank). */
 export default function ServiceScreen() {
-  const { key } = useLocalSearchParams<{ key: string }>();
+  const { key, answers: answersParam } = useLocalSearchParams<{ key: string; answers?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useService(key);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // A retry from the payment screen brings the previous answers back through the `answers` param.
+  const [answers, setAnswers] = useState<Record<string, string>>(() => parseAnswers(answersParam));
   const [handedOver, setHandedOver] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -58,6 +59,14 @@ export default function ServiceScreen() {
 
   // The server creates the gateway intention; the checkout opens in the in-app browser; the status is polled from the server.
   const pay = async () => {
+    const action = service.action;
+    if (action?.type === 'paymob') {
+      const missing = action.fields.find((field) => !(answers[field.key] ?? '').trim());
+      if (missing) {
+        setPayError(`أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`);
+        return;
+      }
+    }
     setPaying(true);
     setPayError(null);
     try {
@@ -188,6 +197,17 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
       return <AppButton label="افتح بنك المشاريع" icon="briefcase-outline" onPress={onProjects} />;
     default:
       return null;
+  }
+}
+
+function parseAnswers(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+  } catch {
+    return {};
   }
 }
 

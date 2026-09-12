@@ -19,7 +19,7 @@ export const PAYMENTS_KEY = 'payments:orders';
 const KEEP_DAYS = 400;
 
 export type PaymentStatus = 'created' | 'paid' | 'failed';
-type Answer = { label: string; value: string };
+type Answer = { key: string; label: string; value: string };
 
 export type Payment = {
   id: string;
@@ -169,7 +169,10 @@ export class PaymentsService {
     }
     const price = priceFor(service, me);
     if (!price) throw new RequestError('not_payable', 'هذه الخدمة لا تُدفع من داخل التطبيق', 403);
-    const answers = service.action.fields.map((field) => ({ label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
+    // Every field of a paid service is required: the management mail and the retry screen depend on the answers.
+    const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
+    if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
+    const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
     const id = randomUUID();
     const [firstName = '', ...rest] = me.name.trim().split(/\s+/);
     const intention = await this.deps.gateway.createIntention({

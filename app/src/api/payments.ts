@@ -9,7 +9,7 @@ export type Payment = {
   id: string;
   serviceKey: string;
   serviceTitle: string;
-  answers: { label: string; value: string }[];
+  answers: { key: string; label: string; value: string }[];
   amount: number;
   currency: string;
   memberPrice: boolean;
