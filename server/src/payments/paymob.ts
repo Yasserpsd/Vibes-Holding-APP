@@ -125,3 +125,11 @@ export function parseIntegrationIds(value: string | undefined): number[] {
     .map((entry) => Number.parseInt(entry.trim(), 10))
     .filter((entry) => Number.isInteger(entry) && entry > 0);
 }
+
+/** Which Paymob key set is configured, read from the secret key prefix (ksa_sk_test_… / ksa_sk_live_…). Never exposes the key. */
+export function paymobKeyMode(secretKey: string | undefined): 'test' | 'live' | 'unknown' | null {
+  if (!secretKey) return null;
+  if (secretKey.includes('_test_')) return 'test';
+  if (secretKey.includes('_live_')) return 'live';
+  return 'unknown';
+}
