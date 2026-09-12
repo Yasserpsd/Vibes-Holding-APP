@@ -22,7 +22,7 @@ import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
-import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, paymobKeyMode, type PaymobGateway } from './payments/paymob.js';
+import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, paymobKeyMode, paymobKeyShape, type PaymobGateway } from './payments/paymob.js';
 import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
@@ -152,7 +152,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     mail: notifier.status(),
     payments: {
       ...payments.status(),
-      ...(config.APP_ENV === 'test' ? { keys: paymobKeyMode(config.PAYMOB_SECRET_KEY), integrations: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID) } : {}),
+      ...(config.APP_ENV === 'test' ? { keys: paymobKeyMode(config.PAYMOB_SECRET_KEY), secret: paymobKeyShape(config.PAYMOB_SECRET_KEY), public: paymobKeyShape(config.PAYMOB_PUBLIC_KEY), hmacLength: config.PAYMOB_HMAC_SECRET?.length ?? 0, baseUrl: config.PAYMOB_BASE_URL, integrations: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID) } : {}),
     },
     membership: membership.status(),
   }));

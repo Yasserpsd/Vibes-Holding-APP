@@ -126,6 +126,14 @@ export function parseIntegrationIds(value: string | undefined): number[] {
     .filter((entry) => Number.isInteger(entry) && entry > 0);
 }
 
+/** Sanitized shape of a Paymob key for /health in the test environment: only the fixed public prefix
+ * (ksa_sk_test_ / ksa_pk_live_ ...) and the length, never the key itself. */
+export function paymobKeyShape(key: string | undefined): { prefix: string; length: number } | null {
+  if (!key) return null;
+  const match = /^[a-z]{2,4}_(sk|pk)_(test|live)_/.exec(key);
+  return { prefix: match ? match[0] : 'unexpected-format', length: key.length };
+}
+
 /** Which Paymob key set is configured, read from the secret key prefix (ksa_sk_test_… / ksa_sk_live_…). Never exposes the key. */
 export function paymobKeyMode(secretKey: string | undefined): 'test' | 'live' | 'unknown' | null {
   if (!secretKey) return null;
