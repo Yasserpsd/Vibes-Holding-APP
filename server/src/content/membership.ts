@@ -115,8 +115,8 @@ function flatBenefits(groups: MembershipGroup[]): MembershipBenefit[] {
 
 // Content from docs/PROJECT_BRIEF.md section 4.1 (the owner's wording, 2026-09-12). The dashboard edits it later.
 export const MEMBERSHIP_SEED: MembershipContent = {
-  title: 'العضوية الذهبية',
-  subtitle: 'العضوية السنوية لنادي المستثمرين',
+  title: 'العضوية السنوية لنادي المستثمرين',
+  subtitle: 'عضوية واحدة لعام كامل، بدون مستويات أو فئات',
   intro: 'عضوية واحدة تفتح كل مزايا النادي لعام كامل: بنك المشاريع، الملتقيات والمقر، المستشار الذكي، وخصومات المنظومة.',
   groups: GROUPS,
   benefits: flatBenefits(GROUPS),
@@ -128,8 +128,8 @@ export const MEMBERSHIP_SEED: MembershipContent = {
     active: 'عضويتك فعّالة.',
     expired: 'انتهت عضويتك، برجاء تجديد عضويتك.',
   },
-  activationNote: 'تفعيل العضوية من داخل التطبيق يتوفر قريبًا.',
-  version: 2,
+  activationNote: 'الاشتراك في العضوية السنوية من داخل التطبيق يتوفر مع الإصدار القادم عبر متجر التطبيقات.',
+  version: 3,
   updatedAt: '2026-09-12T00:00:00.000Z',
 };
 

@@ -1,9 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { useService, type ServiceAction, type ServiceField } from '@/api/content';
+import { errorMessage } from '@/api/client';
+import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
+import { amountLabel, paymentsApi } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -12,19 +15,23 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { composeRequest, openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-/** One service: what it is, what it costs, and the action (WhatsApp handover, web form, advisor, HQ, Projects Bank). */
+/** One service: what it is, what it costs, and the action (in-app payment, WhatsApp handover, web form, advisor, HQ, Projects Bank). */
 export default function ServiceScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useService(key);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [handedOver, setHandedOver] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   if (!data) {
     return (
@@ -42,9 +49,27 @@ export default function ServiceScreen() {
     });
 
   const handOver = async (action: Extract<ServiceAction, { type: 'whatsapp' }>) => {
+    // The management hears about the request right away, even if WhatsApp is closed without sending.
+    reportServiceRequest(service.key, answers);
     const lines = action.fields.map((field) => ({ label: field.label, value: answers[field.key] ?? '' }));
     const text = composeRequest(action.message, lines, me ? { name: me.name, phone: me.phone } : null);
     setHandedOver(await openWhatsApp(action.phone, text));
+  };
+
+  // The server creates the gateway intention; the checkout opens in the in-app browser; the status is polled from the server.
+  const pay = async () => {
+    setPaying(true);
+    setPayError(null);
+    try {
+      const { payment } = await paymentsApi.start(service.key, answers);
+      void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      await openCheckout(payment.checkoutUrl, paymentReturnUrl(payment.id));
+      router.navigate({ pathname: '/payment/[id]', params: { id: payment.id } });
+    } catch (cause) {
+      setPayError(errorMessage(cause));
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -77,14 +102,20 @@ export default function ServiceScreen() {
       ) : (
         <ActionPanel
           action={service.action}
+          price={service.price}
+          signedIn={status === 'signedIn'}
+          paying={paying}
           answers={answers}
           onAnswer={(field, value) => setAnswers((current) => ({ ...current, [field]: value }))}
           onWhatsApp={(action) => void handOver(action)}
+          onPay={() => void pay()}
+          onLogin={() => router.push('/auth/login')}
           onAdvisor={askAdvisor}
           onHq={() => router.push('/hq')}
           onProjects={() => router.push('/projects')}
         />
       )}
+      {payError ? <Notice tone="warning" text={payError} /> : null}
       {handedOver ? <Notice tone="info" text="فتحنا واتساب برسالتك الجاهزة، أكمل الإرسال من هناك وسيتواصل معك الفريق." /> : null}
 
       {service.infoUrl ? <AppButton label="تفاصيل الخدمة على الموقع" variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} /> : null}
@@ -95,15 +126,20 @@ export default function ServiceScreen() {
 
 type ActionPanelProps = {
   action: ServiceAction;
+  price: Service['price'];
+  signedIn: boolean;
+  paying: boolean;
   answers: Record<string, string>;
   onAnswer: (field: string, value: string) => void;
   onWhatsApp: (action: Extract<ServiceAction, { type: 'whatsapp' }>) => void;
+  onPay: () => void;
+  onLogin: () => void;
   onAdvisor: (prompt?: string) => void;
   onHq: () => void;
   onProjects: () => void;
 };
 
-function ActionPanel({ action, answers, onAnswer, onWhatsApp, onAdvisor, onHq, onProjects }: ActionPanelProps) {
+function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects }: ActionPanelProps) {
   switch (action.type) {
     case 'whatsapp':
       return (
@@ -113,6 +149,33 @@ function ActionPanel({ action, answers, onAnswer, onWhatsApp, onAdvisor, onHq, o
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
           <AppButton label="أرسل الطلب عبر واتساب" icon="logo-whatsapp" onPress={() => onWhatsApp(action)} />
+        </View>
+      );
+    case 'paymob':
+      return (
+        <View style={styles.panel}>
+          {action.fields.length ? <Text style={styles.panelTitle}>تفاصيل طلبك</Text> : null}
+          {action.fields.map((field) => (
+            <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
+          ))}
+          {price ? (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>المبلغ</Text>
+              <Text style={styles.priceValue}>{amountLabel(price)}</Text>
+              {price.memberPrice ? <Text style={styles.priceNote}>سعر الأعضاء</Text> : null}
+            </View>
+          ) : null}
+          {!signedIn ? (
+            <>
+              <Text style={styles.payHint}>الدفع من داخل التطبيق يحتاج تسجيل الدخول بحسابك.</Text>
+              <AppButton label="سجّل الدخول للدفع" icon="log-in-outline" onPress={onLogin} />
+            </>
+          ) : paying ? (
+            <ActivityIndicator color={colors.gold} />
+          ) : (
+            <AppButton label="ادفع الآن" icon="card-outline" onPress={onPay} />
+          )}
+          <Text style={styles.payHint}>الدفع عبر بوابة Paymob داخل التطبيق. بعد إتمام الدفع يتواصل معك فريق النادي.</Text>
         </View>
       );
     case 'link':
@@ -175,4 +238,9 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   fieldLabel: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, flexWrap: 'wrap' },
+  priceLabel: { ...typography.caption, color: colors.textSecondary },
+  priceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
+  priceNote: { ...typography.caption, color: colors.goldLight },
+  payHint: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
 });

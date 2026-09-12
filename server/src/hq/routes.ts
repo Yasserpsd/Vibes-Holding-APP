@@ -107,7 +107,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       if (!params) return;
       const body = parse(decisionSchema, request.body, reply);
       if (!body) return;
-      return { visit: await service.decide(params.id, body.status, admin.me.id, body.note) };
+      return { visit: await service.decide(params.id, body.status, { id: admin.me.id, name: admin.me.name }, body.note) };
     }),
   );
 

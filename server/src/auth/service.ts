@@ -181,6 +181,13 @@ export class AuthService {
     return this.deps.sessions.getSession(token);
   }
 
+  /** Drops the cached account of a contact (membership changed outside a session, for example a store purchase). */
+  forget(contactId: number): void {
+    for (const [uuid, entry] of this.meCache) {
+      if (entry.me.id === contactId) this.meCache.delete(uuid);
+    }
+  }
+
   async me(session: SessionRecord, fresh = false): Promise<Me> {
     const cached = this.meCache.get(session.uuid);
     if (!fresh && cached && Date.now() - cached.at < ME_CACHE_MS) return cached.me;

@@ -14,10 +14,17 @@ import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
 import { MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
+import { LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
+import { Notifier } from './mail/notify.js';
+import { membershipRoutes } from './membership/routes.js';
+import { MembershipService } from './membership/service.js';
 import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
+import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, type PaymobGateway } from './payments/paymob.js';
+import { paymentsRoutes } from './payments/routes.js';
+import { PaymentsService } from './payments/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import type { KV } from './store.js';
@@ -25,7 +32,16 @@ import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './vide
 import { videosRoutes } from './videos/routes.js';
 import { VideosService } from './videos/service.js';
 
-export type AppDeps = { config: Config; kv: KV; hub?: HubClient; classifier?: Classifier; blurbs?: BlurbWriter; fetchImpl?: typeof fetch };
+export type AppDeps = {
+  config: Config;
+  kv: KV;
+  hub?: HubClient;
+  classifier?: Classifier;
+  blurbs?: BlurbWriter;
+  fetchImpl?: typeof fetch;
+  mailer?: Mailer;
+  gateway?: PaymobGateway;
+};
 
 /** Length plus a short hash: lets the owner compare the deployed key with the local one without exposing it. */
 function keyFingerprint(key: string | undefined): string | null {
@@ -39,9 +55,9 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier };
 
-export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl }: AppDeps): Promise<BuiltApp> {
+export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -75,7 +91,44 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl 
   const blurbWriter: BlurbWriter =
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
   const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, fetchImpl });
-  const hq = new HqService({ kv, log: app.log });
+  // Management notifications: the website's hosting mailbox (SMTP) or log-only when it is not configured.
+  const mail: Mailer =
+    mailer ??
+    (config.SMTP_HOST
+      ? new SmtpMailer({
+          host: config.SMTP_HOST,
+          port: config.SMTP_PORT,
+          secure: config.SMTP_SECURE ? config.SMTP_SECURE === '1' : config.SMTP_PORT === 465,
+          user: config.SMTP_USER,
+          pass: config.SMTP_PASS,
+          from: config.MAIL_FROM ?? config.SMTP_USER ?? 'no-reply@vcmem.com',
+        })
+      : new LogMailer(app.log));
+  const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
+  const hq = new HqService({ kv, log: app.log, notifier });
+  // Payments: Paymob intentions for real-world services; the mock gateway stands in until the test keys exist.
+  const paymob: PaymobGateway =
+    gateway ??
+    (config.PAYMOB_MODE === 'live' && config.PAYMOB_SECRET_KEY && config.PAYMOB_PUBLIC_KEY
+      ? new LivePaymob({
+          baseUrl: config.PAYMOB_BASE_URL,
+          secretKey: config.PAYMOB_SECRET_KEY,
+          publicKey: config.PAYMOB_PUBLIC_KEY,
+          integrationIds: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID),
+          log: app.log,
+          fetchImpl,
+        })
+      : new MockPaymob(config.PUBLIC_URL));
+  const payments = new PaymentsService({
+    kv,
+    log: app.log,
+    gateway: paymob,
+    notifier,
+    hmacSecret: paymob.mode === 'live' && config.PAYMOB_HMAC_SECRET ? config.PAYMOB_HMAC_SECRET : MOCK_HMAC_SECRET,
+    publicUrl: config.PUBLIC_URL,
+  });
+  const membership = new MembershipService({ kv, log: app.log, hub: hubClient, auth, notifier, appEnv: config.APP_ENV });
+  const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
 
   app.get('/health', async () => ({
     ok: true,
@@ -95,15 +148,20 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl 
     },
     news: news.status(),
     videos: videos.status(),
+    mail: notifier.status(),
+    payments: payments.status(),
+    membership: membership.status(),
   }));
 
   await app.register(projectsRoutes, { service: projects });
-  await app.register(contentRoutes, { kv, auth });
+  await app.register(contentRoutes, { kv, auth, notifier });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
   await app.register(newsRoutes, { service: news, auth });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
+  await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
+  await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -120,5 +178,5 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl 
     });
   });
 
-  return { app, projects, news, videos };
+  return { app, projects, news, videos, payments, notifier };
 }

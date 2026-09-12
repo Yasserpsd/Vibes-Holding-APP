@@ -89,6 +89,7 @@ export default function AccountScreen() {
         <MenuRow icon="ribbon-outline" label="العضوية ومزاياها" onPress={() => router.push('/membership')} />
         <MenuRow icon="create-outline" label="تعديل الملف الشخصي" onPress={() => router.push('/profile-edit')} />
         <MenuRow icon="business-outline" label="مقر النادي وزياراتي" onPress={() => router.push('/hq')} />
+        <MenuRow icon="receipt-outline" label="مدفوعاتي" onPress={() => router.push('/payments')} />
         <MenuRow icon="grid-outline" label="خدمات النادي" onPress={() => router.push('/services')} />
         <MenuRow icon="play-circle-outline" label="مكتبة الفيديو" onPress={() => router.push('/videos')} />
         <MenuRow icon="information-circle-outline" label="عنّا" onPress={() => router.push('/about')} />

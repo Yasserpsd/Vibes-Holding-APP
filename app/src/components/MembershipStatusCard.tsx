@@ -9,7 +9,7 @@ type Props = {
   membership: Membership | null;
   texts: MembershipContent['statusTexts'] | undefined;
   activationNote?: string;
-  /** Server-driven membership name («العضوية الذهبية»). */
+  /** Server-driven membership name («العضوية السنوية لنادي المستثمرين»). */
   title?: string;
 };
 

@@ -78,6 +78,6 @@ Variables: `HUB_MODE` (`live` | `mock`; default `live` when `HUB_SITE_KEY` is se
 
 ## 6. Later milestones on the same bridge
 - Advisor voice and image: `message` already accepts `audio` (data URL, Arabic only, transcribed by the hub) and `image` (jpeg/png/webp data URL); the app needs native modules (expo-audio, expo-image-picker) and therefore a new APK before they can be used.
-- M7 store purchase → hub membership activation: needs a new server-to-server op (`activate_member`) in the plugin; `set_member()` already exists inside the hub.
+- M7 store purchase → hub membership activation: the app server already calls a new server-to-server op `activate_member` with `{ contact_id, days, reference, product, store }` (from the RevenueCat webhook, `server/src/membership/service.ts`) and expects `{ ok: true, contact }`; the plugin still has to implement it with `set_member()` (until then the management gets a «تحتاج تفعيلًا يدويًا» mail and activates by hand). The mock hub implements it.
 - Push on staff replies: a webhook from the hub to this server (new plugin code).
 - Projects Bank unlocks: separate endpoint in the Projects Bank plugin (brief §2.2).

@@ -21,8 +21,8 @@ test('riyadh clock and bookable days follow the Riyadh calendar and the working 
 test('slot times cover the working hours in slot steps', () => {
   const times = slotTimes(HQ_SEED);
   assert.equal(times[0], '10:00');
-  assert.equal(times[times.length - 1], '16:00');
-  assert.equal(times.length, 7);
+  assert.equal(times[times.length - 1], '18:00');
+  assert.equal(times.length, 9);
 });
 
 test('pass windows: 15 minutes of grace before the slot, expired after it', () => {

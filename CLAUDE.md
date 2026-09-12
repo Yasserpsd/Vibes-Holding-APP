@@ -17,7 +17,7 @@ Full scope, business facts, integrations and milestones: `docs/PROJECT_BRIEF.md`
 - Current environment: TEST. Never switch anything to production unless the owner says so explicitly.
 
 ## Hard rules
-1. No secrets in code, git, logs or chat. Paymob secret key, API key and HMAC, the OpenAI key, and the hub/Projects Bank bridge keys live only in environment variables (git-ignored `.env`, Railway variables, EAS environment variables). The app may contain only public values (API base URL, Paymob public key).
+1. No secrets in code, git, logs or chat. Paymob secret key, API key and HMAC, the OpenAI key, the SMTP mailbox password, the RevenueCat webhook value, and the hub/Projects Bank bridge keys live only in environment variables (git-ignored `.env`, Railway variables, EAS environment variables). The app may contain only public values (API base URL, Paymob public key).
 2. One identity source: accounts and memberships belong to the vcmem.com hub (Vibes AI Assistant plugin). The server never keeps its own separate member registry; it proxies and caches hub data.
 3. The annual membership is purchased in-app only through Apple IAP / Google Play Billing (later milestone). Never show Paymob membership links, representative payment links, web prices, or any call to action to pay for membership outside the app. Paymob inside the app is for real-world services only.
 4. Founder contact data (whatsapp, email, website) and pitch decks from the Projects Bank feed never reach the app unless that member unlocked that project. Enforce on the server and strip these fields from every other response.

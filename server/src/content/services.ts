@@ -18,6 +18,8 @@ export type ServiceField = {
 export type ServiceAction =
   /** Hands the request over to a WhatsApp number with a prefilled message plus the filled fields. */
   | { type: 'whatsapp'; phone: string; message: string; fields: ServiceField[] }
+  /** Paid in-app through Paymob (real-world services only, CLAUDE.md rule 3): the member fills the fields, then pays the amount for their account (SAR). */
+  | { type: 'paymob'; message: string; fields: ServiceField[]; amount: number; memberAmount: number | null; currency: 'SAR' }
   /** Opens a web page (registration form, service page) in the in-app browser. */
   | { type: 'link'; url: string; label: string }
   /** Opens the advisor tab with a suggested first message. */
@@ -56,8 +58,11 @@ export type ServicesContent = {
   updatedAt: string;
 };
 
+/** What this account pays for a Paymob service: the member price when the membership is active. */
+export type ServicePrice = { amount: number; currency: string; memberPrice: boolean };
+
 /** A service as the app receives it: locked services carry no action. */
-export type PublicService = Omit<Service, 'action'> & { locked: boolean; action: ServiceAction | null };
+export type PublicService = Omit<Service, 'action'> & { locked: boolean; action: ServiceAction | null; price: ServicePrice | null };
 
 export const SERVICES_CONTENT_KEY = 'content:services';
 
@@ -67,6 +72,7 @@ export const STUDIO_WHATSAPP = '+966538461110';
 
 const management = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: MANAGEMENT_WHATSAPP, message, fields });
 const studio = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: STUDIO_WHATSAPP, message, fields });
+const paid = (amount: number, memberAmount: number | null, message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'paymob', message, fields, amount, memberAmount, currency: 'SAR' });
 
 // Initial content from docs/PROJECT_BRIEF.md sections 4.1, 5 and 5.2. The dashboard edits it later.
 export const SERVICES_SEED: ServicesContent = {
@@ -90,9 +96,9 @@ export const SERVICES_SEED: ServicesContent = {
       icon: 'people',
       group: 'entrepreneur',
       priceLabel: '30,000 ريال',
-      memberLabel: 'خصم 50% للأعضاء',
+      memberLabel: '15,000 ريال للأعضاء',
       access: 'everyone',
-      action: management('أرغب في طلب خدمة «اصنع ملتقاك».', [
+      action: paid(30000, 15000, 'طلب خدمة «اصنع ملتقاك»', [
         { key: 'topic', label: 'موضوع الملتقى', placeholder: 'مثال: فرص الشراكة في قطاع التجزئة' },
         { key: 'date', label: 'الموعد المفضل', placeholder: 'مثال: النصف الثاني من أكتوبر' },
       ]),
@@ -124,7 +130,7 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: '5,000 ريال',
       memberLabel: '2,500 ريال للأعضاء',
       access: 'everyone',
-      action: management('أرغب في طلب خدمة تصميم Pitch Deck لمشروعي.', [
+      action: paid(5000, 2500, 'طلب خدمة تصميم Pitch Deck', [
         { key: 'project', label: 'اسم المشروع' },
         { key: 'stage', label: 'مرحلة المشروع', options: ['فكرة', 'نموذج أولي', 'مشروع قائم', 'توسّع'] },
       ]),
@@ -310,7 +316,7 @@ export const SERVICES_SEED: ServicesContent = {
       order: 15,
     },
   ],
-  version: 1,
+  version: 2,
   updatedAt: '2026-09-12T00:00:00.000Z',
 };
 
@@ -331,10 +337,17 @@ export function isActiveMember(me: Me | null): boolean {
 }
 
 /** Locks member-only services for guests and accounts without an active membership; locked services lose their action. */
+/** The price this account pays for a Paymob service (member price with an active membership); null for other actions. */
+export function priceFor(service: Service, me: Me | null): ServicePrice | null {
+  if (service.action.type !== 'paymob') return null;
+  const memberPrice = isActiveMember(me) && service.action.memberAmount !== null;
+  return { amount: memberPrice ? (service.action.memberAmount as number) : service.action.amount, currency: service.action.currency, memberPrice };
+}
+
 export function toPublicService(service: Service, me: Me | null): PublicService {
   const locked = service.access === 'member' && !isActiveMember(me);
   const { action, ...rest } = service;
-  return { ...rest, locked, action: locked ? null : action };
+  return { ...rest, locked, action: locked ? null : action, price: locked ? null : priceFor(service, me) };
 }
 
 export function lockedTextFor(content: ServicesContent, me: Me | null): string {

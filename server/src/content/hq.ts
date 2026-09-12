@@ -25,7 +25,7 @@ export type HqContent = {
 export const HQ_CONTENT_KEY = 'content:hq';
 
 // Initial content from docs/PROJECT_BRIEF.md section 5.3 and vcmem.com/location. Hours are a
-// working assumption (Sunday to Thursday, 10:00 to 17:00) until the owner sets them from the dashboard.
+// the owner's hours (2026-09-12): Sunday to Thursday, 10:00 to 19:00; the dashboard edits them later.
 export const HQ_SEED: HqContent = {
   title: 'مقر النادي',
   intro: 'مقر نادي المستثمرين في الرياض: 400 م² من المكاتب وقاعات الاجتماعات ومسرح النادي وكوفي شوب، للأعضاء المشتركين بالحجز المسبق.',
@@ -40,12 +40,12 @@ export const HQ_SEED: HqContent = {
   ],
   memberOnlyText: 'حجز زيارة المقر متاح للأعضاء المشتركين. فعّل عضويتك السنوية لحجز موعدك.',
   guestText: 'سجّل الدخول بحسابك وفعّل عضويتك السنوية لحجز زيارة المقر.',
-  hours: { days: [0, 1, 2, 3, 4], open: '10:00', close: '17:00', slotMinutes: 60 },
+  hours: { days: [0, 1, 2, 3, 4], open: '10:00', close: '19:00', slotMinutes: 60 },
   leadDays: 1,
   maxDaysAhead: 30,
   slotCapacity: 5,
   purposes: ['اجتماع عمل', 'زيارة تعريفية للمقر', 'تصوير أو بودكاست', 'حضور فعالية', 'أخرى'],
-  version: 1,
+  version: 2,
   updatedAt: '2026-09-12T00:00:00.000Z',
 };
 

@@ -34,3 +34,12 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
 
 /** Weekday names, Sunday first (JavaScript's getDay order). */
 export const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+/** "12 سبتمبر 2026 · 14:05" in the device's local time, for timestamps such as a booking time. */
+export function formatArabicDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${formatArabicDate(day)} · ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}

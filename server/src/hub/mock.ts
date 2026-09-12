@@ -89,6 +89,8 @@ export class MockHubClient implements HubClient {
         return this.resetConfirm(body);
       case 'delete_account':
         return this.deleteAccount(body);
+      case 'activate_member':
+        return this.activateMember(body);
       case 'config':
         return this.chat.config();
       case 'message': {
@@ -113,6 +115,18 @@ export class MockHubClient implements HubClient {
     const uuid = str(body, 'uuid', 64).replace(/[^a-zA-Z0-9-]/g, '');
     if (uuid.length < 8 && strict) throw new HubError('bad_uuid', 'معرّف الزائر غير صحيح', 400);
     return uuid;
+  }
+
+  /** Store purchase → membership (the live plugin gets the same op in a later release). */
+  private activateMember(body: HubBody): HubResponse {
+    const id = Number(body.contact_id);
+    const contact = Number.isInteger(id) ? this.contacts.get(id) : undefined;
+    if (!contact || !contact.verified) throw new HubError('not_found', 'الحساب غير موجود', 404);
+    const days = Number(body.days);
+    contact.isMember = true;
+    contact.memberStartedAt = Date.now();
+    contact.memberDays = Number.isInteger(days) && days > 0 ? days : 365;
+    return { ok: true, contact: this.publicContact(contact) };
   }
 
   private byUuid(body: HubBody): MockContact | null {

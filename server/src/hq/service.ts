@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { getHqContent, type HqContent } from '../content/hq.js';
+import type { Notifier, VisitLike } from '../mail/notify.js';
 import type { KV } from '../store.js';
 
 /**
@@ -61,7 +62,7 @@ export type AdminVisit = PublicVisit & { contactId: number; name: string; phone:
 
 export type PassState = 'upcoming' | 'active' | 'expired';
 
-export type Pass = { visit: PublicVisit; code: string; qr: string; validFrom: string; validTo: string; state: PassState };
+export type Pass = { visit: PublicVisit; name: string; code: string; qr: string; validFrom: string; validTo: string; state: PassState };
 
 export type HqAccess = 'guest' | 'locked' | 'expired' | 'member';
 
@@ -75,7 +76,7 @@ export type HqOverview = {
 
 export type BookInput = { date: string; time: string; purpose: string; note: string };
 
-type Deps = { kv: KV; log: FastifyBaseLogger };
+type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
@@ -190,6 +191,23 @@ export class HqService {
     return { ...this.toPublic(visit, content, now), contactId: visit.contactId, name: visit.name, phone: visit.phone, email: visit.email };
   }
 
+  /** What the management's e-mail needs: who, when, and the booking time. */
+  private toMail(visit: Visit, content: HqContent): VisitLike {
+    return {
+      id: visit.id,
+      name: visit.name,
+      phone: visit.phone,
+      email: visit.email,
+      date: visit.date,
+      time: visit.time,
+      endTime: timeOf(minutesOf(visit.time) + content.hours.slotMinutes),
+      purpose: visit.purpose,
+      note: visit.note,
+      createdAt: visit.createdAt,
+      adminNote: visit.adminNote,
+    };
+  }
+
   static accessOf(me: Me | null): HqAccess {
     if (!me) return 'guest';
     if (me.membership.status === 'active') return 'member';
@@ -239,7 +257,7 @@ export class HqService {
     if (!content.purposes.includes(purpose)) throw new RequestError('bad_purpose', 'اختر الغرض من الزيارة');
     const note = input.note.trim().slice(0, 300);
 
-    return this.mutate((visits) => {
+    const visit = await this.mutate((visits) => {
       if (visits.some((visit) => visit.contactId === me.id && isOpen(visit) && visit.date === input.date)) {
         throw new RequestError('duplicate', 'لديك حجز في هذا اليوم بالفعل');
       }
@@ -264,19 +282,23 @@ export class HqService {
       };
       visits.push(visit);
       this.deps.log.info({ visit: visit.id, date: visit.date, time: visit.time }, 'hq visit requested');
-      return this.toPublic(visit, content, now);
+      return visit;
     });
+    this.deps.notifier.hqVisitRequested(this.toMail(visit, content));
+    return this.toPublic(visit, content, now);
   }
 
   async cancel(contactId: number, id: string, now = Date.now()): Promise<PublicVisit> {
     const content = await this.content();
-    return this.mutate((visits) => {
+    const visit = await this.mutate((visits) => {
       const visit = visits.find((entry) => entry.id === id && entry.contactId === contactId);
       if (!visit) throw new RequestError('not_found', 'الحجز غير موجود', 404);
       if (!this.toPublic(visit, content, now).cancellable) throw new RequestError('not_cancellable', 'لا يمكن إلغاء هذا الحجز');
       visit.status = 'cancelled';
-      return this.toPublic(visit, content, now);
+      return visit;
     });
+    this.deps.notifier.hqVisitCancelled(this.toMail(visit, content));
+    return this.toPublic(visit, content, now);
   }
 
   /** The QR pass of a confirmed visit: a PNG data URL the app shows as an image. */
@@ -288,7 +310,7 @@ export class HqService {
     const { state, validFrom, validTo } = passState(visit, content.hours.slotMinutes, now);
     const code = `${QR_PREFIX}:${visit.id}:${visit.passCode}`;
     const qr = await QRCode.toDataURL(code, { errorCorrectionLevel: 'M', margin: 1, width: 480 });
-    return { visit: this.toPublic(visit, content, now), code, qr, validFrom: validFrom.toISOString(), validTo: validTo.toISOString(), state };
+    return { visit: this.toPublic(visit, content, now), name: visit.name, code, qr, validFrom: validFrom.toISOString(), validTo: validTo.toISOString(), state };
   }
 
   async adminList(status: VisitStatus | null, now = Date.now()): Promise<AdminVisit[]> {
@@ -297,20 +319,22 @@ export class HqService {
     return visits.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`)).map((visit) => this.toAdmin(visit, content, now));
   }
 
-  async decide(id: string, status: 'confirmed' | 'rejected', adminId: number, note: string, now = Date.now()): Promise<AdminVisit> {
+  async decide(id: string, status: 'confirmed' | 'rejected', admin: { id: number; name: string }, note: string, now = Date.now()): Promise<AdminVisit> {
     const content = await this.content();
-    return this.mutate((visits) => {
+    const visit = await this.mutate((visits) => {
       const visit = visits.find((entry) => entry.id === id);
       if (!visit) throw new RequestError('not_found', 'الحجز غير موجود', 404);
       if (visit.status !== 'pending') throw new RequestError('decided', 'تم البت في هذا الحجز من قبل');
       visit.status = status;
       visit.decidedAt = new Date(now).toISOString();
-      visit.decidedBy = adminId;
+      visit.decidedBy = admin.id;
       visit.adminNote = note.trim().slice(0, 300) || null;
       visit.passCode = status === 'confirmed' ? randomBytes(9).toString('base64url') : null;
-      this.deps.log.info({ visit: visit.id, status, adminId }, 'hq visit decided');
-      return this.toAdmin(visit, content);
+      this.deps.log.info({ visit: visit.id, status, adminId: admin.id }, 'hq visit decided');
+      return visit;
     });
+    this.deps.notifier.hqVisitDecided(this.toMail(visit, content), status, admin.name);
+    return this.toAdmin(visit, content, now);
   }
 
   /** Checks a scanned pass: known code, confirmed visit, and inside the slot window. */

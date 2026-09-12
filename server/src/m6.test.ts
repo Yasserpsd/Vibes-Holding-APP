@@ -79,7 +79,7 @@ test('home, about and membership content follow the wording rules', async () => 
 
   const membership = await get('/api/membership');
   assert.equal(membership.statusCode, 200);
-  assert.equal(membership.json().title, 'العضوية الذهبية');
+  assert.equal(membership.json().title, 'العضوية السنوية لنادي المستثمرين');
   assert.equal(membership.json().groups.length, 4);
   // Older app versions still get the flat lists.
   assert.equal(membership.json().benefits.length, 17);
@@ -109,7 +109,7 @@ test('services are listed for everyone but member-only ones are locked without a
   assert.equal(studio.action, null);
   const pitch = list.services.find((service: { key: string }) => service.key === 'pitch-deck');
   assert.equal(pitch.locked, false);
-  assert.equal(pitch.action.type, 'whatsapp');
+  assert.equal(pitch.action.type, 'paymob');
   assert.equal(pitch.action.fields.length, 2);
 
   const guestStudio = await get('/api/services/studio');

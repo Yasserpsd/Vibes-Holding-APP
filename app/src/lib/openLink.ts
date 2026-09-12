@@ -8,7 +8,7 @@ type WebBrowserModule = typeof import('expo-web-browser');
 // expo-web-browser is native. Binaries built before it was added (the M1 APK) do not contain
 // it. The native module registry is checked first: requiring the package when the module is
 // missing is reported by React Native as a fatal error before any try/catch can run.
-function loadWebBrowser(): WebBrowserModule | null {
+export function loadWebBrowser(): WebBrowserModule | null {
   if (!requireOptionalNativeModule('ExpoWebBrowser')) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

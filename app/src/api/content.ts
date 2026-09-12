@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/auth/AuthProvider';
 
-import { apiGet } from './client';
+import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/content/home.ts, services.ts and about.ts.
 export type PortalKey = 'investor' | 'entrepreneur' | 'neutral';
@@ -31,6 +31,7 @@ export type ServiceField = { key: string; label: string; options?: string[]; pla
 
 export type ServiceAction =
   | { type: 'whatsapp'; phone: string; message: string; fields: ServiceField[] }
+  | { type: 'paymob'; message: string; fields: ServiceField[]; amount: number; memberAmount: number | null; currency: 'SAR' }
   | { type: 'link'; url: string; label: string }
   | { type: 'advisor'; prompt: string }
   | { type: 'hq' }
@@ -50,6 +51,8 @@ export type Service = {
   access: 'everyone' | 'member';
   locked: boolean;
   action: ServiceAction | null;
+  /** What this account pays for a Paymob service (member price with an active membership); null otherwise. */
+  price: { amount: number; currency: string; memberPrice: boolean } | null;
   infoUrl: string | null;
   order: number;
 };
@@ -124,4 +127,9 @@ export function useService(key: string | undefined) {
     enabled: Boolean(key),
     staleTime: 5 * 60_000,
   });
+}
+
+/** Tells the management about a WhatsApp handover before the app leaves for WhatsApp (never blocks the handover). */
+export function reportServiceRequest(key: string, answers: Record<string, string>): void {
+  void apiRequest('POST', `/api/services/${encodeURIComponent(key)}/request`, { body: { answers } }).catch(() => undefined);
 }

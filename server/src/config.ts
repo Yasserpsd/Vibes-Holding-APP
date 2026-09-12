@@ -7,6 +7,9 @@ const envSchema = z.object({
   HOST: z.string().min(1).default('0.0.0.0'),
   LOG_LEVEL: z.string().min(1).default('info'),
   DATABASE_URL: z.string().min(1).optional(),
+  // Public base URL of this server (Paymob callbacks and the payment pages). Railway injects RAILWAY_PUBLIC_DOMAIN.
+  PUBLIC_URL: z.string().url().optional(),
+  RAILWAY_PUBLIC_DOMAIN: z.string().min(1).optional(),
   PB_FEED_URL: z.string().min(1).default('https://vibesholding.com/wp-json/pb/v1/projects'),
   PB_FEED_KEY: z.string().min(1).optional(),
   PB_REFRESH_MINUTES: z.coerce.number().positive().default(10),
@@ -30,11 +33,31 @@ const envSchema = z.object({
   YOUTUBE_CHANNEL: z.string().min(2).default('@investorscl'),
   YOUTUBE_API_KEY: z.string().min(20).optional(),
   VIDEOS_REFRESH_MINUTES: z.coerce.number().nonnegative().default(60),
+  // Paymob KSA, real-world services only (CLAUDE.md rule 3). Secrets live in the environment only (rule 1).
+  // Mock mode serves a local checkout page that fires the same HMAC-signed callback; never in production.
+  PAYMOB_MODE: z.enum(['live', 'mock']).optional(),
+  PAYMOB_BASE_URL: z.string().url().default('https://ksa.paymob.com'),
+  PAYMOB_SECRET_KEY: z.string().min(20).optional(),
+  PAYMOB_PUBLIC_KEY: z.string().min(10).optional(),
+  PAYMOB_HMAC_SECRET: z.string().min(10).optional(),
+  // Integration id(s) of the payment methods shown at checkout (comma separated).
+  PAYMOB_INTEGRATION_ID: z.string().min(1).optional(),
+  // Management notifications, the same idea as the website's notify_email list. Without SMTP_HOST mails are only logged.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_SECURE: z.enum(['0', '1']).optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  MAIL_FROM: z.string().min(3).optional(),
+  NOTIFY_EMAIL: z.string().min(3).optional(),
+  // Store purchases: the RevenueCat webhook carries this Authorization header value verbatim.
+  REVENUECAT_WEBHOOK_AUTH: z.string().min(10).optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
 export type HubMode = 'live' | 'mock';
-export type Config = Omit<Env, 'HUB_MODE'> & { HUB_MODE: HubMode };
+export type PaymobMode = 'live' | 'mock';
+export type Config = Omit<Env, 'HUB_MODE' | 'PAYMOB_MODE'> & { HUB_MODE: HubMode; PAYMOB_MODE: PaymobMode; PUBLIC_URL: string };
 
 /** Loads server/.env when present. Real environments (Railway) use variables only. */
 export function loadDotEnv(): void {
@@ -64,5 +87,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   if (hubMode === 'mock' && env.APP_ENV === 'production') {
     throw new Error('Invalid environment: the mock hub is not allowed in production');
   }
-  return { ...env, HUB_MODE: hubMode };
+  const paymobConfigured = Boolean(env.PAYMOB_SECRET_KEY && env.PAYMOB_HMAC_SECRET && env.PAYMOB_PUBLIC_KEY && env.PAYMOB_INTEGRATION_ID);
+  const paymobMode: PaymobMode = env.PAYMOB_MODE ?? (paymobConfigured ? 'live' : 'mock');
+  if (paymobMode === 'live' && !paymobConfigured) {
+    throw new Error('Invalid environment: PAYMOB_MODE=live requires PAYMOB_SECRET_KEY, PAYMOB_PUBLIC_KEY, PAYMOB_HMAC_SECRET and PAYMOB_INTEGRATION_ID');
+  }
+  if (paymobMode === 'mock' && env.APP_ENV === 'production') {
+    throw new Error('Invalid environment: mock payments are not allowed in production');
+  }
+  const publicUrl = env.PUBLIC_URL ?? (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${env.PORT}`);
+  return { ...env, HUB_MODE: hubMode, PAYMOB_MODE: paymobMode, PUBLIC_URL: publicUrl.replace(/\/+$/, '') };
 }

@@ -55,7 +55,7 @@ export type AdminVisit = Visit & { contactId: number; name: string; phone: strin
 
 export type PassState = 'upcoming' | 'active' | 'expired';
 
-export type Pass = { visit: Visit; code: string; qr: string; validFrom: string; validTo: string; state: PassState };
+export type Pass = { visit: Visit; name: string; code: string; qr: string; validFrom: string; validTo: string; state: PassState };
 
 export type Slot = { time: string; endTime: string; available: boolean };
 

@@ -70,6 +70,7 @@ export type HubOp =
   | 'reset_request'
   | 'reset_confirm'
   | 'delete_account'
+  | 'activate_member'
   | 'message'
   | 'poll'
   | 'history';
