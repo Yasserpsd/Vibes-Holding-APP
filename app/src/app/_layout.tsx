@@ -70,6 +70,15 @@ export default function RootLayout() {
           <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: 'الخبر' }} />
           <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: 'قرارات وأنظمة المملكة' }} />
           <Stack.Screen name="news/interests" options={{ ...detailHeader, title: 'اهتماماتي' }} />
+          <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: 'بوابة رواد الأعمال' }} />
+          <Stack.Screen name="services/index" options={{ ...detailHeader, title: 'خدمات النادي' }} />
+          <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: 'الخدمة' }} />
+          <Stack.Screen name="videos/index" options={{ ...detailHeader, title: 'مكتبة الفيديو' }} />
+          <Stack.Screen name="about" options={{ ...detailHeader, title: 'عنّا' }} />
+          <Stack.Screen name="hq/index" options={{ ...detailHeader, title: 'مقر النادي' }} />
+          <Stack.Screen name="hq/book" options={{ ...detailHeader, title: 'حجز زيارة' }} />
+          <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: 'باركود الدخول' }} />
+          <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: 'طلبات الزيارة' }} />
           <Stack.Screen name="auth/login" options={{ ...detailHeader, title: 'تسجيل الدخول' }} />
           <Stack.Screen name="auth/register" options={{ ...detailHeader, title: 'إنشاء حساب' }} />
           <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: 'رمز التفعيل' }} />

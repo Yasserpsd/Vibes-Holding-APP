@@ -9,6 +9,8 @@ type Props = {
   membership: Membership | null;
   texts: MembershipContent['statusTexts'] | undefined;
   activationNote?: string;
+  /** Server-driven membership name («العضوية الذهبية»). */
+  title?: string;
 };
 
 const FALLBACK_TEXTS: MembershipContent['statusTexts'] = {
@@ -19,7 +21,7 @@ const FALLBACK_TEXTS: MembershipContent['statusTexts'] = {
 };
 
 /** Membership state as a badge: guest, unactivated, active with the days left, or expired. */
-export function MembershipStatusCard({ membership, texts, activationNote }: Props) {
+export function MembershipStatusCard({ membership, texts, activationNote, title }: Props) {
   const t = texts ?? FALLBACK_TEXTS;
   const status = membership?.status ?? 'guest';
   const tone = status === 'active' ? colors.success : status === 'expired' ? colors.danger : status === 'unactivated' ? colors.warning : colors.textMuted;
@@ -32,7 +34,7 @@ export function MembershipStatusCard({ membership, texts, activationNote }: Prop
         <Ionicons name={icon} size={28} color={tone} />
         <View style={styles.texts}>
           <View style={styles.badgeRow}>
-            <Text style={styles.title}>العضوية السنوية</Text>
+            <Text style={styles.title}>{title ?? 'العضوية السنوية'}</Text>
             <View style={[styles.badge, { backgroundColor: tone }]}>
               <Text style={styles.badgeText}>{label}</Text>
             </View>

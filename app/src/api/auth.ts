@@ -67,10 +67,17 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
 
 export type MembershipBenefit = { icon: string; title: string; detail: string | null };
 
+export type MembershipItemLink = { type: 'whatsapp'; phone: string; message: string } | { type: 'route'; path: string };
+export type MembershipItem = { text: string; link: MembershipItemLink | null };
+export type MembershipGroup = { key: string; title: string; icon: string; comingSoon: boolean; items: MembershipItem[] };
+
 export type MembershipContent = {
   title: string;
+  subtitle: string;
   intro: string;
+  groups: MembershipGroup[];
   benefits: MembershipBenefit[];
+  comingSoonTitle: string;
   comingSoon: string[];
   statusTexts: { guest: string; unactivated: string; active: string; expired: string };
   activationNote: string;

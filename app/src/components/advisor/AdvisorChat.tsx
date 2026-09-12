@@ -4,12 +4,13 @@ import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AdvisorGate, AdvisorMessage, AdvisorProfile } from '@/api/advisor';
+import type { AdvisorContext, AdvisorGate, AdvisorMessage, AdvisorProfile, PortalKey } from '@/api/advisor';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { Notice } from '@/components/Notice';
 import { formatArabicDate, formatNumber } from '@/lib/format';
+import type { IoniconName } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 import { Composer } from './Composer';
@@ -19,10 +20,39 @@ import { useAdvisorChat } from './useAdvisorChat';
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
 const IOS_TAB_BAR_HEIGHT = 49;
 
-/** Screen context sent with each message until dismissed: a project or a news item. */
-export type ChatContext = { type: 'project'; id: number; title: string } | { type: 'news'; id: string; title: string };
-type Props = { context: ChatContext | null; onClearContext: () => void };
+/** Screen context sent with each message until dismissed: a project, a news item, a home portal or a service. */
+export type ChatContext =
+  | { type: 'project'; id: number; title: string }
+  | { type: 'news'; id: string; title: string }
+  | { type: 'portal'; id: PortalKey; title: string }
+  | { type: 'service'; id: string; title: string };
+
+/** The advisor opens the conversation itself (neutral portal, services): shown until the member answers. */
+export type ChatOpening = { title: string; text: string; quickReplies: string[] };
+
+type Props = { context: ChatContext | null; opening?: ChatOpening | null; onClearContext: () => void };
 type Item = { message: AdvisorMessage; dayLabel: string | null };
+
+const CONTEXT_ICONS: Record<ChatContext['type'], IoniconName> = {
+  project: 'briefcase-outline',
+  news: 'newspaper-outline',
+  portal: 'compass-outline',
+  service: 'grid-outline',
+};
+
+function toApiContext(context: ChatContext | null): AdvisorContext | null {
+  if (!context) return null;
+  switch (context.type) {
+    case 'project':
+      return { type: 'project', id: context.id };
+    case 'news':
+      return { type: 'news', id: context.id };
+    case 'portal':
+      return { type: 'portal', id: context.id };
+    case 'service':
+      return { type: 'service', id: context.id };
+  }
+}
 
 function dayKey(iso: string): string {
   const date = new Date(iso);
@@ -49,12 +79,14 @@ function withDayLabels(messages: AdvisorMessage[]): Item[] {
 }
 
 /** The advisor conversation for a signed-in member. */
-export function AdvisorChat({ context, onClearContext }: Props) {
+export function AdvisorChat({ context, opening = null, onClearContext }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { me } = useAuth();
   const chat = useAdvisorChat();
   const [draft, setDraft] = useState('');
+  // The opening the member already answered; a new one (another portal or service) shows again.
+  const [answeredOpening, setAnsweredOpening] = useState<ChatOpening | null>(null);
   const listRef = useRef<FlatList<Item>>(null);
 
   const items = useMemo(() => withDayLabels(chat.messages), [chat.messages]);
@@ -70,12 +102,14 @@ export function AdvisorChat({ context, onClearContext }: Props) {
   const submit = async (text: string) => {
     if (!text.trim() || chat.sending) return;
     setDraft('');
-    const accepted = await chat.send(text, context ? (context.type === 'project' ? { type: 'project', id: context.id } : { type: 'news', id: context.id }) : null);
+    setAnsweredOpening(opening);
+    const accepted = await chat.send(text, toApiContext(context));
     if (!accepted) setDraft((current) => current || text);
   };
 
   const dailyLeft = me?.membership.aiDailyLeft ?? null;
   const busy = chat.sending || chat.status !== 'ready';
+  const showOpening = Boolean(opening) && answeredOpening !== opening;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -120,14 +154,19 @@ export function AdvisorChat({ context, onClearContext }: Props) {
                 {item.dayLabel ? <Text style={styles.day}>{item.dayLabel}</Text> : null}
                 <MessageBubble
                   message={item.message}
-                  showQuickReplies={item.message.id === lastReplyId && !chat.waiting && !chat.sending}
+                  showQuickReplies={item.message.id === lastReplyId && !chat.waiting && !chat.sending && !showOpening}
                   onQuickReply={(text) => void submit(text)}
                 />
               </View>
             )}
             contentContainerStyle={styles.list}
-            ListHeaderComponent={<Welcome profile={chat.profile} empty={chat.messages.length === 0} onSuggestion={(text) => void submit(text)} />}
-            ListFooterComponent={chat.waiting ? <Typing name={chat.profile?.botName ?? 'المستشار'} /> : null}
+            ListHeaderComponent={<Welcome profile={chat.profile} empty={chat.messages.length === 0 && !showOpening} onSuggestion={(text) => void submit(text)} />}
+            ListFooterComponent={
+              <>
+                {showOpening && opening ? <OpeningCard opening={opening} botName={chat.profile?.botName ?? 'المستشار'} onReply={(text) => void submit(text)} /> : null}
+                {chat.waiting ? <Typing name={chat.profile?.botName ?? 'المستشار'} /> : null}
+              </>
+            }
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
             keyboardShouldPersistTaps="handled"
           />
@@ -141,7 +180,7 @@ export function AdvisorChat({ context, onClearContext }: Props) {
         ) : null}
         {context ? (
           <View style={styles.context}>
-            <Ionicons name={context.type === 'news' ? 'newspaper-outline' : 'briefcase-outline'} size={16} color={colors.gold} />
+            <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
             <Text style={styles.contextText} numberOfLines={1}>{`الموضوع: ${context.title}`}</Text>
             <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel="إزالة الموضوع">
               <Ionicons name="close-circle" size={18} color={colors.textMuted} />
@@ -163,6 +202,25 @@ function Welcome({ profile, empty, onSuggestion }: { profile: AdvisorProfile | n
         <View style={styles.suggestions}>
           {profile.suggestions.map((suggestion) => (
             <Chip key={suggestion} label={suggestion} onPress={() => onSuggestion(suggestion)} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** The advisor's opening move, rendered like one of its bubbles with the suggested answers underneath. */
+function OpeningCard({ opening, botName, onReply }: { opening: ChatOpening; botName: string; onReply: (text: string) => void }) {
+  return (
+    <View style={styles.opening}>
+      <View style={styles.openingBubble}>
+        <Text style={styles.openingTitle}>{`${botName} · ${opening.title}`}</Text>
+        <Text style={styles.openingText}>{opening.text}</Text>
+      </View>
+      {opening.quickReplies.length ? (
+        <View style={styles.suggestions}>
+          {opening.quickReplies.map((reply) => (
+            <Chip key={reply} label={reply} onPress={() => onReply(reply)} />
           ))}
         </View>
       ) : null}
@@ -219,6 +277,11 @@ const styles = StyleSheet.create({
   welcome: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   welcomeText: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  // In the forced RTL layout flex-start is the right edge, where the advisor's bubbles sit.
+  opening: { alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm },
+  openingBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.lg, gap: spacing.xs, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.goldDark },
+  openingTitle: { ...typography.caption, color: colors.gold, textAlign: 'right' },
+  openingText: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
   typing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   typingText: { ...typography.caption, color: colors.textSecondary },
   notice: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },

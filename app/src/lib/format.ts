@@ -31,3 +31,6 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
   if (days < 7) return `قبل ${formatNumber(days)} أيام`;
   return formatArabicDate(new Date(then).toISOString());
 }
+
+/** Weekday names, Sunday first (JavaScript's getDay order). */
+export const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];

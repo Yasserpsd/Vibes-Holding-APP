@@ -1,29 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useMembershipContent, type MembershipBenefit } from '@/api/auth';
+import { useMembershipContent, type MembershipGroup, type MembershipItem } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { iconFor } from '@/lib/icons';
+import { openWhatsApp } from '@/lib/whatsapp';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
-
-// Server content names an icon family; unknown names fall back to a check mark.
-const ICONS: Record<string, IoniconName> = {
-  megaphone: 'megaphone-outline',
-  briefcase: 'briefcase-outline',
-  sparkles: 'sparkles-outline',
-  people: 'people-outline',
-  business: 'business-outline',
-  pricetag: 'pricetag-outline',
-  cart: 'cart-outline',
-};
-
+/** Membership benefits as the owner wrote them (server content), grouped; lines can open a screen or WhatsApp. */
 export default function MembershipScreen() {
   const router = useRouter();
   const { status, me } = useAuth();
@@ -37,83 +26,83 @@ export default function MembershipScreen() {
     );
   }
 
+  const open = (item: MembershipItem) => {
+    if (!item.link) return;
+    if (item.link.type === 'route') {
+      router.push(item.link.path as Href);
+      return;
+    }
+    const sender = me ? `\nالاسم: ${me.name}${me.phone ? ` · الجوال: ${me.phone}` : ''}` : '';
+    void openWhatsApp(item.link.phone, `${item.link.message}${sender}\n(طلب من تطبيق نادي المستثمرين)`);
+  };
+
   return (
-    <Screen title={data.title} subtitle={data.intro}>
+    <Screen title={data.title} subtitle={data.subtitle}>
+      <Text style={styles.intro}>{data.intro}</Text>
       <MembershipStatusCard
         membership={status === 'signedIn' ? (me?.membership ?? null) : null}
         texts={data.statusTexts}
         activationNote={data.activationNote}
+        title={data.title}
       />
       {status === 'guest' ? <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
 
-      <Text style={styles.section}>مزايا العضوية</Text>
-      <View style={styles.list}>
-        {data.benefits.map((benefit) => (
-          <BenefitRow key={benefit.title} benefit={benefit} />
-        ))}
-      </View>
-
-      {data.comingSoon.length > 0 ? (
-        <>
-          <Text style={styles.section}>قريبًا</Text>
-          <View style={styles.chips}>
-            {data.comingSoon.map((item) => (
-              <View key={item} style={styles.chip}>
-                <Text style={styles.chipText}>{item}</Text>
-              </View>
-            ))}
-          </View>
-        </>
-      ) : null}
+      {data.groups.map((group) => (
+        <GroupCard key={group.key} group={group} onOpen={open} />
+      ))}
     </Screen>
   );
 }
 
-function BenefitRow({ benefit }: { benefit: MembershipBenefit }) {
+function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: MembershipItem) => void }) {
   return (
-    <View style={styles.benefit}>
-      <View style={styles.iconBox}>
-        <Ionicons name={ICONS[benefit.icon] ?? 'checkmark-circle-outline'} size={22} color={colors.gold} />
+    <View style={styles.group}>
+      <View style={styles.groupHeader}>
+        <View style={styles.iconBox}>
+          <Ionicons name={iconFor(group.icon, 'checkmark-circle-outline')} size={22} color={colors.gold} />
+        </View>
+        <Text style={styles.groupTitle}>{group.title}</Text>
+        {group.comingSoon ? (
+          <View style={styles.soon}>
+            <Text style={styles.soonText}>قريبًا</Text>
+          </View>
+        ) : null}
       </View>
-      <View style={styles.benefitText}>
-        <Text style={styles.benefitTitle}>{benefit.title}</Text>
-        {benefit.detail ? <Text style={styles.benefitDetail}>{benefit.detail}</Text> : null}
-      </View>
+      {group.items.map((item, index) => (
+        <Pressable
+          key={item.text}
+          onPress={item.link ? () => onOpen(item) : undefined}
+          disabled={!item.link}
+          accessibilityRole={item.link ? 'button' : undefined}
+          style={({ pressed }) => [styles.item, index > 0 && styles.itemBorder, pressed && item.link ? styles.pressed : null]}
+        >
+          <Ionicons name={group.comingSoon ? 'time-outline' : 'checkmark-circle'} size={18} color={group.comingSoon ? colors.textMuted : colors.gold} />
+          <Text style={[styles.itemText, group.comingSoon && styles.itemSoon]}>{item.text}</Text>
+          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : 'chevron-back'} size={16} color={colors.goldLight} /> : null}
+        </Pressable>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { ...typography.subtitle, color: colors.gold, textAlign: 'right', marginTop: spacing.sm },
-  list: { gap: spacing.sm },
-  benefit: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
+  intro: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  group: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated,
-  },
-  benefitText: { flex: 1, gap: 2 },
-  benefitTitle: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
-  benefitDetail: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
-  },
-  chipText: { ...typography.caption, color: colors.goldLight },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  iconBox: { width: 36, height: 36, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
+  groupTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right', flex: 1 },
+  soon: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark },
+  soonText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  item: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm + 2 },
+  itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  itemText: { ...typography.body, color: colors.textPrimary, textAlign: 'right', flex: 1 },
+  itemSoon: { color: colors.textSecondary },
+  pressed: { opacity: 0.7 },
 });

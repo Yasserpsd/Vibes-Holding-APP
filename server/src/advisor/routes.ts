@@ -11,6 +11,9 @@ export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService 
 const contextSchema = z.union([
   z.object({ type: z.literal('project'), id: z.number().int().positive() }),
   z.object({ type: z.literal('news'), id: z.string().regex(/^[a-f0-9]{16}$/) }),
+  // Home portals and services open the advisor with the screen as the page context.
+  z.object({ type: z.literal('portal'), id: z.enum(['investor', 'entrepreneur', 'neutral']) }),
+  z.object({ type: z.literal('service'), id: z.string().regex(/^[a-z0-9-]{1,40}$/) }),
 ]);
 const messageSchema = z.object({
   text: z.string().trim().min(1, 'اكتب رسالتك أولًا').max(4000, 'الرسالة طويلة، الحد 4000 حرف'),

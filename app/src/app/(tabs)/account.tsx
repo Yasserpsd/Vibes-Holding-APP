@@ -49,6 +49,7 @@ export default function AccountScreen() {
             <AppButton label="إنشاء حساب" variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
           )}
           <AppButton label="مزايا العضوية" variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          <AppButton label="عنّا" variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />
         </View>
       </PlaceholderScreen>
     );
@@ -81,12 +82,17 @@ export default function AccountScreen() {
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
       {me ? <ProfileHeader me={me} /> : <Notice tone="warning" text="تعذّر تحميل بياناتك الآن. اسحب للأسفل لإعادة المحاولة." />}
-      <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} />
+      <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} />
       {!hasSecureStorage() ? <Notice tone="warning" text="هذه النسخة لا تحفظ الجلسة بعد إغلاق التطبيق؛ النسخة القادمة تحفظها." /> : null}
 
       <View style={styles.menu}>
         <MenuRow icon="ribbon-outline" label="العضوية ومزاياها" onPress={() => router.push('/membership')} />
         <MenuRow icon="create-outline" label="تعديل الملف الشخصي" onPress={() => router.push('/profile-edit')} />
+        <MenuRow icon="business-outline" label="مقر النادي وزياراتي" onPress={() => router.push('/hq')} />
+        <MenuRow icon="grid-outline" label="خدمات النادي" onPress={() => router.push('/services')} />
+        <MenuRow icon="play-circle-outline" label="مكتبة الفيديو" onPress={() => router.push('/videos')} />
+        <MenuRow icon="information-circle-outline" label="عنّا" onPress={() => router.push('/about')} />
+        {me?.isAdmin ? <MenuRow icon="shield-checkmark-outline" label="طلبات زيارة المقر (إدارة)" onPress={() => router.push('/hq/admin')} /> : null}
         <MenuRow icon="log-out-outline" label="تسجيل الخروج" onPress={() => void signOut()} />
         <MenuRow icon="trash-outline" label="حذف الحساب" danger onPress={() => setDeleting(true)} />
       </View>

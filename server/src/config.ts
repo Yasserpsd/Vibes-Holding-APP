@@ -25,6 +25,11 @@ const envSchema = z.object({
   // Optional. Without a key the keyword classifier labels the news (classification only, never writing).
   OPENAI_API_KEY: z.string().min(20).optional(),
   OPENAI_MODEL: z.string().min(1).default('gpt-4.1-mini'),
+  // Video library: the club channel (handle or channel id). The Data API key (optional) lists the full catalogue;
+  // without it the public feed lists the latest uploads. 0 disables polling (tests).
+  YOUTUBE_CHANNEL: z.string().min(2).default('@investorscl'),
+  YOUTUBE_API_KEY: z.string().min(20).optional(),
+  VIDEOS_REFRESH_MINUTES: z.coerce.number().nonnegative().default(60),
 });
 
 type Env = z.infer<typeof envSchema>;

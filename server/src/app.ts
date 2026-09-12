@@ -9,6 +9,8 @@ import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { contentRoutes } from './content/routes.js';
+import { hqRoutes } from './hq/routes.js';
+import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
 import { MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
@@ -19,8 +21,11 @@ import { NewsService } from './news/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import type { KV } from './store.js';
+import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './videos/blurbs.js';
+import { videosRoutes } from './videos/routes.js';
+import { VideosService } from './videos/service.js';
 
-export type AppDeps = { config: Config; kv: KV; hub?: HubClient; classifier?: Classifier; fetchImpl?: typeof fetch };
+export type AppDeps = { config: Config; kv: KV; hub?: HubClient; classifier?: Classifier; blurbs?: BlurbWriter; fetchImpl?: typeof fetch };
 
 /** Length plus a short hash: lets the owner compare the deployed key with the local one without exposing it. */
 function keyFingerprint(key: string | undefined): string | null {
@@ -34,7 +39,9 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
-export async function buildApp({ config, kv, hub, classifier, fetchImpl }: AppDeps): Promise<{ app: FastifyInstance; projects: ProjectsService; news: NewsService }> {
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService };
+
+export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl }: AppDeps): Promise<BuiltApp> {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -63,7 +70,12 @@ export async function buildApp({ config, kv, hub, classifier, fetchImpl }: AppDe
       ? new OpenAIClassifier({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log })
       : new KeywordClassifier());
   const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl });
-  const advisor = new AdvisorService({ hub: hubClient, projects, news, log: app.log });
+  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log });
+  // Videos: the channel feed (or the Data API with a key); blurbs are marketing lines written once.
+  const blurbWriter: BlurbWriter =
+    blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
+  const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, fetchImpl });
+  const hq = new HqService({ kv, log: app.log });
 
   app.get('/health', async () => ({
     ok: true,
@@ -82,13 +94,16 @@ export async function buildApp({ config, kv, hub, classifier, fetchImpl }: AppDe
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },
     news: news.status(),
+    videos: videos.status(),
   }));
 
   await app.register(projectsRoutes, { service: projects });
-  await app.register(contentRoutes, { kv });
+  await app.register(contentRoutes, { kv, auth });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
   await app.register(newsRoutes, { service: news, auth });
+  await app.register(videosRoutes, { service: videos });
+  await app.register(hqRoutes, { service: hq, auth });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -105,5 +120,5 @@ export async function buildApp({ config, kv, hub, classifier, fetchImpl }: AppDe
     });
   });
 
-  return { app, projects, news };
+  return { app, projects, news, videos };
 }
