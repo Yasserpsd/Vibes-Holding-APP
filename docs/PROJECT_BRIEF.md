@@ -1,6 +1,6 @@
 # Project brief — تطبيق نادي المستثمرين
 
-Last updated: 2026-09-16 (owner's closing-scope decisions recorded in §5.5 and as M9 to M12: «رسائل الإدارة» first, neutral first with «دليل المحايد» and workshops, «شخصية ومسيرة» self-application, members' chat; M7 part 2 B is open as PR #5 on branch `m7-payments`, waiting for the store accounts, Firebase and RevenueCat setup and the owner's OK for ONE preview build). These are the owner's decisions. If anything here conflicts with what the owner says in a session, ask before acting.
+Last updated: 2026-09-16 (owner's closing-scope decisions recorded in §5.5 and as M9 to M12: «رسائل الإدارة» first, neutral first with «دليل المحايد» and workshops, «شخصية ومسيرة» self-application; members' chat cancelled the same day; the dashboard gets its own domain; M7 part 2 B is open as PR #5 on branch `m7-payments`, waiting for the store accounts, Firebase and RevenueCat setup and the owner's OK for ONE preview build). These are the owner's decisions. If anything here conflicts with what the owner says in a session, ask before acting.
 
 ## 1. Entities and contacts
 - Publisher and membership seller: شركة المجتمع الافتراضي للاستثمار, the official operator of نادي المستثمرين (vcmem.com). CR 2050179051, VAT 311933896300003, Riyadh, Al Olaya.
@@ -72,8 +72,9 @@ The owner's words: «عايزين نقفل كل شيء في التطبيق»; bu
 2. **Neutral first, everywhere** («محايد أول شيء وبعدين رائد الأعمال وبعدين المستثمر، ده في كل شيء»): the persona order becomes محايد → رائد أعمال → مستثمر in the home portals, the registration persona choice, the advisor opening and every list or filter.
 3. **The neutral is number one** («اهتم أوي بالمحايد… المحايد عندي رقم 1»): a dedicated page «دليل المحايد» that tells the neutral what to do and where to go (steps with in-app calls to action: browse the Projects Bank, the advisor, the workshops, the membership); neutrals browse the projects (public fields) and benefit from the workshops all year: an in-app workshops page with the schedule and registration (today workshops are a web link in §5.2).
 4. **«شخصية ومسيرة» in the app** (the owner also wrote «سيرة ومسيرة»: confirm the section title before building): a section at the beginning of the app with the owner's line «لديك الخبرات والمهارات والمؤهلات والإمكانات التي تؤهلك لتكون إحدى شخصيات …» (the owner completes the sentence); a member applies from the app (form: bio, career milestones, photo, links), gets access to their profile page after the admin approves it in the dashboard; the admin can also enter and edit profiles there (extends the 2026-09-11 decision).
-5. **Members' chat** (annual members only): a few rooms, not many; text and voice messages; a private message to a specific member; moderation from the dashboard; block and report per member (required by the stores for user-generated content). Needs Postgres on Railway (messages) and a file store for voice notes (Railway volume or an object store: decide when it starts) and a realtime channel (WebSocket or short polling).
+5. **Members' chat**: cancelled by the owner on 2026-09-16 («كنسل فكرة الدردشة دلوقتي خالص»). Not built; no rooms, no voice notes, no direct messages.
 6. **Golden offer pages in-app** (2026-09-13, §5.1) stays in the list.
+**Dashboard hosting (2026-09-16)**: the owner reserved a dedicated domain that will serve the dashboard only (name to be given when M9 starts). The dashboard is the `admin/` web app, served at that domain (Railway custom domain on the same project), signing in with hub admin accounts through the same API.
 Also from the owner: nothing should require leaving the app; every web link in §5.2 gets an in-app page over time.
 
 ### 5.1 Golden companies (order, valuation, offer page)
@@ -153,5 +154,5 @@ Club story `CnWMWS_nDpM` · 11,000+ members `KUzcLImZc-c` · How the club works 
 - [ ] **M9 — «رسائل الإدارة» and the dashboard's first section** (owner priority 1, 2026-09-16, §5.5): admin posts with text, links, images and video from a web dashboard (`admin/`, hub admin login), the posts block at the top of the home, push per post.
 - [ ] **M10 — Neutral first** (§5.5): persona order محايد → رائد أعمال → مستثمر everywhere, the «دليل المحايد» page, in-app workshops page with registration, neutral benefits wording.
 - [ ] **M11 — «شخصية ومسيرة»** (§5.5): home section with the owner's line, self-application form, admin approval and editing in the dashboard, public profile pages.
-- [ ] **M12 — Members' chat** (§5.5): rooms for annual members, text and voice, direct messages, block and report, dashboard moderation; Postgres and a file store first.
+- [ ] ~~**M12 — Members' chat**~~ cancelled by the owner on 2026-09-16; nothing to build.
 - [ ] **M8 — Store readiness and launch**: privacy policy, account deletion web page, data safety forms, demo account for Apple review, launch.
