@@ -34,13 +34,35 @@ input:focus, textarea:focus { outline: 2px solid var(--gold); outline-offset: 1p
 fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; margin: 0; }
 legend { padding: 0 6px; color: var(--muted); }
 .pair { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; align-items: center; }
-/* Image rows: the URL takes the width, the thumbnail and the button stay content-sized. */
-.pair.image { grid-template-columns: 1fr auto auto; }
-.pair img { width: 56px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+/* Media picker. Square thumbnails that wrap: two per row on a 375px phone, more on a desk. */
+fieldset p { margin: 0; }
+.warn { color: var(--gold); margin: 0; font-size: 0.9rem; }
+.hint { font-size: 0.85rem; }
+.thumbs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.thumb { position: relative; display: grid; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--black); }
+.thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.thumb .order { position: absolute; top: 6px; inset-inline-start: 6px; min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--gold); color: #111; font-size: 0.75rem; font-weight: 600; line-height: 22px; text-align: center; }
+.thumb-actions { display: flex; border-top: 1px solid var(--line); }
+.thumb-actions button { flex: 1; min-height: 36px; padding: 4px 0; border: 0; border-radius: 0; }
+.thumb-actions button + button { border-inline-start: 1px solid var(--line); }
+/* Progress rows: the name and its controls on one line, the bar (or the failure) across the next. */
+.uploads { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.upload { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; font-size: 0.9rem; }
+.upload .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload .muted { display: flex; gap: 4px; align-items: center; margin: 0; }
+.upload .wide { grid-column: 1 / -1; }
+progress { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 8px; border: 0; border-radius: 999px; overflow: hidden; background: var(--line); color: var(--gold); }
+progress::-webkit-progress-bar { background: var(--line); }
+progress::-webkit-progress-value { background: var(--gold); }
+progress::-moz-progress-bar { background: var(--gold); }
+.link-add { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.video-preview { display: grid; gap: 8px; justify-items: start; }
+.video-preview video { display: block; width: 100%; max-height: 360px; border-radius: 8px; border: 1px solid var(--line); background: #000; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.primary { background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; }
 button.danger { border-color: var(--danger); color: var(--danger); }
 button.link { border: 0; padding: 4px 6px; color: var(--muted); text-decoration: underline; }
-@media (max-width: 560px) { .pair, .pair.image { grid-template-columns: 1fr; } }
+button.pick { border-color: var(--gold); color: var(--gold); }
+@media (max-width: 560px) { .pair { grid-template-columns: 1fr; } }

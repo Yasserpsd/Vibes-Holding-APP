@@ -96,6 +96,9 @@ export function App() {
           setEditing(null);
           if (saved) {
             setNotice({ kind: 'ok', text: 'تم حفظ المنشور.' });
+            // The saved post goes into the list at once: a second edit must never start from the older copy,
+            // because saving that copy would make the server remove the files uploaded in between.
+            setPosts((current) => (current.some((entry) => entry.id === saved.id) ? current.map((entry) => (entry.id === saved.id ? saved : entry)) : [saved, ...current]));
             void load();
           }
         }}
@@ -131,6 +134,8 @@ export function App() {
               <p className="muted">
                 {post.status === 'published' ? `نُشر: ${when(post.publishedAt)}` : `آخر تعديل: ${when(post.updatedAt)}`}
                 {post.notifiedAt ? ` · إشعار: ${when(post.notifiedAt)}` : ''}
+                {post.images.length > 0 ? ` · صور: ${post.images.length}` : ''}
+                {post.video ? ' · فيديو مرفوع' : ''}
               </p>
               <div className="actions">
                 <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
