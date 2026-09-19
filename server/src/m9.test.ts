@@ -165,6 +165,34 @@ test('update publishes a draft once and pins it first; delete removes it', async
   assert.equal((await send('DELETE', `/api/admin/posts/${draftId}`, undefined, adminToken)).statusCode, 404);
 });
 
+test('paging like the app: pinned on the first page only, every post exactly once', async () => {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+  const created: string[] = [];
+  for (let index = 0; index < 7; index += 1) {
+    const made = await send('POST', '/api/admin/posts', { title: `صفحة ${index}`, status: 'published', pinned: index === 3 }, adminToken);
+    assert.equal(made.statusCode, 201, made.body);
+    created.push(made.json().post.id as string);
+    await pause();
+  }
+  type Row = { id: string; pinned: boolean; publishedAt: string | null };
+  const seen: Row[] = [];
+  let before: string | undefined;
+  for (let page = 0; page < 10; page += 1) {
+    const result = (await get(`/api/posts?limit=3${before ? `&before=${encodeURIComponent(before)}` : ''}`)).json() as { posts: Row[]; more: boolean };
+    seen.push(...result.posts);
+    if (!result.more) break;
+    // The app's cursor rule (app/src/api/posts.ts): publish time of the last non-pinned post.
+    before = [...result.posts].reverse().find((post) => !post.pinned && post.publishedAt)?.publishedAt ?? undefined;
+    assert.ok(before, 'a page with more to load must contain a non-pinned post to page from');
+  }
+  const ids = seen.map((post) => post.id);
+  assert.equal(new Set(ids).size, ids.length, 'no post is returned twice');
+  for (const id of created) assert.ok(ids.includes(id), `post ${id} is missing from the pages`);
+  assert.equal(seen[0]?.pinned, true, 'the pinned post leads the first page');
+  assert.equal(seen.filter((post) => post.pinned).length, 1);
+  for (const id of created) assert.equal((await send('DELETE', `/api/admin/posts/${id}`, undefined, adminToken)).statusCode, 200);
+});
+
 test('an account that lost its admin role is refused (403) once its account is re-read', async () => {
   hub.revoked = true;
   assert.equal((await get('/api/me?fresh=1', otherToken)).statusCode, 200);
