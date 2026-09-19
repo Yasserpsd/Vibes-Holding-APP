@@ -23,18 +23,20 @@ const seeded = {
   videos: await ensureVideosSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
-const { app, projects, news, videos } = await buildApp({ config, kv });
+const { app, projects, news, videos, media } = await buildApp({ config, kv });
 
 app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded, hub: config.HUB_MODE }, 'storage ready');
 await projects.start();
 await news.start();
 await videos.start();
+media.start();
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutting down');
   projects.stop();
   news.stop();
   videos.stop();
+  media.stop();
   await app.close();
   await kv.close();
   process.exit(0);

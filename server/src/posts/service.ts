@@ -5,8 +5,8 @@ import type { KV } from '../store.js';
 
 /**
  * «رسائل الإدارة»: posts the club's management publishes from the dashboard (M9).
- * Stored as one kv document (`admin:posts`), newest first; media are links only (images by URL,
- * video as a YouTube id), uploads come later with a file store.
+ * Stored as one kv document (`admin:posts`), newest first. Images are URLs (pasted links or uploaded
+ * files under `/media/`), video is a YouTube id and/or an uploaded file with an optional poster (M15).
  */
 export const POSTS_KEY = 'admin:posts';
 const MAX_POSTS = 500;
@@ -23,6 +23,7 @@ export const postInputSchema = z.object({
   links: z.array(z.object({ label: z.string().trim().min(1).max(80), url: httpUrl })).max(8).default([]),
   images: z.array(httpUrl).max(10).default([]),
   video: z.string().trim().max(300).nullish(),
+  videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
   status: z.enum(['draft', 'published']).default('draft'),
   pinned: z.boolean().default(false),
 });
@@ -35,6 +36,8 @@ export type Post = {
   links: { label: string; url: string }[];
   images: string[];
   youtubeId: string | null;
+  /** An uploaded video; posts stored before M15 have no such key. */
+  video?: { url: string; poster: string | null } | null;
   status: 'draft' | 'published';
   pinned: boolean;
   author: string | null;
@@ -43,6 +46,11 @@ export type Post = {
   publishedAt: string | null;
   notifiedAt: string | null;
 };
+
+/** Every media URL a post points at (images, uploaded video, poster), ours or not. */
+export function postMediaUrls(post: Pick<Post, 'images' | 'video'>): string[] {
+  return [...post.images, ...(post.video ? [post.video.url, ...(post.video.poster ? [post.video.poster] : [])] : [])];
+}
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 
@@ -92,6 +100,10 @@ export class PostsService {
     return youtubeId;
   }
 
+  private static videoFile(input: PostInput): Post['video'] {
+    return input.videoFile ? { url: input.videoFile.url, poster: input.videoFile.poster ?? null } : null;
+  }
+
   async listAll(): Promise<Post[]> {
     return this.load();
   }
@@ -118,6 +130,7 @@ export class PostsService {
       links: input.links,
       images: input.images,
       youtubeId,
+      video: PostsService.videoFile(input),
       status: input.status,
       pinned: input.pinned,
       author,
@@ -136,7 +149,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, pinned: input.pinned, updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;

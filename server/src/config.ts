@@ -52,6 +52,19 @@ const envSchema = z.object({
   NOTIFY_EMAIL: z.string().min(3).optional(),
   // Web dashboard origins allowed to call the API from a browser, comma separated (e.g. https://dashboard.example.com).
   ADMIN_ORIGINS: z.string().max(600).optional(),
+  // Uploaded media of the dashboard (M15): an S3-compatible bucket (a Railway Bucket, by variable references).
+  // Without the bucket values files go to UPLOADS_DIR on the local disk: development and tests only, not durable.
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().min(1).default('auto'),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  S3_FORCE_PATH_STYLE: z.enum(['0', '1']).optional(),
+  UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
+  // 1 = this server deletes day-old files that none of ITS posts use. Only for the one server that owns the bucket.
+  UPLOADS_SWEEP: z.enum(['0', '1']).optional(),
+  UPLOAD_MAX_IMAGE_MB: z.coerce.number().int().min(1).max(50).default(10),
+  UPLOAD_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(2000).default(200),
   // Store purchases: the RevenueCat webhook carries this Authorization header value verbatim.
   REVENUECAT_WEBHOOK_AUTH: z.string().min(10).optional(),
   // RevenueCat public SDK keys (they ship in the app) and, optionally, the REST secret key for /api/membership/sync.

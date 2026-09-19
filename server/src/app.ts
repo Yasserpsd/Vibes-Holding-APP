@@ -27,8 +27,12 @@ import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
+import { mediaRoutes } from './media/routes.js';
+import { S3MediaStore } from './media/s3.js';
+import { MediaService } from './media/service.js';
+import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { postsRoutes } from './posts/routes.js';
-import { PostsService } from './posts/service.js';
+import { PostsService, postMediaUrls } from './posts/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
 import type { KV } from './store.js';
@@ -66,7 +70,9 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService };
+
+const MEGABYTE = 1024 * 1024;
 
 export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
   const app = Fastify({
@@ -138,6 +144,36 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   const hq = new HqService({ kv, log: app.log, notifier, push });
   // «رسائل الإدارة»: admin posts from the dashboard, shown first on the app's home (M9).
   const posts = new PostsService(kv);
+  // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
+  let mediaStore: MediaStore;
+  if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
+    const bucket = new S3MediaStore({
+      bucket: config.S3_BUCKET,
+      endpoint: config.S3_ENDPOINT,
+      region: config.S3_REGION,
+      accessKeyId: config.S3_ACCESS_KEY_ID,
+      secretAccessKey: config.S3_SECRET_ACCESS_KEY,
+      forcePathStyle: config.S3_FORCE_PATH_STYLE === '1',
+      log: app.log,
+    });
+    // The dashboard's browsers send files straight to the bucket; not awaited, a failure shows in /health.
+    // Only the deployed service writes the rules: a local server pointed at the same bucket must not replace them.
+    void bucket.allowOrigins(config.RAILWAY_PUBLIC_DOMAIN ? [...adminOrigins] : []);
+    mediaStore = bucket;
+  } else {
+    mediaStore = new DiskMediaStore(config.UPLOADS_DIR, config.PUBLIC_URL);
+  }
+  const mediaOrigins = [config.PUBLIC_URL, ...(config.RAILWAY_PUBLIC_DOMAIN ? [`https://${config.RAILWAY_PUBLIC_DOMAIN}`] : [])].map((url) => new URL(url).origin);
+  const media: MediaService = new MediaService({
+    store: mediaStore,
+    origins: [...new Set(mediaOrigins)],
+    maxImageBytes: config.UPLOAD_MAX_IMAGE_MB * MEGABYTE,
+    maxVideoBytes: config.UPLOAD_MAX_VIDEO_MB * MEGABYTE,
+    enabled: mediaStore.durable || config.APP_ENV !== 'production',
+    referenced: async () => new Set((await posts.listAll()).flatMap(postMediaUrls).map((url) => MediaService.keyInPath(url)).filter((key): key is string => key !== null)),
+    sweepEnabled: config.UPLOADS_SWEEP === '1' && Boolean(config.DATABASE_URL),
+    log: app.log,
+  });
   // Payments: Paymob intentions for real-world services; the mock gateway stands in until the test keys exist.
   const paymob: PaymobGateway =
     gateway ??
@@ -207,6 +243,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     },
     membership: membership.status(),
     push: push.status(),
+    uploads: media.status(),
   }));
 
   await app.register(projectsRoutes, { service: projects });
@@ -219,7 +256,8 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
-  await app.register(postsRoutes, { service: posts, auth, push });
+  await app.register(mediaRoutes, { service: media, auth });
+  await app.register(postsRoutes, { service: posts, auth, push, media });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -236,5 +274,5 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     });
   });
 
-  return { app, projects, news, videos, payments, notifier, membership, push };
+  return { app, projects, news, videos, payments, notifier, membership, push, media };
 }
