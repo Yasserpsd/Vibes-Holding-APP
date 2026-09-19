@@ -64,6 +64,7 @@ export function PushRegistrar() {
       if (target.type === 'membership') void refresh();
       if (target.type === 'payment') void queryClient.invalidateQueries({ queryKey: ['payments'] });
       if (target.type === 'hq_visit') void queryClient.invalidateQueries({ queryKey: ['hq'] });
+      if (target.type === 'post') void queryClient.invalidateQueries({ queryKey: ['posts'] });
     });
     return () => {
       tapped.remove();

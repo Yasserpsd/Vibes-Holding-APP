@@ -7,11 +7,13 @@ import { useMembershipContent } from '@/api/auth';
 import { useHomeContent, useServices, type HomeContent, type HomePortal } from '@/api/content';
 import { useGolden } from '@/api/queries';
 import type { GoldenCompany, GoldenContent } from '@/api/types';
+import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { PortalCard } from '@/components/PortalCard';
+import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
@@ -31,12 +33,14 @@ export default function HomeScreen() {
   const golden = useGolden();
   const services = useServices();
   const videos = useVideos();
+  // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
+  const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const membershipContent = useMembershipContent();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([home.refetch(), golden.refetch(), services.refetch(), videos.refetch()]);
+    await Promise.all([home.refetch(), golden.refetch(), services.refetch(), videos.refetch(), latestPosts.refetch()]);
     setRefreshing(false);
   };
 
@@ -74,6 +78,9 @@ export default function HomeScreen() {
         <Text style={styles.heroTitle}>{content.hero.title}</Text>
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
       </View>
+
+      {/* «رسائل الإدارة»: the first content block, right under the hero (owner, 2026-09-16). */}
+      <PostsBlock />
 
       <View style={styles.portals}>
         {content.portals.map((portal) => (

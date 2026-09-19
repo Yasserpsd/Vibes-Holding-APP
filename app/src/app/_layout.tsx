@@ -78,6 +78,8 @@ export default function RootLayout() {
           <Stack.Screen name="services/index" options={{ ...detailHeader, title: 'خدمات النادي' }} />
           <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: 'الخدمة' }} />
           <Stack.Screen name="videos/index" options={{ ...detailHeader, title: 'مكتبة الفيديو' }} />
+          <Stack.Screen name="posts/index" options={{ ...detailHeader, title: 'رسائل الإدارة' }} />
+          <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: 'رسالة من الإدارة' }} />
           <Stack.Screen name="about" options={{ ...detailHeader, title: 'عنّا' }} />
           <Stack.Screen name="hq/index" options={{ ...detailHeader, title: 'مقر النادي' }} />
           <Stack.Screen name="hq/book" options={{ ...detailHeader, title: 'حجز زيارة' }} />
