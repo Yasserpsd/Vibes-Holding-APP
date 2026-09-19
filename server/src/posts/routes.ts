@@ -1,0 +1,114 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+
+import { adminGuard, guard, parse } from '../auth/guard.js';
+import type { AuthService } from '../auth/service.js';
+import type { PushService } from '../push/service.js';
+import { InvalidVideoError, postInputSchema, type Post, type PostsService } from './service.js';
+
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; push: PushService };
+
+const listSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  before: z.string().max(40).optional(),
+});
+const idSchema = z.object({ id: z.string().uuid() });
+
+const NOT_FOUND = { error: { code: 'not_found', message: 'المنشور غير موجود' } };
+
+/** What the app sees: no author, no draft fields. */
+function publicPost(post: Post) {
+  const { id, title, body, links, images, youtubeId, pinned, publishedAt } = post;
+  return { id, title, body, links, images, youtubeId, pinned, publishedAt };
+}
+
+/** «رسائل الإدارة»: the public feed for the app's home and the dashboard's admin endpoints. */
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, push }) => {
+  const requireAdmin = adminGuard(auth);
+
+  app.get(
+    '/api/posts',
+    guard(async (request, reply) => {
+      const query = parse(listSchema, request.query, reply);
+      if (!query) return;
+      const { posts, more } = await service.listPublished(query.limit, query.before);
+      return { posts: posts.map(publicPost), more };
+    }),
+  );
+
+  app.get(
+    '/api/posts/:id',
+    guard(async (request, reply) => {
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const post = await service.get(params.id);
+      if (!post || post.status !== 'published') return reply.code(404).send(NOT_FOUND);
+      return { post: publicPost(post) };
+    }),
+  );
+
+  app.get(
+    '/api/admin/posts',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return { posts: await service.listAll(), devices: (await push.summary()).total };
+    }),
+  );
+
+  const save = (mode: 'create' | 'update') =>
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = mode === 'update' ? parse(idSchema, request.params, reply) : { id: '' };
+      if (!params) return;
+      const input = parse(postInputSchema, request.body, reply);
+      if (!input) return;
+      try {
+        const post = mode === 'create' ? await service.create(input, admin.me.name ?? admin.me.email ?? null) : await service.update(params.id, input);
+        if (!post) return await reply.code(404).send(NOT_FOUND);
+        return await reply.code(mode === 'create' ? 201 : 200).send({ post });
+      } catch (error) {
+        if (error instanceof InvalidVideoError) return reply.code(400).send({ error: { code: 'invalid', message: error.message } });
+        throw error;
+      }
+    });
+
+  app.post('/api/admin/posts', save('create'));
+  app.put('/api/admin/posts/:id', save('update'));
+
+  app.delete(
+    '/api/admin/posts/:id',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      if (!(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
+      return { ok: true };
+    }),
+  );
+
+  app.post(
+    '/api/admin/posts/:id/notify',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const post = await service.get(params.id);
+      if (!post) return reply.code(404).send(NOT_FOUND);
+      if (post.status !== 'published') {
+        return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
+      }
+      const text = post.body.replace(/\s+/g, ' ').trim();
+      const outcome = await push.broadcast({
+        title: post.title,
+        body: text.length > 140 ? `${text.slice(0, 139)}…` : text || 'رسالة جديدة من إدارة النادي',
+        data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
+      });
+      await service.markNotified(post.id);
+      return { ok: true, ...outcome };
+    }),
+  );
+};

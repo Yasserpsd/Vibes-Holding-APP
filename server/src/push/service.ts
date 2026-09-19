@@ -122,7 +122,16 @@ export class PushService {
 
   /** Sends one message to every device of the account and drops tokens Expo reports as unregistered. */
   async send(contactId: number, message: PushMessage): Promise<PushOutcome> {
-    const tokens = await this.tokensFor(contactId);
+    return this.deliver(await this.tokensFor(contactId), message, { contactId });
+  }
+
+  /** One message to every registered device (admin posts). */
+  async broadcast(message: PushMessage): Promise<PushOutcome> {
+    const tokens = (await this.load()).map((entry) => entry.token);
+    return this.deliver(tokens, message, { broadcast: true });
+  }
+
+  private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {
     const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
     if (!tokens.length) return outcome;
     const dead: string[] = [];
@@ -152,12 +161,12 @@ export class PushService {
           const reason = ticket.details?.error ?? ticket.message ?? 'unknown';
           this.lastError = reason;
           if (ticket.details?.error === 'DeviceNotRegistered') dead.push(batch[index] as string);
-          this.deps.log.warn({ contactId, reason }, 'push ticket error');
+          this.deps.log.warn({ ...context, reason }, 'push ticket error');
         });
       } catch (error) {
         outcome.failed += batch.length;
         this.lastError = error instanceof Error ? error.message : 'push request failed';
-        this.deps.log.error({ err: error, contactId }, 'push send failed');
+        this.deps.log.error({ err: error, ...context }, 'push send failed');
       }
     }
     if (dead.length) {
@@ -172,7 +181,7 @@ export class PushService {
     this.sent += outcome.sent;
     this.failed += outcome.failed;
     if (outcome.sent) this.lastSentAt = new Date().toISOString();
-    this.deps.log.info({ contactId, ...outcome, title: message.title }, 'push');
+    this.deps.log.info({ ...context, ...outcome, title: message.title }, 'push');
     return outcome;
   }
 

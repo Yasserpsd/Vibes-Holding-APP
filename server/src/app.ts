@@ -27,6 +27,8 @@ import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
+import { postsRoutes } from './posts/routes.js';
+import { PostsService } from './posts/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
 import type { KV } from './store.js';
@@ -110,6 +112,8 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   // Member push notifications (Expo push service); tokens come from the app after login.
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
+  // «رسائل الإدارة»: admin posts from the dashboard, shown first on the app's home (M9).
+  const posts = new PostsService(kv);
   // Payments: Paymob intentions for real-world services; the mock gateway stands in until the test keys exist.
   const paymob: PaymobGateway =
     gateway ??
@@ -191,6 +195,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
+  await app.register(postsRoutes, { service: posts, auth, push });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
