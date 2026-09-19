@@ -59,6 +59,13 @@ function errorStatus(error: unknown): number {
   return typeof statusCode === 'number' && statusCode >= 400 ? statusCode : 500;
 }
 
+/** `https://host/` and `https://host` are the same origin for the allow-list. */
+function trimOrigin(value: string): string {
+  let origin = value.trim();
+  while (origin.endsWith('/')) origin = origin.slice(0, -1);
+  return origin;
+}
+
 export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService };
 
 export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
@@ -73,6 +80,23 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   // API responses are never cached by CDNs or proxies (CLAUDE.md rule 8).
   app.addHook('onRequest', async (request, reply) => {
     if (request.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
+  });
+
+  // The web dashboard lives on its own origin and signs in with Bearer tokens (no cookies): answer only listed origins.
+  const adminOrigins = new Set((config.ADMIN_ORIGINS ?? '').split(',').map(trimOrigin).filter(Boolean));
+  app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (!origin || !request.url.startsWith('/api/')) return;
+    reply.header('vary', 'origin');
+    if (!adminOrigins.has(origin)) return;
+    reply.header('access-control-allow-origin', origin);
+    if (request.method !== 'OPTIONS') return;
+    await reply
+      .header('access-control-allow-methods', 'GET, POST, PUT, DELETE')
+      .header('access-control-allow-headers', 'authorization, content-type')
+      .header('access-control-max-age', '600')
+      .code(204)
+      .send();
   });
 
   const projects = new ProjectsService({ kv, config, log: app.log });

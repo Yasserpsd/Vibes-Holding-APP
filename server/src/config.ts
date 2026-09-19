@@ -50,6 +50,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(3).optional(),
   NOTIFY_EMAIL: z.string().min(3).optional(),
+  // Web dashboard origins allowed to call the API from a browser, comma separated (e.g. https://dashboard.example.com).
+  ADMIN_ORIGINS: z.string().max(600).optional(),
   // Store purchases: the RevenueCat webhook carries this Authorization header value verbatim.
   REVENUECAT_WEBHOOK_AUTH: z.string().min(10).optional(),
   // RevenueCat public SDK keys (they ship in the app) and, optionally, the REST secret key for /api/membership/sync.

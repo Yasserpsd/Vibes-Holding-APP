@@ -11,7 +11,7 @@ import { MemoryKV } from './store.js';
 import { TemplateBlurbWriter } from './videos/blurbs.js';
 
 // M9: «رسائل الإدارة» — admin posts, the public feed and the push broadcast.
-const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', PUBLIC_URL: 'http://localhost:3000' });
+const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', PUBLIC_URL: 'http://localhost:3000', ADMIN_ORIGINS: 'https://dashboard.example.com/, http://localhost:5173' });
 
 /** The mock hub makes every verified account an admin; this wrapper can revoke that after sign-in. */
 class RevocableHub implements HubClient {
@@ -143,4 +143,19 @@ test('an account that lost its admin role is refused (403) once its account is r
   assert.equal((await get('/api/admin/posts', otherToken)).statusCode, 403);
   assert.equal((await send('POST', '/api/admin/posts', { title: 'ممنوع' }, otherToken)).statusCode, 403);
   hub.revoked = false;
+});
+
+test('dashboard origins: listed origins are answered, others get no CORS header', async () => {
+  const allowed = await app.inject({ method: 'GET', url: '/api/posts', headers: { origin: 'https://dashboard.example.com' } });
+  assert.equal(allowed.headers['access-control-allow-origin'], 'https://dashboard.example.com');
+  assert.equal(allowed.headers.vary, 'origin');
+  const preflight = await app.inject({ method: 'OPTIONS', url: '/api/admin/posts', headers: { origin: 'http://localhost:5173', 'access-control-request-method': 'POST' } });
+  assert.equal(preflight.statusCode, 204);
+  assert.equal(preflight.headers['access-control-allow-origin'], 'http://localhost:5173');
+  assert.match(String(preflight.headers['access-control-allow-headers']), /authorization/);
+  const stranger = await app.inject({ method: 'GET', url: '/api/posts', headers: { origin: 'https://evil.example.com' } });
+  assert.equal(stranger.statusCode, 200);
+  assert.equal(stranger.headers['access-control-allow-origin'], undefined);
+  const plain = await get('/api/posts');
+  assert.equal(plain.headers['access-control-allow-origin'], undefined);
 });
