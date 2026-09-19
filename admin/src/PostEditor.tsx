@@ -78,7 +78,7 @@ export function PostEditor({ post, onClose }: Props) {
           <fieldset>
             <legend>الصور (روابط)</legend>
             {images.map((url, index) => (
-              <div className="pair" key={index}>
+              <div className="pair image" key={index}>
                 <input placeholder="https://…/image.png" dir="ltr" value={url} onChange={(e) => setImage(index, e.target.value)} />
                 {isHttp(url) ? <img src={url.trim()} alt="" referrerPolicy="no-referrer" /> : null}
                 <button type="button" onClick={() => setImages(images.filter((_, at) => at !== index))}>إزالة</button>

@@ -73,7 +73,11 @@ export function App() {
     setBusyId(post.id);
     try {
       const result = await api.notifyPost(post.id);
-      setNotice({ kind: result.failed ? 'error' : 'ok', text: `أُرسل الإشعار إلى ${result.sent} جهاز، وفشل ${result.failed}.` });
+      setNotice(
+        result.sent > 0
+          ? { kind: result.failed ? 'error' : 'ok', text: `أُرسل الإشعار إلى ${result.sent} جهاز، وفشل ${result.failed}.` }
+          : { kind: 'error', text: `لم يصل الإشعار إلى أي جهاز (فشل ${result.failed}). لم يُسجَّل كإشعار مُرسل.` },
+      );
       await load();
     } catch (failure) {
       fail(failure);
@@ -114,6 +118,7 @@ export function App() {
           <button className="primary" type="button" onClick={() => setEditing('new')}>منشور جديد</button>
         </div>
         <p className="muted">الأجهزة المسجلة للإشعارات: {devices}</p>
+        {devices === 0 ? <p className="muted">زر «إرسال إشعار» متوقف الآن لأن أي جهاز لم يسجّل بعد. يبدأ التسجيل بعد تثبيت نسخة التطبيق التي تدعم الإشعارات وتسجيل الدخول منها.</p> : null}
         {notice ? <p className={notice.kind === 'ok' ? 'ok' : 'error'} role="status">{notice.text}</p> : null}
         {posts.length === 0 ? <p className="muted">لا توجد منشورات بعد.</p> : null}
         <ul className="posts">
@@ -129,7 +134,7 @@ export function App() {
               </p>
               <div className="actions">
                 <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
-                <button type="button" onClick={() => void notify(post)} disabled={busyId === post.id || post.status !== 'published'}>إرسال إشعار</button>
+                <button type="button" onClick={() => void notify(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>
                 <button className="danger" type="button" onClick={() => void remove(post)} disabled={busyId === post.id}>حذف</button>
               </div>
             </li>

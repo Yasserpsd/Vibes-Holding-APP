@@ -34,6 +34,8 @@ input:focus, textarea:focus { outline: 2px solid var(--gold); outline-offset: 1p
 fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; margin: 0; }
 legend { padding: 0 6px; color: var(--muted); }
 .pair { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; align-items: center; }
+/* Image rows: the URL takes the width, the thumbnail and the button stay content-sized. */
+.pair.image { grid-template-columns: 1fr auto auto; }
 .pair img { width: 56px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
@@ -41,4 +43,4 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.primary { background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; }
 button.danger { border-color: var(--danger); color: var(--danger); }
 button.link { border: 0; padding: 4px 6px; color: var(--muted); text-decoration: underline; }
-@media (max-width: 560px) { .pair { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .pair, .pair.image { grid-template-columns: 1fr; } }

@@ -27,11 +27,13 @@ class RevocableHub implements HubClient {
 
 type PushMessage = { to: string; title: string; body: string; data: Record<string, string> };
 const pushBatches: PushMessage[][] = [];
+let failTickets = false;
 const fetchStub: typeof fetch = async (input, init) => {
   if (String(input) !== 'https://exp.host/--/api/v2/push/send') throw new Error(`unexpected fetch: ${String(input)}`);
   const messages = JSON.parse(String(init?.body)) as PushMessage[];
   pushBatches.push(messages);
-  return new Response(JSON.stringify({ data: messages.map(() => ({ status: 'ok', id: 'ticket' })) }), { status: 200 });
+  const ticket = failTickets ? { status: 'error', message: 'rate limited', details: { error: 'MessageRateExceeded' } } : { status: 'ok', id: 'ticket' };
+  return new Response(JSON.stringify({ data: messages.map(() => ticket) }), { status: 200 });
 };
 
 const hub = new RevocableHub();
@@ -104,6 +106,16 @@ test('drafts stay out of the feed; publishing shows the post without admin field
   assert.equal((await get('/api/admin/posts', adminToken)).json().posts.length, 2);
 });
 
+test('notify with no registered device is refused and not recorded', async () => {
+  const refused = await send('POST', `/api/admin/posts/${publishedId}/notify`, undefined, adminToken);
+  assert.equal(refused.statusCode, 409);
+  assert.equal(refused.json().error.code, 'no_devices');
+  assert.match(refused.json().error.message, /لا توجد أجهزة مسجلة/);
+  assert.equal(pushBatches.length, 0);
+  const stored = (await get('/api/admin/posts', adminToken)).json().posts.find((post: { id: string }) => post.id === publishedId);
+  assert.equal(stored.notifiedAt, null);
+});
+
 test('bad input is refused: non-YouTube video, non-http link, empty title', async () => {
   const video = await send('POST', '/api/admin/posts', { title: 'فيديو', video: 'https://vimeo.com/1' }, adminToken);
   assert.equal(video.statusCode, 400);
@@ -126,6 +138,22 @@ test('notify: refused for a draft, broadcast to every device for a published pos
   assert.deepEqual(pushBatches[0]?.[0]?.data, { type: 'post', postId: publishedId, screen: `/posts/${publishedId}` });
   const stored = (await get('/api/admin/posts', adminToken)).json().posts.find((post: { id: string }) => post.id === publishedId);
   assert.ok(stored.notifiedAt);
+});
+
+test('a broadcast where every ticket fails is reported as not sent and not recorded', async () => {
+  const fresh = await send('POST', '/api/admin/posts', { title: 'إشعار سيفشل', status: 'published' }, adminToken);
+  assert.equal(fresh.statusCode, 201, fresh.body);
+  const freshId = fresh.json().post.id as string;
+  failTickets = true;
+  const result = await send('POST', `/api/admin/posts/${freshId}/notify`, undefined, adminToken);
+  failTickets = false;
+  assert.equal(result.statusCode, 200, result.body);
+  assert.equal(result.json().ok, false);
+  assert.equal(result.json().sent, 0);
+  assert.equal(result.json().failed, 2);
+  const stored = (await get('/api/admin/posts', adminToken)).json().posts.find((post: { id: string }) => post.id === freshId);
+  assert.equal(stored.notifiedAt, null);
+  assert.equal((await send('DELETE', `/api/admin/posts/${freshId}`, undefined, adminToken)).statusCode, 200);
 });
 
 test('update publishes a draft once and pins it first; delete removes it', async () => {

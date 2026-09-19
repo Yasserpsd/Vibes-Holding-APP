@@ -102,13 +102,18 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
       }
       const text = post.body.replace(/\s+/g, ' ').trim();
+      // No registered device means nobody would receive it: say so instead of reporting a sent notification.
+      if ((await push.summary()).total === 0) {
+        return reply.code(409).send({ error: { code: 'no_devices', message: 'لا توجد أجهزة مسجلة للإشعارات بعد، فلن يصل الإشعار إلى أحد' } });
+      }
       const outcome = await push.broadcast({
         title: post.title,
         body: text.length > 140 ? `${text.slice(0, 139)}…` : text || 'رسالة جديدة من إدارة النادي',
         data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
       });
-      await service.markNotified(post.id);
-      return { ok: true, ...outcome };
+      // Only a delivered notification counts: a broadcast where every ticket failed is not recorded.
+      if (outcome.sent > 0) await service.markNotified(post.id);
+      return { ok: outcome.sent > 0, ...outcome };
     }),
   );
 };
