@@ -45,7 +45,7 @@ export default function PostScreen() {
             </Pressable>
           ) : null}
           {post.images.map((uri) => (
-            <Image key={uri} source={{ uri }} style={styles.image} resizeMode="cover" />
+            <Image key={uri} source={{ uri }} style={styles.image} resizeMode="contain" />
           ))}
           {post.links.map((link) => (
             <AppButton key={`${link.label}:${link.url}`} label={link.label} variant="outline" icon="open-outline" onPress={() => void openLink(link.url)} />
@@ -74,7 +74,8 @@ const styles = StyleSheet.create({
   time: { ...typography.caption, color: colors.textMuted },
   title: { ...typography.title, color: colors.textPrimary },
   body: { ...typography.body, color: colors.textSecondary },
-  image: { width: '100%', height: 220, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
+  // `contain`: a flyer or a logo keeps its text; the box colour fills the sides.
+  image: { width: '100%', height: 240, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   video: { borderRadius: radii.lg, overflow: 'hidden', backgroundColor: colors.surfaceElevated },
   videoImage: { width: '100%', height: 200 },
   play: {
