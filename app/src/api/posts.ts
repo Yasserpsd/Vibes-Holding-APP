@@ -10,6 +10,8 @@ export type Post = {
   links: { label: string; url: string }[];
   images: string[];
   youtubeId: string | null;
+  /** A video uploaded from the dashboard. Older servers and posts send no `video` key: treat it as null. */
+  video?: { url: string; poster: string | null } | null;
   pinned: boolean;
   publishedAt: string | null;
 };

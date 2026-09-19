@@ -9,10 +9,11 @@ import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 export const HOME_POSTS_LIMIT = 3;
 
-/** First image of the post, else the YouTube thumbnail, else nothing. */
+/** First image of the post, else the YouTube thumbnail, else the uploaded video's poster, else nothing. */
 function thumbnailOf(post: Post): string | null {
   if (post.images[0]) return post.images[0];
-  return post.youtubeId ? `https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg` : null;
+  if (post.youtubeId) return `https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`;
+  return post.video?.poster || null;
 }
 
 /**
@@ -58,7 +59,7 @@ export function PostCard({ post }: { post: Post }) {
         ) : null}
         <View style={styles.metaRow}>
           {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
-          {post.youtubeId ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
+          {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
         </View>
       </View>
       {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" /> : null}

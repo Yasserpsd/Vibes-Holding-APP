@@ -9,7 +9,7 @@ import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-/** One «رسائل الإدارة» post: text, images, a YouTube video and link buttons, all opened in-app. */
+/** One «رسائل الإدارة» post: text, images, a YouTube or uploaded video and link buttons, all opened in-app. */
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const query = usePost(id);
@@ -32,18 +32,10 @@ export default function PostScreen() {
           <Text style={styles.title}>{post.title}</Text>
           {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
           {post.youtubeId ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="تشغيل الفيديو"
-              onPress={() => void openLink(`https://www.youtube.com/watch?v=${post.youtubeId}`)}
-              style={({ pressed }) => [styles.video, pressed && styles.pressed]}
-            >
-              <Image source={{ uri: `https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg` }} style={styles.videoImage} resizeMode="cover" />
-              <View style={styles.play}>
-                <Ionicons name="play" size={28} color={colors.black} />
-              </View>
-            </Pressable>
+            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label="تشغيل فيديو يوتيوب" />
           ) : null}
+          {/* Uploaded video: no native player (the change ships over the air), the in-app browser plays the file. */}
+          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label="تشغيل الفيديو" /> : null}
           {post.images.map((uri) => (
             <Image key={uri} source={{ uri }} style={styles.image} resizeMode="contain" />
           ))}
@@ -53,6 +45,23 @@ export default function PostScreen() {
         </ScrollView>
       )}
     </View>
+  );
+}
+
+/** A video as a tappable tile: its poster (a plain dark tile without one) under a play mark; opens in-app. */
+function VideoTile({ url, poster, posterFit, label }: { url: string; poster: string | null; posterFit: 'cover' | 'contain'; label: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => void openLink(url)}
+      style={({ pressed }) => [styles.video, pressed && styles.pressed]}
+    >
+      {poster ? <Image source={{ uri: poster }} style={styles.videoImage} resizeMode={posterFit} /> : <View style={styles.videoImage} />}
+      <View style={styles.play}>
+        <Ionicons name="play" size={28} color={colors.black} />
+      </View>
+    </Pressable>
   );
 }
 
