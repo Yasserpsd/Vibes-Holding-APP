@@ -76,7 +76,8 @@ export type ProjectBrief = {
   summary: string;
   table: { label: string; value: string }[];
   /** `index` is 0-based into `steps`, -1 when the stage is unknown; `label` is the feed's own wording. */
-  stage: { key: BriefStageKey; label: string; index: number; total: number; steps: string[] };
+  /** `estimated`: the site does not place the project («أخرى», empty) and the step is the adviser's reading of its description. */
+  stage: { key: BriefStageKey; label: string; index: number; total: number; steps: string[]; estimated?: boolean };
   strengths: string[];
   risks: string[];
   competitors: { id: number; title: string; sector: string | null; stage: string | null; why: string }[];
