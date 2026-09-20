@@ -220,6 +220,15 @@ export class PushService {
     });
   }
 
+  /** A person of the club answered in the advisor conversation; the words stay there (no personal data in a push). */
+  staffReplied(contactId: number): void {
+    this.background(contactId, {
+      title: 'رد من فريق النادي',
+      body: 'وصلك رد جديد من فريق نادي المستثمرين في محادثة المستشار.',
+      data: { type: 'advisor', screen: '/advisor' },
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     this.background(contactId, {
       title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',

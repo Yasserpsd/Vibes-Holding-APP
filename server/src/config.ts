@@ -13,13 +13,24 @@ const envSchema = z.object({
   PB_FEED_URL: z.string().min(1).default('https://vibesholding.com/wp-json/pb/v1/projects'),
   PB_FEED_KEY: z.string().min(1).optional(),
   PB_REFRESH_MINUTES: z.coerce.number().positive().default(10),
+  // Projects Bank bridge (plugin 39.0, docs/BRIDGE_V2.md 2): balance, unlock and grant. The key is shown once in the
+  // plugin's settings and also signs the plugin's webhook to /api/webhooks/pb. Without it: the mock with the mock hub, else off.
+  PB_BRIDGE_URL: z.string().url().default('https://vibesholding.com/wp-json/pb/v1/bridge'),
+  PB_BRIDGE_KEY: z.string().min(20).optional(),
   // vcmem.com hub (Vibes AI Assistant plugin). The server is registered there as a tenant site.
   HUB_MODE: z.enum(['live', 'mock']).optional(),
   HUB_URL: z.string().url().default('https://vcmem.com'),
   HUB_SITE_KEY: z.string().min(20).optional(),
   // In the test environment registrations on the live hub stay closed unless the owner opens them.
   HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('0'),
+  // Signs the hub's webhook to /api/webhooks/hub (hub settings «app_webhook_secret», shown once). Unset = the webhook answers 503.
+  HUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),
+  // Dashboard sign-in code by e-mail (M18): a second step after the hub password. Off until the mail delay is measured.
+  // A code lives ADMIN_OTP_SECONDS; a dashboard session asks for a new code after ADMIN_SESSION_HOURS.
+  ADMIN_OTP: z.enum(['0', '1']).default('0'),
+  ADMIN_OTP_SECONDS: z.coerce.number().int().min(30).max(600).default(60),
+  ADMIN_SESSION_HOURS: z.coerce.number().positive().max(720).default(12),
   // News engine: 0 disables polling (tests); items older than NEWS_MAX_AGE_DAYS are dropped.
   NEWS_REFRESH_MINUTES: z.coerce.number().nonnegative().default(20),
   NEWS_MAX_AGE_DAYS: z.coerce.number().positive().default(10),

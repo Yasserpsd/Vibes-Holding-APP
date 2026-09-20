@@ -1,13 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { adminGuard, guard, parse } from '../auth/guard.js';
+import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { MediaService } from '../media/service.js';
 import type { PushService } from '../push/service.js';
+import type { SyncService } from '../sync/service.js';
+import type { PostsHubSync } from './hubSync.js';
 import { InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; push: PushService; media: MediaService };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -20,12 +22,12 @@ const NOT_FOUND = { error: { code: 'not_found', message: 'المنشور غير 
 /** What the app sees: no author, no draft fields. */
 function publicPost(post: Post) {
   const { id, title, body, links, images, youtubeId, pinned, publishedAt } = post;
-  return { id, title, body, links, images, youtubeId, video: post.video ?? null, pinned, publishedAt };
+  return { id, title, body, links, images, youtubeId, video: post.video ?? null, pinned, publishedAt, kind: post.kind ?? 'post', event: post.event ?? null };
 }
 
 /** «رسائل الإدارة»: the public feed for the app's home and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, push, media }) => {
-  const requireAdmin = adminGuard(auth);
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, push, media, hubSync, sync }) => {
+  const requireAdmin = dashboardGuard(auth);
 
   /** Uploaded media must exist with the right kind; pasted image links pass as before. */
   const checkMedia = async (input: PostInput): Promise<void> => {
@@ -90,7 +92,11 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         const post = mode === 'create' ? await service.create(input, admin.me.name ?? admin.me.email ?? null) : await service.update(params.id, input);
         if (!post) return await reply.code(404).send(NOT_FOUND);
         if (previous) await dropUnused(previous, post);
-        return await reply.code(mode === 'create' ? 201 : 200).send({ post });
+        // One brain: the websites' feed and the assistant hear it now, the app through /api/sync. A hub failure never
+        // blocks the post: it is recorded on it (`hubSync`) and tried again on the next edit.
+        await hubSync.saved(post, admin.session.uuid);
+        await sync.bump('posts');
+        return await reply.code(mode === 'create' ? 201 : 200).send({ post: (await service.get(post.id)) ?? post });
       } catch (error) {
         if (error instanceof InvalidVideoError) return reply.code(400).send({ error: { code: 'invalid', message: error.message } });
         throw error;
@@ -110,6 +116,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const post = await service.get(params.id);
       if (!post || !(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
       await dropUnused(post, null);
+      await hubSync.removed(post, admin.session.uuid);
+      await sync.bump('posts');
       return { ok: true };
     }),
   );

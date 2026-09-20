@@ -50,3 +50,10 @@ export function formatArabicDateTime(iso: string): string {
   const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   return `${formatArabicDate(day)} · ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+/** An event's date as the dashboard saved it: a day ("2026-10-05") or an exact time, shown in the device's local time. */
+export function formatEventDate(value: string): string {
+  const date = value.trim();
+  // A day alone has no time to show; parsed as a date it would be UTC midnight, a made-up hour on the member's phone.
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatArabicDate(date) : formatArabicDateTime(date);
+}

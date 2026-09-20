@@ -80,7 +80,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
+    <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
       {me ? <ProfileHeader me={me} /> : <Notice tone="warning" text="تعذّر تحميل بياناتك الآن. اسحب للأسفل لإعادة المحاولة." />}
       <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} />
       {!hasSecureStorage() ? <Notice tone="warning" text="هذه النسخة لا تحفظ الجلسة بعد إغلاق التطبيق؛ النسخة القادمة تحفظها." /> : null}

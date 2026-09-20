@@ -23,7 +23,9 @@ const seeded = {
   videos: await ensureVideosSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
-const { app, projects, news, videos, media } = await buildApp({ config, kv });
+const { app, projects, news, videos, media, sync } = await buildApp({ config, kv });
+// A newer seed (for example the membership copy) is content the app should fetch again.
+if (Object.values(seeded).some(Boolean)) await sync.bump('content');
 
 app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded, hub: config.HUB_MODE }, 'storage ready');
 await projects.start();

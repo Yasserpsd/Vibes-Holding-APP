@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { adminGuard, guard, parse, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { getServicesContent } from '../content/services.js';
 import type { KV } from '../store.js';
@@ -29,7 +29,7 @@ function flatQuery(query: unknown): Record<string, string> {
 /** Payments need a session; the Paymob callback and the browser pages are public (HMAC-checked). */
 export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme }) => {
   const requireSession = sessionGuard(auth);
-  const requireAdmin = adminGuard(auth);
+  const requireAdmin = dashboardGuard(auth);
   // The mock gateway page posts a plain HTML form.
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
     done(null, Object.fromEntries(new URLSearchParams(String(body))));

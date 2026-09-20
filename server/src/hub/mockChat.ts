@@ -11,13 +11,15 @@ export const MOCK_MEMBERSHIP_URL = 'https://vcmem.com/membership/';
 export const MOCK_SITE_URL = 'https://vcmem.com/';
 const FREE_REPLIES = 5;
 
-type Row = HubMessage & { revealAt: number };
+type Row = HubMessage & { revealAt: number; pageUrl?: string };
+/** A thread as the dashboard ops of the mock hub read it (bridge v2). */
+export type MockThreadRow = { id: number; role: string; content: string; by: string; pageUrl: string; at: number };
 type Room = { rows: Row[]; replies: number };
 
 const str = (body: HubBody, key: string, max: number): string =>
   typeof body[key] === 'string' ? (body[key] as string).trim().slice(0, max) : '';
 const iso = (ms: number): string => new Date(ms).toISOString();
-const publicRow = ({ revealAt: _revealAt, ...row }: Row): HubMessage => row;
+const publicRow = ({ revealAt: _revealAt, pageUrl: _pageUrl, ...row }: Row): HubMessage => row;
 
 function membershipCard() {
   return {
@@ -45,7 +47,7 @@ export class MockChat {
     return {
       ok: true,
       config: {
-        bot_name: 'مستشار النادي',
+        bot_name: 'المستشار',
         bot_subtitle: 'نادي المستثمرين',
         welcome: `حياك الله في نادي المستثمرين 🌹 كيف أقدر أخدمك اليوم؟ تفاصيل العضوية: ${MOCK_MEMBERSHIP_URL}`,
         menu: ['ما هو بنك المشاريع؟', 'كيف أختار مشروعًا مناسبًا؟', 'اشترك الآن'],
@@ -71,7 +73,7 @@ export class MockChat {
     }
     const now = Date.now();
     const pageTitle = str(body, 'page_title', 200);
-    const userId = this.push(room, { role: 'user', content: text, actions: [], by: '', at: iso(now), revealAt: now });
+    const userId = this.push(room, { role: 'user', content: text, actions: [], by: '', at: iso(now), revealAt: now, pageUrl: str(body, 'page_url', 300) });
     const revealAt = now + this.replyDelayMs;
     if (/الإدارة|موظف|بشري/.test(text)) {
       this.push(room, { role: 'human', by: 'فريق النادي', content: 'أهلًا بك، معك فريق النادي. وصلتنا رسالتك وسنرد عليك هنا.', actions: [], at: iso(revealAt), revealAt });
@@ -123,6 +125,30 @@ export class MockChat {
 
   forget(contactId: number): void {
     this.rooms.delete(contactId);
+  }
+
+  /** Bridge v2: every conversation with its visible rows, for `admin_threads` / `admin_thread` and the stats. */
+  threads(now = Date.now()): { contactId: number; rows: MockThreadRow[] }[] {
+    return [...this.rooms].map(([contactId, room]) => ({
+      contactId,
+      rows: room.rows
+        .filter((row) => row.revealAt <= now)
+        .map((row) => ({ id: row.id, role: row.role, content: row.content, by: row.by ?? '', pageUrl: row.pageUrl ?? '', at: row.revealAt })),
+    }));
+  }
+
+  /** A staff reply written from the dashboard (`admin_reply`): the member sees it on the next poll. */
+  staffReply(contactId: number, text: string, by: string, now = Date.now()): number {
+    return this.push(this.room(contactId), { role: 'human', by, content: text, actions: [], at: iso(now), revealAt: now });
+  }
+
+  /** Demo history for the seeded contacts. */
+  seed(contactId: number, rows: { role: string; content: string; by?: string; at: number; pageUrl?: string }[]): void {
+    const room = this.room(contactId);
+    for (const row of rows) {
+      this.push(room, { role: row.role, content: row.content, by: row.by ?? '', actions: [], at: iso(row.at), revealAt: row.at, pageUrl: row.pageUrl ?? '' });
+      if (row.role === 'assistant') room.replies += 1;
+    }
   }
 
   private room(contactId: number): Room {

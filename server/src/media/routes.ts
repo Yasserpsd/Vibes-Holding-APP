@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
 import type { FastifyPluginAsync } from 'fastify';
 
-import { adminGuard, guard, parse } from '../auth/guard.js';
+import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { uploadInputSchema, type MediaService } from './service.js';
 import { DiskMediaStore, UploadTokenError, UploadTooLargeError } from './store.js';
@@ -21,7 +21,7 @@ function parseRange(header: string | undefined, size: number): { start: number; 
 
 /** Uploaded media (M15): tickets for the dashboard and the public `/media/<key>` links the posts carry. */
 export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, { service, auth }) => {
-  const requireAdmin = adminGuard(auth);
+  const requireAdmin = dashboardGuard(auth);
   const store = service.store;
 
   app.get(

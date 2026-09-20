@@ -246,7 +246,7 @@ export const SERVICES_SEED: ServicesContent = {
     {
       key: 'credit',
       title: 'رصيد بنك المشاريع',
-      summary: 'رصيد بقيمة 3,750 ريال يعادل فتح بيانات 5 مشاريع كاملة تختارها بنفسك.',
+      summary: 'رصيد بقيمة 2,500 ريال يفتح لك بيانات 5 مشاريع حقيقية كاملة تنتقيها بنفسك.',
       detail: null,
       icon: 'wallet',
       group: 'member',
@@ -316,8 +316,8 @@ export const SERVICES_SEED: ServicesContent = {
       order: 15,
     },
   ],
-  version: 2,
-  updatedAt: '2026-09-12T00:00:00.000Z',
+  version: 3,
+  updatedAt: '2026-09-20T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

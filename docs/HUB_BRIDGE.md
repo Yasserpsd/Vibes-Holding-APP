@@ -1,5 +1,7 @@
 # Hub bridge — accounts, OTP, login, membership status, AI advisor
 
+> 2026-09-21: the privileged ops (dashboard, store activation, publish / feed / changes, the webhook) and the Projects Bank bridge are in `docs/BRIDGE_V2.md` (hub plugin 2.7.0). The owner's 2.6.0 never carried the 2.4.1 `delete_account` patch described below: 2.7.0 brings it back together with `activate_member`.
+
 How the app server talks to the vcmem.com hub (WordPress, plugin **Vibes AI Assistant** in hub mode). Written from the plugin source (v2.4.0, `includes/class-vai-hub.php`); nothing here is guessed.
 
 ## 1. Principle: the app server is a tenant site of the hub
@@ -73,11 +75,11 @@ Variables: `HUB_MODE` (`live` | `mock`; default `live` when `HUB_SITE_KEY` is se
 2. Railway → service Vibes-Holding-APP → Variables: `HUB_SITE_KEY=<key>`, `HUB_MODE=live` (`HUB_URL` may stay default). Redeploy.
 3. Check `https://vibes-holding-app-production.up.railway.app/health` → `hub.mode: "live"`, `hub.registrationOpen: false`, `hub.adminOnly: true`.
 4. Sign in from the app with an existing hub **admin** account (e-mail or phone + password).
-5. Upload plugin **2.4.1** (`vibes-ai-assistant-2.4.1.zip`, next to the original zip on the owner's D: drive; diff in `docs/hub-plugin/`) through WordPress → Plugins → Add New → Upload → Replace current. The only change is the `delete_account` op and the version number; nothing else in the plugin moves. Until then the app's «حذف الحساب» answers «هذه الخدمة غير متاحة حاليًا».
+5. (Superseded by 2.7.0, see `docs/BRIDGE_V2.md` and the owner's `خطوات-التشغيل-2.7.0.md`.) Upload plugin **2.4.1** (`vibes-ai-assistant-2.4.1.zip`, next to the original zip on the owner's D: drive; diff in `docs/hub-plugin/`) through WordPress → Plugins → Add New → Upload → Replace current. The only change is the `delete_account` op and the version number; nothing else in the plugin moves. Until then the app's «حذف الحساب» answers «هذه الخدمة غير متاحة حاليًا».
 6. Vibes AI → **التوجيهات والروابط**: add a directive for the app site (the workflow receives `site.host` = the host chosen in step 1), for example: «إذا كان الموقع هو تطبيق نادي المستثمرين فلا تذكر أسعار العضوية ولا روابط الدفع أو الاشتراك؛ وجّه العضو إلى شاشة العضوية داخل التطبيق». The server already removes membership and payment links, but the wording of the replies comes from the workflow.
 
 ## 6. Later milestones on the same bridge
 - Advisor voice and image: `message` already accepts `audio` (data URL, Arabic only, transcribed by the hub) and `image` (jpeg/png/webp data URL); the app needs native modules (expo-audio, expo-image-picker) and therefore a new APK before they can be used.
-- M7 store purchase → hub membership activation: the app server already calls a new server-to-server op `activate_member` with `{ contact_id, days, reference, product, store }` (from the RevenueCat webhook, `server/src/membership/service.ts`) and expects `{ ok: true, contact }`; the plugin still has to implement it with `set_member()` (until then the management gets a «تحتاج تفعيلًا يدويًا» mail and activates by hand). The mock hub implements it.
-- Push on staff replies: a webhook from the hub to this server (new plugin code).
-- Projects Bank unlocks: separate endpoint in the Projects Bank plugin (brief §2.2).
+- M7 store purchase → hub membership activation: the app server already calls a new server-to-server op `activate_member` with `{ contact_id, days, reference, product, store }` (from the RevenueCat webhook, `server/src/membership/service.ts`) and expects `{ ok: true, contact }`; implemented in plugin 2.7.0 through `member_change(extend, source store, ref reference)`: idempotent, and a renewal keeps the remaining days (until 2.7.0 is on the live hub the management gets a «تحتاج تفعيلًا يدويًا» mail and activates by hand). The mock hub implements it.
+- Push on staff replies: done in 2.7.0 (`message.staff` on the signed webhook → `POST /api/webhooks/hub`).
+- Projects Bank unlocks: done in Projects Bank 39.0 (`/wp-json/pb/v1/bridge/{op}`, `docs/BRIDGE_V2.md` §2).

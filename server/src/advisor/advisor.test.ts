@@ -86,7 +86,7 @@ test('history starts empty with the hub profile, minus membership links and paym
   assert.equal(res.headers['cache-control'], 'no-store');
   const body = res.json();
   assert.deepEqual(body.messages, []);
-  assert.equal(body.profile.botName, 'مستشار النادي');
+  assert.equal(body.profile.botName, 'المستشار');
   assert.ok(body.profile.welcome.includes('حياك الله'));
   assert.ok(!body.profile.welcome.includes(MOCK_MEMBERSHIP_URL));
   assert.deepEqual(body.profile.suggestions, ['ما هو بنك المشاريع؟', 'كيف أختار مشروعًا مناسبًا؟']);
@@ -160,8 +160,10 @@ test('stripUrls removes blocked and payment links and keeps allowed markdown lin
   const block = new BlockList([MOCK_MEMBERSHIP_URL]);
   assert.equal(
     stripUrls(`اشترك من ${MOCK_MEMBERSHIP_URL}. الموقع: [النادي](${MOCK_SITE_URL})`, block),
-    `اشترك من . الموقع: النادي ${MOCK_SITE_URL}`,
+    `اشترك من . الموقع: [النادي](${MOCK_SITE_URL})`,
   );
+  // A blocked markdown link goes with its label.
+  assert.equal(stripUrls(`التفاصيل في [صفحة العضوية](${MOCK_MEMBERSHIP_URL}) الآن`, block), 'التفاصيل في الآن');
   assert.equal(stripUrls('ادفع هنا https://accept.paymob.com/api/acceptance/x', block), 'ادفع هنا');
   assert.equal(stripUrls('ادفع هنا https://vcmem.com/pay/123/ اليوم', block), 'ادفع هنا اليوم');
 });

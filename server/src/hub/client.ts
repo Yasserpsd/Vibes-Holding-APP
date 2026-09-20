@@ -4,6 +4,11 @@ import { HubError, type HubBody, type HubClient, type HubOp, type HubResponse } 
 
 type LiveHubOptions = { url: string; siteKey: string; log: FastifyBaseLogger; timeoutMs?: number };
 
+/** `rest_hub()` in the plugin answers this for an op it does not have. */
+const UNKNOWN_OP_TEXT = 'عملية غير معروفة';
+/** Ops of bridge v2 that only the hub's trusted site may call (docs/BRIDGE_V2.md 1.1). */
+const PRIVILEGED_OP = /^(admin_|activate_member$|changes$|publish$)/;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -56,8 +61,15 @@ export class LiveHubClient implements HubClient {
         this.options.log.error({ op, status }, 'hub rejected the site key');
         throw new HubError('hub_config', 'إعداد الربط بالنادي غير صحيح، أبلغ الإدارة', 502);
       }
-      if (json.code === 'not_found' && status === 404) {
+      // An op the installed plugin does not know (bridge v2 needs 2.7.0). A missing record inside a known op keeps its own 404.
+      if (json.code === 'not_found' && status === 404 && (!json.message || json.message === UNKNOWN_OP_TEXT || !PRIVILEGED_OP.test(op))) {
         throw new HubError('hub_not_supported', 'هذه الخدمة غير متاحة حاليًا', 501);
+      }
+      // Privileged ops answer 403 `forbidden` until the app server's row is marked trusted on the hub's «المواقع» page.
+      // Not passed on as a 403: the dashboard would read it as a lost admin role and sign out.
+      if (json.code === 'forbidden' && PRIVILEGED_OP.test(op)) {
+        this.options.log.error({ op, status }, 'the hub does not trust this site yet');
+        throw new HubError('hub_not_trusted', 'فعّل خيار «خادم التطبيق (صلاحيات إدارية)» لموقع التطبيق في صفحة «المواقع» بالهب', 502);
       }
       throw new HubError(json.code, message, status);
     }

@@ -7,6 +7,7 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { LockedNotice } from '@/components/LockedNotice';
 import { Notice } from '@/components/Notice';
@@ -33,6 +34,7 @@ export default function HqScreen() {
   const visits = useMyVisits(status === 'signedIn');
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  useAdvisorScreen({ type: 'screen', id: 'hq', title: data?.content.title ?? 'مقر النادي' });
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAboutContent, type AboutSection } from '@/api/content';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -14,6 +15,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 /** «عنّا»: the club, its operator, فايبز القابضة and the ecosystem. All copy comes from the server. */
 export default function AboutScreen() {
   const { data, isLoading, error, refetch } = useAboutContent();
+  useAdvisorScreen({ type: 'screen', id: 'about', title: 'عن نادي المستثمرين' });
 
   if (!data) {
     return (

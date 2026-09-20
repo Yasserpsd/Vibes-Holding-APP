@@ -1,58 +1,27 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AdvisorContext, AdvisorGate, AdvisorMessage, AdvisorProfile, PortalKey } from '@/api/advisor';
+import type { AdvisorGate, AdvisorMessage, AdvisorProfile } from '@/api/advisor';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { Notice } from '@/components/Notice';
 import { formatArabicDate, formatNumber } from '@/lib/format';
-import type { IoniconName } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 import { Composer } from './Composer';
+import { CONTEXT_ICONS, toApiContext, type ChatContext, type ChatOpening } from './context';
 import { MessageBubble } from './MessageBubble';
 import { useAdvisorChat } from './useAdvisorChat';
 
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
 const IOS_TAB_BAR_HEIGHT = 49;
 
-/** Screen context sent with each message until dismissed: a project, a news item, a home portal or a service. */
-export type ChatContext =
-  | { type: 'project'; id: number; title: string }
-  | { type: 'news'; id: string; title: string }
-  | { type: 'portal'; id: PortalKey; title: string }
-  | { type: 'service'; id: string; title: string };
-
-/** The advisor opens the conversation itself (neutral portal, services): shown until the member answers. */
-export type ChatOpening = { title: string; text: string; quickReplies: string[] };
-
 type Props = { context: ChatContext | null; opening?: ChatOpening | null; onClearContext: () => void };
 type Item = { message: AdvisorMessage; dayLabel: string | null };
-
-const CONTEXT_ICONS: Record<ChatContext['type'], IoniconName> = {
-  project: 'briefcase-outline',
-  news: 'newspaper-outline',
-  portal: 'compass-outline',
-  service: 'grid-outline',
-};
-
-function toApiContext(context: ChatContext | null): AdvisorContext | null {
-  if (!context) return null;
-  switch (context.type) {
-    case 'project':
-      return { type: 'project', id: context.id };
-    case 'news':
-      return { type: 'news', id: context.id };
-    case 'portal':
-      return { type: 'portal', id: context.id };
-    case 'service':
-      return { type: 'service', id: context.id };
-  }
-}
 
 function dayKey(iso: string): string {
   const date = new Date(iso);
@@ -88,6 +57,11 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   // The opening the member already answered; a new one (another portal or service) shows again.
   const [answeredOpening, setAnsweredOpening] = useState<ChatOpening | null>(null);
   const listRef = useRef<FlatList<Item>>(null);
+  const latestContext = useRef(context);
+
+  useEffect(() => {
+    latestContext.current = context;
+  }, [context]);
 
   const items = useMemo(() => withDayLabels(chat.messages), [chat.messages]);
   const lastReplyId = useMemo(() => {
@@ -103,8 +77,11 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     if (!text.trim() || chat.sending) return;
     setDraft('');
     setAnsweredOpening(opening);
-    const accepted = await chat.send(text, toApiContext(context));
-    if (!accepted) setDraft((current) => current || text);
+    const outcome = await chat.send(text, toApiContext(context));
+    if (!outcome.accepted) setDraft((current) => current || text);
+    // An older server took the message only without its context: the pill would claim what the advisor never
+    // received. A context the member opened while the message was on its way is a different one and stays.
+    if (outcome.contextRefused && latestContext.current === context) onClearContext();
   };
 
   const dailyLeft = me?.membership.aiDailyLeft ?? null;
@@ -181,8 +158,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
         {context ? (
           <View style={styles.context}>
             <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
-            <Text style={styles.contextText} numberOfLines={1}>{`الموضوع: ${context.title}`}</Text>
-            <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel="إزالة الموضوع">
+            <Text style={styles.contextText} numberOfLines={1}>{`تسأل عن: ${context.title}`}</Text>
+            <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel="إزالة موضوع السؤال">
               <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </Pressable>
           </View>

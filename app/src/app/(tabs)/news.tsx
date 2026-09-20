@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem } from '@/api/news';
 import { useAuth } from '@/auth/AuthProvider';
+import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
@@ -26,6 +27,8 @@ export default function NewsScreen() {
   const who = signedIn ? `${me?.id ?? 'me'}:${interests.join(',')}` : 'guest';
   const feed = useNewsFeed(topic, who);
   const decisions = useDecisions(8);
+  // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
+  useAdvisorScreen({ type: 'screen', id: 'news', title: 'الأخبار' }, true);
 
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   const personalized = feed.data?.pages[0]?.personalized ?? false;
@@ -122,7 +125,8 @@ export default function NewsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.black },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: ASK_ADVISOR_CLEARANCE },
   header: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.gold },

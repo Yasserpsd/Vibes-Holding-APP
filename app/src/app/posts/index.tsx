@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text } from 'react-native';
 
 import { usePosts } from '@/api/posts';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { PostCard } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
@@ -13,6 +14,7 @@ import { colors, typography } from '@/theme/tokens';
 export default function PostsScreen() {
   const query = usePosts();
   const [refreshing, setRefreshing] = useState(false);
+  useAdvisorScreen({ type: 'screen', id: 'posts', title: 'رسائل الإدارة' });
   const posts = query.data?.pages.flatMap((page) => page.posts) ?? [];
 
   const onRefresh = async () => {

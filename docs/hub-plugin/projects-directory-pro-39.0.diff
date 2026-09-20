@@ -1,0 +1,696 @@
+diff --git a/pb/inc/assistant.php b/work/pb/inc/assistant.php
+index 7b4f0a7..8af615c 100644
+--- a/pb/inc/assistant.php
++++ b/work/pb/inc/assistant.php
+@@ -152,7 +152,7 @@ function pdp_ai_project_text($pid) {
+     if ($p['sector']) $lines[] = 'القطاع: ' . $p['sector'];
+     if ($p['project_stage']) $lines[] = 'المرحلة: ' . $p['project_stage'];
+     if ($p['golden']) $lines[] = 'مشروع ذهبي من ڤايبز القابضة — فرصة شراكة مباشرة بدون رسوم وبدون خصم رصيد' . ($p['partner_url'] ? '. رابط فرصة الشراكة: ' . $p['partner_url'] : '.');
+-    else $lines[] = 'التواصل مع المؤسس وملف الـ Pitch Deck: لأعضاء نادي المستثمرين (العضوية السنوية الموحدة) — رصيد 3 مشاريع في سنة العضوية' . ($m['has_pitch_deck'] ? '. يتوفر ملف Pitch Deck.' : '.');
++    else $lines[] = 'التواصل مع المؤسس وملف الـ Pitch Deck: لأعضاء نادي المستثمرين (العضوية السنوية الموحدة) — رصيد 5 مشاريع في سنة العضوية' . ($m['has_pitch_deck'] ? '. يتوفر ملف Pitch Deck.' : '.');
+     if ($m['excerpt']) $lines[] = 'نبذة: ' . wp_strip_all_tags($m['excerpt']);
+     if ($m['project_details']) $lines[] = 'تفاصيل المشروع: ' . wp_strip_all_tags($m['project_details']);
+     if ($m['excerpt_en']) $lines[] = 'Summary: ' . wp_strip_all_tags($m['excerpt_en']);
+@@ -251,3 +251,77 @@ function pdp_ai_settings_box() {
+     </div>
+     <?php
+ }
++
++// ========== A7. «اسأل المستشار» on project cards and on the single project page (v39) ==========
++// Calls window.VAI.ask(text, context) of the assistant widget. No button exists while the widget or its ask() is missing.
++// The context carries PUBLIC fields only (title, number, sector, stage, public summary) — never whatsapp / e-mail / website / Pitch Deck.
++function pdp_ai_ask_texts($lang = 'ar') {
++    if ($lang === 'en') return ['label' => 'Ask the Advisor', 'q' => 'Tell me about the project "{title}" in Projects Bank: a short summary, its stage and what stands out.', 'head' => 'Project {n} in Projects Bank — {title}', 'num' => '#{v}', 'sector' => 'Sector', 'stage' => 'Stage', 'summary' => 'Summary'];
++    return ['label' => 'اسأل المستشار', 'q' => 'حدّثني عن مشروع «{title}» في بنك المشاريع: ملخصه، ومرحلته، وأبرز ما يميّزه.', 'head' => 'مشروع {n} في بنك المشاريع — {title}', 'num' => 'رقم {v}', 'sector' => 'القطاع', 'stage' => 'المرحلة', 'summary' => 'نبذة'];
++}
++function pdp_ai_ask_context($pid, $lang = 'ar') {
++    $pid = (int)$pid;
++    $t = pdp_ai_ask_texts($lang);
++    $p = pdp_ai_project_row($pid, false);
++    $m = $p['meta'];
++    $en = $lang === 'en';
++    $title = ($en && $p['title_en'] !== '') ? $p['title_en'] : $p['title'];
++    $sector = [];
++    foreach (pdp_ai_term_names($pid, 'sector') as $n) $sector[] = function_exists('pdp_translate_term') ? pdp_translate_term($n, 'sector', $lang) : $n;
++    $stage = [];
++    foreach (pdp_ai_term_names($pid, 'project_stage') as $n) $stage[] = function_exists('pdp_translate_term') ? pdp_translate_term($n, 'stage', $lang) : $n;
++    $summary = '';
++    if ($en) $summary = $m['excerpt_en'] !== '' ? $m['excerpt_en'] : $m['project_details_en'];
++    if ($summary === '') $summary = $m['excerpt'] !== '' ? $m['excerpt'] : $m['project_details'];
++    $summary = trim(preg_replace('/\s+/u', ' ', wp_strip_all_tags((string)$summary)));
++    $num = $p['number'] ? str_replace('{v}', (string)$p['number'], $t['num']) : '';
++    $lines = [trim(preg_replace('/\s+/u', ' ', str_replace(['{n}', '{title}'], [$num, $title], $t['head'])))];
++    if ($sector) $lines[] = $t['sector'] . ': ' . implode($en ? ', ' : '، ', $sector);
++    if ($stage) $lines[] = $t['stage'] . ': ' . implode($en ? ', ' : '، ', $stage);
++    if ($summary !== '') $lines[] = $t['summary'] . ': ' . $summary;
++    return ['type' => 'project', 'id' => (string)$pid, 'title' => $title, 'text' => mb_substr(implode("\n", $lines), 0, 6000, 'UTF-8')];
++}
++add_action('wp_footer', 'pdp_ai_ask_frontend', 990);
++function pdp_ai_ask_frontend() {
++    if (!function_exists('pdp_gate_should_load') || !pdp_gate_should_load()) return;
++    $lang = pdp_gate_page_lang();
++    $cfg = pdp_ai_ask_texts($lang);
++    $cfg['single'] = is_singular('project') ? pdp_ai_ask_context(get_queried_object_id(), $lang) : null;
++    ?>
++    <style>
++    .pdp-ask-btn{font-family:inherit;cursor:pointer}
++    .pdp-action-btn.pdp-ask-btn{background:#1D2D51;color:#f0d78c!important;border:none}.pdp-action-btn.pdp-ask-btn:hover{background:#0f1829;transform:translateY(-2px);box-shadow:0 8px 24px rgba(29,45,81,.35)}
++    .pdp-overlay-btn-main.pdp-ask-btn{background:rgba(255,255,255,.1);border:1px solid rgba(240,215,140,.65);color:#f0d78c!important}.pdp-overlay-btn-main.pdp-ask-btn:hover{background:rgba(240,215,140,.18)}
++    .sp-btn.pdp-ask-btn{background:#1D2D51;color:#f0d78c!important}.sp-btn.pdp-ask-btn:hover{background:#0f1829;transform:translateY(-3px);box-shadow:0 10px 30px rgba(29,45,81,.35)}
++    </style>
++    <script>
++    (function(){'use strict';
++    var L=<?php echo wp_json_encode($cfg); ?>;
++    var ICON='<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
++    function ready(){return !!(window.VAI&&typeof window.VAI.ask==='function')}
++    function txt(el){return el?String(el.textContent||'').replace(/\s+/g,' ').trim():''}
++    function fill(s,o){return String(s).replace(/\{(\w+)\}/g,function(m,k){return o[k]!=null?o[k]:''}).replace(/\s+/g,' ').trim()}
++    /* public card fields only: title, number, sector, stage, the visible excerpt */
++    function cardCtx(card){var title=txt(card.querySelector('.pdp-card-title'));if(!title)return null;
++      var num=txt(card.querySelector('.pdp-pn-v')),sec=txt(card.querySelector('.pdp-tag-sector')),stg=txt(card.querySelector('.pdp-tag-stage')),sum=txt(card.querySelector('.pdp-card-excerpt'));
++      if(num)num=String(parseInt(num,10)||num);
++      var lines=[fill(L.head,{n:num?fill(L.num,{v:num}):'',title:title})];
++      if(sec)lines.push(L.sector+': '+sec);if(stg)lines.push(L.stage+': '+stg);if(sum)lines.push(L.summary+': '+sum);
++      return {type:'project',id:String(parseInt(card.getAttribute('data-pid'),10)||''),title:title,text:lines.join('\n').slice(0,6000)}}
++    function ask(ctx){if(!ctx||!ready())return;try{window.VAI.ask(fill(L.q,{title:ctx.title}),ctx)}catch(e){}}
++    function mk(cls,getCtx){var b=document.createElement('button');b.type='button';b.className=cls+' pdp-ask-btn';b.innerHTML=ICON;var s=document.createElement('span');s.textContent=L.label;b.appendChild(s);
++      b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();ask(getCtx())});return b}
++    function scan(){if(!ready())return;
++      document.querySelectorAll('.pdp-project-card').forEach(function(card){var get=function(){return cardCtx(card)};
++        var acts=card.querySelector('.pdp-card-actions');if(acts&&!acts.querySelector('.pdp-ask-btn'))acts.appendChild(mk('pdp-action-btn',get));
++        var ov=card.querySelector('.pdp-share-overlay .pdp-main-actions');if(ov&&!ov.querySelector('.pdp-ask-btn'))ov.appendChild(mk('pdp-overlay-btn-main',get))});
++      var sp=document.querySelector('.sp-acts');if(sp&&L.single&&!sp.querySelector('.pdp-ask-btn'))sp.appendChild(mk('sp-btn',function(){return L.single}))}
++    /* the buttons exist only once the widget exposes VAI.ask — the widget may load after this script */
++    var started=false;
++    function start(){if(started||!ready())return;started=true;scan();if(window.MutationObserver){var tm=0;new MutationObserver(function(){clearTimeout(tm);tm=setTimeout(scan,250)}).observe(document.body,{childList:true,subtree:true})}}
++    var tries=0;(function wait(){start();if(!started&&++tries<40)setTimeout(wait,750)})();
++    window.addEventListener('vai:account',start);
++    })();
++    </script>
++    <?php
++}
+diff --git a/work/pb/inc/bridge.php b/work/pb/inc/bridge.php
+new file mode 100644
+index 0000000..ac0a3b0
+--- /dev/null
++++ b/work/pb/inc/bridge.php
+@@ -0,0 +1,359 @@
++<?php
++/**
++ * Projects Bank — app bridge (v39)
++ * ------------------------------------------------------------
++ * POST /wp-json/pb/v1/bridge/{op} for the Investors Club app server only (contract: BRIDGE_V2.md, section 2).
++ *  - Key: header X-PB-Bridge-Key only. The option pdp_bridge_key_hash keeps sha256(key); the key itself is shown once.
++ *    The feed key (pdp_ai_key) is never accepted here, and this key never opens the feed.
++ *  - The caller passes the member's period (is_member, member_end, member_days) because this plugin cannot ask the hub server-side.
++ *  - Founder contact data leaves only through pdp_gate_contact_payload(), only in `unlock`, only for a member who holds that project.
++ *  - Project save / publish / trash → signed, non-blocking webhook `project.changed {pid}` (option pdp_bridge_webhook).
++ */
++if (!defined('ABSPATH')) exit;
++
++// ========== B1. Key (stored hashed) and webhook address ==========
++function pdp_bridge_key_hash() {
++    $h = get_option('pdp_bridge_key_hash', '');
++    return (is_string($h) && preg_match('/^[a-f0-9]{64}$/i', $h)) ? strtolower($h) : '';
++}
++// 80 characters on purpose: longer than the 64-byte HMAC block, see pdp_bridge_send()
++function pdp_bridge_key_generate() {
++    $k = wp_generate_password(80, false, false);
++    update_option('pdp_bridge_key_hash', hash('sha256', $k), false);
++    update_option('pdp_bridge_key_at', time(), false);
++    return $k;
++}
++function pdp_bridge_url() { return home_url('/wp-json/pb/v1/bridge'); }
++function pdp_bridge_webhook_url() {
++    $u = trim((string)get_option('pdp_bridge_webhook', ''));
++    return stripos($u, 'http') === 0 ? $u : '';
++}
++
++// ========== B2. REST: one POST route, key in the header, op in the path ==========
++add_action('rest_api_init', function () {
++    register_rest_route('pb/v1', '/bridge/(?P<op>[a-z_]+)', ['methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'pdp_bridge_rest']);
++});
++// every bridge answer (errors too) is member data: never cached
++add_filter('rest_post_dispatch', function ($response, $server, $request) {
++    if ($response instanceof WP_HTTP_Response && strpos((string)$request->get_route(), '/pb/v1/bridge/') === 0) $response->header('Cache-Control', 'no-store');
++    return $response;
++}, 10, 3);
++function pdp_bridge_error($code, $msg, $status) { return new WP_Error($code, $msg, ['status' => (int)$status]); }
++function pdp_bridge_key_ok(WP_REST_Request $req) {
++    $given = trim((string)$req->get_header('X-PB-Bridge-Key'));
++    $hash = pdp_bridge_key_hash();
++    return $given !== '' && $hash !== '' && hash_equals($hash, hash('sha256', $given));
++}
++function pdp_bridge_ops() {
++    return [
++        'ping'     => 'pdp_bridge_op_ping',
++        'balance'  => 'pdp_bridge_op_balance',
++        'balances' => 'pdp_bridge_op_balances',
++        'unlock'   => 'pdp_bridge_op_unlock',
++        'grant'    => 'pdp_bridge_op_grant',
++        'unlocks'  => 'pdp_bridge_op_unlocks',
++    ];
++}
++function pdp_bridge_rest(WP_REST_Request $req) {
++    if (!pdp_bridge_key_ok($req)) return pdp_bridge_error('forbidden', 'مفتاح الجسر غير صحيح', 403);
++    $ops = pdp_bridge_ops();
++    $op = (string)$req->get_param('op');
++    if (!isset($ops[$op])) return pdp_bridge_error('unknown_op', 'عملية غير معروفة', 404);
++    if (!function_exists('pdp_gate_do_unlock')) return pdp_bridge_error('gate_missing', 'ملف inc/gate.php ناقص', 500);
++    $body = $req->get_json_params();
++    if (!is_array($body)) $body = [];
++    $res = call_user_func($ops[$op], $body);
++    if (is_wp_error($res)) return $res;
++    return array_merge(['ok' => true], $res);
++}
++
++// ========== B3. The member the caller vouches for ==========
++// member{contact_id, is_member (0|1), member_end (Y-m-d, Riyadh), member_days, name, email, phone} → the array shape the gate helpers expect
++function pdp_bridge_member($raw) {
++    if (!is_array($raw)) return null;
++    $cid = isset($raw['contact_id']) ? absint($raw['contact_id']) : 0;
++    if (!$cid) return null;
++    $end = isset($raw['member_end']) ? sanitize_text_field((string)$raw['member_end']) : '';
++    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) $end = '';
++    $m = [
++        'id'          => $cid,
++        'member_end'  => $end,
++        'member_days' => isset($raw['member_days']) ? max(0, (int)$raw['member_days']) : 0,
++        'name'        => isset($raw['name']) ? sanitize_text_field((string)$raw['name']) : '',
++        'email'       => isset($raw['email']) ? sanitize_email((string)$raw['email']) : '',
++        'phone'       => isset($raw['phone']) ? sanitize_text_field((string)$raw['phone']) : '',
++    ];
++    if (array_key_exists('is_member', $raw)) $m['is_member'] = !empty($raw['is_member']) ? 1 : 0;
++    return $m;
++}
++// Fails closed. A member_end before today (Riyadh) is never a member, whatever the flag says, and is_member:0 is never a member.
++// An empty member_end proves nothing: the hub sends it for a membership without expiry and also for an account that never paid
++// or was revoked (member_days then falls back to the hub default), so it counts only when the caller vouches is_member:1.
++function pdp_bridge_is_member($m) {
++    $flag = isset($m['is_member']) ? (bool)$m['is_member'] : null;
++    if ($m['member_end'] === '') return $flag === true;
++    return $flag !== false && strcmp($m['member_end'], gmdate('Y-m-d', time() + 3 * HOUR_IN_SECONDS)) >= 0;
++}
++function pdp_bridge_balance($m) {
++    $s = pdp_gate_settings();
++    $start = pdp_gate_period_start($m);
++    $granted = pdp_gate_granted($m['id'], $start);
++    $used = pdp_gate_used($m['id'], $m);
++    return ['credits' => (int)$s['credits'], 'granted' => $granted, 'used' => $used, 'left' => max(0, (int)$s['credits'] + $granted - $used), 'period_start' => $start];
++}
++// The only place locked founder data leaves through the bridge (contract shape: whatsapp, email, website, pitch_url)
++function pdp_bridge_contact($pid) {
++    $p = pdp_gate_contact_payload($pid, 'ar');
++    return ['whatsapp' => (string)$p['whatsapp'], 'email' => (string)$p['email'], 'website' => (string)$p['website'], 'pitch_url' => (string)$p['pitch']];
++}
++
++// ========== B4. Ops ==========
++function pdp_bridge_op_ping($body) {
++    return ['version' => PDP_VERSION];
++}
++// `unlocked` = every year, `used` = this membership year
++function pdp_bridge_op_balance($body) {
++    $m = pdp_bridge_member(isset($body['member']) ? $body['member'] : null);
++    if (!$m) return pdp_bridge_error('bad_member', 'بيانات العضو ناقصة', 400);
++    $out = pdp_bridge_balance($m);
++    $out['unlocked'] = array_values(array_map('intval', array_keys(pdp_gate_unlocked_map($m['id']))));
++    return $out;
++}
++// Two queries in total, whatever the number of members (no lazy binding of loose grants here: they are only counted)
++function pdp_bridge_op_balances($body) {
++    global $wpdb;
++    $list = (isset($body['members']) && is_array($body['members'])) ? $body['members'] : [];
++    if (count($list) > 200) return pdp_bridge_error('too_many', 'الحد الأقصى 200 عضو في الطلب الواحد', 400);
++    $members = [];
++    foreach ($list as $raw) { $m = pdp_bridge_member($raw); if ($m) $members[$m['id']] = $m; }
++    if (!$members) return ['items' => new stdClass()];
++    $ids = array_keys($members);
++    $in = implode(',', array_fill(0, count($ids), '%d'));
++    $t = pdp_gate_table();
++    $g = pdp_gate_grants_table();
++    $urows = $wpdb->get_results($wpdb->prepare("SELECT contact_id, unlocked_at FROM $t WHERE contact_id IN ($in)", $ids));
++    $grows = $wpdb->get_results($wpdb->prepare("SELECT contact_id, period_start, SUM(amount) AS total FROM $g WHERE contact_id IN ($in) GROUP BY contact_id, period_start", $ids));
++    $unlocks = [];
++    foreach ((array)$urows as $r) $unlocks[(int)$r->contact_id][] = (string)$r->unlocked_at;
++    $grants = [];
++    foreach ((array)$grows as $r) $grants[(int)$r->contact_id][(string)$r->period_start] = (int)$r->total;
++    $credits = (int)pdp_gate_settings()['credits'];
++    $items = [];
++    foreach ($members as $cid => $m) {
++        $start = pdp_gate_period_start($m);
++        $used = 0;
++        $dates = isset($unlocks[$cid]) ? $unlocks[$cid] : [];
++        foreach ($dates as $at) { if ($start === '' || ($at !== '' && strcmp($at, $start) >= 0)) $used++; }
++        $granted = isset($grants[$cid][$start]) ? $grants[$cid][$start] : 0;
++        if ($start !== '' && isset($grants[$cid][''])) $granted += $grants[$cid][''];
++        $items[(string)$cid] = ['credits' => $credits, 'granted' => $granted, 'used' => $used, 'left' => max(0, $credits + $granted - $used)];
++    }
++    return ['items' => (object)$items];
++}
++// Golden projects cost nothing and are never unlocked: their contact goes through the public partnership link of the feed
++function pdp_bridge_op_unlock($body) {
++    $m = pdp_bridge_member(isset($body['member']) ? $body['member'] : null);
++    if (!$m) return pdp_bridge_error('bad_member', 'بيانات العضو ناقصة', 400);
++    $pid = isset($body['pid']) ? absint($body['pid']) : 0;
++    if (!$pid || get_post_type($pid) !== 'project' || get_post_status($pid) !== 'publish') return pdp_bridge_error('not_found', 'المشروع غير موجود', 404);
++    if (get_post_meta($pid, 'is_featured', true) === '1') {
++        $b = pdp_bridge_balance($m);
++        return ['already' => false, 'golden' => true, 'left' => (int)$b['left'], 'contact' => ['whatsapp' => '', 'email' => '', 'website' => '', 'pitch_url' => '']];
++    }
++    if (!pdp_bridge_is_member($m)) return pdp_bridge_error('not_member', 'العضوية السنوية غير مفعّلة', 403);
++    $r = pdp_gate_do_unlock($m, $pid);
++    if (empty($r['ok'])) {
++        if ($r['code'] === 'no_credit') return pdp_bridge_error('no_credit', 'لا يوجد رصيد متبقٍ في سنة العضوية الحالية', 402);
++        return pdp_bridge_error($r['code'] === 'busy' ? 'busy' : 'db_error', 'تعذّر فتح المشروع الآن، أعد المحاولة', 503);
++    }
++    return ['already' => !empty($r['already']), 'left' => (int)$r['left'], 'contact' => pdp_bridge_contact($pid)];
++}
++// amount may be negative. A deduction never takes the year's allowance below what the member already used, so it needs `member`
++// (the year is unknown without it); an addition is always accepted. Without `member` an addition is saved without a year and joins
++// the first membership year seen for this member (granted / left then count only what is known here).
++// `ref` (optional, the caller's id of this one action) makes a retry harmless: the same ref answers already:true and adds nothing.
++function pdp_bridge_op_grant($body) {
++    $cid = isset($body['contact_id']) ? absint($body['contact_id']) : 0;
++    $amount = isset($body['amount']) ? (int)$body['amount'] : 0;
++    if (!$cid) return pdp_bridge_error('bad_request', 'رقم الحساب ناقص', 400);
++    if ($amount === 0 || abs($amount) > 1000) return pdp_bridge_error('bad_amount', 'قيمة الرصيد غير صحيحة', 400);
++    $ref = isset($body['ref']) ? sanitize_text_field((string)$body['ref']) : '';
++    if ($ref !== '' && !preg_match('/^[A-Za-z0-9_.:-]{1,64}$/', $ref)) return pdp_bridge_error('bad_ref', 'مرجع العملية غير صحيح', 400);
++    $m = ['id' => $cid, 'member_end' => '', 'member_days' => 0];
++    if (isset($body['member'])) {
++        $m = pdp_bridge_member($body['member']);
++        if (!$m || $m['id'] !== $cid) return pdp_bridge_error('bad_member', 'بيانات العضو لا تطابق رقم الحساب', 400);
++    } elseif ($amount < 0) {
++        return pdp_bridge_error('bad_member', 'خصم الرصيد يحتاج بيانات عضوية العضو لمعرفة سنة عضويته', 400);
++    }
++    $row = [
++        'contact_id' => $cid,
++        'amount'     => $amount,
++        'note'       => isset($body['note']) ? mb_substr(sanitize_text_field((string)$body['note']), 0, 255) : '',
++        'actor'      => isset($body['actor']) ? mb_substr(sanitize_text_field((string)$body['actor']), 0, 190) : '',
++        'ref'        => $ref !== '' ? $ref : null,
++    ];
++    // the same lock as pdp_gate_do_unlock: no unlock slips in between the balance read and the insert
++    $held = pdp_gate_lock($cid);
++    if ($held === false) return pdp_bridge_error('busy', 'تعذّر حفظ الرصيد الآن، أعد المحاولة', 503);
++    $res = pdp_bridge_grant_save($m, $row);
++    pdp_gate_release($cid, $held);
++    return $res;
++}
++// Runs under the member's lock: balance, floor check and insert see the same rows
++function pdp_bridge_grant_save($m, $row) {
++    global $wpdb;
++    $amount = (int)$row['amount'];
++    $b = pdp_bridge_balance($m);
++    $known = pdp_bridge_grant_known($row, $b);
++    if ($known !== null) return $known;
++    if ($amount < 0 && $b['credits'] + $b['granted'] + $amount < $b['used']) return pdp_bridge_error('below_used', 'لا يمكن خفض الرصيد إلى أقل مما استخدمه العضو', 409);
++    $row['period_start'] = $b['period_start'];
++    $row['created_at'] = gmdate('Y-m-d H:i:s');
++    $prev = $wpdb->suppress_errors(true);
++    $ok = $wpdb->insert(pdp_gate_grants_table(), $row);
++    $wpdb->suppress_errors($prev);
++    if (!$ok) {
++        // the unique key on ref refused it: a parallel retry of the same action got there first
++        $known = pdp_bridge_grant_known($row, pdp_bridge_balance($m));
++        return $known !== null ? $known : pdp_bridge_error('db_error', 'تعذّر حفظ الرصيد', 500);
++    }
++    return ['already' => false, 'granted' => $b['granted'] + $amount, 'left' => max(0, $b['credits'] + $b['granted'] + $amount - $b['used'])];
++}
++// A grant already saved under this ref: for the same member → today's numbers with already:true; for another member → the ref is refused
++function pdp_bridge_grant_known($row, $b) {
++    global $wpdb;
++    if ($row['ref'] === null) return null;
++    $g = pdp_gate_grants_table();
++    $owner = $wpdb->get_var($wpdb->prepare("SELECT contact_id FROM $g WHERE ref=%s LIMIT 1", $row['ref']));
++    if ($owner === null) return null;
++    if ((int)$owner !== (int)$row['contact_id']) return pdp_bridge_error('ref_used', 'مرجع العملية مستخدم مع عضو آخر', 409);
++    return ['already' => true, 'granted' => (int)$b['granted'], 'left' => (int)$b['left']];
++}
++function pdp_bridge_op_unlocks($body) {
++    global $wpdb;
++    $page = max(1, isset($body['page']) ? (int)$body['page'] : 1);
++    $per = min(100, max(1, isset($body['per_page']) ? (int)$body['per_page'] : 50));
++    $cid = isset($body['contact_id']) ? absint($body['contact_id']) : 0;
++    $t = pdp_gate_table();
++    $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE (%d=0 OR contact_id=%d)", $cid, $cid));
++    $rows = $wpdb->get_results($wpdb->prepare("SELECT contact_id, pid, name, unlocked_at FROM $t WHERE (%d=0 OR contact_id=%d) ORDER BY id DESC LIMIT %d OFFSET %d", $cid, $cid, $per, ($page - 1) * $per));
++    $pids = [];
++    foreach ((array)$rows as $r) $pids[(int)$r->pid] = (int)$r->pid;
++    // one query warms the post cache for the titles below
++    if ($pids) get_posts(['post_type' => 'project', 'post_status' => 'any', 'post__in' => array_values($pids), 'posts_per_page' => count($pids), 'no_found_rows' => true, 'suppress_filters' => true]);
++    $items = [];
++    foreach ((array)$rows as $r) {
++        $items[] = [
++            'contact_id'  => (int)$r->contact_id,
++            'pid'         => (int)$r->pid,
++            'title'       => html_entity_decode((string)get_the_title((int)$r->pid), ENT_QUOTES, 'UTF-8'),
++            'name'        => (string)$r->name,
++            'unlocked_at' => (string)$r->unlocked_at,
++        ];
++    }
++    return ['total' => $total, 'items' => $items];
++}
++
++// ========== B5. Webhook to the app server: project.changed {pid} ==========
++// Queued during the request and sent on shutdown, so the meta saved later in the same request is already in place
++function pdp_bridge_queue_change($pid) {
++    $pid = (int)$pid;
++    if (!$pid || pdp_bridge_webhook_url() === '' || pdp_bridge_key_hash() === '') return;
++    // the app server re-reads the feed right after the event
++    delete_transient('pdp_ai_feed_full');
++    delete_transient('pdp_ai_feed_compact');
++    if (!isset($GLOBALS['pdp_bridge_q'])) { $GLOBALS['pdp_bridge_q'] = []; add_action('shutdown', 'pdp_bridge_flush', 5); }
++    $GLOBALS['pdp_bridge_q'][$pid] = $pid;
++}
++function pdp_bridge_flush() {
++    $q = isset($GLOBALS['pdp_bridge_q']) ? $GLOBALS['pdp_bridge_q'] : [];
++    $GLOBALS['pdp_bridge_q'] = [];
++    // a bulk edit needs no more than a few events: the app server refreshes its whole snapshot on the first one
++    foreach (array_slice(array_values($q), 0, 5) as $pid) pdp_bridge_send('project.changed', ['pid' => (int)$pid]);
++}
++// Same scheme as the hub webhook: X-VAI-Signature = sha256 HMAC of "<timestamp>.<raw body>" with the bridge key as secret.
++// Only sha256(key) is stored. HMAC-SHA256 hashes any key longer than its 64-byte block before use (RFC 2104), and the
++// bridge key is 80 characters, so signing with the raw stored digest gives exactly the signature of the key itself.
++function pdp_bridge_send($event, $data) {
++    $url = pdp_bridge_webhook_url();
++    $hash = pdp_bridge_key_hash();
++    if ($url === '' || $hash === '') return;
++    $body = wp_json_encode(['event' => (string)$event, 'at' => gmdate('Y-m-d H:i:s'), 'data' => $data]);
++    $ts = (string)time();
++    $sig = hash_hmac('sha256', $ts . '.' . $body, hex2bin($hash));
++    wp_safe_remote_post($url, [
++        'timeout'     => 3,
++        'blocking'    => false,
++        'redirection' => 0,
++        'headers'     => ['Content-Type' => 'application/json', 'X-VAI-Timestamp' => $ts, 'X-VAI-Signature' => 'sha256=' . $sig],
++        'body'        => $body,
++    ]);
++}
++// save / publish / unpublish / trash / restore: anything that enters or leaves the published state, or edits a published project
++add_action('transition_post_status', function ($new, $old, $post) {
++    if (!$post || $post->post_type !== 'project' || ($new !== 'publish' && $old !== 'publish')) return;
++    pdp_bridge_queue_change($post->ID);
++}, 10, 3);
++add_action('before_delete_post', function ($pid) {
++    if (get_post_type($pid) === 'project') pdp_bridge_queue_change($pid);
++});
++// public flags changed outside the editor (golden quick toggle, Pitch Deck page)
++function pdp_bridge_meta_changed($meta_id, $pid, $key) {
++    if ($key !== 'is_featured' && $key !== 'pitch_deck') return;
++    if (get_post_type($pid) === 'project' && get_post_status($pid) === 'publish') pdp_bridge_queue_change($pid);
++}
++add_action('added_post_meta', 'pdp_bridge_meta_changed', 10, 3);
++add_action('updated_post_meta', 'pdp_bridge_meta_changed', 10, 3);
++add_action('deleted_post_meta', 'pdp_bridge_meta_changed', 10, 3);
++
++// ========== B6. Settings box (inside the plugin settings page) ==========
++add_action('pdp_settings_extra', 'pdp_bridge_settings_box', 15);
++function pdp_bridge_settings_box() {
++    if (!current_user_can('manage_options')) return;
++    $msg = '';
++    $new_key = '';
++    if (isset($_POST['pdp_bridge_regen']) && check_admin_referer('pdp_bridge_regen')) {
++        $new_key = pdp_bridge_key_generate();
++        $msg = '🔑 تم توليد مفتاح جديد لجسر التطبيق — انسخه الآن وضعه في متغيرات خادم التطبيق، فلن يظهر مرة أخرى.';
++    }
++    if (isset($_POST['pdp_bridge_save']) && check_admin_referer('pdp_bridge_save')) {
++        $u = isset($_POST['pdp_bridge_webhook']) ? esc_url_raw(trim((string)wp_unslash($_POST['pdp_bridge_webhook'])), ['https', 'http']) : '';
++        update_option('pdp_bridge_webhook', $u, false);
++        $msg = $u !== '' ? '✅ تم حفظ رابط إشعار خادم التطبيق.' : '✅ تم إيقاف إشعارات خادم التطبيق (الرابط فارغ).';
++    }
++    $has_key = pdp_bridge_key_hash() !== '';
++    $key_at = (int)get_option('pdp_bridge_key_at', 0);
++    $hook = (string)get_option('pdp_bridge_webhook', '');
++    ?>
++    <div id="pdp-bridge-settings" style="margin-top:30px;background:#fff;border-radius:12px;padding:25px;box-shadow:0 2px 15px rgba(0,0,0,.06);border:1px solid #e2e8f0;">
++        <h2 style="margin-top:0;color:#1D2D51;font-size:1.1rem;">📱 جسر التطبيق — ربط بنك المشاريع بتطبيق نادي المستثمرين</h2>
++        <?php if ($msg): ?><div class="notice notice-info inline" style="margin:0 0 14px;"><p><?php echo esc_html($msg); ?></p></div><?php endif; ?>
++        <p style="color:#64748b;font-size:.85rem;">يتيح لخادم التطبيق قراءة رصيد العضو في بنك المشاريع، وفتح مشروع من داخل التطبيق، ومنح رصيد إضافي لعضو بعينه من لوحة التحكم — ويُحتسب الرصيد الممنوح على الموقع أيضًا. مفتاح الجسر مستقل عن مفتاح التغذية أعلاه، ولا تُحفظ منه إلا بصمته، ويظهر مرة واحدة فقط عند توليده.</p>
++        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
++            <div style="background:linear-gradient(135deg,#0f1829,#1D2D51);border:1.5px solid #d4a853;border-radius:12px;padding:18px 20px;color:#fff;">
++                <h3 style="margin:0 0 10px;color:#f0d78c;font-size:1rem;">🔑 مفتاح الجسر</h3>
++                <label style="display:block;font-size:.75rem;color:#cbd5e1;margin-bottom:4px;">رابط الجسر (PB_BRIDGE_URL)</label>
++                <input type="text" readonly value="<?php echo esc_attr(pdp_bridge_url()); ?>" onclick="this.select()" style="width:100%;direction:ltr;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;margin-bottom:10px;">
++                <?php if ($new_key !== ''): ?>
++                <label style="display:block;font-size:.75rem;color:#f0d78c;margin-bottom:4px;">المفتاح الجديد (PB_BRIDGE_KEY) — انسخه الآن، لن يظهر مرة أخرى</label>
++                <input type="text" readonly value="<?php echo esc_attr($new_key); ?>" onclick="this.select()" autocomplete="off" style="width:100%;direction:ltr;padding:8px;border-radius:6px;border:1px solid #d4a853;background:rgba(255,255,255,.08);color:#f0d78c;font-family:monospace;margin-bottom:10px;">
++                <?php endif; ?>
++                <p style="margin:0 0 12px;color:#cbd5e1;font-size:.8rem;"><?php echo $has_key ? '✅ يوجد مفتاح مفعّل' . ($key_at ? ' — وُلّد في ' . esc_html(wp_date('Y/m/d H:i', $key_at)) : '') . '.' : '⚠️ لم يُولَّد مفتاح بعد — الجسر مغلق تمامًا حتى تولّد مفتاحًا.'; ?></p>
++                <form method="post" style="display:inline;"<?php if ($has_key): ?> onsubmit="return confirm('سيتوقف المفتاح الحالي عن العمل فورًا، ويجب وضع المفتاح الجديد في متغيرات خادم التطبيق. متابعة؟');"<?php endif; ?>><?php wp_nonce_field('pdp_bridge_regen'); ?><button type="submit" name="pdp_bridge_regen" class="button"<?php if ($has_key): ?> style="color:#b91c1c;"<?php endif; ?>><?php echo $has_key ? '♻️ تدوير المفتاح' : '🔑 توليد مفتاح الجسر'; ?></button></form>
++            </div>
++            <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:12px;padding:18px 20px;">
++                <h3 style="margin:0 0 10px;color:#1D2D51;font-size:1rem;">🔔 إشعار خادم التطبيق عند تغيّر أي مشروع</h3>
++                <p style="margin:0 0 10px;font-size:.8rem;color:#64748b;">عند حفظ مشروع أو نشره أو نقله إلى سلة المهملات يصل إشعار فوري موقَّع بمفتاح الجسر إلى خادم التطبيق ليحدّث بياناته في اللحظة نفسها. لا يحمل الإشعار أي بيانات سوى رقم المشروع. اترك الحقل فارغًا لإيقاف الإشعارات.</p>
++                <form method="post">
++                    <?php wp_nonce_field('pdp_bridge_save'); ?>
++                    <label style="display:block;font-weight:700;margin-bottom:5px;color:#1D2D51;font-size:.85rem;">رابط الإشعار (Webhook)</label>
++                    <input type="url" name="pdp_bridge_webhook" value="<?php echo esc_attr($hook); ?>" placeholder="https://…/api/webhooks/pb" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;direction:ltr;text-align:left;margin-bottom:10px;">
++                    <button type="submit" name="pdp_bridge_save" class="button button-primary">💾 حفظ رابط الإشعار</button>
++                </form>
++                <?php if ($hook !== '' && !$has_key): ?><p style="margin:10px 0 0;font-size:.75rem;color:#b45309;">⚠️ لن يُرسل أي إشعار قبل توليد مفتاح الجسر، لأن الإشعار يُوقَّع به.</p><?php endif; ?>
++            </div>
++        </div>
++    </div>
++    <?php
++}
+diff --git a/pb/inc/gate.php b/work/pb/inc/gate.php
+index d8fc710..378f669 100644
+--- a/pb/inc/gate.php
++++ b/work/pb/inc/gate.php
+@@ -85,6 +85,7 @@ function pdp_gate_admin_recipients() {
+ 
+ // ========== G2. التثبيت: جدول الفتح (بمعرّف حساب المنظومة) ==========
+ function pdp_gate_table() { global $wpdb; return $wpdb->prefix . 'pdp_unlocks'; }
++function pdp_gate_grants_table() { global $wpdb; return $wpdb->prefix . 'pdp_grants'; }
+ function pdp_gate_install() {
+     global $wpdb;
+     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+@@ -104,9 +105,25 @@ function pdp_gate_install() {
+   KEY contact_id (contact_id),
+   KEY pid (pid)
+ ) $c;");
+-    update_option('pdp_gate_db', '38', false);
++    // v39: extra balance (or a deduction) an admin gives one member for his membership year — an empty period_start joins the first membership year seen for that member
++    // ref = the caller's reference of one grant action (NULL when none): a retried request never adds the same grant twice
++    $g = pdp_gate_grants_table();
++    dbDelta("CREATE TABLE $g (
++  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
++  contact_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
++  amount INT NOT NULL DEFAULT 0,
++  period_start VARCHAR(20) NOT NULL DEFAULT '',
++  note VARCHAR(255) NOT NULL DEFAULT '',
++  actor VARCHAR(190) NOT NULL DEFAULT '',
++  ref VARCHAR(64) NULL,
++  created_at DATETIME NULL,
++  PRIMARY KEY  (id),
++  UNIQUE KEY ref (ref),
++  KEY contact_period (contact_id,period_start)
++) $c;");
++    update_option('pdp_gate_db', '39', false);
+ }
+-add_action('init', function () { if (get_option('pdp_gate_db') !== '38') pdp_gate_install(); }, 5);
++add_action('init', function () { if (get_option('pdp_gate_db') !== '39') pdp_gate_install(); }, 5);
+ 
+ // أعضاء النظام القديم (دور pdp_investor) لم يعودوا مستخدمين — لا لوحة تحكم لهم ولا شريط أدمن حتى تُحذف حساباتهم
+ add_filter('show_admin_bar', function ($show) {
+@@ -135,7 +152,16 @@ function pdp_gate_period_start($c) {
+     $days = isset($c['member_days']) ? (int)$c['member_days'] : 0;
+     if ($end === '' || $days <= 0) return '';
+     $t = strtotime($end . ' 00:00:00 +03:00');
+-    return $t ? gmdate('Y-m-d H:i:s', $t - $days * DAY_IN_SECONDS) : '';
++    if (!$t) return '';
++    $start = $t - $days * DAY_IN_SECONDS;
++    // v39: the hub keeps the first start date of a membership renewed before its end and only adds to member_days,
++    // so every paid year (365 days after that start) opens its own allowance; extra days stay inside the last year
++    $years = max(1, (int)round($days / 365));
++    if ($years > 1) {
++        $n = (int)floor((time() - $start) / YEAR_IN_SECONDS);
++        $start += min($years - 1, max(0, $n)) * YEAR_IN_SECONDS;
++    }
++    return gmdate('Y-m-d H:i:s', $start);
+ }
+ function pdp_gate_unlocked_map($cid) {
+     global $wpdb;
+@@ -152,6 +178,78 @@ function pdp_gate_used($cid, $c) {
+     if ($start) return (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE contact_id=%d AND unlocked_at>=%s", (int)$cid, $start));
+     return (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE contact_id=%d", (int)$cid));
+ }
++// v39: what admins granted this member for his membership year (table pdp_grants, may be negative); a grant saved without a year joins the first year that shows up
++function pdp_gate_granted($cid, $period_start) {
++    global $wpdb;
++    $g = pdp_gate_grants_table();
++    $start = (string)$period_start;
++    $prev = $wpdb->suppress_errors(true);
++    $rows = $wpdb->get_results($wpdb->prepare("SELECT period_start, SUM(amount) AS total FROM $g WHERE contact_id=%d AND (period_start=%s OR period_start='') GROUP BY period_start", (int)$cid, $start));
++    $sum = 0;
++    $loose = false;
++    foreach ((array)$rows as $r) { $sum += (int)$r->total; if ((string)$r->period_start === '') $loose = true; }
++    if ($loose && $start !== '') $wpdb->query($wpdb->prepare("UPDATE $g SET period_start=%s WHERE contact_id=%d AND period_start=''", $start, (int)$cid));
++    $wpdb->suppress_errors($prev);
++    return $sum;
++}
++// v39: the member's whole allowance for his membership year = the membership balance (settings) + admin grants — used by the website and by the app bridge alike
++function pdp_gate_allowance($contact_id, $period_start) {
++    $s = pdp_gate_settings();
++    return max(0, (int)$s['credits'] + pdp_gate_granted($contact_id, $period_start));
++}
++// v39: one named database lock per member around every count-and-write of his allowance (a project unlock, an admin grant)
++// returns true = held, false = busy, null = this database has no GET_LOCK → go on without a lock, as before v39
++function pdp_gate_lock($cid) {
++    global $wpdb;
++    $prev = $wpdb->suppress_errors(true);
++    $got = $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, 5)', 'pdp_unlock_' . (int)$cid));
++    $wpdb->suppress_errors($prev);
++    return $got === null ? null : ((int)$got === 1);
++}
++function pdp_gate_release($cid, $held) {
++    global $wpdb;
++    if ($held === true) $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', 'pdp_unlock_' . (int)$cid));
++}
++function pdp_gate_unlock_row($c, $pid) {
++    return [
++        'contact_id'  => (int)$c['id'],
++        'pid'         => (int)$pid,
++        'name'        => sanitize_text_field((string)($c['name'] ?? '')),
++        'email'       => sanitize_email((string)($c['email'] ?? '')),
++        'phone'       => sanitize_text_field((string)($c['phone'] ?? '')),
++        'period_end'  => sanitize_text_field((string)($c['member_end'] ?? '')),
++        'unlocked_at' => gmdate('Y-m-d H:i:s'),
++    ];
++}
++// v39: unlock a project for a paid member — shared by the website AJAX and the app bridge. GET_LOCK around count-and-insert stops two parallel requests from overspending
++// $c = the member (id, name, email, phone, member_end, member_days) — returns ok / already / code (no_credit | busy | db) / left
++function pdp_gate_do_unlock($c, $pid) {
++    global $wpdb;
++    $cid = isset($c['id']) ? (int)$c['id'] : 0;
++    $pid = (int)$pid;
++    $out = ['ok' => false, 'already' => false, 'code' => '', 'left' => 0];
++    if (!$cid || !$pid) { $out['code'] = 'db'; return $out; }
++    $held = pdp_gate_lock($cid);
++    if ($held === false) { $out['code'] = 'busy'; return $out; }
++    $map  = pdp_gate_unlocked_map($cid);
++    $left = max(0, pdp_gate_allowance($cid, pdp_gate_period_start($c)) - pdp_gate_used($cid, $c));
++    $new  = false;
++    if (isset($map[$pid])) { $out['ok'] = true; $out['already'] = true; }
++    elseif ($left < 1) { $out['code'] = 'no_credit'; }
++    else {
++        $new = (bool)$wpdb->insert(pdp_gate_table(), pdp_gate_unlock_row($c, $pid));
++        if ($new) { $out['ok'] = true; $left--; }
++        else { $again = pdp_gate_unlocked_map($cid); if (isset($again[$pid])) { $out['ok'] = true; $out['already'] = true; } else { $out['code'] = 'db'; } }
++    }
++    pdp_gate_release($cid, $held);
++    $out['left'] = $left;
++    if (!$new) return $out;
++    $cnt = (int)get_post_meta($pid, 'pdp_unlock_count', true);
++    update_post_meta($pid, 'pdp_unlock_count', $cnt + 1);
++    $who = $c; $rem = $left; $tot = count($map) + 1;
++    pdp_gate_bg(function () use ($who, $pid, $rem, $tot) { pdp_gate_notify_admin($who, 'unlock', ['pid' => $pid, 'remaining' => $rem, 'total' => $tot]); });
++    return $out;
++}
+ 
+ // بيانات تواصل المشروع (تُرسل فقط بعد فتح المشروع)
+ function pdp_gate_contact_payload($pid, $lang = 'ar') {
+@@ -256,7 +354,9 @@ function pdp_gate_state($pid = 0, $lang = 'ar', $fresh = false) {
+     $cid = (int)$c['id'];
+     $map = pdp_gate_unlocked_map($cid);
+     $out['used'] = pdp_gate_used($cid, $c);
+-    $out['left'] = max(0, (int)$s['credits'] - $out['used']);
++    // v39: allowance = membership balance + what an admin granted this member (the same helper the app bridge uses)
++    $out['credits'] = pdp_gate_allowance($cid, pdp_gate_period_start($c));
++    $out['left'] = max(0, $out['credits'] - $out['used']);
+     $out['unlocked'] = array_values(array_map('intval', array_keys($map)));
+     $out['unlocked_list'] = pdp_gate_unlocked_list($cid, $lang);
+     if ($pid && isset($map[$pid])) { $out['state'] = 'unlocked'; $out['contact'] = pdp_gate_contact_payload($pid, $lang); return $out; }
+@@ -401,23 +501,14 @@ function pdp_gate_ajax_unlock() {
+     if ($st['state'] !== 'can_unlock') { nocache_headers(); wp_send_json_success($st); }
+     $c = pdp_gate_contact();
+     if (!$c) pdp_gate_json_state($pid, $lang);
+-    global $wpdb;
+-    $wpdb->insert(pdp_gate_table(), [
+-        'contact_id'  => (int)$c['id'],
+-        'pid'         => $pid,
+-        'name'        => sanitize_text_field((string)$c['name']),
+-        'email'       => sanitize_email((string)$c['email']),
+-        'phone'       => sanitize_text_field((string)$c['phone']),
+-        'period_end'  => sanitize_text_field((string)($c['member_end'] ?? '')),
+-        'unlocked_at' => gmdate('Y-m-d H:i:s'),
+-    ]);
+-    $cnt = (int)get_post_meta($pid, 'pdp_unlock_count', true);
+-    update_post_meta($pid, 'pdp_unlock_count', $cnt + 1);
+-    $after = pdp_gate_state($pid, $lang);
+-    $who = $c; $rem = (int)$after['left']; $tot = count($after['unlocked']);
+-    pdp_gate_bg(function () use ($who, $pid, $rem, $tot) { pdp_gate_notify_admin($who, 'unlock', ['pid' => $pid, 'remaining' => $rem, 'total' => $tot]); });
++    // v39: counting, insert and the admin notice live in pdp_gate_do_unlock (shared with the app bridge)
++    $r = pdp_gate_do_unlock($c, $pid);
++    if (empty($r['ok'])) {
++        if ($r['code'] === 'no_credit') pdp_gate_json_state($pid, $lang);
++        wp_send_json_error(['msg' => $en ? 'Something went wrong, please try again.' : 'حدث خطأ، حاول مرة أخرى.']);
++    }
+     nocache_headers();
+-    wp_send_json_success(array_merge($after, ['just_unlocked' => 1]));
++    wp_send_json_success(array_merge(pdp_gate_state($pid, $lang), ['just_unlocked' => 1]));
+ }
+ // ضغطة «اكتشف فرصة الشراكة» في مشروع ذهبي → إشعار الإدارة (مرة كل 30 دقيقة لكل زائر/مشروع)
+ add_action('wp_ajax_pdp_gate_golden', 'pdp_gate_ajax_golden');
+diff --git a/pb/projects-directory-pro.php b/work/pb/projects-directory-pro.php
+index 0aa5a25..dd31cb0 100644
+--- a/pb/projects-directory-pro.php
++++ b/work/pb/projects-directory-pro.php
+@@ -2,19 +2,20 @@
+ /**
+  * Plugin Name: Projects Bank from VibesHolding Pro
+  * Description: نظام بنك مشاريع احترافي من ڤايبز القابضة - ثنائي اللغة — العضوية الموحدة عبر Vibes AI Assistant (v38)
+- * Version: 38.1
++ * Version: 39.0
+  * Author: Yasser Dev
+  * Author URI: https://vibesholding.com/
+  * Text Domain: vibes-projects
+  */
+ if (!defined('ABSPATH')) exit;
+ 
+-define('PDP_VERSION', '38.1');
++define('PDP_VERSION', '39.0');
+ define('PDP_PATH', plugin_dir_path(__FILE__));
+ 
+ // ========== 0. الوحدات (v38): بوابة العضوية الموحدة (Vibes AI) + كشف المشاريع للمساعد + حملات الإيميل + ملفات Pitch Deck ==========
+ // v38: أُلغيت وحدة الدفع (inc/payments.php) ونظام العضوية الخاص بالبنك بالكامل — العضوية من بلجن Vibes AI Assistant
+-foreach (['inc/gate.php', 'inc/assistant.php', 'inc/campaigns.php', 'inc/pitchdecks.php'] as $pdp_inc) {
++// v39: app bridge (inc/bridge.php) — /wp-json/pb/v1/bridge/{op} behind its own key + admin balance grants + project.changed webhook
++foreach (['inc/gate.php', 'inc/assistant.php', 'inc/campaigns.php', 'inc/pitchdecks.php', 'inc/bridge.php'] as $pdp_inc) {
+     if (file_exists(PDP_PATH . $pdp_inc)) { require_once PDP_PATH . $pdp_inc; }
+     else { add_action('admin_notices', function () use ($pdp_inc) { echo '<div class="notice notice-error"><p>❌ بنك المشاريع: الملف <code>' . esc_html($pdp_inc) . '</code> ناقص — ارفع مجلد البلجن كامل (بما فيه مجلد inc).</p></div>'; }); }
+ }
+@@ -1363,7 +1364,7 @@ function pdp_deactivate() {
+ register_uninstall_hook(__FILE__, 'pdp_uninstall');
+ function pdp_uninstall() {
+     delete_option('pdp_version');
+-    foreach (['pdp_gate', 'pdp_gate_db', 'pdp_ai_key', 'pdp_ai_last_push', 'pdp_pay_log'] as $o) delete_option($o);
++    foreach (['pdp_gate', 'pdp_gate_db', 'pdp_ai_key', 'pdp_ai_last_push', 'pdp_pay_log', 'pdp_bridge_key_hash', 'pdp_bridge_key_at', 'pdp_bridge_webhook'] as $o) delete_option($o);
+     wp_clear_scheduled_hook('pdp_daily_views_boost');
+ }
+ 
+diff --git a/work/pb/readme-v39.txt b/work/pb/readme-v39.txt
+new file mode 100644
+index 0000000..13fd88f
+--- /dev/null
++++ b/work/pb/readme-v39.txt
+@@ -0,0 +1,18 @@
++بنك المشاريع — الإصدار 39.0 (جسر التطبيق + منح الرصيد + زر «اسأل المستشار»)
++==============================================================================
++يتطلب: PHP 7.4 أو أحدث. زر «اسأل المستشار» يحتاج بلجن Vibes AI Assistant 2.7.0 أو أحدث — وبدونه لا يظهر الزر ولا يتأثر أي شيء آخر.
++
++ما تغيّر:
++- جسر التطبيق (inc/bridge.php): POST /wp-json/pb/v1/bridge/{op} لخادم تطبيق نادي المستثمرين فقط، بمفتاح مستقل يُرسل في الترويسة X-PB-Bridge-Key وحدها (لا يُقبل في الرابط). العمليات: ping، balance، balances (حتى 200 عضو باستعلامين فقط)، unlock، grant، unlocks. مفتاح التغذية لا يفتح الجسر، ومفتاح الجسر لا يفتح التغذية.
++- مفتاح الجسر يُولَّد من صفحة الإعدادات ويظهر مرة واحدة فقط، ولا تُحفظ منه إلا بصمته (sha256). زر «تدوير المفتاح» يوقف المفتاح القديم فورًا.
++- منح الرصيد: جدول جديد wp_pdp_grants. يمنح الأدمن من لوحة تحكم التطبيق رصيدًا إضافيًا لعضو بعينه في سنة عضويته، أو يخصم منه دون النزول عن المستخدَم (الخصم يتطلب بيانات عضوية العضو، والإضافة تُقبل دائمًا). الرصيد الممنوح يُحتسب على الموقع أيضًا عبر الدالة نفسها pdp_gate_allowance(). كل عملية منح تحمل مرجعًا (ref) فلا تتكرر إذا أُعيد إرسال الطلب نفسه بعد انقطاع، والمنح يأخذ قفل العضو نفسه الذي يأخذه فتح المشروع.
++- سنة العضوية عند التجديد المبكر: إذا جدّد العضو قبل انتهاء عضويته (فتُضاف الأيام في الهب إلى المدة نفسها) فكل سنة مدفوعة تبدأ برصيد جديد بعد 365 يومًا من بداية العضوية، على الموقع وفي التطبيق معًا. الأيام الإضافية القليلة تبقى ضمن السنة الأخيرة.
++- عملية unlock في الجسر لا تفتح إلا لعضوية سارية: تاريخ انتهاء لم يمضِ، أو عضوية بلا تاريخ انتهاء يؤكدها خادم التطبيق صراحةً (is_member). الحساب الذي لم يدفع أو أُلغيت عضويته يُرفض.
++- فتح المشروع صار عبر دالة واحدة pdp_gate_do_unlock() يستخدمها الموقع والتطبيق معًا، مع قفل يمنع تجاوز الرصيد بطلبين متزامنين. المشاريع الذهبية كما هي: بدون رسوم وبدون خصم أي رصيد.
++- بيانات المؤسس (واتساب، بريد، موقع، Pitch Deck) لا تخرج عبر الجسر إلا في عملية unlock ولعضو فتح ذلك المشروع — من الدالة pdp_gate_contact_payload() وحدها.
++- إشعار فوري موقَّع بمفتاح الجسر إلى خادم التطبيق (project.changed) عند حفظ مشروع أو نشره أو نقله إلى سلة المهملات أو حذفه، وعند تغيير حالته الذهبية أو ملف الـ Pitch Deck. الإشعار لا يحمل سوى رقم المشروع.
++- زر «اسأل المستشار» على كروت المشاريع وفي صفحة المشروع: يفتح المستشار بسياق المشروع العام فقط (الاسم، الرقم، القطاع، المرحلة، النبذة). لا يظهر الزر ما لم يكن ويدجت المستشار محمّلًا.
++- تصحيح نص المعرفة المرسل للمساعد: «رصيد 5 مشاريع في سنة العضوية» بدل 3.
++- لا تغيير في التغذية /wp-json/pb/v1/projects ولا في مفتاحها، ولا في نوافذ الموقع وطلبات AJAX الحالية. قاعدة البيانات تُحدَّث تلقائيًا عند أول زيارة بعد الرفع (pdp_gate_db = 39).
++
++بعد الرفع: افتح الإعدادات → صندوق «جسر التطبيق» → اضغط «توليد مفتاح الجسر» وانسخ المفتاح فورًا إلى متغيرات خادم التطبيق (PB_BRIDGE_KEY) ومعه رابط الجسر (PB_BRIDGE_URL) → ضع رابط إشعار خادم التطبيق واضغط «حفظ رابط الإشعار» → إن كان Cloudflare أو بلجن حماية يحجب الطلبات القادمة من غير المتصفحات فاستثنِ المسار /wp-json/pb/v1/bridge/ واجعله بلا تخزين مؤقت.

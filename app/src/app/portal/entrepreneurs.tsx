@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { useHomeContent, useServices, type Service } from '@/api/content';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { ServiceCard } from '@/components/ServiceCard';
@@ -13,6 +14,8 @@ export default function EntrepreneursScreen() {
   const router = useRouter();
   const home = useHomeContent();
   const services = useServices();
+  // The floating «اسأل المستشار» button carries the portal as the context.
+  useAdvisorScreen(home.data ? { type: 'portal', id: 'entrepreneur', title: home.data.entrepreneurs.title } : null);
 
   if (!home.data || !services.data) {
     return (
@@ -40,12 +43,6 @@ export default function EntrepreneursScreen() {
           <ServiceCard key={service.key} service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
         ))}
       </View>
-      <AppButton
-        label="اسأل المستشار عن خدمات رواد الأعمال"
-        variant="outline"
-        icon="sparkles-outline"
-        onPress={() => router.push({ pathname: '/advisor', params: { ctxType: 'portal', ctxId: 'entrepreneur', ctxTitle: title, ctxNonce: String(Date.now()) } })}
-      />
       <AppButton label="كل خدمات النادي" variant="outline" icon="grid-outline" onPress={() => router.push('/services')} />
     </Screen>
   );

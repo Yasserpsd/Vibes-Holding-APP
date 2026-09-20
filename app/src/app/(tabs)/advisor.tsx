@@ -6,42 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthConfig } from '@/api/auth';
 import { useHomeContent } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
-import { AdvisorChat, type ChatContext, type ChatOpening } from '@/components/advisor/AdvisorChat';
+import { AdvisorChat } from '@/components/advisor/AdvisorChat';
+import { openingFor, parseContextParams, type ChatContext, type ChatOpening, type ContextParams } from '@/components/advisor/context';
 import { AppButton } from '@/components/AppButton';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { colors, spacing } from '@/theme/tokens';
-
-/**
- * Set by «اسأل المستشار» on a project or news page, by the home portals and by services;
- * the nonce makes every tap a new request. `prompt` is a suggested first message.
- */
-type ContextParams = { ctxType?: string; ctxId?: string; ctxTitle?: string; ctxNonce?: string; prompt?: string };
-
-type Incoming = { key: string; context: ChatContext; prompt: string | null };
-
-function incomingContext(params: ContextParams): Incoming | null {
-  const key = `${params.ctxType ?? ''}:${params.ctxId ?? ''}:${params.ctxNonce ?? ''}`;
-  const title = params.ctxTitle?.trim() ?? '';
-  const prompt = params.prompt?.trim() || null;
-  if (params.ctxType === 'news') {
-    const id = params.ctxId ?? '';
-    if (!/^[a-f0-9]{16}$/.test(id)) return null;
-    return { key, context: { type: 'news', id, title: title || 'خبر' }, prompt };
-  }
-  if (params.ctxType === 'portal') {
-    const id = params.ctxId;
-    if (id !== 'investor' && id !== 'entrepreneur' && id !== 'neutral') return null;
-    return { key, context: { type: 'portal', id, title: title || 'البوابة' }, prompt };
-  }
-  if (params.ctxType === 'service') {
-    const id = params.ctxId ?? '';
-    if (!/^[a-z0-9-]{1,40}$/.test(id)) return null;
-    return { key, context: { type: 'service', id, title: title || 'الخدمة' }, prompt };
-  }
-  const id = Number(params.ctxId);
-  if (params.ctxType !== 'project' || !Number.isInteger(id) || id <= 0) return null;
-  return { key, context: { type: 'project', id, title: title || `مشروع ${id}` }, prompt };
-}
 
 export default function AdvisorScreen() {
   const router = useRouter();
@@ -53,18 +22,20 @@ export default function AdvisorScreen() {
   const [context, setContext] = useState<ChatContext | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
 
-  const incoming = incomingContext(params);
+  // Set by the floating «اسأل المستشار» button, the inline «ناقش … مع المستشار» buttons, the home portals and services.
+  const incoming = parseContextParams(params);
   if (incoming && incoming.key !== handledKey) {
     setHandledKey(incoming.key);
     setContext(incoming.context);
     setPrompt(incoming.prompt);
   }
 
-  // The neutral portal lets the advisor open the conversation (server copy); a service suggests its first message.
+  // The neutral portal lets the advisor open the conversation (server copy); every other context opens with
+  // starter questions that fit it, a service's suggested first message leading them.
   const opening = useMemo<ChatOpening | null>(() => {
-    if (context?.type === 'portal' && context.id === 'neutral' && home.data) return home.data.neutralOpening;
-    if (context?.type === 'service' && prompt) return { title: context.title, text: 'يمكنني مساعدتك في هذه الخدمة، ابدأ بسؤالك أو اختر الاقتراح.', quickReplies: [prompt] };
-    return null;
+    if (!context) return null;
+    if (context.type === 'portal' && context.id === 'neutral' && home.data) return home.data.neutralOpening;
+    return openingFor(context, prompt);
   }, [context, prompt, home.data]);
 
   if (status === 'loading') {
