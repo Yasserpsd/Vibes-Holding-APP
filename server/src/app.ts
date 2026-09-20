@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { advisorRoutes } from './advisor/routes.js';
 import { AdvisorService } from './advisor/service.js';
 import { authRoutes } from './auth/routes.js';
+import { AdminOtpStore } from './auth/adminOtp.js';
 import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
@@ -12,7 +13,7 @@ import { contentRoutes } from './content/routes.js';
 import { hqRoutes } from './hq/routes.js';
 import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
-import { MockHubClient } from './hub/mock.js';
+import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
 import { LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
@@ -112,7 +113,6 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
       ? new LiveHubClient({ url: config.HUB_URL, siteKey: config.HUB_SITE_KEY, log: app.log })
       : new MockHubClient());
   const sessions = new SessionStore(kv, config.SESSION_DAYS);
-  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log });
   // News: OpenAI labels the items when a key is set; otherwise keywords. Neither writes a word of news.
   const newsClassifier: Classifier =
     classifier ??
@@ -138,6 +138,9 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
           from: config.MAIL_FROM ?? config.SMTP_USER ?? 'no-reply@vcmem.com',
         })
       : new LogMailer(app.log));
+  // Dashboard sign-in code (M18). On the mock hub without SMTP the code is the mock's public test code.
+  const otp = new AdminOtpStore(kv, config.ADMIN_OTP_SECONDS, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail });
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
   // Member push notifications (Expo push service); tokens come from the app after login.
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
@@ -232,6 +235,7 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
       host: new URL(config.HUB_URL).host,
       registrationOpen: auth.registrationOpen,
       adminOnly: auth.adminOnly,
+      adminOtp: auth.adminOtpStatus,
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },
     news: news.status(),

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
-import { adminGuard, guard, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import type { MembershipService } from './service.js';
 
@@ -9,7 +9,7 @@ export type MembershipRoutesOptions = { service: MembershipService; auth: AuthSe
 /** Store settings for the app, RevenueCat's webhook, the post-purchase sync and the admin list. */
 export const membershipRoutes: FastifyPluginAsync<MembershipRoutesOptions> = async (app, { service, auth, webhookAuth }) => {
   const requireSession = sessionGuard(auth);
-  const requireAdmin = adminGuard(auth);
+  const requireAdmin = dashboardGuard(auth);
 
   // Public SDK keys and product ids only; the app configures RevenueCat from this answer.
   app.get('/api/membership/store', async () => service.storeConfig());

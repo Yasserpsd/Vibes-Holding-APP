@@ -98,3 +98,22 @@ export function adminGuard(service: AuthService) {
     return { ...current, me };
   };
 }
+
+/**
+ * The dashboard's endpoints: a hub admin whose session started with the e-mailed code while ADMIN_OTP is on (M18).
+ * The app's reception screens (`/api/admin/hq/*`) keep adminGuard: member sign-in in the app never asks for the code.
+ */
+export function dashboardGuard(service: AuthService) {
+  const requireAdmin = adminGuard(service);
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<AdminAuth | null> => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) return null;
+    if (service.adminOtpEnabled && !service.adminVerified(admin.session)) {
+      // A dashboard session whose code lapsed is over for good; an app session (no adminVerifiedAt) is left alone.
+      if (admin.session.adminVerifiedAt) await service.logout(admin.token, admin.session);
+      void reply.code(403).send({ error: { code: 'otp_required', message: 'ادخل اللوحة من جديد برمز البريد الإلكتروني' } });
+      return null;
+    }
+    return admin;
+  };
+}

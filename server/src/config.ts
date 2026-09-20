@@ -20,6 +20,11 @@ const envSchema = z.object({
   // In the test environment registrations on the live hub stay closed unless the owner opens them.
   HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('0'),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),
+  // Dashboard sign-in code by e-mail (M18): a second step after the hub password. Off until the mail delay is measured.
+  // A code lives ADMIN_OTP_SECONDS; a dashboard session asks for a new code after ADMIN_SESSION_HOURS.
+  ADMIN_OTP: z.enum(['0', '1']).default('0'),
+  ADMIN_OTP_SECONDS: z.coerce.number().int().min(30).max(600).default(60),
+  ADMIN_SESSION_HOURS: z.coerce.number().positive().max(720).default(12),
   // News engine: 0 disables polling (tests); items older than NEWS_MAX_AGE_DAYS are dropped.
   NEWS_REFRESH_MINUTES: z.coerce.number().nonnegative().default(20),
   NEWS_MAX_AGE_DAYS: z.coerce.number().positive().default(10),

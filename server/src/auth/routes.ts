@@ -29,7 +29,9 @@ const registerSchema = z.object({
 const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });
 const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
-const resetRequestSchema = z.object({ login: loginFieldSchema });
+const otpChallengeSchema = z.object({ challengeToken: pendingTokenSchema });
+const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema });
+const resetRequestSchema =z.object({ login: loginFieldSchema });
 const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, password: passwordSchema });
 const profileSchema = z
   .object({
@@ -112,6 +114,37 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
       return service.login(body.login, body.password, request.ip);
+    }),
+  );
+
+  // Dashboard sign-in (M18): the same hub account, plus a short-lived e-mailed code when ADMIN_OTP is on.
+  app.post(
+    '/api/admin/auth/login',
+    guard(async (request, reply) => {
+      if (limited('admin-login', 10, request, reply)) return;
+      const body = parse(loginSchema, request.body, reply);
+      if (!body) return;
+      return service.adminLogin(body.login, body.password, request.ip);
+    }),
+  );
+
+  app.post(
+    '/api/admin/auth/verify',
+    guard(async (request, reply) => {
+      if (limited('admin-otp', 20, request, reply)) return;
+      const body = parse(otpVerifySchema, request.body, reply);
+      if (!body) return;
+      return service.adminVerify(body.challengeToken, body.code);
+    }),
+  );
+
+  app.post(
+    '/api/admin/auth/resend',
+    guard(async (request, reply) => {
+      if (limited('admin-resend', 8, request, reply)) return;
+      const body = parse(otpChallengeSchema, request.body, reply);
+      if (!body) return;
+      return service.adminResend(body.challengeToken);
     }),
   );
 

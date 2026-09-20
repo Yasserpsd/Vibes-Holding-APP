@@ -5,7 +5,10 @@ const TOKEN_KEY = 'club-admin-token';
 export type Me = { id: number; name: string; email: string; isAdmin: boolean };
 export type LoginResult =
   | { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string }
-  | { pending: false; token: string; me: Me };
+  | { pending: false; otp?: undefined; token: string; me: Me };
+/** The password was right and the server e-mailed a short-lived code: the session starts after it (M18). */
+export type OtpStep = { pending: false; otp: true; challengeToken: string; email: string; seconds: number; resendAfter: number };
+export type AdminLoginResult = LoginResult | OtpStep;
 
 export type PostLink = { label: string; url: string };
 /** An uploaded video: both values are `url`s the uploads endpoint returned. */
@@ -89,10 +92,23 @@ async function call<T>(method: string, path: string, body?: unknown, token: stri
 }
 
 export const api = {
-  login: (login: string, password: string) => call<LoginResult>('POST', '/api/auth/login', { login, password }, null),
+  login: async (login: string, password: string): Promise<AdminLoginResult> => {
+    try {
+      return await call<AdminLoginResult>('POST', '/api/admin/auth/login', { login, password }, null);
+    } catch (failure) {
+      // A server from before M18 has no such route (and no e-mailed code): sign in the old way.
+      // A server that has the route never answers not_found here, so this cannot skip the code.
+      if (failure instanceof ApiError && failure.status === 404 && failure.code === 'not_found') {
+        return call<LoginResult>('POST', '/api/auth/login', { login, password }, null);
+      }
+      throw failure;
+    }
+  },
+  otpVerify: (challengeToken: string, code: string) => call<LoginResult>('POST', '/api/admin/auth/verify', { challengeToken, code }, null),
+  otpResend: (challengeToken: string) => call<{ seconds: number; resendAfter: number }>('POST', '/api/admin/auth/resend', { challengeToken }, null),
   verify: (pendingToken: string, code: string) => call<LoginResult>('POST', '/api/auth/verify', { pendingToken, code }, null),
   me: () => call<{ me: Me }>('GET', '/api/me?fresh=1'),
-  logout: () => call<unknown>('POST', '/api/auth/logout', {}),
+  logout: (token?: string) => call<unknown>('POST', '/api/auth/logout', {}, token),
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   createPost: (input: PostInput) => call<{ post: Post }>('POST', '/api/admin/posts', input),
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),

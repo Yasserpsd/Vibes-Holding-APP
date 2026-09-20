@@ -4,6 +4,8 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import type { HubClient, HubContact, HubResponse } from '../hub/types.js';
+import type { Mailer } from '../mail/mailer.js';
+import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
 export type Persona = 'entrepreneur' | 'investor' | 'neutral';
@@ -62,6 +64,9 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
 export type SignedInResult = { pending: false; token: string; me: Me };
 export type LoginResult = PendingResult | SignedInResult;
+/** The dashboard's password was right; the session starts after the e-mailed code (M18). */
+export type OtpResult = { pending: false; otp: true; challengeToken: string; email: string; seconds: number; resendAfter: number };
+export type AdminLoginResult = LoginResult | OtpResult;
 
 export class AuthError extends Error {
   constructor(
@@ -109,7 +114,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -177,6 +182,84 @@ export class AuthService {
     return this.signIn(uuid, contact);
   }
 
+  /** Dashboard sessions need the e-mailed code (M18). Off by default: the owner turns it on once the mail delay is known. */
+  get adminOtpEnabled(): boolean {
+    return this.deps.config.ADMIN_OTP === '1' && Boolean(this.deps.otp);
+  }
+
+  /** How the dashboard's second step stands, for /health: a code that cannot be mailed locks the dashboard, by design. */
+  get adminOtpStatus(): 'off' | 'on' | 'no_mail' {
+    if (!this.adminOtpEnabled) return 'off';
+    return this.deps.mailer?.configured || this.deps.hub.mode === 'mock' ? 'on' : 'no_mail';
+  }
+
+  /** True while the session's e-mailed code is recent enough for the dashboard. */
+  adminVerified(session: SessionRecord): boolean {
+    if (!session.adminVerifiedAt) return false;
+    return Date.now() - Date.parse(session.adminVerifiedAt) < this.deps.config.ADMIN_SESSION_HOURS * 3_600_000;
+  }
+
+  /** Dashboard sign-in: the hub checks the password and the admin role (rule 2); with ADMIN_OTP a code goes to the account's e-mail. */
+  async adminLogin(login: string, password: string, ip: string): Promise<AdminLoginResult> {
+    const uuid = newUuid();
+    const result = await this.deps.hub.call('login', { uuid, ip, login, password, page_url: 'app://dashboard' });
+    const contact = requireContact(result);
+    if (result.pending) {
+      const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
+      return { pending: true, pendingToken, email: contact.email, mailSent: result.mail_sent === 1, text: result.text ?? '' };
+    }
+    if (contact.is_admin !== 1) {
+      await this.dropVisitor(uuid);
+      throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
+    }
+    const { otp } = this.deps;
+    if (!this.adminOtpEnabled || !otp) return this.signIn(uuid, contact);
+    if (this.adminOtpStatus === 'no_mail') {
+      await this.dropVisitor(uuid);
+      throw new AuthError('otp_mail_off', 'تعذر إرسال رمز الدخول: بريد الخادم غير مهيأ', 503);
+    }
+    const created = await otp.create(uuid, contact.id, contact.email, (email, code) => this.sendOtp(email, code)).catch(async (error: unknown) => {
+      await this.dropVisitor(uuid);
+      throw error;
+    });
+    if (!created.ok) {
+      await this.dropVisitor(uuid);
+      throw new AuthError('otp_cooldown', `محاولات دخول كثيرة لهذا الحساب، حاول بعد ${Math.ceil(created.waitSeconds / 60)} دقيقة`, 429);
+    }
+    return { pending: false, otp: true, challengeToken: created.token, email: maskEmail(contact.email), seconds: otp.seconds, resendAfter: OTP_RESEND_GAP_SECONDS };
+  }
+
+  async adminResend(challengeToken: string): Promise<{ seconds: number; resendAfter: number }> {
+    const otp = this.requireOtp();
+    const result = await otp.reissue(challengeToken, (email, code) => this.sendOtp(email, code));
+    if (!result.ok) {
+      if (result.reason === 'too_soon') throw new AuthError('otp_wait', `انتظر ${result.waitSeconds} ثانية ثم اطلب رمزًا جديدًا`, 429);
+      if (result.reason === 'too_many') throw new AuthError('otp_resend_limit', 'تجاوزت عدد مرات إعادة الإرسال، ابدأ الدخول من جديد', 429);
+      throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    }
+    return { seconds: otp.seconds, resendAfter: OTP_RESEND_GAP_SECONDS };
+  }
+
+  async adminVerify(challengeToken: string, code: string): Promise<SignedInResult> {
+    const result = await this.requireOtp().check(challengeToken, code);
+    if (!result.ok) {
+      if (result.reason === 'bad_code') throw new AuthError('otp_bad_code', `الرمز غير صحيح، باقي ${result.attemptsLeft} محاولات`, 400);
+      if (result.reason === 'code_expired') throw new AuthError('otp_code_expired', 'انتهت صلاحية الرمز، اضغط «إعادة الإرسال»', 400);
+      if (result.reason === 'locked') throw new AuthError('otp_locked', 'محاولات خاطئة كثيرة، ابدأ الدخول من جديد', 429);
+      throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    }
+    const { uuid } = result.challenge;
+    // The role is read again: the hub may have changed it while the code was on its way.
+    const account = await this.deps.hub.call('account', { uuid });
+    const contact = account.contact;
+    if (!contact || !contact.has_account || contact.is_admin !== 1) {
+      await this.dropVisitor(uuid);
+      throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
+    }
+    const token = await this.deps.sessions.createSession(uuid, contact.id, true);
+    return { pending: false, token, me: this.remember(uuid, contact) };
+  }
+
   async authenticate(token: string): Promise<SessionRecord | null> {
     return this.deps.sessions.getSession(token);
   }
@@ -242,13 +325,38 @@ export class AuthService {
     return pending;
   }
 
-  private async gate(uuid: string, contact: HubContact): Promise<void> {
-    if (!this.adminOnly || contact.is_admin === 1) return;
+  private requireOtp(): AdminOtpStore {
+    if (!this.adminOtpEnabled || !this.deps.otp) throw new AuthError('otp_off', 'رمز الدخول غير مفعّل', 404);
+    return this.deps.otp;
+  }
+
+  /** The code travels in the mail body only: never in the subject, never in a log line. */
+  private async sendOtp(email: string, code: string): Promise<void> {
+    const { mailer, log } = this.deps;
+    const seconds = this.deps.otp?.seconds ?? 60;
+    try {
+      await mailer?.send({
+        to: [email],
+        subject: 'رمز دخول لوحة إدارة نادي المستثمرين',
+        text: [`رمز الدخول إلى لوحة الإدارة: ${code}`, `صالح لمدة ${seconds} ثانية ولمرة واحدة فقط.`, '', 'إذا لم تكن أنت من يحاول الدخول الآن فغيّر كلمة مرورك فورًا.'].join('\n'),
+      });
+    } catch (error) {
+      log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'dashboard sign-in code was not mailed');
+      throw new AuthError('otp_mail_failed', 'تعذر إرسال رمز الدخول الآن، حاول بعد قليل', 503);
+    }
+  }
+
+  private async dropVisitor(uuid: string): Promise<void> {
     try {
       await this.deps.hub.call('logout', { uuid });
     } catch {
       // Best effort: the visitor row is harmless without a session.
     }
+  }
+
+  private async gate(uuid: string, contact: HubContact): Promise<void> {
+    if (!this.adminOnly || contact.is_admin === 1) return;
+    await this.dropVisitor(uuid);
     throw new AuthError('admin_only', 'النسخة التجريبية متاحة لحسابات إدارة النادي فقط', 403);
   }
 

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { adminGuard, guard, parse, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import type { PushService } from './service.js';
 
@@ -23,7 +23,7 @@ const testSchema = z.object({
 /** Device tokens of signed-in members; the admin endpoints show the registry and send a test message. */
 export const pushRoutes: FastifyPluginAsync<PushRoutesOptions> = async (app, { service, auth }) => {
   const requireSession = sessionGuard(auth);
-  const requireAdmin = adminGuard(auth);
+  const requireAdmin = dashboardGuard(auth);
 
   app.post(
     '/api/push/tokens',
