@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
@@ -26,7 +28,7 @@ export const SORT_LABELS: Record<ProjectsSort, string> = {
 
 type IndexedProject = { project: PublicProject; search: string };
 
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger };
+type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; /** Called when a refresh brought different content (/api/sync). */ onChange?: () => void };
 
 /** Keeps the public projects in memory, refreshed from the feed on a schedule. */
 export class ProjectsService {
@@ -36,12 +38,16 @@ export class ProjectsService {
   private pageUrls = new Map<number, string>();
   private timer: NodeJS.Timeout | null = null;
   private inflight: Promise<void> | null = null;
+  private contentHash: string | null = null;
 
   constructor(private readonly deps: Deps) {}
 
   async start(): Promise<void> {
     const snapshot = await this.deps.kv.get<FeedSnapshot>(SNAPSHOT_KEY);
-    if (snapshot) this.load(snapshot.projects, snapshot.fetchedAt, snapshot.pageUrls ?? {});
+    if (snapshot) {
+      this.load(snapshot.projects, snapshot.fetchedAt, snapshot.pageUrls ?? {});
+      this.contentHash = hashOf(snapshot.projects);
+    }
 
     if (!this.deps.config.PB_FEED_KEY) {
       this.deps.log.warn('PB_FEED_KEY is not set: Projects Bank sync is disabled');
@@ -81,6 +87,9 @@ export class ProjectsService {
       }
       const fetchedAt = new Date().toISOString();
       this.load(projects, fetchedAt, pageUrls);
+      const contentHash = hashOf(projects);
+      if (this.contentHash !== null && this.contentHash !== contentHash) this.deps.onChange?.();
+      this.contentHash = contentHash;
       await this.deps.kv.set(SNAPSHOT_KEY, { projects, fetchedAt, pageUrls } satisfies FeedSnapshot);
       this.lastError = null;
       this.deps.log.info({ count: projects.length, skipped: rawItems.length - projects.length }, 'Projects Bank feed refreshed');
@@ -103,6 +112,11 @@ export class ProjectsService {
 
   status(): { count: number; updatedAt: string | null; lastError: string | null } {
     return { count: this.items.length, updatedAt: this.fetchedAt, lastError: this.lastError };
+  }
+
+  /** Every public project, for the brief's choice of comparable projects. */
+  all(): PublicProject[] {
+    return this.items.map((item) => item.project);
   }
 
   get(id: number): PublicProject | null {
@@ -144,6 +158,11 @@ export class ProjectsService {
       updatedAt: this.fetchedAt,
     };
   }
+}
+
+/** The view counter moves on every visit: it is not a change worth a refetch in the app. */
+function hashOf(projects: PublicProject[]): string {
+  return createHash('sha256').update(JSON.stringify(projects.map((project) => ({ ...project, viewsCount: 0 })))).digest('hex');
 }
 
 function buildSearchText(project: PublicProject): string {

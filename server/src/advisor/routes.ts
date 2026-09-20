@@ -8,12 +8,17 @@ import type { AdvisorService } from './service.js';
 
 export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService };
 
+// The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
+const selection = z.string().trim().max(1000).nullish();
 const contextSchema = z.union([
-  z.object({ type: z.literal('project'), id: z.number().int().positive() }),
-  z.object({ type: z.literal('news'), id: z.string().regex(/^[a-f0-9]{16}$/) }),
+  z.object({ type: z.literal('project'), id: z.number().int().positive(), selection }),
+  z.object({ type: z.literal('news'), id: z.string().regex(/^[a-f0-9]{16}$/), selection }),
   // Home portals and services open the advisor with the screen as the page context.
-  z.object({ type: z.literal('portal'), id: z.enum(['investor', 'entrepreneur', 'neutral']) }),
-  z.object({ type: z.literal('service'), id: z.string().regex(/^[a-z0-9-]{1,40}$/) }),
+  z.object({ type: z.literal('portal'), id: z.enum(['investor', 'entrepreneur', 'neutral']), selection }),
+  z.object({ type: z.literal('service'), id: z.string().regex(/^[a-z0-9-]{1,40}$/), selection }),
+  z.object({ type: z.literal('post'), id: z.string().uuid(), selection }),
+  z.object({ type: z.literal('video'), id: z.string().regex(/^[A-Za-z0-9_-]{6,20}$/), selection }),
+  z.object({ type: z.literal('screen'), id: z.string().regex(/^[a-z0-9-]{1,40}$/), selection }),
 ]);
 const messageSchema = z.object({
   text: z.string().trim().min(1, 'اكتب رسالتك أولًا').max(4000, 'الرسالة طويلة، الحد 4000 حرف'),

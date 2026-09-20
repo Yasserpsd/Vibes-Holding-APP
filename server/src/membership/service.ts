@@ -7,6 +7,7 @@ import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
 import type { ActivationLike, Notifier } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
+import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 
 /**
@@ -162,6 +163,19 @@ export class MembershipService {
 
   async list(): Promise<PurchaseEvent[]> {
     return [...(await this.stored())].reverse();
+  }
+
+  /** Dashboard home: store purchases and renewals per Riyadh day (events that reached the hub or wait for it). */
+  async dailyStats(days: number, now = Date.now()): Promise<{ series: { day: string; purchases: number; renewals: number }[] }> {
+    const series = new Map(lastRiyadhDays(days, now).map((day) => [day, { day, purchases: 0, renewals: 0 }]));
+    for (const event of await this.stored()) {
+      if (event.activation !== 'activated' && event.activation !== 'pending') continue;
+      const row = series.get(riyadhDay(Date.parse(event.receivedAt)));
+      if (!row) continue;
+      if (event.type === 'RENEWAL') row.renewals += 1;
+      else row.purchases += 1;
+    }
+    return { series: [...series.values()] };
   }
 
   /** RevenueCat webhook body → hub activation. Unknown or non-purchase events are recorded and ignored; retries answer from the record. */

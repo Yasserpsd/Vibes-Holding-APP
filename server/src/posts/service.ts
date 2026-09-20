@@ -7,6 +7,8 @@ import type { KV } from '../store.js';
  * «رسائل الإدارة»: posts the club's management publishes from the dashboard (M9).
  * Stored as one kv document (`admin:posts`), newest first. Images are URLs (pasted links or uploaded
  * files under `/media/`), video is a YouTube id and/or an uploaded file with an optional poster (M15).
+ * A post is a plain message or an event with its date and place (bridge v2); published ones are also handed to the
+ * hub (`publish`, see hubSync.ts) so the websites and the assistant learn them at the same moment.
  */
 export const POSTS_KEY = 'admin:posts';
 const MAX_POSTS = 500;
@@ -17,16 +19,27 @@ const httpUrl = z
   .max(600)
   .refine((value) => /^https?:\/\//i.test(value) && URL.canParse(value), 'رابط غير صالح');
 
-export const postInputSchema = z.object({
-  title: z.string().trim().min(1).max(140),
-  body: z.string().trim().max(6000).default(''),
-  links: z.array(z.object({ label: z.string().trim().min(1).max(80), url: httpUrl })).max(8).default([]),
-  images: z.array(httpUrl).max(10).default([]),
-  video: z.string().trim().max(300).nullish(),
-  videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
-  status: z.enum(['draft', 'published']).default('draft'),
-  pinned: z.boolean().default(false),
-});
+/** An event's day (`2026-10-05`) or exact time (`2026-10-05T19:30:00+03:00`). */
+const eventDate = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/, 'تاريخ الفعالية غير صالح')
+  .refine((value) => !Number.isNaN(Date.parse(value)), 'تاريخ الفعالية غير صالح');
+
+export const postInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(140),
+    body: z.string().trim().max(6000).default(''),
+    links: z.array(z.object({ label: z.string().trim().min(1).max(80), url: httpUrl })).max(8).default([]),
+    images: z.array(httpUrl).max(10).default([]),
+    video: z.string().trim().max(300).nullish(),
+    videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
+    status: z.enum(['draft', 'published']).default('draft'),
+    pinned: z.boolean().default(false),
+    kind: z.enum(['post', 'event']).default('post'),
+    event: z.object({ date: eventDate, place: z.string().trim().max(200).default(''), onlineUrl: httpUrl.nullish() }).nullish(),
+  })
+  .refine((input) => input.kind !== 'event' || Boolean(input.event), 'اكتب موعد الفعالية');
 export type PostInput = z.infer<typeof postInputSchema>;
 
 export type Post = {
@@ -45,7 +58,16 @@ export type Post = {
   updatedAt: string;
   publishedAt: string | null;
   notifiedAt: string | null;
+  /** Posts stored before bridge v2 have neither key: they are plain posts. */
+  kind?: PostKind;
+  event?: PostEvent | null;
+  /** How the last hand-over to the hub went; `published` = the hub holds a card for this post. */
+  hubSync?: PostHubSync;
 };
+
+export type PostKind = 'post' | 'event';
+export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 
 /** Every media URL a post points at (images, uploaded video, poster), ours or not. */
 export function postMediaUrls(post: Pick<Post, 'images' | 'video'>): string[] {
@@ -100,6 +122,10 @@ export class PostsService {
     return youtubeId;
   }
 
+  private static event(input: PostInput): PostEvent | null {
+    return input.kind === 'event' && input.event ? { date: input.event.date, place: input.event.place, onlineUrl: input.event.onlineUrl ?? null } : null;
+  }
+
   private static videoFile(input: PostInput): Post['video'] {
     return input.videoFile ? { url: input.videoFile.url, poster: input.videoFile.poster ?? null } : null;
   }
@@ -138,6 +164,8 @@ export class PostsService {
       updatedAt: stamp,
       publishedAt: input.status === 'published' ? stamp : null,
       notifiedAt: null,
+      kind: input.kind,
+      event: PostsService.event(input),
     };
     await this.mutate((posts) => void posts.push(post));
     return post;
@@ -149,7 +177,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;
@@ -162,6 +190,13 @@ export class PostsService {
       if (index < 0) return false;
       posts.splice(index, 1);
       return true;
+    });
+  }
+
+  async markHubSync(id: string, hubSync: PostHubSync): Promise<void> {
+    await this.mutate((posts) => {
+      const post = posts.find((entry) => entry.id === id);
+      if (post) post.hubSync = hubSync;
     });
   }
 

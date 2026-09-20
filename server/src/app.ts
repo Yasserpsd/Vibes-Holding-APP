@@ -10,6 +10,8 @@ import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { contentRoutes } from './content/routes.js';
+import { dashboardRoutes } from './dashboard/routes.js';
+import { DashboardService } from './dashboard/service.js';
 import { hqRoutes } from './hq/routes.js';
 import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
@@ -26,25 +28,34 @@ import { NewsService } from './news/service.js';
 import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, paymobKeyMode, paymobKeyShape, type PaymobGateway } from './payments/paymob.js';
 import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
+import { ProjectAccessService } from './projectsBank/access.js';
+import { BriefService } from './projectsBank/brief.js';
+import { LivePbBridge, MockPbBridge, OffPbBridge, type PbBridge } from './projectsBank/bridge.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import { mediaRoutes } from './media/routes.js';
 import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
+import { PostsHubSync } from './posts/hubSync.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
 import type { KV } from './store.js';
+import { FeedService } from './sync/feed.js';
+import { syncRoutes } from './sync/routes.js';
+import { SyncService, type SyncKey } from './sync/service.js';
 import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './videos/blurbs.js';
 import { videosRoutes } from './videos/routes.js';
 import { VideosService } from './videos/service.js';
+import { webhookRoutes } from './webhooks/routes.js';
 
 export type AppDeps = {
   config: Config;
   kv: KV;
   hub?: HubClient;
+  pb?: PbBridge;
   classifier?: Classifier;
   blurbs?: BlurbWriter;
   fetchImpl?: typeof fetch;
@@ -71,11 +82,11 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService };
 
 const MEGABYTE = 1024 * 1024;
 
-export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
+export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchImpl, mailer, gateway }: AppDeps): Promise<BuiltApp> {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -106,12 +117,25 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
       .send();
   });
 
-  const projects = new ProjectsService({ kv, config, log: app.log });
+  // «عقل واحد»: whatever changes anywhere moves a version the app polls (/api/sync).
+  const sync = new SyncService(kv);
+  // Fire and forget: a version that kv could not save is logged, never an unhandled rejection.
+  const moved = (...keys: SyncKey[]): void => void sync.bump(...keys).catch((error: unknown) => app.log.error({ err: error, keys }, 'sync version not saved'));
+  const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects') });
+  // The server's own mock hub comes with a demo club, so the dashboard can be checked locally.
   const hubClient: HubClient =
     hub ??
     (config.HUB_MODE === 'live' && config.HUB_SITE_KEY
       ? new LiveHubClient({ url: config.HUB_URL, siteKey: config.HUB_SITE_KEY, log: app.log })
-      : new MockHubClient());
+      : new MockHubClient({ seed: true }));
+  // Projects Bank bridge (balance, unlock, grant): live with its key, the mock beside the mock hub, else off.
+  const pbBridge: PbBridge =
+    pb ??
+    (config.PB_BRIDGE_KEY
+      ? new LivePbBridge({ url: config.PB_BRIDGE_URL, key: config.PB_BRIDGE_KEY, log: app.log, fetchImpl })
+      : config.HUB_MODE === 'mock'
+        ? new MockPbBridge({ projects, demo: !hub })
+        : new OffPbBridge());
   const sessions = new SessionStore(kv, config.SESSION_DAYS);
   // News: OpenAI labels the items when a key is set; otherwise keywords. Neither writes a word of news.
   const newsClassifier: Classifier =
@@ -119,12 +143,14 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     (config.OPENAI_API_KEY
       ? new OpenAIClassifier({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log })
       : new KeywordClassifier());
-  const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl });
-  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log });
+  const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl, onChange: () => moved('news') });
   // Videos: the channel feed (or the Data API with a key); blurbs are marketing lines written once.
   const blurbWriter: BlurbWriter =
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
   const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, fetchImpl });
+  // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
+  const posts = new PostsService(kv);
+  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos });
   // Management notifications: the website's hosting mailbox (SMTP) or log-only when it is not configured.
   const mail: Mailer =
     mailer ??
@@ -145,8 +171,6 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   // Member push notifications (Expo push service); tokens come from the app after login.
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
-  // «رسائل الإدارة»: admin posts from the dashboard, shown first on the app's home (M9).
-  const posts = new PostsService(kv);
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
   let mediaStore: MediaStore;
   if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
@@ -220,6 +244,22 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     },
   });
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
+  // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,
+  // the project brief, the websites' feed and the hub hand-over of published posts.
+  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log });
+  const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
+  const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
+  const feed = new FeedService({ hub: hubClient, log: app.log });
+  const postsHub = new PostsHubSync({
+    hub: hubClient,
+    posts,
+    kv,
+    log: app.log,
+    onChange: () => {
+      feed.bust();
+      moved('feed');
+    },
+  });
 
   app.get('/health', async () => ({
     ok: true,
@@ -248,9 +288,11 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     membership: membership.status(),
     push: push.status(),
     uploads: media.status(),
+    // Versions of the hub and Projects Bank bridges as last checked (the check runs in the background).
+    bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
   }));
 
-  await app.register(projectsRoutes, { service: projects });
+  await app.register(projectsRoutes, { service: projects, auth, access, brief });
   await app.register(contentRoutes, { kv, auth, notifier });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
@@ -261,7 +303,10 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
-  await app.register(postsRoutes, { service: posts, auth, push, media });
+  await app.register(postsRoutes, { service: posts, auth, push, media, hubSync: postsHub, sync });
+  await app.register(dashboardRoutes, { service: dashboard, auth });
+  await app.register(syncRoutes, { service: sync, feed });
+  await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });
@@ -278,5 +323,5 @@ export async function buildApp({ config, kv, hub, classifier, blurbs, fetchImpl,
     });
   });
 
-  return { app, projects, news, videos, payments, notifier, membership, push, media };
+  return { app, projects, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed };
 }

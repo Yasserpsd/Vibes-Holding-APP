@@ -281,6 +281,16 @@ export class AuthService {
     return this.remember(session.uuid, result.contact);
   }
 
+  /** The hub's own view of the account, for server-side calls that need more than `Me` (Projects Bank wants the membership period). */
+  async contact(session: SessionRecord): Promise<HubContact> {
+    const result = await this.deps.hub.call('account', { uuid: session.uuid });
+    if (!result.contact || !result.contact.has_account) {
+      throw new AuthError('session_expired', 'انتهت الجلسة، سجّل الدخول من جديد', 401);
+    }
+    this.remember(session.uuid, result.contact);
+    return result.contact;
+  }
+
   async updateProfile(session: SessionRecord, patch: ProfilePatch): Promise<Me> {
     const body: Record<string, unknown> = { uuid: session.uuid };
     if (patch.name !== undefined) body.name = patch.name;

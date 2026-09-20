@@ -1,10 +1,15 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
+import { guard, parse, sessionGuard } from '../auth/guard.js';
+import { RateLimiter } from '../auth/rateLimit.js';
+import type { AuthService } from '../auth/service.js';
+import type { ProjectAccessService } from './access.js';
+import type { BriefService } from './brief.js';
 import type { ProjectsService } from './service.js';
 import { PROJECT_SORTS } from './types.js';
 
-export type ProjectsRoutesOptions = { service: ProjectsService };
+export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService };
 
 const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -21,7 +26,10 @@ function badRequest(reply: FastifyReply, message: string): FastifyReply {
   return reply.code(400).send({ error: { code: 'bad_request', message } });
 }
 
-export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service }) => {
+export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief }) => {
+  const requireSession = sessionGuard(auth);
+  const limiter = new RateLimiter();
+
   app.get('/api/projects', async (request, reply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) return badRequest(reply, 'معاملات البحث غير صالحة');
@@ -37,4 +45,42 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
     if (!project) return reply.code(404).send({ error: { code: 'not_found', message: 'المشروع غير موجود' } });
     return { project };
   });
+
+  // «ملخص المستشار»: public like the project itself (built from the same public fields), cached per content.
+  app.get(
+    '/api/projects/:id/brief',
+    guard(async (request, reply) => {
+      const params = parse(idParamSchema, request.params, reply);
+      if (!params) return;
+      const project = service.get(params.id);
+      if (!project) return reply.code(404).send({ error: { code: 'not_found', message: 'المشروع غير موجود' } });
+      if (!limiter.hit(`brief:${request.ip}`, 120, 15 * 60_000)) {
+        return reply.code(429).send({ error: { code: 'rate', message: 'طلبات كثيرة في وقت قصير، حاول بعد قليل' } });
+      }
+      return brief.brief(project, service.all());
+    }),
+  );
+
+  // The member's «رصيد» for this project; founder contact data only when PB says he unlocked it (rule 4).
+  app.get(
+    '/api/projects/:id/access',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idParamSchema, request.params, reply);
+      if (!params) return;
+      return access.access(current.session, params.id);
+    }),
+  );
+
+  app.post(
+    '/api/projects/:id/unlock',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idParamSchema, request.params, reply);
+      if (!params) return;
+      return access.unlock(current.session, params.id);
+    }),
+  );
 };

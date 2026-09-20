@@ -103,10 +103,10 @@ export function blockListFromConfig(config: Record<string, unknown>): BlockList 
   return block;
 }
 
-/** Removes blocked links from free text; allowed markdown links become "label url" so the app can tap them. */
+/** Removes blocked links from free text; an allowed markdown link stays as it is (the app's chat draws its label as the link). */
 export function stripUrls(text: string, block: BlockList): string {
   const cleaned = text
-    .replace(MARKDOWN_LINK, (_match, label: string, url: string) => (block.blocks(url) ? '' : `${label} ${url}`))
+    .replace(MARKDOWN_LINK, (match: string, _label: string, url: string) => (block.blocks(url) ? '' : match))
     .replace(URL_PATTERN, (url) => {
       const tail = TRAILING_PUNCTUATION.exec(url)?.[0] ?? '';
       const core = tail ? url.slice(0, -tail.length) : url;

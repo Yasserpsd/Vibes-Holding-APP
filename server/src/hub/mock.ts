@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import { EMAIL_POLICY_TEXT, normEmail, normPhone, phoneIntl, phoneLocal } from './phone.js';
+import { MOCK_HUB_VERSION, MockAdmin } from './mockAdmin.js';
 import { MockChat } from './mockChat.js';
+import { blankContact, newMockState, nextId, seedDemo, type MockContact } from './mockData.js';
 import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, type HubResponse } from './types.js';
 
 /**
@@ -9,38 +11,20 @@ import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, ty
  * Rules for testers: the e-mail code is always 123456; every verified account counts as a hub
  * admin (so the test-environment admin gate passes); an e-mail containing "+member@" becomes an
  * active member on verification and one containing "+expired@" an expired member.
+ * Bridge v2 (docs/BRIDGE_V2.md): the dashboard ops live in mockAdmin.ts over the same contacts; `seed: true`
+ * adds the demo club of mockData.ts (the server's own mock hub does, tests start empty).
  */
 export const MOCK_CODE = '123456';
 const MOCK_DAILY_LIMIT = 20;
 const ALLOWED_DOMAINS = ['gmail.com', 'icloud.com', 'outlook.com', 'hotmail.com', 'live.com'];
 const PERSONAS = ['entrepreneur', 'investor', 'neutral'];
 
-type MockContact = {
-  id: number;
-  name: string;
-  phone: string;
-  phoneNorm: string;
-  email: string;
-  passHash: string;
-  verified: boolean;
-  jobTitle: string;
-  persona: string;
-  bio: string;
-  company: string;
-  city: string;
-  website: string;
-  social: string;
-  avatar: string;
-  isMember: boolean;
-  memberDays: number;
-  memberStartedAt: number | null;
-  resetPending: boolean;
-};
-
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex');
 const str = (body: HubBody, key: string, max = 500): string =>
   typeof body[key] === 'string' ? (body[key] as string).trim().slice(0, max) : '';
 const isoDate = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+/** Bridge v2 answers carry fields the generic `HubResponse` does not list (see `HubResults`). */
+const answer = <T extends { ok: true }>(value: T): HubResponse => value as unknown as HubResponse;
 
 function emailAllowed(email: string): boolean {
   const domain = email.slice(email.lastIndexOf('@') + 1);
@@ -49,20 +33,23 @@ function emailAllowed(email: string): boolean {
 
 export class MockHubClient implements HubClient {
   readonly mode = 'mock' as const;
-  private nextId = 1;
-  private readonly contacts = new Map<number, MockContact>();
+  private readonly state = newMockState();
+  private readonly contacts = this.state.contacts;
   private readonly visitors = new Map<string, number>();
   private readonly chat: MockChat;
+  private readonly admin: MockAdmin;
 
   /** options.replyDelayMs: how long a canned chat reply stays hidden (the real workflow takes a few seconds). */
-  constructor(options: { replyDelayMs?: number } = {}) {
+  constructor(options: { replyDelayMs?: number; seed?: boolean } = {}) {
     this.chat = new MockChat(options.replyDelayMs ?? 1500);
+    this.admin = new MockAdmin({ state: this.state, chat: this.chat, visitors: this.visitors, publicContact: (contact) => this.publicContact(contact) });
+    if (options.seed) seedDemo(this.state, this.chat, Date.now());
   }
 
   async call(op: HubOp, body: HubBody): Promise<HubResponse> {
     switch (op) {
       case 'ping':
-        return { ok: true };
+        return answer({ ok: true, hub: 'mock', site: 'app', version: MOCK_HUB_VERSION });
       case 'register':
         return this.register(body);
       case 'resend_code':
@@ -106,6 +93,36 @@ export class MockHubClient implements HubClient {
         const contact = this.byUuid(body);
         return this.chat.history(contact?.id ?? null, contact ? this.publicContact(contact) : null);
       }
+      case 'admin_stats':
+        return answer(this.admin.stats(body));
+      case 'admin_accounts':
+        return answer(this.admin.accounts(body));
+      case 'admin_member':
+        return answer(this.admin.member(body));
+      case 'admin_payments':
+        return answer(this.admin.payments(body));
+      case 'admin_tickets':
+        return answer(this.admin.tickets(body));
+      case 'admin_leads':
+        return answer(this.admin.leads(body));
+      case 'admin_threads':
+        return answer(this.admin.threads(body));
+      case 'admin_thread':
+        return answer(this.admin.thread(body));
+      case 'admin_reply':
+        return answer(this.admin.reply(body));
+      case 'admin_mail':
+        return answer(this.admin.mail(body));
+      case 'admin_grant':
+        return answer(this.admin.grant(body));
+      case 'admin_set_role':
+        return answer(this.admin.setRole(body));
+      case 'changes':
+        return answer(this.admin.changes(body));
+      case 'publish':
+        return answer(this.admin.publish(body));
+      case 'feed':
+        return answer(this.admin.feed(body));
       default:
         throw new HubError('not_found', 'عملية غير معروفة', 404);
     }
@@ -117,16 +134,13 @@ export class MockHubClient implements HubClient {
     return uuid;
   }
 
-  /** Store purchase → membership (the live plugin gets the same op in a later release). */
+  /** Store purchase → membership: `member_change(extend)`, idempotent on the store reference (plugin 2.7.0). */
   private activateMember(body: HubBody): HubResponse {
     const id = Number(body.contact_id);
     const contact = Number.isInteger(id) ? this.contacts.get(id) : undefined;
     if (!contact || !contact.verified) throw new HubError('not_found', 'الحساب غير موجود', 404);
-    const days = Number(body.days);
-    contact.isMember = true;
-    contact.memberStartedAt = Date.now();
-    contact.memberDays = Number.isInteger(days) && days > 0 ? days : 365;
-    return { ok: true, contact: this.publicContact(contact) };
+    const { already } = this.admin.memberChange(contact, 'extend', Number(body.days), 'store', str(body, 'reference', 190), 0, str(body, 'product', 120));
+    return { ok: true, contact: this.publicContact(contact), already };
   }
 
   private byUuid(body: HubBody): MockContact | null {
@@ -146,27 +160,7 @@ export class MockHubClient implements HubClient {
   }
 
   private create(): MockContact {
-    const contact: MockContact = {
-      id: this.nextId++,
-      name: '',
-      phone: '',
-      phoneNorm: '',
-      email: '',
-      passHash: '',
-      verified: false,
-      jobTitle: '',
-      persona: '',
-      bio: '',
-      company: '',
-      city: '',
-      website: '',
-      social: '',
-      avatar: '',
-      isMember: false,
-      memberDays: 360,
-      memberStartedAt: null,
-      resetPending: false,
-    };
+    const contact = blankContact(nextId(this.state, 'contact'), Date.now());
     this.contacts.set(contact.id, contact);
     return contact;
   }
@@ -205,6 +199,7 @@ export class MockHubClient implements HubClient {
       passHash: hash(password),
       verified: false,
     });
+    if (!existing) this.admin.event(contact.id, 'registered');
     this.visitors.set(uuid, contact.id);
     return { ok: true, pending: true, mail_sent: 1, contact: this.publicContact(contact), text: `أرسلنا رمز التفعيل إلى ${email}` };
   }
@@ -222,9 +217,12 @@ export class MockHubClient implements HubClient {
     if (contact.verified) return { ok: true, contact: this.publicContact(contact), already: true };
     if (code !== MOCK_CODE) throw new HubError('bad_code', 'الرمز غير صحيح أو انتهت صلاحيته', 400);
     contact.verified = true;
+    contact.verifiedAt = Date.now();
+    this.admin.event(contact.id, 'verified');
     if (contact.email.includes('+member@')) {
       contact.isMember = true;
       contact.memberStartedAt = Date.now();
+      this.admin.event(contact.id, 'activated', { days: contact.memberDays, source: 'list' });
     } else if (contact.email.includes('+expired@')) {
       contact.isMember = true;
       contact.memberStartedAt = Date.now() - 400 * 86_400_000;
@@ -239,6 +237,7 @@ export class MockHubClient implements HubClient {
       throw new HubError('bad_login', 'البريد/الجوال أو كلمة المرور غير صحيحة', 401);
     }
     this.visitors.set(this.uuid(body), account.id);
+    account.lastLoginAt = Date.now();
     if (!account.verified) {
       return { ok: true, pending: true, mail_sent: 1, contact: this.publicContact(account), text: `حسابك بانتظار التفعيل — أرسلنا الرمز إلى ${account.email}` };
     }
@@ -289,6 +288,7 @@ export class MockHubClient implements HubClient {
     }
     this.contacts.delete(contact.id);
     this.chat.forget(contact.id);
+    this.admin.event(contact.id, 'deleted');
     return { ok: true };
   }
 
@@ -311,8 +311,8 @@ export class MockHubClient implements HubClient {
       daily_left: active ? MOCK_DAILY_LIMIT : null,
       has_account: contact.passHash ? 1 : 0,
       verified: contact.verified ? 1 : 0,
-      role: 'admin',
-      is_admin: contact.verified ? 1 : 0,
+      role: contact.role,
+      is_admin: contact.verified && contact.role === 'admin' ? 1 : 0,
       job_title: contact.jobTitle,
       persona: contact.persona,
       website: contact.website,

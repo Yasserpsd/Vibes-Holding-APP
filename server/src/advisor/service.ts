@@ -2,39 +2,30 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import { toMe, type Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
-import type { PortalKey } from '../content/home.js';
-import { getServicesContent } from '../content/services.js';
 import type { HubClient, HubContact } from '../hub/types.js';
 import type { NewsService } from '../news/service.js';
+import type { PostsService } from '../posts/service.js';
 import type { ProjectsService } from '../projectsBank/service.js';
 import type { KV } from '../store.js';
+import type { VideosService } from '../videos/service.js';
+import { ContextResolver, type AdvisorContext } from './context.js';
 import { BlockList, blockListFromConfig, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
 
 const SETTINGS_TTL_MS = 30 * 60_000;
 const SETTINGS_RETRY_MS = 60_000;
-const DEFAULT_BOT_NAME = 'مستشار النادي';
+const DEFAULT_BOT_NAME = 'المستشار';
 const DEFAULT_WELCOME = 'حياك الله في نادي المستثمرين. اسألني عن بنك المشاريع أو الشراكات أو العضوية أو خدمات النادي.';
 /** Quick-menu entries that invite a web payment are not offered in the app. */
 const PAYMENT_TALK = /ادفع|دفع|اشترك/;
 
-export type AdvisorContext =
-  | { type: 'project'; id: number }
-  | { type: 'news'; id: string }
-  | { type: 'portal'; id: PortalKey }
-  | { type: 'service'; id: string };
-
-const PORTAL_TITLES: Record<PortalKey, string> = {
-  investor: 'بوابة المستثمر',
-  entrepreneur: 'بوابة رواد الأعمال',
-  neutral: 'بوابة المحايدين',
-};
+export type { AdvisorContext } from './context.js';
 export type AdvisorProfile = { botName: string; welcome: string; suggestions: string[] };
 export type HistoryResult = { messages: AdvisorMessage[]; profile: AdvisorProfile; me: Me | null };
 export type SendResult = { messageId: number | null; waiting: boolean; human: boolean; gate: AdvisorGate | null; me: Me | null };
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 type Settings = AdvisorProfile & { block: BlockList };
-type Deps = { hub: HubClient; projects: ProjectsService; news: NewsService; kv: KV; log: FastifyBaseLogger };
+type Deps = { hub: HubClient; projects: ProjectsService; news: NewsService; kv: KV; log: FastifyBaseLogger; posts?: PostsService; videos?: VideosService };
 
 const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const meOf = (contact: HubContact | null | undefined): Me | null => (contact && contact.has_account ? toMe(contact) : null);
@@ -47,8 +38,16 @@ const meOf = (contact: HubContact | null | undefined): Me | null => (contact && 
  */
 export class AdvisorService {
   private settings: { value: Settings; at: number; ttl: number } | null = null;
+  private readonly contexts: ContextResolver;
 
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) {
+    this.contexts = new ContextResolver(deps);
+  }
+
+  /** The hub's webhook says its config changed (`config.changed`): the next message reads it again. */
+  resetSettings(): void {
+    this.settings = null;
+  }
 
   async history(session: SessionRecord): Promise<HistoryResult> {
     const settings = await this.settingsOf();
@@ -62,8 +61,9 @@ export class AdvisorService {
 
   async send(session: SessionRecord, message: string, context: AdvisorContext | null, ip: string): Promise<SendResult> {
     const settings = await this.settingsOf();
-    const page = await this.pageOf(context);
-    const result = await this.deps.hub.call('message', { uuid: session.uuid, message, page_url: page.url, page_title: page.title, ip });
+    // What the member points at («اسأل المستشار»), built here from public data: the hub hands it to the workflow as `focus`.
+    const page = await this.contexts.resolve(context);
+    const result = await this.deps.hub.call('message', { uuid: session.uuid, message, page_url: page.url, page_title: page.title, ip, ...(page.focus ? { context: page.focus } : {}) });
     const me = meOf(result.contact);
     if (result.gated) {
       return { messageId: null, waiting: false, human: false, gate: toGate(result.gate, result.contact ?? null, settings.block), me };
@@ -87,26 +87,6 @@ export class AdvisorService {
       human: result.human === true,
       me: meOf(result.contact),
     };
-  }
-
-  /**
-   * Screen context sent with a message («اسأل المستشار»): the project's public page or the news article,
-   * as the web widget does on a page; home portals and services name the app screen instead.
-   */
-  private async pageOf(context: AdvisorContext | null): Promise<{ url: string; title: string }> {
-    if (context?.type === 'news') {
-      const page = this.deps.news.pageOf(context.id);
-      return page ? { url: page.url, title: page.title.slice(0, 200) } : { url: '', title: '' };
-    }
-    if (context?.type === 'portal') return { url: '', title: `${PORTAL_TITLES[context.id]} — تطبيق نادي المستثمرين` };
-    if (context?.type === 'service') {
-      const service = (await getServicesContent(this.deps.kv)).services.find((entry) => entry.key === context.id);
-      return service ? { url: service.infoUrl ?? '', title: `خدمة ${service.title} — تطبيق نادي المستثمرين`.slice(0, 200) } : { url: '', title: '' };
-    }
-    const project = context ? this.deps.projects.get(context.id) : null;
-    if (!context || !project) return { url: '', title: '' };
-    const number = project.number ? ` (مشروع رقم ${project.number})` : '';
-    return { url: this.deps.projects.pageUrl(context.id) ?? '', title: `${project.title}${number}`.slice(0, 200) };
   }
 
   /** Hub widget config: bot name, welcome, quick menu, and the link library that feeds the block list. */

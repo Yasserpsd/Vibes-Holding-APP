@@ -7,6 +7,7 @@ import type { Me } from '../auth/service.js';
 import { priceFor, toPublicService, type ServicesContent } from '../content/services.js';
 import type { Notifier, PaymentLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
+import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
 import type { PaymobGateway } from './paymob.js';
@@ -69,6 +70,10 @@ export type PublicPayment = Pick<
 >;
 
 export type AdminPayment = PublicPayment & Pick<Payment, 'contactId' | 'name' | 'email' | 'phone' | 'orderId' | 'intentionId'>;
+
+/** Dashboard home: payments per Riyadh day. `count` = created that day, `paid` and `cents` = paid that day. */
+export type PaymentTotals = { count: number; cents: number; paid: number };
+export type PaymentStats = { series: ({ day: string } & PaymentTotals)[]; today: PaymentTotals; month: PaymentTotals };
 
 export type RedirectResult = { payment: PublicPayment | null; verified: boolean; gatewaySuccess: boolean | null };
 
@@ -301,6 +306,30 @@ export class PaymentsService {
       .filter((entry) => !status || entry.status === status)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((entry) => this.toAdmin(entry));
+  }
+
+  async dailyStats(days: number, now = Date.now()): Promise<PaymentStats> {
+    const today = riyadhDay(now);
+    const series = new Map(lastRiyadhDays(days, now).map((day) => [day, { day, count: 0, cents: 0, paid: 0 }]));
+    const month: PaymentTotals = { count: 0, cents: 0, paid: 0 };
+    for (const payment of await this.load()) {
+      const createdDay = riyadhDay(Date.parse(payment.createdAt));
+      const paidDay = payment.status === 'paid' && payment.paidAt ? riyadhDay(Date.parse(payment.paidAt)) : null;
+      const created = series.get(createdDay);
+      if (created) created.count += 1;
+      const paid = paidDay ? series.get(paidDay) : undefined;
+      if (paid) {
+        paid.paid += 1;
+        paid.cents += payment.amountCents;
+      }
+      if (createdDay.slice(0, 7) === today.slice(0, 7)) month.count += 1;
+      if (paidDay?.slice(0, 7) === today.slice(0, 7)) {
+        month.paid += 1;
+        month.cents += payment.amountCents;
+      }
+    }
+    const { day: _day, ...todayTotals } = series.get(today) ?? { day: today, count: 0, cents: 0, paid: 0 };
+    return { series: [...series.values()], today: todayTotals, month };
   }
 
   /** Mock gateway page only: a payment by id without an owner check (the page shows no personal data). */

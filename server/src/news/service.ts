@@ -44,7 +44,7 @@ export type Audience = { prefs: NewsPrefs | null; persona: string };
 
 type Indexed = { item: NewsItem; tokens: Set<string> };
 type Fresh = { source: NewsSource; entry: FeedEntry };
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl };
+type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl; /** Called after a run that stored new items (/api/sync). */ onChange?: () => void };
 
 export function newsIdOf(url: string): string {
   return createHash('sha1').update(url).digest('hex').slice(0, 16);
@@ -122,6 +122,7 @@ export class NewsService {
       this.updatedAt = new Date().toISOString();
       this.lastError = null;
       await this.persist();
+      if (added > 0) this.deps.onChange?.();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
         'news refreshed',
@@ -294,6 +295,12 @@ export class NewsService {
   get(id: string): PublicNewsItem | null {
     const entry = this.items.get(id);
     return entry && !entry.item.hidden ? toPublic(entry.item) : null;
+  }
+
+  /** What the advisor may know about an item: the source's own words, nothing rewritten (rule 7). */
+  contextOf(id: string): { title: string; source: string; snippet: string | null; url: string } | null {
+    const entry = this.items.get(id);
+    return entry && !entry.item.hidden ? { title: entry.item.title, source: entry.item.sourceName, snippet: entry.item.snippet, url: entry.item.url } : null;
   }
 
   /** Title and URL for the advisor's screen context («اسأل المستشار عن هذا الخبر»). */
