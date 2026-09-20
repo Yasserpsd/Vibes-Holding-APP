@@ -18,7 +18,8 @@ import type { PublicProject } from './types.js';
  * returns, contact data). Cached in kv by content hash; without a key, or when the call fails, the rules write it.
  */
 export type BriefRow = { label: string; value: string };
-export type BriefStage = { key: string; label: string; index: number; total: number; steps: string[] };
+/** `estimated`: the site's own wording does not place the project («أخرى», empty), so the step is the adviser's reading of the description. */
+export type BriefStage = { key: string; label: string; index: number; total: number; steps: string[]; estimated: boolean };
 export type BriefCompetitor = { id: number; title: string; sector: string | null; stage: string | null; why: string };
 export type ProjectBrief = {
   summary: string;
@@ -36,7 +37,7 @@ export type ProjectBrief = {
 export const BRIEF_DISCLAIMER = 'ملخص آلي من بيانات المشروع المنشورة في بنك المشاريع. المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.';
 export const briefKey = (id: number): string => `projects:brief:${id}`;
 
-const VERSION = 1;
+const VERSION = 2;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
@@ -86,7 +87,7 @@ export function stageOf(project: Pick<PublicProject, 'stage'>): BriefStage {
     if (folded && stage.match.test(folded)) index = position;
   });
   const hit = index >= 0 ? STAGES[index] : undefined;
-  return { key: hit?.key ?? 'unknown', label: name || 'غير محددة', index, total: STAGES.length, steps: STEPS };
+  return { key: hit?.key ?? 'unknown', label: name || 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: false };
 }
 
 const STOP = new Set(['من', 'في', 'على', 'الى', 'عن', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'او', 'ان', 'كل', 'بين', 'حيث', 'كما', 'ذلك', 'مشروع', 'المشروع', 'شركه', 'الشركه', 'the', 'and', 'for', 'with']);
@@ -205,7 +206,7 @@ const SYSTEM_PROMPT = [
   'Never promise or estimate returns or profits, never call anything guaranteed or safe, never advise to invest. No contact data of any kind (phones, e-mails, links, handles).',
   'Write Modern Standard Arabic, polished and concise, no emojis, no exclamation marks.',
   'Vocabulary: «بدون رسوم» never «مجاني»; «رصيد» never «كريديت»; «الشراكات» never «الصفقات» (company names stay as written). Numeric ranges in words (من … إلى …), never a hyphen between two numbers.',
-  'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, what is requested, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only.',
+  'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, what is requested, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
 ].join('\n');
 
 const RESPONSE_FORMAT = {
@@ -221,8 +222,9 @@ const RESPONSE_FORMAT = {
         strengths: { type: 'array', items: { type: 'string' } },
         risks: { type: 'array', items: { type: 'string' } },
         competitors: { type: 'array', items: { type: 'object', properties: { id: { type: 'integer' }, why: { type: 'string' } }, required: ['id', 'why'], additionalProperties: false } },
+        stageKey: { type: 'string', enum: ['idea', 'prototype', 'launch', 'revenue', 'growth', 'unknown'] },
       },
-      required: ['summary', 'table', 'strengths', 'risks', 'competitors'],
+      required: ['summary', 'table', 'strengths', 'risks', 'competitors', 'stageKey'],
       additionalProperties: false,
     },
   },
@@ -236,6 +238,7 @@ const answerSchema = z
     strengths: z.array(line).max(6),
     risks: z.array(line).max(6),
     competitors: z.array(z.object({ id: z.number().int(), why: line }).strict()).max(8),
+    stageKey: z.enum(['idea', 'prototype', 'launch', 'revenue', 'growth', 'unknown']),
   })
   .strict();
 
@@ -323,9 +326,14 @@ export class BriefService {
       return kept.length ? kept : fallback;
     };
     const whys = new Map(answer.competitors.map((row) => [row.id, fixWording(row.why)]));
+    // The site's own stage wins. Only a project it does not place («أخرى», empty) takes the adviser's reading, marked as such.
+    const guess = rules.stage.index < 0 ? STAGES.findIndex((stage) => stage.key === answer.stageKey) : -1;
+    const guessed = guess >= 0 ? STAGES[guess] : undefined;
+    const stage: BriefStage = guessed ? { ...rules.stage, key: guessed.key, label: guessed.label, index: guess, estimated: true } : rules.stage;
     this.deps.log.info({ project: project.id, usage: body.usage }, 'project brief worded by OpenAI');
     return {
       ...rules,
+      stage,
       summary,
       // The fact rows stay ours; the model's rows replace the «label: value» lines lifted from the text.
       table: [...facts, ...extra],

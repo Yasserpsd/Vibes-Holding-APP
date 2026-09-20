@@ -130,6 +130,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
         })}
       </View>
       {known ? null : <Text style={styles.stageNote}>لم نتمكن من تحديد موقع المشروع على المراحل من بياناته المنشورة.</Text>}
+      {known && stage.estimated ? <Text style={styles.stageNote}>تقدير المستشار من وصف المشروع؛ صاحب المشروع لم يحدد مرحلته.</Text> : null}
     </View>
   );
 }

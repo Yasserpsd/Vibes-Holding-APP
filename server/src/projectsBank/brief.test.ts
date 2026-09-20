@@ -68,6 +68,8 @@ const goodAnswer = {
     { id: 2, why: 'يخدم الشريحة نفسها من المرضى بحجز المواعيد.' },
     { id: 99, why: 'مشروع لم يُطلب.' },
   ],
+  // The site already places this project («إطلاق»): the model's own reading must not replace it.
+  stageKey: 'growth',
 };
 
 test('stages map to a five-step ladder and competitors are chosen without a model', () => {
@@ -100,7 +102,7 @@ test('with a key the model words the brief; its rows about contact and its inven
   assert.ok(!labels.includes('التواصل') && !labels.includes('حجم السوق'), 'no contact row, no number the text does not have');
   assert.deepEqual(brief.strengths, ['حضور في 3 مدن مع 120 عيادة', 'خدمة بدون رسوم للمرضى']);
   assert.deepEqual(brief.competitors, [{ id: 2, title: rival.title, sector: 'تقنية', stage: 'نمو', why: 'يخدم الشريحة نفسها من المرضى بحجز المواعيد.' }]);
-  assert.deepEqual([brief.stage.key, brief.stage.index], ['launch', 2]);
+  assert.deepEqual([brief.stage.key, brief.stage.index, brief.stage.estimated], ['launch', 2, false], 'the stage of the site wins over the model');
 
   // What the model saw: public fields only, the founder's e-mail already gone; JSON schema output.
   assert.equal(openai.requests.length, 1);
@@ -114,6 +116,21 @@ test('with a key the model words the brief; its rows about contact and its inven
   assert.equal(openai.requests.length, 1);
   await service.brief({ ...main, details: `${main.details}\nالمطلوب: شريك تقني.` }, all);
   assert.equal(openai.requests.length, 2);
+});
+
+test('a project the site does not place («أخرى», empty) takes the reading of the adviser from the description, marked as an estimate', async () => {
+  const vague = project({ id: 7, number: '70', title: 'متجر أدوات القهوة', sector: TECH, stage: { slug: 'other', name: 'اخري' }, details: 'متجر إلكتروني يبيع أدوات القهوة المختصة ويحقق مبيعات شهرية منتظمة منذ عام.' });
+  const reading = fakeOpenAI({ ...goodAnswer, summary: 'متجر إلكتروني يبيع أدوات القهوة المختصة لهواة القهوة، ويحقق مبيعات شهرية منتظمة منذ عام.', table: [], strengths: [], risks: [], competitors: [], stageKey: 'revenue' });
+  const service = new BriefService({ kv: new MemoryKV(), log, apiKey: 'sk-test-key-000000000000', model: 'gpt-test', fetchImpl: reading.fetchImpl });
+  const brief = await service.brief(vague, [vague, rival]);
+  assert.deepEqual([brief.stage.key, brief.stage.index, brief.stage.label, brief.stage.estimated], ['revenue', 3, 'تحقيق الدخل', true]);
+
+  // «unknown» from the model, or no model at all, leaves the step open and says so.
+  const unsure = fakeOpenAI({ ...goodAnswer, summary: 'متجر إلكتروني يبيع أدوات القهوة المختصة لهواة القهوة، ويحقق مبيعات شهرية منتظمة منذ عام.', table: [], strengths: [], risks: [], competitors: [], stageKey: 'unknown' });
+  const open = await new BriefService({ kv: new MemoryKV(), log, apiKey: 'sk-test-key-000000000000', model: 'gpt-test', fetchImpl: unsure.fetchImpl }).brief(vague, [vague, rival]);
+  assert.deepEqual([open.stage.key, open.stage.index, open.stage.estimated], ['unknown', -1, false]);
+  const byRules = await new BriefService({ kv: new MemoryKV(), log, model: 'gpt-test' }).brief(vague, [vague, rival]);
+  assert.deepEqual([byRules.stage.index, byRules.stage.estimated, byRules.source], [-1, false, 'rules']);
 });
 
 test('an answer that promises returns, a failed call or a broken JSON all fall back to the rules, and the call is tried again later', async () => {
