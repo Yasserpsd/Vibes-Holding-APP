@@ -2,10 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useLatestPosts, type Post } from '@/api/posts';
+import { eventOf, useLatestPosts, type Post } from '@/api/posts';
 import { SectionHeader } from '@/components/SectionHeader';
-import { formatRelativeTime } from '@/lib/format';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { formatEventDate, formatRelativeTime } from '@/lib/format';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export const HOME_POSTS_LIMIT = 3;
 
@@ -39,6 +39,7 @@ export function PostsBlock() {
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
   const thumbnail = thumbnailOf(post);
+  const event = eventOf(post);
   return (
     <Pressable
       accessibilityRole="button"
@@ -52,6 +53,25 @@ export function PostCard({ post }: { post: Post }) {
             {post.title}
           </Text>
         </View>
+        {event ? (
+          <View style={styles.event}>
+            <View style={styles.eventBadge}>
+              <Ionicons name="calendar" size={12} color={colors.black} />
+              <Text style={styles.eventBadgeText}>فعالية</Text>
+            </View>
+            <Text style={styles.eventWhen} numberOfLines={1}>
+              {formatEventDate(event.date)}
+            </Text>
+          </View>
+        ) : null}
+        {event && (event.place || event.onlineUrl) ? (
+          <View style={styles.eventPlace}>
+            <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />
+            <Text style={styles.eventPlaceText} numberOfLines={1}>
+              {event.place ? (event.onlineUrl ? `${event.place} · وعن بُعد` : event.place) : 'عن بُعد'}
+            </Text>
+          </View>
+        ) : null}
         {post.body ? (
           <Text style={styles.body} numberOfLines={2}>
             {post.body}
@@ -85,6 +105,12 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   title: { ...typography.body, flex: 1, color: colors.textPrimary },
   body: { ...typography.caption, color: colors.textSecondary },
+  event: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  eventBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.gold },
+  eventBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
+  eventWhen: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, flexShrink: 1 },
+  eventPlace: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   time: { ...typography.caption, color: colors.textMuted },
   thumbnail: { width: 72, height: 72, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },

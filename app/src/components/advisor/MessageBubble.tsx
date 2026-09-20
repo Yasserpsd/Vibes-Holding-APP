@@ -8,7 +8,7 @@ import { Chip } from '@/components/Chip';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-import { RichText } from './RichText';
+import { RichText, hasTable } from './RichText';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type Props = { message: AdvisorMessage; showQuickReplies: boolean; onQuickReply: (text: string) => void };
@@ -31,9 +31,11 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props
   const mine = message.role === 'user';
   const quick = message.actions.find((action) => action.type === 'quick_replies');
   const widgets = message.actions.filter((action) => action.type !== 'quick_replies');
+  // A reply with a table takes the bubble's full width so the columns have room.
+  const wide = !mine && hasTable(message.text);
   return (
     <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
-      <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, message.role === 'staff' && styles.bubbleStaff]}>
+      <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, message.role === 'staff' && styles.bubbleStaff, wide && styles.bubbleWide]}>
         {message.role === 'staff' ? <Text style={styles.by}>{message.by ? `${message.by} · فريق النادي` : 'فريق النادي'}</Text> : null}
         {message.image ? (
           <Image source={{ uri: message.image }} style={styles.image} resizeMode="cover" accessibilityLabel="صورة مرفقة" />
@@ -43,6 +45,7 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props
             text={message.text}
             style={[styles.text, mine ? styles.textMine : styles.textTheirs]}
             linkColor={mine ? colors.black : colors.goldLight}
+            plain={mine}
           />
         ) : null}
         <Text style={[styles.time, mine ? styles.timeMine : styles.timeTheirs]}>{formatTime(message.at)}</Text>
@@ -111,6 +114,7 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: colors.gold, borderBottomLeftRadius: radii.sm },
   bubbleTheirs: { backgroundColor: colors.surfaceElevated, borderBottomRightRadius: radii.sm, borderWidth: 1, borderColor: colors.border },
   bubbleStaff: { borderColor: colors.gold },
+  bubbleWide: { alignSelf: 'stretch', maxWidth: '100%' },
   by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: 'right' },
   image: { width: 220, height: 160, borderRadius: radii.md, backgroundColor: colors.surface },
   text: { ...typography.body, textAlign: 'right' },

@@ -10,10 +10,12 @@ type Props = {
   onPress: () => void;
   /** Fixed width for horizontal strips. */
   width?: number;
+  /** Opens the advisor with this video as the context; the card shows «اسأل المستشار» when set. */
+  onAsk?: () => void;
 };
 
 /** A YouTube video: thumbnail with a play mark, the title and its short friendly line. */
-export function VideoCard({ video, onPress, width }: Props) {
+export function VideoCard({ video, onPress, width, onAsk }: Props) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, width ? { width } : null, pressed && styles.pressed]}>
       <View style={styles.thumbBox}>
@@ -32,6 +34,12 @@ export function VideoCard({ video, onPress, width }: Props) {
           </Text>
         ) : null}
         {video.publishedAt ? <Text style={styles.date}>{formatArabicDate(video.publishedAt)}</Text> : null}
+        {onAsk ? (
+          <Pressable onPress={onAsk} hitSlop={6} accessibilityRole="button" accessibilityLabel={`اسأل المستشار عن: ${video.title}`} style={({ pressed }) => [styles.ask, pressed && styles.pressed]}>
+            <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
+            <Text style={styles.askText}>اسأل المستشار</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -53,4 +61,6 @@ const styles = StyleSheet.create({
   title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: 'right' },
   blurb: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
   date: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  ask: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', marginTop: spacing.xs, paddingVertical: 4, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark },
+  askText: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
 });

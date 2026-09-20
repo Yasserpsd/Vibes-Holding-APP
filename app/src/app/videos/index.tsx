@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { useVideos } from '@/api/videos';
+import { useVideos, type Video } from '@/api/videos';
+import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -14,6 +15,10 @@ import { spacing } from '@/theme/tokens';
 export default function VideosScreen() {
   const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useVideos();
   const first = data?.pages[0];
+  const askAdvisor = useAskAdvisor();
+  // The floating button asks about the library; each card asks about its own video.
+  useAdvisorScreen({ type: 'screen', id: 'videos', title: first?.title ?? 'مكتبة الفيديو' });
+  const askAbout = (video: Video) => askAdvisor({ type: 'video', id: video.id, title: video.title });
 
   if (!first) {
     return (
@@ -32,7 +37,7 @@ export default function VideosScreen() {
           <SectionHeader title={first.featuredTitle} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
             {first.featured.map((video) => (
-              <VideoCard key={video.id} video={video} width={240} onPress={() => void openLink(video.url)} />
+              <VideoCard key={video.id} video={video} width={240} onPress={() => void openLink(video.url)} onAsk={() => askAbout(video)} />
             ))}
           </ScrollView>
         </>
@@ -42,7 +47,7 @@ export default function VideosScreen() {
       {items.length ? (
         <View style={styles.list}>
           {items.map((video) => (
-            <VideoCard key={video.id} video={video} onPress={() => void openLink(video.url)} />
+            <VideoCard key={video.id} video={video} onPress={() => void openLink(video.url)} onAsk={() => askAbout(video)} />
           ))}
         </View>
       ) : (

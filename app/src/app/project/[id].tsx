@@ -1,9 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { useProject } from '@/api/queries';
+import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { ProjectBrief } from '@/components/project/ProjectBrief';
+import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
@@ -11,10 +14,15 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const askAdvisor = useAskAdvisor();
   const { width } = useWindowDimensions();
   const query = useProject(id);
   const project = query.data?.project;
+  const advisorContext = project ? ({ type: 'project', id: project.id, title: project.title } as const) : null;
+  // The floating «اسأل المستشار» button opens the advisor with this project as the context.
+  useAdvisorScreen(advisorContext);
+  // Keeps the last card (the unlock button) clear of that floating button.
+  const clearance = useAskAdvisorClearance();
   const imageWidth = width - spacing.md * 2;
 
   return (
@@ -23,7 +31,7 @@ export default function ProjectScreen() {
       {!project ? (
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
           {project.gallery.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.gallery}>
               {project.gallery.map((uri) => (
@@ -54,6 +62,8 @@ export default function ProjectScreen() {
             <InfoRow icon="eye-outline" label="المشاهدات" value={formatNumber(project.viewsCount)} />
           </View>
 
+          <ProjectBrief projectId={String(project.id)} />
+
           {project.details ?? project.detailsEn ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>عن المشروع</Text>
@@ -65,24 +75,9 @@ export default function ProjectScreen() {
             <AppButton label="صفحة الشريك الذهبي" icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
           ) : null}
 
-          <AppButton
-            label="اسأل المستشار عن هذا المشروع"
-            icon="sparkles-outline"
-            variant="outline"
-            onPress={() =>
-              router.navigate({
-                pathname: '/(tabs)/advisor',
-                params: { ctxType: 'project', ctxId: String(project.id), ctxTitle: project.title, ctxNonce: String(Date.now()) },
-              })
-            }
-          />
+          <AppButton label="ناقش المشروع مع المستشار" icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
 
-          <View style={styles.noteCard}>
-            <Ionicons name="lock-closed-outline" size={20} color={colors.goldLight} />
-            <Text style={styles.noteText}>
-              بيانات التواصل مع المؤسس وملف العرض متاحة لأعضاء النادي بعد فتح المشروع. فتح المشاريع من التطبيق في تحديث قادم.
-            </Text>
-          </View>
+          <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} />
         </ScrollView>
       )}
     </View>
@@ -105,7 +100,7 @@ function InfoRow({ icon, label, value }: InfoRowProps) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.black },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
+  content: { padding: spacing.md, gap: spacing.md },
   gallery: { borderRadius: radii.lg, overflow: 'hidden' },
   galleryImage: { height: 220, backgroundColor: colors.surfaceElevated },
   goldenBadge: {
@@ -145,15 +140,4 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.gold },
   body: { ...typography.body, color: colors.textSecondary },
-  noteCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
-  },
-  noteText: { ...typography.caption, flex: 1, color: colors.textSecondary },
 });

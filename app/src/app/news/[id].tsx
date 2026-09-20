@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useNewsItem } from '@/api/news';
+import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { StateView } from '@/components/StateView';
 import { formatRelativeTime } from '@/lib/format';
@@ -12,9 +13,14 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 /** The item as the source published it, with the link to the original page and the advisor shortcut. */
 export default function NewsItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const askAdvisor = useAskAdvisor();
   const query = useNewsItem(id);
   const item = query.data?.item;
+  // The discussion happens in the advisor's chat; the item on this page stays as its source published it.
+  const advisorContext = item ? ({ type: 'news', id: item.id, title: item.title } as const) : null;
+  useAdvisorScreen(advisorContext);
+  // Keeps the note at the end clear of the floating «اسأل المستشار» button.
+  const clearance = useAskAdvisorClearance();
   const latin = item?.lang === 'en';
 
   return (
@@ -23,8 +29,8 @@ export default function NewsItemScreen() {
       {!item ? (
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          {item.image ? <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" /> : null}
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
+          {item.image ?<Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" /> : null}
           <View style={styles.meta}>
             <Text style={styles.source}>{item.source.name}</Text>
             <View style={styles.tierPill}>
@@ -52,17 +58,7 @@ export default function NewsItemScreen() {
             </View>
           ) : null}
           <AppButton label="اقرأ من المصدر" icon="open-outline" onPress={() => void openLink(item.url)} />
-          <AppButton
-            label="اسأل المستشار عن هذا الخبر"
-            icon="sparkles-outline"
-            variant="outline"
-            onPress={() =>
-              router.navigate({
-                pathname: '/(tabs)/advisor',
-                params: { ctxType: 'news', ctxId: item.id, ctxTitle: item.title, ctxNonce: String(Date.now()) },
-              })
-            }
-          />
+          <AppButton label="ناقش الخبر مع المستشار" icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
           <View style={styles.noteCard}>
             <Ionicons name="information-circle-outline" size={20} color={colors.goldLight} />
             <Text style={styles.noteText}>العنوان والمقتطف كما نشرهما المصدر. التطبيق لا يكتب الأخبار ولا يعيد صياغتها؛ النص الكامل على صفحة المصدر.</Text>
@@ -75,7 +71,7 @@ export default function NewsItemScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.black },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
+  content: { padding: spacing.md, gap: spacing.md },
   image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   source: { ...typography.body, color: colors.goldLight },

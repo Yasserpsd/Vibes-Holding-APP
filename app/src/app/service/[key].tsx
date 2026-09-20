@@ -8,6 +8,7 @@ import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
 import { amountLabel, paymentsApi } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
+import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
@@ -33,6 +34,9 @@ export default function ServiceScreen() {
   const [handedOver, setHandedOver] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const openAdvisor = useAskAdvisor();
+  const advisorContext = data ? ({ type: 'service', id: data.service.key, title: data.service.title } as const) : null;
+  useAdvisorScreen(advisorContext);
 
   if (!data) {
     return (
@@ -43,11 +47,7 @@ export default function ServiceScreen() {
   }
 
   const { service, lockedText } = data;
-  const askAdvisor = (prompt?: string) =>
-    router.push({
-      pathname: '/advisor',
-      params: { ctxType: 'service', ctxId: service.key, ctxTitle: service.title, ctxNonce: String(Date.now()), ...(prompt ? { prompt } : {}) },
-    });
+  const askAdvisor = (prompt?: string) => openAdvisor({ type: 'service', id: service.key, title: service.title }, prompt);
 
   const handOver = async (action: Extract<ServiceAction, { type: 'whatsapp' }>) => {
     // The management hears about the request right away, even if WhatsApp is closed without sending.
@@ -128,7 +128,6 @@ export default function ServiceScreen() {
       {handedOver ? <Notice tone="info" text="فتحنا واتساب برسالتك الجاهزة، أكمل الإرسال من هناك وسيتواصل معك الفريق." /> : null}
 
       {service.infoUrl ? <AppButton label="تفاصيل الخدمة على الموقع" variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} /> : null}
-      <AppButton label="اسأل المستشار عن هذه الخدمة" variant="outline" icon="sparkles-outline" onPress={() => askAdvisor()} />
     </Screen>
   );
 }

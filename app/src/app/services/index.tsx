@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useServices } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { LockedNotice } from '@/components/LockedNotice';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -15,6 +16,7 @@ export default function ServicesScreen() {
   const router = useRouter();
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useServices();
+  useAdvisorScreen({ type: 'screen', id: 'services', title: data?.title ?? 'خدمات النادي' });
 
   if (!data) {
     return (

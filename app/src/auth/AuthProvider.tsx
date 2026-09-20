@@ -42,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.removeQueries({ queryKey: ['me'] });
     // Interests belong to the account: the next member on this device must not inherit them.
     queryClient.removeQueries({ queryKey: ['news', 'prefs'] });
+    // Founder contact data a member unlocked never outlives his session (CLAUDE.md rule 4).
+    queryClient.removeQueries({ queryKey: ['project-access'] });
   }, [queryClient]);
 
   useEffect(() => {

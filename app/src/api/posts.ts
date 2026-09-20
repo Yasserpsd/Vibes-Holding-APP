@@ -2,6 +2,9 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet } from './client';
 
+/** An event's day (`2026-10-05`) or exact time (ISO), where it happens and the link for attending online. */
+export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+
 /** «رسائل الإدارة»: a post the club's management published from the dashboard (server: `publicPost`). */
 export type Post = {
   id: string;
@@ -14,7 +17,15 @@ export type Post = {
   video?: { url: string; poster: string | null } | null;
   pinned: boolean;
   publishedAt: string | null;
+  /** Bridge v2: a plain message or an event. Older servers send neither key: treat the post as a plain message. */
+  kind?: 'post' | 'event';
+  event?: PostEvent | null;
 };
+
+/** The event's details when the post is one. */
+export function eventOf(post: Post): PostEvent | null {
+  return post.kind === 'event' && post.event?.date ? post.event : null;
+}
 
 export type PostsPage = { posts: Post[]; more: boolean };
 

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useMembershipContent, type MembershipGroup, type MembershipItem } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { Screen } from '@/components/Screen';
@@ -18,6 +19,7 @@ export default function MembershipScreen() {
   const router = useRouter();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useMembershipContent();
+  useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? 'العضوية' });
 
   if (!data) {
     return (

@@ -13,7 +13,18 @@ export class ApiError extends Error {
 
 type Params = Record<string, string | number | boolean | undefined | null>;
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-type RequestOptions = { params?: Params; body?: unknown; token?: string | null };
+type RequestOptions = {
+  params?: Params;
+  body?: unknown;
+  token?: string | null;
+  /** How long to wait for the answer. A poller passes less than its interval, so a stalled request never blocks the next tick. */
+  timeoutMs?: number;
+};
+
+// React Native's Android HTTP client waits forever by itself: without a deadline one stalled connection keeps a
+// spinner, or a poller's "request in flight" flag, stuck until the app restarts. The server gives its own upstream
+// calls (hub, Projects Bank, Paymob) 30 seconds at most, so a healthy answer is never this late.
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 // The auth provider registers the current session token and a handler for rejected sessions.
 let currentToken: string | null = null;
@@ -45,15 +56,22 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 
+  // The deadline covers the body too: React Native's fetch resolves once the whole answer has arrived.
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(buildUrl(path, options.params), {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal,
     });
   } catch {
+    // No connection, or no answer before the deadline.
     throw new ApiError('تعذّر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.', 0, 'network');
+  } finally {
+    clearTimeout(deadline);
   }
 
   if (!response.ok) {

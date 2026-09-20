@@ -39,6 +39,9 @@ const initialState: ChatState = {
   sending: false,
 };
 
+/** How a send ended. `contextRefused`: the server took the message only without its context, so the «تسأل عن» pill no longer holds. */
+export type SendOutcome = { accepted: boolean; contextRefused: boolean };
+
 function mergeMessages(current: AdvisorMessage[], incoming: AdvisorMessage[]): AdvisorMessage[] {
   if (!incoming.length) return current;
   const known = new Set(current.map((message) => message.id));
@@ -101,22 +104,23 @@ export function useAdvisorChat() {
     }
   }, [setMe]);
 
-  /** Sends a message; resolves true when the hub accepted it. */
+  /** Sends a message; `accepted` when the hub took it. */
   const send = useCallback(
-    async (text: string, context: AdvisorContext | null): Promise<boolean> => {
+    async (text: string, context: AdvisorContext | null): Promise<SendOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed) return false;
+      if (!trimmed) return { accepted: false, contextRefused: false };
       optimisticCount.current += 1;
       const tempId = OPTIMISTIC_BASE + optimisticCount.current;
       const draft: AdvisorMessage = { id: tempId, role: 'user', text: trimmed, at: new Date().toISOString(), by: null, image: null, audio: null, actions: [] };
       setState((prev) => ({ ...prev, messages: [...prev.messages, draft], sending: true, sendError: null, gate: null }));
       try {
         const result = await advisorApi.send(trimmed, context);
+        const contextRefused = result.contextRefused;
         if (result.me) setMe(result.me);
         if (result.gate) {
           const gate = result.gate;
           setState((prev) => ({ ...prev, messages: prev.messages.filter((message) => message.id !== tempId), sending: false, gate }));
-          return false;
+          return { accepted: false, contextRefused };
         }
         const id = result.messageId;
         if (id !== null) lastId.current = Math.max(lastId.current, id);
@@ -131,12 +135,12 @@ export function useAdvisorChat() {
           human: result.human,
         }));
         if (id === null) void load();
-        return true;
+        return { accepted: true, contextRefused };
       } catch (error) {
         setState((prev) => ({ ...prev, messages: prev.messages.filter((message) => message.id !== tempId), sending: false, sendError: errorMessage(error) }));
         // The hub may have stored the message even when its workflow failed: resync.
         void load();
-        return false;
+        return { accepted: false, contextRefused: false };
       }
     },
     [load, setMe],

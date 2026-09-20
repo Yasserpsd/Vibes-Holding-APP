@@ -10,6 +10,7 @@ import type { GoldenCompany, GoldenContent } from '@/api/types';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
+import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { PortalCard } from '@/components/PortalCard';
@@ -37,6 +38,8 @@ export default function HomeScreen() {
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const membershipContent = useMembershipContent();
   const [refreshing, setRefreshing] = useState(false);
+  // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
+  useAdvisorScreen({ type: 'screen', id: 'home', title: 'الرئيسية' }, true);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -47,7 +50,7 @@ export default function HomeScreen() {
   const content = home.data;
   if (!content) {
     return (
-      <Screen>
+      <Screen aboveTabBar>
         <StateView loading={home.isLoading} error={home.error} onRetry={() => void home.refetch()} />
       </Screen>
     );
@@ -71,7 +74,7 @@ export default function HomeScreen() {
   const teaser = services.data?.services.slice(0, 4) ?? [];
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
+    <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
       <View style={styles.hero}>
         <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>

@@ -1,6 +1,7 @@
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useGolden } from '@/api/queries';
+import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
 import { StateView } from '@/components/StateView';
@@ -11,6 +12,9 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 export default function GoldenScreen() {
   const query = useGolden();
   const content = query.data;
+  useAdvisorScreen({ type: 'screen', id: 'golden', title: content?.title ?? 'المشاريع الذهبية' });
+  // Keeps the disclaimer at the end clear of the floating «اسأل المستشار» button.
+  const clearance = useAskAdvisorClearance();
 
   if (!content) {
     return (
@@ -23,7 +27,7 @@ export default function GoldenScreen() {
   const companies = [...content.companies].sort((a, b) => a.order - b.order);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
       <View style={styles.hero}>
         <View style={styles.logoBox}>
           <Image
@@ -53,7 +57,7 @@ export default function GoldenScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.black },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
+  content: { padding: spacing.md, gap: spacing.md },
   hero: {
     alignItems: 'center',
     gap: spacing.md,

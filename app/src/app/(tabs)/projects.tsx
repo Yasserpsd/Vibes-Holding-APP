@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProjectFilters, useProjectsList } from '@/api/queries';
 import type { ProjectsSort } from '@/api/types';
+import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
 import { ProjectCard } from '@/components/ProjectCard';
 import { StateView } from '@/components/StateView';
@@ -27,6 +28,8 @@ export default function ProjectsScreen() {
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
   const q = useDebounced(search.trim());
+  // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
+  useAdvisorScreen({ type: 'screen', id: 'projects', title: 'بنك المشاريع' }, true);
 
   const filters = useProjectFilters();
   const list = useProjectsList({ q, sort, sector, stage });
@@ -138,7 +141,8 @@ export default function ProjectsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.black },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: ASK_ADVISOR_CLEARANCE },
   header: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.gold },

@@ -12,7 +12,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AuthProvider } from '@/auth/AuthProvider';
+import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
+import { SyncPoller } from '@/components/SyncPoller';
 import { ensureRTL } from '@/i18n/rtl';
 import { installNotificationHandler } from '@/lib/notifications';
 import { colors, fonts } from '@/theme/tokens';
@@ -59,39 +61,44 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <PushRegistrar />
+        <SyncPoller />
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.black },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: 'المشروع' }} />
-          <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
-          <Stack.Screen name="membership" options={{ ...detailHeader, title: 'العضوية' }} />
-          <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: 'الملف الشخصي' }} />
-          <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: 'الخبر' }} />
-          <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: 'قرارات وأنظمة المملكة' }} />
-          <Stack.Screen name="news/interests" options={{ ...detailHeader, title: 'اهتماماتي' }} />
-          <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: 'بوابة رواد الأعمال' }} />
-          <Stack.Screen name="services/index" options={{ ...detailHeader, title: 'خدمات النادي' }} />
-          <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: 'الخدمة' }} />
-          <Stack.Screen name="videos/index" options={{ ...detailHeader, title: 'مكتبة الفيديو' }} />
-          <Stack.Screen name="posts/index" options={{ ...detailHeader, title: 'رسائل الإدارة' }} />
-          <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: 'رسالة من الإدارة' }} />
-          <Stack.Screen name="about" options={{ ...detailHeader, title: 'عنّا' }} />
-          <Stack.Screen name="hq/index" options={{ ...detailHeader, title: 'مقر النادي' }} />
-          <Stack.Screen name="hq/book" options={{ ...detailHeader, title: 'حجز زيارة' }} />
-          <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: 'باركود الدخول' }} />
-          <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: 'طلبات الزيارة' }} />
-          <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: 'الدفع' }} />
-          <Stack.Screen name="payments/index" options={{ ...detailHeader, title: 'مدفوعاتي' }} />
-          <Stack.Screen name="auth/login" options={{ ...detailHeader, title: 'تسجيل الدخول' }} />
-          <Stack.Screen name="auth/register" options={{ ...detailHeader, title: 'إنشاء حساب' }} />
-          <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: 'رمز التفعيل' }} />
-          <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: 'استعادة كلمة المرور' }} />
-        </Stack>
+        <AskAdvisorProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.black },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: 'المشروع' }} />
+            <Stack.Screen name="golden" options={{ ...detailHeader, title: 'المشاريع الذهبية' }} />
+            <Stack.Screen name="membership" options={{ ...detailHeader, title: 'العضوية' }} />
+            <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: 'الملف الشخصي' }} />
+            <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: 'الخبر' }} />
+            <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: 'قرارات وأنظمة المملكة' }} />
+            <Stack.Screen name="news/interests" options={{ ...detailHeader, title: 'اهتماماتي' }} />
+            <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: 'بوابة رواد الأعمال' }} />
+            <Stack.Screen name="services/index" options={{ ...detailHeader, title: 'خدمات النادي' }} />
+            <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: 'الخدمة' }} />
+            <Stack.Screen name="videos/index" options={{ ...detailHeader, title: 'مكتبة الفيديو' }} />
+            <Stack.Screen name="posts/index" options={{ ...detailHeader, title: 'رسائل الإدارة' }} />
+            <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: 'رسالة من الإدارة' }} />
+            <Stack.Screen name="about" options={{ ...detailHeader, title: 'عنّا' }} />
+            <Stack.Screen name="hq/index" options={{ ...detailHeader, title: 'مقر النادي' }} />
+            <Stack.Screen name="hq/book" options={{ ...detailHeader, title: 'حجز زيارة' }} />
+            <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: 'باركود الدخول' }} />
+            <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: 'طلبات الزيارة' }} />
+            <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: 'الدفع' }} />
+            <Stack.Screen name="payments/index" options={{ ...detailHeader, title: 'مدفوعاتي' }} />
+            <Stack.Screen name="auth/login" options={{ ...detailHeader, title: 'تسجيل الدخول' }} />
+            <Stack.Screen name="auth/register" options={{ ...detailHeader, title: 'إنشاء حساب' }} />
+            <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: 'رمز التفعيل' }} />
+            <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: 'استعادة كلمة المرور' }} />
+          </Stack>
+          {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
+          <AskAdvisorButton />
+        </AskAdvisorProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
