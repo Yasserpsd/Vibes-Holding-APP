@@ -1,3 +1,5 @@
+import type { AccountFilter, AccountsResult, AppPayment, AuditEntry, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WriteMeta } from './types';
+
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://vibes-holding-app-production.up.railway.app';
 const TOKEN_KEY = 'club-admin-token';
@@ -29,9 +31,18 @@ export type Post = {
   updatedAt: string;
   publishedAt: string | null;
   notifiedAt: string | null;
+  /** Posts stored before bridge v2 have neither key: they are plain posts. */
+  kind?: PostKind;
+  event?: PostEvent | null;
+  /** How the last hand-over to the hub went: the websites and the assistant hear a post through it. */
+  hubSync?: PostHubSync;
 };
+export type PostKind = 'post' | 'event';
+/** `date` is a day (`2026-10-05`) or an exact time (`2026-10-05T19:30:00+03:00`). */
+export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 /** `video` is the YouTube link or id, `videoFile` the uploaded video; a post may carry both. */
-export type PostInput = { title: string; body: string; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean };
+export type PostInput = { title: string; body: string; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null };
 
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
@@ -91,6 +102,23 @@ async function call<T>(method: string, path: string, body?: unknown, token: stri
   return data as T;
 }
 
+/** A query string from the set values only: the server's defaults cover the rest. */
+function query(params: Record<string, string | number | null | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [name, value] of Object.entries(params)) if (value !== null && value !== undefined && value !== '') search.set(name, String(value));
+  const text = search.toString();
+  return text ? `?${text}` : '';
+}
+
+type Paging = { q?: string; page?: number; perPage?: number };
+const paging = ({ q, page, perPage }: Paging) => ({ q, page, per_page: perPage });
+
+/** One id per tap: the server replays the first answer when the same write arrives twice. */
+export function newRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`.padEnd(12, '0');
+}
+
 export const api = {
   login: async (login: string, password: string): Promise<AdminLoginResult> => {
     try {
@@ -114,6 +142,24 @@ export const api = {
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),
   notifyPost: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/posts/${id}/notify`),
+  home: (days: number) => call<Home>('GET', `/api/admin/home${query({ days })}`),
+  accounts: (input: Paging & { state?: AccountFilter }) => call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state })}`),
+  account: (id: number) => call<MemberDetail>('GET', `/api/admin/accounts/${id}`),
+  hubPayments: (input: Paging & { status?: 'all' | 'ok' | 'failed'; action?: string }) =>
+    call<Listed<HubPayment> & { sum_cents_ok: number }>('GET', `/api/admin/hub-payments${query({ ...paging(input), status: input.status, action: input.action })}`),
+  appPayments: () => call<{ payments: AppPayment[] }>('GET', '/api/admin/payments'),
+  storePurchases: () => call<{ events: StorePurchase[] }>('GET', '/api/admin/membership/purchases'),
+  tickets: (input: Paging) => call<Listed<Ticket>>('GET', `/api/admin/tickets${query(paging(input))}`),
+  leads: (input: Paging & { ltype?: string }) => call<Listed<Lead>>('GET', `/api/admin/leads${query({ ...paging(input), ltype: input.ltype })}`),
+  threads: (input: Paging & { filter?: ThreadFilter }) => call<Listed<Thread>>('GET', `/api/admin/threads${query({ ...paging(input), filter: input.filter })}`),
+  thread: (id: number, before?: number) => call<ThreadDetail>('GET', `/api/admin/threads/${id}${query({ before })}`),
+  reply: (id: number, text: string, requestId: string) => call<{ ok: true; message_id: number; already: boolean }>('POST', `/api/admin/threads/${id}/reply`, { text, requestId, confirm: true }),
+  mail: () => call<{ ok: true; stats: MailStats; items: MailItem[] }>('GET', '/api/admin/mail'),
+  grant: (id: number, input: { action: GrantAction; days: number | null } & WriteMeta) =>
+    call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/grant`, { action: input.action, ...(input.days !== null ? { days: input.days } : {}), note: input.note, requestId: input.requestId, confirm: true }),
+  setRole: (id: number, input: { role: 'member' | 'publisher' } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/role`, { ...input, confirm: true }),
+  pbGrant: (id: number, input: { amount: number } & WriteMeta) => call<{ ok: true; already: boolean; granted: number; left: number }>('POST', `/api/admin/accounts/${id}/pb-grant`, { ...input, confirm: true }),
+  audit: (limit = 100) => call<{ entries: AuditEntry[] }>('GET', `/api/admin/audit${query({ limit })}`),
   uploadsConfig: () => call<UploadConfig>('GET', '/api/admin/uploads/config'),
   uploadTicket: (file: { filename: string; contentType: string; size: number }) => call<UploadTicket>('POST', '/api/admin/uploads', file),
 };

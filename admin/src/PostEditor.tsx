@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { api, ApiError, uploadFile, type Post, type PostInput, type PostLink, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { api, ApiError, uploadFile, type Post, type PostEvent, type PostInput, type PostKind, type PostLink, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
 import { capturePoster, DEFAULT_UPLOAD_CONFIG, fileProblem, megabytes, typedFile, typeNames } from './media';
 
 type Props = { post: Post | null; onClose: (saved: Post | null) => void };
@@ -10,6 +10,17 @@ type Pending = { id: number; name: string; kind: UploadKind; progress: number; e
 const MAX_IMAGES = 10;
 const POSTER_UPLOAD_TIMEOUT_MS = 30_000;
 const isHttp = (value: string) => /^https?:\/\/\S+$/i.test(value.trim());
+const RIYADH_OFFSET_MS = 3 * 3_600_000;
+
+/** A stored event date as the two inputs show it: the day, and the Riyadh hour when the post carries one. */
+function eventFields(event: PostEvent | null | undefined): { day: string; time: string } {
+  const date = event?.date ?? '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return { day: date, time: '' };
+  const at = Date.parse(date);
+  if (Number.isNaN(at)) return { day: '', time: '' };
+  const riyadh = new Date(at + RIYADH_OFFSET_MS).toISOString();
+  return { day: riyadh.slice(0, 10), time: riyadh.slice(11, 16) };
+}
 
 /**
  * Uploads the poster frame. Never rejects and never hangs: a failed, cancelled or stalled poster answers null,
@@ -51,6 +62,12 @@ export function PostEditor({ post, onClose }: Props) {
   // The server stores the YouTube id and accepts a bare id back, so an edit starts from it.
   const [video, setVideo] = useState(post?.youtubeId ?? '');
   const [pinned, setPinned] = useState(post?.pinned ?? false);
+  // An event is a post with a date and a place: the websites' feed and the assistant hear it like any other post.
+  const [kind, setKind] = useState<PostKind>(post?.kind ?? 'post');
+  const [eventDay, setEventDay] = useState(() => eventFields(post?.event).day);
+  const [eventTime, setEventTime] = useState(() => eventFields(post?.event).time);
+  const [place, setPlace] = useState(post?.event?.place ?? '');
+  const [onlineUrl, setOnlineUrl] = useState(post?.event?.onlineUrl ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<UploadConfig>(DEFAULT_UPLOAD_CONFIG);
@@ -187,7 +204,17 @@ export function PostEditor({ post, onClose }: Props) {
       setError('كل رابط يحتاج عنوانًا ويبدأ بـ http أو https.');
       return;
     }
-    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned };
+    if (kind === 'event' && !eventDay) {
+      setError('اكتب موعد الفعالية.');
+      return;
+    }
+    if (kind === 'event' && onlineUrl.trim() && !isHttp(onlineUrl)) {
+      setError('رابط الحضور عن بُعد يجب أن يبدأ بـ http أو https.');
+      return;
+    }
+    // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
+    const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
+    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput };
     setBusy(true);
     setError(null);
     try {
@@ -230,13 +257,44 @@ export function PostEditor({ post, onClose }: Props) {
   };
 
   return (
-    <div className="shell">
+    <div className="editor-shell">
       <header className="top">
         <strong>{post ? 'تعديل منشور' : 'منشور جديد'}</strong>
         <button className="link" type="button" onClick={() => onClose(null)}>رجوع بدون حفظ</button>
       </header>
-      <main className="page">
+      <div className="page">
         <form className="card editor" onSubmit={(event) => void save(event, post?.status ?? 'draft')}>
+          <fieldset>
+            <legend>نوع المنشور</legend>
+            <div className="chips" role="group" aria-label="نوع المنشور">
+              <button type="button" className={kind === 'post' ? 'chip on' : 'chip'} aria-pressed={kind === 'post'} onClick={() => setKind('post')}>رسالة</button>
+              <button type="button" className={kind === 'event' ? 'chip on' : 'chip'} aria-pressed={kind === 'event'} onClick={() => setKind('event')}>فعالية</button>
+            </div>
+            {kind === 'event' ? (
+              <>
+                <div className="pair even">
+                  <label>
+                    موعد الفعالية
+                    <input type="date" dir="ltr" value={eventDay} onChange={(e) => setEventDay(e.target.value)} required />
+                  </label>
+                  <label>
+                    الساعة بتوقيت الرياض (اختياري)
+                    <input type="time" dir="ltr" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
+                  </label>
+                </div>
+                <label>
+                  المكان
+                  <input value={place} maxLength={200} placeholder="مقر النادي، الرياض" onChange={(e) => setPlace(e.target.value)} />
+                </label>
+                <label>
+                  رابط الحضور عن بُعد (اختياري)
+                  <input placeholder="https://" dir="ltr" value={onlineUrl} onChange={(e) => setOnlineUrl(e.target.value)} />
+                </label>
+                <p className="muted hint">عند النشر تظهر الفعالية في التطبيق وفي مواقع النادي، ويعرفها المستشار في اللحظة نفسها.</p>
+              </>
+            ) : null}
+          </fieldset>
+
           <label>
             العنوان
             <input value={title} maxLength={140} onChange={(e) => setTitle(e.target.value)} required />
@@ -371,7 +429,7 @@ export function PostEditor({ post, onClose }: Props) {
             )}
           </div>
         </form>
-      </main>
+      </div>
     </div>
   );
 }
