@@ -85,7 +85,7 @@ function BriefBody({ brief }: { brief: Brief }) {
                 ) : null}
                 {competitor.why ? <Text style={styles.competitorWhy}>{competitor.why}</Text> : null}
               </View>
-              <Ionicons name={chevronForward} size={18} color={colors.goldDark} />
+              <Ionicons name={chevronForward()} size={18} color={colors.goldDark} />
             </Pressable>
           ))}
         </View>

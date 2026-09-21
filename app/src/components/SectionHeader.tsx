@@ -22,7 +22,7 @@ export function SectionHeader({ title, subtitle, cta, onPress }: Props) {
       {cta && onPress ? (
         <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
           <Text style={styles.ctaText}>{cta}</Text>
-          <Ionicons name={chevronForward} size={14} color={colors.gold} />
+          <Ionicons name={chevronForward()} size={14} color={colors.gold} />
         </Pressable>
       ) : null}
     </View>

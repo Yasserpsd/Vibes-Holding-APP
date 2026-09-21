@@ -14,16 +14,13 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
-import { WEEKDAYS, formatArabicDate } from '@/lib/format';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
+import { formatArabicDate, weekdayName, weekdayOf } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-const STATUS: Record<VisitStatus, { label: string; color: string }> = {
-  pending: { label: 'بانتظار التأكيد', color: colors.warning },
-  confirmed: { label: 'مؤكد', color: colors.success },
-  rejected: { label: 'مرفوض', color: colors.danger },
-  cancelled: { label: 'ملغي', color: colors.textMuted },
-};
+const STATUS_COLOR: Record<VisitStatus, string> = { pending: colors.warning, confirmed: colors.success, rejected: colors.danger, cancelled: colors.textMuted };
 
 /** HQ page: address, tour, rules, and (for paid members) booking plus the member's visits. */
 export default function HqScreen() {
@@ -34,7 +31,7 @@ export default function HqScreen() {
   const visits = useMyVisits(status === 'signedIn');
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  useAdvisorScreen({ type: 'screen', id: 'hq', title: data?.content.title ?? 'مقر النادي' });
+  useAdvisorScreen({ type: 'screen', id: 'hq', title: data?.content.title ?? t('nav.hq') });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -51,7 +48,7 @@ export default function HqScreen() {
   }
 
   const { content } = data;
-  const days = content.hours.days.map((day) => WEEKDAYS[day]).filter(Boolean).join('، ');
+  const days = content.hours.days.map(weekdayName).filter(Boolean).join(t('common.listSeparator'));
   const cancel = async (visit: Visit) => {
     setActionError(null);
     try {
@@ -71,11 +68,11 @@ export default function HqScreen() {
         </View>
         <View style={styles.row}>
           <Ionicons name="time-outline" size={22} color={colors.gold} />
-          <Text style={styles.rowText}>{`${days} · من ${content.hours.open} إلى ${content.hours.close}`}</Text>
+          <Text style={styles.rowText}>{t('hq.hours', { days, open: content.hours.open, close: content.hours.close })}</Text>
         </View>
         <View style={styles.actions}>
-          <AppButton label="افتح الخريطة" variant="outline" icon="map-outline" onPress={() => void openLink(content.mapUrl)} style={styles.action} />
-          <AppButton label="جولة في المقر" variant="outline" icon="play-circle-outline" onPress={() => void openLink(`https://www.youtube.com/watch?v=${content.tourVideoId}`)} style={styles.action} />
+          <AppButton label={t('hq.openMap')} variant="outline" icon="map-outline" onPress={() => void openLink(content.mapUrl)} style={styles.action} />
+          <AppButton label={t('hq.tour')} variant="outline" icon="play-circle-outline" onPress={() => void openLink(`https://www.youtube.com/watch?v=${content.tourVideoId}`)} style={styles.action} />
         </View>
       </View>
 
@@ -89,9 +86,9 @@ export default function HqScreen() {
         </View>
       ) : null}
 
-      <SectionHeader title="حجز الزيارة" />
+      <SectionHeader title={t('hq.bookingTitle')} />
       {data.access === 'member' ? (
-        <AppButton label="احجز موعد زيارتك" icon="calendar-outline" onPress={() => router.push('/hq/book')} />
+        <AppButton label={t('hq.book')} icon="calendar-outline" onPress={() => router.push('/hq/book')} />
       ) : (
         <LockedNotice text={data.lockedText ?? content.memberOnlyText} guest={data.access === 'guest'} />
       )}
@@ -104,7 +101,7 @@ export default function HqScreen() {
 
       {status === 'signedIn' ? (
         <>
-          <SectionHeader title="زياراتي" />
+          <SectionHeader title={t('hq.myVisits')} />
           {actionError ? <Notice tone="warning" text={actionError} /> : null}
           {visits.data ? (
             visits.data.visits.length ? (
@@ -112,7 +109,7 @@ export default function HqScreen() {
                 <VisitRow key={visit.id} visit={visit} onPass={() => router.push({ pathname: '/hq/pass/[id]', params: { id: visit.id } })} onCancel={() => void cancel(visit)} />
               ))
             ) : (
-              <Text style={styles.empty}>لا توجد زيارات محجوزة بعد.</Text>
+              <Text style={styles.empty}>{t('hq.noVisits')}</Text>
             )
           ) : (
             <StateView loading={visits.isLoading} error={visits.error} onRetry={() => void visits.refetch()} />
@@ -120,30 +117,29 @@ export default function HqScreen() {
         </>
       ) : null}
 
-      {me?.isAdmin ? <AppButton label="طلبات الزيارة (إدارة النادي)" variant="outline" icon="shield-checkmark-outline" onPress={() => router.push('/hq/admin')} /> : null}
+      {me?.isAdmin ? <AppButton label={t('hq.adminRequests')} variant="outline" icon="shield-checkmark-outline" onPress={() => router.push('/hq/admin')} /> : null}
     </Screen>
   );
 }
 
 function VisitRow({ visit, onPass, onCancel }: { visit: Visit; onPass: () => void; onCancel: () => void }) {
-  const badge = STATUS[visit.status];
-  const weekday = WEEKDAYS[new Date(`${visit.date}T00:00:00Z`).getUTCDay()] ?? '';
+  const weekday = weekdayOf(visit.date);
   return (
     <View style={styles.visit}>
       <View style={styles.visitHeader}>
         <Text style={styles.visitDate}>{`${weekday} ${formatArabicDate(visit.date)}`}</Text>
-        <View style={[styles.badge, { backgroundColor: badge.color }]}>
-          <Text style={styles.badgeText}>{badge.label}</Text>
+        <View style={[styles.badge, { backgroundColor: STATUS_COLOR[visit.status] }]}>
+          <Text style={styles.badgeText}>{t(`hq.status.${visit.status}`)}</Text>
         </View>
       </View>
-      <Text style={styles.visitMeta}>{`من ${visit.time} إلى ${visit.endTime} · ${visit.purpose}`}</Text>
+      <Text style={styles.visitMeta}>{t('hq.visitMeta', { from: visit.time, to: visit.endTime, purpose: visit.purpose })}</Text>
       {visit.note ? <Text style={styles.visitNote}>{visit.note}</Text> : null}
-      {visit.adminNote ? <Text style={styles.visitNote}>{`ملاحظة الإدارة: ${visit.adminNote}`}</Text> : null}
+      {visit.adminNote ? <Text style={styles.visitNote}>{t('hq.adminNote', { note: visit.adminNote })}</Text> : null}
       <View style={styles.actions}>
-        {visit.hasPass ? <AppButton label="باركود الدخول" icon="qr-code-outline" onPress={onPass} style={styles.action} /> : null}
+        {visit.hasPass ? <AppButton label={t('hq.pass')} icon="qr-code-outline" onPress={onPass} style={styles.action} /> : null}
         {visit.cancellable ? (
           <Pressable onPress={onCancel} accessibilityRole="button" style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}>
-            <Text style={styles.cancelText}>إلغاء الحجز</Text>
+            <Text style={styles.cancelText}>{t('hq.cancelBooking')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -161,20 +157,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  rowText: { ...typography.body, color: colors.textPrimary, textAlign: 'right', flex: 1 },
+  rowText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   action: { flexGrow: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
   chipText: { ...typography.caption, color: colors.goldLight },
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  bulletText: { ...typography.caption, color: colors.textSecondary, textAlign: 'right', flex: 1 },
-  empty: { ...typography.body, color: colors.textMuted, textAlign: 'right' },
+  bulletText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, flex: 1 },
+  empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   visit: { gap: spacing.xs, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   visitHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  visitDate: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: 'right', flex: 1 },
-  visitMeta: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  visitNote: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  visitDate: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, flex: 1 },
+  visitMeta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  visitNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill },
   badgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.black },
   cancel: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, flexShrink: 0 },

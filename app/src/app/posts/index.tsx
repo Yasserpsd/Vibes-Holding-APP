@@ -8,13 +8,14 @@ import { AppButton } from '@/components/AppButton';
 import { PostCard } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { colors, typography } from '@/theme/tokens';
 
 /** Every «رسائل الإدارة» post, pinned first, then newest; older pages load on demand. */
 export default function PostsScreen() {
   const query = usePosts();
   const [refreshing, setRefreshing] = useState(false);
-  useAdvisorScreen({ type: 'screen', id: 'posts', title: 'رسائل الإدارة' });
+  useAdvisorScreen({ type: 'screen', id: 'posts', title: t('nav.posts') });
   const posts = query.data?.pages.flatMap((page) => page.posts) ?? [];
 
   const onRefresh = async () => {
@@ -26,7 +27,7 @@ export default function PostsScreen() {
   if (!query.data) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'رسائل الإدارة' }} />
+        <Stack.Screen options={{ title: t('nav.posts') }} />
         <StateView loading={query.isPending} error={query.error} onRetry={() => void query.refetch()} />
       </Screen>
     );
@@ -34,14 +35,14 @@ export default function PostsScreen() {
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
-      <Stack.Screen options={{ title: 'رسائل الإدارة' }} />
-      {posts.length === 0 ? <Text style={styles.empty}>لا توجد رسائل من الإدارة حتى الآن.</Text> : null}
+      <Stack.Screen options={{ title: t('nav.posts') }} />
+      {posts.length === 0 ? <Text style={styles.empty}>{t('posts.empty')}</Text> : null}
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}
       {query.hasNextPage ? (
         <AppButton
-          label={query.isFetchingNextPage ? 'جارٍ التحميل…' : 'تحميل المزيد'}
+          label={query.isFetchingNextPage ? t('common.loadingMore') : t('common.loadMore')}
           variant="outline"
           icon="chevron-down"
           onPress={() => void query.fetchNextPage()}

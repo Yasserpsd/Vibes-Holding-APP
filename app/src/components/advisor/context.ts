@@ -1,4 +1,5 @@
 import type { AdvisorContext, PortalKey, ScreenKey } from '@/api/advisor';
+import { t } from '@/i18n';
 import type { IoniconName } from '@/lib/icons';
 
 /** What the member was looking at when he opened the advisor; sent with each message until he removes the pill. */
@@ -73,27 +74,27 @@ export function parseContextParams(params: ContextParams): { key: string; contex
     case 'project': {
       const number = Number(id);
       if (!Number.isInteger(number) || number <= 0) return null;
-      return { key, context: { type: 'project', id: number, title: title || `مشروع ${number}` }, prompt };
+      return { key, context: { type: 'project', id: number, title: title || t('advisor.ctx.project', { number }) }, prompt };
     }
     case 'news':
       if (!/^[a-f0-9]{16}$/.test(id)) return null;
-      return { key, context: { type: 'news', id, title: title || 'خبر' }, prompt };
+      return { key, context: { type: 'news', id, title: title || t('advisor.ctx.news') }, prompt };
     case 'portal':
       if (id !== 'neutral' && id !== 'entrepreneur' && id !== 'investor') return null;
-      return { key, context: { type: 'portal', id, title: title || 'البوابة' }, prompt };
+      return { key, context: { type: 'portal', id, title: title || t('advisor.ctx.portal') }, prompt };
     case 'service':
       if (!/^[a-z0-9-]{1,40}$/.test(id)) return null;
-      return { key, context: { type: 'service', id, title: title || 'الخدمة' }, prompt };
+      return { key, context: { type: 'service', id, title: title || t('advisor.ctx.service') }, prompt };
     case 'post':
       if (!UUID.test(id)) return null;
-      return { key, context: { type: 'post', id, title: title || 'رسالة من الإدارة', event: params.ctxEvent === '1' }, prompt };
+      return { key, context: { type: 'post', id, title: title || t('advisor.ctx.post'), event: params.ctxEvent === '1' }, prompt };
     case 'video':
       if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return null;
-      return { key, context: { type: 'video', id, title: title || 'فيديو' }, prompt };
+      return { key, context: { type: 'video', id, title: title || t('advisor.ctx.video') }, prompt };
     case 'screen': {
       const screen = SCREEN_KEYS.find((candidate) => candidate === id);
       if (!screen) return null;
-      return { key, context: { type: 'screen', id: screen, title: title || 'التطبيق' }, prompt };
+      return { key, context: { type: 'screen', id: screen, title: title || t('advisor.ctx.screen') }, prompt };
     }
     default:
       return null;

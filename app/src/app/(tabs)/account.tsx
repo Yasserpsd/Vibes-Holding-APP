@@ -159,7 +159,7 @@ function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <Ionicons name={icon} size={22} color={color} />
       <Text style={[styles.rowLabel, danger && { color: colors.danger }]}>{label}</Text>
-      <Ionicons name={chevronForward} size={18} color={colors.textMuted} />
+      <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
     </Pressable>
   );
 }

@@ -9,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { spacing } from '@/theme/tokens';
 
 /** Every service, grouped; member-only ones are dimmed until the annual membership is active. */
@@ -16,7 +17,7 @@ export default function ServicesScreen() {
   const router = useRouter();
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useServices();
-  useAdvisorScreen({ type: 'screen', id: 'services', title: data?.title ?? 'خدمات النادي' });
+  useAdvisorScreen({ type: 'screen', id: 'services', title: data?.title ?? t('nav.services') });
 
   if (!data) {
     return (

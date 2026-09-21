@@ -22,7 +22,7 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
         {...inputProps}
         style={[
           styles.input,
-          latin ? styles.latin : styles.natural,
+          latin ? styles.latin : { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
           multiline && styles.multiline,
           error ? styles.inputError : null,
           style,
@@ -47,7 +47,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
   },
-  natural: { textAlign: inputStart, writingDirection: isRTL ? 'rtl' : 'ltr' },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   inputError: { borderColor: colors.danger },

@@ -24,7 +24,7 @@ export default function NewsItemScreen() {
   // Keeps the note at the end clear of the floating «اسأل المستشار» button.
   const clearance = useAskAdvisorClearance();
   // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
-  const latin = item?.lang === 'en' && isRTL;
+  const latin = item?.lang === 'en' && isRTL();
 
   return (
     <View style={styles.screen}>

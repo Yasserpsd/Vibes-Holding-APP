@@ -18,7 +18,7 @@ type Props = {
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
 export function NewsCard({ item, onPress, compact = false }: Props) {
   // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
-  const latin = item.lang === 'en' && isRTL;
+  const latin = item.lang === 'en' && isRTL();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]}>
       <View style={styles.meta}>

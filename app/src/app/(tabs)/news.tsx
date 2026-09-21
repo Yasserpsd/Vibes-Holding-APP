@@ -76,7 +76,7 @@ export default function NewsScreen() {
         <Pressable onPress={() => router.push('/news/interests')} accessibilityRole="button" style={({ pressed }) => [styles.banner, pressed && styles.pressed]}>
           <Ionicons name="sparkles-outline" size={20} color={colors.gold} />
           <Text style={styles.bannerText}>{t('news.pickInterests')}</Text>
-          <Ionicons name={chevronForward} size={18} color={colors.textMuted} />
+          <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
         </Pressable>
       ) : null}
 

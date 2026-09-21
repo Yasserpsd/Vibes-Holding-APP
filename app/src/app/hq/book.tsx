@@ -13,7 +13,9 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
-import { WEEKDAYS, formatArabicDate } from '@/lib/format';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
+import { formatArabicDate, weekdayName } from '@/lib/format';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /** Book an HQ visit: day, time slot, purpose and a note. The club confirms; the pass follows. */
@@ -41,7 +43,7 @@ export default function BookVisitScreen() {
 
   if (data.access !== 'member') {
     return (
-      <Screen title="حجز زيارة">
+      <Screen title={t('hqBook.title')}>
         <LockedNotice text={data.lockedText ?? data.content.memberOnlyText} guest={status !== 'signedIn'} />
       </Screen>
     );
@@ -49,7 +51,7 @@ export default function BookVisitScreen() {
 
   const submit = async () => {
     if (!selectedDate || !time || !purpose) {
-      setSubmitError('اختر اليوم والوقت والغرض من الزيارة');
+      setSubmitError(t('hqBook.incomplete'));
       return;
     }
     setBusy(true);
@@ -66,13 +68,13 @@ export default function BookVisitScreen() {
   };
 
   return (
-    <Screen title="حجز زيارة" subtitle="اختر الموعد الذي يناسبك، وسيصلك باركود الدخول بعد تأكيد الإدارة.">
-      <Text style={styles.label}>اليوم</Text>
+    <Screen title={t('hqBook.title')} subtitle={t('hqBook.subtitle')}>
+      <Text style={styles.label}>{t('hqBook.day')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
         {data.days.map((day) => (
           <Chip
             key={day.date}
-            label={`${WEEKDAYS[day.weekday] ?? ''} ${formatArabicDate(day.date)}`}
+            label={`${weekdayName(day.weekday)} ${formatArabicDate(day.date)}`}
             selected={day.date === selectedDate}
             onPress={() => {
               setDate(day.date);
@@ -82,13 +84,13 @@ export default function BookVisitScreen() {
         ))}
       </ScrollView>
 
-      <Text style={styles.label}>الوقت</Text>
+      <Text style={styles.label}>{t('hqBook.time')}</Text>
       {slots.data ? (
         <View style={styles.chips}>
           {slots.data.slots.map((slot) => (
             <Chip
               key={slot.time}
-              label={slot.available ? `من ${slot.time} إلى ${slot.endTime}` : `${slot.time} (مكتمل)`}
+              label={slot.available ? t('hqBook.slot', { from: slot.time, to: slot.endTime }) : t('hqBook.slotFull', { time: slot.time })}
               selected={slot.time === time}
               onPress={() => (slot.available ? setTime(slot.time) : null)}
             />
@@ -98,25 +100,25 @@ export default function BookVisitScreen() {
         <StateView loading={slots.isLoading} error={slots.error} onRetry={() => void slots.refetch()} />
       )}
 
-      <Text style={styles.label}>الغرض من الزيارة</Text>
+      <Text style={styles.label}>{t('hqBook.purpose')}</Text>
       <View style={styles.chips}>
         {data.content.purposes.map((option) => (
           <Chip key={option} label={option} selected={option === purpose} onPress={() => setPurpose(option)} />
         ))}
       </View>
 
-      <FormField label="ملاحظة للإدارة (اختياري)" value={note} onChangeText={setNote} multiline placeholder="مثال: اجتماع مع فريق بنك المشاريع" />
+      <FormField label={t('hqBook.note')} value={note} onChangeText={setNote} multiline placeholder={t('hqBook.notePlaceholder')} />
 
       {submitError ? <Notice tone="warning" text={submitError} /> : null}
-      <AppButton label={busy ? 'جارٍ الإرسال…' : 'أرسل طلب الحجز'} icon="calendar-outline" onPress={() => (busy ? null : void submit())} />
+      <AppButton label={busy ? t('hqBook.sending') : t('hqBook.submit')} icon="calendar-outline" onPress={() => (busy ? null : void submit())} />
       <Text style={styles.hint}>{data.content.rules[0] ?? ''}</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { ...typography.subtitle, color: colors.gold, textAlign: 'right' },
+  label: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   strip: { gap: spacing.xs, paddingVertical: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 });

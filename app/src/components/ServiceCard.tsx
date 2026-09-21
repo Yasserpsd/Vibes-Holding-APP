@@ -39,7 +39,7 @@ export function ServiceCard({ service, onPress }: Props) {
           </View>
         ) : null}
       </View>
-      <Ionicons name={chevronForward} size={18} color={locked ? colors.textMuted : colors.gold} />
+      <Ionicons name={chevronForward()} size={18} color={locked ? colors.textMuted : colors.gold} />
     </Pressable>
   );
 }

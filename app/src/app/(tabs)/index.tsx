@@ -173,7 +173,7 @@ function MembershipBlock({ block, signedIn, membership, statusTexts, onPress }: 
       </View>
       {signedIn ? <MembershipStatusCard membership={membership} texts={statusTexts} title={block.title} /> : null}
       <Text style={styles.membershipText}>{active ? block.activeText : block.subtitle}</Text>
-      <AppButton label={block.cta} variant={active ? 'outline' : 'primary'} icon={chevronForward} onPress={onPress} />
+      <AppButton label={block.cta} variant={active ? 'outline' : 'primary'} icon={chevronForward()} onPress={onPress} />
     </View>
   );
 }

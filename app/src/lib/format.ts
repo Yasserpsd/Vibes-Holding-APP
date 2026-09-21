@@ -6,7 +6,7 @@ export function formatNumber(value: number): string {
 }
 
 export function formatMillionsSar(millions: number): string {
-  return `${formatNumber(millions)} مليون ريال`;
+  return t('common.millionSar', { amount: formatNumber(millions) });
 }
 
 const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -57,8 +57,18 @@ function englishRelativeTime(minutes: number, then: number): string {
   return formatArabicDate(new Date(then).toISOString());
 }
 
-/** Weekday names, Sunday first (JavaScript's getDay order). */
-export const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const WEEKDAY_KEYS = ['time.sunday', 'time.monday', 'time.tuesday', 'time.wednesday', 'time.thursday', 'time.friday', 'time.saturday'] as const;
+
+/** The weekday name of a JavaScript day index (Sunday = 0), in the app's language; '' for anything else. */
+export function weekdayName(day: number): string {
+  const key = WEEKDAY_KEYS[day];
+  return key ? t(key) : '';
+}
+
+/** The weekday of a "2026-09-22" date. */
+export function weekdayOf(isoDate: string): string {
+  return weekdayName(new Date(`${isoDate}T00:00:00Z`).getUTCDay());
+}
 
 /** "12 سبتمبر 2026 · 14:05" in the device's local time, for timestamps such as a booking time. */
 export function formatArabicDateTime(iso: string): string {

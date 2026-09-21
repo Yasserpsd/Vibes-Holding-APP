@@ -189,7 +189,7 @@ function ContactRow({ icon, label, value, latin = false, onPress }: { icon: Ioni
           {latin ? `‎${value}` : value}
         </Text>
       </View>
-      <Ionicons name={chevronForward} size={16} color={colors.goldDark} />
+      <Ionicons name={chevronForward()} size={16} color={colors.goldDark} />
     </Pressable>
   );
 }
@@ -209,7 +209,7 @@ function ConfirmSheet({ visible, busy, projectTitle, balance, onConfirm, onClose
         {balance ? (
           <View style={styles.sheetFigures}>
             <Figure label={t('unlock.now')} value={formatNumber(balance.left)} />
-            <Ionicons name={arrowForward} size={18} color={colors.textMuted} />
+            <Ionicons name={arrowForward()} size={18} color={colors.textMuted} />
             <Figure label={t('unlock.after')} value={formatNumber(Math.max(0, balance.left - 1))} highlight />
           </View>
         ) : null}

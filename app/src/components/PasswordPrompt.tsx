@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, Vie
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -73,8 +74,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
   },
-  title: { ...typography.subtitle, color: colors.textPrimary, textAlign: 'right' },
-  message: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
+  message: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   actions: { gap: spacing.sm },
   danger: { backgroundColor: colors.danger, borderColor: colors.danger },
 });

@@ -5,12 +5,22 @@ import { loadSetting, saveSetting } from '@/lib/deviceStore';
 
 import { getLang, saveLang, type Lang } from './index';
 
-// The layout direction is native and fixed for a launch: Arabic runs right-to-left, English
-// left-to-right, and a change of language takes effect after a restart. Styles read these
-// constants instead of writing 'right' or a chevron by hand, so one screen serves both directions.
-export const isRTL = I18nManager.isRTL;
-/** The arrow of a «from, to» pair follows the reading direction. */
-export const arrowForward: 'arrow-back' | 'arrow-forward' = isRTL ? 'arrow-back' : 'arrow-forward';
+/*
+ * The layout direction is native and fixed for a launch: Arabic runs right-to-left, English
+ * left-to-right. `syncDirection()` settles it behind the splash screen, before any screen mounts,
+ * so the direction of every launch is the one of the language loaded by `initI18n()`.
+ *
+ * `I18nManager.isRTL` is NOT that direction: it is a constant captured when the JavaScript bundle
+ * starts, and on a binary built with expo-localization `forcesRTL` it reads `true` at every cold
+ * start, English or not (seen on the emulator, 2026-09-22: left-to-right screen, `isRTL` true, every
+ * chevron pointing the Arabic way). Everything below is read at render time from the language.
+ */
+
+/** Whether this launch runs right-to-left. Call it while rendering, never at module scope. */
+export function isRTL(): boolean {
+  return getLang() === 'ar';
+}
+
 /**
  * Where a line of text starts. A Text reads `left` and `right` relative to the layout direction:
  * `left` is the start edge (the right side in Arabic), `right` is the end edge. Seen on the emulator
@@ -19,10 +29,21 @@ export const arrowForward: 'arrow-back' | 'arrow-forward' = isRTL ? 'arrow-back'
 export const textStart = 'left' as const;
 /** The far edge of a line of text (times, amounts): see `textStart`. */
 export const textEnd = 'right' as const;
+
 /** A TextInput reads `left` and `right` as the physical sides, so its start follows the language. */
-export const inputStart: 'left' | 'right' = isRTL ? 'right' : 'left';
+export function inputStart(): 'left' | 'right' {
+  return isRTL() ? 'right' : 'left';
+}
+
 /** The «open this row» chevron points away from the text. */
-export const chevronForward: 'chevron-back' | 'chevron-forward' = isRTL ? 'chevron-back' : 'chevron-forward';
+export function chevronForward(): 'chevron-back' | 'chevron-forward' {
+  return isRTL() ? 'chevron-back' : 'chevron-forward';
+}
+
+/** The arrow of a «from, to» pair follows the reading direction. */
+export function arrowForward(): 'arrow-back' | 'arrow-forward' {
+  return isRTL() ? 'arrow-back' : 'arrow-forward';
+}
 
 const ATTEMPT_KEY = 'investorsclub.lang.restart';
 
@@ -41,8 +62,9 @@ async function restart(): Promise<void> {
 
 /**
  * Makes the native direction follow the language loaded by `initI18n()`. Runs behind the splash
- * screen. A binary that forces its own direction (runtime 1.0.0) would ask for a restart at every
- * start, so one language gets one restart only.
+ * screen. A binary that forces its own direction (runtime 1.0.0) reports the wrong constant at every
+ * start, so one language gets one restart only; the views mounted after this call take the direction
+ * set here either way.
  */
 export async function syncDirection(): Promise<void> {
   const lang = getLang();

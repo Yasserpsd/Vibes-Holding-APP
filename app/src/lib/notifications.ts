@@ -2,6 +2,8 @@ import { requireOptionalNativeModule } from 'expo';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { t } from '@/i18n';
+
 type NotificationsModule = typeof import('expo-notifications');
 
 export type PushDevice = { token: string; platform: 'ios' | 'android' };
@@ -51,7 +53,7 @@ export async function obtainPushToken(): Promise<PushDevice | null> {
   try {
     if (Platform.OS === 'android') {
       await notifications.setNotificationChannelAsync('default', {
-        name: 'إشعارات النادي',
+        name: t('notifications.channel'),
         importance: notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
       });

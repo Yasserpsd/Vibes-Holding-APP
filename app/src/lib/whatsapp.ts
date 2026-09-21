@@ -1,5 +1,7 @@
 import { Linking } from 'react-native';
 
+import { t } from '@/i18n';
+
 /** Hands a request over to WhatsApp: the wa.me link opens the app when installed, the web client otherwise. */
 export async function openWhatsApp(phone: string, text: string): Promise<boolean> {
   const digits = phone.replace(/\D+/g, '');
@@ -18,7 +20,7 @@ export function composeRequest(message: string, lines: { label: string; value: s
   for (const line of lines) {
     if (line.value.trim()) parts.push(`${line.label}: ${line.value.trim()}`);
   }
-  if (sender) parts.push(`الاسم: ${sender.name}${sender.phone ? ` · الجوال: ${sender.phone}` : ''}`);
-  parts.push('(طلب من تطبيق نادي المستثمرين)');
+  if (sender) parts.push(`${t('request.senderName', { name: sender.name })}${sender.phone ? ` · ${t('request.senderPhone', { phone: sender.phone })}` : ''}`);
+  parts.push(t('request.fromApp'));
   return parts.join('\n');
 }

@@ -37,8 +37,8 @@ export default function MembershipScreen() {
       router.push(item.link.path as Href);
       return;
     }
-    const sender = me ? `\n${t('membership.senderName', { name: me.name })}${me.phone ? ` · ${t('membership.senderPhone', { phone: me.phone })}` : ''}` : '';
-    void openWhatsApp(item.link.phone, `${item.link.message}${sender}\n${t('membership.fromApp')}`);
+    const sender = me ? `\n${t('request.senderName', { name: me.name })}${me.phone ? ` · ${t('request.senderPhone', { phone: me.phone })}` : ''}` : '';
+    void openWhatsApp(item.link.phone, `${item.link.message}${sender}\n${t('request.fromApp')}`);
   };
 
   return (
@@ -84,7 +84,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
         >
           <Ionicons name={group.comingSoon ? 'time-outline' : 'checkmark-circle'} size={18} color={group.comingSoon ? colors.textMuted : colors.gold} />
           <Text style={[styles.itemText, group.comingSoon && styles.itemSoon]}>{item.text}</Text>
-          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : chevronForward} size={16} color={colors.goldLight} /> : null}
+          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : chevronForward()} size={16} color={colors.goldLight} /> : null}
         </Pressable>
       ))}
     </View>

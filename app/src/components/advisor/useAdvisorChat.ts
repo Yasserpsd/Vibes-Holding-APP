@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { advisorApi, type AdvisorContext, type AdvisorGate, type AdvisorMessage, type AdvisorProfile } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
+import { t } from '@/i18n';
 
 const WAITING_POLL_MS = 2000;
 const IDLE_POLL_MS = 15000;
 /** Messages shown before the hub confirms them get ids above any real hub id, so they stay last. */
 const OPTIMISTIC_BASE = 1e15;
-const TIMEOUT_TEXT = 'تأخر الرد هذه المرة. أعد إرسال سؤالك بعد قليل.';
 
 export type ChatStatus = 'loading' | 'ready' | 'error';
 
@@ -94,7 +94,7 @@ export function useAdvisorChat() {
         messages: mergeMessages(prev.messages, result.messages),
         waiting: result.waiting,
         human: result.human,
-        sendError: result.timeout && !result.messages.length ? TIMEOUT_TEXT : prev.sendError,
+        sendError: result.timeout && !result.messages.length ? t('advisor.timeout') : prev.sendError,
       }));
       if (result.me) setMe(result.me);
     } catch {
