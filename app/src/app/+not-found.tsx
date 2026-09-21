@@ -1,16 +1,17 @@
 import { Link, Stack } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { t } from '@/i18n';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: 'غير موجود' }} />
+      <Stack.Screen options={{ title: t('notFound.title') }} />
       <View style={styles.container}>
-        <Text style={styles.title}>هذه الصفحة غير موجودة</Text>
+        <Text style={styles.title}>{t('notFound.message')}</Text>
         <Link href="/" style={styles.link}>
-          العودة إلى الرئيسية
+          {t('notFound.home')}
         </Link>
       </View>
     </>

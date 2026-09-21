@@ -8,6 +8,8 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { colors, typography } from '@/theme/tokens';
 
 export default function ResetPasswordScreen() {
@@ -23,7 +25,7 @@ export default function ResetPasswordScreen() {
   const request = async () => {
     if (busy) return;
     if (login.trim().length < 3) {
-      setError('اكتب البريد الإلكتروني أو رقم الجوال المسجّل');
+      setError(t('auth.reset.loginRequired'));
       return;
     }
     setBusy(true);
@@ -41,11 +43,11 @@ export default function ResetPasswordScreen() {
   const confirm = async () => {
     if (busy) return;
     if (!/^\d{6}$/.test(code)) {
-      setError('اكتب الرمز المكوّن من 6 أرقام');
+      setError(t('auth.verify.codeRequired'));
       return;
     }
     if (password.length < 6) {
-      setError('كلمة المرور الجديدة 6 أحرف على الأقل');
+      setError(t('auth.reset.passwordShort'));
       return;
     }
     setBusy(true);
@@ -62,21 +64,21 @@ export default function ResetPasswordScreen() {
 
   if (step === 'done') {
     return (
-      <Screen title="استعادة كلمة المرور">
-        <Notice tone="success" text="تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة." />
-        <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+      <Screen title={t('auth.reset.title')}>
+        <Notice tone="success" text={t('auth.reset.done')} />
+        <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
       </Screen>
     );
   }
 
   return (
     <Screen
-      title="استعادة كلمة المرور"
-      subtitle={step === 'request' ? 'يصلك رمز من 6 أرقام على بريدك الإلكتروني المسجّل.' : `أرسلنا الرمز إلى بريد الحساب ${login.trim()}. الرمز صالح 20 دقيقة.`}
+      title={t('auth.reset.title')}
+      subtitle={step === 'request' ? t('auth.reset.subtitleRequest') : t('auth.reset.subtitleConfirm', { login: login.trim() })}
     >
-      {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={`وضع الاختبار: الرمز هو ${config.testCode}`} /> : null}
+      {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
       <FormField
-        label="البريد الإلكتروني أو رقم الجوال"
+        label={t('auth.login.field')}
         latin
         autoCapitalize="none"
         autoCorrect={false}
@@ -87,20 +89,20 @@ export default function ResetPasswordScreen() {
       />
       {step === 'confirm' ? (
         <>
-          <FormField label="الرمز" latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />
-          <FormField label="كلمة المرور الجديدة" latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint="6 أحرف على الأقل" />
+          <FormField label={t('auth.verify.code')} latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />
+          <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint={t('auth.register.passwordHint')} />
         </>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {step === 'request' ? (
-        <AppButton label={busy ? 'جارٍ الإرسال…' : 'إرسال الرمز'} icon="mail-outline" onPress={() => void request()} />
+        <AppButton label={busy ? t('auth.reset.sending') : t('auth.reset.send')} icon="mail-outline" onPress={() => void request()} />
       ) : (
-        <AppButton label={busy ? 'جارٍ الحفظ…' : 'حفظ كلمة المرور'} icon="key-outline" onPress={() => void confirm()} />
+        <AppButton label={busy ? t('auth.reset.saving') : t('auth.reset.save')} icon="key-outline" onPress={() => void confirm()} />
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
 });

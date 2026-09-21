@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { authApi, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
@@ -15,21 +15,12 @@ import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { Screen } from '@/components/Screen';
 import { env } from '@/config/env';
-import { getLang, languageChoiceOffered, t } from '@/i18n';
-import { chevronForward, switchLanguage, textStart } from '@/i18n/direction';
+import { languageChoiceOffered, t, tOptional } from '@/i18n';
+import { chooseLanguage } from '@/i18n/chooseLanguage';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-
-/** The language names stay in their own language, so a member who cannot read the current one still finds his. */
-function chooseLanguage(): void {
-  const mark = (name: string, current: boolean) => (current ? `${name} (${t('lang.current')})` : name);
-  Alert.alert(t('lang.title'), t('lang.message'), [
-    { text: mark(t('lang.arabic'), getLang() === 'ar'), onPress: () => void switchLanguage('ar') },
-    { text: mark(t('lang.english'), getLang() === 'en'), onPress: () => void switchLanguage('en') },
-    { text: t('lang.cancel'), style: 'cancel' },
-  ]);
-}
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -151,7 +142,7 @@ function ProfileHeader({ me }: { me: Me }) {
             </View>
           ) : null}
         </View>
-        {me.personaLabel ? <Text style={styles.meta}>{me.personaLabel}</Text> : null}
+        {me.personaLabel ? <Text style={styles.meta}>{tOptional(`persona.${me.persona}`) ?? me.personaLabel}</Text> : null}
         {me.jobTitle ? <Text style={styles.meta}>{me.jobTitle}</Text> : null}
         <Text style={styles.contact}>{me.email}</Text>
         <Text style={styles.contact}>{me.phone}</Text>

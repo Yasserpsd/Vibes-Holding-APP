@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
 import { AuthProvider } from '@/auth/AuthProvider';
+import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { SyncPoller } from '@/components/SyncPoller';
@@ -73,45 +74,50 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PushRegistrar />
-        <SyncPoller />
-        <StatusBar style="light" />
-        <AskAdvisorProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.black },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: t('nav.project') }} />
-            <Stack.Screen name="golden" options={{ ...detailHeader, title: t('nav.golden') }} />
-            <Stack.Screen name="membership" options={{ ...detailHeader, title: t('nav.membership') }} />
-            <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: t('nav.profileEdit') }} />
-            <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: t('nav.newsItem') }} />
-            <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: t('nav.decisions') }} />
-            <Stack.Screen name="news/interests" options={{ ...detailHeader, title: t('nav.interests') }} />
-            <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: t('nav.entrepreneurs') }} />
-            <Stack.Screen name="services/index" options={{ ...detailHeader, title: t('nav.services') }} />
-            <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: t('nav.service') }} />
-            <Stack.Screen name="videos/index" options={{ ...detailHeader, title: t('nav.videos') }} />
-            <Stack.Screen name="posts/index" options={{ ...detailHeader, title: t('nav.posts') }} />
-            <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: t('nav.post') }} />
-            <Stack.Screen name="about" options={{ ...detailHeader, title: t('nav.about') }} />
-            <Stack.Screen name="hq/index" options={{ ...detailHeader, title: t('nav.hq') }} />
-            <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />
-            <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: t('nav.hqPass') }} />
-            <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: t('nav.hqAdmin') }} />
-            <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
-            <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
-            <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
-            <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
-            <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
-            <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: t('nav.reset') }} />
-          </Stack>
-          {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
-          <AskAdvisorButton />
-        </AskAdvisorProvider>
+        <GuestGateProvider>
+          <PushRegistrar />
+          <SyncPoller />
+          <StatusBar style="light" />
+          <AskAdvisorProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.black },
+              }}
+            >
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+              <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: t('nav.project') }} />
+              <Stack.Screen name="golden" options={{ ...detailHeader, title: t('nav.golden') }} />
+              <Stack.Screen name="membership" options={{ ...detailHeader, title: t('nav.membership') }} />
+              <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: t('nav.profileEdit') }} />
+              <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: t('nav.newsItem') }} />
+              <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: t('nav.decisions') }} />
+              <Stack.Screen name="news/interests" options={{ ...detailHeader, title: t('nav.interests') }} />
+              <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: t('nav.entrepreneurs') }} />
+              <Stack.Screen name="services/index" options={{ ...detailHeader, title: t('nav.services') }} />
+              <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: t('nav.service') }} />
+              <Stack.Screen name="videos/index" options={{ ...detailHeader, title: t('nav.videos') }} />
+              <Stack.Screen name="posts/index" options={{ ...detailHeader, title: t('nav.posts') }} />
+              <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: t('nav.post') }} />
+              <Stack.Screen name="about" options={{ ...detailHeader, title: t('nav.about') }} />
+              <Stack.Screen name="hq/index" options={{ ...detailHeader, title: t('nav.hq') }} />
+              <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />
+              <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: t('nav.hqPass') }} />
+              <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: t('nav.hqAdmin') }} />
+              <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
+              <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
+              <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
+              <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
+              <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
+              <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: t('nav.reset') }} />
+            </Stack>
+            {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
+            <AskAdvisorButton />
+          </AskAdvisorProvider>
+          {/* The app opens for members: a visitor is sent to the gate, and again when his guest minute is over. */}
+          <GuestGate />
+        </GuestGateProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, typ
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
+import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -49,6 +50,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md },
   heading: { gap: spacing.xs, marginBottom: spacing.sm },
-  title: { ...typography.title, color: colors.gold, textAlign: 'right' },
-  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  title: { ...typography.title, color: colors.gold, textAlign: textStart },
+  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
 });

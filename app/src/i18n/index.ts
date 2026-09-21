@@ -100,6 +100,11 @@ export function tOptional(key: string, params?: Params): string | null {
   return key in BUNDLED.ar ? t(key as StringKey, params) : null;
 }
 
+/** A sentence the hub wrote (Arabic only): shown as it is in Arabic, replaced by the app's own text in English. */
+export function hubText(text: string | null | undefined, key: StringKey, params?: Params): string {
+  return lang === 'ar' && text ? text : t(key, params);
+}
+
 type SavedStrings = { version: string; strings: Record<string, string> };
 
 function readSaved(raw: string | null): SavedStrings | null {

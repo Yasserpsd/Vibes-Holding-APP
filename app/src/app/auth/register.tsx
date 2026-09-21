@@ -12,6 +12,8 @@ import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { t, tOptional } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { isEmail, isLocalPhone } from '@/lib/validation';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -46,12 +48,12 @@ export default function RegisterScreen() {
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
-    if (form.name.trim().length < 2) next.name = 'الاسم مطلوب';
-    if (!isLocalPhone(form.phone, country?.pattern)) next.phone = `اكتب الرقم بهذا الشكل: ${country?.example ?? '0558318777'}`;
-    if (!isEmail(form.email)) next.email = 'اكتب بريدًا إلكترونيًا صحيحًا';
-    if (form.password.length < 6) next.password = 'كلمة المرور 6 أحرف على الأقل';
-    if (!form.persona) next.persona = 'اختر فئتك في النادي';
-    if (form.bio.trim().length < 10) next.bio = 'اكتب نبذة مختصرة عنك (سطر على الأقل)';
+    if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
+    if (!isLocalPhone(form.phone, country?.pattern)) next.phone = t('auth.register.error.phone', { example: country?.example ?? '0558318777' });
+    if (!isEmail(form.email)) next.email = t('auth.register.error.email');
+    if (form.password.length < 6) next.password = t('auth.register.error.password');
+    if (!form.persona) next.persona = t('auth.register.error.persona');
+    if (form.bio.trim().length < 10) next.bio = t('auth.register.error.bio');
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -84,7 +86,7 @@ export default function RegisterScreen() {
 
   if (!config) {
     return (
-      <Screen title="إنشاء حساب">
+      <Screen title={t('auth.register.title')}>
         <StateView loading={isLoading} error={configError} onRetry={() => void refetch()} />
       </Screen>
     );
@@ -92,38 +94,38 @@ export default function RegisterScreen() {
 
   if (!config.registrationOpen) {
     return (
-      <Screen title="إنشاء حساب">
-        <Notice tone="warning" text="التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة." />
-        <AppButton label="تسجيل الدخول" variant="outline" icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+      <Screen title={t('auth.register.title')}>
+        <Notice tone="warning" text={t('auth.register.closed')} />
+        <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
       </Screen>
     );
   }
 
   return (
-    <Screen title="إنشاء حساب" subtitle="حساب واحد لكل مواقع المنظومة والتطبيق.">
-      <Notice text={config.phonePolicy} />
-      <FormField label="الاسم الكامل" value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
+    <Screen title={t('auth.register.title')} subtitle={t('auth.register.subtitle')}>
+      <Notice text={t('auth.register.phonePolicy')} />
+      <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
       <View style={styles.group}>
-        <Text style={styles.label}>الدولة</Text>
+        <Text style={styles.label}>{t('auth.register.country')}</Text>
         <View style={styles.chips}>
           {config.countries.map((item) => (
-            <Chip key={item.code} label={`${item.flag} ${item.name}`} selected={item.code === form.country} onPress={() => set('country')(item.code)} />
+            <Chip key={item.code} label={`${item.flag} ${tOptional(`country.${item.code}`) ?? item.name}`} selected={item.code === form.country} onPress={() => set('country')(item.code)} />
           ))}
         </View>
       </View>
       <FormField
-        label="رقم الجوال"
+        label={t('auth.register.phone')}
         latin
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         value={form.phone}
         onChangeText={set('phone')}
         placeholder={country?.example}
-        hint={`بدون مسافات وبدون رمز الدولة، مثال: ${country?.example ?? '0558318777'}`}
+        hint={t('auth.register.phoneHint', { example: country?.example ?? '0558318777' })}
         error={errors.phone}
       />
       <FormField
-        label="البريد الإلكتروني"
+        label={t('auth.register.email')}
         latin
         keyboardType="email-address"
         autoCapitalize="none"
@@ -131,22 +133,22 @@ export default function RegisterScreen() {
         textContentType="emailAddress"
         value={form.email}
         onChangeText={set('email')}
-        hint={config.emailPolicy}
+        hint={t('auth.register.emailPolicy')}
         error={errors.email}
       />
       <FormField
-        label="كلمة المرور"
+        label={t('common.password')}
         latin
         secureTextEntry
         autoCapitalize="none"
         textContentType="newPassword"
         value={form.password}
         onChangeText={set('password')}
-        hint="6 أحرف على الأقل"
+        hint={t('auth.register.passwordHint')}
         error={errors.password}
       />
       <View style={styles.group}>
-        <Text style={styles.label}>فئتك في النادي</Text>
+        <Text style={styles.label}>{t('auth.register.persona')}</Text>
         {config.personas.map((item) => {
           const selected = item.key === form.persona;
           return (
@@ -158,17 +160,17 @@ export default function RegisterScreen() {
               style={({ pressed }) => [styles.persona, selected && styles.personaSelected, pressed && styles.pressed]}
             >
               <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? colors.gold : colors.textMuted} />
-              <Text style={[styles.personaText, selected && styles.personaTextSelected]}>{item.label}</Text>
+              <Text style={[styles.personaText, selected && styles.personaTextSelected]}>{tOptional(`persona.${item.key}`) ?? item.label}</Text>
             </Pressable>
           );
         })}
         {errors.persona ? <Text style={styles.error}>{errors.persona}</Text> : null}
       </View>
-      <FormField label="نبذة مختصرة عنك" multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder="مجالك، خبرتك، أو ما تبحث عنه في النادي" />
-      <FormField label="المسمى الوظيفي (اختياري)" value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+      <FormField label={t('auth.register.bio')} multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder={t('auth.register.bioPlaceholder')} />
+      <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
       {topics.data && topics.data.topics.length > 0 ? (
         <View style={styles.group}>
-          <Text style={styles.label}>اهتماماتك في الأخبار (اختياري)</Text>
+          <Text style={styles.label}>{t('auth.register.interests')}</Text>
           <View style={styles.chips}>
             {topics.data.topics.map((topic) => (
               <Chip key={topic.key} label={topic.label} selected={form.interests.includes(topic.key)} onPress={() => toggleInterest(topic.key)} />
@@ -177,15 +179,15 @@ export default function RegisterScreen() {
         </View>
       ) : null}
       {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
-      <AppButton label={busy ? 'جارٍ إنشاء الحساب…' : 'إنشاء الحساب'} icon="person-add-outline" onPress={() => void submit()} />
-      <Text style={styles.footnote}>بعد إنشاء الحساب يصلك رمز تفعيل على بريدك الإلكتروني.</Text>
+      <AppButton label={busy ? t('auth.register.busy') : t('auth.register.submit')} icon="person-add-outline" onPress={() => void submit()} />
+      <Text style={styles.footnote}>{t('auth.register.footnote')}</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   group: { gap: spacing.sm },
-  label: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   persona: {
     flexDirection: 'row',
@@ -199,8 +201,8 @@ const styles = StyleSheet.create({
   },
   personaSelected: { borderColor: colors.gold, backgroundColor: colors.surfaceElevated },
   pressed: { opacity: 0.8 },
-  personaText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: 'right' },
+  personaText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
   personaTextSelected: { color: colors.textPrimary },
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 });

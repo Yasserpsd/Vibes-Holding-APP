@@ -9,8 +9,16 @@ import { getLang, saveLang, type Lang } from './index';
 // left-to-right, and a change of language takes effect after a restart. Styles read these
 // constants instead of writing 'right' or a chevron by hand, so one screen serves both directions.
 export const isRTL = I18nManager.isRTL;
-/** Where a line of text starts: the right edge in Arabic, the left edge in English. */
-export const textStart: 'left' | 'right' = isRTL ? 'right' : 'left';
+/**
+ * Where a line of text starts. A Text reads `left` and `right` relative to the layout direction:
+ * `left` is the start edge (the right side in Arabic), `right` is the end edge. Seen on the emulator
+ * (RN 0.86): `textAlign: 'right'` drew Arabic titles and labels on the LEFT of a right-to-left screen.
+ */
+export const textStart = 'left' as const;
+/** The far edge of a line of text (times, amounts): see `textStart`. */
+export const textEnd = 'right' as const;
+/** A TextInput reads `left` and `right` as the physical sides, so its start follows the language. */
+export const inputStart: 'left' | 'right' = isRTL ? 'right' : 'left';
 /** The «open this row» chevron points away from the text. */
 export const chevronForward: 'chevron-back' | 'chevron-forward' = isRTL ? 'chevron-back' : 'chevron-forward';
 
