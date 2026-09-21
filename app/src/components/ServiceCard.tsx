@@ -2,6 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -23,7 +25,7 @@ export function ServiceCard({ service, onPress }: Props) {
           {locked ? (
             <View style={styles.lock}>
               <Ionicons name="lock-closed" size={11} color={colors.goldLight} />
-              <Text style={styles.lockText}>للأعضاء</Text>
+              <Text style={styles.lockText}>{t('services.membersOnly')}</Text>
             </View>
           ) : null}
         </View>
@@ -37,7 +39,7 @@ export function ServiceCard({ service, onPress }: Props) {
           </View>
         ) : null}
       </View>
-      <Ionicons name="chevron-back" size={18} color={locked ? colors.textMuted : colors.gold} />
+      <Ionicons name={chevronForward} size={18} color={locked ? colors.textMuted : colors.gold} />
     </Pressable>
   );
 }
@@ -66,7 +68,7 @@ const styles = StyleSheet.create({
   },
   texts: { flex: 1, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: 'right', flexShrink: 1 },
+  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, flexShrink: 1 },
   lock: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,7 +80,7 @@ const styles = StyleSheet.create({
     borderColor: colors.goldDark,
   },
   lockText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
-  summary: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  summary: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 2 },
   price: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.textPrimary },
   member: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },

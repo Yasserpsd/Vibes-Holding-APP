@@ -11,6 +11,8 @@ import type { ProjectAccess, ProjectContact, ProjectsBalance } from '@/api/types
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Notice } from '@/components/Notice';
+import { hubText, t } from '@/i18n';
+import { arrowForward, chevronForward, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -37,14 +39,14 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) 
   if (status === 'loading') return null;
   if (status === 'guest') {
     return (
-      <Frame icon="lock-closed-outline" text="بيانات التواصل مع المؤسس وملف العرض متاحة لأعضاء النادي بعد فتح المشروع. سجّل الدخول للمتابعة.">
-        <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+      <Frame icon="lock-closed-outline" text={t('unlock.guest')}>
+        <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
       </Frame>
     );
   }
   if (query.isPending) {
     return (
-      <Frame icon="lock-closed-outline" text="نتحقق من رصيدك في بنك المشاريع…">
+      <Frame icon="lock-closed-outline" text={t('unlock.checking')}>
         <ActivityIndicator color={colors.gold} />
       </Frame>
     );
@@ -52,10 +54,10 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) 
   const access = query.data;
   if (!access) {
     // A server that does not know the route yet (deployed after this update): stay quiet, the page works without it.
-    if (query.error instanceof ApiError && query.error.status === 404) return <Frame icon="time-outline" text="فتح المشاريع من التطبيق غير متاح الآن." quiet />;
+    if (query.error instanceof ApiError && query.error.status === 404) return <Frame icon="time-outline" text={t('unlock.notAvailable')} quiet />;
     return (
-      <Frame icon="cloud-offline-outline" text={query.error ? errorMessage(query.error) : 'تعذّر التحقق من حالة فتح المشروع الآن.'}>
-        <AppButton label="إعادة المحاولة" variant="outline" icon="refresh-outline" onPress={() => void query.refetch()} />
+      <Frame icon="cloud-offline-outline" text={query.error ? errorMessage(query.error) : t('unlock.checkFailed')}>
+        <AppButton label={t('common.retry')} variant="outline" icon="refresh-outline" onPress={() => void query.refetch()} />
       </Frame>
     );
   }
@@ -91,15 +93,15 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) 
       return null;
     case 'not_member':
       return (
-        <Frame icon="ribbon-outline" text={access.message ?? 'فتح بيانات التواصل متاح لأعضاء النادي المشتركين.'}>
-          <AppButton label="مزايا العضوية" icon="ribbon-outline" onPress={() => router.push('/membership')} />
+        <Frame icon="ribbon-outline" text={hubText(access.message, 'unlock.membersOnly')}>
+          <AppButton label={t('account.benefits')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
         </Frame>
       );
     case 'unavailable':
-      return <Frame icon="time-outline" text={access.message ?? 'فتح المشاريع غير متاح الآن، حاول لاحقًا.'} quiet />;
+      return <Frame icon="time-outline" text={hubText(access.message, 'unlock.later')} quiet />;
     case 'exhausted':
       return (
-        <Frame icon="wallet-outline" text="استخدمت كامل رصيدك في بنك المشاريع لسنة عضويتك الحالية. لزيادة الرصيد تواصل مع إدارة النادي.">
+        <Frame icon="wallet-outline" text={t('unlock.used')}>
           {access.balance ? <BalanceRow balance={access.balance} /> : null}
         </Frame>
       );
@@ -108,21 +110,21 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) 
         <View style={styles.box}>
           <View style={styles.row}>
             <Ionicons name="lock-open-outline" size={20} color={colors.success} />
-            <Text style={styles.title}>بيانات التواصل مع المؤسس</Text>
+            <Text style={styles.title}>{t('unlock.contactTitle')}</Text>
           </View>
           {access.contact ? <ContactList contact={access.contact} projectTitle={projectTitle} /> : null}
           {access.balance ? <BalanceRow balance={access.balance} /> : null}
-          <Text style={styles.hint}>هذه البيانات خاصة بك كعضو فتح المشروع. لا تشاركها خارج النادي.</Text>
+          <Text style={styles.hint}>{t('unlock.private')}</Text>
         </View>
       );
     case 'can_unlock':
       return (
         <Frame
           icon="lock-closed-outline"
-          text={hasPitchDeck ? 'افتح المشروع لتصل إلى بيانات التواصل مع المؤسس وملف العرض.' : 'افتح المشروع لتصل إلى بيانات التواصل مع المؤسس.'}
+          text={hasPitchDeck ? t('unlock.promptWithDeck') : t('unlock.prompt')}
         >
           {access.balance ? <BalanceRow balance={access.balance} /> : null}
-          <AppButton label="افتح بيانات التواصل" icon="lock-open-outline" onPress={() => setConfirming(true)} />
+          <AppButton label={t('unlock.open')} icon="lock-open-outline" onPress={() => setConfirming(true)} />
           {error ? <Notice tone="warning" text={error} /> : null}
           <ConfirmSheet
             visible={confirming}
@@ -156,22 +158,22 @@ function BalanceRow({ balance }: { balance: ProjectsBalance }) {
   return (
     <View style={styles.balance}>
       <Ionicons name="wallet-outline" size={18} color={colors.gold} />
-      <Text style={styles.balanceLabel}>رصيد بنك المشاريع</Text>
-      <Text style={styles.balanceValue}>{`المتبقي ${formatNumber(balance.left)} من ${formatNumber(total)}`}</Text>
+      <Text style={styles.balanceLabel}>{t('unlock.balance')}</Text>
+      <Text style={styles.balanceValue}>{t('unlock.balanceLeft', { left: formatNumber(balance.left), total: formatNumber(total) })}</Text>
     </View>
   );
 }
 
 function ContactList({ contact, projectTitle }: { contact: ProjectContact; projectTitle: string }) {
   const empty = !contact.whatsapp && !contact.email && !contact.website && !contact.pitchUrl;
-  if (empty) return <Text style={styles.hint}>لم يضف المؤسس بيانات تواصل أو ملف عرض لهذا المشروع بعد.</Text>;
-  const greeting = `السلام عليكم، أتواصل معكم بخصوص مشروع «${projectTitle}» في بنك المشاريع بنادي المستثمرين.`;
+  if (empty) return <Text style={styles.hint}>{t('unlock.empty')}</Text>;
+  const greeting = t('unlock.greeting', { title: projectTitle });
   return (
     <View style={styles.contacts}>
-      {contact.whatsapp ? <ContactRow icon="logo-whatsapp" label="واتساب" value={contact.whatsapp} latin onPress={() => void openWhatsApp(contact.whatsapp, greeting)} /> : null}
-      {contact.email ? <ContactRow icon="mail-outline" label="البريد" value={contact.email} latin onPress={() => void Linking.openURL(`mailto:${contact.email}`).catch(() => undefined)} /> : null}
-      {contact.website ? <ContactRow icon="globe-outline" label="الموقع" value={contact.website} latin onPress={() => void openLink(contact.website)} /> : null}
-      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label="ملف العرض" value="افتح ملف العرض (Pitch Deck)" onPress={() => void openLink(contact.pitchUrl)} /> : null}
+      {contact.whatsapp ? <ContactRow icon="logo-whatsapp" label={t('unlock.whatsapp')} value={contact.whatsapp} latin onPress={() => void openWhatsApp(contact.whatsapp, greeting)} /> : null}
+      {contact.email ? <ContactRow icon="mail-outline" label={t('unlock.email')} value={contact.email} latin onPress={() => void Linking.openURL(`mailto:${contact.email}`).catch(() => undefined)} /> : null}
+      {contact.website ? <ContactRow icon="globe-outline" label={t('unlock.website')} value={contact.website} latin onPress={() => void openLink(contact.website)} /> : null}
+      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label={t('unlock.pitch')} value={t('unlock.openPitch')} onPress={() => void openLink(contact.pitchUrl)} /> : null}
     </View>
   );
 }
@@ -187,7 +189,7 @@ function ContactRow({ icon, label, value, latin = false, onPress }: { icon: Ioni
           {latin ? `‎${value}` : value}
         </Text>
       </View>
-      <Ionicons name="chevron-back" size={16} color={colors.goldDark} />
+      <Ionicons name={chevronForward} size={16} color={colors.goldDark} />
     </Pressable>
   );
 }
@@ -199,20 +201,20 @@ function ConfirmSheet({ visible, busy, projectTitle, balance, onConfirm, onClose
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="إغلاق" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('unlock.close')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.handle} />
-        <Text style={styles.sheetTitle}>تأكيد فتح المشروع</Text>
-        <Text style={styles.sheetText}>{`سيُخصم مشروع واحد من رصيدك في بنك المشاريع مقابل فتح «${projectTitle}»، وتبقى بياناته مفتوحة لك بعدها دون خصم جديد.`}</Text>
+        <Text style={styles.sheetTitle}>{t('unlock.confirmTitle')}</Text>
+        <Text style={styles.sheetText}>{t('unlock.confirmText', { title: projectTitle })}</Text>
         {balance ? (
           <View style={styles.sheetFigures}>
-            <Figure label="رصيدك الآن" value={formatNumber(balance.left)} />
-            <Ionicons name="arrow-back" size={18} color={colors.textMuted} />
-            <Figure label="بعد الفتح" value={formatNumber(Math.max(0, balance.left - 1))} highlight />
+            <Figure label={t('unlock.now')} value={formatNumber(balance.left)} />
+            <Ionicons name={arrowForward} size={18} color={colors.textMuted} />
+            <Figure label={t('unlock.after')} value={formatNumber(Math.max(0, balance.left - 1))} highlight />
           </View>
         ) : null}
-        {busy ? <ActivityIndicator color={colors.gold} /> : <AppButton label="تأكيد الفتح" icon="lock-open-outline" onPress={onConfirm} />}
-        <AppButton label="إلغاء" variant="outline" onPress={onClose} />
+        {busy ? <ActivityIndicator color={colors.gold} /> : <AppButton label={t('unlock.confirm')} icon="lock-open-outline" onPress={onConfirm} />}
+        <AppButton label={t('common.cancel')} variant="outline" onPress={onClose} />
       </View>
     </Modal>
   );
@@ -231,26 +233,26 @@ const styles = StyleSheet.create({
   box: { gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
   boxQuiet: { borderColor: colors.border },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  title: { ...typography.subtitle, flex: 1, color: colors.textPrimary, textAlign: 'right' },
-  text: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: 'right' },
+  title: { ...typography.subtitle, flex: 1, color: colors.textPrimary, textAlign: textStart },
+  text: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: textStart },
   textQuiet: { color: colors.textMuted },
-  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   balance: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
-  balanceLabel: { ...typography.caption, flex: 1, color: colors.textSecondary, textAlign: 'right' },
+  balanceLabel: { ...typography.caption, flex: 1, color: colors.textSecondary, textAlign: textStart },
   balanceValue: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.gold },
   contacts: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   contact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surfaceElevated, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   contactTexts: { flex: 1 },
-  contactLabel: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
-  contactValue: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
+  contactLabel: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  contactValue: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   // Phone numbers, e-mails and links read left to right, still aligned with the Arabic labels.
   latin: { writingDirection: 'ltr' },
   pressed: { opacity: 0.8 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
   sheet: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, borderTopWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
   handle: { alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.xs },
-  sheetTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right' },
-  sheetText: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  sheetTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
+  sheetText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   sheetFigures: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
   figure: { alignItems: 'center', gap: 2 },
   figureLabel: { ...typography.caption, color: colors.textMuted },

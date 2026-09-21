@@ -20,6 +20,8 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { formatMillionsSar } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -39,7 +41,7 @@ export default function HomeScreen() {
   const membershipContent = useMembershipContent();
   const [refreshing, setRefreshing] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
-  useAdvisorScreen({ type: 'screen', id: 'home', title: 'الرئيسية' }, true);
+  useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -69,7 +71,7 @@ export default function HomeScreen() {
     }
   };
 
-  const greeting = status === 'signedIn' && me ? `أهلًا ${me.name.split(' ')[0]}.` : '';
+  const greeting = status === 'signedIn' && me ? t('home.greeting', { name: me.name.split(' ')[0] }) : '';
   const featured = videos.data?.pages[0]?.featured ?? [];
   const teaser = services.data?.services.slice(0, 4) ?? [];
 
@@ -79,7 +81,7 @@ export default function HomeScreen() {
       <PostsBlock />
 
       <View style={styles.hero}>
-        <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
+        <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
         <Text style={styles.heroTitle}>{content.hero.title}</Text>
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
@@ -121,8 +123,8 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={styles.footerLinks}>
-        <FooterLink icon="business-outline" label="مقر النادي" onPress={() => router.push('/hq')} />
-        <FooterLink icon="information-circle-outline" label="عنّا" onPress={() => router.push('/about')} />
+        <FooterLink icon="business-outline" label={t('nav.hq')} onPress={() => router.push('/hq')} />
+        <FooterLink icon="information-circle-outline" label={t('nav.about')} onPress={() => router.push('/about')} />
       </View>
     </Screen>
   );
@@ -171,7 +173,7 @@ function MembershipBlock({ block, signedIn, membership, statusTexts, onPress }: 
       </View>
       {signedIn ? <MembershipStatusCard membership={membership} texts={statusTexts} title={block.title} /> : null}
       <Text style={styles.membershipText}>{active ? block.activeText : block.subtitle}</Text>
-      <AppButton label={block.cta} variant={active ? 'outline' : 'primary'} icon="chevron-back" onPress={onPress} />
+      <AppButton label={block.cta} variant={active ? 'outline' : 'primary'} icon={chevronForward} onPress={onPress} />
     </View>
   );
 }
@@ -220,8 +222,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   membershipHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  membershipTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 30, color: colors.gold, textAlign: 'right' },
-  membershipText: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  membershipTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 30, color: colors.gold, textAlign: textStart },
+  membershipText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   footerLinks: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   footerLink: {
     flex: 1,

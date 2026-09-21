@@ -1,6 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 
 import type { StoreConfig } from '@/api/membership';
+import { t } from '@/i18n';
 
 type PurchasesModule = typeof import('react-native-purchases');
 type PurchasesPackage = import('react-native-purchases').PurchasesPackage;
@@ -99,20 +100,20 @@ function storeErrorMessage(purchases: PurchasesModule, code: unknown): string {
   const codes = purchases.PURCHASES_ERROR_CODE;
   switch (code) {
     case codes.PURCHASE_NOT_ALLOWED_ERROR:
-      return 'الشراء غير مسموح به على هذا الجهاز أو الحساب.';
+      return t('store.error.notAllowed');
     case codes.PAYMENT_PENDING_ERROR:
-      return 'الدفع قيد المعالجة لدى المتجر. سنفعّل عضويتك عند اكتماله.';
+      return t('store.error.paymentPending');
     case codes.PRODUCT_ALREADY_PURCHASED_ERROR:
-      return 'هذا الاشتراك مشترى بالفعل. جرّب «استعادة المشتريات».';
+      return t('store.error.alreadyPurchased');
     case codes.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR:
-      return 'الاشتراك غير متاح في المتجر حاليًا.';
+      return t('store.error.notAvailable');
     case codes.NETWORK_ERROR:
     case codes.OFFLINE_CONNECTION_ERROR:
-      return 'تعذّر الاتصال بالمتجر. تأكد من اتصالك بالإنترنت.';
+      return t('store.error.network');
     case codes.STORE_PROBLEM_ERROR:
-      return 'مشكلة مؤقتة في المتجر. حاول مرة أخرى بعد قليل.';
+      return t('store.error.storeProblem');
     default:
-      return 'تعذّر إتمام الشراء من المتجر.';
+      return t('store.error.failed');
   }
 }
 
@@ -121,7 +122,7 @@ type StoreFailure = { code?: unknown; userCancelled?: boolean | null };
 /** Opens the store's purchase sheet. The server, not this result, activates the membership. */
 export async function purchaseMembership(config: StoreConfig, offer: StoreOffer): Promise<PurchaseResult> {
   const purchases = loadPurchases();
-  if (!purchases) return { status: 'failed', message: 'هذه النسخة من التطبيق لا تدعم الشراء من المتجر.' };
+  if (!purchases) return { status: 'failed', message: t('store.error.unsupported') };
   try {
     const result = offer.kind === 'package' ? await purchases.default.purchasePackage(offer.pkg) : await purchases.default.purchaseStoreProduct(offer.product);
     return { status: 'purchased', entitled: Boolean(result.customerInfo.entitlements.active[config.entitlement]) };
@@ -135,7 +136,7 @@ export async function purchaseMembership(config: StoreConfig, offer: StoreOffer)
 /** Reads earlier purchases of the store account on this device (new phone, reinstall). */
 export async function restoreMembership(config: StoreConfig): Promise<{ entitled: boolean } | { error: string }> {
   const purchases = loadPurchases();
-  if (!purchases) return { error: 'هذه النسخة من التطبيق لا تدعم الشراء من المتجر.' };
+  if (!purchases) return { error: t('store.error.unsupported') };
   try {
     const info = await purchases.default.restorePurchases();
     return { entitled: Boolean(info.entitlements.active[config.entitlement]) };

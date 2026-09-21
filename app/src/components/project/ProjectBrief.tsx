@@ -5,6 +5,8 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useProjectBrief } from '@/api/queries';
 import type { ProjectBrief as Brief } from '@/api/types';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -20,7 +22,7 @@ export function ProjectBrief({ projectId }: { projectId: string }) {
     return (
       <View style={styles.fallback}>
         <Ionicons name="sparkles-outline" size={16} color={colors.textMuted} />
-        <Text style={styles.fallbackText}>ملخص المستشار غير متاح الآن. يمكنك سؤاله عن المشروع مباشرة.</Text>
+        <Text style={styles.fallbackText}>{t('brief.unavailable')}</Text>
       </View>
     );
   }
@@ -36,7 +38,7 @@ function BriefBody({ brief }: { brief: Brief }) {
           <View style={styles.mark}>
             <Ionicons name="sparkles" size={16} color={colors.black} />
           </View>
-          <Text style={styles.headerTitle}>ملخص المستشار</Text>
+          <Text style={styles.headerTitle}>{t('brief.title')}</Text>
         </View>
         {brief.summary ? <Text style={styles.summary}>{brief.summary}</Text> : null}
 
@@ -57,13 +59,13 @@ function BriefBody({ brief }: { brief: Brief }) {
 
         <StageStepper stage={brief.stage} />
 
-        <Points title="نقاط القوة" icon="trending-up-outline" tone={colors.success} items={brief.strengths} />
-        <Points title="مخاطر تستحق الانتباه" icon="alert-circle-outline" tone={colors.warning} items={brief.risks} />
+        <Points title={t('brief.strengths')} icon="trending-up-outline" tone={colors.success} items={brief.strengths} />
+        <Points title={t('brief.risks')} icon="alert-circle-outline" tone={colors.warning} items={brief.risks} />
       </View>
 
       {brief.competitors.length ? (
         <View style={styles.competitors}>
-          <Text style={styles.sectionTitle}>مشاريع منافسة من بنك المشاريع</Text>
+          <Text style={styles.sectionTitle}>{t('brief.competitors')}</Text>
           {brief.competitors.map((competitor) => (
             <Pressable
               key={competitor.id}
@@ -83,7 +85,7 @@ function BriefBody({ brief }: { brief: Brief }) {
                 ) : null}
                 {competitor.why ? <Text style={styles.competitorWhy}>{competitor.why}</Text> : null}
               </View>
-              <Ionicons name="chevron-back" size={18} color={colors.goldDark} />
+              <Ionicons name={chevronForward} size={18} color={colors.goldDark} />
             </Pressable>
           ))}
         </View>
@@ -100,7 +102,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
   return (
     <View style={styles.stage}>
       <View style={styles.stageHeader}>
-        <Text style={styles.blockTitle}>مرحلة المشروع</Text>
+        <Text style={styles.blockTitle}>{t('brief.stage')}</Text>
         <View style={styles.stagePill}>
           <Text style={styles.stagePillText} numberOfLines={1}>
             {stage.label}
@@ -129,8 +131,8 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
           );
         })}
       </View>
-      {known ? null : <Text style={styles.stageNote}>لم نتمكن من تحديد موقع المشروع على المراحل من بياناته المنشورة.</Text>}
-      {known && stage.estimated ? <Text style={styles.stageNote}>تقدير المستشار من وصف المشروع؛ صاحب المشروع لم يحدد مرحلته.</Text> : null}
+      {known ? null : <Text style={styles.stageNote}>{t('brief.stageUnknown')}</Text>}
+      {known && stage.estimated ? <Text style={styles.stageNote}>{t('brief.stageEstimated')}</Text> : null}
     </View>
   );
 }
@@ -177,14 +179,14 @@ function BriefSkeleton() {
     return () => loop.stop();
   }, [pulse]);
   return (
-    <View style={styles.card} accessibilityLabel="المستشار يجهّز ملخص المشروع">
+    <View style={styles.card} accessibilityLabel={t('brief.preparingLabel')}>
       <View style={styles.header}>
         <View style={styles.mark}>
           <Ionicons name="sparkles" size={16} color={colors.black} />
         </View>
-        <Text style={styles.headerTitle}>ملخص المستشار</Text>
+        <Text style={styles.headerTitle}>{t('brief.title')}</Text>
       </View>
-      <Text style={styles.skeletonNote}>المستشار يقرأ بيانات المشروع ويجهّز الملخص…</Text>
+      <Text style={styles.skeletonNote}>{t('brief.preparing')}</Text>
       <Animated.View style={[styles.skeletonBlock, { opacity: pulse }]}>
         <View style={[styles.bar, styles.barFull]} />
         <View style={[styles.bar, styles.barFull]} />
@@ -203,8 +205,8 @@ const styles = StyleSheet.create({
   card: { gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   mark: { width: 30, height: 30, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { ...typography.subtitle, color: colors.gold, flex: 1, textAlign: 'right' },
-  summary: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
+  headerTitle: { ...typography.subtitle, color: colors.gold, flex: 1, textAlign: textStart },
+  summary: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
 
   table: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   // In the forced RTL layout the row starts on the right: the label column is the right one.
@@ -213,10 +215,10 @@ const styles = StyleSheet.create({
   tableRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   labelCell: { width: '36%', paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm, borderEndWidth: StyleSheet.hairlineWidth, borderEndColor: colors.border, backgroundColor: 'rgba(201, 162, 39, 0.08)' },
   valueCell: { flex: 1, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm },
-  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, textAlign: 'right' },
-  valueText: { ...typography.caption, fontSize: 14, lineHeight: 22, color: colors.textPrimary, textAlign: 'right' },
+  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, textAlign: textStart },
+  valueText: { ...typography.caption, fontSize: 14, lineHeight: 22, color: colors.textPrimary, textAlign: textStart },
 
-  blockTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: 'right' },
+  blockTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
   stage: { gap: spacing.sm },
   stageHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   stagePill: { paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark, maxWidth: '70%' },
@@ -234,30 +236,30 @@ const styles = StyleSheet.create({
   stepLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 2 },
   stepLabelDone: { color: colors.textSecondary },
   stepLabelCurrent: { fontFamily: fonts.semiBold, color: colors.goldLight },
-  stageNote: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  stageNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 
   points: { gap: spacing.xs + 2 },
   pointsHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   point: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bullet: { width: 6, height: 6, borderRadius: 3, marginTop: 9 },
-  pointText: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: 'right' },
+  pointText: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: textStart },
 
   competitors: { gap: spacing.sm },
-  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right' },
+  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   competitor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   pressed: { opacity: 0.8 },
   competitorTexts: { flex: 1, gap: spacing.xs },
-  competitorTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: 'right' },
-  competitorWhy: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  competitorTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
+  competitorWhy: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   tag: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
   tagText: { ...typography.caption, color: colors.textSecondary },
-  disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 
   fallback: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xs },
-  fallbackText: { ...typography.caption, flex: 1, color: colors.textMuted, textAlign: 'right' },
+  fallbackText: { ...typography.caption, flex: 1, color: colors.textMuted, textAlign: textStart },
 
-  skeletonNote: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  skeletonNote: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   skeletonBlock: { gap: spacing.sm },
   bar: { height: 12, borderRadius: radii.sm, backgroundColor: colors.surfaceElevated },
   barFull: { alignSelf: 'stretch' },

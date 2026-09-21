@@ -5,6 +5,7 @@ import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/A
 import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -12,7 +13,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 export default function GoldenScreen() {
   const query = useGolden();
   const content = query.data;
-  useAdvisorScreen({ type: 'screen', id: 'golden', title: content?.title ?? 'المشاريع الذهبية' });
+  useAdvisorScreen({ type: 'screen', id: 'golden', title: content?.title ?? t('nav.golden') });
   // Keeps the disclaimer at the end clear of the floating «اسأل المستشار» button.
   const clearance = useAskAdvisorClearance();
 
@@ -40,10 +41,10 @@ export default function GoldenScreen() {
         <Text style={styles.heroTitle}>{content.umbrella.name}</Text>
         <Text style={styles.intro}>{content.intro}</Text>
         <View style={styles.valueBadge}>
-          <Text style={styles.valueLabel}>قيمة المحفظة</Text>
+          <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
           <Text style={styles.valueText}>{formatMillionsSar(content.portfolioValueSarMillions)}</Text>
         </View>
-        <AppButton label="صفحة عرض فايبز القابضة" icon="open-outline" onPress={() => openLink(content.umbrella.offerUrl)} />
+        <AppButton label={t('golden.vibesPage')} icon="open-outline" onPress={() => openLink(content.umbrella.offerUrl)} />
       </View>
 
       {companies.map((company) => (

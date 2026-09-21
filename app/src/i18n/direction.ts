@@ -9,6 +9,8 @@ import { getLang, saveLang, type Lang } from './index';
 // left-to-right, and a change of language takes effect after a restart. Styles read these
 // constants instead of writing 'right' or a chevron by hand, so one screen serves both directions.
 export const isRTL = I18nManager.isRTL;
+/** The arrow of a «from, to» pair follows the reading direction. */
+export const arrowForward: 'arrow-back' | 'arrow-forward' = isRTL ? 'arrow-back' : 'arrow-forward';
 /**
  * Where a line of text starts. A Text reads `left` and `right` relative to the layout direction:
  * `left` is the start edge (the right side in Arabic), `right` is the end edge. Seen on the emulator

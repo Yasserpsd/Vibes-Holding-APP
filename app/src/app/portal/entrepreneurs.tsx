@@ -7,6 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { ServiceCard } from '@/components/ServiceCard';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { spacing } from '@/theme/tokens';
 
 /** «بوابة رواد الأعمال»: the three services the owner picked, in the order the server lists them. */
@@ -43,7 +44,7 @@ export default function EntrepreneursScreen() {
           <ServiceCard key={service.key} service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
         ))}
       </View>
-      <AppButton label="كل خدمات النادي" variant="outline" icon="grid-outline" onPress={() => router.push('/services')} />
+      <AppButton label={t('portal.allServices')} variant="outline" icon="grid-outline" onPress={() => router.push('/services')} />
     </Screen>
   );
 }

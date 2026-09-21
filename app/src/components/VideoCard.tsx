@@ -2,6 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Video } from '@/api/videos';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -35,9 +37,9 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
         ) : null}
         {video.publishedAt ? <Text style={styles.date}>{formatArabicDate(video.publishedAt)}</Text> : null}
         {onAsk ? (
-          <Pressable onPress={onAsk} hitSlop={6} accessibilityRole="button" accessibilityLabel={`اسأل المستشار عن: ${video.title}`} style={({ pressed }) => [styles.ask, pressed && styles.pressed]}>
+          <Pressable onPress={onAsk} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('videos.askAbout', { title: video.title })} style={({ pressed }) => [styles.ask, pressed && styles.pressed]}>
             <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
-            <Text style={styles.askText}>اسأل المستشار</Text>
+            <Text style={styles.askText}>{t('advisor.ask')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -58,9 +60,9 @@ const styles = StyleSheet.create({
   thumb: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   play: { width: 48, height: 48, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center', opacity: 0.95 },
   texts: { padding: spacing.md, gap: 4 },
-  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: 'right' },
-  blurb: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  date: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
+  blurb: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  date: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   ask: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', marginTop: spacing.xs, paddingVertical: 4, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark },
   askText: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
 });
