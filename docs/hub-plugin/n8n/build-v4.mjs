@@ -14,7 +14,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const NAME = 'Vibes Web Agent v4.0';
+const NAME = 'Vibes Web Agent v4.1';
 const PROMPT_TARGET = 9000; // characters, contract target (v3.2 carried 44,847)
 const PROMPT_LIMIT = 12000;
 // the hub stores vai_clip(memo, 700) in 2.6.0 and in 2.7.0: a longer MEMO loses its tail on every turn. Raise this, the
@@ -269,7 +269,7 @@ lines.push('الموقع الذي يتصفحه العميل الآن: ' + (site.
 // bridge v2 update) and by the 2.7.0 widget, the one that sends the live page text; an older widget gets «label: value» lines
 const liveText = clipText(safe(page.live_text), 6000);
 const tables = appSite || !!liveText;
-if (appSite) lines.push('وضع التطبيق: المحادثة داخل تطبيق نادي المستثمرين. ممنوع سعر العضوية وأي رابط دفع أو اشتراك وأي دعوة للدفع خارج التطبيق؛ العضوية تُشترى من شاشة العضوية داخل التطبيق عبر المتجر (كارت membership يفتحها). لا تذكر العضوية من نفسك هنا. نبرة مستشار العضو أولًا. الأفعال المتاحة هنا: quick_replies وlink وopen_page وvideo وcard فقط — لا handoff ولا نماذج ولا request_contact ولا scroll_to، فلا تعد بزر الإدارة ولا بنموذج: ما يحتاج الفريق يُقال له بسطر إنه يُرفع للإدارة، مع LEAD.');
+if (appSite) lines.push('وضع التطبيق: المحادثة داخل تطبيق نادي المستثمرين. ممنوع سعر العضوية وأي رابط دفع أو اشتراك وأي دعوة للدفع خارج التطبيق؛ العضوية تُشترى من شاشة العضوية داخل التطبيق عبر المتجر (كارت membership يفتحها). لا تذكر العضوية من نفسك هنا. نبرة مستشار العضو أولًا. في بنك المشاريع داخل التطبيق يُعرض المشروع نفسه فقط: لا تذكر اسم مؤسس أي مشروع، ولا المبلغ الذي يطلبه، ولا حجم استثماره أو رأس ماله أو تقييمه، ولا الحصة المعروضة؛ من أراد ذلك يتواصل مع صاحب المشروع بعد فتحه. الأفعال المتاحة هنا: quick_replies وlink وopen_page وvideo وcard فقط — لا handoff ولا نماذج ولا request_contact ولا scroll_to، فلا تعد بزر الإدارة ولا بنموذج: ما يحتاج الفريق يُقال له بسطر إنه يُرفع للإدارة، مع LEAD.');
 lines.push(tables ? 'العرض: الجداول مدعومة هنا.' : 'العرض: بلا جداول Markdown هنا — المقارنة أو التلخيص كقائمة قصيرة، كل سطر «البند: القيمة».');
 lines.push('');
 
@@ -354,7 +354,7 @@ const stageTxt = isAdmin ? 'أدمن المنظومة — أنت مساعد إد
 const msgCount = Number(c.msg_count || 0);
 lines.push('حالة العميل: ' + ((!msgCount && !memo && !turns.length) ? 'جديد تمامًا — لا توجد محادثات سابقة. ' : 'له محادثات سابقة معنا. ') + stageTxt + '.');
 if (c.name) lines.push('اسم العميل: ' + c.name + (c.phone ? ' | جواله: ' + c.phone : '') + (c.email ? ' | إيميله: ' + c.email : '') + (c.company ? ' | شركته/مشروعه: ' + c.company : '') + (c.city ? ' | مدينته: ' + c.city : '') + (c.job_title ? ' | وظيفته: ' + c.job_title : '') + ' — لا تسأل عن أي من هذه البيانات.');
-if (c.persona) lines.push('صفته التي اختارها عند التسجيل: ' + (({ entrepreneur: 'رائد أعمال — لديه مشروع', investor: 'باحث عن فرص شراكة (مستثمر)', neutral: 'محايد — مهتم بعالم الأعمال وسيحدد توجهه لاحقًا' })[c.persona] || c.persona));
+if (c.persona) lines.push('صفته التي اختارها عند التسجيل: ' + (({ entrepreneur: 'رائد أعمال — لديه مشروع', investor: 'باحث عن فرص شراكة (مستثمر)', neutral: 'محايد — يستكشف توجهه (يناسبه حضور الملتقيات والندوات وورش العمل في مقر النادي أو عبر الإنترنت)' })[c.persona] || c.persona));
 if (c.bio) lines.push('نبذة كتبها العميل عن نفسه: ' + clip(c.bio, 600));
 if (Array.isArray(c.sites) && c.sites.length) lines.push('المواقع التي تواصل منها سابقًا: ' + c.sites.join('، '));
 if (c.first_at) lines.push('أول تواصل معنا: ' + fmtDay(c.first_at) + ' (' + ago(c.first_at) + ').');

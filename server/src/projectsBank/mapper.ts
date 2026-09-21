@@ -1,3 +1,4 @@
+import { stripFunding } from './redact.js';
 import { htmlToText, makeExcerpt } from './text.js';
 import type { PublicProject, Term } from './types.js';
 
@@ -119,12 +120,13 @@ export function toPublicProject(raw: unknown): PublicProject | null {
 
   const detailsHtml = asString(readField(raw, 'project_details')) ?? asString(raw.content) ?? '';
   const detailsEnHtml = asString(readField(raw, 'project_details_en')) ?? '';
-  const details = htmlToText(detailsHtml) || null;
-  const detailsEn = htmlToText(detailsEnHtml) || null;
+  // The app shows what a project is, never what it asks for: no funding sought, no investment amount (owner's rule).
+  const details = stripFunding(htmlToText(detailsHtml)) || null;
+  const detailsEn = stripFunding(htmlToText(detailsEnHtml)) || null;
   const excerptRaw = asString(raw.excerpt) ?? asString(raw.post_excerpt);
-  const excerpt = excerptRaw ? htmlToText(excerptRaw) : details ? makeExcerpt(details) : null;
+  const excerpt = excerptRaw ? stripFunding(htmlToText(excerptRaw)) || (details ? makeExcerpt(details) : null) : details ? makeExcerpt(details) : null;
   const excerptEnRaw = asString(readField(raw, 'excerpt_en'));
-  const excerptEn = excerptEnRaw ? htmlToText(excerptEnRaw) : detailsEn ? makeExcerpt(detailsEn) : null;
+  const excerptEn = excerptEnRaw ? stripFunding(htmlToText(excerptEnRaw)) || (detailsEn ? makeExcerpt(detailsEn) : null) : detailsEn ? makeExcerpt(detailsEn) : null;
 
   const gallery = asUrlList(readField(raw, 'project_gallery'));
   const image =
@@ -140,8 +142,9 @@ export function toPublicProject(raw: unknown): PublicProject | null {
     titleEn: asString(readField(raw, 'title_en')),
     companyName: asString(readField(raw, 'company_name')),
     companyNameEn: asString(readField(raw, 'company_name_en')),
-    founderName: asString(readField(raw, 'founder_name')),
-    founderNameEn: asString(readField(raw, 'founder_name_en')),
+    // The founder's name is not shown in the app (owner's rule, 2026-09-21); the fields stay in the type for older app builds.
+    founderName: null,
+    founderNameEn: null,
     excerpt,
     excerptEn,
     details,

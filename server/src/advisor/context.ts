@@ -35,6 +35,11 @@ const SELECTION_MAX = 1000;
 const APP = 'تطبيق نادي المستثمرين';
 const NONE: ResolvedContext = { url: '', title: '', focus: null };
 
+/** What suits whoever stands at a portal (the owner's direction, 2026-09-21): a fact the adviser builds on. */
+const PORTAL_NOTES: Partial<Record<PortalKey, string>> = {
+  neutral:
+    'يناسب المحايد الذي لم يحدّد وجهته بعد: حضور ملتقيات النادي وندواته وورش عمله الدورية في مقر النادي بالرياض، والحضور متاح عبر الإنترنت أينما كان.',
+};
 const PORTAL_TITLES: Record<PortalKey, string> = {
   investor: 'بوابة المستثمر',
   entrepreneur: 'بوابة رواد الأعمال',
@@ -78,7 +83,6 @@ export class ContextResolver {
         const text = lines([
           `مشروع في بنك المشاريع: ${title}`,
           project.companyName && `الشركة: ${project.companyName}`,
-          project.founderName && `المؤسس: ${project.founderName}`,
           project.sector && `القطاع: ${project.sector.name}`,
           project.stage && `المرحلة: ${project.stage.name}`,
           project.isGolden && 'مشروع ذهبي يحمل علامة V.',
@@ -98,7 +102,7 @@ export class ContextResolver {
       case 'portal': {
         const portal = (await getHomeContent(this.deps.kv)).portals.find((entry) => entry.key === context.id);
         const title = `${PORTAL_TITLES[context.id]} — ${APP}`;
-        return { url: '', title, focus: focus(PORTAL_TITLES[context.id], lines([portal?.title, portal?.subtitle])) };
+        return { url: '', title, focus: focus(PORTAL_TITLES[context.id], lines([portal?.title, portal?.subtitle, PORTAL_NOTES[context.id]])) };
       }
       case 'service': {
         const service = (await getServicesContent(this.deps.kv)).services.find((entry) => entry.key === context.id);

@@ -11,9 +11,10 @@ import type { SessionRecord, SessionStore } from './sessions.js';
 export type Persona = 'entrepreneur' | 'investor' | 'neutral';
 
 export const PERSONAS: { key: Persona; label: string }[] = [
-  { key: 'entrepreneur', label: 'رائد أعمال — لدي مشروع مميز' },
-  { key: 'investor', label: 'مستثمر — أبحث عن فرص شراكة واعدة' },
-  { key: 'neutral', label: 'محايد — شريك المستقبل وسأحدد توجهي لاحقًا' },
+  // The owner's wording and order (2026-09-21), the same three lines as the home portals.
+  { key: 'neutral', label: 'محايد — أستكشف توجهي' },
+  { key: 'entrepreneur', label: 'رائد أعمال — لدي مشروع' },
+  { key: 'investor', label: 'مستثمر — أبحث عن فرص' },
 ];
 
 export type MembershipStatus = 'unactivated' | 'active' | 'expired';
