@@ -6,6 +6,7 @@ import type { Config } from '../config.js';
 import type { KV } from '../store.js';
 import { fetchFeedItems } from './feed.js';
 import { pageUrlOf, toPublicProject } from './mapper.js';
+import { STAGES } from './stage.js';
 import { normalizeForSearch } from './text.js';
 import type {
   FeedSnapshot,
@@ -146,14 +147,15 @@ export class ProjectsService {
 
   filters(): ProjectsFilters {
     const sectors = new Map<string, FilterOption>();
-    const stages = new Map<string, FilterOption>();
+    const stages = new Map<string, number>();
     for (const { project } of this.items) {
       if (project.sector) countTerm(sectors, project.sector);
-      if (project.stage) countTerm(stages, project.stage);
+      if (project.stage) stages.set(project.stage.slug, (stages.get(project.stage.slug) ?? 0) + 1);
     }
     return {
       sectors: sortOptions(sectors),
-      stages: sortOptions(stages),
+      // The five steps in their own order, declared and estimated together; a step without projects is not offered.
+      stages: STAGES.filter((step) => stages.has(step.key)).map((step) => ({ slug: step.key, name: step.label, count: stages.get(step.key) ?? 0 })),
       sorts: (Object.keys(SORT_LABELS) as ProjectsSort[]).map((key) => ({ key, label: SORT_LABELS[key] })),
       updatedAt: this.fetchedAt,
     };

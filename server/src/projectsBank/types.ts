@@ -1,4 +1,6 @@
 export type Term = { slug: string; name: string };
+/** One of the club's five steps (`stage.ts`). `estimated`: the site does not place the project and the adviser read the step from its description. */
+export type StageTerm = Term & { estimated?: boolean };
 
 /**
  * The only project shape that leaves the server. Built field by field from the
@@ -21,7 +23,7 @@ export type PublicProject = {
   image: string | null;
   gallery: string[];
   sector: Term | null;
-  stage: Term | null;
+  stage: StageTerm | null;
   isGolden: boolean;
   featuredOrder: number | null;
   goldenPartnerUrl: string | null;

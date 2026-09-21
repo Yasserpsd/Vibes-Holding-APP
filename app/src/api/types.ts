@@ -19,7 +19,8 @@ export type PublicProject = {
   image: string | null;
   gallery: string[];
   sector: Term | null;
-  stage: Term | null;
+  /** One of the club's five steps; `estimated` = the adviser read it from the description (the name already says «تقدير المستشار»). Never «اخري». */
+  stage: (Term & { estimated?: boolean }) | null;
   isGolden: boolean;
   featuredOrder: number | null;
   goldenPartnerUrl: string | null;

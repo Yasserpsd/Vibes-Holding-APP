@@ -1,0 +1,160 @@
+diff -ruN --strip-trailing-cr hub/vibes-ai-assistant/assets/widget.js work/hub/vibes-ai-assistant/assets/widget.js
+--- hub/vibes-ai-assistant/assets/widget.js	2026-09-20 23:39:25.000000000 +0300
++++ work/hub/vibes-ai-assistant/assets/widget.js	2026-09-22 00:56:59.313115700 +0300
+@@ -1824,7 +1824,7 @@
+ 			field({ name: 'email', label: 'البريد الإلكتروني', type: 'email', dir: 'ltr', value: c.email, autocomplete: 'email', inputmode: 'email' }) +
+ 			field({ name: 'company', label: 'الشركة أو المشروع', optional: true, value: c.company, autocomplete: 'organization' }) +
+ 			field({ name: 'city', label: 'المدينة', optional: true, value: c.city, autocomplete: 'address-level2' }) +
+-			field({ name: 'job_title', label: 'الوظيفة أو الصفة', optional: true, value: c.job_title, autocomplete: 'organization-title' }) +
++			field({ name: 'job_title', label: 'الوظيفة أو المنصب', optional: true, value: c.job_title, autocomplete: 'organization-title' }) +
+ 			field({ name: 'website', label: 'موقع شركتك', optional: true, dir: 'ltr', value: c.website, autocomplete: 'url', inputmode: 'url' }) +
+ 			field({ name: 'social', label: 'روابط السوشيال ميديا', optional: true, type: 'textarea', rows: 2, dir: 'ltr', value: c.social, help: 'سطر لكل رابط.' }) +
+ 			field({ name: 'bio', label: 'نبذة قصيرة عنك أو عن مشروعك', optional: true, type: 'textarea', rows: 2, value: c.bio }) +
+@@ -1918,7 +1918,8 @@
+ 	   The hub's rules and the op payloads are untouched: register {name, country, phone, email, job_title, persona, bio, password}, login {login, password},
+ 	   verify {code}, resend_code {}, reset_request {login}, reset_confirm {login, code, password}. */
+ 	var regDraft = {}; /* what the visitor typed so far (never the password), kept while switching between the two tabs */
+-	var PERSONAS = [['entrepreneur', 'رائد أعمال', 'لدي مشروع مميز'], ['investor', 'مستثمر', 'أبحث عن فرص شراكة واعدة'], ['neutral', 'محايد', 'سأحدد توجهي لاحقًا']];
++	/* 2.7.1 — the owner's order and wording, the same three lines as the app's portals: neutral, entrepreneur, investor */
++	var PERSONAS = [['neutral', 'محايد', 'أستكشف توجهي'], ['entrepreneur', 'رائد أعمال', 'لدي مشروع'], ['investor', 'مستثمر', 'أبحث عن فرص']];
+ 	function authTabs(mode) {
+ 		var tab = function (m, label) { return '<button type="button" data-m="' + m + '" aria-pressed="' + (mode === m ? 'true' : 'false') + '"' + (mode === m ? ' class="vai-on"' : '') + '>' + label + '</button>'; };
+ 		return '<div class="vai-tabs" role="group" aria-label="الحساب">' + tab('register', 'حساب جديد') + tab('login', 'تسجيل الدخول') + '</div>';
+@@ -1942,7 +1943,7 @@
+ 		if (/بريد|email/i.test(t)) { return { s: 1, f: 'email' }; }
+ 		if (/جوال|phone/i.test(t)) { return { s: 1, f: 'phone' }; }
+ 		if (/الاسم/.test(t)) { return { s: 1, f: 'name' }; }
+-		if (/صفت/.test(t)) { return { s: 2, f: 'persona' }; }
++		if (/فئت|صفت/.test(t)) { return { s: 2, f: 'persona' }; }
+ 		if (/نبذة/.test(t)) { return { s: 2, f: 'bio' }; }
+ 		if (/كلمة المرور/.test(t)) { return { s: 2, f: 'password' }; }
+ 		return { s: 2, f: '' };
+@@ -1954,7 +1955,7 @@
+ 		var step = function (n, focus) {
+ 			f1.hidden = n !== 1; f2.hidden = n !== 2;
+ 			bar.style.width = n === 1 ? '50%' : '100%';
+-			pn.textContent = 'الخطوة ' + n + ' من 2'; pt.textContent = n === 1 ? 'بياناتك' : 'صفتك ونبذتك';
++			pn.textContent = 'الخطوة ' + n + ' من 2'; pt.textContent = n === 1 ? 'بياناتك' : 'فئتك ونبذتك';
+ 			prog.setAttribute('aria-valuenow', n);
+ 			ui.sheetBackFn = n === 2 ? function () { step(1, true); } : null; ui.sheetBack.hidden = n !== 2;
+ 			ui.sheetBody.scrollTop = 0;
+@@ -1981,7 +1982,7 @@
+ 			e.preventDefault();
+ 			if (isBusy(sb)) { return; }
+ 			var errs = [];
+-			if (!val(f2, 'persona')) { errs.push(['persona', 'اختر صفتك: رائد أعمال، مستثمر، أو محايد.']); }
++			if (!val(f2, 'persona')) { errs.push(['persona', 'اختر فئتك في النادي: محايد، رائد أعمال، أو مستثمر.']); }
+ 			if (val(f2, 'bio').length < 10) { errs.push(['bio', 'اكتب نبذة مختصرة عنك (سطر على الأقل).']); }
+ 			if (val(f2, 'password').length < 6) { errs.push(['password', 'كلمة المرور 6 أحرف فأكثر.']); }
+ 			if (showErrs(f2, errs)) { return; }
+@@ -2017,12 +2018,12 @@
+ 				(CFG.phone_policy ? '<div class="vai-form-note">' + esc(CFG.phone_policy) + '</div>' : '') +
+ 				errBox + '<button type="submit" class="vai-btn vai-btn-p vai-btn-block">التالي</button></form>' +
+ 				'<form class="vai-form vai-reg2" hidden>' +
+-				'<div class="vai-field" data-f="persona"><div class="vai-label" id="vai-persona-l">صفتك</div><div class="vai-choices" role="radiogroup" aria-labelledby="vai-persona-l">' +
++				'<div class="vai-field" data-f="persona"><div class="vai-label" id="vai-persona-l">فئتك في النادي</div><div class="vai-choices" role="radiogroup" aria-labelledby="vai-persona-l">' +
+ 				PERSONAS.map(function (p) { var on = regDraft.persona === p[0]; return '<label class="vai-choice' + (on ? ' vai-on' : '') + '"><input type="radio" name="persona" value="' + p[0] + '"' + (on ? ' checked' : '') + '><span class="vai-choice-t">' + p[1] + '</span><span class="vai-choice-d">' + p[2] + '</span></label>'; }).join('') +
+ 				'</div><div class="vai-field-err" role="alert"></div></div>' +
+ 				field({ name: 'bio', label: 'نبذة مختصرة عنك', type: 'textarea', rows: 3, required: true, value: regDraft.bio, help: 'من أنت وماذا تبحث عنه — سطر واحد يكفي.' }) +
+ 				'<div class="vai-count" aria-hidden="true"></div>' +
+-				field({ name: 'job_title', label: 'الوظيفة أو الصفة', optional: true, value: regDraft.job_title, autocomplete: 'organization-title' }) +
++				field({ name: 'job_title', label: 'الوظيفة أو المنصب', optional: true, value: regDraft.job_title, autocomplete: 'organization-title' }) +
+ 				field({ name: 'password', label: 'كلمة مرور لحسابك', type: 'password', dir: 'ltr', autocomplete: 'new-password', required: true, help: '6 أحرف على الأقل.' }) +
+ 				errBox + '<button type="submit" class="vai-btn vai-btn-p vai-btn-block">إنشاء الحساب وإرسال الرمز</button><button type="button" class="vai-link vai-back">رجوع لتعديل بياناتي</button>' +
+ 				'<div class="vai-form-note">حساب واحد تدخل به على كل مواقع المنظومة.</div></form>';
+diff -ruN --strip-trailing-cr hub/vibes-ai-assistant/includes/class-vai-hub.php work/hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-21 00:02:52.000000000 +0300
++++ work/hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-22 00:57:23.892037000 +0300
+@@ -1945,7 +1945,7 @@
+ 			$lines[] = 'وضع خاص: الذي يكلمك الآن هو أدمن المنظومة (' . $c->name . ') وله التحكم الكامل — عامله كمدير، نادِه باسمه، بلا أي بيع أو بوابات؛ نفّذ طلباته المعلوماتية من «ملخص العمليات» في السياق (عدد المحادثات اليوم، الحسابات الجديدة، الأعضاء، الليدز، أهم العملاء وما وصلوا إليه)، واقترح عليه ما تقدر تقدمه: إحصاءات اليوم، أهم العملاء الجادين، ملخص عميل معيّن، صياغة رد، رابط لوحة الإدارة ' . home_url( '/?vai-console=1' ) . '. ما لا تقدر عليه (تعديل إعدادات، إرسال إيميلات) اشرح مكانه في لوحة التحكم.';
+ 		}
+ 		if ( $paid ) {
+-			$lines[] = 'وضع العميل: عضو مدفوع ⭐ — أنت مستشاره الخاص: تكلم معه بحرية وبتوسّع وعمق، بلا حدود على طول الحوار، وبلا أي محاولة بيع للعضوية. عرّف نفسك عند بداية التعامل كمستشاره الشخصي: لرائد الأعمال «أساعدك في تحويل شركتك ونموها خطوة بخطوة»، وللمستثمر «أساعدك تلاقي الشركة المناسبة لتوجهك ونتابع معًا حتى الشراكة»، وللمحايد «أنا مستشارك الخاص الموجود لك 24 ساعة في اليوم». طبّق خصومات الأعضاء تلقائيًا على كل خدمة تذكرها.';
++			$lines[] = 'وضع العميل: عضو مدفوع ⭐ — أنت مستشاره الخاص: تكلم معه بحرية وبتوسّع وعمق، بلا حدود على طول الحوار، وبلا أي محاولة بيع للعضوية. عرّف نفسك عند بداية التعامل كمستشاره الشخصي: للمحايد «أنا مستشارك الخاص الموجود لك 24 ساعة في اليوم»، ولرائد الأعمال «أساعدك في تحويل شركتك ونموها خطوة بخطوة»، وللمستثمر «أساعدك تلاقي الشركة المناسبة لتوجهك ونتابع معًا حتى الشراكة». طبّق خصومات الأعضاء تلقائيًا على كل خدمة تذكرها.';
+ 			$lines[] = 'مع المستثمر الجاد اسأل بلطف: كم نسبة الحصة التي يفضّل الدخول بها إن أعجبته شركة؟ وهل لديه القدرة المالية الجاهزة للشراكة الآن؟ — لتوجّهه للفرصة المناسبة وتمهّد للإدارة.';
+ 			$lines[] = 'بنك المشاريع للعضو: افهم توجهه أولًا (قطاعه، قائم أم ناشئ، شريك صامت أم فاعل، مدينته) ثم رشّح له من «مشاريع مطابقة» أو find_projects بروح المستشار الحريص: «رصيدك 5 مشاريع فقط للتواصل مع مؤسسيها — خلنا نختار بتأنٍ ونفكر أحسن قبل ما نفتح أي مشروع» — واعرض المشروع الأنسب أولًا مع سبب الترشيح.';
+ 			$lines[] = 'خدمات الأعضاء عنده جاهزة بزر «خدمات الأعضاء» في المساعد: حجز حلقة بودكاست بخصم 50% (أقرب موعد عبر واتساب الاستوديو، ويمكن لأي شخص من طرفه الاستفادة بنفس الخصم)، Pitch Deck بخصم 50% (رابط دفع الأعضاء)، اصنع ملتقاك بخصم 50% (رابط دفع الأعضاء)، بنك المشاريع، وباقي الخدمات عبر رقم الإدارة الموحد. عند طلب أي منها وجّهه للزر أو أرسل الرابط المناسب من مكتبة الروابط/الخدمات.';
+@@ -1953,7 +1953,7 @@
+ 		} else {
+ 			$reg = $c && ! empty( $c->pass_hash ) && (int) $c->verified;
+ 			if ( ! $reg ) {
+-				$lines[] = 'الزائر غير معروف الهوية: بعد ردك هذا يعرض النظام نموذج البيانات تلقائيًا — فاختم ردك بجملة لطيفة تمهّد له أنك تحتاج تتعرّف عليه أكثر لتكمل معه صح (اسمه وجواله وبريده وصفته)، خاصة لو ذكر شراكة أو استثمارًا: لا تناقش أي تفاصيل شراكة ولا تحوّله للإدارة قبل التسجيل.';
++				$lines[] = 'الزائر غير معروف الهوية: بعد ردك هذا يعرض النظام نموذج البيانات تلقائيًا — فاختم ردك بجملة لطيفة تمهّد له أنك تحتاج تتعرّف عليه أكثر لتكمل معه صح (اسمه وجواله وبريده وفئته في النادي)، خاصة لو ذكر شراكة أو استثمارًا: لا تناقش أي تفاصيل شراكة ولا تحوّله للإدارة قبل التسجيل.';
+ 			}
+ 			$lines[] = 'وضع العميل: ' . ( $reg ? 'مسجّل لكن عضويته غير مفعّلة (لم يدفع) — ابدأ ردك الأول له بـ «عضويتك غير مفعّلة بعد» وذكّره عند المناسبة' : 'زائر غير مشترك' ) . ' — الممنوع: الدردشة والسوالف والاستشارات والخطط والتحليلات؛ المسموح فقط: شرح مزايا العضوية بالأرقام، والإجابة المختصرة عن الخدمات (تسجيل مشروع، اصنع ملتقاك، Pitch Deck، البودكاست) بسطر أو سطرين، ثم في كل رد دعوة واضحة للاشتراك: «لازم تسجّل عضوية سنوية عشان نكمل» مع رابط الدفع المباشر ' . $pay . '. لا خصومات له ولا انضمام للمجموعات ولا بنك مشاريع قبل التفعيل — قل ذلك صراحة إن سأل. ' . ( trim( (string) vai_cfg( 'first_reply_note' ) ) !== '' ? 'في أول رد له فقط أضف هذه الجملة بمعناها وبأسلوبك (مرة واحدة): «' . trim( (string) vai_cfg( 'first_reply_note' ) ) . '».' : 'لا تذكر شيئًا عن تسجيل المحادثة من عدمه.' ) . ' الترحيب الأول بلا قوائم نقطية وبلا سرد خيارات — سطران وسؤال واحد.';
+ 			$lines[] = 'الشراكات والمجموعات وبنك المشاريع للمشتركين فقط: لا تفتح نقاش حصص أو تفاصيل شراكة عميقة، ولا تعِد بالانضمام للمجموعات، قبل الاشتراك — وجّهه للاشتراك أولًا.';
+@@ -2297,8 +2297,8 @@
+ 			return vai_error( 'phone', 'رقم الجوال غير صحيح أو ناقص — اكتبه بدون مسافات وبدون رمز الدولة بهذا الشكل: ' . $ex . ( $country === 'sa' ? ' (للسعودية)' : '' ) . '. التسجيل متاح للسعوديين والمقيمين في المملكة ودول مجلس التعاون الخليجي — اختر دولتك من القائمة إن لم تكن السعودية.' );
+ 		}
+ 		$phone = vai_phone_local( $pn );
+-		if ( ! in_array( $persona, array( 'entrepreneur', 'investor', 'neutral' ), true ) ) {
+-			return vai_error( 'invalid', 'اختر صفتك: رائد أعمال، مستثمر، أو محايد' );
++		if ( ! in_array( $persona, array( 'neutral', 'entrepreneur', 'investor' ), true ) ) {
++			return vai_error( 'invalid', 'اختر فئتك في النادي: محايد، رائد أعمال، أو مستثمر' );
+ 		}
+ 		if ( mb_strlen( trim( $bio ), 'UTF-8' ) < 10 ) {
+ 			return vai_error( 'invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل' );
+@@ -2433,7 +2433,8 @@
+ 	}
+ 
+ 	public static function persona_label( $p ) {
+-		$m = array( 'entrepreneur' => 'رائد أعمال — لدي مشروع مميز', 'investor' => 'مستثمر — أبحث عن فرص شراكة واعدة', 'neutral' => 'محايد — شريك المستقبل وسأحدد توجهي لاحقًا' );
++		// 2.7.1 — the owner's order and wording (the same three lines as the app): neutral, entrepreneur, investor
++		$m = array( 'neutral' => 'محايد — أستكشف توجهي', 'entrepreneur' => 'رائد أعمال — لدي مشروع', 'investor' => 'مستثمر — أبحث عن فرص' );
+ 		return isset( $m[ $p ] ) ? $m[ $p ] : ( $p ?: '—' );
+ 	}
+ 
+@@ -2448,7 +2449,7 @@
+ 			'الجوال: ' . vai_phone_local( $c->phone_norm ?: $c->phone ),
+ 			'البريد: ' . $c->email,
+ 			'الوظيفة: ' . ( $c->job_title ?: '—' ),
+-			'الصفة: ' . self::persona_label( $c->persona ),
++			'الفئة: ' . self::persona_label( $c->persona ),
+ 			'نبذة: ' . ( $c->bio ?: '—' ),
+ 			'الموقع الذي سجّل منه: ' . ( $site ? $site->host : '' ),
+ 			'التاريخ: ' . vai_riyadh( vai_now() ) . ' (الرياض)',
+diff -ruN --strip-trailing-cr hub/vibes-ai-assistant/readme.txt work/hub/vibes-ai-assistant/readme.txt
+--- hub/vibes-ai-assistant/readme.txt	2026-09-20 22:58:28.000000000 +0300
++++ work/hub/vibes-ai-assistant/readme.txt	2026-09-22 01:09:42.862896300 +0300
+@@ -3,7 +3,7 @@
+ Requires at least: 6.0
+ Tested up to: 6.8
+ Requires PHP: 7.4
+-Stable tag: 2.7.0
++Stable tag: 2.7.1
+ 
+ مساعد منظومة ڤايبز الذكي: ويدجت محادثة يعمل على كل مواقع المنظومة (وضع «موقع تابع») + قاعدة بيانات وداشبورد مركزية (وضع «الهب») + ربط بعقل n8n (Vibes Web Agent).
+ 
+@@ -13,6 +13,11 @@
+ 3. أضف كل موقع من صفحة «المواقع» في الهب، وثبّت البلجن على ذلك الموقع بوضع «موقع تابع» مع مفتاحه.
+ 
+ == سجل التغييرات ==
++= 2.7.1 =
++* فئات النادي بترتيب واحد في كل مكان: «محايد — أستكشف توجهي» ثم «رائد أعمال — لدي مشروع» ثم «مستثمر — أبحث عن فرص» (نموذج التسجيل، رسائل الخطأ، صفحات الأدمن، بريد إشعار التسجيل، توجيه المستشار).
++* الكلمة صارت «فئة» («فئتك في النادي») بدل «صفة» في نموذج التسجيل ورسائل الخطأ وبريد الإشعار وتوجيه المستشار؛ وحقل «الوظيفة أو المنصب».
++* لا تغيير في قاعدة البيانات ولا في المفاتيح ولا في مسار Paymob ورابط الإشعار. يُرفع فوق 2.7.0 مباشرة.
++
+ = 2.7.0 =
+ * عقل واحد للموقع والتطبيق: عمليات جديدة لخادم تطبيق نادي المستثمرين (إحصاءات يومية، الحسابات، المدفوعات، التذاكر، الليدز، المحادثات والرد باسم الأدمن، طابور البريد، منح العضوية وتمديدها وإلغاؤها، دور «ناشر»).
+ * صلاحية «خادم التطبيق (صلاحيات إدارية)» في صفحة «المواقع»: العمليات الإدارية لا يجيبها الهب إلا لهذا الصف، والهب هو من يقرر من هو الأدمن.
+diff -ruN --strip-trailing-cr hub/vibes-ai-assistant/vibes-ai-assistant.php work/hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-20 22:02:57.000000000 +0300
++++ work/hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-22 01:09:42.840537800 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: مساعد منظومة ڤايبز الذكي — ويدجت محادثة يعمل على كل مواقع المنظومة (وضع «موقع تابع») + قاعدة بيانات وداشبورد مركزية (وضع «الهب») + ربط بعقل n8n.
+- * Version:     2.7.0
++ * Version:     2.7.1
+  * Author:      Vibes Holding
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.7.0' );
++define( 'VAI_VERSION', '2.7.1' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

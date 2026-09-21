@@ -75,15 +75,15 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
+      {/* «رسائل الإدارة» is the first thing on the home, above the hero (owner, 2026-09-16 and again 2026-09-22). Renders nothing without posts. */}
+      <PostsBlock />
+
       <View style={styles.hero}>
         <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
         <Text style={styles.heroTitle}>{content.hero.title}</Text>
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
       </View>
-
-      {/* «رسائل الإدارة»: the first content block, right under the hero (owner, 2026-09-16). */}
-      <PostsBlock />
 
       <View style={styles.portals}>
         {content.portals.map((portal) => (

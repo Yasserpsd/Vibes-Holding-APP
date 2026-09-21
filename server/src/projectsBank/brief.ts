@@ -7,6 +7,7 @@ import { RateLimiter } from '../auth/rateLimit.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { KV } from '../store.js';
 import { hasContact, mentionsFunding, stripContacts, stripFunding } from './redact.js';
+import { STAGES, STEPS, stepOf } from './stage.js';
 import { makeExcerpt, normalizeForSearch } from './text.js';
 import type { PublicProject } from './types.js';
 
@@ -37,21 +38,13 @@ export type ProjectBrief = {
 export const BRIEF_DISCLAIMER = 'ملخص آلي من بيانات المشروع المنشورة في بنك المشاريع. المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.';
 export const briefKey = (id: number): string => `projects:brief:${id}`;
 
-const VERSION = 3;
+const VERSION = 4;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
 const MAX_COMPETITORS = 4;
 const AI_PER_HOUR = 90;
 
-const STAGES = [
-  { key: 'idea', label: 'فكرة', match: /فكر|دراس|idea|concept/i },
-  { key: 'prototype', label: 'تأسيس ونموذج أولي', match: /تاسيس|نموذج|اولي|تجريب|تطوير|prototype|mvp|seed/i },
-  { key: 'launch', label: 'إطلاق وتشغيل', match: /اطلاق|تشغيل|قايم|بدايه|launch|operat/i },
-  { key: 'revenue', label: 'تحقيق الدخل', match: /دخل|ايراد|مبيعات|cash|revenue/i },
-  { key: 'growth', label: 'نمو وتوسع', match: /نمو|توسع|انتشار|growth|scale|expan/i },
-] as const;
-const STEPS = STAGES.map((stage) => stage.label);
 
 /** Wording rules of the app applied to text we author (CLAUDE.md): «بدون رسوم», and an en dash between two numbers. */
 function fixWording(value: string): string {
@@ -82,15 +75,11 @@ function publicProse(details: string | null): string {
 }
 
 export function stageOf(project: Pick<PublicProject, 'stage'>): BriefStage {
-  const name = project.stage?.name ?? '';
-  const folded = normalizeForSearch(name);
-  // The furthest matching step wins («تشغيل ونمو» is growth).
-  let index = -1;
-  STAGES.forEach((stage, position) => {
-    if (folded && stage.match.test(folded)) index = position;
-  });
-  const hit = index >= 0 ? STAGES[index] : undefined;
-  return { key: hit?.key ?? 'unknown', label: name || 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: false };
+  // The mapper already placed the project on the five steps (`placeStage`); a snapshot stored before that still carries the site's wording.
+  const bySlug = STAGES.findIndex((stage) => stage.key === project.stage?.slug);
+  const index = bySlug >= 0 ? bySlug : stepOf(project.stage?.name);
+  const hit = STAGES[index];
+  return { key: hit?.key ?? 'unknown', label: hit?.label ?? 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: Boolean(hit && project.stage?.estimated) };
 }
 
 const STOP = new Set(['من', 'في', 'على', 'الى', 'عن', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'او', 'ان', 'كل', 'بين', 'حيث', 'كما', 'ذلك', 'مشروع', 'المشروع', 'شركه', 'الشركه', 'the', 'and', 'for', 'with']);

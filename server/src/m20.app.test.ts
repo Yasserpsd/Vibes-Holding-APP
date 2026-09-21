@@ -227,7 +227,7 @@ test('brief without an OpenAI key: the rules write it from public fields, contac
   const brief = res.json();
   assert.deepEqual(Object.keys(brief), ['summary', 'table', 'stage', 'strengths', 'risks', 'competitors', 'disclaimer', 'generatedAt', 'source']);
   assert.equal(brief.source, 'rules');
-  assert.deepEqual([brief.stage.key, brief.stage.index, brief.stage.total, brief.stage.label], ['growth', 4, 5, 'نمو']);
+  assert.deepEqual([brief.stage.key, brief.stage.index, brief.stage.total, brief.stage.label], ['growth', 4, 5, 'نمو وتوسع']);
   assert.equal(brief.stage.steps.length, 5);
   assert.ok(brief.disclaimer.includes('المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد'));
   const labels = brief.table.map((row: { label: string }) => row.label);
