@@ -17,7 +17,7 @@ import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, ty
 export const MOCK_CODE = '123456';
 const MOCK_DAILY_LIMIT = 20;
 const ALLOWED_DOMAINS = ['gmail.com', 'icloud.com', 'outlook.com', 'hotmail.com', 'live.com'];
-const PERSONAS = ['entrepreneur', 'investor', 'neutral'];
+const PERSONAS = ['neutral', 'entrepreneur', 'investor'];
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex');
 const str = (body: HubBody, key: string, max = 500): string =>
@@ -175,7 +175,7 @@ export class MockHubClient implements HubClient {
     if (!name) throw new HubError('invalid', 'الاسم مطلوب', 400);
     const phoneNorm = phoneIntl(country, str(body, 'phone', 40));
     if (!phoneNorm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص — اكتبه بدون مسافات وبدون رمز الدولة', 400);
-    if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر صفتك: رائد أعمال، مستثمر، أو محايد', 400);
+    if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر فئتك: محايد، رائد أعمال، أو مستثمر', 400);
     if (bio.length < 10) throw new HubError('invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل', 400);
     if (!email) throw new HubError('invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل', 400);
     if (!emailAllowed(email)) throw new HubError('email_domain', `${EMAIL_POLICY_TEXT} — هذا البريد غير مقبول`, 400);

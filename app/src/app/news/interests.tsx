@@ -10,6 +10,8 @@ import { Chip } from '@/components/Chip';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /** The member's news interests, stored with the account so every device sees the same ranking. */
@@ -26,16 +28,16 @@ export default function InterestsScreen() {
 
   if (!signedIn) {
     return (
-      <Screen title="اهتماماتي">
-        <Notice text="سجّل الدخول لحفظ اهتماماتك وترتيب الأخبار حسبها." />
-        <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+      <Screen title={t('nav.interests')}>
+        <Notice text={t('news.interests.signInNotice')} />
+        <AppButton label={t('account.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
       </Screen>
     );
   }
 
   if (!topics.data || !prefs.data || selected === null) {
     return (
-      <Screen title="اهتماماتي">
+      <Screen title={t('nav.interests')}>
         <StateView loading={topics.isPending || prefs.isPending} error={topics.error ?? prefs.error} onRetry={() => void Promise.all([topics.refetch(), prefs.refetch()])} />
       </Screen>
     );
@@ -55,7 +57,7 @@ export default function InterestsScreen() {
   };
 
   return (
-    <Screen title="اهتماماتي" subtitle="اختر ما يهمك؛ تُرتَّب الأخبار لك حسب اختيارك، ويبقى قسم «قرارات وأنظمة المملكة» ثابتًا للجميع.">
+    <Screen title={t('nav.interests')} subtitle={t('news.interests.subtitle')}>
       <View style={styles.chips}>
         {topics.data.topics.map((topic) => (
           <Chip key={topic.key} label={topic.label} selected={selected.includes(topic.key)} onPress={() => toggle(topic.key)} />
@@ -63,13 +65,13 @@ export default function InterestsScreen() {
       </View>
       {suggestedLabels.length > 0 ? (
         <View style={styles.suggestion}>
-          <Text style={styles.suggestionText}>{`مقترح لصفتك في النادي: ${suggestedLabels.join('، ')}`}</Text>
-          <AppButton label="اختيار المقترح" variant="outline" icon="checkmark-done-outline" onPress={() => setPicked(prefs.data?.suggested ?? [])} />
+          <Text style={styles.suggestionText}>{t('news.interests.suggested', { topics: suggestedLabels.join(t('common.listSeparator')) })}</Text>
+          <AppButton label={t('news.interests.useSuggested')} variant="outline" icon="checkmark-done-outline" onPress={() => setPicked(prefs.data?.suggested ?? [])} />
         </View>
       ) : null}
       {save.error ? <Text style={styles.error}>{errorMessage(save.error)}</Text> : null}
-      <AppButton label={save.isPending ? 'جارٍ الحفظ…' : 'حفظ الاهتمامات'} icon="save-outline" onPress={() => void submit()} />
-      <Text style={styles.footnote}>{selected.length === 0 ? 'بدون اختيار تُرتَّب الأخبار حسب الأهمية والحداثة فقط.' : `${selected.length} اهتمامات مختارة`}</Text>
+      <AppButton label={save.isPending ? t('news.interests.saving') : t('news.interests.save')} icon="save-outline" onPress={() => void submit()} />
+      <Text style={styles.footnote}>{selected.length === 0 ? t('news.interests.none') : t('news.interests.count', { count: selected.length })}</Text>
     </Screen>
   );
 }
@@ -77,7 +79,7 @@ export default function InterestsScreen() {
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   suggestion: { gap: spacing.sm },
-  suggestionText: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  suggestionText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 });

@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, Vie
 
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { t } from '@/i18n';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -39,7 +40,7 @@ function PromptSheet({ title, message, confirmLabel, busy = false, error, onConf
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           <FormField
-            label="كلمة المرور"
+            label={t('common.password')}
             latin
             secureTextEntry
             autoCapitalize="none"
@@ -52,8 +53,8 @@ function PromptSheet({ title, message, confirmLabel, busy = false, error, onConf
             editable={!busy}
           />
           <View style={styles.actions}>
-            <AppButton label={busy ? 'جارٍ التنفيذ…' : confirmLabel} onPress={confirm} style={styles.danger} />
-            <AppButton label="إلغاء" variant="outline" onPress={onCancel} />
+            <AppButton label={busy ? t('common.working') : confirmLabel} onPress={confirm} style={styles.danger} />
+            <AppButton label={t('common.cancel')} variant="outline" onPress={onCancel} />
           </View>
         </Pressable>
       </Pressable>

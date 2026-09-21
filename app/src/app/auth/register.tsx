@@ -50,7 +50,7 @@ export default function RegisterScreen() {
     if (!isLocalPhone(form.phone, country?.pattern)) next.phone = `اكتب الرقم بهذا الشكل: ${country?.example ?? '0558318777'}`;
     if (!isEmail(form.email)) next.email = 'اكتب بريدًا إلكترونيًا صحيحًا';
     if (form.password.length < 6) next.password = 'كلمة المرور 6 أحرف على الأقل';
-    if (!form.persona) next.persona = 'اختر صفتك في النادي';
+    if (!form.persona) next.persona = 'اختر فئتك في النادي';
     if (form.bio.trim().length < 10) next.bio = 'اكتب نبذة مختصرة عنك (سطر على الأقل)';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -146,7 +146,7 @@ export default function RegisterScreen() {
         error={errors.password}
       />
       <View style={styles.group}>
-        <Text style={styles.label}>صفتك في النادي</Text>
+        <Text style={styles.label}>فئتك في النادي</Text>
         {config.personas.map((item) => {
           const selected = item.key === form.persona;
           return (

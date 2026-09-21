@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "strings": "node scripts/sync-app-strings.mjs",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "seed": "tsx src/cli/seed.ts",
     "feed:inspect": "tsx src/cli/inspect-feed.ts"

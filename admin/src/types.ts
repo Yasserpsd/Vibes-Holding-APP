@@ -223,6 +223,12 @@ export type StorePurchase = {
   reason: string | null;
 };
 
+/** «نصوص التطبيق» (mirrors server/src/appStrings/service.ts). */
+export type WordingLang = 'ar' | 'en';
+export type WordingEdit = { value: string; by: string; at: string };
+export type WordingItem = { key: string; group: string; ar: string; en: string; arEdit: WordingEdit | null; enEdit: WordingEdit | null; placeholders: string[] };
+export type WordingList = { groups: { key: string; label: string; count: number }[]; items: WordingItem[]; edited: Record<WordingLang, number> };
+
 export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply';
 export type AuditEntry = {
   id: string;

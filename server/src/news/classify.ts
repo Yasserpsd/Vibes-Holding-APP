@@ -30,7 +30,11 @@ function escape(term: string): string {
  * does not match «أمطار»; suffixes stay allowed (plurals, pronouns). Latin terms use word boundaries.
  */
 function pattern(terms: string[]): RegExp {
-  const parts = terms.map((term) => (/[؀-ۿ]/.test(term) ? `(?<!\\p{L})${ARABIC_PREFIX}${escape(term)}` : `\\b${escape(term)}`));
+  const parts = terms.map((term) => {
+    if (/[؀-ۿ]/.test(term)) return `(?<!\\p{L})${ARABIC_PREFIX}${escape(term)}`;
+    // «the Kingdom» is Saudi Arabia in Saudi English outlets; «United Kingdom» is another country.
+    return term === 'kingdom' ? '(?<!united\\s)\\bkingdom' : `\\b${escape(term)}`;
+  });
   return new RegExp(parts.join('|'), 'iu');
 }
 
@@ -61,6 +65,22 @@ const DECISION_NOUN = pattern(['نظام', 'أنظمة', 'لائحة', 'لوائ
 const CABINET = pattern(['مجلس الوزراء يوافق', 'مجلس الوزراء وافق', 'وافق مجلس الوزراء', 'مجلس الوزراء يقر', 'أقر مجلس الوزراء', 'مجلس الوزراء يقرر', 'قرر مجلس الوزراء', 'قرارات مجلس الوزراء', 'cabinet approv']);
 const AUTHORITY = pattern(['السعودية', 'سعودي', 'المملكة', 'هيئة', 'وزارة', 'وزير', 'البنك المركزي', 'ساما', 'مجلس', 'أمانة', 'الجهات المختصة', 'saudi', 'kingdom', 'ministry', 'authority', 'cabinet', 'sama', 'cma', 'zatca', 'misa', 'monsha']);
 const SAUDI = pattern(['السعودية', 'سعودي', 'المملكة', 'الرياض', 'جدة', 'الدمام', 'saudi', 'kingdom', 'riyadh', 'jeddah', 'dammam']);
+/** What an English outlet writes when the story is about Saudi Arabia. */
+const SAUDI_EN_TERMS = ['saudi', 'riyadh', 'jeddah', 'dammam', 'aramco', 'neom', 'tadawul', 'vision 2030', 'public investment fund', 'pif', 'sabic', 'qiddiya', 'diriyah', 'ksa'];
+const SAUDI_EN = pattern(SAUDI_EN_TERMS);
+/** A Saudi outlet also writes «the Kingdom»; abroad that word is as often Jordan, Bahrain or Morocco. */
+const SAUDI_EN_HOME = pattern([...SAUDI_EN_TERMS, 'kingdom']);
+const LEDE_CHARS = 220;
+
+/**
+ * Whether an English entry is a story about Saudi Arabia: the country is named in the title or in the opening
+ * lines. The rest of a summary does not count: feeds that carry the whole article mention it in passing.
+ */
+export function mentionsSaudi(title: string, summary: string | null, tier: SourceTier): boolean {
+  const names = tier === 'global' ? SAUDI_EN : SAUDI_EN_HOME;
+  return names.test(title) || names.test((summary ?? '').slice(0, LEDE_CHARS));
+}
+
 /** Another country's decision reported by a Saudi outlet is not a Saudi decision. */
 const FOREIGN = pattern(['الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان', 'سلطنة', 'مصر', 'الأردن', 'العراق', 'سوريا', 'لبنان', 'تركيا', 'إيران', 'أمريكا', 'أمريكي', 'الولايات المتحدة', 'أوروبا', 'أوروبي', 'بريطانيا', 'بريطاني', 'فرنسا', 'ألمانيا', 'الصين', 'الهند', 'اليابان', 'روسيا', 'الفيدرالي', 'روسي', 'صيني', 'هندي', 'ياباني', 'تركي', 'إيراني', 'إماراتي', 'كويتي', 'قطري', 'بحريني', 'عماني', 'مصري', 'أردني', 'عراقي', 'سوري', 'لبناني', 'فرنسي', 'ألماني', 'الأوروبي', 'uae', 'emirates', 'kuwait', 'qatar', 'bahrain', 'oman', 'egypt', 'jordan', 'iraq', 'turkey', 'iran', 'europe', 'u.s.', 'federal reserve', 'china', 'india', 'japan', 'russia']);
 

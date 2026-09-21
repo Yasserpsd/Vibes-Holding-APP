@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import { useDecisions } from '@/api/news';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /** The fixed section, the same for everyone: official decisions, laws and regulations, newest first. */
@@ -18,9 +19,9 @@ export default function DecisionsScreen() {
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <NewsCard item={item} onPress={() => router.push({ pathname: '/news/[id]', params: { id: item.id } })} />}
-        ListHeaderComponent={<Text style={styles.intro}>القرارات والأنظمة واللوائح الصادرة عن الجهات الرسمية في المملكة، من مصادرها.</Text>}
+        ListHeaderComponent={<Text style={styles.intro}>{t('news.decisionsIntro')}</Text>}
         ListEmptyComponent={
-          <StateView loading={list.isPending} error={list.error} onRetry={() => list.refetch()} empty={!list.isPending && !list.error} emptyText="لا توجد قرارات جديدة حاليًا" />
+          <StateView loading={list.isPending} error={list.error} onRetry={() => list.refetch()} empty={!list.isPending && !list.error} emptyText={t('news.decisionsEmptyList')} />
         }
         ListFooterComponent={list.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}
         onEndReached={() => {

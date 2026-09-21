@@ -4,7 +4,7 @@ import type { KV } from '../store.js';
  * Home screen content: the three portals, the golden and membership blocks and the advisor
  * opening for the neutral portal. Editable server content (the dashboard edits it later).
  */
-export type PortalKey = 'investor' | 'entrepreneur' | 'neutral';
+export type PortalKey = 'neutral' | 'entrepreneur' | 'investor';
 
 export type HomePortal = {
   key: PortalKey;

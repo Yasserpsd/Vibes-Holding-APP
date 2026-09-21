@@ -2,24 +2,25 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 
+import { t, type StringKey } from '@/i18n';
 import { colors, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type TabDefinition = {
   name: string;
-  title: string;
+  title: StringKey;
   icon: IoniconName;
   iconOutline: IoniconName;
 };
 
-// Order matters: in RTL the first tab is rendered on the right.
+// Order matters: the first tab sits where reading starts (the right in Arabic, the left in English).
 const TABS: TabDefinition[] = [
-  { name: 'index', title: 'الرئيسية', icon: 'home', iconOutline: 'home-outline' },
-  { name: 'projects', title: 'بنك المشاريع', icon: 'briefcase', iconOutline: 'briefcase-outline' },
-  { name: 'advisor', title: 'المستشار', icon: 'sparkles', iconOutline: 'sparkles-outline' },
-  { name: 'news', title: 'الأخبار', icon: 'newspaper', iconOutline: 'newspaper-outline' },
-  { name: 'account', title: 'حسابي', icon: 'person', iconOutline: 'person-outline' },
+  { name: 'index', title: 'tabs.home', icon: 'home', iconOutline: 'home-outline' },
+  { name: 'projects', title: 'tabs.projects', icon: 'briefcase', iconOutline: 'briefcase-outline' },
+  { name: 'advisor', title: 'tabs.advisor', icon: 'sparkles', iconOutline: 'sparkles-outline' },
+  { name: 'news', title: 'tabs.news', icon: 'newspaper', iconOutline: 'newspaper-outline' },
+  { name: 'account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
 
 export default function TabsLayout() {
@@ -42,7 +43,7 @@ export default function TabsLayout() {
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.title),
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons name={focused ? tab.icon : tab.iconOutline} color={color} size={size} />
             ),

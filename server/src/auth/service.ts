@@ -8,7 +8,7 @@ import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
-export type Persona = 'entrepreneur' | 'investor' | 'neutral';
+export type Persona = 'neutral' | 'entrepreneur' | 'investor';
 
 export const PERSONAS: { key: Persona; label: string }[] = [
   // The owner's wording and order (2026-09-21), the same three lines as the home portals.

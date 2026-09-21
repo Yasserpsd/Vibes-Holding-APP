@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/content/home.ts, services.ts and about.ts.
-export type PortalKey = 'investor' | 'entrepreneur' | 'neutral';
+export type PortalKey = 'neutral' | 'entrepreneur' | 'investor';
 
 export type HomePortal = {
   key: PortalKey;

@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { AccountFilter } from './types';
 
-export type SectionKey = 'home' | 'members' | 'payments' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts';
+export type SectionKey = 'home' | 'members' | 'payments' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {
@@ -81,6 +81,7 @@ const ICONS = {
   mail: 'M3 6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11ZM3.5 7l8.5 6.5L20.5 7',
   audit: 'M12 8v4.5l3 1.75M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4.5v4h4',
   posts: 'M4 10v4h3l6 4.5v-13L7 10H4ZM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11',
+  wording: 'M4 6.5h16M4 6.5V5M20 6.5V5M12 6.5V19M9 19h6M15.5 13.5l4 4M19.5 13.5l-4 4',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
   close: 'M6 6l12 12M18 6 6 18',

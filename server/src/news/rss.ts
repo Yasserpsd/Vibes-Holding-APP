@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 
 import { htmlToText } from '../projectsBank/text.js';
 import { isSpaApi, parseSpaList } from './spa.js';
+import type { NewsLang } from './types.js';
 
 /** One entry of a feed, as the source published it. */
 export type FeedEntry = {
@@ -24,6 +25,11 @@ const MAX_SUMMARY = 500;
 /** Some Saudi outlets answer 403 to non-browser agents; the server identifies as a browser for feeds and pages. */
 export const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
 const TRACKING_PARAMS = /^(utm_|at_|fbclid$|gclid$|traffic_source$|ref$|source$|ito$)/i;
+
+/** What the server asks a source for: an English source gets English (the SPA API picks its wire from this). */
+export function acceptLanguage(lang: NewsLang): string {
+  return lang === 'en' ? 'en' : 'ar,en;q=0.8';
+}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -170,12 +176,12 @@ export function parseFeed(xml: string): FeedEntry[] {
   throw new Error('Unrecognized feed format');
 }
 
-export async function fetchFeed(url: string, fetchImpl: FetchImpl = fetch): Promise<FeedEntry[]> {
+export async function fetchFeed(url: string, fetchImpl: FetchImpl = fetch, lang: NewsLang = 'ar'): Promise<FeedEntry[]> {
   const response = await fetchImpl(url, {
     headers: {
       'user-agent': BROWSER_UA,
       accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5',
-      'accept-language': 'ar,en;q=0.8',
+      'accept-language': acceptLanguage(lang),
     },
     redirect: 'follow',
     signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
@@ -184,7 +190,7 @@ export async function fetchFeed(url: string, fetchImpl: FetchImpl = fetch): Prom
   const length = Number(response.headers.get('content-length') ?? 0);
   if (length > MAX_FEED_BYTES) throw new Error('Feed too large');
   const body = (await response.text()).slice(0, MAX_FEED_BYTES);
-  if (isSpaApi(url)) return parseSpaList(body);
+  if (isSpaApi(url)) return parseSpaList(body, lang);
   if (/^\s*<!doctype html|^\s*<html/i.test(body)) throw new Error('Not a feed (HTML page)');
   return parseFeed(body);
 }

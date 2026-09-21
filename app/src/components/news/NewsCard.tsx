@@ -2,6 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { NewsItem } from '@/api/news';
+import { t } from '@/i18n';
+import { isRTL } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -15,7 +17,8 @@ type Props = {
 
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
 export function NewsCard({ item, onPress, compact = false }: Props) {
-  const latin = item.lang === 'en';
+  // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
+  const latin = item.lang === 'en' && isRTL;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]}>
       <View style={styles.meta}>
@@ -27,7 +30,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         {item.decision ? (
           <View style={styles.badge}>
             <Ionicons name="ribbon-outline" size={11} color={colors.black} />
-            <Text style={styles.badgeText}>قرار</Text>
+            <Text style={styles.badgeText}>{t('news.decisionBadge')}</Text>
           </View>
         ) : null}
       </View>
@@ -56,7 +59,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
           <Pressable onPress={() => void openLink(item.url)} accessibilityRole="link" hitSlop={8} style={({ pressed }) => [styles.readLink, pressed && styles.pressed]}>
             <Ionicons name="open-outline" size={14} color={colors.goldLight} />
             <Text style={styles.readText} numberOfLines={1}>
-              اقرأ من المصدر
+              {t('news.readSource')}
             </Text>
           </Pressable>
         </View>

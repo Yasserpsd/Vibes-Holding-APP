@@ -79,7 +79,7 @@ export function parseContextParams(params: ContextParams): { key: string; contex
       if (!/^[a-f0-9]{16}$/.test(id)) return null;
       return { key, context: { type: 'news', id, title: title || 'خبر' }, prompt };
     case 'portal':
-      if (id !== 'investor' && id !== 'entrepreneur' && id !== 'neutral') return null;
+      if (id !== 'neutral' && id !== 'entrepreneur' && id !== 'investor') return null;
       return { key, context: { type: 'portal', id, title: title || 'البوابة' }, prompt };
     case 'service':
       if (!/^[a-z0-9-]{1,40}$/.test(id)) return null;

@@ -6,6 +6,8 @@ import { useNewsItem } from '@/api/news';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { isRTL } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -21,11 +23,12 @@ export default function NewsItemScreen() {
   useAdvisorScreen(advisorContext);
   // Keeps the note at the end clear of the floating «اسأل المستشار» button.
   const clearance = useAskAdvisorClearance();
-  const latin = item?.lang === 'en';
+  // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
+  const latin = item?.lang === 'en' && isRTL;
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: item?.decision ? 'قرار' : 'الخبر' }} />
+      <Stack.Screen options={{ title: item?.decision ? t('nav.newsDecision') : t('nav.newsItem') }} />
       {!item ? (
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
@@ -43,7 +46,7 @@ export default function NewsItemScreen() {
           {item.decision ? (
             <View style={styles.badge}>
               <Ionicons name="ribbon-outline" size={14} color={colors.black} />
-              <Text style={styles.badgeText}>قرارات وأنظمة المملكة</Text>
+              <Text style={styles.badgeText}>{t('news.decisionsTitle')}</Text>
             </View>
           ) : null}
           <Text style={[styles.title, latin && styles.latin]}>{item.title}</Text>
@@ -57,11 +60,11 @@ export default function NewsItemScreen() {
               ))}
             </View>
           ) : null}
-          <AppButton label="اقرأ من المصدر" icon="open-outline" onPress={() => void openLink(item.url)} />
-          <AppButton label="ناقش الخبر مع المستشار" icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          <AppButton label={t('news.readSource')} icon="open-outline" onPress={() => void openLink(item.url)} />
+          <AppButton label={t('news.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
           <View style={styles.noteCard}>
             <Ionicons name="information-circle-outline" size={20} color={colors.goldLight} />
-            <Text style={styles.noteText}>العنوان والمقتطف كما نشرهما المصدر. التطبيق لا يكتب الأخبار ولا يعيد صياغتها؛ النص الكامل على صفحة المصدر.</Text>
+            <Text style={styles.noteText}>{t('news.sourceNote')}</Text>
           </View>
         </ScrollView>
       )}
