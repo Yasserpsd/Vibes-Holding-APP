@@ -666,5 +666,16 @@
   "card.sending": "Sending…",
   "card.sent": "Your request reached the management; the card will arrive at your address at no charge.",
   "card.needCity": "Write the city.",
-  "card.needAddress": "Write the full address."
+  "card.needAddress": "Write the full address.",
+
+  "poll.badge": "Poll",
+  "poll.openShort": "Share your view",
+  "poll.votedShort": "Your vote is in",
+  "poll.closedShort": "Voting ended",
+  "poll.signIn": "Sign in to take part in the poll.",
+  "poll.total": "Voters: {count}",
+  "poll.closed": "The poll has ended",
+  "poll.closesAt": "Voting is open until {date}",
+  "poll.votedHidden": "Your vote is recorded; the results stay with the management",
+  "poll.changeHint": "You can change your choice until it closes"
 }

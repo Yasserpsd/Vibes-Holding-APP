@@ -81,6 +81,17 @@ export function PostCard({ post }: { post: Post }) {
             </Text>
           </View>
         ) : null}
+        {post.kind === 'poll' ? (
+          <View style={styles.event}>
+            <View style={styles.eventBadge}>
+              <Ionicons name="stats-chart" size={12} color={colors.black} />
+              <Text style={styles.eventBadgeText}>{t('poll.badge')}</Text>
+            </View>
+            <Text style={styles.eventWhen} numberOfLines={1}>
+              {post.poll?.closed ? t('poll.closedShort') : post.poll?.myVote ? t('poll.votedShort') : t('poll.openShort')}
+            </Text>
+          </View>
+        ) : null}
         {event && (event.place || event.onlineUrl) ? (
           <View style={styles.eventPlace}>
             <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />

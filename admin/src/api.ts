@@ -36,18 +36,25 @@ export type Post = {
   event?: PostEvent | null;
   /** M29: posts stored before it have no key and are for everyone. */
   audience?: PostAudience;
+  /** M31: the poll behind a `kind: 'poll'` post, and its live counts as the admin list attaches them. */
+  poll?: PostPoll | null;
+  pollResults?: PollResults | null;
   /** How the last hand-over to the hub went: the websites and the assistant hear a post through it. */
   hubSync?: PostHubSync;
 };
-export type PostKind = 'post' | 'event';
+export type PostKind = 'post' | 'event' | 'poll';
 /** `date` is a day (`2026-10-05`) or an exact time (`2026-10-05T19:30:00+03:00`). */
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+/** M31: a poll's stored shape, its editor input (existing options keep their id so votes survive), and its counts. */
+export type PostPoll = { options: { id: string; label: string }[]; closesAt: string | null; resultsVisible: boolean };
+export type PostPollInput = { options: { id?: string; label: string }[]; closesAt: string | null; resultsVisible: boolean };
+export type PollResults = { options: { id: string; label: string; votes: number | null }[]; closesAt: string | null; closed: boolean; resultsVisible: boolean; totalVotes: number | null; myVote: string | null };
 /** M29: everyone, one persona, or one member («رسالة Admin»). `name` is only the shown label. */
 export type PostPersona = 'neutral' | 'entrepreneur' | 'investor';
 export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona } | { type: 'member'; contactId: number; name: string };
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 /** `video` is the YouTube link or id, `videoFile` the uploaded video; a post may carry both. */
-export type PostInput = { title: string; body: string; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; audience: PostAudience };
+export type PostInput = { title: string; body: string; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; audience: PostAudience };
 
 /** M30: a member's request for his printed membership card, delivered to his door at no charge. */
 export type CardRequest = {

@@ -29,6 +29,16 @@ const eventDate = z
   .regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/, 'تاريخ الفعالية غير صالح')
   .refine((value) => !Number.isNaN(Date.parse(value)), 'تاريخ الفعالية غير صالح');
 
+/** M31: a poll's options as the dashboard sends them; an option keeps its id across edits so votes survive. */
+const pollInputSchema = z.object({
+  options: z
+    .array(z.object({ id: z.string().trim().max(40).optional(), label: z.string().trim().min(1, 'اكتب نص الخيار').max(140) }))
+    .min(2, 'استفتاء يحتاج خيارين على الأقل')
+    .max(20, 'حتى 20 خيارًا في الاستفتاء'),
+  closesAt: eventDate.nullish(),
+  resultsVisible: z.boolean().default(true),
+});
+
 /** M29: who a message is for. `name` on a member audience is only a display label for the dashboard. */
 export const audienceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('all') }),
@@ -46,11 +56,13 @@ export const postInputSchema = z
     videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
     status: z.enum(['draft', 'published']).default('draft'),
     pinned: z.boolean().default(false),
-    kind: z.enum(['post', 'event']).default('post'),
+    kind: z.enum(['post', 'event', 'poll']).default('post'),
     event: z.object({ date: eventDate, place: z.string().trim().max(200).default(''), onlineUrl: httpUrl.nullish() }).nullish(),
+    poll: pollInputSchema.nullish(),
     audience: audienceSchema.default({ type: 'all' }),
   })
-  .refine((input) => input.kind !== 'event' || Boolean(input.event), 'اكتب موعد الفعالية');
+  .refine((input) => input.kind !== 'event' || Boolean(input.event), 'اكتب موعد الفعالية')
+  .refine((input) => input.kind !== 'poll' || Boolean(input.poll), 'اكتب خيارات الاستفتاء');
 export type PostInput = z.infer<typeof postInputSchema>;
 
 export type Post = {
@@ -74,12 +86,21 @@ export type Post = {
   event?: PostEvent | null;
   /** M29: posts stored before it have no key and are for everyone. */
   audience?: PostAudience;
+  /** M31: the poll behind a `kind: 'poll'` post; votes live in their own document (polls/service.ts). */
+  poll?: PostPoll | null;
   /** How the last hand-over to the hub went; `published` = the hub holds a card for this post. */
   hubSync?: PostHubSync;
 };
 
-export type PostKind = 'post' | 'event';
+export type PostKind = 'post' | 'event' | 'poll';
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+export type PostPollOption = { id: string; label: string };
+export type PostPoll = { options: PostPollOption[]; closesAt: string | null; resultsVisible: boolean };
+
+/** M31: a poll after its closing moment takes no more votes; without one it stays open. */
+export function pollClosed(poll: PostPoll, now = Date.now()): boolean {
+  return poll.closesAt !== null && Date.parse(poll.closesAt) <= now;
+}
 export type PostAudience = { type: 'all' } | { type: 'persona'; persona: Persona } | { type: 'member'; contactId: number; name: string };
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 
@@ -155,6 +176,23 @@ export class PostsService {
     return input.kind === 'event' && input.event ? { date: input.event.date, place: input.event.place, onlineUrl: input.event.onlineUrl ?? null } : null;
   }
 
+  /**
+   * M31: builds the stored poll. An edited option keeps its stored id (its votes survive); a new
+   * option gets a fresh random id, never a reused one, so a removed option's votes cannot
+   * resurrect under a newcomer.
+   */
+  private static poll(input: PostInput, before: Post | null): PostPoll | null {
+    if (input.kind !== 'poll' || !input.poll) return null;
+    const kept = new Set((before?.poll?.options ?? []).map((option) => option.id));
+    const used = new Set<string>();
+    const options = input.poll.options.map((option) => {
+      const id = option.id && kept.has(option.id) && !used.has(option.id) ? option.id : randomUUID().slice(0, 8);
+      used.add(id);
+      return { id, label: option.label };
+    });
+    return { options, closesAt: input.poll.closesAt ?? null, resultsVisible: input.poll.resultsVisible };
+  }
+
   private static videoFile(input: PostInput): Post['video'] {
     return input.videoFile ? { url: input.videoFile.url, poster: input.videoFile.poster ?? null } : null;
   }
@@ -195,6 +233,7 @@ export class PostsService {
       notifiedAt: null,
       kind: input.kind,
       event: PostsService.event(input),
+      poll: PostsService.poll(input, null),
       audience: input.audience,
     };
     await this.mutate((posts) => void posts.push(post));
@@ -207,7 +246,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), audience: input.audience, updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), poll: PostsService.poll(input, post), audience: input.audience, updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;

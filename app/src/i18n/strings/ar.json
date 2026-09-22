@@ -666,5 +666,16 @@
   "card.sending": "جارٍ الإرسال…",
   "card.sent": "وصل طلبك إلى الإدارة، وسيصلك الكارت إلى عنوانك بدون رسوم.",
   "card.needCity": "اكتب المدينة.",
-  "card.needAddress": "اكتب العنوان بالتفصيل."
+  "card.needAddress": "اكتب العنوان بالتفصيل.",
+
+  "poll.badge": "استفتاء",
+  "poll.openShort": "شارك برأيك",
+  "poll.votedShort": "سجّلنا صوتك",
+  "poll.closedShort": "انتهى التصويت",
+  "poll.signIn": "سجّل الدخول للمشاركة في الاستفتاء.",
+  "poll.total": "المصوتون: {count}",
+  "poll.closed": "انتهى الاستفتاء",
+  "poll.closesAt": "التصويت متاح حتى {date}",
+  "poll.votedHidden": "تم تسجيل صوتك، والنتائج لدى الإدارة",
+  "poll.changeHint": "يمكنك تغيير اختيارك حتى الإغلاق"
 }

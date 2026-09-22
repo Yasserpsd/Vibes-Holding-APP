@@ -630,7 +630,17 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "card.sending": "جارٍ الإرسال…",
     "card.sent": "وصل طلبك إلى الإدارة، وسيصلك الكارت إلى عنوانك بدون رسوم.",
     "card.needCity": "اكتب المدينة.",
-    "card.needAddress": "اكتب العنوان بالتفصيل."
+    "card.needAddress": "اكتب العنوان بالتفصيل.",
+    "poll.badge": "استفتاء",
+    "poll.openShort": "شارك برأيك",
+    "poll.votedShort": "سجّلنا صوتك",
+    "poll.closedShort": "انتهى التصويت",
+    "poll.signIn": "سجّل الدخول للمشاركة في الاستفتاء.",
+    "poll.total": "المصوتون: {count}",
+    "poll.closed": "انتهى الاستفتاء",
+    "poll.closesAt": "التصويت متاح حتى {date}",
+    "poll.votedHidden": "تم تسجيل صوتك، والنتائج لدى الإدارة",
+    "poll.changeHint": "يمكنك تغيير اختيارك حتى الإغلاق"
   },
   "en": {
     "tabs.home": "Home",
@@ -1262,7 +1272,17 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "card.sending": "Sending…",
     "card.sent": "Your request reached the management; the card will arrive at your address at no charge.",
     "card.needCity": "Write the city.",
-    "card.needAddress": "Write the full address."
+    "card.needAddress": "Write the full address.",
+    "poll.badge": "Poll",
+    "poll.openShort": "Share your view",
+    "poll.votedShort": "Your vote is in",
+    "poll.closedShort": "Voting ended",
+    "poll.signIn": "Sign in to take part in the poll.",
+    "poll.total": "Voters: {count}",
+    "poll.closed": "The poll has ended",
+    "poll.closesAt": "Voting is open until {date}",
+    "poll.votedHidden": "Your vote is recorded; the results stay with the management",
+    "poll.changeHint": "You can change your choice until it closes"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -1292,6 +1312,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "posts": "رسائل الإدارة",
     "compose": "إرسال رسالة من الإدارة",
     "card": "كارت العضوية",
+    "poll": "الاستفتاءات",
     "videos": "مكتبة الفيديو",
     "advisor": "المستشار",
     "news": "الأخبار",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, type PostLink, type PostPersona, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, type PostLink, type PostPersona, type PostPollInput, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
 import { capturePoster, DEFAULT_UPLOAD_CONFIG, fileProblem, megabytes, typedFile, typeNames } from './media';
 
 type Props = { post: Post | null; isAdmin: boolean; onClose: (saved: Post | null) => void };
@@ -150,6 +150,11 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [eventTime, setEventTime] = useState(() => eventFields(post?.event).time);
   const [place, setPlace] = useState(post?.event?.place ?? '');
   const [onlineUrl, setOnlineUrl] = useState(post?.event?.onlineUrl ?? '');
+  // M31: the poll's options (kept ids let votes survive an edit), closing moment and results switch.
+  const [pollOptions, setPollOptions] = useState<{ id?: string; label: string }[]>(() => (post?.poll?.options.length ? post.poll.options.map((option) => ({ ...option })) : [{ label: '' }, { label: '' }]));
+  const [pollDay, setPollDay] = useState(() => eventFields(post?.poll?.closesAt ? { date: post.poll.closesAt, place: '', onlineUrl: null } : null).day);
+  const [pollTime, setPollTime] = useState(() => eventFields(post?.poll?.closesAt ? { date: post.poll.closesAt, place: '', onlineUrl: null } : null).time);
+  const [resultsVisible, setResultsVisible] = useState(post?.poll?.resultsVisible ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<UploadConfig>(DEFAULT_UPLOAD_CONFIG);
@@ -294,13 +299,19 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
       setError('رابط الحضور عن بُعد يجب أن يبدأ بـ http أو https.');
       return;
     }
+    const cleanOptions = pollOptions.map((option) => ({ ...option, label: option.label.trim() })).filter((option) => option.label);
+    if (kind === 'poll' && cleanOptions.length < 2) {
+      setError('استفتاء يحتاج خيارين مكتوبين على الأقل.');
+      return;
+    }
     if (audience.type === 'member' && !audience.contactId) {
       setError('اختر العضو الذي تصله الرسالة أولًا.');
       return;
     }
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
     const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
-    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, audience };
+    const pollInput: PostPollInput | null = kind === 'poll' ? { options: cleanOptions, closesAt: pollDay ? (pollTime ? `${pollDay}T${pollTime}:00+03:00` : pollDay) : null, resultsVisible } : null;
+    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, poll: pollInput, audience };
     setBusy(true);
     setError(null);
     try {
@@ -355,7 +366,43 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             <div className="chips" role="group" aria-label="نوع المنشور">
               <button type="button" className={kind === 'post' ? 'chip on' : 'chip'} aria-pressed={kind === 'post'} onClick={() => setKind('post')}>رسالة</button>
               <button type="button" className={kind === 'event' ? 'chip on' : 'chip'} aria-pressed={kind === 'event'} onClick={() => setKind('event')}>فعالية</button>
+              {isAdmin ? (
+                <button type="button" className={kind === 'poll' ? 'chip on' : 'chip'} aria-pressed={kind === 'poll'} onClick={() => setKind('poll')}>استفتاء</button>
+              ) : null}
             </div>
+            {kind === 'poll' ? (
+              <>
+                <div className="poll-options">
+                  {pollOptions.map((option, index) => (
+                    <div className="pair" key={option.id ?? `new-${index}`}>
+                      <input
+                        placeholder={`الخيار ${index + 1}`}
+                        value={option.label}
+                        maxLength={140}
+                        onChange={(e) => setPollOptions(pollOptions.map((entry, at) => (at === index ? { ...entry, label: e.target.value } : entry)))}
+                      />
+                      <button type="button" disabled={pollOptions.length <= 2} onClick={() => setPollOptions(pollOptions.filter((_, at) => at !== index))}>إزالة</button>
+                    </div>
+                  ))}
+                </div>
+                {pollOptions.length < 20 ? <button type="button" onClick={() => setPollOptions([...pollOptions, { label: '' }])}>إضافة خيار</button> : null}
+                <div className="pair even">
+                  <label>
+                    يُغلق يوم (اختياري)
+                    <input type="date" dir="ltr" value={pollDay} onChange={(e) => setPollDay(e.target.value)} />
+                  </label>
+                  <label>
+                    الساعة بتوقيت الرياض (اختياري)
+                    <input type="time" dir="ltr" value={pollTime} onChange={(e) => setPollTime(e.target.value)} />
+                  </label>
+                </div>
+                <label className="check">
+                  <input type="checkbox" checked={resultsVisible} onChange={(e) => setResultsVisible(e.target.checked)} />
+                  يرى العضو النتائج بعد تصويته (وبعد الإغلاق). بدونها تبقى النتائج للوحة فقط.
+                </label>
+                <p className="muted hint">العضو يصوّت مرة واحدة ويقدر يغيّر اختياره حتى الإغلاق. الاستفتاء داخل التطبيق فقط ولا يصل للمواقع، وحذف خيار يُسقط أصواته.</p>
+              </>
+            ) : null}
             {kind === 'event' ? (
               <>
                 <div className="pair even">

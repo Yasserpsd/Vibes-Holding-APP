@@ -19,12 +19,38 @@ function AudiencePill({ post }: { post: Post }) {
 function HubSync({ post }: { post: Post }) {
   const sync = post.hubSync;
   if (post.status !== 'published') return null;
-  // A targeted message is private: it never travels to the websites or the assistant.
-  if (audienceOf(post).type !== 'all') return <Pill tone="muted">داخل التطبيق فقط</Pill>;
+  // A targeted message is private, and a poll cannot be voted on a website: both stay in the app.
+  if (audienceOf(post).type !== 'all' || post.kind === 'poll') return <Pill tone="muted">داخل التطبيق فقط</Pill>;
   if (!sync) return null;
   if (sync.state === 'ok') return <Pill tone="ok">وصل للمواقع والمستشار</Pill>;
   if (sync.state === 'unsupported') return <Pill tone="muted">المواقع تحتاج إضافة الهب 2.7.0</Pill>;
   return <Pill tone="danger">لم يصل للمواقع بعد · يُعاد عند التعديل التالي</Pill>;
+}
+
+/** M31: the poll's live numbers on its row — a bar per option, the leader filled fullest. */
+function PollResults({ post }: { post: Post }) {
+  const results = post.pollResults;
+  if (post.kind !== 'poll' || !results) return null;
+  const total = results.totalVotes ?? 0;
+  return (
+    <div className="poll-results">
+      {results.options.map((option) => {
+        const votes = option.votes ?? 0;
+        return (
+          <div className="row-line" key={option.id}>
+            <span>{option.label}</span>
+            <span className="muted">{formatNumber(votes)}{total > 0 ? ` · ${Math.round((votes / total) * 100)}%` : ''}</span>
+            <div className="bar"><span style={{ width: total > 0 ? `${(votes / total) * 100}%` : 0 }} /></div>
+          </div>
+        );
+      })}
+      <span className="muted">
+        {`المصوتون: ${formatNumber(total)}`}
+        {results.closesAt ? ` · ${results.closed ? 'أُغلق' : 'يُغلق'} ${formatEventDate(results.closesAt)}` : ''}
+        {results.resultsVisible ? '' : ' · النتائج للوحة فقط'}
+      </span>
+    </div>
+  );
 }
 
 /** «رسائل الإدارة»: messages and events. Publishing one reaches the app, the websites and the assistant together. */
@@ -113,7 +139,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
           setEditing(null);
           if (!post) return;
           setSaved((current) => [post, ...current.filter((entry) => entry.id !== post.id)]);
-          notify('ok', post.kind === 'event' ? 'تم حفظ الفعالية.' : 'تم حفظ المنشور.');
+          notify('ok', post.kind === 'event' ? 'تم حفظ الفعالية.' : post.kind === 'poll' ? 'تم حفظ الاستفتاء.' : 'تم حفظ المنشور.');
           state.reload();
         }}
       />
@@ -135,6 +161,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                   <h2>{post.pinned ? '📌 ' : ''}{post.title}</h2>
                   <span className="pills">
                     {post.kind === 'event' ? <Pill tone="gold">فعالية</Pill> : null}
+                    {post.kind === 'poll' ? <Pill tone="gold">استفتاء</Pill> : null}
                     <AudiencePill post={post} />
                     <span className={post.status === 'published' ? 'badge on' : 'badge'}>{post.status === 'published' ? 'منشور' : 'مسودة'}</span>
                   </span>
@@ -147,6 +174,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                   {post.video ? ' · فيديو مرفوع' : ''}
                 </p>
                 <HubSync post={post} />
+                <PollResults post={post} />
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
                   <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>

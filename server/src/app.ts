@@ -40,6 +40,7 @@ import { mediaRoutes } from './media/routes.js';
 import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
+import { PollsService } from './polls/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
@@ -153,6 +154,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, fetchImpl });
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
   const posts = new PostsService(kv);
+  const polls = new PollsService(kv);
   const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos });
   // Management notifications: the website's hosting mailbox (SMTP) or log-only when it is not configured.
   const mail: Mailer =
@@ -309,7 +311,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
-  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, push, media, hubSync: postsHub, sync });
+  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync });
   await app.register(dashboardRoutes, { service: dashboard, auth });
   await app.register(syncRoutes, { service: sync, feed });
   await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });

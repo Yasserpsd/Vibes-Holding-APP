@@ -18,13 +18,30 @@ export type Post = {
   pinned: boolean;
   publishedAt: string | null;
   /** Bridge v2: a plain message or an event. Older servers send neither key: treat the post as a plain message. */
-  kind?: 'post' | 'event';
+  kind?: 'post' | 'event' | 'poll';
   event?: PostEvent | null;
   /**
    * M29: the message reached this member because it is for everyone, for his category, or for him
    * alone — the feed only ever contains what he may read. Older servers send no key: everyone.
    */
   audience?: 'all' | 'persona' | 'member';
+  /** M31: the poll block as THIS viewer may see it — counts stay null until he may read them. */
+  poll?: Poll | null;
+};
+
+/** M31: «استفتاء» — one changeable vote per member until it closes (server: polls/service.ts view). */
+export type PollOption = { id: string; label: string; votes: number | null };
+export type Poll = {
+  options: PollOption[];
+  closesAt: string | null;
+  closed: boolean;
+  resultsVisible: boolean;
+  totalVotes: number | null;
+  myVote: string | null;
+};
+
+export const pollsApi = {
+  vote: (postId: string, optionId: string) => apiRequest<{ poll: Poll }>('POST', `/api/posts/${encodeURIComponent(postId)}/vote`, { body: { optionId } }),
 };
 
 /** The event's details when the post is one. */

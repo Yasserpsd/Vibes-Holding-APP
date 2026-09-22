@@ -5,12 +5,13 @@ import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../au
 import { PERSONAS, type AuthService } from '../auth/service.js';
 import { hubCall, type HubClient } from '../hub/types.js';
 import { MediaService } from '../media/service.js';
+import type { PollsService } from '../polls/service.js';
 import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
 import type { PostsHubSync } from './hubSync.js';
 import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -34,8 +35,10 @@ const composeSchema = z.object({
 });
 const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 
+const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
+
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, push, media, hubSync, sync }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -44,6 +47,12 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     const current = await maybeSession(request);
     return current?.me ? { contactId: current.me.id, persona: current.me.persona } : null;
   };
+
+  /** M31: the post as the app reads it, with the poll block as THIS viewer may see it. */
+  const viewerPost = async (post: Post, viewer: PostViewer) => ({
+    ...publicPost(post),
+    ...(post.kind === 'poll' ? { poll: await polls.view(post, viewer?.contactId ?? null) } : {}),
+  });
 
   /** How many registered devices the post's audience holds right now. */
   const audienceDevices = async (post: Post): Promise<number> => {
@@ -90,8 +99,9 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     guard(async (request, reply) => {
       const query = parse(listSchema, request.query, reply);
       if (!query) return;
-      const { posts, more } = await service.listPublished(query.limit, query.before, await viewerOf(request));
-      return { posts: posts.map(publicPost), more };
+      const viewer = await viewerOf(request);
+      const { posts, more } = await service.listPublished(query.limit, query.before, viewer);
+      return { posts: await Promise.all(posts.map((post) => viewerPost(post, viewer))), more };
     }),
   );
 
@@ -101,9 +111,27 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
       const post = await service.get(params.id);
+      const viewer = await viewerOf(request);
       // A targeted post answers the wrong viewer exactly like a missing one: its existence is private too.
-      if (!post || post.status !== 'published' || !canSee(post, await viewerOf(request))) return reply.code(404).send(NOT_FOUND);
-      return { post: publicPost(post) };
+      if (!post || post.status !== 'published' || !canSee(post, viewer)) return reply.code(404).send(NOT_FOUND);
+      return { post: await viewerPost(post, viewer) };
+    }),
+  );
+
+  /** M31: one standing vote per member, changeable until the poll closes. Members only. */
+  app.post(
+    '/api/posts/:id/vote',
+    guard(async (request, reply) => {
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const input = parse(voteSchema, request.body, reply);
+      if (!input) return;
+      const viewer = await viewerOf(request);
+      if (!viewer) return reply.code(401).send({ error: { code: 'unauthorized', message: 'سجّل الدخول أولًا للمشاركة في الاستفتاء' } });
+      const post = await service.get(params.id);
+      if (!post || post.status !== 'published' || !canSee(post, viewer)) return reply.code(404).send(NOT_FOUND);
+      await polls.vote(post, viewer.contactId, input.optionId);
+      return { poll: await polls.view(post, viewer.contactId) };
     }),
   );
 
@@ -113,13 +141,20 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
       // M28/M29: a moderator publishes to everyone; the admin's targeted messages are not his to read.
-      const posts = await service.listAll();
-      return { posts: admin.level === 'admin' ? posts : posts.filter((post) => audienceOf(post).type === 'all'), devices: (await push.summary()).total };
+      const all = await service.listAll();
+      const listed = admin.level === 'admin' ? all : all.filter((post) => audienceOf(post).type === 'all');
+      // M31: the dashboard reads every poll's live counts beside it.
+      const posts = await Promise.all(
+        listed.map(async (post) => (post.kind === 'poll' ? { ...post, pollResults: await polls.view(post, null, admin.level === 'admin') } : post)),
+      );
+      return { posts, devices: (await push.summary()).total };
     }),
   );
 
-  /** M28/M29: a moderator publishes to everyone only; targeted messages are the admin's alone. */
+  /** M28/M29/M31: a moderator publishes plain posts to everyone; targeted messages and polls are the admin's alone. */
   const MODERATOR_TARGETED = { error: { code: 'forbidden', message: 'الرسائل الموجّهة لحسابات الأدمن فقط' } };
+  const MODERATOR_POLL = { error: { code: 'forbidden', message: 'الاستفتاءات لحسابات الأدمن فقط' } };
+  const isPoll = (value: Pick<Post, 'kind'> | PostInput | null): boolean => value?.kind === 'poll';
 
   const save = (mode: 'create' | 'update') =>
     guard(async (request, reply) => {
@@ -135,6 +170,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         if (admin.level !== 'admin' && (input.audience.type !== 'all' || (before && audienceOf(before).type !== 'all'))) {
           return await reply.code(403).send(MODERATOR_TARGETED);
         }
+        if (admin.level !== 'admin' && (isPoll(input) || isPoll(before))) return await reply.code(403).send(MODERATOR_POLL);
         await checkMedia(input);
         // A copy: the stored post object is changed in place by the update.
         const previous = before ? { ...before, images: [...before.images] } : null;
@@ -165,8 +201,10 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const post = await service.get(params.id);
       if (!post) return reply.code(404).send(NOT_FOUND);
       if (admin.level !== 'admin' && audienceOf(post).type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
+      if (admin.level !== 'admin' && isPoll(post)) return reply.code(403).send(MODERATOR_POLL);
       if (!(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
       await dropUnused(post, null);
+      if (isPoll(post)) await polls.remove(post.id);
       await hubSync.removed(post, admin.session.uuid);
       await sync.bump('posts');
       return { ok: true };
@@ -183,6 +221,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const post = await service.get(params.id);
       if (!post) return reply.code(404).send(NOT_FOUND);
       if (admin.level !== 'admin' && audienceOf(post).type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
+      if (admin.level !== 'admin' && isPoll(post)) return reply.code(403).send(MODERATOR_POLL);
       if (post.status !== 'published') {
         return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
       }
