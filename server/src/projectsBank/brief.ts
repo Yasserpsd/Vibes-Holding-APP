@@ -44,7 +44,7 @@ export const BRIEF_DISCLAIMER_EN = "An automatic summary from the project's publ
 /** The Arabic brief keeps its key of M13; the English one sits beside it. */
 export const briefKey = (id: number, lang: AppLang = 'ar'): string => (lang === 'en' ? `projects:brief:${id}:en` : `projects:brief:${id}`);
 
-const VERSION = 4;
+const VERSION = 5;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
@@ -55,8 +55,7 @@ const AI_PER_HOUR = 90;
 type BriefText = {
   unknownStage: string;
   disclaimer: string;
-  labels: { number: string; company: string; sector: string; stage: string; kind: string; deck: string; updated: string };
-  kind: { golden: string; bank: string };
+  labels: { number: string; company: string; sector: string; stage: string; deck: string; updated: string };
   deck: { members: string; none: string };
   summaryFallback: (title: string, sector: string | null) => string;
   strengths: { detailed: string; deck: string; golden: string; pastLaunch: string; fallback: string };
@@ -70,8 +69,7 @@ const TEXT: Record<AppLang, BriefText> = {
   ar: {
     unknownStage: 'غير محددة',
     disclaimer: BRIEF_DISCLAIMER,
-    labels: { number: 'رقم المشروع', company: 'الشركة', sector: 'القطاع', stage: 'المرحلة', kind: 'النوع', deck: 'ملف العرض', updated: 'آخر تحديث' },
-    kind: { golden: 'مشروع ذهبي (علامة V)', bank: 'مشروع في بنك المشاريع' },
+    labels: { number: 'رقم المشروع', company: 'الشركة', sector: 'القطاع', stage: 'المرحلة', deck: 'ملف العرض', updated: 'آخر تحديث' },
     deck: { members: 'متاح للأعضاء بعد فتح المشروع', none: 'غير مرفق' },
     summaryFallback: (title, sector) => `${title}${sector ? `: مشروع في قطاع ${sector}` : ''}.`,
     strengths: {
@@ -99,8 +97,7 @@ const TEXT: Record<AppLang, BriefText> = {
   en: {
     unknownStage: 'Not specified',
     disclaimer: BRIEF_DISCLAIMER_EN,
-    labels: { number: 'Project number', company: 'Company', sector: 'Sector', stage: 'Stage', kind: 'Type', deck: 'Pitch deck', updated: 'Last update' },
-    kind: { golden: 'Golden project (V mark)', bank: 'Project in the Projects Bank' },
+    labels: { number: 'Project number', company: 'Company', sector: 'Sector', stage: 'Stage', deck: 'Pitch deck', updated: 'Last update' },
     deck: { members: 'Available to members after unlocking the project', none: 'Not attached' },
     summaryFallback: (title, sector) => `${title}${sector ? `: a project in the ${sector} sector` : ''}.`,
     strengths: {
@@ -228,7 +225,6 @@ function factRows(project: PublicProject, lang: AppLang): BriefRow[] {
     [text.labels.company, project.companyName],
     [text.labels.sector, project.sector?.name ?? null],
     [text.labels.stage, project.stage?.name ?? null],
-    [text.labels.kind, project.isGolden ? text.kind.golden : text.kind.bank],
     [text.labels.deck, project.hasPitchDeck && !project.isGolden ? text.deck.members : text.deck.none],
     [text.labels.updated, project.modifiedAt ? dayFormat(lang).format(new Date(project.modifiedAt)) : null],
   ];

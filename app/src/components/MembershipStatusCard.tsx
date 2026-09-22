@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { Membership, MembershipContent } from '@/api/auth';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { showAdvisorBalance } from '@/lib/advisorBalance';
 import { formatArabicDate } from '@/lib/format';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -40,7 +41,7 @@ export function MembershipStatusCard({ membership, texts, activationNote, title 
         <View style={styles.meta}>
           {membership.daysLeft !== null ? <Text style={styles.metaText}>{t('membership.daysLeft', { days: membership.daysLeft })}</Text> : null}
           {membership.endDate ? <Text style={styles.metaText}>{t('membership.endsOn', { date: formatArabicDate(membership.endDate) })}</Text> : null}
-          {membership.aiDailyLeft !== null ? (
+          {showAdvisorBalance(membership.aiDailyLeft, membership.aiDailyLimit) ? (
             <Text style={styles.metaText}>{t('membership.advisorBalance', { left: membership.aiDailyLeft, limit: membership.aiDailyLimit })}</Text>
           ) : null}
         </View>

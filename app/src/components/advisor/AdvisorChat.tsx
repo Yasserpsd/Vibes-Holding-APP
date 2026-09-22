@@ -11,6 +11,7 @@ import { Chip } from '@/components/Chip';
 import { Notice } from '@/components/Notice';
 import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { showAdvisorBalance } from '@/lib/advisorBalance';
 import { formatArabicDate, formatNumber } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -86,7 +87,9 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     if (outcome.contextRefused && latestContext.current === context) onClearContext();
   };
 
+  // The balance shows up only when it is nearly out (owner's rule): otherwise the header carries no counter.
   const dailyLeft = me?.membership.aiDailyLeft ?? null;
+  const nearlyOut = showAdvisorBalance(dailyLeft, me?.membership.aiDailyLimit);
   const busy = chat.sending || chat.status !== 'ready';
   const showOpening = Boolean(opening) && answeredOpening !== opening;
 
@@ -100,7 +103,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
           <Text style={styles.title}>{botNameOf(chat.profile)}</Text>
           <Text style={styles.subtitle}>{chat.human ? t('advisor.staffFollowing') : t('advisor.oneConversation')}</Text>
         </View>
-        {dailyLeft !== null ? (
+        {nearlyOut ? (
           <View style={styles.credit}>
             <Ionicons name="flash-outline" size={14} color={colors.gold} />
             <Text style={styles.creditText}>{t('advisor.creditToday', { left: formatNumber(dailyLeft) })}</Text>
