@@ -233,6 +233,39 @@ export type WordingList = { groups: { key: string; label: string; count: number 
 export type ContentItem = { block: string; path: string; ar: string; en: string; arEdit: WordingEdit | null; enEdit: WordingEdit | null };
 export type ContentList = { blocks: { key: string; label: string; count: number }[]; items: ContentItem[]; edited: Record<WordingLang, number> };
 
+/** M33 «الإحصائيات» (mirrors server/src/analytics): one Riyadh day of usage, and the club by category. */
+export type AnalyticsEvents = { advisorMessages: number; pbUnlocks: number; newsReads: number };
+export type AnalyticsDay = { day: string; visitors: number; views: number; screens: Record<string, number>; events: AnalyticsEvents };
+export type Personas = { neutral: number; entrepreneur: number; investor: number; none: number; total: number };
+export type AnalyticsResult = {
+  days: AnalyticsDay[];
+  personas: Personas | null;
+  /** Projects Bank unlocks bucketed by day, from the bridge's own rows; null when the bridge is off. */
+  pbDays: Record<string, number> | null;
+  errors: { personas?: { code: string; message: string }; pb?: { code: string; message: string } };
+};
+
+/** M33 «القيم والأسعار» (mirrors server/src/content/values.ts). */
+export type ValueKind = 'number' | 'url' | 'phone' | 'switch';
+export type ContentValue = { block: string; path: string; kind: ValueKind; value: number | string | boolean; seedValue: number | string | boolean | null; edit: { by: string; at: string } | null };
+export type ContentValues = { blocks: { key: string; label: string; count: number }[]; items: ContentValue[]; edited: number };
+
+/** M34 «الأخبار» (mirrors server/src/news): one source with its last-poll health. */
+export type NewsSourceStatus = { id: string; name: string; ok: boolean; count: number; stored: number; failed: number; error: string | null; at: string | null };
+export type NewsSourceRow = {
+  id: string;
+  name: string;
+  url: string;
+  tier: 'official' | 'saudi' | 'global';
+  tierLabel: string;
+  lang: 'ar' | 'en';
+  enabled: boolean;
+  hint: string | null;
+  saudiOnly?: boolean;
+  status: NewsSourceStatus | null;
+};
+export type NewsSourcesResult = { sources: NewsSourceRow[]; updatedAt: string | null; lastError: string | null; running: boolean; visibleByLang: { ar: number; en: number }; classifier: string };
+
 export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply';
 export type AuditEntry = {
   id: string;

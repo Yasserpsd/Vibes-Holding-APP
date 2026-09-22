@@ -10,12 +10,15 @@ import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
 import { Threads } from './sections/Threads';
 import { Content } from './sections/Content';
+import { News } from './sections/News';
+import { Stats } from './sections/Stats';
 import { Wording } from './sections/Wording';
 import type { AccountFilter } from './types';
 import { Boundary, Broken, Icon, ShellContext, Sheet, type IconName, type SectionKey, type Shell } from './ui';
 
 const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'home', label: 'الرئيسية', icon: 'home' },
+  { key: 'stats', label: 'الإحصائيات', icon: 'stats' },
   { key: 'members', label: 'الأعضاء', icon: 'members' },
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
@@ -28,6 +31,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'posts', label: 'المنشورات', icon: 'posts' },
   { key: 'wording', label: 'نصوص التطبيق', icon: 'wording' },
   { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
+  { key: 'news', label: 'مصادر الأخبار', icon: 'news' },
 ];
 /** A phone's bar holds four sections and «المزيد»; a desk's rail lists them all. */
 const BAR: SectionKey[] = ['home', 'members', 'payments', 'threads'];
@@ -236,6 +240,7 @@ export function App() {
           {/* A section that throws while drawing shows a card in its place: the bars around it keep working, and another address tries again. */}
           <Boundary key={section} watch={route.thread}>
             {section === 'home' ? <Home /> : null}
+            {section === 'stats' ? <Stats /> : null}
             {section === 'members' ? <Members key={memberFilter.turn} initial={memberFilter.state} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
             {section === 'cards' ? <CardRequests /> : null}
@@ -248,6 +253,7 @@ export function App() {
             {section === 'posts' ? <Posts onEditing={onEditing} isAdmin={me.isAdmin} /> : null}
             {section === 'wording' ? <Wording /> : null}
             {section === 'content' ? <Content /> : null}
+            {section === 'news' ? <News /> : null}
           </Boundary>
         </main>
 

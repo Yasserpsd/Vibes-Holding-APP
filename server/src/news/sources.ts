@@ -52,6 +52,29 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'bloomberg-saudi', name: 'Bloomberg', url: bing('site:bloomberg.com Saudi Arabia', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Bloomberg — article pages refuse server requests (403)', saudiOnly: true },
   { id: 'ft-saudi', name: 'Financial Times', url: 'https://www.ft.com/saudi-arabia?format=rss', tier: 'global', lang: 'en', enabled: false, hint: 'Financial Times — article pages refuse server requests (403)', saudiOnly: true },
   { id: 'ap-saudi', name: 'AP', url: bing('site:apnews.com Saudi Arabia', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Associated Press — article pages refuse server requests (403)', saudiOnly: true },
+  // M34 (seed 3, probed 2026-09-23 with news:probe): wider Arabic and English lists. Same rule 7 pipeline.
+  { id: 'sabq', name: 'سبق', url: bing('site:sabq.org'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة سبق الإلكترونية' },
+  { id: 'ajel', name: 'عاجل', url: bing('site:ajel.sa'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة عاجل الإلكترونية' },
+  { id: 'alyaum', name: 'اليوم', url: bing('site:alyaum.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة اليوم — المنطقة الشرقية' },
+  { id: 'alwatan-sa', name: 'الوطن', url: bing('site:alwatan.com.sa'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة الوطن السعودية' },
+  { id: 'almadina', name: 'المدينة', url: bing('site:al-madina.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة المدينة' },
+  { id: 'makkah', name: 'مكة', url: bing('site:makkahnewspaper.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة مكة' },
+  { id: 'albilad', name: 'البلاد', url: 'https://albiladdaily.com/feed/', tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة البلاد' },
+  { id: 'mubasher-sa', name: 'مباشر', url: bing('site:mubasher.info'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'مباشر — أخبار الأسواق والشركات' },
+  { id: 'cnbcarabia', name: 'CNBC عربية', url: bing('site:cnbcarabia.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'CNBC عربية — الاقتصاد والأسواق' },
+  { id: 'asharq-business', name: 'الشرق للأعمال', url: bing('site:asharqbusiness.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'الشرق للأعمال مع بلومبرغ — أخبار الاقتصاد والأسواق' },
+  { id: 'independentarabia', name: 'اندبندنت عربية', url: bing('site:independentarabia.com السعودية'), tier: 'global', lang: 'ar', enabled: true, hint: 'اندبندنت عربية — تغطية الشأن السعودي' },
+  { id: 'guardian-saudi', name: 'The Guardian', url: 'https://www.theguardian.com/world/saudiarabia/rss', tier: 'global', lang: 'en', enabled: true, hint: 'The Guardian — Saudi Arabia section', saudiOnly: true },
+  { id: 'zawya-saudi', name: 'Zawya', url: bing('site:zawya.com Saudi Arabia', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'Zawya (LSEG) — Gulf business news, Saudi items', saudiOnly: true },
+  { id: 'gulfnews-saudi', name: 'Gulf News', url: bing('site:gulfnews.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'Gulf News — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'khaleejtimes-saudi', name: 'Khaleej Times', url: bing('site:khaleejtimes.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'Khaleej Times — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'economyme', name: 'Economy Middle East', url: 'https://economymiddleeast.com/feed/', tier: 'global', lang: 'en', enabled: true, hint: 'Economy Middle East — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'fastcompanyme', name: 'Fast Company ME', url: 'https://fastcompanyme.com/feed/', tier: 'global', lang: 'en', enabled: true, hint: 'Fast Company Middle East — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'wamda', name: 'Wamda', url: 'https://www.wamda.com/feed', tier: 'global', lang: 'en', enabled: true, hint: 'Wamda — MENA startups, Saudi items only', saudiOnly: true },
+  { id: 'tradearabia-saudi', name: 'TradeArabia', url: bing('site:tradearabia.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'TradeArabia — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'forbesme-saudi', name: 'Forbes ME', url: bing('site:forbesmiddleeast.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'Forbes Middle East — items about Saudi Arabia only', saudiOnly: true },
+  { id: 'meed-saudi', name: 'MEED', url: bing('site:meed.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'MEED — Gulf projects and business, Saudi items', saudiOnly: true },
+  { id: 'arabianbusiness-saudi', name: 'Arabian Business', url: bing('site:arabianbusiness.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Arabian Business — article pages refuse server requests (403)', saudiOnly: true },
 ];
 
 /**
@@ -59,8 +82,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  * seed rows it does not have yet and applies that revision's one-time switches, so the owner's edits stay.
  * 2 = M27: the English sources; Arab News and Saudi Gazette turned on and read for their Saudi stories; the SPA
  * feeds get their language in the URL (see `spa()`).
+ * 3 = M34: eleven more Arabic sources and eleven more English ones (probed 2026-09-23; the refusing ones disabled).
  */
-export const NEWS_SEED_VERSION = 2;
+export const NEWS_SEED_VERSION = 3;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -92,6 +116,12 @@ const OUTLET_NAMES: Record<string, string> = {
   'bbc.com': 'BBC عربي',
   'saudigazette.com.sa': 'Saudi Gazette',
   'arabnews.com': 'Arab News',
+  'alyaum.com': 'اليوم',
+  'alwatan.com.sa': 'الوطن',
+  'al-madina.com': 'المدينة',
+  'makkahnewspaper.com': 'مكة',
+  'asharqbusiness.com': 'الشرق للأعمال',
+  'independentarabia.com': 'اندبندنت عربية',
 };
 
 /** The same, for items of the English feed: an outlet keeps its English name there. */
@@ -109,6 +139,17 @@ const OUTLET_NAMES_EN: Record<string, string> = {
   'bloomberg.com': 'Bloomberg',
   'ft.com': 'Financial Times',
   'apnews.com': 'AP',
+  'theguardian.com': 'The Guardian',
+  'zawya.com': 'Zawya',
+  'gulfnews.com': 'Gulf News',
+  'khaleejtimes.com': 'Khaleej Times',
+  'economymiddleeast.com': 'Economy Middle East',
+  'fastcompanyme.com': 'Fast Company ME',
+  'wamda.com': 'Wamda',
+  'tradearabia.com': 'TradeArabia',
+  'forbesmiddleeast.com': 'Forbes ME',
+  'meed.com': 'MEED',
+  'arabianbusiness.com': 'Arabian Business',
 };
 
 export function outletNameFor(url: string, fallback: string, lang: NewsLang = 'ar'): string {
@@ -169,4 +210,22 @@ export async function getNewsSources(kv: KV): Promise<NewsSource[]> {
   const content = await kv.get<NewsSourcesContent>(NEWS_SOURCES_KEY);
   const rows = Array.isArray(content?.sources) ? content.sources.filter(isSource) : [];
   return rows.length > 0 ? rows.map((row) => ({ ...row, hint: typeof row.hint === 'string' ? row.hint : null })) : NEWS_SOURCES_SEED;
+}
+
+// One toggle at a time (single-instance server): each one rewrites the stored list.
+let toggleChain: Promise<unknown> = Promise.resolve();
+
+/** M34: the dashboard turns one source on or off. Answers the row as stored, or null for an unknown id. */
+export function setSourceEnabled(kv: KV, id: string, enabled: boolean): Promise<NewsSource | null> {
+  const run = toggleChain.then(async () => {
+    const sources = await getNewsSources(kv);
+    const row = sources.find((source) => source.id === id);
+    if (!row) return null;
+    const next = sources.map((source) => (source.id === id ? { ...source, enabled } : source));
+    const stored = await kv.get<NewsSourcesContent>(NEWS_SOURCES_KEY);
+    await kv.set(NEWS_SOURCES_KEY, { sources: next, updatedAt: new Date().toISOString(), seedVersion: stored?.seedVersion ?? NEWS_SEED_VERSION } satisfies NewsSourcesContent);
+    return { ...row, enabled };
+  });
+  toggleChain = run.catch(() => undefined);
+  return run;
 }

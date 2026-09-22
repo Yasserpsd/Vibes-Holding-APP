@@ -23,7 +23,7 @@ const seeded = {
   videos: await ensureVideosSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
-const { app, projects, news, videos, media, sync } = await buildApp({ config, kv });
+const { app, projects, news, videos, media, sync, analytics } = await buildApp({ config, kv });
 // A newer seed (for example the membership copy) is content the app should fetch again.
 if (Object.values(seeded).some(Boolean)) await sync.bump('content');
 
@@ -32,6 +32,7 @@ await projects.start();
 await news.start();
 await videos.start();
 media.start();
+analytics.start();
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutting down');
@@ -39,6 +40,8 @@ const shutdown = async (signal: string): Promise<void> => {
   news.stop();
   videos.stop();
   media.stop();
+  // The last seconds of counts reach the store before the pool closes.
+  await analytics.stop();
   await app.close();
   await kv.close();
   process.exit(0);

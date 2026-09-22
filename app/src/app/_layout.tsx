@@ -15,6 +15,7 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
+import { ScreenTracker } from '@/components/ScreenTracker';
 import { SyncPoller } from '@/components/SyncPoller';
 import { initI18n, t } from '@/i18n';
 import { isRTL, syncDirection } from '@/i18n/direction';
@@ -77,6 +78,7 @@ export default function RootLayout() {
         <GuestGateProvider>
           <PushRegistrar />
           <SyncPoller />
+          <ScreenTracker />
           <StatusBar style="light" />
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}

@@ -225,6 +225,46 @@ export class DashboardService {
     return { ...result, pb, pbError };
   }
 
+  /**
+   * M33: Projects Bank unlocks bucketed by Riyadh day over the last `days` — read from the bridge's newest
+   * rows (up to 500), so the analytics counter (which only starts counting now) still gets a full history.
+   */
+  pbUnlockDays(days: number, now = Date.now()): Promise<Record<string, number>> {
+    return this.cache.get(`pb:unlockDays:${days}`, async () => {
+      const since = riyadhDay(now - (days - 1) * 86_400_000);
+      const buckets: Record<string, number> = {};
+      for (let page = 1; page <= 5; page += 1) {
+        const { total, items } = await this.deps.pb.unlocks({ page, perPage: 100 });
+        let past = false;
+        for (const row of items) {
+          const day = riyadhDay(parseHubTime(row.unlocked_at));
+          if (day < since) {
+            past = true;
+            continue;
+          }
+          buckets[day] = (buckets[day] ?? 0) + 1;
+        }
+        if (past || page * 100 >= total || items.length === 0) break;
+      }
+      return buckets;
+    });
+  }
+
+  /** M33: the active members by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
+  async personas(admin: AdminActor): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number }> {
+    const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0 };
+    for (let page = 1; page <= 10; page += 1) {
+      const result = await this.hub(admin, 'admin_accounts', { q: '', state: 'member', page, per_page: 100 });
+      for (const account of result.items) {
+        counts.total += 1;
+        if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;
+        else counts.none += 1;
+      }
+      if (page * 100 >= result.total) break;
+    }
+    return counts;
+  }
+
   hubPayments(admin: AdminActor, query: { q: string; status: string; action: string; page: number; perPage: number }): Promise<HubResults['admin_payments']> {
     return this.hub(admin, 'admin_payments', { q: query.q, status: query.status, action: query.action, page: query.page, per_page: query.perPage });
   }

@@ -15,7 +15,8 @@
     "strings": "node scripts/sync-app-strings.mjs",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "seed": "tsx src/cli/seed.ts",
-    "feed:inspect": "tsx src/cli/inspect-feed.ts"
+    "feed:inspect": "tsx src/cli/inspect-feed.ts",
+    "news:probe": "tsx src/cli/probe-sources.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

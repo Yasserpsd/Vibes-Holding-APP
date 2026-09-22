@@ -4,6 +4,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import { advisorRoutes } from './advisor/routes.js';
 import { AdvisorService } from './advisor/service.js';
+import { analyticsRoutes } from './analytics/routes.js';
+import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { AuthService } from './auth/service.js';
@@ -88,7 +90,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -125,6 +127,19 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
 
   // «عقل واحد»: whatever changes anywhere moves a version the app polls (/api/sync).
   const sync = new SyncService(kv);
+  // M33: usage aggregates (screens, visitors, counted acts) — one small document per Riyadh day.
+  const analytics = new AnalyticsService({ kv, log: app.log });
+  // The acts worth a chart count themselves here: one hook, and the routes stay untouched.
+  const counted: Record<string, EventKey> = {
+    'POST /api/advisor/message': 'advisorMessages',
+    'POST /api/projects/:id/unlock': 'pbUnlocks',
+    'GET /api/news/:id': 'newsReads',
+  };
+  app.addHook('onResponse', async (request, reply) => {
+    if (reply.statusCode >= 400) return;
+    const event = counted[`${request.method} ${request.routeOptions.url ?? ''}`];
+    if (event) analytics.hit(event);
+  });
   // Fire and forget: a version that kv could not save is logged, never an unhandled rejection.
   const moved = (...keys: SyncKey[]): void => void sync.bump(...keys).catch((error: unknown) => app.log.error({ err: error, keys }, 'sync version not saved'));
   const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects') });
@@ -308,7 +323,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(appStringsRoutes, { kv, auth, sync });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
-  await app.register(newsRoutes, { service: news, auth });
+  await app.register(newsRoutes, { service: news, auth, kv });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });
@@ -319,6 +334,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(mediaRoutes, { service: media, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync });
   await app.register(dashboardRoutes, { service: dashboard, auth });
+  await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });
   await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });
 
@@ -337,5 +353,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed };
+  return { app, projects, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics };
 }

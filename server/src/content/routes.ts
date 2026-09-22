@@ -10,6 +10,7 @@ import type { SyncService } from '../sync/service.js';
 import { getAboutContent } from './about.js';
 import { ContentError, adminContent, saveContentEdit } from './admin.js';
 import { CONTENT_BLOCK_KEYS, MAX_CONTENT_TEXT } from './edits.js';
+import { adminValues, saveContentValue } from './values.js';
 import { getGoldenContent } from './golden.js';
 import { getHomeContent } from './home.js';
 import { getMembershipContent } from './membership.js';
@@ -27,6 +28,13 @@ const editSchema = z.object({
   lang: z.enum(['ar', 'en']),
   /** `null` = back to the block's own text. */
   value: z.string().max(MAX_CONTENT_TEXT * 2).nullable(),
+});
+
+const valueSchema = z.object({
+  block: z.enum(CONTENT_BLOCK_KEYS),
+  path: z.string().trim().min(1).max(200),
+  /** `null` = back to the seed's value (M33 «القيم والأسعار»). */
+  value: z.union([z.number(), z.string().max(500), z.boolean()]).nullable(),
 });
 
 /**
@@ -116,6 +124,34 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       try {
         const saved = await saveContentEdit(kv, { ...body, by: admin.me.name });
         // Open apps hear it through /api/sync and read the block again at once.
+        await sync.bump('content').catch(() => undefined);
+        return { ok: true, ...saved };
+      } catch (error) {
+        if (error instanceof ContentError) return reply.code(400).send({ error: { code: 'invalid', message: error.message } });
+        throw error;
+      }
+    }),
+  );
+
+  // M33 «القيم والأسعار»: the prices, links, phone numbers, order numbers and switches of the same blocks.
+  app.get(
+    '/api/admin/content/values',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return adminValues(kv);
+    }),
+  );
+
+  app.put(
+    '/api/admin/content/value',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(valueSchema, request.body, reply);
+      if (!body) return;
+      try {
+        const saved = await saveContentValue(kv, { ...body, by: admin.me.name });
         await sync.bump('content').catch(() => undefined);
         return { ok: true, ...saved };
       } catch (error) {

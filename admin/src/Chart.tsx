@@ -2,14 +2,16 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEve
 
 import { formatDay, formatNumber } from './format';
 
-/** One Riyadh day: the bar's value and what the tooltip and the table say beside it. */
-export type ChartPoint = { day: string; value: number; details?: { label: string; value: string }[] };
+/** One bar: a Riyadh day, or (M33) a week or month bucket carrying its own `label`. */
+export type ChartPoint = { day: string; value: number; label?: string; details?: { label: string; value: string }[] };
 type Props = {
   title: string;
   /** One sentence for screen readers: what the bars count and over which period. */
   desc: string;
   /** Column name of the value in the table fallback. */
   valueLabel: string;
+  /** Column name of the bucket in the table fallback («اليوم», «الأسبوع»…). */
+  dayLabel?: string;
   points: ChartPoint[];
   format?: (value: number) => string;
 };
@@ -34,7 +36,7 @@ function ticksFor(max: number): number[] {
  * Daily bars, hand-drawn SVG: one series, one axis, time from left to right. Pointer, touch and the arrow keys move
  * the same marker; the value shows in a tooltip, in each bar's label for screen readers, and in a table below.
  */
-export function BarChart({ title, desc, valueLabel, points, format = formatNumber }: Props) {
+export function BarChart({ title, desc, valueLabel, dayLabel = 'اليوم', points, format = formatNumber }: Props) {
   const frame = useRef<HTMLDivElement>(null);
   const bars = useRef<(SVGRectElement | null)[]>([]);
   const [width, setWidth] = useState(0);
@@ -119,13 +121,13 @@ export function BarChart({ title, desc, valueLabel, points, format = formatNumbe
                     height={plotHeight}
                     tabIndex={index === (active ?? count - 1) ? 0 : -1}
                     role="img"
-                    aria-label={`${formatDay(point.day, 'long')}: ${format(point.value)}${(point.details ?? []).map((detail) => `، ${detail.label} ${detail.value}`).join('')}`}
+                    aria-label={`${point.label ?? formatDay(point.day, 'long')}: ${format(point.value)}${(point.details ?? []).map((detail) => `، ${detail.label} ${detail.value}`).join('')}`}
                     onFocus={() => setActive(index)}
                     onBlur={() => setActive((value) => (value === index ? null : value))}
                     onKeyDown={(event) => onKey(event, index)}
                   />
                   {/* Arabic day names run right to left: under that direction «start» pins the right edge. */}
-                  {labelled(index) ? <text className="chart-tick" direction="rtl" x={index === count - 1 ? left + plotWidth : left + index * slot + slot / 2} y={HEIGHT - 6} textAnchor={index === count - 1 ? 'start' : 'middle'}>{formatDay(point.day, 'short')}</text> : null}
+                  {labelled(index) ? <text className="chart-tick" direction="rtl" x={index === count - 1 ? left + plotWidth : left + index * slot + slot / 2} y={HEIGHT - 6} textAnchor={index === count - 1 ? 'start' : 'middle'}>{point.label ?? formatDay(point.day, 'short')}</text> : null}
                 </g>
               );
             })}
@@ -135,7 +137,7 @@ export function BarChart({ title, desc, valueLabel, points, format = formatNumbe
         )}
         {current && active !== null ? (
           <div className="chart-tip" style={{ left: Math.min(Math.max(left + active * slot + slot / 2, 84), Math.max(84, width - 84)), top: Math.max(0, y(current.value) - 12) }} aria-hidden="true">
-            <span className="muted">{formatDay(current.day, 'long')}</span>
+            <span className="muted">{current.label ?? formatDay(current.day, 'long')}</span>
             <strong className="num">{format(current.value)}</strong>
             {(current.details ?? []).map((detail) => (
               <span key={detail.label} className="chart-tip-row">
@@ -152,7 +154,7 @@ export function BarChart({ title, desc, valueLabel, points, format = formatNumbe
             <caption className="sr-only">{title}</caption>
             <thead>
               <tr>
-                <th scope="col">اليوم</th>
+                <th scope="col">{dayLabel}</th>
                 <th scope="col" className="num">{valueLabel}</th>
                 {(points[0]?.details ?? []).map((detail) => <th key={detail.label} scope="col" className="num">{detail.label}</th>)}
               </tr>
@@ -160,7 +162,7 @@ export function BarChart({ title, desc, valueLabel, points, format = formatNumbe
             <tbody>
               {[...points].reverse().map((point) => (
                 <tr key={point.day}>
-                  <th scope="row">{formatDay(point.day)}</th>
+                  <th scope="row">{point.label ?? formatDay(point.day)}</th>
                   <td className="num">{format(point.value)}</td>
                   {(point.details ?? []).map((detail) => <td key={detail.label} className="num">{detail.value}</td>)}
                 </tr>
@@ -170,5 +172,55 @@ export function BarChart({ title, desc, valueLabel, points, format = formatNumbe
         </div>
       </details>
     </figure>
+  );
+}
+
+/** One slice of the M33 donut. `tone` picks one of four fixed ring colors (gold shades then gray). */
+export type DonutSlice = { label: string; value: number; tone: 'a' | 'b' | 'c' | 'd' };
+
+const RADIUS = 15.915; // circumference 100: percentages are dash lengths.
+const GAP = 1.2;
+
+/**
+ * A ring of the whole split into parts (members by category): hand-drawn SVG, the total in the middle,
+ * a legend with counts and percentages beside it. Zero slices are left out of the ring but named in the legend.
+ */
+export function Donut({ title, slices, centerLabel }: { title: string; slices: DonutSlice[]; centerLabel: string }) {
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const shown = slices.filter((slice) => slice.value > 0);
+  let offset = 25; // Twelve o'clock.
+  const parts = shown.map((slice) => {
+    const length = (slice.value / Math.max(1, total)) * 100;
+    const gap = shown.length > 1 ? Math.min(GAP, length / 3) : 0;
+    const part = { ...slice, length: length - gap, offset: offset - gap / 2 };
+    offset -= length;
+    return part;
+  });
+  const percent = (value: number) => `${Math.round((value / Math.max(1, total)) * 100)}%`;
+  return (
+    <div className="donut" role="img" aria-label={`${title}: ${slices.map((slice) => `${slice.label} ${formatNumber(slice.value)}`).join('، ')}`}>
+      <div className="donut-ring">
+        <svg viewBox="0 0 42 42" aria-hidden="true">
+          <circle className="donut-track" cx="21" cy="21" r={RADIUS} />
+          {parts.map((part) => (
+            <circle key={part.label} className={`donut-slice ${part.tone}`} cx="21" cy="21" r={RADIUS} strokeDasharray={`${Math.max(0, part.length)} ${100 - Math.max(0, part.length)}`} strokeDashoffset={part.offset} />
+          ))}
+        </svg>
+        <div className="donut-center" aria-hidden="true">
+          <strong className="num">{formatNumber(total)}</strong>
+          <span>{centerLabel}</span>
+        </div>
+      </div>
+      <ul className="donut-legend">
+        {slices.map((slice) => (
+          <li key={slice.label}>
+            <i className={`donut-dot ${slice.tone}`} aria-hidden="true" />
+            <span className="donut-name">{slice.label}</span>
+            <b className="num">{formatNumber(slice.value)}</b>
+            <span className="muted num">{total > 0 ? percent(slice.value) : '—'}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
