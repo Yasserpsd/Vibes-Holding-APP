@@ -13,6 +13,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { formatArabicDate } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const PERSONA_KEY: Record<string, StringKey> = { neutral: 'persona.neutral', entrepreneur: 'persona.entrepreneur', investor: 'persona.investor' };
@@ -23,10 +24,14 @@ function categoryOf(persona: string): string {
   return key ? (t(key).split('—')[0] ?? '').trim() : '';
 }
 
+// Left-to-right mark: keeps a Latin or numeric value readable inside the Arabic line (Android RTL).
+const LRM = '‎';
+
 /**
- * M30: «كارت العضوية» — a real-looking membership card in gold on black: club name, the member's
- * name, category and job title, the membership number, and the daily countdown of the days left.
- * Under it: the member's own request for a printed copy delivered to his door at no charge.
+ * M30: «كارت العضوية» — a gold business card on black: club name, the member's name with an
+ * engraved-gold effect, his title, company and city, the membership number, the expiry date and
+ * the daily countdown. Under it: the member's own request for a printed copy, at no charge.
+ * Pure views and shadows (no gradient package: a new native module would break OTA updates).
  */
 export default function CardScreen() {
   const { me, status } = useAuth();
@@ -44,6 +49,9 @@ export default function CardScreen() {
 
   const active = me.membership.status === 'active';
   const category = categoryOf(me.persona);
+  const endDate = me.membership.endDate ? formatArabicDate(me.membership.endDate) : null;
+  const roleLine = [me.jobTitle, me.company].filter(Boolean).join(' · ');
+  const contacts = [me.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
 
   return (
     <Screen title={t('nav.card')} subtitle={t('card.subtitle')}>
@@ -51,6 +59,13 @@ export default function CardScreen() {
 
       <View style={styles.card}>
         <View style={styles.cardInner}>
+          {/* The metal of the card: soft gold rings and a diagonal sheen, behind everything. */}
+          <View pointerEvents="none" style={[styles.ring, styles.ringLarge]} />
+          <View pointerEvents="none" style={[styles.ring, styles.ringSmall]} />
+          <View pointerEvents="none" style={styles.sheen} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerTopStart]} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerBottomEnd]} />
+
           <View style={styles.head}>
             <View style={styles.logoBadge}>
               <Image source={require('../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
@@ -59,6 +74,20 @@ export default function CardScreen() {
               <Text style={styles.club} numberOfLines={1}>{t('common.clubName')}</Text>
               <Text style={styles.clubEn} numberOfLines={1}>{t('card.clubEn')}</Text>
             </View>
+            {category ? (
+              <View style={styles.categoryPill}>
+                <Text style={styles.categoryText}>{category}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <GoldRule />
+
+          <View style={styles.holder}>
+            <Text style={styles.holderName} numberOfLines={1} adjustsFontSizeToFit>
+              {me.name}
+            </Text>
+            {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
           </View>
 
           {me.cardNumber ? (
@@ -68,29 +97,34 @@ export default function CardScreen() {
             </View>
           ) : null}
 
-          <View style={styles.holder}>
-            <View style={styles.holderMain}>
-              <Text style={styles.holderLabel}>{t('card.member')}</Text>
-              <Text style={styles.holderName} numberOfLines={1}>{me.name}</Text>
-              {me.jobTitle ? <Text style={styles.holderJob} numberOfLines={1}>{me.jobTitle}</Text> : null}
-            </View>
-            {category ? (
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryText}>{category}</Text>
+          <View style={styles.footer}>
+            {active && endDate ? (
+              <View style={styles.cell}>
+                <Text style={styles.cellLabel}>{t('card.validThru')}</Text>
+                <Text style={styles.cellValue}>{endDate}</Text>
               </View>
             ) : null}
+            {active && me.membership.daysLeft !== null ? (
+              <View style={styles.cell}>
+                <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
+                <View style={styles.daysRow}>
+                  <Ionicons name="hourglass-outline" size={13} color={colors.gold} />
+                  <Text style={styles.cellValue}>{t('card.daysValue', { days: me.membership.daysLeft })}</Text>
+                </View>
+              </View>
+            ) : null}
+            {!active ? <Text style={styles.inactive}>{me.membership.status === 'expired' ? t('card.expired') : t('card.notActive')}</Text> : null}
           </View>
 
-          <View style={styles.footer}>
-            {active && me.membership.daysLeft !== null ? (
-              <View style={styles.daysChip}>
-                <Ionicons name="hourglass-outline" size={14} color={colors.gold} />
-                <Text style={styles.daysText}>{t('card.daysLeft', { days: me.membership.daysLeft })}</Text>
-              </View>
-            ) : (
-              <Text style={styles.inactive}>{me.membership.status === 'expired' ? t('card.expired') : t('card.notActive')}</Text>
-            )}
-          </View>
+          {contacts.length ? (
+            <View style={styles.contacts}>
+              {contacts.map((entry) => (
+                <Text key={entry} style={styles.contact} numberOfLines={1}>
+                  {entry}
+                </Text>
+              ))}
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -98,6 +132,19 @@ export default function CardScreen() {
 
       <PrintBlock active={active} />
     </Screen>
+  );
+}
+
+/** A thin metallic divider: dark gold melting into bright gold and back. */
+function GoldRule() {
+  return (
+    <View style={styles.rule}>
+      <View style={[styles.ruleStep, { backgroundColor: colors.goldDark, flex: 2 }]} />
+      <View style={[styles.ruleStep, { backgroundColor: colors.gold, flex: 3 }]} />
+      <View style={[styles.ruleStep, { backgroundColor: colors.goldLight, flex: 2 }]} />
+      <View style={[styles.ruleStep, { backgroundColor: colors.gold, flex: 3 }]} />
+      <View style={[styles.ruleStep, { backgroundColor: colors.goldDark, flex: 2 }]} />
+    </View>
   );
 }
 
@@ -165,30 +212,95 @@ function PrintBlock({ active }: { active: boolean }) {
   );
 }
 
+const CARD_BLACK = '#0B0A08';
+
 const styles = StyleSheet.create({
-  // The card: gold on black, framed twice like a real premium card.
-  card: { borderRadius: radii.lg, borderWidth: 1.5, borderColor: colors.gold, backgroundColor: colors.black, padding: 5 },
-  cardInner: { borderRadius: radii.lg - 4, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.goldDark, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  logoBadge: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 34, height: 34 },
-  headText: { flex: 1, gap: 2 },
-  club: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.gold, textAlign: textStart },
-  clubEn: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 14, color: colors.goldLight, letterSpacing: 3, textAlign: textStart, writingDirection: 'ltr' },
-  numberBlock: { gap: 2 },
-  numberLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1 },
-  number: { fontFamily: fonts.semiBold, fontSize: 24, lineHeight: 32, color: colors.textPrimary, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 2 },
-  holder: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
-  holderMain: { flex: 1, gap: 2 },
-  holderLabel: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  holderName: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.textPrimary, textAlign: textStart },
-  holderJob: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
-  categoryPill: { paddingVertical: 4, paddingHorizontal: spacing.md, borderRadius: radii.pill, backgroundColor: colors.gold },
-  categoryText: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.black },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.goldDark, paddingTop: spacing.sm },
-  daysChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  daysText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLight, textAlign: textStart },
+  // The card: a gold slab on black — double gold frame, deep warm black, a gold glow around it.
+  card: {
+    borderRadius: radii.lg,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    backgroundColor: colors.black,
+    padding: 5,
+    shadowColor: colors.gold,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+  },
+  cardInner: {
+    borderRadius: radii.lg - 5,
+    borderWidth: 1,
+    borderColor: colors.goldDark,
+    backgroundColor: CARD_BLACK,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.md + 2,
+    gap: spacing.md,
+    overflow: 'hidden',
+  },
+  // Engraved gold circles, barely there, like guilloché on a bank card.
+  ring: { position: 'absolute', borderColor: colors.gold, opacity: 0.09 },
+  ringLarge: { width: 230, height: 230, borderRadius: 115, borderWidth: 22, top: -95, start: -85 },
+  ringSmall: { width: 130, height: 130, borderRadius: 65, borderWidth: 12, bottom: -55, end: -45 },
+  // A diagonal sheen band across the metal.
+  sheen: { position: 'absolute', width: 520, height: 74, backgroundColor: colors.goldLight, opacity: 0.05, top: 26, start: -120, transform: [{ rotate: '-16deg' }] },
+  // Thin corner accents.
+  corner: { position: 'absolute', width: 26, height: 26, borderColor: colors.gold, opacity: 0.75 },
+  cornerTopStart: { top: 10, start: 10, borderTopWidth: 1.5, borderStartWidth: 1.5, borderTopStartRadius: 8 },
+  cornerBottomEnd: { bottom: 10, end: 10, borderBottomWidth: 1.5, borderEndWidth: 1.5, borderBottomEndRadius: 8 },
+
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
+  logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: colors.gold, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 32, height: 32 },
+  headText: { flex: 1, gap: 1 },
+  club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: colors.gold, textAlign: textStart },
+  clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: colors.goldLight, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
+  categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: colors.gold },
+  categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.black },
+
+  rule: { flexDirection: 'row', alignItems: 'center', height: 2, borderRadius: 1, overflow: 'hidden' },
+  ruleStep: { height: 2 },
+
+  holder: { gap: 2, paddingVertical: 2 },
+  // The name in raised gold: bright gold letters lifted off the black by a soft dark drop.
+  holderName: {
+    fontFamily: fonts.bold,
+    fontSize: 26,
+    lineHeight: 38,
+    color: colors.goldLight,
+    letterSpacing: 0.4,
+    textAlign: textStart,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 4,
+  },
+  holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: textStart },
+
+  numberBlock: { gap: 1 },
+  numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
+  number: {
+    fontFamily: fonts.semiBold,
+    fontSize: 22,
+    lineHeight: 30,
+    color: colors.gold,
+    textAlign: textStart,
+    writingDirection: 'ltr',
+    letterSpacing: 3,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
+  },
+
+  footer: { flexDirection: 'row', gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.goldDark, paddingTop: spacing.sm + 2 },
+  cell: { flex: 1, gap: 2 },
+  cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: textStart },
+  cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, color: colors.goldLight, textAlign: textStart },
+  daysRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   inactive: { ...typography.caption, color: colors.warning, textAlign: textStart },
+
+  contacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 },
+  contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.textSecondary, textAlign: textStart, flexShrink: 1 },
+
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   print: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   printTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
