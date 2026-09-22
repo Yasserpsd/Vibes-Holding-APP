@@ -22,7 +22,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: IS_PRODUCTION ? 'نادي المستثمرين' : 'نادي المستثمرين (تجريبي)',
   slug: 'vibes-holding',
   owner: 'vibes-holding',
-  version: '1.0.0',
+  // 1.1.0 (M27 stage 4): the first binary with the native modules added since M1 (secure store, notifications,
+  // RevenueCat) and without a forced layout direction; its runtime gets its own updates.
+  version: '1.1.0',
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -64,7 +66,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         backgroundColor: BRAND_BLACK,
       },
     ],
-    ['expo-localization', { supportsRTL: true, forcesRTL: true }],
+    // Right-to-left layout is supported, not forced: the direction follows the app's language
+    // (src/i18n/direction.ts sets it before the first screen mounts).
+    ['expo-localization', { supportsRTL: true }],
     // Member notifications: white club mark on the brand gold (Android small icon), one default channel.
     ['expo-notifications', { icon: './assets/images/notification-icon.png', color: BRAND_GOLD, defaultChannel: 'default' }],
   ],
@@ -75,7 +79,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // updates fall back to the test server so a publish without the variable still works.
     apiBaseUrl: process.env.EXPO_PUBLIC_API_URL ?? (IS_PRODUCTION ? '' : TEST_API_URL),
     supportsRTL: true,
-    forcesRTL: true,
     eas: { projectId: EAS_PROJECT_ID },
   },
 });

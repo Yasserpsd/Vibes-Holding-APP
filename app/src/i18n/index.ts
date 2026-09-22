@@ -31,7 +31,9 @@ const STRINGS_KEY = 'investorsclub.strings';
  * build of them lets JavaScript turn the layout left-to-right is not proven yet (a local debug build
  * of the same native code does, and keeps it across cold starts: checked on 2026-09-22). Until the
  * owner has tried it on his phone, members on these binaries are not offered English: only an
- * admin sees the language row there (see `languageChoiceOffered`).
+ * admin sees the language row there (see `languageChoiceOffered`). Found on 2026-09-22: the only
+ * 1.0.0 binary is the M1 build, which has no secure store at all, so nothing chosen on it survives a
+ * restart; 1.1.0 is built without `forcesRTL` and with the store, and is offered English.
  */
 const UNPROVEN_RUNTIMES = ['1.0.0'];
 
