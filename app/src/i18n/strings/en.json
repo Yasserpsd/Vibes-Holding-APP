@@ -677,5 +677,8 @@
   "poll.closed": "The poll has ended",
   "poll.closesAt": "Voting is open until {date}",
   "poll.votedHidden": "Your vote is recorded; the results stay with the management",
-  "poll.changeHint": "You can change your choice until it closes"
+  "poll.confirm": "Confirm my vote",
+  "poll.confirming": "Recording…",
+  "poll.finalHint": "Pick then confirm; your vote is final and cannot be changed",
+  "poll.votedFinal": "Your vote is recorded and final"
 }

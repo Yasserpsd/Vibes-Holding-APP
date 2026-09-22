@@ -4,9 +4,9 @@ import type { KV } from '../store.js';
 
 /**
  * M31: votes of the «استفتاء» posts. The poll itself (question, options, closing moment) lives on
- * its post; this keeps one small document per poll — who chose what — so a member counts once
- * and may change his choice until the poll closes. Counts reach a voter only after he voted
- * (and only when the poll shows its results); the dashboard always sees them.
+ * its post; this keeps one small document per poll — who chose what. A member votes once and his
+ * choice is final (the owner's rule, 2026-09-23: «لو اخترت اختيار مينفعش اغيره»). Counts reach a
+ * voter only after he voted (and only when the poll shows its results); the dashboard always sees them.
  */
 export const pollVotesKey = (postId: string) => `polls:votes:${postId}`;
 
@@ -31,7 +31,7 @@ export class PollsService {
     return (await this.kv.get<VotesDoc>(pollVotesKey(postId)))?.votes ?? {};
   }
 
-  /** One member, one standing vote; a new choice replaces the old one until the poll closes. */
+  /** One member, one final vote: a second attempt is refused, whatever it picks. */
   async vote(post: Post, contactId: number, optionId: string, now = Date.now()): Promise<void> {
     const poll = post.poll;
     if (post.kind !== 'poll' || !poll) throw new RequestError('not_poll', 'هذا المنشور ليس استفتاء', 400);
@@ -39,6 +39,7 @@ export class PollsService {
     if (!poll.options.some((option) => option.id === optionId)) throw new RequestError('bad_option', 'هذا الخيار غير موجود في الاستفتاء', 400);
     const run = this.chain.then(async () => {
       const votes = await this.load(post.id);
+      if (votes[String(contactId)] !== undefined) throw new RequestError('already_voted', 'سبق أن سجّلت صوتك في هذا الاستفتاء ولا يمكن تغييره', 409);
       votes[String(contactId)] = optionId;
       await this.kv.set(pollVotesKey(post.id), { votes });
     });

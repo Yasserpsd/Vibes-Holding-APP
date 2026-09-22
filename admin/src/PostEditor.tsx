@@ -400,7 +400,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                   <input type="checkbox" checked={resultsVisible} onChange={(e) => setResultsVisible(e.target.checked)} />
                   يرى العضو النتائج بعد تصويته (وبعد الإغلاق). بدونها تبقى النتائج للوحة فقط.
                 </label>
-                <p className="muted hint">العضو يصوّت مرة واحدة ويقدر يغيّر اختياره حتى الإغلاق. الاستفتاء داخل التطبيق فقط ولا يصل للمواقع، وحذف خيار يُسقط أصواته.</p>
+                <p className="muted hint">العضو يصوّت مرة واحدة وصوته نهائي لا يتغيّر. الاستفتاء داخل التطبيق فقط ولا يصل للمواقع، وحذف خيار يُسقط أصواته.</p>
               </>
             ) : null}
             {kind === 'event' ? (

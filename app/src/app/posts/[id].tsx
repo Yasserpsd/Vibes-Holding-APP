@@ -72,35 +72,38 @@ export default function PostScreen() {
 }
 
 /**
- * M31: the poll — tap an option to vote (members only), change it until the poll closes.
- * Counts and bars appear once the server sends them: after the member's vote, or after closing,
- * and only when the poll shows its results.
+ * M31: the poll — a member marks his choice, then confirms it, and the vote is FINAL (the owner's
+ * rule: «لو اخترت اختيار مينفعش اغيره»). Counts and bars appear once the server sends them: after
+ * the member's vote, or after closing, and only when the poll shows its results.
  */
 function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
   const { me } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [poll, setPoll] = useState(initial);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const open = !poll.closed;
   const showCounts = poll.totalVotes !== null;
+  // Choosing is open only before the member's one final vote and before the close.
+  const canChoose = Boolean(me) && !poll.closed && poll.myVote === null;
 
-  const vote = async (optionId: string) => {
-    if (!open || busyId || optionId === poll.myVote) return;
-    setBusyId(optionId);
+  const confirm = async () => {
+    if (!selected || busy) return;
+    setBusy(true);
     setError(null);
     try {
-      const result = await pollsApi.vote(postId, optionId);
+      const result = await pollsApi.vote(postId, selected);
       setPoll(result.poll);
+      setSelected(null);
       // The list card shows the voted state too.
       await queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.setQueryData(['post', postId], (current: { post: { poll?: Poll | null } } | undefined) => (current ? { post: { ...current.post, poll: result.poll } } : current));
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   };
 
@@ -108,26 +111,32 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
     <View style={styles.poll}>
       {poll.options.map((option) => {
         const mine = option.id === poll.myVote;
+        const picked = canChoose && option.id === selected;
         const votes = option.votes ?? 0;
         const share = showCounts && (poll.totalVotes ?? 0) > 0 ? votes / (poll.totalVotes as number) : 0;
         return (
           <Pressable
             key={option.id}
             accessibilityRole="button"
-            accessibilityState={{ selected: mine, disabled: !open }}
-            onPress={() => (me ? void vote(option.id) : null)}
-            style={({ pressed }) => [styles.option, mine && styles.optionMine, pressed && open && styles.pressed]}
+            accessibilityState={{ selected: mine || picked, disabled: !canChoose }}
+            onPress={() => (canChoose ? setSelected(option.id) : null)}
+            style={({ pressed }) => [styles.option, (mine || picked) && styles.optionMine, pressed && canChoose && styles.pressed]}
           >
             {showCounts ? <View style={[styles.optionFill, { width: `${Math.round(share * 100)}%` }]} /> : null}
             <View style={styles.optionRow}>
-              <Ionicons name={mine ? 'checkmark-circle' : open ? 'ellipse-outline' : 'remove-circle-outline'} size={20} color={mine ? colors.gold : colors.textMuted} />
-              <Text style={[styles.optionLabel, mine && styles.optionLabelMine]}>{option.label}</Text>
-              {showCounts ? <Text style={styles.optionVotes}>{busyId === option.id ? '…' : `${Math.round(share * 100)}%`}</Text> : busyId === option.id ? <Text style={styles.optionVotes}>…</Text> : null}
+              <Ionicons
+                name={mine ? 'checkmark-circle' : picked ? 'radio-button-on' : poll.closed ? 'remove-circle-outline' : 'ellipse-outline'}
+                size={20}
+                color={mine || picked ? colors.gold : colors.textMuted}
+              />
+              <Text style={[styles.optionLabel, (mine || picked) && styles.optionLabelMine]}>{option.label}</Text>
+              {showCounts ? <Text style={styles.optionVotes}>{`${Math.round(share * 100)}%`}</Text> : null}
             </View>
           </Pressable>
         );
       })}
 
+      {canChoose && selected ? <AppButton label={busy ? t('poll.confirming') : t('poll.confirm')} icon="checkmark-circle-outline" onPress={() => void confirm()} /> : null}
       {!me ? (
         <>
           <Notice tone="warning" text={t('poll.signIn')} />
@@ -138,10 +147,11 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
 
       <Text style={styles.pollMeta}>
         {[
+          canChoose ? t('poll.finalHint') : null,
+          me && poll.myVote !== null ? t('poll.votedFinal') : null,
           showCounts ? t('poll.total', { count: poll.totalVotes ?? 0 }) : null,
+          me && poll.myVote !== null && !showCounts ? t('poll.votedHidden') : null,
           poll.closed ? t('poll.closed') : poll.closesAt ? t('poll.closesAt', { date: formatEventDate(poll.closesAt) }) : null,
-          me && poll.myVote && !showCounts ? t('poll.votedHidden') : null,
-          me && poll.myVote && open ? t('poll.changeHint') : null,
         ]
           .filter(Boolean)
           .join(' · ')}

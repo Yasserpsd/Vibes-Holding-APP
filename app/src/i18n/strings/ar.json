@@ -677,5 +677,8 @@
   "poll.closed": "انتهى الاستفتاء",
   "poll.closesAt": "التصويت متاح حتى {date}",
   "poll.votedHidden": "تم تسجيل صوتك، والنتائج لدى الإدارة",
-  "poll.changeHint": "يمكنك تغيير اختيارك حتى الإغلاق"
+  "poll.confirm": "تأكيد التصويت",
+  "poll.confirming": "جارٍ التسجيل…",
+  "poll.finalHint": "اختر ثم أكّد؛ صوتك نهائي ولا يمكن تغييره",
+  "poll.votedFinal": "سجّلنا صوتك، وهو نهائي"
 }

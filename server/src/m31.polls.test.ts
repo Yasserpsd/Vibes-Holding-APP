@@ -93,7 +93,7 @@ test('an admin creates a poll with its options; a moderator may not; the hub nev
   assert.ok(!hub.published.some((body) => body.key === pollId), 'the poll must never be handed to the hub');
 });
 
-test('the feed shows the poll without counts; a vote answers with them; a guest cannot vote', async () => {
+test('the feed shows the poll without counts; a vote answers with them and is final; a guest cannot vote', async () => {
   const feed = (await get('/api/posts?limit=20', investor.token)).json();
   const poll = feed.posts.find((entry: { id: string }) => entry.id === pollId);
   assert.ok(poll, 'the poll reaches the member feed');
@@ -110,12 +110,15 @@ test('the feed shows the poll without counts; a vote answers with them; a guest 
   assert.equal(voted.json().poll.myVote, optionIds[0]);
   assert.equal(voted.json().poll.totalVotes, 1);
 
-  // A second choice replaces the first: the member counts once.
-  const changed = await send('POST', `/api/posts/${pollId}/vote`, { optionId: optionIds[1] }, investor.token);
-  assert.equal(changed.json().poll.myVote, optionIds[1]);
-  assert.equal(changed.json().poll.totalVotes, 1);
-  const counts = Object.fromEntries(changed.json().poll.options.map((option: { id: string; votes: number }) => [option.id, option.votes])) as Record<string, number>;
-  assert.deepEqual([counts[optionIds[0] ?? ''], counts[optionIds[1] ?? '']], [0, 1]);
+  // The vote is final: a second attempt is refused and the numbers stand.
+  const again = await send('POST', `/api/posts/${pollId}/vote`, { optionId: optionIds[1] }, investor.token);
+  assert.equal(again.statusCode, 409);
+  assert.equal(again.json().error.code, 'already_voted');
+  const standing = (await get(`/api/posts/${pollId}`, investor.token)).json().post.poll;
+  assert.equal(standing.myVote, optionIds[0]);
+  assert.equal(standing.totalVotes, 1);
+  const counts = Object.fromEntries(standing.options.map((option: { id: string; votes: number }) => [option.id, option.votes])) as Record<string, number>;
+  assert.deepEqual([counts[optionIds[0] ?? ''], counts[optionIds[1] ?? '']], [1, 0]);
 
   // A member who has not voted still sees no numbers.
   const other = (await get(`/api/posts/${pollId}`, neutral.token)).json().post;

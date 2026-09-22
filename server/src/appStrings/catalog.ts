@@ -640,7 +640,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "poll.closed": "انتهى الاستفتاء",
     "poll.closesAt": "التصويت متاح حتى {date}",
     "poll.votedHidden": "تم تسجيل صوتك، والنتائج لدى الإدارة",
-    "poll.changeHint": "يمكنك تغيير اختيارك حتى الإغلاق"
+    "poll.confirm": "تأكيد التصويت",
+    "poll.confirming": "جارٍ التسجيل…",
+    "poll.finalHint": "اختر ثم أكّد؛ صوتك نهائي ولا يمكن تغييره",
+    "poll.votedFinal": "سجّلنا صوتك، وهو نهائي"
   },
   "en": {
     "tabs.home": "Home",
@@ -1282,7 +1285,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "poll.closed": "The poll has ended",
     "poll.closesAt": "Voting is open until {date}",
     "poll.votedHidden": "Your vote is recorded; the results stay with the management",
-    "poll.changeHint": "You can change your choice until it closes"
+    "poll.confirm": "Confirm my vote",
+    "poll.confirming": "Recording…",
+    "poll.finalHint": "Pick then confirm; your vote is final and cannot be changed",
+    "poll.votedFinal": "Your vote is recorded and final"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
