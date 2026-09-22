@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { MEMBERSHIP_EN } from './en/membership.js';
 
 /**
  * Membership screen content: benefit groups and status wording. Editable server content
@@ -164,6 +167,7 @@ export async function ensureMembershipSeed(kv: KV, options: { force?: boolean } 
   return true;
 }
 
-export async function getMembershipContent(kv: KV): Promise<MembershipContent> {
-  return (await kv.get<MembershipContent>(MEMBERSHIP_CONTENT_KEY)) ?? MEMBERSHIP_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getMembershipContent(kv: KV, lang: AppLang = 'ar'): Promise<MembershipContent> {
+  return localizeBlock(kv, 'membership', (await kv.get<MembershipContent>(MEMBERSHIP_CONTENT_KEY)) ?? MEMBERSHIP_SEED, MEMBERSHIP_EN, lang);
 }

@@ -1,19 +1,25 @@
+import { getLang, t } from '@/i18n';
+
 /** Thousands separators without relying on Intl (partial on Hermes). */
 export function formatNumber(value: number): string {
   return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 export function formatMillionsSar(millions: number): string {
-  return `${formatNumber(millions)} مليون ريال`;
+  return t('common.millionSar', { amount: formatNumber(millions) });
 }
 
 const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const ENGLISH_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** "2027-09-06" → "6 سبتمبر 2027". Hyphenated dates flip visually inside Arabic text, so the month is spelled out. */
+/**
+ * "2027-09-06" → "6 سبتمبر 2027" ("6 September 2027" in the English version). Hyphenated dates flip visually
+ * inside Arabic text, so the month is spelled out.
+ */
 export function formatArabicDate(isoDate: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
   if (!match) return isoDate;
-  const month = ARABIC_MONTHS[Number(match[2]) - 1];
+  const month = (getLang() === 'en' ? ENGLISH_MONTHS : ARABIC_MONTHS)[Number(match[2]) - 1];
   return month ? `${Number(match[3])} ${month} ${match[1]}` : isoDate;
 }
 
@@ -29,18 +35,40 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return '';
   const minutes = Math.round((now - then) / 60_000);
-  if (minutes < 1) return 'الآن';
+  if (minutes < 1) return t('time.now');
+  if (getLang() === 'en') return englishRelativeTime(minutes, then);
   if (minutes < 60) return `قبل ${arabicCount(minutes, 'دقيقة', 'دقيقتين', 'دقائق')}`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `قبل ${arabicCount(hours, 'ساعة', 'ساعتين', 'ساعات')}`;
   const days = Math.round(hours / 24);
-  if (days === 1) return 'أمس';
+  if (days === 1) return t('time.yesterday');
   if (days < 7) return `قبل ${arabicCount(days, 'يوم', 'يومين', 'أيام')}`;
   return formatArabicDate(new Date(then).toISOString());
 }
 
-/** Weekday names, Sunday first (JavaScript's getDay order). */
-export const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+/** The same steps in English: "5 min ago", "2 hr ago", "yesterday", "3 days ago", then the date. */
+function englishRelativeTime(minutes: number, then: number): string {
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return t('time.yesterday');
+  if (days < 7) return `${days} days ago`;
+  return formatArabicDate(new Date(then).toISOString());
+}
+
+const WEEKDAY_KEYS = ['time.sunday', 'time.monday', 'time.tuesday', 'time.wednesday', 'time.thursday', 'time.friday', 'time.saturday'] as const;
+
+/** The weekday name of a JavaScript day index (Sunday = 0), in the app's language; '' for anything else. */
+export function weekdayName(day: number): string {
+  const key = WEEKDAY_KEYS[day];
+  return key ? t(key) : '';
+}
+
+/** The weekday of a "2026-09-22" date. */
+export function weekdayOf(isoDate: string): string {
+  return weekdayName(new Date(`${isoDate}T00:00:00Z`).getUTCDay());
+}
 
 /** "12 سبتمبر 2026 · 14:05" in the device's local time, for timestamps such as a booking time. */
 export function formatArabicDateTime(iso: string): string {

@@ -10,15 +10,17 @@ import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/As
 import { Chip } from '@/components/Chip';
 import { ProjectCard } from '@/components/ProjectCard';
 import { StateView } from '@/components/StateView';
+import { t, tOptional } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
+// The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
 const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
-  { key: 'latest', label: 'الأحدث' },
-  { key: 'views', label: 'الأكثر مشاهدة' },
-  { key: 'discover', label: 'اكتشف' },
-  { key: 'golden', label: 'المشاريع الذهبية' },
+  { key: 'latest', label: '' },
+  { key: 'views', label: '' },
+  { key: 'discover', label: '' },
+  { key: 'golden', label: '' },
 ];
 
 export default function ProjectsScreen() {
@@ -29,7 +31,7 @@ export default function ProjectsScreen() {
   const [stage, setStage] = useState<string | undefined>();
   const q = useDebounced(search.trim());
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
-  useAdvisorScreen({ type: 'screen', id: 'projects', title: 'بنك المشاريع' }, true);
+  useAdvisorScreen({ type: 'screen', id: 'projects', title: t('tabs.projects') }, true);
 
   const filters = useProjectFilters();
   const list = useProjectsList({ q, sort, sector, stage });
@@ -40,10 +42,10 @@ export default function ProjectsScreen() {
   const header = (
     <View style={styles.header}>
       <View style={styles.titleRow}>
-        <Text style={styles.title}>بنك المشاريع</Text>
+        <Text style={styles.title}>{t('tabs.projects')}</Text>
         <Pressable onPress={() => router.push('/golden')} style={styles.goldenLink} accessibilityRole="link">
           <Ionicons name="star" size={16} color={colors.gold} />
-          <Text style={styles.goldenLinkText}>المشاريع الذهبية</Text>
+          <Text style={styles.goldenLinkText}>{t('nav.golden')}</Text>
         </Pressable>
       </View>
 
@@ -52,14 +54,14 @@ export default function ProjectsScreen() {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="ابحث باسم المشروع أو الشركة"
+          placeholder={t('projects.searchPlaceholder')}
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}
           returnKeyType="search"
           autoCorrect={false}
         />
         {search ? (
-          <Pressable onPress={() => setSearch('')} accessibilityLabel="مسح البحث" hitSlop={8}>
+          <Pressable onPress={() => setSearch('')} accessibilityLabel={t('projects.clearSearch')} hitSlop={8}>
             <Ionicons name="close-circle" size={20} color={colors.textMuted} />
           </Pressable>
         ) : null}
@@ -67,13 +69,13 @@ export default function ProjectsScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {sorts.map((option) => (
-          <Chip key={option.key} label={option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
+          <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
         ))}
       </ScrollView>
 
       {filters.data && filters.data.sectors.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label="كل القطاعات" selected={!sector} onPress={() => setSector(undefined)} />
+          <Chip label={t('projects.allSectors')} selected={!sector} onPress={() => setSector(undefined)} />
           {filters.data.sectors.map((option) => (
             <Chip
               key={option.slug}
@@ -87,7 +89,7 @@ export default function ProjectsScreen() {
 
       {filters.data && filters.data.stages.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label="كل المراحل" selected={!stage} onPress={() => setStage(undefined)} />
+          <Chip label={t('projects.allStages')} selected={!stage} onPress={() => setStage(undefined)} />
           {filters.data.stages.map((option) => (
             <Chip
               key={option.slug}
@@ -99,7 +101,7 @@ export default function ProjectsScreen() {
         </ScrollView>
       ) : null}
 
-      {typeof total === 'number' ? <Text style={styles.count}>{`${formatNumber(total)} مشروع`}</Text> : null}
+      {typeof total === 'number' ? <Text style={styles.count}>{t('projects.count', { count: formatNumber(total) })}</Text> : null}
     </View>
   );
 
@@ -121,7 +123,7 @@ export default function ProjectsScreen() {
             error={list.error}
             onRetry={() => list.refetch()}
             empty={!list.isPending && !list.error}
-            emptyText="لا توجد مشاريع مطابقة"
+            emptyText={t('projects.empty')}
           />
         }
         ListFooterComponent={list.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}

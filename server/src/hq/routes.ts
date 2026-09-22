@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { adminGuard, guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import type { HqService } from './service.js';
 
 export type HqRoutesOptions = { service: HqService; auth: AuthService };
@@ -29,7 +30,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
     '/api/hq',
     guard(async (request) => {
       const who = await whoIs(request);
-      return service.overview(who?.me ?? null);
+      return service.overview(who?.me ?? null, Date.now(), langOf(request));
     }),
   );
 

@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { t } from '@/i18n';
+
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/payments/service.ts (PublicPayment).
@@ -45,5 +47,6 @@ export function useMyPayments(enabled: boolean) {
 }
 
 export function amountLabel(payment: Pick<Payment, 'amount' | 'currency'>): string {
-  return `${new Intl.NumberFormat('en-US').format(payment.amount)} ${payment.currency === 'SAR' ? 'ريال' : payment.currency}`;
+  const amount = new Intl.NumberFormat('en-US').format(payment.amount);
+  return payment.currency === 'SAR' ? t('common.sar', { amount }) : `${amount} ${payment.currency}`;
 }

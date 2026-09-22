@@ -9,6 +9,7 @@ import { AdminOtpStore } from './auth/adminOtp.js';
 import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
+import { appStringsRoutes } from './appStrings/routes.js';
 import { contentRoutes } from './content/routes.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
@@ -293,7 +294,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   }));
 
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
-  await app.register(contentRoutes, { kv, auth, notifier });
+  await app.register(contentRoutes, { kv, auth, notifier, sync });
+  await app.register(appStringsRoutes, { kv, auth, sync });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });
   await app.register(newsRoutes, { service: news, auth });

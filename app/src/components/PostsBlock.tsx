@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { eventOf, useLatestPosts, type Post } from '@/api/posts';
 import { SectionHeader } from '@/components/SectionHeader';
+import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -27,7 +28,7 @@ export function PostsBlock() {
 
   return (
     <View style={styles.block}>
-      <SectionHeader title="رسائل الإدارة" cta="عرض الكل" onPress={() => router.push('/posts' as Href)} />
+      <SectionHeader title={t('nav.posts')} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}
@@ -57,7 +58,7 @@ export function PostCard({ post }: { post: Post }) {
           <View style={styles.event}>
             <View style={styles.eventBadge}>
               <Ionicons name="calendar" size={12} color={colors.black} />
-              <Text style={styles.eventBadgeText}>فعالية</Text>
+              <Text style={styles.eventBadgeText}>{t('posts.eventBadge')}</Text>
             </View>
             <Text style={styles.eventWhen} numberOfLines={1}>
               {formatEventDate(event.date)}
@@ -68,7 +69,7 @@ export function PostCard({ post }: { post: Post }) {
           <View style={styles.eventPlace}>
             <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />
             <Text style={styles.eventPlaceText} numberOfLines={1}>
-              {event.place ? (event.onlineUrl ? `${event.place} · وعن بُعد` : event.place) : 'عن بُعد'}
+              {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
             </Text>
           </View>
         ) : null}

@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
+import { t } from '@/i18n';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
 };
 
 /** Loading, error and empty states for list and detail screens. */
-export function StateView({ loading, error, onRetry, empty, emptyText = 'لا توجد نتائج' }: Props) {
+export function StateView({ loading, error, onRetry, empty, emptyText }: Props) {
   if (loading) {
     return (
       <View style={styles.box}>
@@ -27,7 +28,7 @@ export function StateView({ loading, error, onRetry, empty, emptyText = 'لا ت
       <View style={styles.box}>
         <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
         <Text style={styles.text}>{errorMessage(error)}</Text>
-        {onRetry ? <AppButton label="إعادة المحاولة" variant="outline" icon="refresh" onPress={onRetry} /> : null}
+        {onRetry ? <AppButton label={t('common.retry')} variant="outline" icon="refresh" onPress={onRetry} /> : null}
       </View>
     );
   }
@@ -35,7 +36,7 @@ export function StateView({ loading, error, onRetry, empty, emptyText = 'لا ت
     return (
       <View style={styles.box}>
         <Ionicons name="search-outline" size={36} color={colors.textMuted} />
-        <Text style={styles.text}>{emptyText}</Text>
+        <Text style={styles.text}>{emptyText ?? t('common.noResults')}</Text>
       </View>
     );
   }

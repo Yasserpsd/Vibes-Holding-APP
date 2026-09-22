@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { GOLDEN_EN } from './en/golden.js';
 
 /** Golden projects portal: the umbrella plus ten companies. Editable server content. */
 export type GoldenCompany = {
@@ -74,6 +77,7 @@ export async function ensureGoldenSeed(kv: KV, options: { force?: boolean } = {}
   return true;
 }
 
-export async function getGoldenContent(kv: KV): Promise<GoldenContent> {
-  return (await kv.get<GoldenContent>(GOLDEN_CONTENT_KEY)) ?? GOLDEN_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getGoldenContent(kv: KV, lang: AppLang = 'ar'): Promise<GoldenContent> {
+  return localizeBlock(kv, 'golden', (await kv.get<GoldenContent>(GOLDEN_CONTENT_KEY)) ?? GOLDEN_SEED, GOLDEN_EN, lang);
 }

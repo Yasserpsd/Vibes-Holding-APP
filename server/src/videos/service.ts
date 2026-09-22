@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import { getVideosContent, type FeaturedVideo } from '../content/videos.js';
+import type { AppLang } from '../lang.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { KV } from '../store.js';
 import type { BlurbWriter } from './blurbs.js';
@@ -175,8 +176,8 @@ export class VideosService {
     };
   }
 
-  async list(query: { page: number; limit: number }): Promise<VideosPage> {
-    const content = await getVideosContent(this.deps.kv);
+  async list(query: { page: number; limit: number }, lang: AppLang = 'ar'): Promise<VideosPage> {
+    const content = await getVideosContent(this.deps.kv, lang);
     const byId = new Map(this.snapshot.videos.map((video) => [video.id, video]));
     const featured = content.featured.filter((pick) => isVideoId(pick.id)).map((pick) => {
       const video = byId.get(pick.id);
@@ -199,10 +200,10 @@ export class VideosService {
     };
   }
 
-  async get(id: string): Promise<PublicVideo | null> {
+  async get(id: string, lang: AppLang = 'ar'): Promise<PublicVideo | null> {
     const video = this.snapshot.videos.find((entry) => entry.id === id);
     if (video) return this.toPublic(video);
-    const content = await getVideosContent(this.deps.kv);
+    const content = await getVideosContent(this.deps.kv, lang);
     const pick = content.featured.find((entry) => entry.id === id);
     return pick ? this.placeholder(pick) : null;
   }

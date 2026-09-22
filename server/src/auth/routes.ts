@@ -10,7 +10,7 @@ import { PERSONAS, type AuthService } from './service.js';
 
 export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode };
 
-const personaSchema = z.enum(['entrepreneur', 'investor', 'neutral']);
+const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
 const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
 const codeSchema = z.string().trim().regex(/^\d{6}$/, 'الرمز 6 أرقام');
 const loginFieldSchema = z.string().trim().min(3).max(190);

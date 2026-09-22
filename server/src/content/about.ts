@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { ABOUT_EN } from './en/about.js';
 
 /** «عنّا»: the club, the operator and the فايبز القابضة ecosystem. Editable server content. */
 export type AboutSection = {
@@ -132,6 +135,7 @@ export async function ensureAboutSeed(kv: KV, options: { force?: boolean } = {})
   return true;
 }
 
-export async function getAboutContent(kv: KV): Promise<AboutContent> {
-  return (await kv.get<AboutContent>(ABOUT_CONTENT_KEY)) ?? ABOUT_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getAboutContent(kv: KV, lang: AppLang = 'ar'): Promise<AboutContent> {
+  return localizeBlock(kv, 'about', (await kv.get<AboutContent>(ABOUT_CONTENT_KEY)) ?? ABOUT_SEED, ABOUT_EN, lang);
 }

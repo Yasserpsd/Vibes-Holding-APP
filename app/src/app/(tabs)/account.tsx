@@ -15,6 +15,9 @@ import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { Screen } from '@/components/Screen';
 import { env } from '@/config/env';
+import { languageChoiceOffered, t, tOptional } from '@/i18n';
+import { chooseLanguage } from '@/i18n/chooseLanguage';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -40,16 +43,17 @@ export default function AccountScreen() {
   if (status === 'guest') {
     return (
       <PlaceholderScreen
-        title="حسابي"
-        description="سجّل الدخول للوصول إلى عضويتك وملفك الشخصي. يمكنك تصفّح بنك المشاريع والمشاريع الذهبية بدون تسجيل."
+        title={t('account.title')}
+        description={t('account.guestDescription')}
       >
         <View style={styles.actions}>
-          <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          <AppButton label={t('account.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
           {config?.registrationOpen === false ? null : (
-            <AppButton label="إنشاء حساب" variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+            <AppButton label={t('account.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
           )}
-          <AppButton label="مزايا العضوية" variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
-          <AppButton label="عنّا" variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />
+          <AppButton label={t('account.benefits')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          <AppButton label={t('account.about')} variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />
+          {languageChoiceOffered(false) ? <AppButton label={t('account.menu.language')} variant="outline" icon="language-outline" onPress={chooseLanguage} /> : null}
         </View>
       </PlaceholderScreen>
     );
@@ -63,7 +67,7 @@ export default function AccountScreen() {
 
   const confirmDelete = async (password: string) => {
     if (!password) {
-      setDeleteError('اكتب كلمة المرور للتأكيد');
+      setDeleteError(t('account.delete.passwordRequired'));
       return;
     }
     setDeleteBusy(true);
@@ -81,28 +85,29 @@ export default function AccountScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
-      {me ? <ProfileHeader me={me} /> : <Notice tone="warning" text="تعذّر تحميل بياناتك الآن. اسحب للأسفل لإعادة المحاولة." />}
+      {me ? <ProfileHeader me={me} /> : <Notice tone="warning" text={t('account.loadFailed')} />}
       <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} />
-      {!hasSecureStorage() ? <Notice tone="warning" text="هذه النسخة لا تحفظ الجلسة بعد إغلاق التطبيق؛ النسخة القادمة تحفظها." /> : null}
+      {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 
       <View style={styles.menu}>
-        <MenuRow icon="ribbon-outline" label="العضوية ومزاياها" onPress={() => router.push('/membership')} />
-        <MenuRow icon="create-outline" label="تعديل الملف الشخصي" onPress={() => router.push('/profile-edit')} />
-        <MenuRow icon="business-outline" label="مقر النادي وزياراتي" onPress={() => router.push('/hq')} />
-        <MenuRow icon="receipt-outline" label="مدفوعاتي" onPress={() => router.push('/payments')} />
-        <MenuRow icon="grid-outline" label="خدمات النادي" onPress={() => router.push('/services')} />
-        <MenuRow icon="play-circle-outline" label="مكتبة الفيديو" onPress={() => router.push('/videos')} />
-        <MenuRow icon="information-circle-outline" label="عنّا" onPress={() => router.push('/about')} />
-        {me?.isAdmin ? <MenuRow icon="shield-checkmark-outline" label="طلبات زيارة المقر (إدارة)" onPress={() => router.push('/hq/admin')} /> : null}
-        <MenuRow icon="log-out-outline" label="تسجيل الخروج" onPress={() => void signOut()} />
-        <MenuRow icon="trash-outline" label="حذف الحساب" danger onPress={() => setDeleting(true)} />
+        <MenuRow icon="ribbon-outline" label={t('account.menu.membership')} onPress={() => router.push('/membership')} />
+        <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
+        <MenuRow icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
+        <MenuRow icon="receipt-outline" label={t('account.menu.payments')} onPress={() => router.push('/payments')} />
+        <MenuRow icon="grid-outline" label={t('account.menu.services')} onPress={() => router.push('/services')} />
+        <MenuRow icon="play-circle-outline" label={t('account.menu.videos')} onPress={() => router.push('/videos')} />
+        <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
+        {languageChoiceOffered(me?.isAdmin === true) ? <MenuRow icon="language-outline" label={t('account.menu.language')} onPress={chooseLanguage} /> : null}
+        {me?.isAdmin ? <MenuRow icon="shield-checkmark-outline" label={t('account.menu.hqAdmin')} onPress={() => router.push('/hq/admin')} /> : null}
+        <MenuRow icon="log-out-outline" label={t('account.menu.signOut')} onPress={() => void signOut()} />
+        <MenuRow icon="trash-outline" label={t('account.menu.delete')} danger onPress={() => setDeleting(true)} />
       </View>
 
       <PasswordPrompt
         visible={deleting}
-        title="حذف الحساب"
-        message="سيُحذف حسابك وبياناتك الشخصية ومحادثاتك نهائيًا من النادي والتطبيق. أدخل كلمة المرور للتأكيد."
-        confirmLabel="حذف الحساب نهائيًا"
+        title={t('account.delete.title')}
+        message={t('account.delete.message')}
+        confirmLabel={t('account.delete.confirm')}
         busy={deleteBusy}
         error={deleteError}
         onConfirm={(password) => void confirmDelete(password)}
@@ -112,7 +117,7 @@ export default function AccountScreen() {
         }}
       />
 
-      <Text style={styles.footer}>{env.isProduction ? `الإصدار ${env.appVersion}` : `نسخة تجريبية · الإصدار ${env.appVersion}`}</Text>
+      <Text style={styles.footer}>{t(env.isProduction ? 'account.version' : 'account.versionPreview', { version: env.appVersion })}</Text>
     </Screen>
   );
 }
@@ -133,11 +138,11 @@ function ProfileHeader({ me }: { me: Me }) {
           <Text style={styles.name}>{me.name}</Text>
           {me.isAdmin ? (
             <View style={styles.adminBadge}>
-              <Text style={styles.adminBadgeText}>إدارة</Text>
+              <Text style={styles.adminBadgeText}>{t('account.adminBadge')}</Text>
             </View>
           ) : null}
         </View>
-        {me.personaLabel ? <Text style={styles.meta}>{me.personaLabel}</Text> : null}
+        {me.personaLabel ? <Text style={styles.meta}>{tOptional(`persona.${me.persona}`) ?? me.personaLabel}</Text> : null}
         {me.jobTitle ? <Text style={styles.meta}>{me.jobTitle}</Text> : null}
         <Text style={styles.contact}>{me.email}</Text>
         <Text style={styles.contact}>{me.phone}</Text>
@@ -154,7 +159,7 @@ function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <Ionicons name={icon} size={22} color={color} />
       <Text style={[styles.rowLabel, danger && { color: colors.danger }]}>{label}</Text>
-      <Ionicons name="chevron-back" size={18} color={colors.textMuted} />
+      <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -168,11 +173,11 @@ const styles = StyleSheet.create({
   avatarInitial: { ...typography.title, color: colors.gold },
   headerText: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name: { ...typography.subtitle, color: colors.textPrimary, textAlign: 'right' },
+  name: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   adminBadge: { paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.gold },
   adminBadgeText: { ...typography.caption, color: colors.goldLight, fontSize: 11 },
-  meta: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  contact: { ...typography.caption, color: colors.textMuted, textAlign: 'right', writingDirection: 'ltr' },
+  meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  contact: { ...typography.caption, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr' },
   menu: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' },
   row: {
     flexDirection: 'row',
@@ -184,6 +189,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   pressed: { opacity: 0.8 },
-  rowLabel: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: 'right' },
+  rowLabel: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   footer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md },
 });

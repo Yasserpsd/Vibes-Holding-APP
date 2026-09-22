@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -21,8 +23,8 @@ export function LockedNotice({ text, guest }: Props) {
         <Text style={styles.text}>{text}</Text>
       </View>
       <View style={styles.actions}>
-        {guest ? <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
-        <AppButton label="مزايا العضوية" variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+        {guest ? <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
+        <AppButton label={t('account.benefits')} variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={() => router.push('/membership')} />
       </View>
     </View>
   );
@@ -38,6 +40,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  text: { ...typography.body, color: colors.textPrimary, textAlign: 'right', flex: 1 },
+  text: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   actions: { gap: spacing.sm },
 });

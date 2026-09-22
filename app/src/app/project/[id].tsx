@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -27,7 +28,7 @@ export default function ProjectScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: project?.title ?? 'المشروع' }} />
+      <Stack.Screen options={{ title: project?.title ?? t('nav.project') }} />
       {!project ? (
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
@@ -43,7 +44,7 @@ export default function ProjectScreen() {
           {project.isGolden ? (
             <View style={styles.goldenBadge}>
               <Ionicons name="star" size={14} color={colors.black} />
-              <Text style={styles.goldenText}>مشروع ذهبي</Text>
+              <Text style={styles.goldenText}>{t('project.golden')}</Text>
             </View>
           ) : null}
 
@@ -53,29 +54,29 @@ export default function ProjectScreen() {
           <View style={styles.tags}>
             {project.sector ? <Text style={styles.tag}>{project.sector.name}</Text> : null}
             {project.stage ? <Text style={styles.tag}>{project.stage.name}</Text> : null}
-            {project.number ? <Text style={styles.tag}>{`رقم ${project.number}`}</Text> : null}
+            {project.number ? <Text style={styles.tag}>{t('project.number', { number: project.number })}</Text> : null}
           </View>
 
           <View style={styles.infoCard}>
-            {project.companyName ? <InfoRow icon="business-outline" label="الشركة" value={project.companyName} /> : null}
-            {project.founderName ? <InfoRow icon="person-outline" label="المؤسس" value={project.founderName} /> : null}
-            <InfoRow icon="eye-outline" label="المشاهدات" value={formatNumber(project.viewsCount)} />
+            {project.companyName ? <InfoRow icon="business-outline" label={t('project.company')} value={project.companyName} /> : null}
+            {project.founderName ? <InfoRow icon="person-outline" label={t('project.founder')} value={project.founderName} /> : null}
+            <InfoRow icon="eye-outline" label={t('project.views')} value={formatNumber(project.viewsCount)} />
           </View>
 
           <ProjectBrief projectId={String(project.id)} />
 
           {project.details ?? project.detailsEn ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>عن المشروع</Text>
+              <Text style={styles.sectionTitle}>{t('project.about')}</Text>
               <Text style={styles.body}>{project.details ?? project.detailsEn}</Text>
             </View>
           ) : null}
 
           {project.isGolden && project.goldenPartnerUrl ? (
-            <AppButton label="صفحة الشريك الذهبي" icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
+            <AppButton label={t('project.partnerPage')} icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
           ) : null}
 
-          <AppButton label="ناقش المشروع مع المستشار" icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
 
           <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} />
         </ScrollView>

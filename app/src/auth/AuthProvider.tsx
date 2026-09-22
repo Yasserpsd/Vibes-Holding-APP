@@ -13,6 +13,8 @@ export type AuthStatus = 'loading' | 'guest' | 'signedIn';
 type AuthContextValue = {
   status: AuthStatus;
   me: Me | null;
+  /** Whether this device holds a saved session; `null` until the secure store has answered (read by the sign-in gate). */
+  hasSession: boolean | null;
   /** Stores the session after login or verification. */
   signIn: (token: string, me: Me) => Promise<void>;
   /** Ends the session on the server (best effort) and locally. */
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [me, setMeState] = useState<Me | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const tokenRef = useRef<string | null>(null);
 
   const clearLocal = useCallback(async () => {
@@ -37,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The store identity belongs to the account too (RevenueCat app user id).
     void resetPurchases();
     setMeState(null);
+    setHasSession(false);
     setStatus('guest');
     await saveToken(null);
     queryClient.removeQueries({ queryKey: ['me'] });
@@ -51,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       const stored = await loadToken();
       if (cancelled) return;
+      setHasSession(Boolean(stored));
       if (!stored) {
         setStatus('guest');
         return;
@@ -88,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenRef.current = token;
     setAuthToken(token);
     setMeState(account);
+    setHasSession(true);
     setStatus('signedIn');
     await saveToken(token);
   }, []);
@@ -130,8 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setMe = useCallback((account: Me) => setMeState(account), []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, me, signIn, signOut, refresh, setMe }),
-    [status, me, signIn, signOut, refresh, setMe],
+    () => ({ status, me, hasSession, signIn, signOut, refresh, setMe }),
+    [status, me, hasSession, signIn, signOut, refresh, setMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

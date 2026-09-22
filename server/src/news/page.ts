@@ -1,5 +1,6 @@
 import { htmlToText } from '../projectsBank/text.js';
-import { BROWSER_UA, toIso, type FetchImpl } from './rss.js';
+import { BROWSER_UA, acceptLanguage, toIso, type FetchImpl } from './rss.js';
+import type { NewsLang } from './types.js';
 
 /** What the article page says about itself (Open Graph and friends). Nothing here is generated. */
 export type PageMeta = {
@@ -97,12 +98,12 @@ async function readLimited(response: Response, limit: number): Promise<Uint8Arra
  * Fetches the article page (CLAUDE.md rule 7: an item is shown only when its URL was fetched
  * successfully). Rejects non-HTML answers so PDFs and images never become news items.
  */
-export async function fetchArticle(url: string, fetchImpl: FetchImpl = fetch): Promise<PageMeta> {
+export async function fetchArticle(url: string, fetchImpl: FetchImpl = fetch, lang: NewsLang = 'ar'): Promise<PageMeta> {
   const response = await fetchImpl(url, {
     headers: {
       'user-agent': BROWSER_UA,
       accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.7',
-      'accept-language': 'ar,en;q=0.8',
+      'accept-language': acceptLanguage(lang),
     },
     redirect: 'follow',
     signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),

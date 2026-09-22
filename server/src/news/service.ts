@@ -4,16 +4,17 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import type { KV } from '../store.js';
-import { MIN_RELEVANCE, decisionGuard, type Classifier, type ClassifyInput } from './classify.js';
+import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
 import { fetchArticle, type PageMeta } from './page.js';
 import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
 import { getNewsSources, outletNameFor } from './sources.js';
 import { fetchSpaSnippet } from './spa.js';
 import {
-  TIER_LABELS,
-  TOPIC_LABELS,
+  tierLabel,
+  topicLabel,
   type NewsItem,
+  type NewsLang,
   type NewsPage,
   type NewsPrefs,
   type NewsSnapshot,
@@ -26,6 +27,11 @@ import {
 
 export const NEWS_SNAPSHOT_KEY = 'news:snapshot';
 export const DECISIONS_TITLE = 'قرارات وأنظمة المملكة';
+export const DECISIONS_TITLE_EN = 'Saudi Decisions & Regulations';
+
+export function decisionsTitle(lang: NewsLang): string {
+  return lang === 'en' ? DECISIONS_TITLE_EN : DECISIONS_TITLE;
+}
 
 const MAX_ITEMS = 1500;
 const MAX_NEW_PER_SOURCE = 30;
@@ -34,12 +40,13 @@ const RECENCY_HALF_LIFE_H = 36;
 
 /** Interests assumed from the persona until the member picks their own. */
 const PERSONA_TOPICS: Record<string, TopicKey[]> = {
+  neutral: ['economy', 'markets', 'tech'],
   entrepreneur: ['startups', 'economy', 'tech', 'retail', 'finance'],
   investor: ['markets', 'economy', 'realestate', 'finance', 'energy'],
-  neutral: ['economy', 'markets', 'tech'],
 };
 
-export type ListQuery = { topic?: TopicKey; page: number; limit: number };
+/** `lang` picks the feed: Arabic sources for the Arabic app, English sources for the English one (never translated, rule 7). */
+export type ListQuery = { topic?: TopicKey; page: number; limit: number; lang?: NewsLang };
 export type Audience = { prefs: NewsPrefs | null; persona: string };
 
 type Indexed = { item: NewsItem; tokens: Set<string> };
@@ -141,12 +148,15 @@ export class NewsService {
       sources.map(async (source) => {
         const at = new Date().toISOString();
         try {
-          const entries = await fetchFeed(source.url, this.deps.fetchImpl);
+          const entries = await fetchFeed(source.url, this.deps.fetchImpl, source.lang);
+          // Such a feed is read for its Saudi stories only; the rest never costs a page fetch or a label.
+          const saudiOnly = source.saudiOnly === true;
           let taken = 0;
           for (const entry of entries) {
             const id = newsIdOf(entry.url);
             if (this.items.has(id) || seen.has(id)) continue;
             if (entry.publishedAt && Date.parse(entry.publishedAt) < cutoff) continue;
+            if (saudiOnly && !mentionsSaudi(entry.title, entry.summary, source.tier)) continue;
             seen.add(id);
             fresh.push({ source, entry });
             taken += 1;
@@ -173,9 +183,9 @@ export class NewsService {
         const next = fresh[cursor++];
         if (!next) return;
         try {
-          const page = await fetchArticle(next.entry.url, this.deps.fetchImpl);
+          const page = await fetchArticle(next.entry.url, this.deps.fetchImpl, next.source.lang);
           if (next.entry.detailUrl && !next.entry.summary) {
-            next.entry.summary = await fetchSpaSnippet(next.entry.detailUrl, this.deps.fetchImpl).catch(() => null);
+            next.entry.summary = await fetchSpaSnippet(next.entry.detailUrl, this.deps.fetchImpl, next.source.lang).catch(() => null);
           }
           items.push(this.toItem(next, page));
         } catch (error) {
@@ -192,7 +202,7 @@ export class NewsService {
   private toItem({ source, entry }: Fresh, page: PageMeta): NewsItem {
     const aggregated = entry.sourceName !== null;
     const snippet = aggregated ? (page.description ?? entry.summary) : (entry.summary ?? page.description);
-    const sourceName = outletNameFor(page.url, entry.sourceName ?? (aggregated ? page.siteName : null) ?? source.name);
+    const sourceName = outletNameFor(page.url, entry.sourceName ?? (aggregated ? page.siteName : null) ?? source.name, source.lang);
     const now = new Date().toISOString();
     return {
       id: newsIdOf(entry.url),
@@ -256,9 +266,10 @@ export class NewsService {
     await this.deps.kv.set(NEWS_SNAPSHOT_KEY, snapshot);
   }
 
-  private visible(): NewsItem[] {
+  /** Shown items, of one language when given. */
+  private visible(lang?: NewsLang): NewsItem[] {
     const rows: NewsItem[] = [];
-    for (const { item } of this.items.values()) if (!item.hidden && !item.duplicateOf) rows.push(item);
+    for (const { item } of this.items.values()) if (!item.hidden && !item.duplicateOf && (!lang || item.lang === lang)) rows.push(item);
     return rows;
   }
 
@@ -269,6 +280,7 @@ export class NewsService {
     return {
       count: this.items.size,
       visible: rows.length,
+      visibleByLang: { ar: rows.filter((item) => item.lang === 'ar').length, en: rows.filter((item) => item.lang === 'en').length },
       decisions: rows.filter((item) => item.decision).length,
       updatedAt: this.updatedAt,
       lastError: this.lastError,
@@ -313,7 +325,7 @@ export class NewsService {
   feed(query: ListQuery, audience: Audience): NewsPage {
     const interests = audience.prefs?.topics.length ? audience.prefs.topics : this.suggestedTopics(audience.persona);
     const wanted = new Set(interests);
-    let rows = this.visible();
+    let rows = this.visible(query.lang ?? 'ar');
     if (query.topic) rows = rows.filter((item) => item.topics.includes(query.topic as TopicKey));
     const now = Date.now();
     const scored = rows
@@ -324,18 +336,26 @@ export class NewsService {
 
   /** The fixed section, newest first, the same for everyone. */
   decisions(query: Omit<ListQuery, 'topic'>): NewsPage {
-    const rows = this.visible()
+    const rows = this.visible(query.lang ?? 'ar')
       .filter((item) => item.decision)
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
     return paginate(rows, query, this.updatedAt, false);
   }
 }
 
+/**
+ * The Arabic feed leads with the official wire, then Saudi outlets. The English feed is «Saudi news from foreign
+ * sources» (owner, 2026-09-21): foreign outlets lead there, the official English wire comes last.
+ */
+function feedTierRank(item: NewsItem): number {
+  return item.lang === 'en' ? 4 - tierRank(item.tier) : tierRank(item.tier);
+}
+
 function scoreOf(item: NewsItem, wanted: Set<TopicKey>, now: number): number {
   const ageHours = Math.max(0, now - Date.parse(item.publishedAt)) / 3_600_000;
   const recency = 40 * Math.pow(0.5, ageHours / RECENCY_HALF_LIFE_H);
   const interest = item.topics.some((topic) => wanted.has(topic)) ? 25 : 0;
-  return tierRank(item.tier) * 8 + recency + item.relevance * 0.3 + interest;
+  return feedTierRank(item) * 8 + recency + item.relevance * 0.3 + interest;
 }
 
 function paginate(rows: NewsItem[], query: { page: number; limit: number }, updatedAt: string | null, personalized: boolean): NewsPage {
@@ -352,8 +372,8 @@ export function toPublic(item: NewsItem): PublicNewsItem {
     url: item.url,
     image: item.image,
     publishedAt: item.publishedAt,
-    source: { id: item.sourceId, name: item.sourceName, tier: item.tier, tierLabel: TIER_LABELS[item.tier] },
-    topics: item.topics.map((key) => ({ key, label: TOPIC_LABELS[key] })),
+    source: { id: item.sourceId, name: item.sourceName, tier: item.tier, tierLabel: tierLabel(item.tier, item.lang) },
+    topics: item.topics.map((key) => ({ key, label: topicLabel(key, item.lang) })),
     decision: item.decision,
     lang: item.lang,
   };

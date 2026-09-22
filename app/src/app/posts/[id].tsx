@@ -6,6 +6,8 @@ import { eventOf, usePost, type PostEvent } from '@/api/posts';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -23,7 +25,7 @@ export default function PostScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: event ? 'فعالية' : 'رسالة من الإدارة' }} />
+      <Stack.Screen options={{ title: event ? t('posts.event') : t('nav.post') }} />
       {!post ? (
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
@@ -31,7 +33,7 @@ export default function PostScreen() {
           <View style={styles.meta}>
             <View style={styles.badge}>
               <Ionicons name={event ? 'calendar' : 'megaphone-outline'} size={14} color={colors.black} />
-              <Text style={styles.badgeText}>{event ? 'فعالية' : 'رسائل الإدارة'}</Text>
+              <Text style={styles.badgeText}>{event ? t('posts.event') : t('nav.posts')}</Text>
             </View>
             {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
           </View>
@@ -39,10 +41,10 @@ export default function PostScreen() {
           {event ? <EventCard event={event} /> : null}
           {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
           {post.youtubeId ? (
-            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label="تشغيل فيديو يوتيوب" />
+            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label={t('posts.playYoutube')} />
           ) : null}
           {/* Uploaded video: no native player (the change ships over the air), the in-app browser plays the file. */}
-          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label="تشغيل الفيديو" /> : null}
+          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} /> : null}
           {post.images.map((uri) => (
             <Image key={uri} source={{ uri }} style={styles.image} resizeMode="contain" />
           ))}
@@ -63,7 +65,7 @@ function EventCard({ event }: { event: PostEvent }) {
       <View style={styles.eventRow}>
         <Ionicons name="calendar-outline" size={20} color={colors.gold} />
         <View style={styles.eventTexts}>
-          <Text style={styles.eventLabel}>الموعد</Text>
+          <Text style={styles.eventLabel}>{t('posts.when')}</Text>
           <Text style={styles.eventValue}>{formatEventDate(event.date)}</Text>
         </View>
       </View>
@@ -71,12 +73,12 @@ function EventCard({ event }: { event: PostEvent }) {
         <View style={[styles.eventRow, styles.eventRowBorder]}>
           <Ionicons name="location-outline" size={20} color={colors.gold} />
           <View style={styles.eventTexts}>
-            <Text style={styles.eventLabel}>المكان</Text>
+            <Text style={styles.eventLabel}>{t('posts.where')}</Text>
             <Text style={styles.eventValue}>{event.place}</Text>
           </View>
         </View>
       ) : null}
-      {onlineUrl ? <AppButton label="رابط الحضور عن بُعد" icon="videocam-outline" onPress={() => void openLink(onlineUrl)} /> : null}
+      {onlineUrl ? <AppButton label={t('posts.onlineLink')} icon="videocam-outline" onPress={() => void openLink(onlineUrl)} /> : null}
     </View>
   );
 }
@@ -120,8 +122,8 @@ const styles = StyleSheet.create({
   eventRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   eventRowBorder: { paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eventTexts: { flex: 1 },
-  eventLabel: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
-  eventValue: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'right' },
+  eventLabel: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  eventValue: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
   // `contain`: a flyer or a logo keeps its text; the box colour fills the sides.
   image: { width: '100%', height: 240, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   video: { borderRadius: radii.lg, overflow: 'hidden', backgroundColor: colors.surfaceElevated },

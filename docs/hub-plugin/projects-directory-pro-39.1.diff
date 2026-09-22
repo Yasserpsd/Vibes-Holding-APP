@@ -1,0 +1,503 @@
+diff -ruN --strip-trailing-cr pb/inc/brief.php work/pb/inc/brief.php
+--- pb/inc/brief.php	1970-01-01 03:00:00.000000000 +0300
++++ work/pb/inc/brief.php	2026-09-22 01:17:44.746176600 +0300
+@@ -0,0 +1,363 @@
++<?php
++/**
++ * v39.1 — «جدول المستشار»: the adviser's own table in place of the founder's description on the project page
++ * (owner, 2026-09-22: the project is shown alone — the app's «ملخص المستشار» is the model).
++ *
++ *  - Built from the project's own published fields only: no AI call, no request to any server, nothing stored but a
++ *    small per-project cache of the stage reading.
++ *  - Never in it: the founder's name, contact data, funding sought, valuation, equity on offer, promised returns.
++ *  - The site's stage «اخري / أخرى» is not a stage. The adviser reads the step from what the description says already
++ *    exists (plans never count) and marks it «تقدير المستشار»; a project it cannot read shows no stage at all.
++ *  - Setting «صفحة المشروع» in the plugin settings: table (default) | both (table, then the founder's text) | off.
++ */
++if (!defined('ABSPATH')) exit;
++
++// ========== R1. Text helpers ==========
++function pdp_brief_lower($s) { return function_exists('mb_strtolower') ? mb_strtolower((string)$s, 'UTF-8') : strtolower((string)$s); }
++function pdp_brief_len($s) { return function_exists('mb_strlen') ? mb_strlen((string)$s, 'UTF-8') : strlen((string)$s); }
++function pdp_brief_cut($s, $n) {
++    $s = trim(preg_replace('/\s+/u', ' ', (string)$s));
++    if (pdp_brief_len($s) <= $n) return $s;
++    $cut = function_exists('mb_substr') ? mb_substr($s, 0, $n, 'UTF-8') : substr($s, 0, $n);
++    $sp = function_exists('mb_strrpos') ? mb_strrpos($cut, ' ', 0, 'UTF-8') : strrpos($cut, ' ');
++    if ($sp !== false && $sp > $n * 0.6) $cut = function_exists('mb_substr') ? mb_substr($cut, 0, $sp, 'UTF-8') : substr($cut, 0, $sp);
++    return rtrim($cut, " ،,.;:") . '…';
++}
++/** Lowercase and fold the common Arabic spelling variants, punctuation to spaces (same folding as the app server). */
++function pdp_brief_fold($s) {
++    $s = pdp_brief_lower($s);
++    $s = preg_replace('/[\x{064B}-\x{0652}\x{0670}\x{0640}]/u', '', $s);
++    $s = preg_replace('/[أإآٱ]/u', 'ا', (string)$s);
++    $s = str_replace(['ى', 'ئ', 'ؤ', 'ة'], ['ي', 'ي', 'و', 'ه'], (string)$s);
++    $s = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', (string)$s);
++    return trim(preg_replace('/\s+/u', ' ', (string)$s));
++}
++function pdp_brief_plain($html) {
++    $t = html_entity_decode(wp_strip_all_tags((string)$html), ENT_QUOTES, 'UTF-8');
++    return trim(preg_replace('/[ \t]+/u', ' ', str_replace(["\r\n", "\r"], "\n", $t)));
++}
++
++// ========== R2. The five steps and the stage reading ==========
++function pdp_brief_steps() {
++    return [
++        ['key' => 'idea',      'ar' => 'فكرة',              'en' => 'Idea',                 'match' => '/فكر|دراس|idea|concept/u'],
++        ['key' => 'prototype', 'ar' => 'تأسيس ونموذج أولي', 'en' => 'Founding & prototype', 'match' => '/تاسيس|نموذج|اولي|تجريب|تطوير|prototype|mvp|(?<!pre )seed/u'],
++        ['key' => 'launch',    'ar' => 'إطلاق وتشغيل',      'en' => 'Launch & operation',   'match' => '/اطلاق|تشغيل|قايم|بدايه|launch|operat|early/u'],
++        ['key' => 'revenue',   'ar' => 'تحقيق الدخل',       'en' => 'Revenue',              'match' => '/دخل|ايراد|مبيعات|cash|revenue/u'],
++        ['key' => 'growth',    'ar' => 'نمو وتوسع',         'en' => 'Growth & expansion',   'match' => '/نمو|توسع|انتشار|نضج|growth|scale|expan|mature/u'],
++    ];
++}
++/** 0-based step of a stage wording, -1 when it names none («اخري», empty). The furthest matching step wins. */
++function pdp_brief_step_of($name) {
++    $folded = pdp_brief_fold($name);
++    $index = -1;
++    if ($folded === '') return $index;
++    foreach (pdp_brief_steps() as $i => $step) { if (preg_match($step['match'], $folded)) $index = $i; }
++    return $index;
++}
++/** The step a description shows TODAY, -1 when it does not say. A clause about tomorrow is skipped. */
++function pdp_brief_estimate_step($details) {
++    $plans = '/نخطط|نسعي|نهدف|نطمح|نستهدف|نتطلع|نتوقع|متوقع|توقعات|سوف|سنقوم|سيتم|سنطلق|مستقبل|القادم|خطه|خطط|رويه|رويتنا|هدف|اهداف|يهدف|تهدف|يسعي|تسعي|نحتاج|بحاجه|aim|plan|will|goal|vision|future|expect|seek|need/u';
++    $evidence = [
++        '/فكره|دراسه جدوي|قيد الدراسه|idea|concept|feasibility/u',
++        '/نموذج اولي|النموذج الاولي|قيد التطوير|تحت التطوير|قيد الانشاء|تحت الانشاء|قيد التاسيس|تحت التاسيس|نسخه تجريبيه|مرحله تجريبيه|mvp|prototype|beta|under development/u',
++        '/تم اطلاق|تم الاطلاق|اطلقنا|تم تشغيل|تم التشغيل|يعمل حاليا|تعمل حاليا|نعمل حاليا|قايم حاليا|شركه قايمه|مشروع قايم|تم افتتاح|افتتحنا|مستخدم مسجل|شركه مسجله|شركات مسجله|عميل مسجل|launched|operating|is live|registered users/u',
++        '/حققنا|حققت ايرادات|حققت مبيعات|حقق ايرادات|حقق مبيعات|ايراداتنا|مبيعاتنا|ايرادات سنويه|ايرادات شهريه|مبيعات سنويه|مبيعات شهريه|عملاء يدفعون|دخل شهري|دخل سنوي|revenue of|in revenue|paying customers|annual sales/u',
++        '/توسعنا|تم التوسع|افتتحنا فرع|فروعنا|عده فروع|اكثر من فرع|فرعا في|اسواق جديده دخلناها|expanded to|branches in/u',
++    ];
++    $index = -1;
++    $clauses = preg_split('/[.!?؟؛\n،]+|,(?!\d)|\sبينما\s/u', (string)$details);
++    foreach ((array)$clauses as $clause) {
++        $folded = pdp_brief_fold($clause);
++        if ($folded === '' || preg_match($plans, $folded)) continue;
++        foreach ($evidence as $i => $rx) { if ($i > $index && preg_match($rx, $folded)) $index = $i; }
++    }
++    return $index;
++}
++/** array( index, estimated ) of a project: the site's stage, else the adviser's reading (cached per description), else -1. */
++function pdp_brief_project_step($pid) {
++    $pid = (int)$pid;
++    $terms = get_the_terms($pid, 'project_stage');
++    $name = ($terms && !is_wp_error($terms) && !empty($terms[0])) ? (string)$terms[0]->name : '';
++    $declared = pdp_brief_step_of($name);
++    if ($declared >= 0) return [$declared, false];
++    $details = pdp_brief_plain(get_post_meta($pid, 'project_details', true));
++    $sig = md5($details);
++    $cached = (string)get_post_meta($pid, '_pdp_stage_est', true);
++    if ($cached !== '' && strpos($cached, $sig . ':') === 0) return [(int)substr($cached, 33), true];
++    $est = pdp_brief_estimate_step($details);
++    update_post_meta($pid, '_pdp_stage_est', $sig . ':' . $est);
++    return [$est, true];
++}
++/**
++ * The stage as the visitor sees it, everywhere on the site. A declared stage keeps the site's own wording; «اخري» becomes
++ * the adviser's reading («إطلاق وتشغيل · تقدير المستشار») or an empty string (no tag at all).
++ */
++function pdp_stage_display($pid, $lang = 'ar') {
++    $terms = get_the_terms((int)$pid, 'project_stage');
++    $name = ($terms && !is_wp_error($terms) && !empty($terms[0])) ? (string)$terms[0]->name : '';
++    if ($name !== '' && pdp_brief_step_of($name) >= 0) return function_exists('pdp_translate_term') ? pdp_translate_term($name, 'stage', $lang) : $name;
++    list($index, ) = pdp_brief_project_step($pid);
++    $steps = pdp_brief_steps();
++    if ($index < 0 || !isset($steps[$index])) return '';
++    return $lang === 'en' ? $steps[$index]['en'] . ' · adviser\'s estimate' : $steps[$index]['ar'] . ' · تقدير المستشار';
++}
++
++// ========== R3. What may be lifted from the founder's text ==========
++/** A clause the table must not repeat: contact data, the ask (funding, valuation, equity), returns or guarantees. */
++function pdp_brief_blocked($text) {
++    $raw = (string)$text;
++    if (preg_match('/[\w.+-]+@[\w-]+\.[\w.-]+|https?:\/\/|www\.|(?<![\w.])@[\w.]{3,}|(?:\+|00)?[\d٠-٩][\d٠-٩\s\-()]{7,}[\d٠-٩]/u', $raw)) return true;
++    $f = pdp_brief_fold($raw);
++    return (bool)preg_match('/واتس|جوال|هاتف|للتواصل|تواصل معنا|ايميل|البريد|انستقرام|تويتر|سناب|whats|phone|email|تمويل|استثمار|مستثمر|راس المال|راس مال|راسمال|حصه|حصص|تقييم|جوله|ريال|دولار|درهم|جنيه|مليون|مليار|sar|usd|funding|invest|valuation|equity|capital|عايد|عوايد|ارباح|ربح|roi|return|profit|مضمون|نضمن|يضمن|ضمان|بلا مخاطر|بدون مخاطر|guarantee|risk free|الموسس|موسس|المالك|founder|owner/u', $f);
++}
++/** The club's wording rules on text we author or lift. */
++function pdp_brief_wording($s) {
++    $s = preg_replace('/مجان(?:ًا|اً|ا|ية|ي)?/u', 'بدون رسوم', (string)$s);
++    $s = str_replace('كريديت', 'رصيد', (string)$s);
++    $s = preg_replace('/(\d)\s*-\s*(\d)/u', '$1–$2', (string)$s);
++    return trim(preg_replace('/\s+/u', ' ', (string)$s));
++}
++function pdp_brief_summary($excerpt, $details, $fallback) {
++    foreach ([$excerpt, $details] as $source) {
++        $keep = [];
++        $size = 0;
++        foreach ((array)preg_split('/(?<=[.!?؟])\s+|\n+/u', pdp_brief_plain($source)) as $sentence) {
++            $sentence = trim((string)$sentence);
++            if (preg_match('/^[\s•\-–*]*[^:：\n]{2,40}[:：]\s*.{2,160}$/u', $sentence)) continue; // a «label: value» line belongs to the table
++            if (pdp_brief_len($sentence) < 25 || pdp_brief_blocked($sentence)) continue;
++            $keep[] = $sentence;
++            $size += pdp_brief_len($sentence);
++            if ($size >= 300 || count($keep) >= 3) break;
++        }
++        if ($keep) return pdp_brief_cut(pdp_brief_wording(implode(' ', $keep)), 420);
++    }
++    return $fallback;
++}
++/** «label: value» lines the founder wrote, minus anything blocked. */
++function pdp_brief_written_rows($details, $taken) {
++    $rows = [];
++    foreach (explode("\n", pdp_brief_plain($details)) as $line) {
++        if (!preg_match('/^[\s•\-–*]*([^:：\n]{2,40})[:：]\s*(.{2,160})$/u', trim($line), $m)) continue;
++        $label = pdp_brief_wording($m[1]);
++        $value = pdp_brief_wording($m[2]);
++        if ($label === '' || $value === '' || isset($taken[$label]) || pdp_brief_blocked($label . ' ' . $value)) continue;
++        $taken[$label] = true;
++        $rows[] = [$label, $value];
++        if (count($rows) >= 6) break;
++    }
++    return $rows;
++}
++
++/** «5 سبتمبر 2026» / «September 5, 2026» in the site's timezone, whatever language WordPress itself runs in. */
++function pdp_brief_day($timestamp, $en) {
++    if ($timestamp <= 0) return '';
++    $months_ar = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
++    $months_en = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
++    $parts = explode('-', wp_date('Y-n-j', $timestamp));
++    if (count($parts) !== 3) return '';
++    $month = (int)$parts[1] - 1;
++    return $en ? $months_en[$month] . ' ' . (int)$parts[2] . ', ' . $parts[0] : (int)$parts[2] . ' ' . $months_ar[$month] . ' ' . $parts[0];
++}
++
++// ========== R4. The brief ==========
++function pdp_brief_build($pid, $lang = 'ar') {
++    $pid = (int)$pid;
++    $en = ($lang === 'en');
++    $title = html_entity_decode(get_the_title($pid), ENT_QUOTES, 'UTF-8');
++    $title_en = (string)get_post_meta($pid, 'title_en', true);
++    $company = (string)get_post_meta($pid, $en ? 'company_name_en' : 'company_name', true);
++    if ($en && $company === '') $company = (string)get_post_meta($pid, 'company_name', true);
++    $details_ar = (string)get_post_meta($pid, 'project_details', true);
++    $details = $en ? ((string)get_post_meta($pid, 'project_details_en', true) ?: $details_ar) : $details_ar;
++    $excerpt = $en ? (string)get_post_meta($pid, 'excerpt_en', true) : (string)get_post_field('post_excerpt', $pid);
++    $golden = get_post_meta($pid, 'is_featured', true) === '1';
++    $pitch = (int)get_post_meta($pid, 'pitch_deck', true) > 0;
++    $sectors = get_the_terms($pid, 'sector');
++    $sector = ($sectors && !is_wp_error($sectors) && !empty($sectors[0])) ? (function_exists('pdp_translate_term') ? pdp_translate_term($sectors[0]->name, 'sector', $lang) : $sectors[0]->name) : '';
++    $number = (string)get_post_meta($pid, 'project_number', true);
++    list($index, $estimated) = pdp_brief_project_step($pid);
++    $steps = pdp_brief_steps();
++    $stage_label = pdp_stage_display($pid, $lang);
++    $plain_len = pdp_brief_len(pdp_brief_plain($details));
++
++    $facts = [
++        [$en ? 'Project no.' : 'رقم المشروع', $number !== '' ? '#' . $number : ''],
++        [$en ? 'Company' : 'الشركة', $company],
++        [$en ? 'Sector' : 'القطاع', $sector],
++        [$en ? 'Stage' : 'المرحلة', $stage_label],
++        [$en ? 'Type' : 'النوع', $golden ? ($en ? 'Golden project (V mark)' : 'مشروع ذهبي (علامة V)') : ($en ? 'Projects Bank project' : 'مشروع في بنك المشاريع')],
++        [$en ? 'Pitch deck' : 'ملف العرض', ($pitch && !$golden) ? ($en ? 'Available to members after unlocking the project' : 'متاح للأعضاء بعد فتح المشروع') : ($en ? 'Not attached' : 'غير مرفق')],
++        [$en ? 'Last update' : 'آخر تحديث', pdp_brief_day((int)get_post_modified_time('U', true, $pid), $en)],
++    ];
++    $rows = [];
++    $taken = [];
++    foreach ($facts as $fact) { if (trim((string)$fact[1]) !== '') { $rows[] = [$fact[0], pdp_brief_wording($fact[1])]; $taken[$fact[0]] = true; } }
++    $rows = array_merge($rows, pdp_brief_written_rows($details, $taken));
++
++    $shown_title = ($en && $title_en !== '') ? $title_en : $title;
++    $fallback = $en ? $shown_title . ($sector !== '' ? ': a project in ' . $sector . '.' : '.') : $shown_title . ($sector !== '' ? ': مشروع في قطاع ' . $sector . '.' : '.');
++
++    $strengths = [];
++    if ($plain_len >= 400) $strengths[] = $en ? 'A detailed description of the idea and the business model' : 'وصف تفصيلي يشرح فكرة المشروع ونموذج عمله';
++    if ($pitch && !$golden) $strengths[] = $en ? 'A pitch deck is available to members after unlocking the project' : 'ملف عرض (Pitch Deck) متاح للأعضاء بعد فتح المشروع';
++    if ($golden) $strengths[] = $en ? 'A golden project carrying the V mark of the ecosystem\'s companies' : 'مشروع ذهبي يحمل علامة V من شركات المنظومة';
++    if ($index >= 3 && !$estimated) $strengths[] = $en ? 'Past the launch stage according to its owner\'s data' : 'تجاوز مرحلة الإطلاق بحسب بيانات صاحبه';
++    if (!$strengths) $strengths[] = $en ? 'Its data is published in the Projects Bank and the adviser can answer questions about it' : 'بياناته منشورة في بنك المشاريع ويمكن سؤال المستشار عن تفاصيلها';
++
++    $notes = [$en ? 'The information comes from the project owner and was not independently reviewed' : 'المعلومات مقدمة من صاحب المشروع ولم تُراجَع بشكل مستقل'];
++    if ($index < 0) $notes[] = $en ? 'The project\'s stage is not stated in its data' : 'مرحلة المشروع غير محددة في بياناته';
++    elseif ($index <= 1) $notes[] = $en ? 'An early-stage project whose model is not proven in the market yet' : 'المشروع في مرحلة مبكرة ولم يثبت نموذجه في السوق بعد';
++    if ($plain_len < 200) $notes[] = $en ? 'The published description is short; ask for fuller details before any decision' : 'الوصف المنشور مختصر؛ اطلب تفاصيل أوفى قبل أي قرار';
++    if (!$pitch) $notes[] = $en ? 'No pitch deck attached' : 'لا يوجد ملف عرض مرفق';
++
++    return [
++        'title'      => $shown_title,
++        'summary'    => pdp_brief_summary($excerpt, $details, $fallback),
++        'rows'       => $rows,
++        'steps'      => array_map(function ($s) use ($en) { return $en ? $s['en'] : $s['ar']; }, $steps),
++        'index'      => $index,
++        'estimated'  => (bool)$estimated && $index >= 0,
++        'stage'      => $stage_label,
++        'strengths'  => $strengths,
++        'notes'      => $notes,
++        'disclaimer' => $en ? 'An automatic brief built from the project\'s published data in the Projects Bank. Informational only: not a contractual offer and no guarantee of returns.' : 'ملخص آلي من بيانات المشروع المنشورة في بنك المشاريع. المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.',
++    ];
++}
++
++function pdp_brief_mode() {
++    $m = (string)get_option('pdp_brief_mode', 'table');
++    return in_array($m, ['table', 'both', 'off'], true) ? $m : 'table';
++}
++
++/** The block that takes the place of «تفاصيل المشروع» on the project page. */
++function pdp_brief_render($pid, $lang = 'ar') {
++    $b = pdp_brief_build($pid, $lang);
++    $en = ($lang === 'en');
++    $known = $b['index'] >= 0 && $b['index'] < count($b['steps']);
++    ob_start();
++    ?>
++    <div class="sp-brief" id="spBrief">
++        <h2 class="sp-brief-t"><span class="sp-brief-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z"/></svg></span><?php echo esc_html($en ? 'Adviser\'s brief' : 'ملخص المستشار'); ?></h2>
++        <p class="sp-brief-sum"><?php echo esc_html($b['summary']); ?></p>
++
++        <div class="sp-brief-tbl" role="table">
++            <?php foreach ($b['rows'] as $row): ?>
++            <div class="sp-brief-row" role="row"><span class="sp-brief-l" role="rowheader"><?php echo esc_html($row[0]); ?></span><span class="sp-brief-v" role="cell"><?php echo esc_html($row[1]); ?></span></div>
++            <?php endforeach; ?>
++        </div>
++
++        <div class="sp-brief-stage">
++            <div class="sp-brief-h"><?php echo esc_html($en ? 'Where the project stands' : 'موقع المشروع على المراحل'); ?><?php if ($known): ?><span class="sp-brief-pill"><?php echo esc_html($b['steps'][$b['index']]); ?></span><?php endif; ?></div>
++            <ol class="sp-brief-steps">
++                <?php foreach ($b['steps'] as $i => $label): $cls = $known ? ($i < $b['index'] ? ' is-done' : ($i === $b['index'] ? ' is-now' : '')) : ''; ?>
++                <li class="sp-brief-step<?php echo esc_attr($cls); ?>"<?php echo ($known && $i === $b['index']) ? ' aria-current="step"' : ''; ?>><span class="sp-brief-dot" aria-hidden="true"></span><span class="sp-brief-sl"><?php echo esc_html($label); ?></span></li>
++                <?php endforeach; ?>
++            </ol>
++            <?php if (!$known): ?><p class="sp-brief-note"><?php echo esc_html($en ? 'The published data does not place the project on the stages.' : 'لم نتمكن من تحديد موقع المشروع على المراحل من بياناته المنشورة.'); ?></p>
++            <?php elseif ($b['estimated']): ?><p class="sp-brief-note"><?php echo esc_html($en ? 'The adviser\'s estimate from the project\'s description; its owner did not state the stage.' : 'تقدير المستشار من وصف المشروع؛ صاحب المشروع لم يحدد مرحلته.'); ?></p><?php endif; ?>
++        </div>
++
++        <div class="sp-brief-cols">
++            <div class="sp-brief-col"><div class="sp-brief-h"><?php echo esc_html($en ? 'Strengths' : 'نقاط القوة'); ?></div><ul><?php foreach ($b['strengths'] as $line): ?><li><?php echo esc_html($line); ?></li><?php endforeach; ?></ul></div>
++            <div class="sp-brief-col sp-brief-col-n"><div class="sp-brief-h"><?php echo esc_html($en ? 'Worth a closer look' : 'نقاط تستحق الانتباه'); ?></div><ul><?php foreach ($b['notes'] as $line): ?><li><?php echo esc_html($line); ?></li><?php endforeach; ?></ul></div>
++        </div>
++
++        <button type="button" class="sp-brief-ask" id="spBriefAsk" hidden data-pid="<?php echo (int)$pid; ?>" data-title="<?php echo esc_attr($b['title']); ?>" data-text="<?php echo esc_attr($b['summary']); ?>">
++            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 10h8m-8 4h5m8-2a9 9 0 01-13.4 7.9L3 21l1.1-4.6A9 9 0 1121 12z"/></svg>
++            <?php echo esc_html($en ? 'Ask the adviser about this project' : 'اسأل المستشار عن هذا المشروع'); ?>
++        </button>
++        <p class="sp-brief-dis"><?php echo esc_html($b['disclaimer']); ?></p>
++    </div>
++    <style>
++    .sp-brief{--c1:#1D2D51;--c2:#d4a853;--c2d:#b8923d;--c3:#f8fafc;--c4:#1e293b;--c5:#64748b;--c6:#e2e8f0;background:#fff;border-radius:14px;padding:25px;margin-bottom:25px;box-shadow:0 4px 20px rgba(0,0,0,.08);border:1px solid var(--c6);text-align:start}
++    .sp-brief-t{font-size:1.15rem;font-weight:800;color:var(--c1);margin:0 0 15px;display:flex;align-items:center;gap:10px}
++    .sp-brief-ic{display:inline-flex;width:34px;height:34px;border-radius:10px;align-items:center;justify-content:center;background:rgba(212,168,83,.14);color:var(--c2d);flex-shrink:0}
++    .sp-brief-ic svg{width:19px;height:19px}
++    .sp-brief-sum{font-size:1rem;line-height:1.9;color:var(--c4);margin:0 0 18px}
++    .sp-brief-tbl{border:1px solid var(--c6);border-radius:12px;overflow:hidden;margin-bottom:22px}
++    .sp-brief-row{display:grid;grid-template-columns:minmax(110px,30%) 1fr;gap:12px;padding:11px 16px;font-size:.92rem;line-height:1.7}
++    .sp-brief-row:nth-child(odd){background:var(--c3)}
++    .sp-brief-l{color:var(--c5);font-weight:700}
++    .sp-brief-v{color:var(--c4);font-weight:600;overflow-wrap:anywhere}
++    .sp-brief-h{font-size:.95rem;font-weight:800;color:var(--c1);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
++    .sp-brief-pill{font-size:.75rem;font-weight:700;color:var(--c2d);border:1px solid var(--c2);border-radius:999px;padding:2px 12px;background:rgba(212,168,83,.1)}
++    .sp-brief-stage{margin-bottom:22px}
++    .sp-brief-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:0}
++    .sp-brief-step{position:relative;text-align:center;padding-top:22px;font-size:.78rem;line-height:1.5;color:var(--c5);font-weight:600}
++    .sp-brief-step::before{content:"";position:absolute;top:7px;inset-inline-start:-50%;width:100%;height:2px;background:var(--c6)}
++    .sp-brief-step:first-child::before{display:none}
++    .sp-brief-dot{position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--c6);z-index:1}
++    .sp-brief-step.is-done::before,.sp-brief-step.is-now::before{background:var(--c2)}
++    .sp-brief-step.is-done .sp-brief-dot{background:var(--c2);border-color:var(--c2)}
++    .sp-brief-step.is-now .sp-brief-dot{background:var(--c1);border-color:var(--c2);box-shadow:0 0 0 4px rgba(212,168,83,.22)}
++    .sp-brief-step.is-now{color:var(--c1);font-weight:800}
++    .sp-brief-sl{display:block;padding:0 4px}
++    .sp-brief-note{font-size:.8rem;color:var(--c5);margin:12px 0 0}
++    .sp-brief-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
++    .sp-brief-col{border:1px solid var(--c6);border-radius:12px;padding:16px 18px;background:var(--c3)}
++    .sp-brief-col ul{margin:0;padding:0;list-style:none}
++    .sp-brief-col li{position:relative;padding-inline-start:18px;font-size:.88rem;line-height:1.8;color:var(--c4);margin-bottom:6px}
++    .sp-brief-col li::before{content:"";position:absolute;inset-inline-start:0;top:.72em;width:7px;height:7px;border-radius:50%;background:var(--c2)}
++    .sp-brief-col-n li::before{background:var(--c5)}
++    .sp-brief-ask{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--c2);background:rgba(212,168,83,.1);color:var(--c1);font-weight:800;font-size:.9rem;padding:11px 20px;border-radius:12px;cursor:pointer;font-family:inherit;margin-bottom:16px;transition:background-color .18s}
++    .sp-brief-ask:hover,.sp-brief-ask:focus-visible{background:rgba(212,168,83,.22)}
++    .sp-brief-ask svg{width:18px;height:18px}
++    .sp-brief-ask[hidden]{display:none}
++    .sp-brief-dis{font-size:.76rem;line-height:1.7;color:var(--c5);margin:0;border-top:1px dashed var(--c6);padding-top:12px}
++    @media(max-width:640px){
++        .sp-brief{padding:20px 15px}
++        .sp-brief-row{grid-template-columns:1fr;gap:2px;padding:10px 14px}
++        .sp-brief-cols{grid-template-columns:1fr}
++        .sp-brief-steps{grid-template-columns:1fr;gap:10px}
++        .sp-brief-step{text-align:start;padding-top:0;padding-inline-start:28px;font-size:.85rem}
++        .sp-brief-step::before{display:none}
++        .sp-brief-dot{left:auto;inset-inline-start:0;top:2px;transform:none}
++        .sp-brief-ask{width:100%;justify-content:center}
++    }
++    </style>
++    <script>
++    (function(){var b=document.getElementById('spBriefAsk');if(!b)return;var n=0;
++    function ready(){return window.VAI&&typeof window.VAI.ask==='function'}
++    function show(){if(ready()){b.hidden=false;return}if(++n<40)setTimeout(show,500)}
++    b.addEventListener('click',function(){if(!ready())return;try{window.VAI.ask('',{type:'project',id:String(b.getAttribute('data-pid')),title:b.getAttribute('data-title')||'',text:b.getAttribute('data-text')||''})}catch(e){}});
++    show()})();
++    </script>
++    <?php
++    return ob_get_clean();
++}
++
++// The stage reading follows the description: drop it when the project is saved.
++add_action('save_post_project', function ($pid) { delete_post_meta((int)$pid, '_pdp_stage_est'); }, 97);
++
++// ========== R5. Settings box ==========
++add_action('pdp_settings_extra', 'pdp_brief_settings_box', 12);
++function pdp_brief_settings_box() {
++    if (!current_user_can('manage_options')) return;
++    $msg = '';
++    if (isset($_POST['pdp_brief_save']) && check_admin_referer('pdp_brief_save')) {
++        $m = isset($_POST['pdp_brief_mode']) ? sanitize_key(wp_unslash($_POST['pdp_brief_mode'])) : 'table';
++        update_option('pdp_brief_mode', in_array($m, ['table', 'both', 'off'], true) ? $m : 'table', false);
++        $msg = '✅ تم حفظ طريقة عرض صفحة المشروع.';
++    }
++    $mode = pdp_brief_mode();
++    $options = [
++        'table' => 'جدول المستشار فقط (المشروع وحده — بلا وصف المؤسس)',
++        'both'  => 'جدول المستشار ثم وصف المؤسس تحته',
++        'off'   => 'وصف المؤسس فقط (كما كان قبل 39.1)',
++    ];
++    ?>
++    <div id="pdp-brief-settings" style="margin-top:30px;background:#fff;border-radius:12px;padding:25px;box-shadow:0 2px 15px rgba(0,0,0,.06);border:1px solid #e2e8f0;">
++        <h2 style="margin-top:0;color:#1D2D51;font-size:1.1rem;">📋 صفحة المشروع — جدول المستشار</h2>
++        <?php if ($msg): ?><div class="notice notice-info inline" style="margin:0 0 14px;"><p><?php echo esc_html($msg); ?></p></div><?php endif; ?>
++        <p style="color:#64748b;font-size:.85rem;">في خانة «تفاصيل المشروع» يظهر جدول المستشار بدل وصف المؤسس: ملخص قصير، جدول الحقائق، موقع المشروع على المراحل الخمس، نقاط القوة وما يستحق الانتباه. لا يظهر فيه اسم المؤسس ولا بيانات التواصل ولا التمويل المطلوب أو التقييم أو أي حديث عن العوائد. المرحلة «اخري» لا تظهر للزائر أبدًا: يقرأها المستشار من الوصف ويكتب بجانبها «تقدير المستشار»، وإن لم يتضح له شيء تختفي الخانة.</p>
++        <form method="post">
++            <?php wp_nonce_field('pdp_brief_save'); ?>
++            <?php foreach ($options as $value => $label): ?>
++            <label style="display:block;margin:0 0 8px;font-size:.9rem;color:#1e293b;"><input type="radio" name="pdp_brief_mode" value="<?php echo esc_attr($value); ?>" <?php checked($mode, $value); ?>> <?php echo esc_html($label); ?></label>
++            <?php endforeach; ?>
++            <button type="submit" name="pdp_brief_save" class="button button-primary" style="margin-top:8px;">💾 حفظ</button>
++        </form>
++    </div>
++    <?php
++}
+diff -ruN --strip-trailing-cr pb/projects-directory-pro.php work/pb/projects-directory-pro.php
+--- pb/projects-directory-pro.php	2026-09-20 22:06:28.000000000 +0300
++++ work/pb/projects-directory-pro.php	2026-09-22 01:09:14.885619200 +0300
+@@ -2,20 +2,21 @@
+ /**
+  * Plugin Name: Projects Bank from VibesHolding Pro
+  * Description: نظام بنك مشاريع احترافي من ڤايبز القابضة - ثنائي اللغة — العضوية الموحدة عبر Vibes AI Assistant (v38)
+- * Version: 39.0
++ * Version: 39.1
+  * Author: Yasser Dev
+  * Author URI: https://vibesholding.com/
+  * Text Domain: vibes-projects
+  */
+ if (!defined('ABSPATH')) exit;
+ 
+-define('PDP_VERSION', '39.0');
++define('PDP_VERSION', '39.1');
+ define('PDP_PATH', plugin_dir_path(__FILE__));
+ 
+ // ========== 0. الوحدات (v38): بوابة العضوية الموحدة (Vibes AI) + كشف المشاريع للمساعد + حملات الإيميل + ملفات Pitch Deck ==========
+ // v38: أُلغيت وحدة الدفع (inc/payments.php) ونظام العضوية الخاص بالبنك بالكامل — العضوية من بلجن Vibes AI Assistant
+ // v39: app bridge (inc/bridge.php) — /wp-json/pb/v1/bridge/{op} behind its own key + admin balance grants + project.changed webhook
+-foreach (['inc/gate.php', 'inc/assistant.php', 'inc/campaigns.php', 'inc/pitchdecks.php', 'inc/bridge.php'] as $pdp_inc) {
++// v39.1: the adviser's table on the project page (inc/brief.php) + the site's «اخري» is never shown as a stage (pdp_stage_display)
++foreach (['inc/gate.php', 'inc/assistant.php', 'inc/campaigns.php', 'inc/pitchdecks.php', 'inc/bridge.php', 'inc/brief.php'] as $pdp_inc) {
+     if (file_exists(PDP_PATH . $pdp_inc)) { require_once PDP_PATH . $pdp_inc; }
+     else { add_action('admin_notices', function () use ($pdp_inc) { echo '<div class="notice notice-error"><p>❌ بنك المشاريع: الملف <code>' . esc_html($pdp_inc) . '</code> ناقص — ارفع مجلد البلجن كامل (بما فيه مجلد inc).</p></div>'; }); }
+ }
+@@ -738,7 +739,7 @@
+                 $sector_display = '';
+                 $stage_display = '';
+                 if ($project_sectors && !is_wp_error($project_sectors)) $sector_display = pdp_translate_term($project_sectors[0]->name, 'sector', $lang);
+-                if ($project_stages && !is_wp_error($project_stages)) $stage_display = pdp_translate_term($project_stages[0]->name, 'stage', $lang);
++                if ($project_stages && !is_wp_error($project_stages)) $stage_display = function_exists('pdp_stage_display') ? pdp_stage_display($pid, $lang) : pdp_translate_term($project_stages[0]->name, 'stage', $lang);
+                 $gallery_attr = '';
+                 $gallery_urls = [];
+                 if (has_post_thumbnail()) $gallery_urls[] = get_the_post_thumbnail_url($pid, 'medium_large');
+@@ -926,7 +927,7 @@
+     $sector_display = '';
+     $stage_display = '';
+     if ($sectors && !is_wp_error($sectors)) $sector_display = pdp_translate_term($sectors[0]->name, 'sector', $lang);
+-    if ($stages && !is_wp_error($stages)) $stage_display = pdp_translate_term($stages[0]->name, 'stage', $lang);
++    if ($stages && !is_wp_error($stages)) $stage_display = function_exists('pdp_stage_display') ? pdp_stage_display($pid, $lang) : pdp_translate_term($stages[0]->name, 'stage', $lang);
+     $vibes_holding_url = $is_english ? 'https://vibesholding.com/en/' : 'https://vibesholding.com/';
+     $investors_club_url = $is_english ? 'https://vcmem.com/en/investors-club/' : 'https://vcmem.com/investors-club/';
+     $success_partners_url = $is_english ? 'https://pvspaces.com/en/sp-2/' : 'https://pvspaces.com/sp/';
+@@ -1004,7 +1005,7 @@
+             <?php if ($stage_display): ?><span class="pds-tag pds-tag-stage"><?php echo esc_html($stage_display); ?></span><?php endif; ?>
+         </div>
+         <div class="pds-meta-grid">
+-            <?php if ($pdata['founder_name']): ?><div class="pds-meta-item"><div class="pds-meta-icon"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><div class="pds-meta-content"><span class="pds-meta-label"><?php echo $texts['founder']; ?></span><span class="pds-meta-value"><?php echo esc_html($pdata['founder_name']); ?></span></div></div><?php endif; ?>
++            <?php if ($pdata['founder_name'] && (!function_exists('pdp_brief_mode') || pdp_brief_mode() === 'off')): // v39.1: the project is shown alone ?><div class="pds-meta-item"><div class="pds-meta-icon"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><div class="pds-meta-content"><span class="pds-meta-label"><?php echo $texts['founder']; ?></span><span class="pds-meta-value"><?php echo esc_html($pdata['founder_name']); ?></span></div></div><?php endif; ?>
+             <?php if ($pdata['company_name']): ?><div class="pds-meta-item"><div class="pds-meta-icon"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div><div class="pds-meta-content"><span class="pds-meta-label"><?php echo $texts['company']; ?></span><span class="pds-meta-value"><?php echo esc_html($pdata['company_name']); ?></span></div></div><?php endif; ?>
+             <?php if ($pdata['website']): ?><div class="pds-meta-item"><div class="pds-meta-icon"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg></div><div class="pds-meta-content"><span class="pds-meta-label"><?php echo $texts['visit_website']; ?></span><span class="pds-meta-value"><a href="<?php echo esc_url($pdata['website']); ?>" target="_blank"><?php echo esc_html(parse_url($pdata['website'], PHP_URL_HOST)); ?></a></span></div></div><?php endif; ?>
+             <div class="pds-meta-item"><div class="pds-meta-icon"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></div><div class="pds-meta-content"><span class="pds-meta-label"><?php echo $texts['views']; ?></span><span class="pds-meta-value"><?php echo number_format($views); ?></span></div></div>
+@@ -1027,7 +1028,8 @@
+         </div>
+         <?php endif; ?>
+         <?php if ($pdata['project_details']): ?>
+-        <div class="pds-details"><h2 class="pds-section-title"><?php echo $texts['project_details']; ?></h2><div class="pds-details-content"><?php echo wpautop(esc_html($pdata['project_details'])); ?></div></div>
++        <?php $pds_brief_mode = function_exists('pdp_brief_mode') ? pdp_brief_mode() : 'off'; if ($pds_brief_mode !== 'off') echo pdp_brief_render($pid, $lang); // v39.1: the adviser's table in place of the founder's description ?>
++        <?php if ($pds_brief_mode !== 'table'): ?><div class="pds-details"><h2 class="pds-section-title"><?php echo $texts['project_details']; ?></h2><div class="pds-details-content"><?php echo wpautop(esc_html($pdata['project_details'])); ?></div></div><?php endif; ?>
+         <?php endif; ?>
+         <?php $pds_golden = ($pdata['is_featured'] === '1'); ?>
+         <div class="pds-actions">
+@@ -2575,7 +2577,7 @@
+         }
+         if ($stgs && !is_wp_error($stgs)) {
+             foreach ($stgs as $tt) { $stg_all[] = $tt->name; $en = pdp_translate_term($tt->name, 'stage', 'en'); if ($en !== $tt->name) $stg_all[] = $en; }
+-            $stage_display = pdp_translate_term($stgs[0]->name, 'stage', $lang);
++            $stage_display = function_exists('pdp_stage_display') ? pdp_stage_display($pid, $lang) : pdp_translate_term($stgs[0]->name, 'stage', $lang);
+         }
+         $num = get_post_meta($pid, 'project_number', true);
+         $num_pad = ($num !== '' && (int)$num > 0) ? str_pad((int)$num, 2, '0', STR_PAD_LEFT) : '';
+@@ -3380,7 +3382,7 @@
+         $stage_display = '';
+         $pstages = get_the_terms($rpid, 'project_stage');
+         if ($pstages && !is_wp_error($pstages)) {
+-            $stage_display = pdp_translate_term($pstages[0]->name, 'stage', $lang);
++            $stage_display = function_exists('pdp_stage_display') ? pdp_stage_display($rpid, $lang) : pdp_translate_term($pstages[0]->name, 'stage', $lang);
+         }
+ 
+         $projects[] = [
+diff -ruN --strip-trailing-cr pb/readme-v39.1.txt work/pb/readme-v39.1.txt
+--- pb/readme-v39.1.txt	1970-01-01 03:00:00.000000000 +0300
++++ work/pb/readme-v39.1.txt	2026-09-22 01:09:33.248066000 +0300
+@@ -0,0 +1,13 @@
++بنك المشاريع — الإصدار 39.1 (جدول المستشار بدل وصف المؤسس + لا تظهر «اخري» كمرحلة)
++==============================================================================
++يتطلب: PHP 7.4 أو أحدث. يُرفع فوق 39.0 مباشرة («استبدال الحالية») — لا تغيير في قاعدة البيانات ولا في المفاتيح.
++
++ما تغيّر:
++- صفحة المشروع: خانة «تفاصيل المشروع» صارت «ملخص المستشار» — ملخص قصير، جدول الحقائق (رقم المشروع، الشركة، القطاع، المرحلة، النوع، ملف العرض، آخر تحديث، وما كتبه صاحب المشروع بصيغة «عنوان: قيمة»)، موقع المشروع على المراحل الخمس، نقاط القوة، ونقاط تستحق الانتباه، ثم التنبيه. المشروع يظهر وحده: لا اسم المؤسس، ولا بيانات تواصل، ولا التمويل المطلوب أو التقييم أو الحصص، ولا أي حديث عن العوائد.
++- الجدول يُبنى داخل البلجن من بيانات المشروع المنشورة نفسها: بلا أي اتصال بخادم خارجي وبلا تكلفة ذكاء اصطناعي.
++- زر «اسأل المستشار عن هذا المشروع» تحت الجدول يفتح المستشار على المشروع نفسه (يحتاج بلجن Vibes AI Assistant 2.7.0 أو أحدث — وبدونه لا يظهر الزر).
++- المرحلة «اخري / أخرى» لا تظهر للزائر في أي مكان (الكروت، صفحة المشروع، المشاريع المشابهة): يقرأ المستشار المرحلة مما يقوله الوصف إنه قائم فعلًا (الخطط والطموحات لا تُحتسب) ويكتب بجانبها «تقدير المستشار»، وإن لم يتضح له شيء تختفي الخانة. المراحل التي حددها صاحب المشروع تبقى بصياغة الموقع كما هي.
++- إعداد جديد في صفحة الإعدادات ← «صفحة المشروع — جدول المستشار»: جدول المستشار فقط (الافتراضي) | الجدول ثم وصف المؤسس تحته | وصف المؤسس فقط كما كان.
++- لا تغيير في التغذية /wp-json/pb/v1/projects ولا في جسر التطبيق ولا في نافذة العضوية وفتح المشاريع ولا في كشف المشاريع للمساعد.
++
++بعد الرفع: افتح أي مشروع وتأكد من ظهور «ملخص المستشار»، ثم افتح مشروعًا كانت مرحلته «اخري» وتأكد أنها لم تعد تظهر.
+diff -ruN --strip-trailing-cr pb/single-project.php work/pb/single-project.php
+--- pb/single-project.php	2026-09-20 21:49:37.000000000 +0300
++++ work/pb/single-project.php	2026-09-22 01:08:10.832601400 +0300
+@@ -47,7 +47,8 @@
+         $sector = function_exists('pdp_translate_term') ? pdp_translate_term($sectors[0]->name, 'sector', $lang) : $sectors[0]->name;
+     }
+     if ($stages && !is_wp_error($stages) && !empty($stages[0])) {
+-        $stage = function_exists('pdp_translate_term') ? pdp_translate_term($stages[0]->name, 'stage', $lang) : $stages[0]->name;
++        // v39.1: «اخري» is never shown — the adviser's reading of the stage, or no tag at all
++        $stage = function_exists('pdp_stage_display') ? pdp_stage_display($pid, $lang) : (function_exists('pdp_translate_term') ? pdp_translate_term($stages[0]->name, 'stage', $lang) : $stages[0]->name);
+     }
+ 
+     $is_mobile = false;
+@@ -451,7 +452,12 @@
+     </div>
+     <?php endif;?>
+ 
+-    <?php if($desc):?>
++    <?php
++    // v39.1: the adviser's table takes the place of the founder's description (setting «صفحة المشروع»: table | both | off)
++    $brief_mode = function_exists('pdp_brief_mode') ? pdp_brief_mode() : 'off';
++    if ($brief_mode !== 'off') echo pdp_brief_render($pid, $lang);
++    ?>
++    <?php if($desc && $brief_mode !== 'table'):?>
+     <div class="sp-det">
+         <h2 class="sp-sec-t"><?php echo esc_html($t['details']);?></h2>
+         <div class="sp-det-c"><?php echo wpautop(esc_html($desc));?></div>
+@@ -552,7 +558,7 @@
+                 $rstage   = '';
+                 $rst      = get_the_terms($rid, 'project_stage');
+                 if ($rst && !is_wp_error($rst) && !empty($rst[0])) {
+-                    $rstage = function_exists('pdp_translate_term') ? pdp_translate_term($rst[0]->name, 'stage', $lang) : $rst[0]->name;
++                    $rstage = function_exists('pdp_stage_display') ? pdp_stage_display($rid, $lang) : (function_exists('pdp_translate_term') ? pdp_translate_term($rst[0]->name, 'stage', $lang) : $rst[0]->name);
+                 }
+                 $rfeat = (get_post_meta($rid, 'is_featured', true) === '1');
+                 $slider_cards[] = compact('rtitle','rimg','rlink','rexcerpt','rstage','rfeat');

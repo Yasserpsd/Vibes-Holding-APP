@@ -8,6 +8,15 @@ export const TIER_LABELS: Record<SourceTier, string> = {
   saudi: 'إعلام سعودي',
   global: 'إعلام عالمي',
 };
+export const TIER_LABELS_EN: Record<SourceTier, string> = {
+  official: 'Official source',
+  saudi: 'Saudi media',
+  global: 'International media',
+};
+
+export function tierLabel(tier: SourceTier, lang: NewsLang): string {
+  return lang === 'en' ? TIER_LABELS_EN[tier] : TIER_LABELS[tier];
+}
 
 /** A polled feed. Stored as server-driven content so the dashboard can edit the list later. */
 export type NewsSource = {
@@ -21,27 +30,43 @@ export type NewsSource = {
   enabled: boolean;
   /** What the feed covers, given to the classifier as context. */
   hint: string | null;
+  /**
+   * Read this feed for its stories about Saudi Arabia only (the English version is Saudi news, owner 2026-09-21):
+   * an entry that names the country neither in its title nor in its opening lines is never collected.
+   */
+  saudiOnly?: boolean;
 };
 
-export type NewsSourcesContent = { sources: NewsSource[]; updatedAt: string };
+export type NewsSourcesContent = { sources: NewsSource[]; updatedAt: string; /** Seed revision already merged into this list (see sources.ts). */ seedVersion?: number };
 
 export const NEWS_TOPICS = [
-  { key: 'economy', label: 'الاقتصاد والأعمال' },
-  { key: 'markets', label: 'الأسواق والأسهم' },
-  { key: 'finance', label: 'البنوك والتمويل' },
-  { key: 'realestate', label: 'العقار والإنشاءات' },
-  { key: 'startups', label: 'ريادة الأعمال والشركات الناشئة' },
-  { key: 'tech', label: 'التقنية والذكاء الاصطناعي' },
-  { key: 'energy', label: 'الطاقة والتعدين' },
-  { key: 'industry', label: 'الصناعة واللوجستيات' },
-  { key: 'retail', label: 'التجزئة والتجارة الإلكترونية' },
-  { key: 'tourism', label: 'السياحة والترفيه' },
-  { key: 'sports', label: 'الرياضة (الجانب الاستثماري)' },
+  { key: 'economy', label: 'الاقتصاد والأعمال', labelEn: 'Economy & Business' },
+  { key: 'markets', label: 'الأسواق والأسهم', labelEn: 'Markets & Stocks' },
+  { key: 'finance', label: 'البنوك والتمويل', labelEn: 'Banking & Finance' },
+  { key: 'realestate', label: 'العقار والإنشاءات', labelEn: 'Real Estate & Construction' },
+  { key: 'startups', label: 'ريادة الأعمال والشركات الناشئة', labelEn: 'Entrepreneurship & Startups' },
+  { key: 'tech', label: 'التقنية والذكاء الاصطناعي', labelEn: 'Technology & AI' },
+  { key: 'energy', label: 'الطاقة والتعدين', labelEn: 'Energy & Mining' },
+  { key: 'industry', label: 'الصناعة واللوجستيات', labelEn: 'Industry & Logistics' },
+  { key: 'retail', label: 'التجزئة والتجارة الإلكترونية', labelEn: 'Retail & E-commerce' },
+  { key: 'tourism', label: 'السياحة والترفيه', labelEn: 'Tourism & Entertainment' },
+  { key: 'sports', label: 'الرياضة (الجانب الاستثماري)', labelEn: 'Sports (the business side)' },
 ] as const;
 
 export type TopicKey = (typeof NEWS_TOPICS)[number]['key'];
 export const TOPIC_KEYS = NEWS_TOPICS.map((topic) => topic.key) as TopicKey[];
 export const TOPIC_LABELS = Object.fromEntries(NEWS_TOPICS.map((topic) => [topic.key, topic.label])) as Record<TopicKey, string>;
+
+const TOPIC_LABELS_EN = Object.fromEntries(NEWS_TOPICS.map((topic) => [topic.key, topic.labelEn])) as Record<TopicKey, string>;
+
+export function topicLabel(key: TopicKey, lang: NewsLang): string {
+  return lang === 'en' ? TOPIC_LABELS_EN[key] : TOPIC_LABELS[key];
+}
+
+/** The interests list in one language, as the app shows it. */
+export function topicsFor(lang: NewsLang): { key: TopicKey; label: string }[] {
+  return NEWS_TOPICS.map((topic) => ({ key: topic.key, label: topicLabel(topic.key, lang) }));
+}
 
 export function isTopicKey(value: unknown): value is TopicKey {
   return typeof value === 'string' && (TOPIC_KEYS as string[]).includes(value);
@@ -126,6 +151,8 @@ export type SourceStatus = {
 export type NewsStatus = {
   count: number;
   visible: number;
+  /** Visible items per language: the English feed has its own sources. */
+  visibleByLang: Record<NewsLang, number>;
   decisions: number;
   updatedAt: string | null;
   lastError: string | null;

@@ -68,7 +68,7 @@ test('home, about and membership content follow the wording rules', async () => 
   assert.equal(home.statusCode, 200);
   assert.deepEqual(
     home.json().portals.map((portal: { key: string }) => portal.key),
-    ['investor', 'entrepreneur', 'neutral'],
+    ['neutral', 'entrepreneur', 'investor'],
   );
   assert.equal(home.json().neutralOpening.quickReplies.length, 4);
 

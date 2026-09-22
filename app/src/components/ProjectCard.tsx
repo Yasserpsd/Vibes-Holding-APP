@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { PublicProject } from '@/api/types';
+import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -28,7 +29,7 @@ export function ProjectCard({ project, onPress }: Props) {
           {project.isGolden ? (
             <View style={styles.goldenBadge}>
               <Ionicons name="star" size={12} color={colors.black} />
-              <Text style={styles.goldenText}>ذهبي</Text>
+              <Text style={styles.goldenText}>{t('project.goldenBadge')}</Text>
             </View>
           ) : null}
         </View>

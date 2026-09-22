@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/auth/service.ts and server/src/auth/routes.ts.
-export type Persona = 'entrepreneur' | 'investor' | 'neutral';
+export type Persona = 'neutral' | 'entrepreneur' | 'investor';
 export type MembershipStatus = 'unactivated' | 'active' | 'expired';
 
 export type Membership = {

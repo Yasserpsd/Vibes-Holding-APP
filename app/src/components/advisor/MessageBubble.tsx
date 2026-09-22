@@ -5,6 +5,8 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AdvisorAction, AdvisorMessage } from '@/api/advisor';
 import { Chip } from '@/components/Chip';
+import { t } from '@/i18n';
+import { textEnd, textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -20,7 +22,7 @@ export function formatTime(iso: string): string {
   if (Number.isNaN(date.getTime())) return '';
   const hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? 'ص' : 'م'}`;
+  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? t('time.am') : t('time.pm')}`;
 }
 
 /** One chat message. The member's own messages sit on the left, replies on the right (mirrored for RTL). */
@@ -36,9 +38,9 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props
   return (
     <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
       <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, message.role === 'staff' && styles.bubbleStaff, wide && styles.bubbleWide]}>
-        {message.role === 'staff' ? <Text style={styles.by}>{message.by ? `${message.by} · فريق النادي` : 'فريق النادي'}</Text> : null}
+        {message.role === 'staff' ? <Text style={styles.by}>{message.by ? t('advisor.staffBy', { name: message.by }) : t('advisor.staff')}</Text> : null}
         {message.image ? (
-          <Image source={{ uri: message.image }} style={styles.image} resizeMode="cover" accessibilityLabel="صورة مرفقة" />
+          <Image source={{ uri: message.image }} style={styles.image} resizeMode="cover" accessibilityLabel={t('advisor.attachedImage')} />
         ) : null}
         {message.text ? (
           <RichText
@@ -76,7 +78,7 @@ function ActionView({ action }: { action: AdvisorAction }) {
     case 'video':
       return <ActionButton icon="play-circle-outline" label={action.title} onPress={() => void openLink(action.url)} />;
     case 'membership':
-      return <ActionButton icon="ribbon-outline" label="تفاصيل العضوية في التطبيق" onPress={() => router.push('/membership')} />;
+      return <ActionButton icon="ribbon-outline" label={t('advisor.membershipDetails')} onPress={() => router.push('/membership')} />;
     case 'card': {
       const url = action.url;
       return (
@@ -87,7 +89,7 @@ function ActionView({ action }: { action: AdvisorAction }) {
             <Text key={bullet} style={styles.cardBullet}>{`• ${bullet}`}</Text>
           ))}
           {action.note ? <Text style={styles.cardNote}>{action.note}</Text> : null}
-          {url ? <ActionButton icon="open-outline" label="تفاصيل الخدمة" onPress={() => void openLink(url)} /> : null}
+          {url ? <ActionButton icon="open-outline" label={t('advisor.serviceDetails')} onPress={() => void openLink(url)} /> : null}
         </View>
       );
     }
@@ -115,12 +117,12 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.surfaceElevated, borderBottomRightRadius: radii.sm, borderWidth: 1, borderColor: colors.border },
   bubbleStaff: { borderColor: colors.gold },
   bubbleWide: { alignSelf: 'stretch', maxWidth: '100%' },
-  by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: 'right' },
+  by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
   image: { width: 220, height: 160, borderRadius: radii.md, backgroundColor: colors.surface },
-  text: { ...typography.body, textAlign: 'right' },
+  text: { ...typography.body, textAlign: textStart },
   textMine: { color: colors.black },
   textTheirs: { color: colors.textPrimary },
-  time: { ...typography.caption, fontSize: 11, lineHeight: 14, textAlign: 'left' },
+  time: { ...typography.caption, fontSize: 11, lineHeight: 14, textAlign: textEnd },
   timeMine: { color: GOLD_INK },
   timeTheirs: { color: colors.textMuted },
   widgets: { gap: spacing.xs, marginTop: spacing.xs, maxWidth: '86%' },
@@ -139,9 +141,9 @@ const styles = StyleSheet.create({
   actionPressed: { backgroundColor: colors.surface },
   actionLabel: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
   card: { gap: spacing.xs, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  cardTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: 'right' },
-  cardPrice: { ...typography.body, color: colors.gold, textAlign: 'right' },
-  cardBullet: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
-  cardNote: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  cardTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
+  cardPrice: { ...typography.body, color: colors.gold, textAlign: textStart },
+  cardBullet: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  cardNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   system: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginVertical: spacing.sm },
 });

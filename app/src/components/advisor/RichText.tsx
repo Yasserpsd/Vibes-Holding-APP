@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 
+import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   cellFit: { flex: 1, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },
   cellFixed: { width: SCROLL_COLUMN_WIDTH, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },
   cellBorder: { borderStartWidth: StyleSheet.hairlineWidth, borderStartColor: colors.border },
-  headText: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: 'right' },
-  cellText: { ...typography.caption, color: colors.textPrimary, textAlign: 'right' },
+  headText: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
+  cellText: { ...typography.caption, color: colors.textPrimary, textAlign: textStart },
   cellLead: { fontFamily: fonts.medium, color: colors.textSecondary },
 });

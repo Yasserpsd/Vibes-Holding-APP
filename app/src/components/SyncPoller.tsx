@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
+import { syncStrings } from '@/i18n/remote';
 
 const POLL_MS = 10_000;
 /** Shorter than the interval: a stalled request is given up before the next tick, so `busy` never blocks the poller. */
@@ -52,6 +53,8 @@ export function SyncPoller() {
           next[part] = version;
           if (previous && previous[part] !== undefined && previous[part] !== version) {
             for (const queryKey of QUERY_KEYS[part]) void queryClient.invalidateQueries({ queryKey });
+            // A wording edit from the dashboard is content too: screens drawn from now on use it.
+            if (part === 'content') void syncStrings();
           }
         }
         seen = { ...previous, ...next };

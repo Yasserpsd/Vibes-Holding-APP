@@ -16,6 +16,8 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -63,7 +65,7 @@ export default function ServiceScreen() {
     if (action?.type === 'paymob') {
       const missing = action.fields.find((field) => !(answers[field.key] ?? '').trim());
       if (missing) {
-        setPayError(`أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`);
+        setPayError(t('service.missingField', { field: missing.label }));
         return;
       }
     }
@@ -125,9 +127,9 @@ export default function ServiceScreen() {
         />
       )}
       {payError ? <Notice tone="warning" text={payError} /> : null}
-      {handedOver ? <Notice tone="info" text="فتحنا واتساب برسالتك الجاهزة، أكمل الإرسال من هناك وسيتواصل معك الفريق." /> : null}
+      {handedOver ? <Notice tone="info" text={t('service.handedOver')} /> : null}
 
-      {service.infoUrl ? <AppButton label="تفاصيل الخدمة على الموقع" variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} /> : null}
+      {service.infoUrl ? <AppButton label={t('service.infoOnSite')} variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} /> : null}
     </Screen>
   );
 }
@@ -152,48 +154,48 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
     case 'whatsapp':
       return (
         <View style={styles.panel}>
-          {action.fields.length ? <Text style={styles.panelTitle}>تفاصيل طلبك</Text> : null}
+          {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
-          <AppButton label="أرسل الطلب عبر واتساب" icon="logo-whatsapp" onPress={() => onWhatsApp(action)} />
+          <AppButton label={t('service.sendWhatsApp')} icon="logo-whatsapp" onPress={() => onWhatsApp(action)} />
         </View>
       );
     case 'paymob':
       return (
         <View style={styles.panel}>
-          {action.fields.length ? <Text style={styles.panelTitle}>تفاصيل طلبك</Text> : null}
+          {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
           {price ? (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>المبلغ</Text>
+              <Text style={styles.priceLabel}>{t('service.amount')}</Text>
               <Text style={styles.priceValue}>{amountLabel(price)}</Text>
-              {price.memberPrice ? <Text style={styles.priceNote}>سعر الأعضاء</Text> : null}
+              {price.memberPrice ? <Text style={styles.priceNote}>{t('service.memberPrice')}</Text> : null}
             </View>
           ) : null}
           {!signedIn ? (
             <>
-              <Text style={styles.payHint}>الدفع من داخل التطبيق يحتاج تسجيل الدخول بحسابك.</Text>
-              <AppButton label="سجّل الدخول للدفع" icon="log-in-outline" onPress={onLogin} />
+              <Text style={styles.payHint}>{t('service.signInToPay')}</Text>
+              <AppButton label={t('service.signInButton')} icon="log-in-outline" onPress={onLogin} />
             </>
           ) : paying ? (
             <ActivityIndicator color={colors.gold} />
           ) : (
-            <AppButton label="ادفع الآن" icon="card-outline" onPress={onPay} />
+            <AppButton label={t('service.payNow')} icon="card-outline" onPress={onPay} />
           )}
-          <Text style={styles.payHint}>الدفع عبر بوابة Paymob داخل التطبيق. بعد إتمام الدفع يتواصل معك فريق النادي.</Text>
+          <Text style={styles.payHint}>{t('service.payHint')}</Text>
         </View>
       );
     case 'link':
       return <AppButton label={action.label} icon="open-outline" onPress={() => void openLink(action.url)} />;
     case 'advisor':
-      return <AppButton label="اسأل المستشار" icon="sparkles-outline" onPress={() => onAdvisor(action.prompt)} />;
+      return <AppButton label={t('advisor.ask')} icon="sparkles-outline" onPress={() => onAdvisor(action.prompt)} />;
     case 'hq':
-      return <AppButton label="احجز زيارتك للمقر" icon="business-outline" onPress={onHq} />;
+      return <AppButton label={t('service.bookHq')} icon="business-outline" onPress={onHq} />;
     case 'projects':
-      return <AppButton label="افتح بنك المشاريع" icon="briefcase-outline" onPress={onProjects} />;
+      return <AppButton label={t('service.openProjects')} icon="briefcase-outline" onPress={onProjects} />;
     default:
       return null;
   }
@@ -239,12 +241,12 @@ const styles = StyleSheet.create({
     borderColor: colors.goldDark,
   },
   headerText: { flex: 1, gap: 4 },
-  title: { ...typography.title, color: colors.gold, textAlign: 'right' },
+  title: { ...typography.title, color: colors.gold, textAlign: textStart },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   price: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textPrimary },
   member: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLight },
-  summary: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
-  paragraph: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  summary: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
+  paragraph: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   panel: {
     gap: spacing.md,
     padding: spacing.md,
@@ -253,13 +255,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  panelTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right' },
+  panelTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   field: { gap: spacing.xs },
-  fieldLabel: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  fieldLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, flexWrap: 'wrap' },
   priceLabel: { ...typography.caption, color: colors.textSecondary },
   priceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
   priceNote: { ...typography.caption, color: colors.goldLight },
-  payHint: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  payHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 });

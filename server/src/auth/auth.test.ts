@@ -75,7 +75,7 @@ test('register → verify → me → logout', async () => {
   assert.ok(token.length >= 32);
   assert.equal(me.name, registration.name);
   assert.equal(me.phone, '0558318777');
-  assert.equal(me.personaLabel, 'مستثمر — أبحث عن فرص شراكة واعدة');
+  assert.equal(me.personaLabel, 'مستثمر — أبحث عن فرص');
   assert.equal(me.membership.status, 'active');
   assert.ok(me.membership.daysLeft > 300);
 

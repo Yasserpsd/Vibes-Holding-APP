@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { guard, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import type { AdvisorService } from './service.js';
 
 export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService };
@@ -14,7 +15,7 @@ const contextSchema = z.union([
   z.object({ type: z.literal('project'), id: z.number().int().positive(), selection }),
   z.object({ type: z.literal('news'), id: z.string().regex(/^[a-f0-9]{16}$/), selection }),
   // Home portals and services open the advisor with the screen as the page context.
-  z.object({ type: z.literal('portal'), id: z.enum(['investor', 'entrepreneur', 'neutral']), selection }),
+  z.object({ type: z.literal('portal'), id: z.enum(['neutral', 'entrepreneur', 'investor']), selection }),
   z.object({ type: z.literal('service'), id: z.string().regex(/^[a-z0-9-]{1,40}$/), selection }),
   z.object({ type: z.literal('post'), id: z.string().uuid(), selection }),
   z.object({ type: z.literal('video'), id: z.string().regex(/^[A-Za-z0-9_-]{6,20}$/), selection }),
@@ -50,7 +51,7 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       }
       const body = parse(messageSchema, request.body, reply);
       if (!body) return;
-      return service.send(current.session, body.text, body.context ?? null, request.ip);
+      return service.send(current.session, body.text, body.context ?? null, request.ip, langOf(request));
     }),
   );
 

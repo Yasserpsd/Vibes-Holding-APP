@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useMemo, useS
 import { Animated, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { t } from '@/i18n';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 import { contextParams, type ChatContext } from './context';
@@ -124,14 +125,14 @@ function FloatingButton({ registration }: { registration: Registration }) {
       <Pressable
         onPress={() => ask(registration.context)}
         accessibilityRole="button"
-        accessibilityLabel={`اسأل المستشار عن: ${registration.context.title}`}
+        accessibilityLabel={t('advisor.askAbout', { title: registration.context.title })}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
         <View style={styles.mark}>
           <Ionicons name="sparkles" size={16} color={colors.black} />
         </View>
         <Text style={styles.label} numberOfLines={1}>
-          اسأل المستشار
+          {t('advisor.ask')}
         </Text>
       </Pressable>
     </Animated.View>

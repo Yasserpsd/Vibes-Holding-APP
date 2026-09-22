@@ -1,12 +1,13 @@
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
+import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = TextInputProps & {
   label: string;
   hint?: string;
   error?: string | null;
-  /** Latin content (e-mail, phone, password) is typed left-to-right inside the RTL layout. */
+  /** Latin content (e-mail, phone, password) is typed left-to-right in both languages. */
   latin?: boolean;
 };
 
@@ -21,7 +22,7 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
         {...inputProps}
         style={[
           styles.input,
-          latin ? styles.latin : styles.arabic,
+          latin ? styles.latin : { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
           multiline && styles.multiline,
           error ? styles.inputError : null,
           style,
@@ -34,7 +35,7 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
 
 const styles = StyleSheet.create({
   field: { gap: spacing.xs },
-  label: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   input: {
     fontFamily: fonts.regular,
     fontSize: 16,
@@ -46,10 +47,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
   },
-  arabic: { textAlign: 'right', writingDirection: 'rtl' },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   inputError: { borderColor: colors.danger },
-  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
 });

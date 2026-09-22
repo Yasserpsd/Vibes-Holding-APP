@@ -1,3 +1,5 @@
+import { stripContacts, stripFunding } from './redact.js';
+import { placeStage } from './stage.js';
 import { htmlToText, makeExcerpt } from './text.js';
 import type { PublicProject, Term } from './types.js';
 
@@ -73,6 +75,9 @@ function asUrlList(value: unknown): string[] {
   return [];
 }
 
+/** A «المؤسس: …» line inside the description: the founder is not shown in the app (owner's rule, 2026-09-21). */
+const FOUNDER_LINE = /^[\s•\-–*]*(?:اسم\s+)?(?:المؤسس(?:ة|ون|ين)?|المالك|صاحب(?:ة)?\s+المشروع|المدير\s+التنفيذي|founders?|co-?founders?|owner|ceo)\s*[:：]/i;
+
 function slugify(name: string): string {
   return name.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
 }
@@ -119,12 +124,15 @@ export function toPublicProject(raw: unknown): PublicProject | null {
 
   const detailsHtml = asString(readField(raw, 'project_details')) ?? asString(raw.content) ?? '';
   const detailsEnHtml = asString(readField(raw, 'project_details_en')) ?? '';
-  const details = htmlToText(detailsHtml) || null;
-  const detailsEn = htmlToText(detailsEnHtml) || null;
+  // The app shows what a project is, never what it asks for: no funding sought, no investment amount (owner's rule).
+  // Rule 4 covers the free text too: a phone, an e-mail, a link or a «المؤسس: …» line typed inside the description never leaves.
+  const publicText = (html: string): string => stripContacts(stripFunding(htmlToText(html)).split('\n').filter((row) => !FOUNDER_LINE.test(row)).join('\n'));
+  const details = publicText(detailsHtml) || null;
+  const detailsEn = publicText(detailsEnHtml) || null;
   const excerptRaw = asString(raw.excerpt) ?? asString(raw.post_excerpt);
-  const excerpt = excerptRaw ? htmlToText(excerptRaw) : details ? makeExcerpt(details) : null;
+  const excerpt = excerptRaw ? publicText(excerptRaw) || (details ? makeExcerpt(details) : null) : details ? makeExcerpt(details) : null;
   const excerptEnRaw = asString(readField(raw, 'excerpt_en'));
-  const excerptEn = excerptEnRaw ? htmlToText(excerptEnRaw) : detailsEn ? makeExcerpt(detailsEn) : null;
+  const excerptEn = excerptEnRaw ? publicText(excerptEnRaw) || (detailsEn ? makeExcerpt(detailsEn) : null) : detailsEn ? makeExcerpt(detailsEn) : null;
 
   const gallery = asUrlList(readField(raw, 'project_gallery'));
   const image =
@@ -140,8 +148,9 @@ export function toPublicProject(raw: unknown): PublicProject | null {
     titleEn: asString(readField(raw, 'title_en')),
     companyName: asString(readField(raw, 'company_name')),
     companyNameEn: asString(readField(raw, 'company_name_en')),
-    founderName: asString(readField(raw, 'founder_name')),
-    founderNameEn: asString(readField(raw, 'founder_name_en')),
+    // The founder's name is not shown in the app (owner's rule, 2026-09-21); the fields stay in the type for older app builds.
+    founderName: null,
+    founderNameEn: null,
     excerpt,
     excerptEn,
     details,
@@ -149,7 +158,8 @@ export function toPublicProject(raw: unknown): PublicProject | null {
     image,
     gallery,
     sector: asTerm(raw.sector ?? raw.sectors ?? readField(raw, 'sector')),
-    stage: asTerm(raw.project_stage ?? raw.stage ?? raw.stages ?? readField(raw, 'project_stage')),
+    // The site's «اخري» is not a stage: the adviser reads the step from the description, or the project shows none.
+    stage: placeStage(asTerm(raw.project_stage ?? raw.stage ?? raw.stages ?? readField(raw, 'project_stage')), details),
     isGolden: asBoolean(raw.golden ?? readField(raw, 'is_featured')),
     featuredOrder: asNumber(readField(raw, 'featured_order')),
     goldenPartnerUrl: asUrl(raw.partner_url ?? readField(raw, 'golden_partner_url')),

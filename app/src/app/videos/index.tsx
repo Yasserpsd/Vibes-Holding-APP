@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
+import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { spacing } from '@/theme/tokens';
@@ -17,7 +18,7 @@ export default function VideosScreen() {
   const first = data?.pages[0];
   const askAdvisor = useAskAdvisor();
   // The floating button asks about the library; each card asks about its own video.
-  useAdvisorScreen({ type: 'screen', id: 'videos', title: first?.title ?? 'مكتبة الفيديو' });
+  useAdvisorScreen({ type: 'screen', id: 'videos', title: first?.title ?? t('nav.videos') });
   const askAbout = (video: Video) => askAdvisor({ type: 'video', id: video.id, title: video.title });
 
   if (!first) {
@@ -43,7 +44,7 @@ export default function VideosScreen() {
         </>
       ) : null}
 
-      <SectionHeader title="كل الفيديوهات" subtitle={first.total ? `${formatNumber(first.total)} فيديو` : null} />
+      <SectionHeader title={t('videos.all')} subtitle={first.total ? t('videos.count', { count: formatNumber(first.total) }) : null} />
       {items.length ? (
         <View style={styles.list}>
           {items.map((video) => (
@@ -51,10 +52,10 @@ export default function VideosScreen() {
           ))}
         </View>
       ) : (
-        <StateView empty emptyText="لم تصل فيديوهات القناة بعد، حاول لاحقًا." />
+        <StateView empty emptyText={t('videos.empty')} />
       )}
-      {hasNextPage ? <AppButton label={isFetchingNextPage ? 'جارٍ التحميل…' : 'تحميل المزيد'} variant="outline" icon="chevron-down" onPress={() => void fetchNextPage()} /> : null}
-      <AppButton label="قناة النادي على يوتيوب" variant="outline" icon="logo-youtube" onPress={() => void openLink(first.channelUrl)} />
+      {hasNextPage ? <AppButton label={isFetchingNextPage ? t('common.loadingMore') : t('common.loadMore')} variant="outline" icon="chevron-down" onPress={() => void fetchNextPage()} /> : null}
+      <AppButton label={t('videos.channel')} variant="outline" icon="logo-youtube" onPress={() => void openLink(first.channelUrl)} />
     </Screen>
   );
 }

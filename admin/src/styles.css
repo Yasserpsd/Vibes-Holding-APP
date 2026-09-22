@@ -201,6 +201,17 @@ button.tile:hover { border-color: var(--gold-line); }
 .confirm { display: grid; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--gold-line); background: var(--gold-wash); }
 .confirm.danger { border-color: rgba(229, 72, 77, 0.5); background: var(--danger-wash); }
 .confirm.danger h3 { color: #ff8589; }
+/* «نصوص التطبيق»: each text as the member reads it; a tap opens its wording. */
+.wording-list { display: grid; gap: 8px; }
+.wording { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; }
+.wording.on { border-color: var(--gold-line); }
+.wording-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; inline-size: 100%; padding: 12px 14px; border: 0; border-radius: 12px; text-align: start; }
+.wording-head:hover .wording-text { color: var(--gold-bright); }
+.wording-text { flex: 1; min-width: 0; font-size: 1rem; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+.wording-text[dir='ltr'] { text-align: left; }
+.wording-form { display: grid; gap: 10px; padding: 0 14px 14px; }
+.wording-form textarea { font-size: 1rem; line-height: 1.7; min-block-size: 64px; }
+.wording-form .row { justify-content: flex-start; }
 /* How a write went, inside the sheet: the page's own notice would sit under the sheet's backdrop. */
 .done { padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(63, 185, 80, 0.5); background: var(--ok-wash); font-size: 0.92rem; }
 .sheet-body > .done { margin-block-end: 12px; }

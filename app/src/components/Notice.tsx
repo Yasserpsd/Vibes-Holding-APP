@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = { text: string; tone?: 'info' | 'warning' | 'success' };
@@ -27,5 +28,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: colors.surface,
   },
-  text: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: 'right' },
+  text: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
 });

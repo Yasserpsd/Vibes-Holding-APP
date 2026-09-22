@@ -1,4 +1,5 @@
 import { env } from '@/config/env';
+import { getLang, t, tOptional } from '@/i18n';
 
 export class ApiError extends Error {
   constructor(
@@ -49,10 +50,11 @@ function buildUrl(path: string, params?: Params): string {
 
 export async function apiRequest<T>(method: Method, path: string, options: RequestOptions = {}): Promise<T> {
   if (!env.apiBaseUrl) {
-    throw new ApiError('عنوان الخادم غير مضبوط في هذه النسخة', 0, 'no_api_url');
+    throw new ApiError(t('errors.noApiUrl'), 0, 'no_api_url');
   }
   const token = options.token === undefined ? currentToken : options.token;
-  const headers: Record<string, string> = { accept: 'application/json' };
+  // The server answers in the app's language where it has both (news feeds, topics, content).
+  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang() };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 
@@ -69,18 +71,18 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     });
   } catch {
     // No connection, or no answer before the deadline.
-    throw new ApiError('تعذّر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.', 0, 'network');
+    throw new ApiError(t('errors.network'), 0, 'network');
   } finally {
     clearTimeout(deadline);
   }
 
   if (!response.ok) {
     let code = 'http_error';
-    let message = 'حدث خطأ أثناء تحميل البيانات';
+    let message = t('errors.generic');
     try {
       const body = (await response.json()) as { error?: { code?: string; message?: string } };
       code = body.error?.code ?? code;
-      message = body.error?.message ?? message;
+      message = localMessage(code, body.error?.message) ?? message;
     } catch {
       // Non-JSON error body: keep the generic message.
     }
@@ -92,11 +94,22 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   return (await response.json()) as T;
 }
 
+/**
+ * The server and the hub write their messages in Arabic. The English version shows its own text for the
+ * codes it knows, and never an Arabic sentence: an unknown code falls back to the general message.
+ */
+function localMessage(code: string, serverMessage: string | undefined): string | null {
+  if (getLang() === 'ar') return serverMessage ?? tOptional(`errors.code.${code}`);
+  const known = tOptional(`errors.code.${code}`);
+  if (known) return known;
+  return serverMessage && !/[؀-ۿ]/.test(serverMessage) ? serverMessage : null;
+}
+
 export async function apiGet<T>(path: string, params?: Params): Promise<T> {
   return apiRequest<T>('GET', path, { params });
 }
 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  return 'حدث خطأ غير متوقع';
+  return t('errors.unexpected');
 }

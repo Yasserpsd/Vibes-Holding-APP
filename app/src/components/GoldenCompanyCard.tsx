@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
+import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -25,11 +26,11 @@ export function GoldenCompanyCard({ company }: Props) {
       </View>
       {company.valuationSarMillions !== null ? (
         <View style={styles.valuationRow}>
-          <Text style={styles.valuationLabel}>التقييم</Text>
+          <Text style={styles.valuationLabel}>{t('golden.valuation')}</Text>
           <Text style={styles.valuationValue}>{formatMillionsSar(company.valuationSarMillions)}</Text>
         </View>
       ) : null}
-      <AppButton label="صفحة العرض" variant="outline" icon="open-outline" onPress={() => openLink(company.offerUrl)} />
+      <AppButton label={t('golden.offerPage')} variant="outline" icon="open-outline" onPress={() => openLink(company.offerUrl)} />
     </View>
   );
 }

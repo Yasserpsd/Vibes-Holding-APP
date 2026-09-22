@@ -10,6 +10,7 @@ import { AdvisorChat } from '@/components/advisor/AdvisorChat';
 import { openingFor, parseContextParams, type ChatContext, type ChatOpening, type ContextParams } from '@/components/advisor/context';
 import { AppButton } from '@/components/AppButton';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
+import { t } from '@/i18n';
 import { colors, spacing } from '@/theme/tokens';
 
 export default function AdvisorScreen() {
@@ -49,13 +50,13 @@ export default function AdvisorScreen() {
   if (status === 'guest') {
     return (
       <PlaceholderScreen
-        title="المستشار"
-        description="سجّل الدخول لتتحدث مع مستشار النادي الذكي. محادثتك واحدة على موقع النادي وفي التطبيق، بنفس الحساب."
+        title={t('advisor.title')}
+        description={t('advisor.signInDescription')}
       >
         <View style={styles.actions}>
-          <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
           {config?.registrationOpen === false ? null : (
-            <AppButton label="إنشاء حساب" variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+            <AppButton label={t('auth.register.title')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
           )}
         </View>
       </PlaceholderScreen>

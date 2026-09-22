@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { KV } from '../store.js';
-import { hasContact, stripContacts } from './redact.js';
+import { hasContact, mentionsFunding, stripContacts, stripFunding } from './redact.js';
+import { STAGES, STEPS, stepOf } from './stage.js';
 import { makeExcerpt, normalizeForSearch } from './text.js';
 import type { PublicProject } from './types.js';
 
@@ -37,21 +38,13 @@ export type ProjectBrief = {
 export const BRIEF_DISCLAIMER = 'ملخص آلي من بيانات المشروع المنشورة في بنك المشاريع. المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.';
 export const briefKey = (id: number): string => `projects:brief:${id}`;
 
-const VERSION = 2;
+const VERSION = 4;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
 const MAX_COMPETITORS = 4;
 const AI_PER_HOUR = 90;
 
-const STAGES = [
-  { key: 'idea', label: 'فكرة', match: /فكر|دراس|idea|concept/i },
-  { key: 'prototype', label: 'تأسيس ونموذج أولي', match: /تاسيس|نموذج|اولي|تجريب|تطوير|prototype|mvp|seed/i },
-  { key: 'launch', label: 'إطلاق وتشغيل', match: /اطلاق|تشغيل|قايم|بدايه|launch|operat/i },
-  { key: 'revenue', label: 'تحقيق الدخل', match: /دخل|ايراد|مبيعات|cash|revenue/i },
-  { key: 'growth', label: 'نمو وتوسع', match: /نمو|توسع|انتشار|growth|scale|expan/i },
-] as const;
-const STEPS = STAGES.map((stage) => stage.label);
 
 /** Wording rules of the app applied to text we author (CLAUDE.md): «بدون رسوم», and an en dash between two numbers. */
 function fixWording(value: string): string {
@@ -67,10 +60,13 @@ const RETURNS = /عائد|عوائد|أرباح|ارباح|ربح|roi|return|pro
 /** Forward-looking yield talk: never in the prose, whatever the founder wrote. */
 const YIELD = /عائد|عوائد|roi|return on/i;
 const CONTACT_LABEL = /واتس|جوال|هاتف|تواصل|بريد|ايميل|إيميل|موقع|رابط|email|phone|whats|website|انستقرام|تويتر|سناب/i;
+/** Rows about what the project asks for or who founded it: the app shows what the project is (owner's rule). */
+const ASK_LABEL = /المطلوب|الاحتياج|التمويل|الاستثمار|رأس\s*المال|راس\s*المال|الحص[ةه]|التقييم|المؤسس|المالك|funding|investment|valuation|equity|founder|the ask/i;
 
 /** The founder's text as the brief may use it: no contact data, and no line that talks yields or guarantees. */
 function publicProse(details: string | null): string {
-  return (details ?? '')
+  // The mapper strips the funding ask already; here as well, for a snapshot stored before that rule.
+  return stripFunding(details ?? '')
     .split('\n')
     .filter((row) => !hasContact(row) && !YIELD.test(row) && !PROMISE.test(row) && !/للتواصل|تواصل معنا|واتس/.test(row))
     .join('\n')
@@ -79,15 +75,11 @@ function publicProse(details: string | null): string {
 }
 
 export function stageOf(project: Pick<PublicProject, 'stage'>): BriefStage {
-  const name = project.stage?.name ?? '';
-  const folded = normalizeForSearch(name);
-  // The furthest matching step wins («تشغيل ونمو» is growth).
-  let index = -1;
-  STAGES.forEach((stage, position) => {
-    if (folded && stage.match.test(folded)) index = position;
-  });
-  const hit = index >= 0 ? STAGES[index] : undefined;
-  return { key: hit?.key ?? 'unknown', label: name || 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: false };
+  // The mapper already placed the project on the five steps (`placeStage`); a snapshot stored before that still carries the site's wording.
+  const bySlug = STAGES.findIndex((stage) => stage.key === project.stage?.slug);
+  const index = bySlug >= 0 ? bySlug : stepOf(project.stage?.name);
+  const hit = STAGES[index];
+  return { key: hit?.key ?? 'unknown', label: hit?.label ?? 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: Boolean(hit && project.stage?.estimated) };
 }
 
 const STOP = new Set(['من', 'في', 'على', 'الى', 'عن', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'او', 'ان', 'كل', 'بين', 'حيث', 'كما', 'ذلك', 'مشروع', 'المشروع', 'شركه', 'الشركه', 'the', 'and', 'for', 'with']);
@@ -143,7 +135,6 @@ function factRows(project: PublicProject): BriefRow[] {
   const rows: [string, string | null][] = [
     ['رقم المشروع', project.number],
     ['الشركة', project.companyName],
-    ['المؤسس', project.founderName],
     ['القطاع', project.sector?.name ?? null],
     ['المرحلة', project.stage?.name ?? null],
     ['النوع', project.isGolden ? 'مشروع ذهبي (علامة V)' : 'مشروع في بنك المشاريع'],
@@ -161,7 +152,7 @@ function writtenRows(details: string, taken: Set<string>): BriefRow[] {
     if (!match) continue;
     const label = fixWording(match[1] ?? '');
     const value = fixWording(match[2] ?? '');
-    if (!label || !value || taken.has(label) || RETURNS.test(label + value) || PROMISE.test(value) || CONTACT_LABEL.test(label)) continue;
+    if (!label || !value || taken.has(label) || RETURNS.test(label + value) || PROMISE.test(value) || CONTACT_LABEL.test(label) || ASK_LABEL.test(label) || mentionsFunding(value)) continue;
     taken.add(label);
     rows.push({ label, value });
     if (rows.length >= 6) break;
@@ -177,7 +168,6 @@ function rulesBrief(project: PublicProject, details: string, picks: Ranked[], no
     details.length >= 400 ? 'وصف تفصيلي يشرح فكرة المشروع ونموذج عمله' : null,
     project.hasPitchDeck && !project.isGolden ? 'ملف عرض (Pitch Deck) متاح للأعضاء بعد فتح المشروع' : null,
     project.isGolden ? 'مشروع ذهبي يحمل علامة V من شركات المنظومة' : null,
-    project.companyName && project.founderName ? 'الشركة والمؤسس معلنان بالاسم' : null,
     stage.index >= 3 ? 'تجاوز مرحلة الإطلاق بحسب بيانات صاحبه' : null,
   ].filter((line): line is string => line !== null);
   const risks = [
@@ -204,9 +194,10 @@ const SYSTEM_PROMPT = [
   'You are «المستشار», the adviser of نادي المستثمرين (a Saudi business club). You turn ONE project of the club\'s Projects Bank into a short brief for a member.',
   'Use ONLY the project data you are given. Never invent a number, a name, a market size, a customer or a date; quote numbers exactly as written or leave them out.',
   'Never promise or estimate returns or profits, never call anything guaranteed or safe, never advise to invest. No contact data of any kind (phones, e-mails, links, handles).',
+  'Describe what the project IS. Never say what it asks for: no funding sought, no investment amount, no capital, no valuation, no equity or share on offer, no founder name.',
   'Write Modern Standard Arabic, polished and concise, no emojis, no exclamation marks.',
   'Vocabulary: «بدون رسوم» never «مجاني»; «رصيد» never «كريديت»; «الشراكات» never «الصفقات» (company names stay as written). Numeric ranges in words (من … إلى …), never a hyphen between two numbers.',
-  'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, what is requested, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
+  'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
 ].join('\n');
 
 const RESPONSE_FORMAT = {
@@ -312,14 +303,14 @@ export class BriefService {
     const answer = answerSchema.parse(JSON.parse(content));
 
     const allowed = numbersOf(JSON.stringify(payload));
-    const sound = (value: string): boolean => !PROMISE.test(value) && !hasContact(value) && [...numbersOf(value)].every((run) => allowed.has(run));
+    const sound = (value: string): boolean => !PROMISE.test(value) && !hasContact(value) && !mentionsFunding(value) && [...numbersOf(value)].every((run) => allowed.has(run));
     const summary = fixWording(answer.summary);
     if (!sound(summary) || YIELD.test(summary)) throw new Error('the summary breaks a wording rule');
     const facts = factRows(project);
     const taken = new Set(facts.map((row) => row.label));
     const extra = answer.table
       .map((row) => ({ label: fixWording(row.label), value: fixWording(row.value) }))
-      .filter((row) => sound(row.value) && sound(row.label) && !RETURNS.test(row.label + row.value) && !CONTACT_LABEL.test(row.label) && !taken.has(row.label))
+      .filter((row) => sound(row.value) && sound(row.label) && !RETURNS.test(row.label + row.value) && !CONTACT_LABEL.test(row.label) && !ASK_LABEL.test(row.label) && !taken.has(row.label))
       .slice(0, 8);
     const lines = (items: string[], fallback: string[]): string[] => {
       const kept = items.map(fixWording).filter((item) => sound(item) && !YIELD.test(item)).slice(0, 4);

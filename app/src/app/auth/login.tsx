@@ -9,6 +9,8 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function LoginScreen() {
@@ -22,7 +24,7 @@ export default function LoginScreen() {
 
   const submit = async () => {
     if (!login.trim() || !password) {
-      setError('اكتب البريد الإلكتروني أو رقم الجوال وكلمة المرور');
+      setError(t('auth.login.required'));
       return;
     }
     setBusy(true);
@@ -44,10 +46,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen title="تسجيل الدخول" subtitle="بنفس حساب نادي المستثمرين الذي تستخدمه على مواقع المنظومة.">
-      {config?.adminOnly ? <Notice text="النسخة التجريبية: الدخول متاح لحسابات إدارة النادي فقط." /> : null}
+    <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
+      {config?.adminOnly ? <Notice text={t('auth.login.adminOnly')} /> : null}
       <FormField
-        label="البريد الإلكتروني أو رقم الجوال"
+        label={t('auth.login.field')}
         latin
         autoCapitalize="none"
         autoCorrect={false}
@@ -55,10 +57,10 @@ export default function LoginScreen() {
         textContentType="username"
         value={login}
         onChangeText={setLogin}
-        placeholder="name@gmail.com أو 0558318777"
+        placeholder={t('auth.login.placeholder')}
       />
       <FormField
-        label="كلمة المرور"
+        label={t('common.password')}
         latin
         secureTextEntry
         autoCapitalize="none"
@@ -69,18 +71,18 @@ export default function LoginScreen() {
         returnKeyType="go"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <AppButton label={busy ? 'جارٍ الدخول…' : 'دخول'} icon="log-in-outline" onPress={() => (busy ? undefined : void submit())} />
+      <AppButton label={busy ? t('auth.login.busy') : t('auth.login.submit')} icon="log-in-outline" onPress={() => (busy ? undefined : void submit())} />
       <Link href="/auth/reset" style={styles.link}>
-        نسيت كلمة المرور؟
+        {t('auth.login.forgot')}
       </Link>
       {config?.registrationOpen === false ? null : (
-        <AppButton label="إنشاء حساب جديد" variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+        <AppButton label={t('auth.login.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   link: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
 });

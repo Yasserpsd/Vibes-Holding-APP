@@ -1,4 +1,5 @@
 import type { AdvisorContext, PortalKey, ScreenKey } from '@/api/advisor';
+import { t, type StringKey } from '@/i18n';
 import type { IoniconName } from '@/lib/icons';
 
 /** What the member was looking at when he opened the advisor; sent with each message until he removes the pill. */
@@ -73,83 +74,111 @@ export function parseContextParams(params: ContextParams): { key: string; contex
     case 'project': {
       const number = Number(id);
       if (!Number.isInteger(number) || number <= 0) return null;
-      return { key, context: { type: 'project', id: number, title: title || `مشروع ${number}` }, prompt };
+      return { key, context: { type: 'project', id: number, title: title || t('advisor.ctx.project', { number }) }, prompt };
     }
     case 'news':
       if (!/^[a-f0-9]{16}$/.test(id)) return null;
-      return { key, context: { type: 'news', id, title: title || 'خبر' }, prompt };
+      return { key, context: { type: 'news', id, title: title || t('advisor.ctx.news') }, prompt };
     case 'portal':
-      if (id !== 'investor' && id !== 'entrepreneur' && id !== 'neutral') return null;
-      return { key, context: { type: 'portal', id, title: title || 'البوابة' }, prompt };
+      if (id !== 'neutral' && id !== 'entrepreneur' && id !== 'investor') return null;
+      return { key, context: { type: 'portal', id, title: title || t('advisor.ctx.portal') }, prompt };
     case 'service':
       if (!/^[a-z0-9-]{1,40}$/.test(id)) return null;
-      return { key, context: { type: 'service', id, title: title || 'الخدمة' }, prompt };
+      return { key, context: { type: 'service', id, title: title || t('advisor.ctx.service') }, prompt };
     case 'post':
       if (!UUID.test(id)) return null;
-      return { key, context: { type: 'post', id, title: title || 'رسالة من الإدارة', event: params.ctxEvent === '1' }, prompt };
+      return { key, context: { type: 'post', id, title: title || t('advisor.ctx.post'), event: params.ctxEvent === '1' }, prompt };
     case 'video':
       if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return null;
-      return { key, context: { type: 'video', id, title: title || 'فيديو' }, prompt };
+      return { key, context: { type: 'video', id, title: title || t('advisor.ctx.video') }, prompt };
     case 'screen': {
       const screen = SCREEN_KEYS.find((candidate) => candidate === id);
       if (!screen) return null;
-      return { key, context: { type: 'screen', id: screen, title: title || 'التطبيق' }, prompt };
+      return { key, context: { type: 'screen', id: screen, title: title || t('advisor.ctx.screen') }, prompt };
     }
     default:
       return null;
   }
 }
 
-const SCREEN_STARTERS: Partial<Record<ScreenKey, string[]>> = {
-  home: ['من أين أبدأ في النادي؟', 'ما الجديد في النادي هذا الأسبوع؟', 'ما الخدمات التي تناسبني؟'],
-  projects: ['رشّح لي مشاريع تناسب اهتماماتي', 'كيف أقيّم مشروعًا في بنك المشاريع؟', 'ما القطاعات الأكثر نشاطًا في البنك؟', 'كيف أستخدم رصيد بنك المشاريع؟'],
-  golden: ['ما الذي يميّز المشاريع الذهبية؟', 'قارن لي بين الشركات الذهبية', 'كيف أبدأ شراكة مع إحدى هذه الشركات؟'],
-  membership: ['ما الذي تضيفه لي العضوية السنوية؟', 'كيف أستفيد من رصيد بنك المشاريع؟', 'ما خدمات الأعضاء التي تنصحني بها؟', 'كيف أفعّل عضويتي من التطبيق؟'],
-  services: ['ما الخدمة الأنسب لوضعي؟', 'قارن لي بين خدمات النادي', 'ما الخدمات المتاحة بدون رسوم للأعضاء؟'],
-  hq: ['ما الذي يقدمه مقر النادي للأعضاء؟', 'كيف أحجز زيارة للمقر؟', 'كيف أستعد لاجتماع في المقر؟'],
-  news: ['ما أهم ما يخص المستثمرين اليوم؟', 'ما القرارات الجديدة التي تهم أصحاب الأعمال؟', 'كيف أتابع أخبار قطاعي؟'],
-  videos: ['رشّح لي فيديو أبدأ به', 'ما أهم الدروس في فيديوهات النادي؟', 'هل يوجد فيديو عن تقييم المشاريع؟'],
-  posts: ['ما أهم رسائل الإدارة مؤخرًا؟', 'هل توجد فعاليات قادمة؟', 'كيف أشارك في فعاليات النادي؟'],
-  about: ['عرّفني بنادي المستثمرين', 'ما علاقة النادي بفايبز القابضة؟', 'ما شركات المنظومة وما دور كل منها؟'],
+/**
+ * The starter questions live in the app's strings (`advisor.starter.<list>.<n>`, M27 stage 3), so they follow the
+ * language and the owner edits them from the dashboard. Each list names how many it has; read while rendering.
+ */
+const STARTER_LISTS = {
+  'screen.home': 3,
+  'screen.projects': 4,
+  'screen.golden': 3,
+  'screen.membership': 4,
+  'screen.services': 3,
+  'screen.hq': 3,
+  'screen.news': 3,
+  'screen.videos': 3,
+  'screen.posts': 3,
+  'screen.about': 3,
+  'screen.other': 3,
+  project: 4,
+  news: 4,
+  service: 4,
+  event: 3,
+  post: 3,
+  video: 3,
+  entrepreneur: 3,
+  investor: 3,
+} as const;
+type StarterList = keyof typeof STARTER_LISTS;
+
+const starters = (list: StarterList): string[] => Array.from({ length: STARTER_LISTS[list] }, (_, index) => t(`advisor.starter.${list}.${index + 1}` as StringKey));
+
+const SCREEN_LISTS: Partial<Record<ScreenKey, StarterList>> = {
+  home: 'screen.home',
+  projects: 'screen.projects',
+  golden: 'screen.golden',
+  membership: 'screen.membership',
+  services: 'screen.services',
+  hq: 'screen.hq',
+  news: 'screen.news',
+  videos: 'screen.videos',
+  posts: 'screen.posts',
+  about: 'screen.about',
 };
 
 /** Three or four first questions that fit what the member is looking at. */
 export function startersFor(context: ChatContext): string[] {
   switch (context.type) {
     case 'project':
-      return ['ما رأيك في هذا المشروع؟', 'ما أبرز نقاط القوة والمخاطر؟', 'من ينافسه في بنك المشاريع؟', 'ما الأسئلة التي أطرحها على المؤسس؟'];
+      return starters('project');
     case 'news':
-      return ['ما أثر هذا الخبر على المستثمرين؟', 'اشرح لي خلفية هذا الخبر', 'هل يرتبط بمشاريع في بنك المشاريع؟', 'ما الخطوة العملية التي تقترحها؟'];
+      return starters('news');
     case 'service':
-      return ['ما الذي تشمله هذه الخدمة؟', 'هل تناسب وضعي الحالي؟', 'ما خطوات الطلب؟', 'ما البدائل القريبة منها في النادي؟'];
+      return starters('service');
     case 'post':
-      return context.event
-        ? ['لمن تناسب هذه الفعالية؟', 'كيف أستعد لحضورها؟', 'ما الذي سأخرج به منها؟']
-        : ['ما المطلوب مني في هذه الرسالة؟', 'كيف أستفيد مما جاء فيها؟', 'هل لها علاقة بخدمات النادي؟'];
+      return starters(context.event ? 'event' : 'post');
     case 'video':
-      return ['ما أهم أفكار هذا الفيديو؟', 'كيف أطبّق ما فيه على مشروعي؟', 'رشّح لي فيديو مكمّلًا له'];
+      return starters('video');
     case 'portal':
-      return context.id === 'entrepreneur'
-        ? ['كيف أجهّز مشروعي للعرض على المستثمرين؟', 'ما الخدمة الأنسب لمرحلة مشروعي؟', 'كيف أضيف مشروعي إلى بنك المشاريع؟']
-        : ['كيف أجد فرص شراكات تناسبني؟', 'كيف أقيّم مشروعًا قبل التواصل مع مؤسسه؟', 'ما الذي يقدمه النادي للمستثمر؟'];
+      return starters(context.id === 'entrepreneur' ? 'entrepreneur' : 'investor');
     case 'screen':
-      return SCREEN_STARTERS[context.id] ?? ['كيف أستفيد من هذه الشاشة؟', 'ما الذي تنصحني به الآن؟', 'ما الجديد في النادي؟'];
+      return starters(SCREEN_LISTS[context.id] ?? 'screen.other');
   }
 }
 
-const OPENING_TEXT: Record<ChatContext['type'], string> = {
-  project: 'اطّلعت على بيانات هذا المشروع المنشورة في بنك المشاريع. اسألني عنه أو اختر سؤالًا للبداية.',
-  news: 'نناقش هذا الخبر كما نشره مصدره. اسألني عن أثره أو اختر سؤالًا للبداية.',
-  portal: 'أنا معك في هذه البوابة. اسألني أو اختر سؤالًا للبداية.',
-  service: 'يمكنني مساعدتك في هذه الخدمة. اسألني أو اختر سؤالًا للبداية.',
-  post: 'قرأت ما نشرته الإدارة هنا. اسألني عنه أو اختر سؤالًا للبداية.',
-  video: 'اسألني عن هذا الفيديو أو اختر سؤالًا للبداية.',
-  screen: 'أنا معك في هذه الشاشة. اسألني أو اختر سؤالًا للبداية.',
+/** The welcome chips when the conversation is empty: the home screen's starters, in the app's language. */
+export const welcomeStarters = (): string[] => starters('screen.home');
+
+const OPENING_KEYS: Record<ChatContext['type'], StringKey> = {
+  project: 'advisor.opening.project',
+  news: 'advisor.opening.news',
+  portal: 'advisor.opening.portal',
+  service: 'advisor.opening.service',
+  post: 'advisor.opening.post',
+  video: 'advisor.opening.video',
+  screen: 'advisor.opening.screen',
 };
 
 /** The advisor's first move for a context: a short line and the starter questions (the suggested prompt first). */
 export function openingFor(context: ChatContext, prompt: string | null): ChatOpening {
-  const starters = startersFor(context);
-  const quickReplies = prompt ? [prompt, ...starters.filter((starter) => starter !== prompt)] : starters;
-  return { title: context.title, text: OPENING_TEXT[context.type], quickReplies: quickReplies.slice(0, 4) };
+  const starterList = startersFor(context);
+  const quickReplies = prompt ? [prompt, ...starterList.filter((starter) => starter !== prompt)] : starterList;
+  return { title: context.title, text: t(OPENING_KEYS[context.type]), quickReplies: quickReplies.slice(0, 4) };
 }

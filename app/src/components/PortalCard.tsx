@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { HomePortal } from '@/api/content';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -19,7 +20,7 @@ export function PortalCard({ portal, onPress }: Props) {
         <Text style={styles.title}>{portal.title}</Text>
         <Text style={styles.subtitle}>{portal.subtitle}</Text>
       </View>
-      <Ionicons name="chevron-back" size={22} color={colors.gold} />
+      <Ionicons name={chevronForward()} size={22} color={colors.gold} />
     </Pressable>
   );
 }
@@ -49,6 +50,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
   },
   texts: { flex: 1, gap: 2 },
-  title: { fontFamily: fonts.bold, fontSize: 19, lineHeight: 28, color: colors.textPrimary, textAlign: 'right' },
-  subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  title: { fontFamily: fonts.bold, fontSize: 19, lineHeight: 28, color: colors.textPrimary, textAlign: textStart },
+  subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
 });

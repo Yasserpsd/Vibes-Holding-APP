@@ -11,6 +11,7 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { hubText, t } from '@/i18n';
 import { fonts } from '@/theme/tokens';
 
 type Params = { pendingToken?: string; email?: string; text?: string; interests?: string };
@@ -23,7 +24,7 @@ export default function VerifyScreen() {
   const { data: config } = useAuthConfig();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(text ?? null);
+  const [info, setInfo] = useState<string | null>(text ? hubText(text, 'auth.verify.sent') : null);
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(!pendingToken);
   const [cooldown, setCooldown] = useState(0);
@@ -42,7 +43,7 @@ export default function VerifyScreen() {
   const submit = async () => {
     if (busy || !pendingToken) return;
     if (!/^\d{6}$/.test(code)) {
-      setError('اكتب الرمز المكوّن من 6 أرقام');
+      setError(t('auth.verify.codeRequired'));
       return;
     }
     setBusy(true);
@@ -69,7 +70,7 @@ export default function VerifyScreen() {
     setError(null);
     try {
       const result = await authApi.resend(pendingToken);
-      setInfo(result.text || 'أعدنا إرسال الرمز');
+      setInfo(hubText(result.text, 'auth.verify.resent'));
       setCooldown(60);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -78,11 +79,11 @@ export default function VerifyScreen() {
   };
 
   return (
-    <Screen title="رمز التفعيل" subtitle={`أرسلنا رمزًا من 6 أرقام إلى ${email || 'بريدك الإلكتروني'}. الرمز صالح 30 دقيقة.`}>
+    <Screen title={t('auth.verify.title')} subtitle={t('auth.verify.subtitle', { email: email || t('auth.verify.yourEmail') })}>
       {info ? <Notice tone="success" text={info} /> : null}
-      {config?.testCode ? <Notice tone="warning" text={`وضع الاختبار: الرمز هو ${config.testCode}`} /> : null}
+      {config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
       <FormField
-        label="الرمز"
+        label={t('auth.verify.code')}
         latin
         keyboardType="number-pad"
         textContentType="oneTimeCode"
@@ -95,12 +96,12 @@ export default function VerifyScreen() {
         editable={!expired}
       />
       {expired ? (
-        <AppButton label="العودة لتسجيل الدخول" icon="arrow-undo-outline" onPress={() => router.replace('/auth/login')} />
+        <AppButton label={t('auth.verify.backToLogin')} icon="arrow-undo-outline" onPress={() => router.replace('/auth/login')} />
       ) : (
         <>
-          <AppButton label={busy ? 'جارٍ التحقق…' : 'تأكيد'} icon="checkmark-circle-outline" onPress={() => void submit()} />
+          <AppButton label={busy ? t('auth.verify.busy') : t('auth.verify.submit')} icon="checkmark-circle-outline" onPress={() => void submit()} />
           <AppButton
-            label={cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ثانية` : 'إعادة إرسال الرمز'}
+            label={cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('auth.verify.resend')}
             variant="outline"
             icon="mail-outline"
             onPress={() => void resend()}

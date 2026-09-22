@@ -1,15 +1,21 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { HOME_EN } from './en/home.js';
 
 /**
  * Home screen content: the three portals, the golden and membership blocks and the advisor
  * opening for the neutral portal. Editable server content (the dashboard edits it later).
  */
-export type PortalKey = 'investor' | 'entrepreneur' | 'neutral';
+export type PortalKey = 'neutral' | 'entrepreneur' | 'investor';
 
 export type HomePortal = {
   key: PortalKey;
   title: string;
   subtitle: string;
+  /** The same two lines for the English version of the app (owner's wording, 2026-09-21). */
+  titleEn?: string;
+  subtitleEn?: string;
   /** Icon family name known to the app; unknown names fall back to a generic icon. */
   icon: string;
   /** Where the portal leads: the Projects Bank, the entrepreneurs page or the advisor. */
@@ -40,27 +46,34 @@ export const HOME_SEED: HomeContent = {
     title: 'مجتمع راقٍ يؤمن بأن الفكر ثروة',
     subtitle: 'اختر بوابتك وابدأ رحلتك في المنظومة: فرص شراكة، خدمات أعمال، ومستشار ذكي.',
   },
+  // The owner's wording and order (2026-09-21): the neutral member first.
   portals: [
     {
-      key: 'investor',
-      title: 'بوابة المستثمر',
-      subtitle: 'تصفّح بنك المشاريع واختر فرص الشراكة التي تناسبك',
-      icon: 'briefcase',
-      target: 'projects',
+      key: 'neutral',
+      title: 'محايد',
+      subtitle: 'أستكشف توجهي',
+      titleEn: 'Neutral',
+      subtitleEn: 'Exploring my direction',
+      icon: 'compass',
+      target: 'advisor',
     },
     {
       key: 'entrepreneur',
-      title: 'بوابة رواد الأعمال',
-      subtitle: 'اصنع ملتقاك، شركاء النجاح، وتصميم Pitch Deck لمشروعك',
+      title: 'رائد أعمال',
+      subtitle: 'لدي مشروع',
+      titleEn: 'Entrepreneur',
+      subtitleEn: 'Has a venture',
       icon: 'rocket',
       target: 'entrepreneurs',
     },
     {
-      key: 'neutral',
-      title: 'بوابة المحايدين',
-      subtitle: 'لم تحدد توجهك بعد؟ المستشار الذكي يبدأ معك الحوار',
-      icon: 'compass',
-      target: 'advisor',
+      key: 'investor',
+      title: 'مستثمر',
+      subtitle: 'أبحث عن فرص',
+      titleEn: 'Investor',
+      subtitleEn: 'Seeking opportunities',
+      icon: 'briefcase',
+      target: 'projects',
     },
   ],
   golden: {
@@ -90,12 +103,12 @@ export const HOME_SEED: HomeContent = {
     serviceKeys: ['meetup', 'success-partners', 'pitch-deck'],
   },
   neutralOpening: {
-    title: 'بوابة المحايدين',
-    text: 'أهلًا بك في نادي المستثمرين. أنا مستشار النادي الذكي، وسأساعدك على تحديد توجهك في المنظومة. حدّثني عن شركتك أو مجال عملك، أو أخبرني إن كنت تفكّر في الاستثمار أو في إطلاق مشروع.',
-    quickReplies: ['لدي شركة قائمة وأبحث عن شراكة', 'أفكّر في الاستثمار في مشروع', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
+    title: 'محايد — أستكشف توجهي',
+    text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
+    quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 2,
-  updatedAt: '2026-09-12T00:00:00.000Z',
+  version: 3,
+  updatedAt: '2026-09-21T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */
@@ -106,6 +119,7 @@ export async function ensureHomeSeed(kv: KV, options: { force?: boolean } = {}):
   return true;
 }
 
-export async function getHomeContent(kv: KV): Promise<HomeContent> {
-  return (await kv.get<HomeContent>(HOME_CONTENT_KEY)) ?? HOME_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getHomeContent(kv: KV, lang: AppLang = 'ar'): Promise<HomeContent> {
+  return localizeBlock(kv, 'home', (await kv.get<HomeContent>(HOME_CONTENT_KEY)) ?? HOME_SEED, HOME_EN, lang);
 }

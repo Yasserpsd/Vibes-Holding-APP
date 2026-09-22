@@ -4,6 +4,7 @@ import { getHomeContent, type PortalKey } from '../content/home.js';
 import { getHqContent } from '../content/hq.js';
 import { getMembershipContent } from '../content/membership.js';
 import { getServicesContent } from '../content/services.js';
+import type { AppLang } from '../lang.js';
 import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import { stripContacts } from '../projectsBank/redact.js';
@@ -35,6 +36,11 @@ const SELECTION_MAX = 1000;
 const APP = 'تطبيق نادي المستثمرين';
 const NONE: ResolvedContext = { url: '', title: '', focus: null };
 
+/** What suits whoever stands at a portal (the owner's direction, 2026-09-21): a fact the adviser builds on. */
+const PORTAL_NOTES: Partial<Record<PortalKey, string>> = {
+  neutral:
+    'يناسب المحايد الذي لم يحدّد وجهته بعد: حضور ملتقيات النادي وندواته وورش عمله الدورية في مقر النادي بالرياض، والحضور متاح عبر الإنترنت أينما كان.',
+};
 const PORTAL_TITLES: Record<PortalKey, string> = {
   investor: 'بوابة المستثمر',
   entrepreneur: 'بوابة رواد الأعمال',
@@ -52,6 +58,19 @@ const SCREENS: Record<string, { title: string; text: string }> = {
   account: { title: 'حسابي', text: 'حساب العضو: بياناته وحالة عضويته وعملياته داخل التطبيق.' },
 };
 
+/**
+ * The English app (M27): the brain's prompt shows the page title (its first 90 characters) and the focus text first,
+ * so both carry the request to answer in English. No fabricated focus: one would send every message to the deep model.
+ */
+const ENGLISH_TITLE = `${APP} (English: reply in English)`;
+const ENGLISH_NOTE = 'العضو يستخدم النسخة الإنجليزية من التطبيق: أجب بالإنجليزية. (The member uses the English version of the app: reply in English.)';
+
+function inEnglish(found: ResolvedContext): ResolvedContext {
+  const title = found.title ? `${ENGLISH_TITLE} — ${found.title}` : ENGLISH_TITLE;
+  const focus = found.focus ? { ...found.focus, text: `${ENGLISH_NOTE}\n${found.focus.text}` } : null;
+  return { ...found, title, focus };
+}
+
 const clip = (value: string, max: number): string => value.replace(/[ \t]+/g, ' ').trim().slice(0, max);
 const lines = (rows: (string | null | undefined | false)[]): string => rows.filter((row): row is string => Boolean(row)).join('\n');
 
@@ -60,7 +79,12 @@ type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: Post
 export class ContextResolver {
   constructor(private readonly deps: Deps) {}
 
-  async resolve(context: AdvisorContext | null): Promise<ResolvedContext> {
+  async resolve(context: AdvisorContext | null, lang: AppLang = 'ar'): Promise<ResolvedContext> {
+    const found = await this.resolved(context);
+    return lang === 'en' ? inEnglish(found) : found;
+  }
+
+  private async resolved(context: AdvisorContext | null): Promise<ResolvedContext> {
     if (!context) return NONE;
     const found = await this.find(context);
     if (!found.focus) return found;
@@ -78,7 +102,6 @@ export class ContextResolver {
         const text = lines([
           `مشروع في بنك المشاريع: ${title}`,
           project.companyName && `الشركة: ${project.companyName}`,
-          project.founderName && `المؤسس: ${project.founderName}`,
           project.sector && `القطاع: ${project.sector.name}`,
           project.stage && `المرحلة: ${project.stage.name}`,
           project.isGolden && 'مشروع ذهبي يحمل علامة V.',
@@ -98,7 +121,7 @@ export class ContextResolver {
       case 'portal': {
         const portal = (await getHomeContent(this.deps.kv)).portals.find((entry) => entry.key === context.id);
         const title = `${PORTAL_TITLES[context.id]} — ${APP}`;
-        return { url: '', title, focus: focus(PORTAL_TITLES[context.id], lines([portal?.title, portal?.subtitle])) };
+        return { url: '', title, focus: focus(PORTAL_TITLES[context.id], lines([portal?.title, portal?.subtitle, PORTAL_NOTES[context.id]])) };
       }
       case 'service': {
         const service = (await getServicesContent(this.deps.kv)).services.find((entry) => entry.key === context.id);

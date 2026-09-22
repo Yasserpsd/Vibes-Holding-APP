@@ -10,9 +10,9 @@ import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/As
 import { Chip } from '@/components/Chip';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
-
-const DECISIONS_TITLE = 'قرارات وأنظمة المملكة';
 
 export default function NewsScreen() {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function NewsScreen() {
   const feed = useNewsFeed(topic, who);
   const decisions = useDecisions(8);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
-  useAdvisorScreen({ type: 'screen', id: 'news', title: 'الأخبار' }, true);
+  useAdvisorScreen({ type: 'screen', id: 'news', title: t('news.title') }, true);
 
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   const personalized = feed.data?.pages[0]?.personalized ?? false;
@@ -45,20 +45,20 @@ export default function NewsScreen() {
   const header = (
     <View style={styles.header}>
       <View style={styles.titleRow}>
-        <Text style={styles.title}>الأخبار</Text>
+        <Text style={styles.title}>{t('news.title')}</Text>
         {signedIn ? (
           <Pressable onPress={() => router.push('/news/interests')} style={styles.headerLink} accessibilityRole="button" hitSlop={8}>
             <Ionicons name="options-outline" size={16} color={colors.gold} />
-            <Text style={styles.headerLinkText}>اهتماماتي</Text>
+            <Text style={styles.headerLinkText}>{t('news.interestsLink')}</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>{topics.data?.decisionsTitle ?? DECISIONS_TITLE}</Text>
+        <Text style={styles.sectionTitle}>{topics.data?.decisionsTitle ?? t('news.decisionsTitle')}</Text>
         {decisionItems.length > 0 ? (
           <Pressable onPress={() => router.push('/news/decisions')} accessibilityRole="link" hitSlop={8}>
-            <Text style={styles.sectionLink}>عرض الكل</Text>
+            <Text style={styles.sectionLink}>{t('news.viewAll')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -69,24 +69,24 @@ export default function NewsScreen() {
           ))}
         </ScrollView>
       ) : (
-        <Text style={styles.sectionEmpty}>{decisions.isPending ? 'جارٍ تحميل القرارات…' : 'لا توجد قرارات جديدة حاليًا.'}</Text>
+        <Text style={styles.sectionEmpty}>{decisions.isPending ? t('news.decisionsLoading') : t('news.decisionsEmpty')}</Text>
       )}
 
       {askForInterests ? (
         <Pressable onPress={() => router.push('/news/interests')} accessibilityRole="button" style={({ pressed }) => [styles.banner, pressed && styles.pressed]}>
           <Ionicons name="sparkles-outline" size={20} color={colors.gold} />
-          <Text style={styles.bannerText}>اختر اهتماماتك لتُرتَّب الأخبار حسب ما يهمك.</Text>
-          <Ionicons name="chevron-back" size={18} color={colors.textMuted} />
+          <Text style={styles.bannerText}>{t('news.pickInterests')}</Text>
+          <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
         </Pressable>
       ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Chip label="الكل" selected={!topic} onPress={() => setTopic(undefined)} />
+        <Chip label={t('news.all')} selected={!topic} onPress={() => setTopic(undefined)} />
         {chips.map((item) => (
           <Chip key={item.key} label={item.label} selected={topic === item.key} onPress={() => setTopic(topic === item.key ? undefined : item.key)} />
         ))}
       </ScrollView>
-      <Text style={styles.count}>{personalized ? 'مرتّبة حسب اهتماماتك' : 'أحدث أخبار الأعمال من مصادر موثوقة'}</Text>
+      <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
     </View>
   );
 
@@ -103,7 +103,7 @@ export default function NewsScreen() {
             error={feed.error}
             onRetry={() => feed.refetch()}
             empty={!feed.isPending && !feed.error}
-            emptyText="لا توجد أخبار في هذا الاهتمام حاليًا"
+            emptyText={t('news.emptyTopic')}
           />
         }
         ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     borderColor: colors.goldDark,
     backgroundColor: colors.surface,
   },
-  bannerText: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: 'right' },
+  bannerText: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
   pressed: { opacity: 0.8 },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
   count: { ...typography.caption, color: colors.textMuted },

@@ -7,6 +7,8 @@ import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
@@ -15,7 +17,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 /** «عنّا»: the club, its operator, فايبز القابضة and the ecosystem. All copy comes from the server. */
 export default function AboutScreen() {
   const { data, isLoading, error, refetch } = useAboutContent();
-  useAdvisorScreen({ type: 'screen', id: 'about', title: 'عن نادي المستثمرين' });
+  useAdvisorScreen({ type: 'screen', id: 'about', title: t('about.title') });
 
   if (!data) {
     return (
@@ -28,7 +30,7 @@ export default function AboutScreen() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <Image source={{ uri: data.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel="نادي المستثمرين" />
+        <Image source={{ uri: data.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
         <Text style={styles.title}>{data.title}</Text>
         <Text style={styles.intro}>{data.intro}</Text>
       </View>
@@ -52,9 +54,9 @@ export default function AboutScreen() {
 
       <SectionHeader title={data.contact.title} />
       <View style={styles.card}>
-        <ContactRow icon="logo-whatsapp" label="إدارة النادي" value={data.contact.management} onPress={() => void openWhatsApp(data.contact.management, 'السلام عليكم، أتواصل معكم من تطبيق نادي المستثمرين.')} />
-        <ContactRow icon="mic-outline" label="استديو بودكاست الملتقى" value={data.contact.studio} onPress={() => void openWhatsApp(data.contact.studio, 'السلام عليكم، أرغب في الاستفسار عن حجز الاستديو.')} border />
-        <ContactRow icon="mail-outline" label="البريد الإلكتروني" value={data.contact.email} onPress={() => void Linking.openURL(`mailto:${data.contact.email}`)} border />
+        <ContactRow icon="logo-whatsapp" label={t('about.management')} value={data.contact.management} onPress={() => void openWhatsApp(data.contact.management, t('about.managementGreeting'))} />
+        <ContactRow icon="mic-outline" label={t('about.studio')} value={data.contact.studio} onPress={() => void openWhatsApp(data.contact.studio, t('about.studioGreeting'))} border />
+        <ContactRow icon="mail-outline" label={t('about.email')} value={data.contact.email} onPress={() => void Linking.openURL(`mailto:${data.contact.email}`)} border />
         {data.contact.websites.map((site) => (
           <ContactRow key={site.url} icon="globe-outline" label={site.label} value={site.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} onPress={() => void openLink(site.url)} border />
         ))}
@@ -62,7 +64,7 @@ export default function AboutScreen() {
 
       <View style={styles.legal}>
         <Text style={styles.legalText}>{data.legal.operator}</Text>
-        <Text style={styles.legalText}>{`سجل تجاري ${data.legal.cr} · الرقم الضريبي ${data.legal.vat}`}</Text>
+        <Text style={styles.legalText}>{t('about.legal', { cr: data.legal.cr, vat: data.legal.vat })}</Text>
         <Text style={styles.legalText}>{data.legal.address}</Text>
         <Text style={styles.legalText}>{data.legal.trademark}</Text>
       </View>
@@ -105,7 +107,7 @@ function ContactRow({ icon, label, value, onPress, border = false }: { icon: Ion
         <Text style={styles.rowTitle}>{label}</Text>
         <Text style={[styles.rowHint, styles.latin]}>{value}</Text>
       </View>
-      <Ionicons name="chevron-back" size={16} color={colors.textMuted} />
+      <Ionicons name={chevronForward()} size={16} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -126,16 +128,16 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionLogoBox: { width: 44, height: 44, padding: 4, borderRadius: radii.md, backgroundColor: colors.white },
   sectionLogo: { width: '100%', height: '100%' },
-  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right', flex: 1 },
-  paragraph: { ...typography.body, color: colors.textPrimary, textAlign: 'right' },
+  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
+  paragraph: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  bulletText: { ...typography.body, color: colors.textSecondary, textAlign: 'right', flex: 1 },
+  bulletText: { ...typography.body, color: colors.textSecondary, textAlign: textStart, flex: 1 },
   card: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm + 2 },
   rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   rowText: { flex: 1, gap: 2 },
-  rowTitle: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'right' },
-  rowHint: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
+  rowTitle: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
+  rowHint: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   latin: { writingDirection: 'ltr' },
   pressed: { opacity: 0.75 },
   legal: { gap: 2, marginTop: spacing.sm },

@@ -10,6 +10,8 @@ import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { StorePurchaseCard } from '@/components/StorePurchaseCard';
+import { t } from '@/i18n';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -19,7 +21,7 @@ export default function MembershipScreen() {
   const router = useRouter();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useMembershipContent();
-  useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? 'العضوية' });
+  useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? t('nav.membership') });
 
   if (!data) {
     return (
@@ -35,8 +37,8 @@ export default function MembershipScreen() {
       router.push(item.link.path as Href);
       return;
     }
-    const sender = me ? `\nالاسم: ${me.name}${me.phone ? ` · الجوال: ${me.phone}` : ''}` : '';
-    void openWhatsApp(item.link.phone, `${item.link.message}${sender}\n(طلب من تطبيق نادي المستثمرين)`);
+    const sender = me ? `\n${t('request.senderName', { name: me.name })}${me.phone ? ` · ${t('request.senderPhone', { phone: me.phone })}` : ''}` : '';
+    void openWhatsApp(item.link.phone, `${item.link.message}${sender}\n${t('request.fromApp')}`);
   };
 
   return (
@@ -49,7 +51,7 @@ export default function MembershipScreen() {
         title={data.title}
       />
       {status === 'signedIn' ? <StorePurchaseCard title={data.title} /> : null}
-      {status === 'guest' ? <AppButton label="تسجيل الدخول" icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
+      {status === 'guest' ? <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
 
       {data.groups.map((group) => (
         <GroupCard key={group.key} group={group} onOpen={open} />
@@ -68,7 +70,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
         <Text style={styles.groupTitle}>{group.title}</Text>
         {group.comingSoon ? (
           <View style={styles.soon}>
-            <Text style={styles.soonText}>قريبًا</Text>
+            <Text style={styles.soonText}>{t('membership.soon')}</Text>
           </View>
         ) : null}
       </View>
@@ -82,7 +84,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
         >
           <Ionicons name={group.comingSoon ? 'time-outline' : 'checkmark-circle'} size={18} color={group.comingSoon ? colors.textMuted : colors.gold} />
           <Text style={[styles.itemText, group.comingSoon && styles.itemSoon]}>{item.text}</Text>
-          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : 'chevron-back'} size={16} color={colors.goldLight} /> : null}
+          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : chevronForward()} size={16} color={colors.goldLight} /> : null}
         </Pressable>
       ))}
     </View>
@@ -90,7 +92,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
 }
 
 const styles = StyleSheet.create({
-  intro: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   group: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -101,12 +103,12 @@ const styles = StyleSheet.create({
   },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   iconBox: { width: 36, height: 36, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
-  groupTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'right', flex: 1 },
+  groupTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   soon: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark },
   soonText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
   item: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm + 2 },
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  itemText: { ...typography.body, color: colors.textPrimary, textAlign: 'right', flex: 1 },
+  itemText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   itemSoon: { color: colors.textSecondary },
   pressed: { opacity: 0.7 },
 });

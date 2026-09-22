@@ -3,8 +3,9 @@ import { z } from 'zod';
 
 import { guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService, Me } from '../auth/service.js';
-import { DECISIONS_TITLE, type NewsService } from './service.js';
-import { NEWS_TOPICS, isTopicKey, type TopicKey } from './types.js';
+import { langOf } from '../lang.js';
+import { decisionsTitle, type NewsService } from './service.js';
+import { NEWS_TOPICS, isTopicKey, topicsFor, type TopicKey } from './types.js';
 
 export type NewsRoutesOptions = { service: NewsService; auth: AuthService };
 
@@ -16,7 +17,10 @@ const listSchema = z.object({
 const prefsSchema = z.object({ topics: z.array(z.string().trim().max(30)).max(NEWS_TOPICS.length) });
 const idSchema = z.object({ id: z.string().regex(/^[a-f0-9]{16}$/, 'رقم الخبر غير صالح') });
 
-/** Public feeds for everyone; interests need a session. A signed-in member gets a personalized ranking. */
+/**
+ * Public feeds for everyone; interests need a session. A signed-in member gets a personalized ranking.
+ * The feeds follow the app's language (`langOf`): English sources for the English version, Arabic otherwise.
+ */
 export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { service, auth }) => {
   const requireSession = sessionGuard(auth);
 
@@ -35,7 +39,10 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
     return { contactId: session.contactId, me };
   };
 
-  app.get('/api/news/topics', async () => ({ topics: NEWS_TOPICS, decisionsTitle: DECISIONS_TITLE }));
+  app.get('/api/news/topics', async (request) => {
+    const lang = langOf(request);
+    return { topics: topicsFor(lang), decisionsTitle: decisionsTitle(lang) };
+  });
 
   app.get(
     '/api/news/feed',
@@ -46,7 +53,7 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
       if (query.topic && !topic) return reply.code(400).send({ error: { code: 'invalid', message: 'الاهتمام غير معروف' } });
       const who = await whoIs(request);
       const prefs = who ? await service.prefs(who.contactId) : null;
-      return service.feed({ topic, page: query.page, limit: query.limit }, { prefs, persona: who?.me?.persona ?? '' });
+      return service.feed({ topic, page: query.page, limit: query.limit, lang: langOf(request) }, { prefs, persona: who?.me?.persona ?? '' });
     }),
   );
 
@@ -55,7 +62,7 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
     guard(async (request, reply) => {
       const query = parse(listSchema, request.query, reply);
       if (!query) return;
-      return service.decisions({ page: query.page, limit: query.limit });
+      return service.decisions({ page: query.page, limit: query.limit, lang: langOf(request) });
     }),
   );
 

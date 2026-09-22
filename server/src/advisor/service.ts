@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { toMe, type Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import type { HubClient, HubContact } from '../hub/types.js';
+import type { AppLang } from '../lang.js';
 import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import type { ProjectsService } from '../projectsBank/service.js';
@@ -59,10 +60,11 @@ export class AdvisorService {
     };
   }
 
-  async send(session: SessionRecord, message: string, context: AdvisorContext | null, ip: string): Promise<SendResult> {
+  async send(session: SessionRecord, message: string, context: AdvisorContext | null, ip: string, lang: AppLang = 'ar'): Promise<SendResult> {
     const settings = await this.settingsOf();
     // What the member points at («اسأل المستشار»), built here from public data: the hub hands it to the workflow as `focus`.
-    const page = await this.contexts.resolve(context);
+    // The English app says so in the page title and the focus, so the brain answers in English (no plugin change).
+    const page = await this.contexts.resolve(context, lang);
     const result = await this.deps.hub.call('message', { uuid: session.uuid, message, page_url: page.url, page_title: page.title, ip, ...(page.focus ? { context: page.focus } : {}) });
     const me = meOf(result.contact);
     if (result.gated) {

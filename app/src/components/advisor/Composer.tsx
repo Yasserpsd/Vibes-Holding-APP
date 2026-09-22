@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { t } from '@/i18n';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
 type Props = {
@@ -19,20 +20,20 @@ export function Composer({ value, onChange, onSend, busy }: Props) {
         style={styles.input}
         value={value}
         onChangeText={onChange}
-        placeholder="اكتب سؤالك للمستشار…"
+        placeholder={t('advisor.placeholder')}
         placeholderTextColor={colors.textMuted}
         multiline
         maxLength={4000}
         textAlign="right"
         editable={!busy}
-        accessibilityLabel="رسالة للمستشار"
+        accessibilityLabel={t('advisor.messageLabel')}
       />
       <Pressable
         onPress={onSend}
         disabled={!canSend}
         style={({ pressed }) => [styles.send, !canSend && styles.sendDisabled, pressed && canSend && styles.sendPressed]}
         accessibilityRole="button"
-        accessibilityLabel="إرسال"
+        accessibilityLabel={t('advisor.send')}
       >
         {busy && value.trim().length > 0 ? (
           <ActivityIndicator color={colors.black} size="small" />

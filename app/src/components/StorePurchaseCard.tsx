@@ -6,6 +6,8 @@ import { membershipApi, useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Notice } from '@/components/Notice';
+import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import {
   fetchManagementUrl,
@@ -124,19 +126,19 @@ export function StorePurchaseCard({ title }: { title: string }) {
       return go('ready');
     }
     if (!result.entitled) {
-      setError(`لا يوجد اشتراك سابق مرتبط بحساب ${storeName()} على هذا الجهاز.`);
+      setError(t('store.noPrevious', { store: storeName() }));
       return go('ready');
     }
     await settle();
   };
 
   if (!me || isLoading) return null;
-  if (phase === 'done') return <Notice tone="success" text="تم تفعيل عضويتك السنوية. أهلًا بك في نادي المستثمرين." />;
-  if (phase === 'pending') return <Notice tone="warning" text="تم استلام اشتراكك من المتجر وسيتم تفعيل عضويتك خلال دقائق. سنرسل لك إشعارًا عند التفعيل." />;
-  if (!config || !apiKey) return active ? null : <Notice text={`الاشتراك من داخل التطبيق عبر ${storeName()} يتوفر قريبًا على هذا الجهاز.`} />;
-  if (!supported) return active ? null : <Notice tone="warning" text="هذه النسخة من التطبيق لا تدعم الشراء من المتجر بعد. حدّث التطبيق من المتجر ثم عد إلى هذه الشاشة." />;
+  if (phase === 'done') return <Notice tone="success" text={t('store.done')} />;
+  if (phase === 'pending') return <Notice tone="warning" text={t('store.pending')} />;
+  if (!config || !apiKey) return active ? null : <Notice text={t('store.comingSoon', { store: storeName() })} />;
+  if (!supported) return active ? null : <Notice tone="warning" text={t('store.unsupported')} />;
   if (active) {
-    return manageUrl ? <AppButton label={`إدارة الاشتراك من ${storeName()}`} variant="outline" icon="settings-outline" onPress={() => void openLink(manageUrl)} /> : null;
+    return manageUrl ? <AppButton label={t('store.manage', { store: storeName() })} variant="outline" icon="settings-outline" onPress={() => void openLink(manageUrl)} /> : null;
   }
 
   return (
@@ -145,34 +147,34 @@ export function StorePurchaseCard({ title }: { title: string }) {
         <Ionicons name="storefront-outline" size={22} color={colors.gold} />
         <Text style={styles.title}>{title}</Text>
       </View>
-      {phase === 'loading' ? <Progress text="جارٍ جلب سعر الاشتراك من المتجر…" /> : null}
-      {phase === 'busy' ? <Progress text={`جارٍ فتح ${storeName()}…`} /> : null}
-      {phase === 'activating' ? <Progress text="تم الشراء، جارٍ تفعيل عضويتك…" /> : null}
-      {phase === 'unavailable' ? <Text style={styles.muted}>الاشتراك غير متاح في المتجر حاليًا. حاول لاحقًا.</Text> : null}
+      {phase === 'loading' ? <Progress text={t('store.loadingPrice')} /> : null}
+      {phase === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
+      {phase === 'activating' ? <Progress text={t('store.activating')} /> : null}
+      {phase === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
       {phase === 'ready' && offer ? (
         <>
           <View style={styles.priceRow}>
             <Text style={styles.price}>{offer.product.priceString}</Text>
-            <Text style={styles.period}>{`سنويًا · عبر ${storeName()}`}</Text>
+            <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
           </View>
-          <AppButton label="اشترك الآن" icon="card-outline" onPress={() => void buy()} />
+          <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />
         </>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {phase === 'ready' || phase === 'unavailable' ? (
         <Pressable onPress={() => void restore()} accessibilityRole="button" style={styles.restore}>
           <Ionicons name="refresh-outline" size={16} color={colors.goldLight} />
-          <Text style={styles.restoreText}>استعادة المشتريات</Text>
+          <Text style={styles.restoreText}>{t('store.restore')}</Text>
         </Pressable>
       ) : null}
       <Text style={styles.legal}>
-        {`يتجدد الاشتراك تلقائيًا كل سنة بالسعر نفسه ما لم يُلغَ قبل نهاية المدة بـ24 ساعة على الأقل. الإلغاء والإدارة من إعدادات ${storeName()}. يُحصَّل المبلغ من حساب المتجر عند تأكيد الشراء.`}
+        {t('store.legal', { store: storeName() })}
       </Text>
-      {config.environment === 'test' ? <Text style={styles.legal}>بيئة اختبار: الشراء تجريبي ولا يُحصَّل أي مبلغ حقيقي.</Text> : null}
+      {config.environment === 'test' ? <Text style={styles.legal}>{t('store.testEnv')}</Text> : null}
       {config.termsUrl || config.privacyUrl ? (
         <View style={styles.links}>
-          {config.termsUrl ? <LinkText label="شروط الاستخدام" url={config.termsUrl} /> : null}
-          {config.privacyUrl ? <LinkText label="سياسة الخصوصية" url={config.privacyUrl} /> : null}
+          {config.termsUrl ? <LinkText label={t('store.terms')} url={config.termsUrl} /> : null}
+          {config.privacyUrl ? <LinkText label={t('store.privacy')} url={config.privacyUrl} /> : null}
         </View>
       ) : null}
     </View>
@@ -199,16 +201,16 @@ function LinkText({ label, url }: { label: string; url: string }) {
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { ...typography.subtitle, color: colors.textPrimary, flex: 1, textAlign: 'right' },
+  title: { ...typography.subtitle, color: colors.textPrimary, flex: 1, textAlign: textStart },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, justifyContent: 'flex-start' },
   price: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 32, color: colors.gold },
   period: { ...typography.caption, color: colors.textSecondary },
   progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  muted: { ...typography.body, color: colors.textSecondary, textAlign: 'right', flex: 1 },
-  error: { ...typography.caption, color: colors.danger, textAlign: 'right' },
+  muted: { ...typography.body, color: colors.textSecondary, textAlign: textStart, flex: 1 },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   restore: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', paddingVertical: spacing.xs },
   restoreText: { ...typography.caption, color: colors.goldLight },
-  legal: { ...typography.caption, color: colors.textMuted, textAlign: 'right' },
+  legal: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   links: { flexDirection: 'row', gap: spacing.md },
   link: { ...typography.caption, color: colors.goldLight, textDecorationLine: 'underline' },
 });
