@@ -4,6 +4,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import type { HubClient, HubContact, HubResponse } from '../hub/types.js';
+import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
@@ -70,6 +71,8 @@ export type RegisterInput = {
   persona: Persona;
   bio: string;
   jobTitle?: string;
+  /** M32: another member's membership number — resolved and stored by the hub, never by the client. */
+  inviteCode?: string;
 };
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
@@ -131,7 +134,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -153,6 +156,8 @@ export class AuthService {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
     }
+    // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
+    const referral = input.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(input.inviteCode) : '';
     const uuid = newUuid();
     const result = await this.deps.hub.call('register', {
       uuid,
@@ -166,7 +171,11 @@ export class AuthService {
       bio: input.bio,
       job_title: input.jobTitle ?? '',
       page_url: 'app://register',
+      ...(referral ? { referral } : {}),
     });
+    if (referral && this.deps.invites && result.contact) {
+      await this.deps.invites.recordFromRegister(result.contact, Number(result.referred_by ?? 0), String(result.referred_name ?? ''), referral);
+    }
     const email = result.contact?.email || input.email;
     const pendingToken = await this.deps.sessions.createPending(uuid, email);
     return { pending: true, pendingToken, email, mailSent: result.mail_sent === 1, text: result.text ?? '' };
@@ -182,6 +191,8 @@ export class AuthService {
     const pending = await this.requirePending(pendingToken);
     const result = await this.deps.hub.call('verify', { uuid: pending.uuid, code, ip, page_url: 'app://verify' });
     const contact = requireContact(result);
+    // M32: a confirmed e-mail makes the invitation real — recorded before the sign-in gate, and it never throws.
+    if (this.deps.invites) await this.deps.invites.onVerified(contact);
     await this.gate(pending.uuid, contact);
     await this.deps.sessions.deletePending(pendingToken);
     return this.signIn(pending.uuid, contact);

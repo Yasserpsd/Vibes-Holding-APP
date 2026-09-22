@@ -75,6 +75,25 @@ export type CardRequest = {
   doneBy: string | null;
 };
 
+/** M32: one invited registration — mirrors server/src/invites/service.ts. */
+export type InviteRecord = {
+  id: string;
+  inviteeId: number;
+  inviteeName: string;
+  inviteePhone: string;
+  inviteeEmail: string;
+  inviterId: number;
+  inviterName: string;
+  inviterNumber: string;
+  code: string;
+  createdAt: string;
+  verifiedAt: string | null;
+  activatedAt: string | null;
+  gift: { note: string; doneAt: string; doneBy: string } | null;
+};
+
+export type InvitesConfig = { giftText: string; shareText: string };
+
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
@@ -171,6 +190,9 @@ export const api = {
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),
+  invites: () => call<{ invites: InviteRecord[]; config: InvitesConfig }>('GET', '/api/admin/invites'),
+  inviteGift: (id: string, note: string) => call<{ invite: InviteRecord }>('POST', `/api/admin/invites/${id}/gift`, { note }),
+  invitesConfig: (input: Partial<InvitesConfig>) => call<{ config: InvitesConfig }>('POST', '/api/admin/invites/config', input),
   createPost: (input: PostInput) => call<{ post: Post }>('POST', '/api/admin/posts', input),
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),

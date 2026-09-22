@@ -1,0 +1,171 @@
+diff -ruN --strip-trailing-cr base/vibes-ai-assistant/includes/class-vai-hub.php plugin/vibes-ai-assistant/includes/class-vai-hub.php
+--- base/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-22 00:57:23.000000000 +0300
++++ plugin/vibes-ai-assistant/includes/class-vai-hub.php	2026-09-23 00:35:11.724306700 +0300
+@@ -13,7 +13,7 @@
+  */
+ class VAI_Hub {
+ 
+-	const DB_VERSION = '2.0.0';
++	const DB_VERSION = '2.1.0';
+ 
+ 	/** Source / reference of the next set_member() call (see member_context()). */
+ 	private static $member_ctx = null;
+@@ -134,11 +134,13 @@
+ 			pass_token VARCHAR(64) NOT NULL DEFAULT '',
+ 			pass_token_expires DATETIME NULL,
+ 			created_at DATETIME NULL,
++			referred_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ 			PRIMARY KEY  (id),
+ 			KEY phone_norm (phone_norm),
+ 			KEY email_norm (email_norm),
+ 			KEY last_at (last_at),
+-			KEY stage (stage)
++			KEY stage (stage),
++			KEY referred_by (referred_by)
+ 		) $c;";
+ 
+ 		$sql[] = 'CREATE TABLE ' . self::t( 'visitors' ) . " (
+@@ -2315,6 +2317,20 @@
+ 		if ( (int) vai_cfg( 'saudi_only' ) && strpos( $pn, '966' ) !== 0 ) {
+ 			return vai_error( 'saudi', 'نخدم داخل المملكة فقط — نحتاج رقم جوال سعودي (966)' );
+ 		}
++		// 2.7.2 (app M32): an invite code = another member's membership number. The hub itself resolves the
++		// digits and stores the inviter on the new contact — the app server passes the code through, never a verdict.
++		$referral = vai_str( $d, 'referral', 40 );
++		$ref_id   = 0;
++		$ref_name = '';
++		if ( $referral !== '' ) {
++			$rid = (int) preg_replace( '/\D+/', '', $referral );
++			$rc  = $rid > 0 ? self::contact( $rid ) : null;
++			if ( ! $rc || empty( $rc->pass_hash ) || ! (int) $rc->verified || ! self::member_active( $rc ) ) {
++				return vai_error( 'referral', 'كود الدعوة غير صحيح أو عضوية صاحبه غير سارية — راجعه مع من دعاك، أو امسحه وأكمل التسجيل' );
++			}
++			$ref_id   = (int) $rc->id;
++			$ref_name = (string) $rc->name;
++		}
+ 		if ( self::too_many_attempts( 'reg_' . ( isset( $d['ip'] ) ? $d['ip'] : '' ), 12 ) ) {
+ 			return vai_error( 'rate', 'محاولات كثيرة — حاول بعد قليل', 429 );
+ 		}
+@@ -2342,28 +2358,32 @@
+ 				self::attach_visitor( $site, isset( $d['uuid'] ) ? $d['uuid'] : '', $c );
+ 			}
+ 		}
+-		$wpdb->update(
+-			$ct,
+-			array(
+-				'name'       => $name,
+-				'phone'      => $phone,
+-				'phone_norm' => $pn,
+-				'email'      => $email,
+-				'email_norm' => $email,
+-				'job_title'  => $job,
+-				'persona'    => $persona,
+-				'bio'        => $bio,
+-				'pass_hash'  => wp_hash_password( $pass ),
+-				'verified'   => 0,
+-				'last_at'    => vai_now(),
+-			),
+-			array( 'id' => $c->id )
++		if ( $ref_id === (int) $c->id ) {
++			$ref_id   = 0;
++			$ref_name = '';
++		}
++		$fields = array(
++			'name'       => $name,
++			'phone'      => $phone,
++			'phone_norm' => $pn,
++			'email'      => $email,
++			'email_norm' => $email,
++			'job_title'  => $job,
++			'persona'    => $persona,
++			'bio'        => $bio,
++			'pass_hash'  => wp_hash_password( $pass ),
++			'verified'   => 0,
++			'last_at'    => vai_now(),
+ 		);
++		if ( $ref_id ) {
++			$fields['referred_by'] = $ref_id;
++		}
++		$wpdb->update( $ct, $fields, array( 'id' => $c->id ) );
+ 		$c    = self::contact( $c->id );
+ 		$sent = self::issue_verify_code( $c );
+ 		self::log_event_once( $c->id, 'registered', self::site_source( $site ), $site->host );
+-		self::insert_message( $c->id, $site->id, 'system', 'بدأ إنشاء حساب للاشتراك (بانتظار رمز التفعيل): ' . $c->name . ' / ' . $c->phone . ' / ' . $c->email . ( $job ? ' / ' . $job : '' ) . ( $sent ? '' : ' — فشل إرسال البريد!' ), null, vai_str( $d, 'page_url', 500 ) );
+-		return array( 'ok' => true, 'pending' => true, 'mail_sent' => $sent ? 1 : 0, 'contact' => self::public_contact( $c ), 'text' => $sent ? 'أرسلنا رمز التفعيل إلى ' . $email : 'تعذّر إرسال البريد الآن — اضغط «إعادة الإرسال» بعد لحظات أو تواصل مع الإدارة' );
++		self::insert_message( $c->id, $site->id, 'system', 'بدأ إنشاء حساب للاشتراك (بانتظار رمز التفعيل): ' . $c->name . ' / ' . $c->phone . ' / ' . $c->email . ( $job ? ' / ' . $job : '' ) . ( $ref_id ? ' — بدعوة من العضو #' . $ref_id . ' ' . $ref_name : '' ) . ( $sent ? '' : ' — فشل إرسال البريد!' ), null, vai_str( $d, 'page_url', 500 ) );
++		return array( 'ok' => true, 'pending' => true, 'mail_sent' => $sent ? 1 : 0, 'contact' => self::public_contact( $c ), 'referred_by' => $ref_id, 'referred_name' => $ref_name, 'text' => $sent ? 'أرسلنا رمز التفعيل إلى ' . $email : 'تعذّر إرسال البريد الآن — اضغط «إعادة الإرسال» بعد لحظات أو تواصل مع الإدارة' );
+ 	}
+ 
+ 	private static function op_resend_code( $site, $d ) {
+@@ -4336,6 +4356,7 @@
+ 			'intent'        => $score,
+ 			'intent_label'  => self::intent_label( $score ),
+ 			'has_password'  => ! empty( $c->pass_hash ) ? 1 : 0,
++			'referred_by'   => isset( $c->referred_by ) ? (int) $c->referred_by : 0,
+ 		);
+ 	}
+ 
+diff -ruN --strip-trailing-cr base/vibes-ai-assistant/readme.txt plugin/vibes-ai-assistant/readme.txt
+--- base/vibes-ai-assistant/readme.txt	2026-09-22 01:09:42.000000000 +0300
++++ plugin/vibes-ai-assistant/readme.txt	2026-09-23 00:35:48.947301500 +0300
+@@ -3,7 +3,7 @@
+ Requires at least: 6.0
+ Tested up to: 6.8
+ Requires PHP: 7.4
+-Stable tag: 2.7.1
++Stable tag: 2.7.2
+ 
+ مساعد منظومة ڤايبز الذكي: ويدجت محادثة يعمل على كل مواقع المنظومة (وضع «موقع تابع») + قاعدة بيانات وداشبورد مركزية (وضع «الهب») + ربط بعقل n8n (Vibes Web Agent).
+ 
+@@ -13,6 +13,11 @@
+ 3. أضف كل موقع من صفحة «المواقع» في الهب، وثبّت البلجن على ذلك الموقع بوضع «موقع تابع» مع مفتاحه.
+ 
+ == سجل التغييرات ==
++= 2.7.2 =
++* الدعوات (M32 في التطبيق): التسجيل يقبل حقل «referral» اختياريًا = رقم عضوية عضو داعٍ. الهب نفسه يتحقق (حساب موجود ومفعّل وعضويته سارية) ويخزّن الداعي على الحساب الجديد في عمود جديد referred_by، ويرجعه في رد التسجيل وفي صفوف admin_accounts/admin_member. كود غير صحيح يوقف التسجيل برسالة واضحة. تسجيل الموقع (الويدجت) بلا كود كما هو بلا أي تغيير.
++* رسالة النظام عند التسجيل تذكر «بدعوة من العضو #…» ليراها الأدمن في المحادثة.
++* قاعدة البيانات: عمود referred_by على جدول contacts (ترقية تلقائية عند التفعيل، dbDelta). المفاتيح ومسار Paymob ورابط الإشعار كما هي بلا تغيير. يُرفع فوق 2.7.1 مباشرة.
++
+ = 2.7.1 =
+ * فئات النادي بترتيب واحد في كل مكان: «محايد — أستكشف توجهي» ثم «رائد أعمال — لدي مشروع» ثم «مستثمر — أبحث عن فرص» (نموذج التسجيل، رسائل الخطأ، صفحات الأدمن، بريد إشعار التسجيل، توجيه المستشار).
+ * الكلمة صارت «فئة» («فئتك في النادي») بدل «صفة» في نموذج التسجيل ورسائل الخطأ وبريد الإشعار وتوجيه المستشار؛ وحقل «الوظيفة أو المنصب».
+diff -ruN --strip-trailing-cr base/vibes-ai-assistant/vibes-ai-assistant.php plugin/vibes-ai-assistant/vibes-ai-assistant.php
+--- base/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-22 01:09:42.000000000 +0300
++++ plugin/vibes-ai-assistant/vibes-ai-assistant.php	2026-09-23 00:35:34.259652200 +0300
+@@ -2,8 +2,8 @@
+ /**
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+- * Description: مساعد منظومة ڤايبز الذكي — ويدجت محادثة يعمل على كل مواقع المنظومة (وضع «موقع تابع») + قاعدة بيانات وداشبورد مركزية (وضع «الهب») + ربط بعقل n8n.
+- * Version:     2.7.1
++ * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
++ * Version:     2.7.2
+  * Author:      Vibes Holding
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.7.1' );
++define( 'VAI_VERSION', '2.7.2' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );
+@@ -55,14 +55,14 @@
+ 	vai_ensure_roles();
+ }
+ 
+-/** Capability vai_dashboard: admins + the «مشرف Vibes AI» role (dashboard + replies only). */
++/** Capability vai_dashboard: admins + the Â«Ù…Ø´Ø±Ù Vibes AIÂ» role (dashboard + replies only). */
+ function vai_ensure_roles() {
+ 	$admin = get_role( 'administrator' );
+ 	if ( $admin && ! $admin->has_cap( 'vai_dashboard' ) ) {
+ 		$admin->add_cap( 'vai_dashboard' );
+ 	}
+ 	if ( ! get_role( 'vai_agent' ) ) {
+-		add_role( 'vai_agent', 'مشرف Vibes AI', array( 'read' => true, 'vai_dashboard' => true ) );
++		add_role( 'vai_agent', 'Ù…Ø´Ø±Ù Vibes AI', array( 'read' => true, 'vai_dashboard' => true ) );
+ 	}
+ 	update_option( 'vai_roles_v', '1', false );
+ }

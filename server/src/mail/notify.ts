@@ -162,6 +162,22 @@ export class Notifier {
     ]);
   }
 
+  /** M32: an invited registration confirmed its e-mail — the administration prepares the gift by hand. */
+  inviteVerified(invite: { id: string; inviteeName: string; inviteePhone: string; inviteeEmail: string; inviterName: string; inviterNumber: string }): void {
+    this.dispatch(`تسجيل جديد بدعوة عضو: ${invite.inviteeName}`, [
+      `سجّل عضو جديد في ${APP_NAME} بكود دعوة أحد الأعضاء وفعّل بريده، والهدية عليه من الإدارة (تحددونها وتسلّمونها بأنفسكم).`,
+      '',
+      `العضو الجديد: ${invite.inviteeName || '—'}`,
+      `جواله: ${invite.inviteePhone || '—'}`,
+      `بريده: ${invite.inviteeEmail || '—'}`,
+      '',
+      `الداعي: ${invite.inviterName || '—'}`,
+      `رقم عضوية الداعي: ${invite.inviterNumber}`,
+      '',
+      'القائمة الكاملة في لوحة الإدارة: قسم «الدعوات». عند تسليم الهدية اضغط «تم تسليم الهدية» واكتب ما سلّمتموه.',
+    ]);
+  }
+
   /** M30: a member asked for his membership card printed and delivered (his own choice, no charge). */
   cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string }): void {
     this.dispatch(`طلب طباعة كارت العضوية: ${request.name}`, [

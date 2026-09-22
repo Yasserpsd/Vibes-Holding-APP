@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type CardRequest } from '../api';
+import { api, type CardRequest, type InviteRecord, type InvitesConfig } from '../api';
 import { formatDateTime, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { AuditEntry, Lead, MailItem, Ticket } from '../types';
 import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, messageOf, Pill, SearchBox, SectionHead, sessionOver, useDebounced, useLoad, useShell, type Tone } from '../ui';
@@ -92,6 +92,120 @@ export function CardRequests() {
               },
             ]}
           />
+        )}
+      </Async>
+    </>
+  );
+}
+
+/** The invitee's road so far, at a glance. */
+function inviteProgress(row: InviteRecord): { label: string; tone: Tone } {
+  if (row.activatedAt) return { label: 'عضو بعضوية مفعّلة', tone: 'ok' };
+  if (row.verifiedAt) return { label: 'فعّل بريده', tone: 'gold' };
+  return { label: 'سجّل، بانتظار تفعيل البريد', tone: 'muted' };
+}
+
+/** M32: who registered through whose invite code, and the administration's manual gift per invitee. */
+export function Invites() {
+  const { signOut, notify } = useShell();
+  const state = useLoad(() => api.invites(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [config, setConfig] = useState<InvitesConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setConfig(state.data?.config ?? null), [state.data]);
+  const waiting = state.data?.invites.filter((row) => row.verifiedAt && !row.gift).length ?? 0;
+
+  async function saveConfig() {
+    if (!config || saving) return;
+    setSaving(true);
+    try {
+      await api.invitesConfig(config);
+      notify('ok', 'حُفظت النصوص.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function markGift(row: InviteRecord) {
+    const note = window.prompt(`ما الهدية التي سلّمتها الإدارة للعضو «${row.inviteeName}»؟ (كود خصم، كتاب…)`)?.trim();
+    if (!note) return;
+    setBusyId(row.id);
+    try {
+      await api.inviteGift(row.id, note);
+      notify('ok', 'سُجّل تسليم الهدية.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      <SectionHead title="الدعوات" hint={state.data ? `هدايا بانتظار التسليم: ${formatNumber(waiting)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <p className="muted">
+        كل صف هنا تسجيل تحقق منه النظام: كود الدعوة سافر مع التسجيل وخزّنه الهب على الحساب الجديد. العضو الداعي يرشّح فقط؛ الهدية للعضو الجديد
+        تحددها وتسلّمها الإدارة بنفسها (كود خصم، كتاب المؤسس…)، ثم تُسجَّل هنا بزر «تم تسليم الهدية».
+      </p>
+      <Async state={state} rows={5}>
+        {(data) => (
+          <div className="stack">
+            {config ? (
+              <form className="card editor" onSubmit={(event) => { event.preventDefault(); void saveConfig(); }}>
+                <label>
+                  نص الدعوة الذي يشاركه العضو ({'{code}'} يصير رقم عضويته)
+                  <textarea rows={3} maxLength={700} value={config.shareText} onChange={(event) => setConfig({ ...config, shareText: event.target.value })} />
+                </label>
+                <label>
+                  نص الهدية الظاهر في شاشة الدعوات
+                  <textarea rows={2} maxLength={500} value={config.giftText} onChange={(event) => setConfig({ ...config, giftText: event.target.value })} />
+                </label>
+                <div>
+                  <button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ النصوص'}</button>
+                </div>
+              </form>
+            ) : null}
+            {data.invites.length === 0 ? (
+              <p className="state-card empty">لم يسجّل أحد بكود دعوة بعد.</p>
+            ) : (
+              <DataTable<InviteRecord>
+                caption="الدعوات"
+                rows={data.invites}
+                rowKey={(row) => row.id}
+                columns={[
+                  { key: 'who', label: 'العضو الجديد', cell: (row) => <MemberLink id={row.inviteeId} name={row.inviteeName || row.inviteeEmail} /> },
+                  { key: 'phone', label: 'جواله', cell: (row) => (row.inviteePhone ? <bdi dir="ltr" className="num">{row.inviteePhone}</bdi> : '—') },
+                  {
+                    key: 'from',
+                    label: 'بدعوة من',
+                    cell: (row) => (
+                      <>
+                        <MemberLink id={row.inviterId} name={row.inviterName || `حساب رقم ${row.inviterId}`} /> <bdi dir="ltr" className="num">{row.inviterNumber}</bdi>
+                      </>
+                    ),
+                  },
+                  { key: 'state', label: 'وصل إلى', cell: (row) => { const progress = inviteProgress(row); return <Pill tone={progress.tone}>{progress.label}</Pill>; } },
+                  { key: 'at', label: 'سجّل', cell: (row) => formatDateTime(row.createdAt) },
+                  {
+                    key: 'gift',
+                    label: 'الهدية',
+                    cell: (row) =>
+                      row.gift ? (
+                        <Pill tone="ok">{`سُلّمت: ${row.gift.note}`}</Pill>
+                      ) : (
+                        <button type="button" disabled={busyId === row.id} onClick={() => void markGift(row)}>تم تسليم الهدية</button>
+                      ),
+                  },
+                ]}
+              />
+            )}
+          </div>
         )}
       </Async>
     </>

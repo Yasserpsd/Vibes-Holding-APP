@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { AUDIT_KEY, type AuditEntry } from './dashboard/service.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
+import { MOCK_HUB_VERSION } from './hub/mockAdmin.js';
 import { HubError, type HubBody, type HubClient, type HubOp, type HubResponse } from './hub/types.js';
 import { MOCK_PB_VERSION, OffPbBridge } from './projectsBank/bridge.js';
 import { MemoryKV } from './store.js';
@@ -143,7 +144,7 @@ test('home: hub stats with a zero-filled daily series, app payments, store, push
   assert.deepEqual(Object.keys(home.app.store.series[0]), ['day', 'purchases', 'renewals']);
   assert.equal(home.app.push.devices, 0);
   assert.equal(typeof home.pb.unlocksToday, 'number');
-  assert.deepEqual(home.bridge, { hub: { version: '2.7.0-mock', ok: true }, pb: { version: MOCK_PB_VERSION, ok: true } });
+  assert.deepEqual(home.bridge, { hub: { version: MOCK_HUB_VERSION, ok: true }, pb: { version: MOCK_PB_VERSION, ok: true } });
   assert.deepEqual(home.errors, {});
   assert.equal((await get('/api/admin/home?days=3', adminToken)).statusCode, 400);
 
@@ -152,7 +153,7 @@ test('home: hub stats with a zero-filled daily series, app payments, store, push
   await get('/api/admin/home?days=14', adminToken);
   assert.equal(hub.count('admin_stats'), before);
   const health = (await app.inject({ method: 'GET', url: '/health' })).json();
-  assert.equal(health.bridge.hub.version, '2.7.0-mock');
+  assert.equal(health.bridge.hub.version, MOCK_HUB_VERSION);
   assert.equal(health.bridge.pbMode, 'mock');
 });
 

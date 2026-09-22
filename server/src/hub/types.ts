@@ -99,6 +99,9 @@ export type HubResponse = {
   pending?: boolean;
   already?: boolean;
   mail_sent?: 0 | 1;
+  /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
+  referred_by?: number;
+  referred_name?: string;
   sent?: boolean;
   text?: string;
   contact?: HubContact | null;
@@ -149,6 +152,8 @@ export type HubAccount = {
   intent: number;
   intent_label: string;
   has_password: 0 | 1;
+  /** Plugin 2.7.2 (M32): the contact whose invite code this account registered with; 0 or absent = none. */
+  referred_by?: number;
 };
 
 export type HubPayment = {

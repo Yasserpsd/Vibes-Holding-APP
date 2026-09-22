@@ -21,7 +21,7 @@ import {
  * events and conversations the way plugin 2.7.0 computes them from its tables. The mock's site is trusted;
  * `admin_*` still needs the uuid of a verified admin account and `publish` an admin or a publisher.
  */
-export const MOCK_HUB_VERSION = '2.7.0-mock';
+export const MOCK_HUB_VERSION = '2.7.2-mock';
 const MOCK_DAILY_LIMIT = 20;
 const LEAD_WEIGHTS: Record<string, number> = { payment: 4, partner: 3, membership: 3, service: 2, cooperation: 2, owner: 1, management: 1 };
 
@@ -137,6 +137,7 @@ export class MockAdmin {
       daily_left: view.daily_left,
       ...this.intent(contact, state, rows.length),
       has_password: contact.passHash ? 1 : 0,
+      referred_by: contact.referredBy,
     };
   }
 

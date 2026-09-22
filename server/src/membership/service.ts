@@ -5,6 +5,7 @@ import { RequestError } from '../auth/guard.js';
 import type { AuthService, Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
+import type { InvitesService } from '../invites/service.js';
 import type { ActivationLike, Notifier } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
@@ -113,6 +114,8 @@ type Deps = {
   appEnv: 'test' | 'production';
   store: StoreSettings;
   fetchImpl?: typeof fetch;
+  /** M32: marks the invitee «فعّل العضوية» on the invitations list. */
+  invites?: InvitesService;
 };
 
 export class MembershipService {
@@ -338,6 +341,7 @@ export class MembershipService {
       this.deps.auth.forget(contactId);
       this.deps.notifier.membershipActivated(mail);
       this.deps.push.membershipActivated(contactId, { expiresAt: event.expiresAt, pending: false });
+      if (this.deps.invites) await this.deps.invites.onActivated(contactId);
       return { ...event, activation: 'activated', reason: null };
     } catch (error) {
       const reason = error instanceof HubError ? `${error.code}: ${error.message}` : error instanceof Error ? error.message : 'hub error';

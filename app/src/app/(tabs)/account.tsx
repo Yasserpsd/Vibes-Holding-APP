@@ -92,6 +92,7 @@ export default function AccountScreen() {
       <View style={styles.menu}>
         <MenuRow icon="ribbon-outline" label={t('account.menu.membership')} onPress={() => router.push('/membership')} />
         <MenuRow icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} />
+        <MenuRow icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} />
         <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
         <MenuRow icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
         <MenuRow icon="receipt-outline" label={t('account.menu.payments')} onPress={() => router.push('/payments')} />

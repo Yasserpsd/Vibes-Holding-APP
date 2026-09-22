@@ -26,11 +26,13 @@ type Form = {
   persona: Persona | '';
   bio: string;
   jobTitle: string;
+  /** M32: another member's membership number; checked and stored by the server side. */
+  inviteCode: string;
   /** News interests (optional): saved with the account right after the code is verified. */
   interests: string[];
 };
 
-const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', interests: [] };
+const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [] };
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -72,6 +74,7 @@ export default function RegisterScreen() {
         persona: form.persona,
         bio: form.bio.trim(),
         jobTitle: form.jobTitle.trim() || undefined,
+        inviteCode: form.inviteCode.trim() || undefined,
       });
       router.push({
         pathname: '/auth/verify',
@@ -168,6 +171,16 @@ export default function RegisterScreen() {
       </View>
       <FormField label={t('auth.register.bio')} multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder={t('auth.register.bioPlaceholder')} />
       <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+      <FormField
+        label={t('auth.register.inviteCode')}
+        latin
+        autoCapitalize="characters"
+        autoCorrect={false}
+        value={form.inviteCode}
+        onChangeText={set('inviteCode')}
+        hint={t('auth.register.inviteCodeHint')}
+        placeholder="I-0000000000"
+      />
       {topics.data && topics.data.topics.length > 0 ? (
         <View style={styles.group}>
           <Text style={styles.label}>{t('auth.register.interests')}</Text>

@@ -25,6 +25,7 @@ const registerSchema = z.object({
   persona: personaSchema,
   bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
   jobTitle: z.string().trim().max(150).optional(),
+  inviteCode: z.string().trim().max(30).optional(),
 });
 const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });

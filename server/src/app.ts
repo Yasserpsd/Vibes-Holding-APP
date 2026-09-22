@@ -12,6 +12,8 @@ import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
 import { cardRoutes } from './card/routes.js';
 import { CardService } from './card/service.js';
+import { invitesRoutes } from './invites/routes.js';
+import { InvitesService } from './invites/service.js';
 import { contentRoutes } from './content/routes.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
@@ -171,8 +173,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       : new LogMailer(app.log));
   // Dashboard sign-in code (M18). On the mock hub without SMTP the code is the mock's public test code.
   const otp = new AdminOtpStore(kv, config.ADMIN_OTP_SECONDS, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail });
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
+  // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
+  const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
+  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites });
   // Member push notifications (Expo push service); tokens come from the app after login.
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
@@ -233,6 +237,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const membership = new MembershipService({
     kv,
     log: app.log,
+    invites,
     hub: hubClient,
     auth,
     notifier,
@@ -307,6 +312,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });
+  await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });

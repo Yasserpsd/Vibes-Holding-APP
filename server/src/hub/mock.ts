@@ -165,6 +165,18 @@ export class MockHubClient implements HubClient {
     return contact;
   }
 
+  /** M32, as plugin 2.7.2 resolves `referral`: digits → an existing, verified, active member — or the registration is refused. */
+  private resolveReferral(body: HubBody): MockContact | null {
+    const referral = str(body, 'referral', 40);
+    if (!referral) return null;
+    const id = Number.parseInt(referral.replace(/\D+/g, ''), 10);
+    const contact = id > 0 ? this.contacts.get(id) : undefined;
+    if (!contact || !contact.passHash || !contact.verified || this.publicContact(contact).is_member !== 1) {
+      throw new HubError('referral', 'كود الدعوة غير صحيح أو عضوية صاحبه غير سارية — راجعه مع من دعاك، أو امسحه وأكمل التسجيل', 400);
+    }
+    return contact;
+  }
+
   private register(body: HubBody): HubResponse {
     const name = str(body, 'name', 120);
     const country = str(body, 'country', 5).toLowerCase() || 'sa';
@@ -180,6 +192,7 @@ export class MockHubClient implements HubClient {
     if (!email) throw new HubError('invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل', 400);
     if (!emailAllowed(email)) throw new HubError('email_domain', `${EMAIL_POLICY_TEXT} — هذا البريد غير مقبول`, 400);
     if (password.length < 6) throw new HubError('invalid', 'كلمة المرور 6 أحرف على الأقل', 400);
+    const referrer = this.resolveReferral(body);
     const uuid = this.uuid(body);
     const existing = [...this.contacts.values()].find(
       (contact) => contact.passHash && (contact.email === email || contact.phoneNorm === phoneNorm),
@@ -199,9 +212,18 @@ export class MockHubClient implements HubClient {
       passHash: hash(password),
       verified: false,
     });
+    if (referrer && referrer.id !== contact.id) contact.referredBy = referrer.id;
     if (!existing) this.admin.event(contact.id, 'registered');
     this.visitors.set(uuid, contact.id);
-    return { ok: true, pending: true, mail_sent: 1, contact: this.publicContact(contact), text: `أرسلنا رمز التفعيل إلى ${email}` };
+    return {
+      ok: true,
+      pending: true,
+      mail_sent: 1,
+      contact: this.publicContact(contact),
+      referred_by: contact.referredBy,
+      referred_name: contact.referredBy ? (this.contacts.get(contact.referredBy)?.name ?? '') : '',
+      text: `أرسلنا رمز التفعيل إلى ${email}`,
+    };
   }
 
   private resendCode(body: HubBody): HubResponse {

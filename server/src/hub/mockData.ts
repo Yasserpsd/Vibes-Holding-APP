@@ -39,6 +39,8 @@ export type MockContact = {
   site: string;
   memo: string;
   notes: string;
+  /** M32: the contact whose invite code this account registered with (0 = none), as the plugin stores it. */
+  referredBy: number;
 };
 
 export type MockEvent = { id: number; contactId: number; kind: HubEventKind; days: number; source: string; ref: string; actorId: number; note: string; at: number };
@@ -109,6 +111,7 @@ export function blankContact(id: number, now: number): MockContact {
     site: 'app',
     memo: '',
     notes: '',
+    referredBy: 0,
   };
 }
 
