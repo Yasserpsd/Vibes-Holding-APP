@@ -4,8 +4,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
 import { RateLimiter } from '../auth/rateLimit.js';
+import type { AppLang } from '../lang.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { KV } from '../store.js';
+import { STAGE_EN, localizeProject } from './lang.js';
 import { hasContact, mentionsFunding, stripContacts, stripFunding } from './redact.js';
 import { STAGES, STEPS, stepOf } from './stage.js';
 import { makeExcerpt, normalizeForSearch } from './text.js';
@@ -17,6 +19,8 @@ import type { PublicProject } from './types.js';
  * competitors are deterministic; with an OpenAI key the model only words the summary, the extra rows, the strengths, the
  * risks and the «why» of each competitor, and its answer is dropped when it breaks a rule (invented numbers, promised
  * returns, contact data). Cached in kv by content hash; without a key, or when the call fails, the rules write it.
+ * The English app (M27) gets its brief in English: the same choices, the founder's English text where he wrote one,
+ * the rules' sentences and the model's wording in English, cached apart from the Arabic brief.
  */
 export type BriefRow = { label: string; value: string };
 /** `estimated`: the site's own wording does not place the project («أخرى», empty), so the step is the adviser's reading of the description. */
@@ -36,7 +40,9 @@ export type ProjectBrief = {
 
 /** The brief's disclaimer (docs/PROJECT_BRIEF.md, golden portal) after the «ملخص آلي» note of M13. */
 export const BRIEF_DISCLAIMER = 'ملخص آلي من بيانات المشروع المنشورة في بنك المشاريع. المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.';
-export const briefKey = (id: number): string => `projects:brief:${id}`;
+export const BRIEF_DISCLAIMER_EN = "An automatic summary from the project's published data in the Projects Bank. This information is descriptive and is neither a contractual offer nor a guarantee of returns.";
+/** The Arabic brief keeps its key of M13; the English one sits beside it. */
+export const briefKey = (id: number, lang: AppLang = 'ar'): string => (lang === 'en' ? `projects:brief:${id}:en` : `projects:brief:${id}`);
 
 const VERSION = 4;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -45,12 +51,89 @@ const RETRY_MS = 6 * 3_600_000;
 const MAX_COMPETITORS = 4;
 const AI_PER_HOUR = 90;
 
+/** Every sentence the rules write, per language; the model gets the matching language line of its prompt. */
+type BriefText = {
+  unknownStage: string;
+  disclaimer: string;
+  labels: { number: string; company: string; sector: string; stage: string; kind: string; deck: string; updated: string };
+  kind: { golden: string; bank: string };
+  deck: { members: string; none: string };
+  summaryFallback: (title: string, sector: string | null) => string;
+  strengths: { detailed: string; deck: string; golden: string; pastLaunch: string; fallback: string };
+  risks: { unreviewed: string; noStage: string; early: string; short: string; crowded: string; noDeck: string };
+  why: { sameSector: (sector: string) => string; sameStage: string; nearStage: string; overlap: string; join: string };
+  dateLocale: string;
+  language: string[];
+};
+
+const TEXT: Record<AppLang, BriefText> = {
+  ar: {
+    unknownStage: 'غير محددة',
+    disclaimer: BRIEF_DISCLAIMER,
+    labels: { number: 'رقم المشروع', company: 'الشركة', sector: 'القطاع', stage: 'المرحلة', kind: 'النوع', deck: 'ملف العرض', updated: 'آخر تحديث' },
+    kind: { golden: 'مشروع ذهبي (علامة V)', bank: 'مشروع في بنك المشاريع' },
+    deck: { members: 'متاح للأعضاء بعد فتح المشروع', none: 'غير مرفق' },
+    summaryFallback: (title, sector) => `${title}${sector ? `: مشروع في قطاع ${sector}` : ''}.`,
+    strengths: {
+      detailed: 'وصف تفصيلي يشرح فكرة المشروع ونموذج عمله',
+      deck: 'ملف عرض (Pitch Deck) متاح للأعضاء بعد فتح المشروع',
+      golden: 'مشروع ذهبي يحمل علامة V من شركات المنظومة',
+      pastLaunch: 'تجاوز مرحلة الإطلاق بحسب بيانات صاحبه',
+      fallback: 'بياناته منشورة في بنك المشاريع ويمكن سؤال المستشار عن تفاصيلها',
+    },
+    risks: {
+      unreviewed: 'المعلومات مقدمة من صاحب المشروع ولم تُراجَع بشكل مستقل',
+      noStage: 'مرحلة المشروع غير محددة في بياناته',
+      early: 'المشروع في مرحلة مبكرة ولم يثبت نموذجه في السوق بعد',
+      short: 'الوصف المنشور مختصر؛ اطلب تفاصيل أوفى قبل أي قرار',
+      crowded: 'أكثر من مشروع مشابه في القطاع نفسه داخل بنك المشاريع',
+      noDeck: 'لا يوجد ملف عرض مرفق',
+    },
+    why: { sameSector: (sector) => `يعمل في القطاع نفسه (${sector})`, sameStage: 'في المرحلة نفسها', nearStage: 'في مرحلة قريبة', overlap: 'يتقاطع وصفه مع وصف هذا المشروع', join: ' و' },
+    dateLocale: 'ar-SA-u-ca-gregory-nu-latn',
+    language: [
+      'Write Modern Standard Arabic, polished and concise, no emojis, no exclamation marks.',
+      'Vocabulary: «بدون رسوم» never «مجاني»; «رصيد» never «كريديت»; «الشراكات» never «الصفقات» (company names stay as written). Numeric ranges in words (من … إلى …), never a hyphen between two numbers.',
+    ],
+  },
+  en: {
+    unknownStage: 'Not specified',
+    disclaimer: BRIEF_DISCLAIMER_EN,
+    labels: { number: 'Project number', company: 'Company', sector: 'Sector', stage: 'Stage', kind: 'Type', deck: 'Pitch deck', updated: 'Last update' },
+    kind: { golden: 'Golden project (V mark)', bank: 'Project in the Projects Bank' },
+    deck: { members: 'Available to members after unlocking the project', none: 'Not attached' },
+    summaryFallback: (title, sector) => `${title}${sector ? `: a project in the ${sector} sector` : ''}.`,
+    strengths: {
+      detailed: 'A detailed description explains the project idea and its business model',
+      deck: 'A pitch deck is available to members once the project is unlocked',
+      golden: "A golden project carrying the V mark of the group's companies",
+      pastLaunch: "Past the launch stage according to its owner's data",
+      fallback: 'Its data is published in the Projects Bank and the adviser can be asked about the details',
+    },
+    risks: {
+      unreviewed: 'The information is provided by the project owner and has not been independently reviewed',
+      noStage: 'The project stage is not stated in its data',
+      early: 'The project is at an early stage and its model is not yet proven in the market',
+      short: 'The published description is brief; ask for fuller details before any decision',
+      crowded: 'More than one similar project in the same sector inside the Projects Bank',
+      noDeck: 'No pitch deck attached',
+    },
+    why: { sameSector: (sector) => `works in the same sector (${sector})`, sameStage: 'is at the same stage', nearStage: 'is at a nearby stage', overlap: "its description overlaps with this project's", join: ' and ' },
+    dateLocale: 'en-GB',
+    language: [
+      'Write polished, concise English, no emojis, no exclamation marks. Write the table labels in English too.',
+      'Vocabulary: "at no charge" never "free"; "balance" never "credit"; "partnerships" never "deals" (company names stay as written). Numeric ranges in words (from … to …), never a hyphen between two numbers.',
+    ],
+  },
+};
 
 /** Wording rules of the app applied to text we author (CLAUDE.md): «بدون رسوم», and an en dash between two numbers. */
-function fixWording(value: string): string {
-  return value
-    .replace(/مجان(?:ًا|اً|ا|ية|ي)?/g, 'بدون رسوم')
-    .replace(/كريديت/g, 'رصيد')
+function fixWording(value: string, lang: AppLang = 'ar'): string {
+  const text =
+    lang === 'en'
+      ? value.replace(/\bfree\b/gi, 'at no charge')
+      : value.replace(/مجان(?:ًا|اً|ا|ية|ي)?/g, 'بدون رسوم').replace(/كريديت/g, 'رصيد');
+  return text
     .replace(/([\d٠-٩%])\s*-\s*([\d٠-٩])/g, '$1–$2')
     .replace(/\s+/g, ' ')
     .trim();
@@ -74,12 +157,15 @@ function publicProse(details: string | null): string {
     .trim();
 }
 
-export function stageOf(project: Pick<PublicProject, 'stage'>): BriefStage {
+const stepsOf = (lang: AppLang): string[] => (lang === 'en' ? STAGES.map((stage) => STAGE_EN[stage.key]) : STEPS);
+
+export function stageOf(project: Pick<PublicProject, 'stage'>, lang: AppLang = 'ar'): BriefStage {
   // The mapper already placed the project on the five steps (`placeStage`); a snapshot stored before that still carries the site's wording.
   const bySlug = STAGES.findIndex((stage) => stage.key === project.stage?.slug);
   const index = bySlug >= 0 ? bySlug : stepOf(project.stage?.name);
   const hit = STAGES[index];
-  return { key: hit?.key ?? 'unknown', label: hit?.label ?? 'غير محددة', index, total: STAGES.length, steps: STEPS, estimated: Boolean(hit && project.stage?.estimated) };
+  const label = hit ? (lang === 'en' ? STAGE_EN[hit.key] : hit.label) : TEXT[lang].unknownStage;
+  return { key: hit?.key ?? 'unknown', label, index, total: STAGES.length, steps: stepsOf(lang), estimated: Boolean(hit && project.stage?.estimated) };
 }
 
 const STOP = new Set(['من', 'في', 'على', 'الى', 'عن', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'او', 'ان', 'كل', 'بين', 'حيث', 'كما', 'ذلك', 'مشروع', 'المشروع', 'شركه', 'الشركه', 'the', 'and', 'for', 'with']);
@@ -90,7 +176,7 @@ function tokens(project: PublicProject): Set<string> {
 
 type Ranked = { project: PublicProject; sameSector: boolean; gap: number | null; overlap: number };
 
-/** Same sector first, then the closest stage, then shared wording. No model is asked. */
+/** Same sector first, then the closest stage, then shared wording. No model is asked. Always on the Arabic data, so both languages name the same projects. */
 export function pickCompetitors(project: PublicProject, all: PublicProject[], max = MAX_COMPETITORS): Ranked[] {
   const own = tokens(project);
   const ownStage = stageOf(project).index;
@@ -114,13 +200,16 @@ export function pickCompetitors(project: PublicProject, all: PublicProject[], ma
   return ranked.sort((a, b) => score(b) - score(a) || a.project.id - b.project.id).slice(0, max);
 }
 
-function ruleWhy(row: Ranked): string {
+function ruleWhy(row: Ranked, lang: AppLang): string {
+  const text = TEXT[lang];
+  const shown = localizeProject(row.project, lang);
   const parts: string[] = [];
-  if (row.sameSector && row.project.sector) parts.push(`يعمل في القطاع نفسه (${row.project.sector.name})`);
-  if (row.gap === 0) parts.push('في المرحلة نفسها');
-  else if (row.gap === 1) parts.push('في مرحلة قريبة');
-  if (!row.sameSector || row.overlap >= 0.4) parts.push('يتقاطع وصفه مع وصف هذا المشروع');
-  return `${parts.join(' و')}.`;
+  if (row.sameSector && shown.sector) parts.push(text.why.sameSector(shown.sector.name));
+  if (row.gap === 0) parts.push(text.why.sameStage);
+  else if (row.gap === 1) parts.push(text.why.nearStage);
+  if (!row.sameSector || row.overlap >= 0.4) parts.push(text.why.overlap);
+  const sentence = `${parts.join(text.why.join)}.`;
+  return lang === 'en' ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : sentence;
 }
 
 /** Digit runs of a text (Arabic-Indic folded, separators dropped): what the model may quote, nothing else. */
@@ -129,29 +218,31 @@ function numbersOf(value: string): Set<string> {
   return new Set((western.match(/\d[\d,٬.]*\d|\d/g) ?? []).map((run) => run.replace(/[,٬.]/g, '')).filter((run) => run.length >= 2));
 }
 
-const dayFormat = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'long', timeZone: 'Asia/Riyadh' });
+const dayFormats: Partial<Record<AppLang, Intl.DateTimeFormat>> = {};
+const dayFormat = (lang: AppLang): Intl.DateTimeFormat => (dayFormats[lang] ??= new Intl.DateTimeFormat(TEXT[lang].dateLocale, { dateStyle: 'long', timeZone: 'Asia/Riyadh' }));
 
-function factRows(project: PublicProject): BriefRow[] {
+function factRows(project: PublicProject, lang: AppLang): BriefRow[] {
+  const text = TEXT[lang];
   const rows: [string, string | null][] = [
-    ['رقم المشروع', project.number],
-    ['الشركة', project.companyName],
-    ['القطاع', project.sector?.name ?? null],
-    ['المرحلة', project.stage?.name ?? null],
-    ['النوع', project.isGolden ? 'مشروع ذهبي (علامة V)' : 'مشروع في بنك المشاريع'],
-    ['ملف العرض', project.hasPitchDeck && !project.isGolden ? 'متاح للأعضاء بعد فتح المشروع' : 'غير مرفق'],
-    ['آخر تحديث', project.modifiedAt ? dayFormat.format(new Date(project.modifiedAt)) : null],
+    [text.labels.number, project.number],
+    [text.labels.company, project.companyName],
+    [text.labels.sector, project.sector?.name ?? null],
+    [text.labels.stage, project.stage?.name ?? null],
+    [text.labels.kind, project.isGolden ? text.kind.golden : text.kind.bank],
+    [text.labels.deck, project.hasPitchDeck && !project.isGolden ? text.deck.members : text.deck.none],
+    [text.labels.updated, project.modifiedAt ? dayFormat(lang).format(new Date(project.modifiedAt)) : null],
   ];
-  return rows.filter((row): row is [string, string] => Boolean(row[1])).map(([label, value]) => ({ label, value: fixWording(stripContacts(value)) })).filter((row) => row.value);
+  return rows.filter((row): row is [string, string] => Boolean(row[1])).map(([label, value]) => ({ label, value: fixWording(stripContacts(value), lang) })).filter((row) => row.value);
 }
 
 /** «label: value» lines the founder wrote, minus anything about returns or contact. */
-function writtenRows(details: string, taken: Set<string>): BriefRow[] {
+function writtenRows(details: string, taken: Set<string>, lang: AppLang): BriefRow[] {
   const rows: BriefRow[] = [];
   for (const line of details.split('\n')) {
     const match = /^[\s•\-–*]*([^:：\n]{2,40})[:：]\s*(.{2,160})$/.exec(line.trim());
     if (!match) continue;
-    const label = fixWording(match[1] ?? '');
-    const value = fixWording(match[2] ?? '');
+    const label = fixWording(match[1] ?? '', lang);
+    const value = fixWording(match[2] ?? '', lang);
     if (!label || !value || taken.has(label) || RETURNS.test(label + value) || PROMISE.test(value) || CONTACT_LABEL.test(label) || ASK_LABEL.test(label) || mentionsFunding(value)) continue;
     taken.add(label);
     rows.push({ label, value });
@@ -160,45 +251,50 @@ function writtenRows(details: string, taken: Set<string>): BriefRow[] {
   return rows;
 }
 
-function rulesBrief(project: PublicProject, details: string, picks: Ranked[], now: number): ProjectBrief {
-  const stage = stageOf(project);
-  const facts = factRows(project);
-  const summary = fixWording(publicProse(project.excerpt) || makeExcerpt(details, 320)) || `${project.title}${project.sector ? `: مشروع في قطاع ${project.sector.name}` : ''}.`;
+/** `project` is already in the brief's language (`localizeProject`); `picks` were chosen on the Arabic data. */
+function rulesBrief(project: PublicProject, details: string, picks: Ranked[], now: number, lang: AppLang): ProjectBrief {
+  const text = TEXT[lang];
+  const stage = stageOf(project, lang);
+  const facts = factRows(project, lang);
+  const summary = fixWording(publicProse(project.excerpt) || makeExcerpt(details, 320), lang) || text.summaryFallback(project.title, project.sector?.name ?? null);
   const strengths = [
-    details.length >= 400 ? 'وصف تفصيلي يشرح فكرة المشروع ونموذج عمله' : null,
-    project.hasPitchDeck && !project.isGolden ? 'ملف عرض (Pitch Deck) متاح للأعضاء بعد فتح المشروع' : null,
-    project.isGolden ? 'مشروع ذهبي يحمل علامة V من شركات المنظومة' : null,
-    stage.index >= 3 ? 'تجاوز مرحلة الإطلاق بحسب بيانات صاحبه' : null,
+    details.length >= 400 ? text.strengths.detailed : null,
+    project.hasPitchDeck && !project.isGolden ? text.strengths.deck : null,
+    project.isGolden ? text.strengths.golden : null,
+    stage.index >= 3 ? text.strengths.pastLaunch : null,
   ].filter((line): line is string => line !== null);
   const risks = [
-    'المعلومات مقدمة من صاحب المشروع ولم تُراجَع بشكل مستقل',
-    stage.index < 0 ? 'مرحلة المشروع غير محددة في بياناته' : stage.index <= 1 ? 'المشروع في مرحلة مبكرة ولم يثبت نموذجه في السوق بعد' : null,
-    details.length < 200 ? 'الوصف المنشور مختصر؛ اطلب تفاصيل أوفى قبل أي قرار' : null,
-    picks.filter((row) => row.sameSector).length >= 3 ? 'أكثر من مشروع مشابه في القطاع نفسه داخل بنك المشاريع' : null,
-    project.hasPitchDeck ? null : 'لا يوجد ملف عرض مرفق',
+    text.risks.unreviewed,
+    stage.index < 0 ? text.risks.noStage : stage.index <= 1 ? text.risks.early : null,
+    details.length < 200 ? text.risks.short : null,
+    picks.filter((row) => row.sameSector).length >= 3 ? text.risks.crowded : null,
+    project.hasPitchDeck ? null : text.risks.noDeck,
   ].filter((line): line is string => line !== null);
   return {
     summary,
-    table: [...facts, ...writtenRows(details, new Set(facts.map((row) => row.label)))],
+    table: [...facts, ...writtenRows(details, new Set(facts.map((row) => row.label)), lang)],
     stage,
-    strengths: strengths.length ? strengths : ['بياناته منشورة في بنك المشاريع ويمكن سؤال المستشار عن تفاصيلها'],
+    strengths: strengths.length ? strengths : [text.strengths.fallback],
     risks,
-    competitors: picks.map((row) => ({ id: row.project.id, title: row.project.title, sector: row.project.sector?.name ?? null, stage: row.project.stage?.name ?? null, why: ruleWhy(row) })),
-    disclaimer: BRIEF_DISCLAIMER,
+    competitors: picks.map((row) => {
+      const shown = localizeProject(row.project, lang);
+      return { id: shown.id, title: shown.title, sector: shown.sector?.name ?? null, stage: shown.stage?.name ?? null, why: ruleWhy(row, lang) };
+    }),
+    disclaimer: text.disclaimer,
     generatedAt: new Date(now).toISOString(),
     source: 'rules',
   };
 }
 
-const SYSTEM_PROMPT = [
-  'You are «المستشار», the adviser of نادي المستثمرين (a Saudi business club). You turn ONE project of the club\'s Projects Bank into a short brief for a member.',
-  'Use ONLY the project data you are given. Never invent a number, a name, a market size, a customer or a date; quote numbers exactly as written or leave them out.',
-  'Never promise or estimate returns or profits, never call anything guaranteed or safe, never advise to invest. No contact data of any kind (phones, e-mails, links, handles).',
-  'Describe what the project IS. Never say what it asks for: no funding sought, no investment amount, no capital, no valuation, no equity or share on offer, no founder name.',
-  'Write Modern Standard Arabic, polished and concise, no emojis, no exclamation marks.',
-  'Vocabulary: «بدون رسوم» never «مجاني»; «رصيد» never «كريديت»; «الشراكات» never «الصفقات» (company names stay as written). Numeric ranges in words (من … إلى …), never a hyphen between two numbers.',
-  'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
-].join('\n');
+const systemPrompt = (lang: AppLang): string =>
+  [
+    'You are «المستشار», the adviser of نادي المستثمرين (a Saudi business club). You turn ONE project of the club\'s Projects Bank into a short brief for a member.',
+    'Use ONLY the project data you are given. Never invent a number, a name, a market size, a customer or a date; quote numbers exactly as written or leave them out.',
+    'Never promise or estimate returns or profits, never call anything guaranteed or safe, never advise to invest. No contact data of any kind (phones, e-mails, links, handles).',
+    'Describe what the project IS. Never say what it asks for: no funding sought, no investment amount, no capital, no valuation, no equity or share on offer, no founder name.',
+    ...TEXT[lang].language,
+    'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
+  ].join('\n');
 
 const RESPONSE_FORMAT = {
   type: 'json_schema',
@@ -237,7 +333,7 @@ type Stored = { hash: string; brief: ProjectBrief; retryAt?: number };
 type Deps = { kv: KV; log: FastifyBaseLogger; apiKey?: string; model: string; fetchImpl?: FetchImpl };
 
 export class BriefService {
-  private readonly inflight = new Map<number, Promise<ProjectBrief>>();
+  private readonly inflight = new Map<string, Promise<ProjectBrief>>();
   private readonly limiter = new RateLimiter();
 
   constructor(private readonly deps: Deps) {}
@@ -246,41 +342,47 @@ export class BriefService {
     return this.deps.apiKey ? 'openai' : 'rules';
   }
 
-  brief(project: PublicProject, all: PublicProject[], now = Date.now()): Promise<ProjectBrief> {
-    const running = this.inflight.get(project.id);
+  /** `project` and `all` are the Arabic data of the feed; `lang` is the language the brief is written in. */
+  brief(project: PublicProject, all: PublicProject[], now = Date.now(), lang: AppLang = 'ar'): Promise<ProjectBrief> {
+    const key = `${project.id}:${lang}`;
+    const running = this.inflight.get(key);
     if (running) return running;
-    const run = this.build(project, all, now).finally(() => this.inflight.delete(project.id));
-    this.inflight.set(project.id, run);
+    const run = this.build(project, all, now, lang).finally(() => this.inflight.delete(key));
+    this.inflight.set(key, run);
     return run;
   }
 
-  private async build(project: PublicProject, all: PublicProject[], now: number): Promise<ProjectBrief> {
-    const details = publicProse(project.details);
+  private async build(project: PublicProject, all: PublicProject[], now: number, lang: AppLang): Promise<ProjectBrief> {
+    const shown = localizeProject(project, lang);
+    const details = publicProse(shown.details);
     const picks = pickCompetitors(project, all);
-    const content = [VERSION, this.mode, project.number, project.title, project.companyName, project.founderName, project.sector?.name, project.stage?.name, project.excerpt, details, project.isGolden, project.hasPitchDeck, picks.map((row) => [row.project.id, row.project.title])];
+    const content = [VERSION, lang, this.mode, shown.number, shown.title, shown.companyName, shown.founderName, shown.sector?.name, shown.stage?.name, shown.excerpt, details, shown.isGolden, shown.hasPitchDeck, picks.map((row) => [row.project.id, localizeProject(row.project, lang).title])];
     const hash = createHash('sha256').update(JSON.stringify(content)).digest('hex');
-    const stored = await this.deps.kv.get<Stored>(briefKey(project.id));
+    const stored = await this.deps.kv.get<Stored>(briefKey(project.id, lang));
     if (stored?.hash === hash && (stored.brief.source === 'ai' || this.mode === 'rules' || now < (stored.retryAt ?? 0))) return stored.brief;
 
-    const rules = rulesBrief(project, details, picks, now);
+    const rules = rulesBrief(shown, details, picks, now, lang);
     let brief = rules;
     if (this.deps.apiKey && this.limiter.hit('brief', AI_PER_HOUR, 3_600_000)) {
       try {
-        brief = await this.worded(project, details, picks, rules);
+        brief = await this.worded(shown, details, picks, rules, lang);
       } catch (error) {
-        this.deps.log.warn({ project: project.id, reason: error instanceof Error ? error.message : 'unknown' }, 'AI project brief failed, the rules wrote it');
+        this.deps.log.warn({ project: project.id, lang, reason: error instanceof Error ? error.message : 'unknown' }, 'AI project brief failed, the rules wrote it');
       }
     }
     // A failed call is tried again later; the rules' answer serves meanwhile.
-    await this.deps.kv.set(briefKey(project.id), { hash, brief, ...(brief.source === 'rules' && this.mode === 'openai' ? { retryAt: now + RETRY_MS } : {}) } satisfies Stored);
+    await this.deps.kv.set(briefKey(project.id, lang), { hash, brief, ...(brief.source === 'rules' && this.mode === 'openai' ? { retryAt: now + RETRY_MS } : {}) } satisfies Stored);
     return brief;
   }
 
-  private async worded(project: PublicProject, details: string, picks: Ranked[], rules: ProjectBrief): Promise<ProjectBrief> {
+  private async worded(project: PublicProject, details: string, picks: Ranked[], rules: ProjectBrief, lang: AppLang): Promise<ProjectBrief> {
     const fetchImpl = this.deps.fetchImpl ?? fetch;
     const payload = {
       project: { title: project.title, company: project.companyName, sector: project.sector?.name ?? null, stage: project.stage?.name ?? null, golden: project.isGolden, description: details.slice(0, 5000) },
-      competitors: picks.map((row) => ({ id: row.project.id, title: row.project.title, sector: row.project.sector?.name ?? null, stage: row.project.stage?.name ?? null, description: publicProse(row.project.excerpt ?? makeExcerpt(row.project.details ?? '', 300)).slice(0, 400) })),
+      competitors: picks.map((row) => {
+        const shown = localizeProject(row.project, lang);
+        return { id: shown.id, title: shown.title, sector: shown.sector?.name ?? null, stage: shown.stage?.name ?? null, description: publicProse(shown.excerpt ?? makeExcerpt(shown.details ?? '', 300)).slice(0, 400) };
+      }),
     };
     const response = await fetchImpl(ENDPOINT, {
       method: 'POST',
@@ -290,7 +392,7 @@ export class BriefService {
         temperature: 0.3,
         response_format: RESPONSE_FORMAT,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt(lang) },
           { role: 'user', content: JSON.stringify(payload) },
         ],
       }),
@@ -304,24 +406,24 @@ export class BriefService {
 
     const allowed = numbersOf(JSON.stringify(payload));
     const sound = (value: string): boolean => !PROMISE.test(value) && !hasContact(value) && !mentionsFunding(value) && [...numbersOf(value)].every((run) => allowed.has(run));
-    const summary = fixWording(answer.summary);
+    const summary = fixWording(answer.summary, lang);
     if (!sound(summary) || YIELD.test(summary)) throw new Error('the summary breaks a wording rule');
-    const facts = factRows(project);
+    const facts = factRows(project, lang);
     const taken = new Set(facts.map((row) => row.label));
     const extra = answer.table
-      .map((row) => ({ label: fixWording(row.label), value: fixWording(row.value) }))
+      .map((row) => ({ label: fixWording(row.label, lang), value: fixWording(row.value, lang) }))
       .filter((row) => sound(row.value) && sound(row.label) && !RETURNS.test(row.label + row.value) && !CONTACT_LABEL.test(row.label) && !ASK_LABEL.test(row.label) && !taken.has(row.label))
       .slice(0, 8);
     const lines = (items: string[], fallback: string[]): string[] => {
-      const kept = items.map(fixWording).filter((item) => sound(item) && !YIELD.test(item)).slice(0, 4);
+      const kept = items.map((item) => fixWording(item, lang)).filter((item) => sound(item) && !YIELD.test(item)).slice(0, 4);
       return kept.length ? kept : fallback;
     };
-    const whys = new Map(answer.competitors.map((row) => [row.id, fixWording(row.why)]));
+    const whys = new Map(answer.competitors.map((row) => [row.id, fixWording(row.why, lang)]));
     // The site's own stage wins. Only a project it does not place («أخرى», empty) takes the adviser's reading, marked as such.
     const guess = rules.stage.index < 0 ? STAGES.findIndex((stage) => stage.key === answer.stageKey) : -1;
     const guessed = guess >= 0 ? STAGES[guess] : undefined;
-    const stage: BriefStage = guessed ? { ...rules.stage, key: guessed.key, label: guessed.label, index: guess, estimated: true } : rules.stage;
-    this.deps.log.info({ project: project.id, usage: body.usage }, 'project brief worded by OpenAI');
+    const stage: BriefStage = guessed ? { ...rules.stage, key: guessed.key, label: lang === 'en' ? STAGE_EN[guessed.key] : guessed.label, index: guess, estimated: true } : rules.stage;
+    this.deps.log.info({ project: project.id, lang, usage: body.usage }, 'project brief worded by OpenAI');
     return {
       ...rules,
       stage,

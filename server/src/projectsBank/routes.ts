@@ -4,8 +4,10 @@ import { z } from 'zod';
 import { guard, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import type { ProjectAccessService } from './access.js';
 import type { BriefService } from './brief.js';
+import { localizeFilters, localizePage, localizeProject } from './lang.js';
 import type { ProjectsService } from './service.js';
 import { PROJECT_SORTS } from './types.js';
 
@@ -30,20 +32,21 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
   const requireSession = sessionGuard(auth);
   const limiter = new RateLimiter();
 
+  // The English app (M27) reads the founders' English fields and the terms' English names (projectsBank/lang.ts).
   app.get('/api/projects', async (request, reply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) return badRequest(reply, 'معاملات البحث غير صالحة');
-    return service.list(query.data);
+    return localizePage(service.list(query.data), langOf(request));
   });
 
-  app.get('/api/projects/filters', async () => service.filters());
+  app.get('/api/projects/filters', async (request) => localizeFilters(service.filters(), langOf(request)));
 
   app.get('/api/projects/:id', async (request, reply) => {
     const params = idParamSchema.safeParse(request.params);
     if (!params.success) return badRequest(reply, 'رقم المشروع غير صالح');
     const project = service.get(params.data.id);
     if (!project) return reply.code(404).send({ error: { code: 'not_found', message: 'المشروع غير موجود' } });
-    return { project };
+    return { project: localizeProject(project, langOf(request)) };
   });
 
   // «ملخص المستشار»: public like the project itself (built from the same public fields), cached per content.
@@ -57,7 +60,7 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
       if (!limiter.hit(`brief:${request.ip}`, 120, 15 * 60_000)) {
         return reply.code(429).send({ error: { code: 'rate', message: 'طلبات كثيرة في وقت قصير، حاول بعد قليل' } });
       }
-      return brief.brief(project, service.all());
+      return brief.brief(project, service.all(), Date.now(), langOf(request));
     }),
   );
 
