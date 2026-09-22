@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { VIDEOS_EN } from './en/videos.js';
 
 /** Video library page copy plus the curated picks shown first. Editable server content. */
 export type FeaturedVideo = { id: string; label: string };
@@ -42,6 +45,7 @@ export async function ensureVideosSeed(kv: KV, options: { force?: boolean } = {}
   return true;
 }
 
-export async function getVideosContent(kv: KV): Promise<VideosContent> {
-  return (await kv.get<VideosContent>(VIDEOS_CONTENT_KEY)) ?? VIDEOS_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getVideosContent(kv: KV, lang: AppLang = 'ar'): Promise<VideosContent> {
+  return localizeBlock(kv, 'videos', (await kv.get<VideosContent>(VIDEOS_CONTENT_KEY)) ?? VIDEOS_SEED, VIDEOS_EN, lang);
 }

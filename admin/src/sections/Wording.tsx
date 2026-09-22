@@ -2,17 +2,18 @@ import { useMemo, useState } from 'react';
 
 import { api } from '../api';
 import { formatDateTime } from '../format';
-import type { WordingItem, WordingLang } from '../types';
+import type { WordingItem, WordingLang, WordingList } from '../types';
 import { Async, Chips, Pill, SearchBox, SectionHead, messageOf, sessionOver, useLoad, useShell, type ChipOption } from '../ui';
 
 const LANGS: ChipOption<WordingLang>[] = [
   { value: 'ar', label: 'النسخة العربية' },
   { value: 'en', label: 'النسخة الإنجليزية' },
 ];
-const MAX = 800;
 
 const shownText = (item: WordingItem, lang: WordingLang) => (lang === 'ar' ? (item.arEdit?.value ?? item.ar) : (item.enEdit?.value ?? item.en));
 const folded = (text: string) => text.toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا');
+
+export type WordingSave = (input: { lang: WordingLang; key: string; value: string | null }) => Promise<unknown>;
 
 /**
  * «نصوص التطبيق»: every text of the app as the member reads it, screen by screen, in both versions. The owner changes
@@ -20,8 +21,15 @@ const folded = (text: string) => text.toLowerCase().replace(/[ً-ْـ]/g, '').re
  * and the save refuses an empty text or wording the club does not use.
  */
 export function Wording() {
+  return <WordingEditor title="نصوص التطبيق" hint="غيّر صياغة أي نص يراه العضو في التطبيق، بالعربية أو بالإنجليزية. يظهر التعديل في التطبيق خلال ثوانٍ." groupLabel="الشاشة" allLabel="كل الشاشات" maxLength={800} load={api.strings} save={api.saveString} />;
+}
+
+type EditorProps = { title: string; hint: string; groupLabel: string; allLabel: string; maxLength: number; load: () => Promise<WordingList>; save: WordingSave };
+
+/** The list, the chips and the inline edit, shared by «نصوص التطبيق» and «محتوى التطبيق» (sections/Content.tsx). */
+export function WordingEditor({ title, hint, groupLabel, allLabel, maxLength, load, save }: EditorProps) {
   const shell = useShell();
-  const state = useLoad(() => api.strings(), []);
+  const state = useLoad(load, [load]);
   const [lang, setLang] = useState<WordingLang>('ar');
   const [group, setGroup] = useState('all');
   const [search, setSearch] = useState('');
@@ -30,8 +38,8 @@ export function Wording() {
 
   const data = state.data;
   const groups: ChipOption<string>[] = useMemo(
-    () => [{ value: 'all', label: 'كل الشاشات', count: data?.items.length ?? null }, ...(data?.groups ?? []).map((entry) => ({ value: entry.key, label: entry.label, count: entry.count }))],
-    [data],
+    () => [{ value: 'all', label: allLabel, count: data?.items.length ?? null }, ...(data?.groups ?? []).map((entry) => ({ value: entry.key, label: entry.label, count: entry.count }))],
+    [allLabel, data],
   );
   const rows = useMemo(() => {
     const needle = folded(search.trim());
@@ -44,12 +52,12 @@ export function Wording() {
 
   return (
     <>
-      <SectionHead title="نصوص التطبيق" hint="غيّر صياغة أي نص يراه العضو في التطبيق، بالعربية أو بالإنجليزية. يظهر التعديل في التطبيق خلال ثوانٍ." onReload={state.reload} busy={state.loading} />
+      <SectionHead title={title} hint={hint} onReload={state.reload} busy={state.loading} />
       <Async state={state} rows={8}>
         {(loaded) => (
           <div className="stack">
             <Chips label="النسخة" options={LANGS.map((option) => ({ ...option, count: loaded.edited[option.value] }))} value={lang} onChange={setLang} />
-            <Chips label="الشاشة" options={groups} value={group} onChange={setGroup} />
+            <Chips label={groupLabel} options={groups} value={group} onChange={setGroup} />
             <div className="row">
               <SearchBox value={search} onChange={setSearch} placeholder="ابحث عن كلمة كما تظهر في التطبيق" />
               <label className="check">
@@ -64,8 +72,10 @@ export function Wording() {
                   key={`${item.key}:${lang}`}
                   item={item}
                   lang={lang}
+                  maxLength={maxLength}
                   open={open === item.key}
                   onToggle={() => setOpen(open === item.key ? null : item.key)}
+                  save={(value) => save({ lang, key: item.key, value })}
                   onSaved={(text) => {
                     shell.notify('ok', text);
                     setOpen(null);
@@ -82,9 +92,18 @@ export function Wording() {
   );
 }
 
-type RowProps = { item: WordingItem; lang: WordingLang; open: boolean; onToggle: () => void; onSaved: (text: string) => void; onFailed: (failure: unknown) => void };
+type RowProps = {
+  item: WordingItem;
+  lang: WordingLang;
+  maxLength: number;
+  open: boolean;
+  onToggle: () => void;
+  save: (value: string | null) => Promise<unknown>;
+  onSaved: (text: string) => void;
+  onFailed: (failure: unknown) => void;
+};
 
-function WordingRow({ item, lang, open, onToggle, onSaved, onFailed }: RowProps) {
+function WordingRow({ item, lang, maxLength, open, onToggle, save, onSaved, onFailed }: RowProps) {
   const edit = lang === 'ar' ? item.arEdit : item.enEdit;
   const own = lang === 'ar' ? item.ar : item.en;
   const other = shownText(item, lang === 'ar' ? 'en' : 'ar');
@@ -95,10 +114,9 @@ function WordingRow({ item, lang, open, onToggle, onSaved, onFailed }: RowProps)
   const problem = !text ? 'النص لا يُترك فارغًا: غيّر الصياغة فقط.' : lost.length > 0 ? `أبقِ ${lost.join(' و ')} كما هي: التطبيق يضع مكانها قيمة.` : null;
   const unchanged = text === (edit?.value ?? own);
 
-  const save = (value: string | null) => {
+  const submit = (value: string | null) => {
     setBusy(true);
-    api
-      .saveString({ lang, key: item.key, value })
+    save(value)
       .then(() => onSaved(value === null ? 'رجع النص إلى صياغته الأصلية.' : 'حُفظت الصياغة الجديدة، وتظهر في التطبيق خلال ثوانٍ.'))
       .catch(onFailed)
       .finally(() => setBusy(false));
@@ -117,12 +135,12 @@ function WordingRow({ item, lang, open, onToggle, onSaved, onFailed }: RowProps)
           className="wording-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!problem && !unchanged && !busy) save(text);
+            if (!problem && !unchanged && !busy) submit(text);
           }}
         >
           <label>
             الصياغة في {lang === 'ar' ? 'النسخة العربية' : 'النسخة الإنجليزية'}
-            <textarea value={draft} dir={lang === 'en' ? 'ltr' : 'rtl'} rows={Math.min(8, Math.max(2, Math.ceil(draft.length / 60)))} maxLength={MAX} onChange={(event) => setDraft(event.target.value)} />
+            <textarea value={draft} dir={lang === 'en' ? 'ltr' : 'rtl'} rows={Math.min(12, Math.max(2, Math.ceil(draft.length / 60)))} maxLength={maxLength} onChange={(event) => setDraft(event.target.value)} />
           </label>
           {problem ? <p className="error">{problem}</p> : null}
           {item.placeholders.length > 0 ? <p className="muted">ما بين القوسين {item.placeholders.map((name) => <bdi key={name} dir="ltr">{name} </bdi>)}يضع التطبيق مكانه قيمة (رقم أو اسم): أبقه كما هو.</p> : null}
@@ -139,7 +157,7 @@ function WordingRow({ item, lang, open, onToggle, onSaved, onFailed }: RowProps)
               {busy ? 'جارٍ الحفظ…' : 'حفظ الصياغة'}
             </button>
             {edit ? (
-              <button type="button" disabled={busy} onClick={() => save(null)}>
+              <button type="button" disabled={busy} onClick={() => submit(null)}>
                 رجوع للنص الأصلي
               </button>
             ) : null}

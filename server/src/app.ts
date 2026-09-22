@@ -294,7 +294,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   }));
 
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
-  await app.register(contentRoutes, { kv, auth, notifier });
+  await app.register(contentRoutes, { kv, auth, notifier, sync });
   await app.register(appStringsRoutes, { kv, auth, sync });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
   await app.register(advisorRoutes, { service: advisor, auth });

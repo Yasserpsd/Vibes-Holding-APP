@@ -1,4 +1,4 @@
-import type { AccountFilter, AccountsResult, AppPayment, AuditEntry, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
+import type { AccountFilter, AccountsResult, AppPayment, AuditEntry, ContentList, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://vibes-holding-app-production.up.railway.app';
@@ -160,6 +160,9 @@ export const api = {
   setRole: (id: number, input: { role: 'member' | 'publisher' } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/role`, { ...input, confirm: true }),
   pbGrant: (id: number, input: { amount: number } & WriteMeta) => call<{ ok: true; already: boolean; granted: number; left: number }>('POST', `/api/admin/accounts/${id}/pb-grant`, { ...input, confirm: true }),
   audit: (limit = 100) => call<{ entries: AuditEntry[] }>('GET', `/api/admin/audit${query({ limit })}`),
+  content: () => call<ContentList>('GET', '/api/admin/content'),
+  /** `value: null` goes back to the block's own text. */
+  saveContent: (input: { lang: WordingLang; block: string; path: string; value: string | null }) => call<{ ok: true; edit: WordingEdit | null }>('PUT', '/api/admin/content', input),
   strings: () => call<WordingList>('GET', '/api/admin/strings'),
   /** `value: null` goes back to the app's own text. */
   saveString: (input: { lang: WordingLang; key: string; value: string | null }) => call<{ ok: true; edit: WordingEdit | null }>('PUT', '/api/admin/strings', input),

@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { HQ_EN } from './en/hq.js';
 
 /** HQ page and booking rules. Editable server content (hours and capacity are the dashboard's to change). */
 export type HqContent = {
@@ -56,6 +59,7 @@ export async function ensureHqSeed(kv: KV, options: { force?: boolean } = {}): P
   return true;
 }
 
-export async function getHqContent(kv: KV): Promise<HqContent> {
-  return (await kv.get<HqContent>(HQ_CONTENT_KEY)) ?? HQ_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getHqContent(kv: KV, lang: AppLang = 'ar'): Promise<HqContent> {
+  return localizeBlock(kv, 'hq', (await kv.get<HqContent>(HQ_CONTENT_KEY)) ?? HQ_SEED, HQ_EN, lang);
 }

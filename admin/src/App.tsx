@@ -9,6 +9,7 @@ import { MemberSheet } from './sections/MemberSheet';
 import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
 import { Threads } from './sections/Threads';
+import { Content } from './sections/Content';
 import { Wording } from './sections/Wording';
 import type { AccountFilter } from './types';
 import { Boundary, Broken, Icon, ShellContext, Sheet, type IconName, type SectionKey, type Shell } from './ui';
@@ -24,6 +25,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'audit', label: 'سجل الإجراءات', icon: 'audit' },
   { key: 'posts', label: 'المنشورات', icon: 'posts' },
   { key: 'wording', label: 'نصوص التطبيق', icon: 'wording' },
+  { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
 ];
 /** A phone's bar holds four sections and «المزيد»; a desk's rail lists them all. */
 const BAR: SectionKey[] = ['home', 'members', 'payments', 'threads'];
@@ -238,6 +240,7 @@ export function App() {
             {section === 'audit' ? <Audit /> : null}
             {section === 'posts' ? <Posts onEditing={onEditing} /> : null}
             {section === 'wording' ? <Wording /> : null}
+            {section === 'content' ? <Content /> : null}
           </Boundary>
         </main>
 

@@ -9,13 +9,13 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { Notice } from '@/components/Notice';
-import { t } from '@/i18n';
+import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatNumber } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 import { Composer } from './Composer';
-import { CONTEXT_ICONS, toApiContext, type ChatContext, type ChatOpening } from './context';
+import { CONTEXT_ICONS, toApiContext, welcomeStarters, type ChatContext, type ChatOpening } from './context';
 import { MessageBubble } from './MessageBubble';
 import { useAdvisorChat } from './useAdvisorChat';
 
@@ -97,7 +97,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
           <Ionicons name="sparkles" size={22} color={colors.black} />
         </View>
         <View style={styles.headerText}>
-          <Text style={styles.title}>{chat.profile?.botName ?? t('advisor.title')}</Text>
+          <Text style={styles.title}>{botNameOf(chat.profile)}</Text>
           <Text style={styles.subtitle}>{chat.human ? t('advisor.staffFollowing') : t('advisor.oneConversation')}</Text>
         </View>
         {dailyLeft !== null ? (
@@ -142,8 +142,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
             ListHeaderComponent={<Welcome profile={chat.profile} empty={chat.messages.length === 0 && !showOpening} onSuggestion={(text) => void submit(text)} />}
             ListFooterComponent={
               <>
-                {showOpening && opening ? <OpeningCard opening={opening} botName={chat.profile?.botName ?? t('advisor.title')} onReply={(text) => void submit(text)} /> : null}
-                {chat.waiting ? <Typing name={chat.profile?.botName ?? t('advisor.title')} /> : null}
+                {showOpening && opening ? <OpeningCard opening={opening} botName={botNameOf(chat.profile)} onReply={(text) => void submit(text)} /> : null}
+                {chat.waiting ? <Typing name={botNameOf(chat.profile)} /> : null}
               </>
             }
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
@@ -172,14 +172,29 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   );
 }
 
+/** The hub writes the bot's name in Arabic: the English version shows the app's own. */
+export const botNameOf = (profile: AdvisorProfile | null): string => hubText(profile?.botName, 'advisor.title');
+
+const GATE_KEYS: Record<AdvisorGate['type'] | 'expired', StringKey> = {
+  membership: 'advisor.gate.membership',
+  expired: 'advisor.gate.expired',
+  daily: 'advisor.gate.daily',
+  rate: 'advisor.gate.rate',
+  site_cap: 'advisor.gate.site_cap',
+  contact: 'advisor.gate.contact',
+  other: 'advisor.gate.other',
+};
+
+/** The hub's welcome and quick menu are Arabic (the owner's own wording): the English version uses the app's strings. */
 function Welcome({ profile, empty, onSuggestion }: { profile: AdvisorProfile | null; empty: boolean; onSuggestion: (text: string) => void }) {
   if (!empty || !profile) return null;
+  const suggestions = getLang() === 'ar' ? profile.suggestions : welcomeStarters();
   return (
     <View style={styles.welcome}>
-      <Text style={styles.welcomeText}>{profile.welcome}</Text>
-      {profile.suggestions.length ? (
+      <Text style={styles.welcomeText}>{hubText(profile.welcome, 'advisor.welcome')}</Text>
+      {suggestions.length ? (
         <View style={styles.suggestions}>
-          {profile.suggestions.map((suggestion) => (
+          {suggestions.map((suggestion) => (
             <Chip key={suggestion} label={suggestion} onPress={() => onSuggestion(suggestion)} />
           ))}
         </View>
@@ -221,7 +236,7 @@ function GateNotice({ gate, onDismiss, onMembership }: { gate: AdvisorGate; onDi
     <View style={styles.gate}>
       <View style={styles.gateRow}>
         <Ionicons name={gate.membership ? 'lock-closed-outline' : 'time-outline'} size={20} color={colors.goldLight} />
-        <Text style={styles.gateText}>{gate.text}</Text>
+        <Text style={styles.gateText}>{hubText(gate.text, GATE_KEYS[gate.expired ? 'expired' : gate.type])}</Text>
         <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </Pressable>

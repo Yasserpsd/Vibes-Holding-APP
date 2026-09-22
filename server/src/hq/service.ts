@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { getHqContent, type HqContent } from '../content/hq.js';
+import type { AppLang } from '../lang.js';
 import type { Notifier, VisitLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
 import type { KV } from '../store.js';
@@ -145,8 +146,9 @@ export class HqService {
 
   constructor(private readonly deps: Deps) {}
 
-  content(): Promise<HqContent> {
-    return getHqContent(this.deps.kv);
+  /** The HQ block; the booking rules are the same in both languages, so the logic reads the Arabic one. */
+  content(lang: AppLang = 'ar'): Promise<HqContent> {
+    return getHqContent(this.deps.kv, lang);
   }
 
   private async load(): Promise<Visit[]> {
@@ -215,8 +217,8 @@ export class HqService {
     return me.membership.status === 'expired' ? 'expired' : 'locked';
   }
 
-  async overview(me: Me | null, now = Date.now()): Promise<HqOverview> {
-    const content = await this.content();
+  async overview(me: Me | null, now = Date.now(), lang: AppLang = 'ar'): Promise<HqOverview> {
+    const content = await this.content(lang);
     const { version: _version, slotCapacity: _capacity, ...visible } = content;
     const access = HqService.accessOf(me);
     return {

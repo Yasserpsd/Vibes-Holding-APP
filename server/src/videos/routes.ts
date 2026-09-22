@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { guard, parse } from '../auth/guard.js';
+import { langOf } from '../lang.js';
 import type { VideosService } from './service.js';
 
 export type VideosRoutesOptions = { service: VideosService };
@@ -19,7 +20,7 @@ export const videosRoutes: FastifyPluginAsync<VideosRoutesOptions> = async (app,
     guard(async (request, reply) => {
       const query = parse(listSchema, request.query, reply);
       if (!query) return;
-      return service.list(query);
+      return service.list(query, langOf(request));
     }),
   );
 
@@ -28,7 +29,7 @@ export const videosRoutes: FastifyPluginAsync<VideosRoutesOptions> = async (app,
     guard(async (request, reply) => {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      const video = await service.get(params.id);
+      const video = await service.get(params.id, langOf(request));
       if (!video) return reply.code(404).send({ error: { code: 'not_found', message: 'الفيديو غير موجود' } });
       return { video };
     }),

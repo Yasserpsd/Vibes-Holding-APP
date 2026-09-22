@@ -1,4 +1,7 @@
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { HOME_EN } from './en/home.js';
 
 /**
  * Home screen content: the three portals, the golden and membership blocks and the advisor
@@ -116,6 +119,7 @@ export async function ensureHomeSeed(kv: KV, options: { force?: boolean } = {}):
   return true;
 }
 
-export async function getHomeContent(kv: KV): Promise<HomeContent> {
-  return (await kv.get<HomeContent>(HOME_CONTENT_KEY)) ?? HOME_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getHomeContent(kv: KV, lang: AppLang = 'ar'): Promise<HomeContent> {
+  return localizeBlock(kv, 'home', (await kv.get<HomeContent>(HOME_CONTENT_KEY)) ?? HOME_SEED, HOME_EN, lang);
 }

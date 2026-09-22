@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { guard, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import type { AdvisorService } from './service.js';
 
 export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService };
@@ -50,7 +51,7 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       }
       const body = parse(messageSchema, request.body, reply);
       if (!body) return;
-      return service.send(current.session, body.text, body.context ?? null, request.ip);
+      return service.send(current.session, body.text, body.context ?? null, request.ip, langOf(request));
     }),
   );
 

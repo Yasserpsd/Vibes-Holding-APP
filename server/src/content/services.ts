@@ -1,5 +1,8 @@
 import type { Me } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
+import { localizeBlock } from './edits.js';
+import { SERVICES_EN } from './en/services.js';
 
 /**
  * Services catalogue. Every service is server content (the dashboard edits it later).
@@ -328,8 +331,9 @@ export async function ensureServicesSeed(kv: KV, options: { force?: boolean } = 
   return true;
 }
 
-export async function getServicesContent(kv: KV): Promise<ServicesContent> {
-  return (await kv.get<ServicesContent>(SERVICES_CONTENT_KEY)) ?? SERVICES_SEED;
+/** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
+export async function getServicesContent(kv: KV, lang: AppLang = 'ar'): Promise<ServicesContent> {
+  return localizeBlock(kv, 'services', (await kv.get<ServicesContent>(SERVICES_CONTENT_KEY)) ?? SERVICES_SEED, SERVICES_EN, lang);
 }
 
 export function isActiveMember(me: Me | null): boolean {

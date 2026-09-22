@@ -4,6 +4,7 @@ import { getHomeContent, type PortalKey } from '../content/home.js';
 import { getHqContent } from '../content/hq.js';
 import { getMembershipContent } from '../content/membership.js';
 import { getServicesContent } from '../content/services.js';
+import type { AppLang } from '../lang.js';
 import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import { stripContacts } from '../projectsBank/redact.js';
@@ -57,6 +58,19 @@ const SCREENS: Record<string, { title: string; text: string }> = {
   account: { title: 'حسابي', text: 'حساب العضو: بياناته وحالة عضويته وعملياته داخل التطبيق.' },
 };
 
+/**
+ * The English app (M27): the brain's prompt shows the page title (its first 90 characters) and the focus text first,
+ * so both carry the request to answer in English. No fabricated focus: one would send every message to the deep model.
+ */
+const ENGLISH_TITLE = `${APP} (English: reply in English)`;
+const ENGLISH_NOTE = 'العضو يستخدم النسخة الإنجليزية من التطبيق: أجب بالإنجليزية. (The member uses the English version of the app: reply in English.)';
+
+function inEnglish(found: ResolvedContext): ResolvedContext {
+  const title = found.title ? `${ENGLISH_TITLE} — ${found.title}` : ENGLISH_TITLE;
+  const focus = found.focus ? { ...found.focus, text: `${ENGLISH_NOTE}\n${found.focus.text}` } : null;
+  return { ...found, title, focus };
+}
+
 const clip = (value: string, max: number): string => value.replace(/[ \t]+/g, ' ').trim().slice(0, max);
 const lines = (rows: (string | null | undefined | false)[]): string => rows.filter((row): row is string => Boolean(row)).join('\n');
 
@@ -65,7 +79,12 @@ type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: Post
 export class ContextResolver {
   constructor(private readonly deps: Deps) {}
 
-  async resolve(context: AdvisorContext | null): Promise<ResolvedContext> {
+  async resolve(context: AdvisorContext | null, lang: AppLang = 'ar'): Promise<ResolvedContext> {
+    const found = await this.resolved(context);
+    return lang === 'en' ? inEnglish(found) : found;
+  }
+
+  private async resolved(context: AdvisorContext | null): Promise<ResolvedContext> {
     if (!context) return NONE;
     const found = await this.find(context);
     if (!found.focus) return found;
