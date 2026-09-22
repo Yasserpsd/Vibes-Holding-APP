@@ -49,7 +49,7 @@ export function Login({ onSignedIn }: Props) {
       setOtp({ token: result.challengeToken, email: result.email, expiresAt: at + result.seconds * 1000, resendAt: at + result.resendAfter * 1000 });
       return;
     }
-    if (!result.me.isAdmin) {
+    if (!result.me.isAdmin && !result.me.isModerator) {
       setError('هذه اللوحة لإدارة النادي فقط.');
       return;
     }
@@ -111,7 +111,7 @@ export function Login({ onSignedIn }: Props) {
     <main className="login">
       <form className="card" onSubmit={submit}>
         <h1>لوحة إدارة نادي المستثمرين</h1>
-        <p className="muted">الدخول لحسابات إدارة النادي فقط.</p>
+        <p className="muted">الدخول لحسابات إدارة النادي والموديريتور فقط.</p>
         {otp ? (
           <>
             <p>

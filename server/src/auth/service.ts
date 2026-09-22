@@ -44,6 +44,7 @@ export type Me = {
   avatarUrl: string;
   verified: boolean;
   isAdmin: boolean;
+  isModerator: boolean;
   membership: Membership;
 };
 
@@ -111,6 +112,7 @@ export function toMe(contact: HubContact): Me {
     avatarUrl: contact.avatar,
     verified: contact.verified === 1,
     isAdmin: contact.is_admin === 1,
+    isModerator: contact.role === 'publisher',
     membership: membershipOf(contact),
   };
 }
@@ -209,7 +211,8 @@ export class AuthService {
       const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
       return { pending: true, pendingToken, email: contact.email, mailSent: result.mail_sent === 1, text: result.text ?? '' };
     }
-    if (contact.is_admin !== 1) {
+    // M28: the dashboard admits admins and moderators (hub role `publisher`); sections are gated per level.
+    if (contact.is_admin !== 1 && contact.role !== 'publisher') {
       await this.dropVisitor(uuid);
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }
@@ -253,7 +256,7 @@ export class AuthService {
     // The role is read again: the hub may have changed it while the code was on its way.
     const account = await this.deps.hub.call('account', { uuid });
     const contact = account.contact;
-    if (!contact || !contact.has_account || contact.is_admin !== 1) {
+    if (!contact || !contact.has_account || (contact.is_admin !== 1 && contact.role !== 'publisher')) {
       await this.dropVisitor(uuid);
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }

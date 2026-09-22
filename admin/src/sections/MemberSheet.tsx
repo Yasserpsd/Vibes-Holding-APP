@@ -15,8 +15,8 @@ const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: bool
   extend: { button: 'تمديد العضوية', title: 'تمديد العضوية' },
   revoke: { button: 'إلغاء العضوية', title: 'إلغاء العضوية', danger: true },
   pb: { button: 'إضافة رصيد بنك المشاريع', title: 'تعديل رصيد بنك المشاريع' },
-  publisher: { button: 'جعله ناشرًا', title: 'صلاحية النشر' },
-  unpublisher: { button: 'سحب صلاحية النشر', title: 'سحب صلاحية النشر', danger: true },
+  publisher: { button: 'ترقية إلى موديريتور', title: 'صلاحية النشر (موديريتور)' },
+  unpublisher: { button: 'سحب صلاحية الموديريتور', title: 'سحب صلاحية الموديريتور', danger: true },
 };
 
 const EVENT_KINDS: Record<string, string> = { registered: 'تسجيل', verified: 'تأكيد البريد', activated: 'تفعيل عضوية', renewed: 'تجديد عضوية', revoked: 'إلغاء عضوية', role: 'تغيير صلاحية', deleted: 'حذف الحساب' };
@@ -47,9 +47,9 @@ function summary(draft: Draft, name: string): string {
     case 'pb':
       return draft.amount > 0 ? `يزيد رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(draft.amount, 'مشروعين')}.` : `ينقص رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(-draft.amount, 'مشروعين')}.`;
     case 'publisher':
-      return `سيصبح «${name}» ناشرًا: يستطيع نشر المحتوى باسم النادي.`;
+      return `سيصبح «${name}» موديريتور: يدخل اللوحة وينشر «رسائل الإدارة» فقط، بلا أي تحكم آخر.`;
     case 'unpublisher':
-      return `ستُسحب صلاحية النشر من «${name}» ويعود عضوًا عاديًا.`;
+      return `ستُسحب صلاحية الموديريتور من «${name}» ويعود عضوًا عاديًا.`;
   }
 }
 

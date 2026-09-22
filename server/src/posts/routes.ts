@@ -27,7 +27,7 @@ function publicPost(post: Post) {
 
 /** «رسائل الإدارة»: the public feed for the app's home and the dashboard's admin endpoints. */
 export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, push, media, hubSync, sync }) => {
-  const requireAdmin = dashboardGuard(auth);
+  const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
 
   /** Uploaded media must exist with the right kind; pasted image links pass as before. */
   const checkMedia = async (input: PostInput): Promise<void> => {

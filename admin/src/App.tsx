@@ -69,7 +69,7 @@ export function App() {
     if (!session.get()) return;
     api
       .me()
-      .then((result) => (result.me.isAdmin ? setMe(result.me) : signOut()))
+      .then((result) => (result.me.isAdmin || result.me.isModerator ? setMe(result.me) : signOut()))
       .catch(() => signOut())
       .finally(() => setChecking(false));
   }, [signOut]);
@@ -183,8 +183,11 @@ export function App() {
   if (checking) return <main className="login"><p className="muted">جارٍ التحميل…</p></main>;
   if (!me) return <Login onSignedIn={setMe} />;
 
-  const { section } = route;
-  const inBar = BAR.includes(section);
+  // M28: a moderator's dashboard is the posts section alone; any other address lands there too.
+  const sections = me.isAdmin ? SECTIONS : SECTIONS.filter((entry) => entry.key === 'posts');
+  const bar = me.isAdmin ? BAR : sections.map((entry) => entry.key);
+  const section = me.isAdmin || route.section === 'posts' ? route.section : 'posts';
+  const inBar = bar.includes(section);
   const navButton = (entry: (typeof SECTIONS)[number]) => (
     <button key={entry.key} type="button" className={entry.key === section ? 'nav-item on' : 'nav-item'} aria-current={entry.key === section ? 'page' : undefined} onClick={() => shell.openSection(entry.key)}>
       <Icon name={entry.icon} />
@@ -201,9 +204,9 @@ export function App() {
             <strong>نادي المستثمرين</strong>
             <span>لوحة الإدارة</span>
           </div>
-          <nav className="rail-nav" aria-label="أقسام اللوحة">{SECTIONS.map(navButton)}</nav>
+          <nav className="rail-nav" aria-label="أقسام اللوحة">{sections.map(navButton)}</nav>
           <div className="rail-foot">
-            <span className="muted">{me.name || me.email}</span>
+            <span className="muted">{me.name || me.email}{me.isAdmin ? '' : ' — موديريتور'}</span>
             <button className="link" type="button" onClick={logout}>خروج</button>
           </div>
         </aside>
@@ -245,20 +248,22 @@ export function App() {
         </main>
 
         <nav className="tabbar" aria-label="أقسام اللوحة">
-          {SECTIONS.filter((entry) => BAR.includes(entry.key)).map(navButton)}
-          <button type="button" className={!inBar || more ? 'nav-item on' : 'nav-item'} aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)}>
-            <Icon name="more" />
-            <span>المزيد</span>
-          </button>
+          {sections.filter((entry) => bar.includes(entry.key)).map(navButton)}
+          {sections.length > bar.length ? (
+            <button type="button" className={!inBar || more ? 'nav-item on' : 'nav-item'} aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)}>
+              <Icon name="more" />
+              <span>المزيد</span>
+            </button>
+          ) : null}
         </nav>
 
         {more ? (
           <Sheet title="كل الأقسام" onClose={() => setMore(false)}>
-            <nav className="more-nav" aria-label="باقي الأقسام">{SECTIONS.filter((entry) => !BAR.includes(entry.key)).map(navButton)}</nav>
+            <nav className="more-nav" aria-label="باقي الأقسام">{sections.filter((entry) => !bar.includes(entry.key)).map(navButton)}</nav>
           </Sheet>
         ) : null}
 
-        {route.member ? (
+        {me.isAdmin && route.member ? (
           <Boundary key={route.member} fallback={(retry) => <Sheet title="بيانات الحساب" onClose={closeMember}><Broken onRetry={retry} /></Sheet>}>
             <MemberSheet contactId={route.member} onClose={closeMember} onChanged={() => setStamp((value) => value + 1)} />
           </Boundary>

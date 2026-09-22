@@ -4,7 +4,7 @@ import type { AccountFilter, AccountsResult, AppPayment, AuditEntry, ContentList
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://vibes-holding-app-production.up.railway.app';
 const TOKEN_KEY = 'club-admin-token';
 
-export type Me = { id: number; name: string; email: string; isAdmin: boolean };
+export type Me = { id: number; name: string; email: string; isAdmin: boolean; isModerator: boolean };
 export type LoginResult =
   | { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string }
   | { pending: false; otp?: undefined; token: string; me: Me };

@@ -21,7 +21,7 @@ function parseRange(header: string | undefined, size: number): { start: number; 
 
 /** Uploaded media (M15): tickets for the dashboard and the public `/media/<key>` links the posts carry. */
 export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, { service, auth }) => {
-  const requireAdmin = dashboardGuard(auth);
+  const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const store = service.store;
 
   app.get(

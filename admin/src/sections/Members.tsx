@@ -12,7 +12,7 @@ const FILTERS: { value: AccountFilter; label: string }[] = [
   { value: 'unpaid', label: 'لم يدفعوا بعد' },
   { value: 'pending', label: 'بانتظار تأكيد البريد' },
   { value: 'expired', label: 'انتهت عضويتهم' },
-  { value: 'publisher', label: 'ناشرون' },
+  { value: 'publisher', label: 'موديريتور' },
   { value: 'admin', label: 'الإدارة' },
   { value: 'lead', label: 'عملاء محتملون' },
 ];
@@ -30,7 +30,7 @@ export function StatePill({ account }: { account: Pick<Account, 'state' | 'role'
   return (
     <>
       <Pill tone={state.tone}>{state.label}</Pill>
-      {account.role === 'admin' ? <Pill tone="gold">إدارة</Pill> : account.role === 'publisher' ? <Pill tone="gold">ناشر</Pill> : null}
+      {account.role === 'admin' ? <Pill tone="gold">إدارة</Pill> : account.role === 'publisher' ? <Pill tone="gold">موديريتور</Pill> : null}
     </>
   );
 }

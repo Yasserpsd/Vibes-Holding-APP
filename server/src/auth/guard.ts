@@ -82,9 +82,14 @@ export function optionalSession(service: AuthService) {
   };
 }
 
-export type AdminAuth = SessionAuth & { me: Me };
+export type AdminAuth = SessionAuth & { me: Me; level: 'admin' | 'moderator' };
 
-/** Hub admin accounts only (the dashboard's role until M7). */
+/** admin = hub `is_admin`; moderator = hub role `publisher` (M28: shown as «موديريتور», publishing only). */
+export function levelOf(me: Me): 'admin' | 'moderator' | null {
+  return me.isAdmin ? 'admin' : me.isModerator ? 'moderator' : null;
+}
+
+/** Hub admin accounts only: the app's reception screens (`/api/admin/hq/*`), never open to moderators. */
 export function adminGuard(service: AuthService) {
   const requireSession = sessionGuard(service);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<AdminAuth | null> => {
@@ -95,25 +100,34 @@ export function adminGuard(service: AuthService) {
       void reply.code(403).send({ error: { code: 'forbidden', message: 'هذه الصفحة لإدارة النادي فقط' } });
       return null;
     }
-    return { ...current, me };
+    return { ...current, me, level: 'admin' };
   };
 }
 
 /**
- * The dashboard's endpoints: a hub admin whose session started with the e-mailed code while ADMIN_OTP is on (M18).
+ * The dashboard's endpoints: a session that started with the e-mailed code while ADMIN_OTP is on (M18).
+ * Admins reach everything; a moderator (M28) only the routes built with `allowModerator` — the posts
+ * section and its uploads — and gets a 403 naming the admin level everywhere else.
  * The app's reception screens (`/api/admin/hq/*`) keep adminGuard: member sign-in in the app never asks for the code.
  */
-export function dashboardGuard(service: AuthService) {
-  const requireAdmin = adminGuard(service);
+export function dashboardGuard(service: AuthService, allowModerator = false) {
+  const requireSession = sessionGuard(service);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<AdminAuth | null> => {
-    const admin = await requireAdmin(request, reply);
-    if (!admin) return null;
-    if (service.adminOtpEnabled && !service.adminVerified(admin.session)) {
+    const current = await requireSession(request, reply);
+    if (!current) return null;
+    const me = await service.me(current.session);
+    const level = levelOf(me);
+    if (!level || (level === 'moderator' && !allowModerator)) {
+      const message = level === 'moderator' ? 'هذا القسم لحسابات الأدمن فقط' : 'هذه الصفحة لإدارة النادي فقط';
+      void reply.code(403).send({ error: { code: 'forbidden', message } });
+      return null;
+    }
+    if (service.adminOtpEnabled && !service.adminVerified(current.session)) {
       // A dashboard session whose code lapsed is over for good; an app session (no adminVerifiedAt) is left alone.
-      if (admin.session.adminVerifiedAt) await service.logout(admin.token, admin.session);
+      if (current.session.adminVerifiedAt) await service.logout(current.token, current.session);
       void reply.code(403).send({ error: { code: 'otp_required', message: 'ادخل اللوحة من جديد برمز البريد الإلكتروني' } });
       return null;
     }
-    return admin;
+    return { ...current, me, level };
   };
 }
