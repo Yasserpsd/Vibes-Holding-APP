@@ -5,6 +5,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { eventOf, usePost, type PostEvent } from '@/api/posts';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { audienceBadge } from '@/components/PostsBlock';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -35,6 +36,12 @@ export default function PostScreen() {
               <Ionicons name={event ? 'calendar' : 'megaphone-outline'} size={14} color={colors.black} />
               <Text style={styles.badgeText}>{event ? t('posts.event') : t('nav.posts')}</Text>
             </View>
+            {audienceBadge(post) ? (
+              <View style={styles.badge}>
+                <Ionicons name="person" size={14} color={colors.black} />
+                <Text style={styles.badgeText}>{audienceBadge(post)}</Text>
+              </View>
+            ) : null}
             {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
           </View>
           <Text style={styles.title}>{post.title}</Text>

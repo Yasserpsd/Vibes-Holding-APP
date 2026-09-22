@@ -31,6 +31,8 @@ export type Me = {
   verified: boolean;
   isAdmin: boolean;
   membership: Membership;
+  /** M30: the number on the membership card; an older server sends none and the card hides it. */
+  cardNumber?: string;
 };
 
 export type Country = { code: string; name: string; dial: string; flag: string; example: string; pattern: string };

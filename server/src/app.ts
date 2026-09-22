@@ -10,6 +10,8 @@ import { AuthService } from './auth/service.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
+import { cardRoutes } from './card/routes.js';
+import { CardService } from './card/service.js';
 import { contentRoutes } from './content/routes.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
@@ -172,6 +174,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // Member push notifications (Expo push service); tokens come from the app after login.
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
+  const card = new CardService({ kv, notifier });
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
   let mediaStore: MediaStore;
   if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
@@ -301,11 +304,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(newsRoutes, { service: news, auth });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
+  await app.register(cardRoutes, { service: card, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
-  await app.register(postsRoutes, { service: posts, auth, push, media, hubSync: postsHub, sync });
+  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, push, media, hubSync: postsHub, sync });
   await app.register(dashboardRoutes, { service: dashboard, auth });
   await app.register(syncRoutes, { service: sync, feed });
   await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });

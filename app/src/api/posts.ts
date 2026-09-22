@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
-import { apiGet } from './client';
+import { apiGet, apiRequest } from './client';
 
 /** An event's day (`2026-10-05`) or exact time (ISO), where it happens and the link for attending online. */
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
@@ -20,6 +20,11 @@ export type Post = {
   /** Bridge v2: a plain message or an event. Older servers send neither key: treat the post as a plain message. */
   kind?: 'post' | 'event';
   event?: PostEvent | null;
+  /**
+   * M29: the message reached this member because it is for everyone, for his category, or for him
+   * alone — the feed only ever contains what he may read. Older servers send no key: everyone.
+   */
+  audience?: 'all' | 'persona' | 'member';
 };
 
 /** The event's details when the post is one. */
@@ -65,3 +70,13 @@ export function usePost(id: string | undefined) {
     enabled: Boolean(id),
   });
 }
+
+// M29: the admin composer inside the app (mirrors server /api/admin/app/*; admins only).
+export type MessageAudience = { type: 'all' } | { type: 'persona'; persona: 'neutral' | 'entrepreneur' | 'investor' } | { type: 'member'; contactId: number; name: string };
+export type MemberHit = { id: number; name: string; email: string; persona: string; personaLabel: string };
+export type SentMessage = { post: Post; devices: number; push: { sent: number; failed: number; dropped: number } | null };
+
+export const adminMessagesApi = {
+  searchMembers: (q: string) => apiGet<{ members: MemberHit[] }>('/api/admin/app/members', { q }),
+  send: (input: { title: string; body: string; audience: MessageAudience }) => apiRequest<SentMessage>('POST', '/api/admin/app/messages', { body: input }),
+};

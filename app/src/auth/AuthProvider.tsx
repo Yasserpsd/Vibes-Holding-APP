@@ -48,6 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.removeQueries({ queryKey: ['news', 'prefs'] });
     // Founder contact data a member unlocked never outlives his session (CLAUDE.md rule 4).
     queryClient.removeQueries({ queryKey: ['project-access'] });
+    // «رسائل الإدارة» is the member's inbox (M29): targeted messages never outlive his session.
+    queryClient.removeQueries({ queryKey: ['posts'] });
+    queryClient.removeQueries({ queryKey: ['post'] });
+    // The membership card and its print request belong to the account too (M30).
+    queryClient.removeQueries({ queryKey: ['card'] });
   }, [queryClient]);
 
   useEffect(() => {
@@ -89,14 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [clearLocal]);
 
-  const signIn = useCallback(async (token: string, account: Me) => {
-    tokenRef.current = token;
-    setAuthToken(token);
-    setMeState(account);
-    setHasSession(true);
-    setStatus('signedIn');
-    await saveToken(token);
-  }, []);
+  const signIn = useCallback(
+    async (token: string, account: Me) => {
+      tokenRef.current = token;
+      setAuthToken(token);
+      setMeState(account);
+      setHasSession(true);
+      setStatus('signedIn');
+      await saveToken(token);
+      // The guest feed lacks the member's targeted messages (M29): fetch the inbox as him.
+      queryClient.removeQueries({ queryKey: ['posts'] });
+      queryClient.removeQueries({ queryKey: ['post'] });
+    },
+    [queryClient],
+  );
 
   const signOut = useCallback(async () => {
     const token = tokenRef.current;

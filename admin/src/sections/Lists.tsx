@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { api } from '../api';
+import { api, type CardRequest } from '../api';
 import { formatDateTime, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { AuditEntry, Lead, MailItem, Ticket } from '../types';
-import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, Pill, SearchBox, SectionHead, useDebounced, useLoad, type Tone } from '../ui';
+import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, messageOf, Pill, SearchBox, SectionHead, sessionOver, useDebounced, useLoad, useShell, type Tone } from '../ui';
 
 const PER_PAGE = 25;
 
@@ -37,6 +37,63 @@ export function Tickets() {
           />
         )}
       </AsyncPage>
+    </>
+  );
+}
+
+/** M30: members asking for the printed membership card, delivered to the door at no charge. */
+export function CardRequests() {
+  const { signOut, notify } = useShell();
+  const state = useLoad(() => api.cardRequests(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const pending = state.data?.requests.filter((row) => row.status === 'pending').length ?? 0;
+
+  async function markDone(row: CardRequest) {
+    if (!window.confirm(`تم تسليم الكارت المطبوع للعضو «${row.name}»؟`)) return;
+    setBusyId(row.id);
+    try {
+      await api.cardRequestDone(row.id);
+      notify('ok', 'سُجّل التسليم.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      <SectionHead title="طلبات الكروت" hint={state.data ? `قيد التنفيذ: ${formatNumber(pending)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <p className="muted">كل طلب هنا اختاره العضو بنفسه من التطبيق: كارت عضويته مطبوعًا يصل إلى عنوانه بدون رسوم. اطبع الكارت، سلّمه، ثم علّم الطلب «تم التسليم».</p>
+      <Async state={state} rows={5} empty={() => (state.data?.requests.length ?? 0) === 0} emptyText="لا توجد طلبات طباعة بعد.">
+        {() => (
+          <DataTable<CardRequest>
+            caption="طلبات طباعة كارت العضوية"
+            rows={state.data?.requests ?? []}
+            rowKey={(row) => row.id}
+            columns={[
+              { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
+              { key: 'number', label: 'رقم العضوية', cell: (row) => <bdi dir="ltr" className="num">{row.cardNumber}</bdi> },
+              { key: 'persona', label: 'الفئة', cell: (row) => row.personaLabel || '—' },
+              { key: 'to', label: 'التوصيل', cell: (row) => `${row.city} · ${row.address}${row.note ? ` · ${row.note}` : ''}` },
+              { key: 'phone', label: 'الجوال', cell: (row) => <bdi dir="ltr" className="num">{row.phone || '—'}</bdi> },
+              { key: 'at', label: 'طُلب', cell: (row) => formatDateTime(row.createdAt) },
+              {
+                key: 'status',
+                label: 'الحالة',
+                cell: (row) =>
+                  row.status === 'done' ? (
+                    <Pill tone="ok">سُلّم {row.doneAt ? formatDateTime(row.doneAt) : ''}</Pill>
+                  ) : (
+                    <button type="button" disabled={busyId === row.id} onClick={() => void markDone(row)}>تم التسليم</button>
+                  ),
+              },
+            ]}
+          />
+        )}
+      </Async>
     </>
   );
 }

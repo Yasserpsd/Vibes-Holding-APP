@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -91,6 +91,7 @@ export default function AccountScreen() {
 
       <View style={styles.menu}>
         <MenuRow icon="ribbon-outline" label={t('account.menu.membership')} onPress={() => router.push('/membership')} />
+        <MenuRow icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} />
         <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
         <MenuRow icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
         <MenuRow icon="receipt-outline" label={t('account.menu.payments')} onPress={() => router.push('/payments')} />

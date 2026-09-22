@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import { HubError, hubCall, type HubClient } from '../hub/types.js';
 import type { KV } from '../store.js';
-import type { Post, PostsService } from './service.js';
+import { audienceOf, type Post, type PostsService } from './service.js';
 
 /**
  * «عقل واحد»: a post or an event published from the dashboard is handed to the hub's `publish` op (docs/BRIDGE_V2.md
@@ -32,7 +32,9 @@ export class PostsHubSync {
 
   private async afterSave(post: Post, adminUuid: string): Promise<void> {
     const onHub = post.hubSync?.published === true;
-    if (post.status === 'published') {
+    // M29: a targeted message is private to its member or persona — the websites and the assistant
+    // never hear it, and one that was public before the edit is pulled off them like a draft.
+    if (post.status === 'published' && audienceOf(post).type === 'all') {
       const error = await this.call(adminUuid, {
         key: post.id,
         kind: post.kind ?? 'post',
@@ -52,7 +54,7 @@ export class PostsHubSync {
   }
 
   private async afterRemove(post: Post, adminUuid: string): Promise<void> {
-    if (post.hubSync?.published || post.status === 'published') {
+    if (post.hubSync?.published || (post.status === 'published' && audienceOf(post).type === 'all')) {
       const error = await this.call(adminUuid, { key: post.id, remove: true });
       // The post is gone, so the removal is remembered on its own and tried again on the next edit of any post.
       if (error && error !== 'hub_not_supported') await this.remember(post.id);

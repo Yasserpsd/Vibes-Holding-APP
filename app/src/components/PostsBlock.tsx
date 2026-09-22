@@ -36,11 +36,19 @@ export function PostsBlock() {
   );
 }
 
+/** M29: a targeted message is marked for its reader; the feed already holds only what he may read. */
+export function audienceBadge(post: Pick<Post, 'audience'>): string | null {
+  if (post.audience === 'member') return t('posts.forYou');
+  if (post.audience === 'persona') return t('posts.forYourCategory');
+  return null;
+}
+
 /** One post as a tappable card (home block and the posts list). */
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
   const thumbnail = thumbnailOf(post);
   const event = eventOf(post);
+  const targeted = audienceBadge(post);
   return (
     <Pressable
       accessibilityRole="button"
@@ -48,6 +56,14 @@ export function PostCard({ post }: { post: Post }) {
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.texts}>
+        {targeted ? (
+          <View style={styles.audience}>
+            <View style={styles.audienceBadge}>
+              <Ionicons name="person" size={12} color={colors.black} />
+              <Text style={styles.audienceBadgeText}>{targeted}</Text>
+            </View>
+          </View>
+        ) : null}
         <View style={styles.titleRow}>
           {post.pinned ? <Ionicons name="pin" size={14} color={colors.gold} /> : null}
           <Text style={styles.title} numberOfLines={2}>
@@ -109,6 +125,9 @@ const styles = StyleSheet.create({
   event: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   eventBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.gold },
   eventBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
+  audience: { flexDirection: 'row' },
+  audienceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.goldLight },
+  audienceBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
   eventWhen: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, flexShrink: 1 },
   eventPlace: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },

@@ -1,21 +1,34 @@
 import { useEffect, useState } from 'react';
 
-import { api, type Post } from '../api';
+import { api, type Post, type PostAudience } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
-import { PostEditor } from '../PostEditor';
+import { personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
+
+const audienceOf = (post: Post): PostAudience => post.audience ?? { type: 'all' };
+
+/** M29: who the message is for, named on its row. Nothing shows for a public post. */
+function AudiencePill({ post }: { post: Post }) {
+  const audience = audienceOf(post);
+  if (audience.type === 'all') return null;
+  if (audience.type === 'persona') return <Pill tone="gold">لفئة {personaLabel(audience.persona)}</Pill>;
+  return <Pill tone="gold">لعضو: {audience.name || `#${audience.contactId}`}</Pill>;
+}
 
 /** How the hand-over to the hub went: the websites' feed and the assistant hear a published post through it. */
 function HubSync({ post }: { post: Post }) {
   const sync = post.hubSync;
-  if (!sync || post.status !== 'published') return null;
+  if (post.status !== 'published') return null;
+  // A targeted message is private: it never travels to the websites or the assistant.
+  if (audienceOf(post).type !== 'all') return <Pill tone="muted">داخل التطبيق فقط</Pill>;
+  if (!sync) return null;
   if (sync.state === 'ok') return <Pill tone="ok">وصل للمواقع والمستشار</Pill>;
   if (sync.state === 'unsupported') return <Pill tone="muted">المواقع تحتاج إضافة الهب 2.7.0</Pill>;
   return <Pill tone="danger">لم يصل للمواقع بعد · يُعاد عند التعديل التالي</Pill>;
 }
 
 /** «رسائل الإدارة»: messages and events. Publishing one reaches the app, the websites and the assistant together. */
-export function Posts({ onEditing }: { onEditing: (editing: boolean) => void }) {
+export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) => void; isAdmin: boolean }) {
   const { signOut, notify } = useShell();
   const state = useLoad(() => api.posts(), []);
   const [editing, setEditing] = useState<Post | 'new' | null>(null);
@@ -75,7 +88,9 @@ export function Posts({ onEditing }: { onEditing: (editing: boolean) => void }) 
 
   async function push(post: Post) {
     const again = post.notifiedAt ? ' سبق إرسال إشعار لهذا المنشور.' : '';
-    if (!window.confirm(`إرسال إشعار بهذا المنشور إلى ${devices} جهاز؟${again}`)) return;
+    const audience = audienceOf(post);
+    const target = audience.type === 'all' ? `إلى ${devices} جهاز` : audience.type === 'persona' ? `إلى أجهزة فئة ${personaLabel(audience.persona)}` : `إلى أجهزة العضو ${audience.name || `#${audience.contactId}`}`;
+    if (!window.confirm(`إرسال إشعار بهذا المنشور ${target}؟${again}`)) return;
     setBusyId(post.id);
     try {
       const result = await api.notifyPost(post.id);
@@ -92,6 +107,7 @@ export function Posts({ onEditing }: { onEditing: (editing: boolean) => void }) 
   if (editing) {
     return (
       <PostEditor
+        isAdmin={isAdmin}
         post={editing === 'new' ? null : editing}
         onClose={(post) => {
           setEditing(null);
@@ -119,6 +135,7 @@ export function Posts({ onEditing }: { onEditing: (editing: boolean) => void }) 
                   <h2>{post.pinned ? '📌 ' : ''}{post.title}</h2>
                   <span className="pills">
                     {post.kind === 'event' ? <Pill tone="gold">فعالية</Pill> : null}
+                    <AudiencePill post={post} />
                     <span className={post.status === 'published' ? 'badge on' : 'badge'}>{post.status === 'published' ? 'منشور' : 'مسودة'}</span>
                   </span>
                 </div>

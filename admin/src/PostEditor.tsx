@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { api, ApiError, uploadFile, type Post, type PostEvent, type PostInput, type PostKind, type PostLink, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, type PostLink, type PostPersona, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
 import { capturePoster, DEFAULT_UPLOAD_CONFIG, fileProblem, megabytes, typedFile, typeNames } from './media';
 
-type Props = { post: Post | null; onClose: (saved: Post | null) => void };
+type Props = { post: Post | null; isAdmin: boolean; onClose: (saved: Post | null) => void };
+
+/** The club's three categories, in the owner's order and wording. */
+export const PERSONA_LABELS: { key: PostPersona; label: string }[] = [
+  { key: 'neutral', label: 'محايد' },
+  { key: 'entrepreneur', label: 'رائد الأعمال' },
+  { key: 'investor', label: 'المستثمر' },
+];
+
+export const personaLabel = (key: string): string => PERSONA_LABELS.find((entry) => entry.key === key)?.label ?? key;
 /** One row of the progress list. A failed row stays, with the reason, until the owner hides it. */
 type Pending = { id: number; name: string; kind: UploadKind; progress: number; error: string | null };
 
@@ -51,8 +60,79 @@ function sendPoster(frame: Blob, signal: AbortSignal): Promise<string | null> {
   });
 }
 
+type MemberHit = { id: number; name: string; email: string; persona: string };
+
+/** M29: the «عضو واحد» picker — a small search over the hub accounts, ending in one chosen member. */
+function MemberPicker({ chosen, onPick }: { chosen: { contactId: number; name: string } | null; onPick: (member: MemberHit | null) => void }) {
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState<MemberHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function search() {
+    const term = q.trim();
+    if (term.length < 2) {
+      setNote('اكتب حرفين على الأقل من الاسم أو البريد.');
+      return;
+    }
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await api.accounts({ q: term, page: 1, perPage: 8 });
+      setHits(result.items.map((item) => ({ id: item.id, name: item.name, email: item.email, persona: item.persona })));
+    } catch (failure) {
+      setNote(failure instanceof ApiError ? failure.message : 'تعذر البحث عن الأعضاء.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (chosen) {
+    return (
+      <p className="member-chosen">
+        <strong>{chosen.name || `عضو #${chosen.contactId}`}</strong>
+        <button className="link" type="button" onClick={() => onPick(null)}>تغيير العضو</button>
+      </p>
+    );
+  }
+  return (
+    <>
+      <div className="link-add">
+        <input
+          placeholder="ابحث بالاسم أو البريد أو الجوال"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            void search();
+          }}
+        />
+        <button type="button" disabled={busy} onClick={() => void search()}>{busy ? '…' : 'بحث'}</button>
+      </div>
+      {note ? <p className="error" role="alert">{note}</p> : null}
+      {hits ? (
+        hits.length ? (
+          <ul className="member-hits">
+            {hits.map((hit) => (
+              <li key={hit.id}>
+                <button type="button" onClick={() => onPick(hit)}>
+                  <strong>{hit.name || hit.email}</strong>
+                  <span className="muted"> · {personaLabel(hit.persona) || 'بدون فئة'} · {hit.email}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">لا نتائج لهذا البحث.</p>
+        )
+      ) : null}
+    </>
+  );
+}
+
 /** New post or edit. Images and one video are picked from the device and uploaded; an image link and a YouTube link stay possible. */
-export function PostEditor({ post, onClose }: Props) {
+export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [title, setTitle] = useState(post?.title ?? '');
   const [body, setBody] = useState(post?.body ?? '');
   const [links, setLinks] = useState<PostLink[]>(post?.links ?? []);
@@ -62,6 +142,8 @@ export function PostEditor({ post, onClose }: Props) {
   // The server stores the YouTube id and accepts a bare id back, so an edit starts from it.
   const [video, setVideo] = useState(post?.youtubeId ?? '');
   const [pinned, setPinned] = useState(post?.pinned ?? false);
+  // M29: who reads the message — everyone, one category, or one member. Only admins retarget.
+  const [audience, setAudience] = useState<PostAudience>(post?.audience ?? { type: 'all' });
   // An event is a post with a date and a place: the websites' feed and the assistant hear it like any other post.
   const [kind, setKind] = useState<PostKind>(post?.kind ?? 'post');
   const [eventDay, setEventDay] = useState(() => eventFields(post?.event).day);
@@ -212,9 +294,13 @@ export function PostEditor({ post, onClose }: Props) {
       setError('رابط الحضور عن بُعد يجب أن يبدأ بـ http أو https.');
       return;
     }
+    if (audience.type === 'member' && !audience.contactId) {
+      setError('اختر العضو الذي تصله الرسالة أولًا.');
+      return;
+    }
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
     const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
-    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput };
+    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, audience };
     setBusy(true);
     setError(null);
     try {
@@ -294,6 +380,31 @@ export function PostEditor({ post, onClose }: Props) {
               </>
             ) : null}
           </fieldset>
+
+          {isAdmin ? (
+            <fieldset>
+              <legend>الجمهور</legend>
+              <div className="chips" role="group" aria-label="جمهور الرسالة">
+                <button type="button" className={audience.type === 'all' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'all'} onClick={() => setAudience({ type: 'all' })}>للجميع</button>
+                <button type="button" className={audience.type === 'persona' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'persona'} onClick={() => setAudience({ type: 'persona', persona: audience.type === 'persona' ? audience.persona : 'neutral' })}>فئة واحدة</button>
+                <button type="button" className={audience.type === 'member' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'member'} onClick={() => setAudience({ type: 'member', contactId: 0, name: '' })}>عضو واحد</button>
+              </div>
+              {audience.type === 'persona' ? (
+                <div className="chips" role="group" aria-label="الفئة">
+                  {PERSONA_LABELS.map((entry) => (
+                    <button key={entry.key} type="button" className={audience.persona === entry.key ? 'chip on' : 'chip'} aria-pressed={audience.persona === entry.key} onClick={() => setAudience({ type: 'persona', persona: entry.key })}>{entry.label}</button>
+                  ))}
+                </div>
+              ) : null}
+              {audience.type === 'member' ? (
+                <MemberPicker
+                  chosen={audience.contactId ? { contactId: audience.contactId, name: audience.name } : null}
+                  onPick={(member) => setAudience({ type: 'member', contactId: member?.id ?? 0, name: member?.name ?? '' })}
+                />
+              ) : null}
+              {audience.type !== 'all' ? <p className="muted hint">الرسالة الموجّهة تصل داخل التطبيق فقط إلى صاحبها، ولا تظهر في المواقع ولا يعرفها المستشار.</p> : null}
+            </fieldset>
+          ) : null}
 
           <label>
             العنوان

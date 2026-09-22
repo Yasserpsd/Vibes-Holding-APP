@@ -19,6 +19,17 @@ export const PERSONAS: { key: Persona; label: string }[] = [
 
 export type MembershipStatus = 'unactivated' | 'active' | 'expired';
 
+/**
+ * M30: the membership number printed on the card — one letter for the category (N محايد,
+ * E رائد الأعمال, I مستثمر, C when no category is set) and ten digits from the hub contact id,
+ * so the number is unique, never stored, and the same wherever it is computed.
+ */
+const CARD_LETTERS: Record<string, string> = { neutral: 'N', entrepreneur: 'E', investor: 'I' };
+
+export function membershipNumber(account: { id: number; persona: string }): string {
+  return `${CARD_LETTERS[account.persona] ?? 'C'}-${String(account.id).padStart(10, '0').slice(-10)}`;
+}
+
 export type Membership = {
   status: MembershipStatus;
   daysLeft: number | null;
@@ -46,6 +57,8 @@ export type Me = {
   isAdmin: boolean;
   isModerator: boolean;
   membership: Membership;
+  /** M30: the number on the membership card, derived from the category and the contact id. */
+  cardNumber: string;
 };
 
 export type RegisterInput = {
@@ -114,6 +127,7 @@ export function toMe(contact: HubContact): Me {
     isAdmin: contact.is_admin === 1,
     isModerator: contact.role === 'publisher',
     membership: membershipOf(contact),
+    cardNumber: membershipNumber({ id: contact.id, persona: persona?.key ?? '' }),
   };
 }
 

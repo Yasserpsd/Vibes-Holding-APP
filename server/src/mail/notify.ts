@@ -162,6 +162,23 @@ export class Notifier {
     ]);
   }
 
+  /** M30: a member asked for his membership card printed and delivered (his own choice, no charge). */
+  cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string }): void {
+    this.dispatch(`طلب طباعة كارت العضوية: ${request.name}`, [
+      `طلب العضو نسخة مطبوعة من كارت عضويته تُوصَّل إلى عنوانه بدون رسوم (من ${APP_NAME}).`,
+      '',
+      ...personLines(request),
+      `رقم العضوية: ${request.cardNumber}`,
+      request.personaLabel ? `الفئة: ${request.personaLabel}` : null,
+      `المدينة: ${request.city}`,
+      `العنوان: ${request.address}`,
+      request.note ? `ملاحظة العضو: ${request.note}` : null,
+      `رقم الطلب: ${request.id}`,
+      '',
+      'القائمة الكاملة في لوحة الإدارة: قسم «طلبات الكروت». عند التسليم علّم الطلب «تم التسليم».',
+    ]);
+  }
+
   serviceRequested(request: ServiceRequestLike): void {
     this.dispatch(`طلب خدمة من التطبيق: ${request.serviceTitle} — ${request.sender?.name || 'زائر'}`, [
       `طلب جديد لخدمة «${request.serviceTitle}» من ${APP_NAME}. فتح التطبيق واتساب (${request.channel}) برسالة الطلب الجاهزة.`,

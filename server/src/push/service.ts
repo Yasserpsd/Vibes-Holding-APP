@@ -19,6 +19,8 @@ const TOKEN_PATTERN = /^Expo(?:nent)?PushToken\[[A-Za-z0-9_-]{8,}\]$/;
 export type PushToken = {
   token: string;
   contactId: number;
+  /** M29: the account's persona at the last registration (app launch); older tokens have none until then. */
+  persona?: string | null;
   platform: string;
   deviceName: string | null;
   appVersion: string | null;
@@ -78,7 +80,7 @@ export class PushService {
   }
 
   /** Upserts a device token for the signed-in account; a token moves to the account that last signed in on the device. */
-  async register(contactId: number, input: { token: string; platform: string; deviceName?: string | null; appVersion?: string | null }, now = Date.now()): Promise<{ tokens: number }> {
+  async register(contactId: number, input: { token: string; platform: string; deviceName?: string | null; appVersion?: string | null }, persona: string | null = null, now = Date.now()): Promise<{ tokens: number }> {
     const token = input.token.trim();
     if (!isExpoPushToken(token)) throw new RequestError('invalid', 'رمز الإشعارات غير صالح');
     const platform = input.platform === 'ios' ? 'ios' : input.platform === 'android' ? 'android' : 'unknown';
@@ -88,13 +90,15 @@ export class PushService {
     await this.mutate((tokens) => {
       const existing = tokens.find((entry) => entry.token === token);
       if (existing) {
+        // A persona missing this time (hub unreachable) keeps the known one — unless the device changed hands.
+        existing.persona = persona ?? (existing.contactId === contactId ? (existing.persona ?? null) : null);
         existing.contactId = contactId;
         existing.platform = platform;
         existing.deviceName = deviceName ?? existing.deviceName;
         existing.appVersion = appVersion ?? existing.appVersion;
         existing.updatedAt = stamp;
       } else {
-        tokens.push({ token, contactId, platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
+        tokens.push({ token, contactId, persona, platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
       }
     });
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId).length;
@@ -113,6 +117,11 @@ export class PushService {
     return (await this.load()).filter((entry) => entry.contactId === contactId).map((entry) => entry.token);
   }
 
+  /** M29: devices whose account carried this persona at the last registration. */
+  async tokensForPersona(persona: string): Promise<string[]> {
+    return (await this.load()).filter((entry) => entry.persona === persona).map((entry) => entry.token);
+  }
+
   async summary(): Promise<{ total: number; accounts: number; byPlatform: Record<string, number> }> {
     const tokens = await this.load();
     const byPlatform: Record<string, number> = {};
@@ -129,6 +138,11 @@ export class PushService {
   async broadcast(message: PushMessage): Promise<PushOutcome> {
     const tokens = (await this.load()).map((entry) => entry.token);
     return this.deliver(tokens, message, { broadcast: true });
+  }
+
+  /** M29: one message to every device of one persona's members. */
+  async broadcastPersona(persona: string, message: PushMessage): Promise<PushOutcome> {
+    return this.deliver(await this.tokensForPersona(persona), message, { persona });
   }
 
   private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {

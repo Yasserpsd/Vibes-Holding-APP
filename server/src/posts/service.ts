@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
+import type { Persona } from '../auth/service.js';
 import type { KV } from '../store.js';
 
 /**
@@ -9,6 +10,8 @@ import type { KV } from '../store.js';
  * files under `/media/`), video is a YouTube id and/or an uploaded file with an optional poster (M15).
  * A post is a plain message or an event with its date and place (bridge v2); published ones are also handed to the
  * hub (`publish`, see hubSync.ts) so the websites and the assistant learn them at the same moment.
+ * M29: a post carries an audience — everyone, one persona, or one member — and the feed shows each
+ * viewer only what is addressed to him; targeted posts stay inside the app (never handed to the hub).
  */
 export const POSTS_KEY = 'admin:posts';
 const MAX_POSTS = 500;
@@ -26,6 +29,13 @@ const eventDate = z
   .regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/, 'تاريخ الفعالية غير صالح')
   .refine((value) => !Number.isNaN(Date.parse(value)), 'تاريخ الفعالية غير صالح');
 
+/** M29: who a message is for. `name` on a member audience is only a display label for the dashboard. */
+export const audienceSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('all') }),
+  z.object({ type: z.literal('persona'), persona: z.enum(['neutral', 'entrepreneur', 'investor']) }),
+  z.object({ type: z.literal('member'), contactId: z.coerce.number().int().positive(), name: z.string().trim().max(120).default('') }),
+]);
+
 export const postInputSchema = z
   .object({
     title: z.string().trim().min(1).max(140),
@@ -38,6 +48,7 @@ export const postInputSchema = z
     pinned: z.boolean().default(false),
     kind: z.enum(['post', 'event']).default('post'),
     event: z.object({ date: eventDate, place: z.string().trim().max(200).default(''), onlineUrl: httpUrl.nullish() }).nullish(),
+    audience: audienceSchema.default({ type: 'all' }),
   })
   .refine((input) => input.kind !== 'event' || Boolean(input.event), 'اكتب موعد الفعالية');
 export type PostInput = z.infer<typeof postInputSchema>;
@@ -61,13 +72,31 @@ export type Post = {
   /** Posts stored before bridge v2 have neither key: they are plain posts. */
   kind?: PostKind;
   event?: PostEvent | null;
+  /** M29: posts stored before it have no key and are for everyone. */
+  audience?: PostAudience;
   /** How the last hand-over to the hub went; `published` = the hub holds a card for this post. */
   hubSync?: PostHubSync;
 };
 
 export type PostKind = 'post' | 'event';
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
+export type PostAudience = { type: 'all' } | { type: 'persona'; persona: Persona } | { type: 'member'; contactId: number; name: string };
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
+
+/** Who is reading the feed; null is a guest. */
+export type PostViewer = { contactId: number; persona: string } | null;
+
+export function audienceOf(post: Pick<Post, 'audience'>): PostAudience {
+  return post.audience ?? { type: 'all' };
+}
+
+/** M29: a post for everyone is for guests too; a targeted one only for its persona or its member. */
+export function canSee(post: Pick<Post, 'audience'>, viewer: PostViewer): boolean {
+  const audience = audienceOf(post);
+  if (audience.type === 'all') return true;
+  if (!viewer) return false;
+  return audience.type === 'persona' ? viewer.persona === audience.persona : viewer.contactId === audience.contactId;
+}
 
 /** Every media URL a post points at (images, uploaded video, poster), ours or not. */
 export function postMediaUrls(post: Pick<Post, 'images' | 'video'>): string[] {
@@ -134,9 +163,9 @@ export class PostsService {
     return this.load();
   }
 
-  /** Published posts for the app: pinned first, then newest; `before` pages by publishedAt. */
-  async listPublished(limit: number, before?: string): Promise<{ posts: Post[]; more: boolean }> {
-    const published = (await this.load()).filter((post) => post.status === 'published');
+  /** Published posts the viewer may read: pinned first, then newest; `before` pages by publishedAt. */
+  async listPublished(limit: number, before?: string, viewer: PostViewer = null): Promise<{ posts: Post[]; more: boolean }> {
+    const published = (await this.load()).filter((post) => post.status === 'published' && canSee(post, viewer));
     const ordered = [...published.filter((post) => post.pinned), ...published.filter((post) => !post.pinned)];
     const from = before ? ordered.filter((post) => !post.pinned && (post.publishedAt ?? '') < before) : ordered;
     return { posts: from.slice(0, limit), more: from.length > limit };
@@ -166,6 +195,7 @@ export class PostsService {
       notifiedAt: null,
       kind: input.kind,
       event: PostsService.event(input),
+      audience: input.audience,
     };
     await this.mutate((posts) => void posts.push(post));
     return post;
@@ -177,7 +207,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), audience: input.audience, updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;

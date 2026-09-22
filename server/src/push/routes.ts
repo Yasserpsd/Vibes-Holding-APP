@@ -32,7 +32,10 @@ export const pushRoutes: FastifyPluginAsync<PushRoutesOptions> = async (app, { s
       if (!current) return;
       const input = parse(registerSchema, request.body, reply);
       if (!input) return;
-      const result = await service.register(current.session.contactId, input);
+      // M29: the persona rides on the token so category messages know their devices. The hub being
+      // unreachable never blocks the registration; the next app launch fills the persona in.
+      const persona = await auth.me(current.session).then((me) => me.persona || null, () => null);
+      const result = await service.register(current.session.contactId, input, persona);
       return { ok: true, ...result };
     }),
   );

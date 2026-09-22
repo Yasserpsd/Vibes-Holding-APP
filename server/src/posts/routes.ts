@@ -1,15 +1,16 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { dashboardGuard, guard, parse } from '../auth/guard.js';
-import type { AuthService } from '../auth/service.js';
+import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../auth/guard.js';
+import { PERSONAS, type AuthService } from '../auth/service.js';
+import { hubCall, type HubClient } from '../hub/types.js';
 import { MediaService } from '../media/service.js';
 import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
 import type { PostsHubSync } from './hubSync.js';
-import { InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService } from './service.js';
+import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -19,15 +20,53 @@ const idSchema = z.object({ id: z.string().uuid() });
 
 const NOT_FOUND = { error: { code: 'not_found', message: 'المنشور غير موجود' } };
 
-/** What the app sees: no author, no draft fields. */
+/** What the app sees: no author, no draft fields. `audience` is only its type — the viewer labels «لك خصيصًا» / «لفئتك». */
 function publicPost(post: Post) {
   const { id, title, body, links, images, youtubeId, pinned, publishedAt } = post;
-  return { id, title, body, links, images, youtubeId, video: post.video ?? null, pinned, publishedAt, kind: post.kind ?? 'post', event: post.event ?? null };
+  return { id, title, body, links, images, youtubeId, video: post.video ?? null, pinned, publishedAt, kind: post.kind ?? 'post', event: post.event ?? null, audience: audienceOf(post).type };
 }
 
-/** «رسائل الإدارة»: the public feed for the app's home and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, push, media, hubSync, sync }) => {
+/** M29: the app's admin composer sends a plain targeted message (no media) and its notification in one act. */
+const composeSchema = z.object({
+  title: z.string().trim().min(1).max(140),
+  body: z.string().trim().min(1).max(6000),
+  audience: audienceSchema,
+});
+const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
+
+/** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, push, media, hubSync, sync }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
+  const maybeSession = optionalSession(auth);
+
+  /** Who is reading: a guest — or a member the hub cannot confirm right now — sees only what is for everyone (M29). */
+  const viewerOf = async (request: FastifyRequest): Promise<PostViewer> => {
+    const current = await maybeSession(request);
+    return current?.me ? { contactId: current.me.id, persona: current.me.persona } : null;
+  };
+
+  /** How many registered devices the post's audience holds right now. */
+  const audienceDevices = async (post: Post): Promise<number> => {
+    const audience = audienceOf(post);
+    if (audience.type === 'all') return (await push.summary()).total;
+    if (audience.type === 'persona') return (await push.tokensForPersona(audience.persona)).length;
+    return (await push.tokensFor(audience.contactId)).length;
+  };
+
+  /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
+  const pushPost = async (post: Post) => {
+    const text = post.body.replace(/\s+/g, ' ').trim();
+    const message = {
+      title: post.title,
+      body: text.length > 140 ? `${text.slice(0, 139)}…` : text || 'رسالة جديدة من إدارة النادي',
+      data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
+    };
+    const audience = audienceOf(post);
+    const outcome =
+      audience.type === 'all' ? await push.broadcast(message) : audience.type === 'persona' ? await push.broadcastPersona(audience.persona, message) : await push.send(audience.contactId, message);
+    if (outcome.sent > 0) await service.markNotified(post.id);
+    return outcome;
+  };
 
   /** Uploaded media must exist with the right kind; pasted image links pass as before. */
   const checkMedia = async (input: PostInput): Promise<void> => {
@@ -51,7 +90,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     guard(async (request, reply) => {
       const query = parse(listSchema, request.query, reply);
       if (!query) return;
-      const { posts, more } = await service.listPublished(query.limit, query.before);
+      const { posts, more } = await service.listPublished(query.limit, query.before, await viewerOf(request));
       return { posts: posts.map(publicPost), more };
     }),
   );
@@ -62,7 +101,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
       const post = await service.get(params.id);
-      if (!post || post.status !== 'published') return reply.code(404).send(NOT_FOUND);
+      // A targeted post answers the wrong viewer exactly like a missing one: its existence is private too.
+      if (!post || post.status !== 'published' || !canSee(post, await viewerOf(request))) return reply.code(404).send(NOT_FOUND);
       return { post: publicPost(post) };
     }),
   );
@@ -72,9 +112,14 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     guard(async (request, reply) => {
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
-      return { posts: await service.listAll(), devices: (await push.summary()).total };
+      // M28/M29: a moderator publishes to everyone; the admin's targeted messages are not his to read.
+      const posts = await service.listAll();
+      return { posts: admin.level === 'admin' ? posts : posts.filter((post) => audienceOf(post).type === 'all'), devices: (await push.summary()).total };
     }),
   );
+
+  /** M28/M29: a moderator publishes to everyone only; targeted messages are the admin's alone. */
+  const MODERATOR_TARGETED = { error: { code: 'forbidden', message: 'الرسائل الموجّهة لحسابات الأدمن فقط' } };
 
   const save = (mode: 'create' | 'update') =>
     guard(async (request, reply) => {
@@ -85,8 +130,12 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const input = parse(postInputSchema, request.body, reply);
       if (!input) return;
       try {
-        await checkMedia(input);
         const before = mode === 'update' ? await service.get(params.id) : null;
+        if (mode === 'update' && !before) return await reply.code(404).send(NOT_FOUND);
+        if (admin.level !== 'admin' && (input.audience.type !== 'all' || (before && audienceOf(before).type !== 'all'))) {
+          return await reply.code(403).send(MODERATOR_TARGETED);
+        }
+        await checkMedia(input);
         // A copy: the stored post object is changed in place by the update.
         const previous = before ? { ...before, images: [...before.images] } : null;
         const post = mode === 'create' ? await service.create(input, admin.me.name ?? admin.me.email ?? null) : await service.update(params.id, input);
@@ -114,7 +163,9 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
       const post = await service.get(params.id);
-      if (!post || !(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
+      if (!post) return reply.code(404).send(NOT_FOUND);
+      if (admin.level !== 'admin' && audienceOf(post).type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
+      if (!(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
       await dropUnused(post, null);
       await hubSync.removed(post, admin.session.uuid);
       await sync.bump('posts');
@@ -131,22 +182,59 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (!params) return;
       const post = await service.get(params.id);
       if (!post) return reply.code(404).send(NOT_FOUND);
+      if (admin.level !== 'admin' && audienceOf(post).type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
       if (post.status !== 'published') {
         return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
       }
-      const text = post.body.replace(/\s+/g, ' ').trim();
-      // No registered device means nobody would receive it: say so instead of reporting a sent notification.
-      if ((await push.summary()).total === 0) {
-        return reply.code(409).send({ error: { code: 'no_devices', message: 'لا توجد أجهزة مسجلة للإشعارات بعد، فلن يصل الإشعار إلى أحد' } });
+      // M29: the notification goes exactly where the message goes. No registered device in the
+      // audience means nobody would receive it: say so instead of reporting a sent notification.
+      if ((await audienceDevices(post)) === 0) {
+        const audience = audienceOf(post);
+        const who = audience.type === 'all' ? 'للإشعارات بعد' : audience.type === 'persona' ? 'لهذه الفئة بعد' : 'لهذا العضو بعد';
+        return reply.code(409).send({ error: { code: 'no_devices', message: `لا توجد أجهزة مسجلة ${who}، فلن يصل الإشعار إلى أحد` } });
       }
-      const outcome = await push.broadcast({
-        title: post.title,
-        body: text.length > 140 ? `${text.slice(0, 139)}…` : text || 'رسالة جديدة من إدارة النادي',
-        data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
-      });
-      // Only a delivered notification counts: a broadcast where every ticket failed is not recorded.
-      if (outcome.sent > 0) await service.markNotified(post.id);
+      const outcome = await pushPost(post);
       return { ok: outcome.sent > 0, ...outcome };
+    }),
+  );
+
+  const requireAppAdmin = adminGuard(auth);
+
+  /**
+   * M29: the composer inside the app (admins only, like every `/api/admin/app|hq` route — the app's
+   * sign-in never goes through the dashboard's e-mailed code). Picking «عضو واحد» starts here.
+   */
+  app.get(
+    '/api/admin/app/members',
+    guard(async (request, reply) => {
+      const admin = await requireAppAdmin(request, reply);
+      if (!admin) return;
+      const query = parse(memberSearchSchema, request.query, reply);
+      if (!query) return;
+      const result = await hubCall(hub, 'admin_accounts', { uuid: admin.session.uuid, q: query.q, state: 'all', page: 1, per_page: 8 });
+      const personaLabel = (key: string) => PERSONAS.find((entry) => entry.key === key)?.label.split('—')[0]?.trim() ?? '';
+      return { members: result.items.map((item) => ({ id: item.id, name: item.name, email: item.email, persona: item.persona, personaLabel: personaLabel(item.persona) })) };
+    }),
+  );
+
+  /** Sends a plain message to its audience and pushes it in the same act; it lands in the inboxes at once. */
+  app.post(
+    '/api/admin/app/messages',
+    guard(async (request, reply) => {
+      const admin = await requireAppAdmin(request, reply);
+      if (!admin) return;
+      const input = parse(composeSchema, request.body, reply);
+      if (!input) return;
+      const post = await service.create(
+        { title: input.title, body: input.body, links: [], images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, audience: input.audience },
+        admin.me.name ?? admin.me.email ?? null,
+      );
+      // A message for everyone reaches the websites and the assistant like any dashboard post; a targeted one never does.
+      await hubSync.saved(post, admin.session.uuid);
+      await sync.bump('posts');
+      const devices = await audienceDevices(post);
+      const outcome = devices > 0 ? await pushPost(post) : null;
+      return reply.code(201).send({ post: (await service.get(post.id)) ?? post, devices, push: outcome });
     }),
   );
 };
