@@ -22,7 +22,8 @@
       },
       "env": {
         "APP_ENV": "test",
-        "EXPO_PUBLIC_API_URL": "https://vibes-holding-app-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://vibes-holding-app-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "980470249678-g51bg4r3u4op57tse8t2nt4vut1fp0cm.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -30,7 +31,8 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "980470249678-g51bg4r3u4op57tse8t2nt4vut1fp0cm.apps.googleusercontent.com"
       }
     }
   },
