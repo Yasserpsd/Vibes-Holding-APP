@@ -11,6 +11,7 @@ import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
+import { AgendaBlock } from '@/components/AgendaBlock';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
@@ -99,6 +100,9 @@ export default function HomeScreen() {
           </FadeInView>
         ))}
       </View>
+
+      {/* «أجندة النادي» (M41): the next events, one tap from a confirmed attendance. Renders nothing while empty. */}
+      <AgendaBlock />
 
       {/* «شخصية ومسيرة» (M11): the approved club figures, early on the home. Renders nothing while none are approved. */}
       <PeopleBlock />

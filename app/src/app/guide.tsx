@@ -24,7 +24,8 @@ export default function GuideScreen() {
   const open = (step: GuideStep, nonce: string) => {
     switch (step.target) {
       case 'workshops':
-        router.push('/workshops' as Href);
+        // M41: the agenda is the one place for every event and workshop of the year.
+        router.push('/agenda' as Href);
         return;
       case 'projects':
         router.push('/projects');

@@ -86,8 +86,14 @@ function isoDaysAgo(now: number, days: number): string {
 export class PaymentsService {
   private chain: Promise<unknown> = Promise.resolve();
   private known = 0;
+  /** M41: modules that own a payment (the agenda) hear its final webhook state here. */
+  private readonly settledListeners: ((payment: Payment) => void)[] = [];
 
   constructor(private readonly deps: Deps) {}
+
+  onSettled(listener: (payment: Payment) => void): void {
+    this.settledListeners.push(listener);
+  }
 
   get mode(): 'live' | 'mock' {
     return this.deps.gateway.mode;
@@ -166,31 +172,20 @@ export class PaymentsService {
     };
   }
 
-  /** Creates the gateway intention for a paid service and records the payment as created. */
-  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, now = Date.now()): Promise<PublicPayment> {
-    const service = content.services.find((entry) => entry.key === serviceKey);
-    if (!service) throw new RequestError('not_found', 'الخدمة غير موجودة', 404);
-    if (toPublicService(service, me).locked || service.action.type !== 'paymob') {
-      throw new RequestError('not_payable', 'هذه الخدمة لا تُدفع من داخل التطبيق', 403);
-    }
-    const price = priceFor(service, me);
-    if (!price) throw new RequestError('not_payable', 'هذه الخدمة لا تُدفع من داخل التطبيق', 403);
-    // Every field of a paid service is required: the management mail and the retry screen depend on the answers.
-    const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
-    if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
-    const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
+  /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
+  private async createPayment(me: Me, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean }, now: number): Promise<Payment> {
     const id = randomUUID();
     const [firstName = '', ...rest] = me.name.trim().split(/\s+/);
     const intention = await this.deps.gateway.createIntention({
       paymentId: id,
-      amountCents: price.amount * 100,
-      currency: price.currency,
-      itemName: service.title,
-      description: `${service.title} — تطبيق نادي المستثمرين`,
+      amountCents: input.amount * 100,
+      currency: input.currency,
+      itemName: input.title,
+      description: `${input.title} — تطبيق نادي المستثمرين`,
       customer: { firstName, lastName: rest.join(' '), email: me.email, phone: me.phone },
       notificationUrl: `${this.deps.publicUrl}/api/payments/paymob/webhook`,
       redirectionUrl: `${this.deps.publicUrl}/pay/return?payment=${id}`,
-      extras: { app: 'investorsclub', payment: id, service: service.key, contact: String(me.id) },
+      extras: { app: 'investorsclub', payment: id, service: input.key, contact: String(me.id) },
     });
     const stamp = new Date(now).toISOString();
     const payment: Payment = {
@@ -199,13 +194,13 @@ export class PaymentsService {
       name: me.name,
       email: me.email,
       phone: me.phone,
-      serviceKey: service.key,
-      serviceTitle: service.title,
-      answers,
-      amount: price.amount,
-      amountCents: price.amount * 100,
-      currency: price.currency,
-      memberPrice: price.memberPrice,
+      serviceKey: input.key,
+      serviceTitle: input.title,
+      answers: input.answers,
+      amount: input.amount,
+      amountCents: input.amount * 100,
+      currency: input.currency,
+      memberPrice: input.memberPrice,
       status: 'created',
       provider: this.mode === 'mock' ? 'mock' : 'paymob',
       intentionId: intention.intentionId,
@@ -222,8 +217,42 @@ export class PaymentsService {
     await this.mutate((payments) => {
       payments.push(payment);
     }, now);
-    this.deps.log.info({ payment: id, service: service.key, amount: price.amount, mode: this.mode }, 'payment started');
+    this.deps.log.info({ payment: id, service: input.key, amount: input.amount, mode: this.mode }, 'payment started');
     this.deps.notifier.paymentStarted(this.toMail(payment));
+    return payment;
+  }
+
+  /** Creates the gateway intention for a paid service and records the payment as created. */
+  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, now = Date.now()): Promise<PublicPayment> {
+    const service = content.services.find((entry) => entry.key === serviceKey);
+    if (!service) throw new RequestError('not_found', 'الخدمة غير موجودة', 404);
+    if (toPublicService(service, me).locked || service.action.type !== 'paymob') {
+      throw new RequestError('not_payable', 'هذه الخدمة لا تُدفع من داخل التطبيق', 403);
+    }
+    const price = priceFor(service, me);
+    if (!price) throw new RequestError('not_payable', 'هذه الخدمة لا تُدفع من داخل التطبيق', 403);
+    // Every field of a paid service is required: the management mail and the retry screen depend on the answers.
+    const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
+    if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
+    const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
+    const payment = await this.createPayment(me, { key: service.key, title: service.title, answers, amount: price.amount, currency: price.currency, memberPrice: price.memberPrice }, now);
+    return this.toPublic(payment);
+  }
+
+  /** M41 «أجندة النادي»: the attendance fee of a visitor without an active membership (a real-world service, rule 3 intact). */
+  async startAgenda(me: Me, input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number }, now = Date.now()): Promise<PublicPayment> {
+    const payment = await this.createPayment(
+      me,
+      {
+        key: `agenda:${input.eventId}`,
+        title: `حضور فعالية: ${input.eventTitle}`,
+        answers: [{ key: 'attendance', label: 'طريقة الحضور', value: input.attendanceLabel }],
+        amount: input.amountSar,
+        currency: 'SAR',
+        memberPrice: false,
+      },
+      now,
+    );
     return this.toPublic(payment);
   }
 
@@ -274,6 +303,13 @@ export class PaymentsService {
       if (result.payment.status === 'paid' || result.payment.status === 'failed') {
         const { id, contactId, serviceTitle, amount, currency, status } = result.payment;
         this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });
+        for (const listener of this.settledListeners) {
+          try {
+            listener(result.payment);
+          } catch (error) {
+            this.deps.log.error({ err: error, payment: id }, 'payment settled listener failed');
+          }
+        }
       }
     }
     return { ok: true, id: result.payment.id, status: result.payment.status };

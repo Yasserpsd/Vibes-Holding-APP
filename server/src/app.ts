@@ -4,6 +4,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import { advisorRoutes } from './advisor/routes.js';
 import { AdvisorService } from './advisor/service.js';
+import { agendaRoutes } from './agenda/routes.js';
+import { AgendaService } from './agenda/service.js';
 import { analyticsRoutes } from './analytics/routes.js';
 import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
@@ -280,6 +282,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       privacyUrl: config.STORE_PRIVACY_URL,
     },
   });
+  // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
+  const agenda = new AgendaService({ kv, notifier, push, payments, onChange: () => moved('content') });
+  payments.onSettled((payment) => agenda.paymentSettled(payment));
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
   // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,
   // the project brief, the websites' feed and the hub hand-over of published posts.
@@ -341,6 +346,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(contactRoutes, { service: contact, auth });
   await app.register(profilesRoutes, { service: profiles, auth });
   await app.register(workshopsRoutes, { service: workshops, auth });
+  await app.register(agendaRoutes, { service: agenda, auth });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });

@@ -225,6 +225,28 @@ export class Notifier {
     ]);
   }
 
+  /** M41: a CONFIRMED attendance registration in «أجندة النادي» (members at once; fee payers after the webhook). */
+  agendaRegistered(
+    registration: { id: string; name: string; phone: string; email: string; personaLabel: string; attendance: 'hq' | 'online'; member: boolean; paid: boolean; paymentId: string | null },
+    event: { title: string; date: string; time: string; place: string; feeSar: number },
+  ): void {
+    this.dispatch(`تسجيل حضور: ${event.title} — ${registration.name || '—'}`, [
+      `سجّل ${registration.member ? 'عضو' : 'مستخدم'} حضوره في فعالية من «أجندة النادي» في ${APP_NAME}.`,
+      '',
+      `الفعالية: ${event.title}`,
+      `الموعد: ${event.date}${event.time ? ` · ${event.time}` : ''}`,
+      event.place ? `المكان: ${event.place}` : null,
+      `طريقة الحضور: ${registration.attendance === 'hq' ? 'حضوري في المقر' : 'أونلاين'}`,
+      registration.member ? 'الرسوم: عضو — بدون رسوم' : event.feeSar > 0 ? `الرسوم: ${event.feeSar} ريال — مدفوعة داخل التطبيق (رقم العملية ${registration.paymentId ?? '—'})` : 'الرسوم: بدون رسوم',
+      '',
+      ...personLines(registration),
+      registration.personaLabel ? `الفئة: ${registration.personaLabel}` : null,
+      `رقم التسجيل: ${registration.id}`,
+      '',
+      'القائمة الكاملة في لوحة الإدارة: قسم «أجندة النادي» — افتح الفعالية لترى كل المسجّلين.',
+    ]);
+  }
+
   /** M10: someone registered his interest in a workshop from the guide page. */
   workshopRegistered(registration: { id: string; workshopTitle: string; name: string; phone: string; email: string; personaLabel: string; note: string }): void {
     this.dispatch(`تسجيل في ورشة: ${registration.workshopTitle} — ${registration.name || '—'}`, [

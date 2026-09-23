@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, session, type Me } from './api';
 import { Login } from './Login';
+import { Agenda } from './sections/Agenda';
 import { Home } from './sections/Home';
 import { Audit, CardRequests, Invites, Leads, Mail, Tickets, Workshops } from './sections/Lists';
 import { MemberMail } from './sections/MemberMail';
@@ -26,6 +27,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
   { key: 'inbox', label: 'رسائل الأعضاء', icon: 'inbox' },
+  { key: 'agenda', label: 'أجندة النادي', icon: 'agenda' },
   { key: 'people', label: 'شخصية ومسيرة', icon: 'people' },
   { key: 'workshops', label: 'تسجيلات الورش', icon: 'workshops' },
   { key: 'tickets', label: 'التذاكر', icon: 'tickets' },
@@ -251,6 +253,7 @@ export function App() {
             {section === 'cards' ? <CardRequests /> : null}
             {section === 'invites' ? <Invites /> : null}
             {section === 'inbox' ? <MemberMail /> : null}
+            {section === 'agenda' ? <Agenda /> : null}
             {section === 'people' ? <People /> : null}
             {section === 'workshops' ? <Workshops /> : null}
             {section === 'tickets' ? <Tickets /> : null}

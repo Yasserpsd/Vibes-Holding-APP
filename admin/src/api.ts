@@ -166,6 +166,42 @@ export type WorkshopRegistration = {
   createdAt: string;
 };
 
+/** M41 «أجندة النادي» — mirrors server/src/agenda/service.ts. */
+export type AgendaMode = 'hq' | 'online' | 'both';
+export type AgendaEventInput = {
+  title: string;
+  blurb: string;
+  date: string;
+  time: string;
+  endTime: string;
+  place: string;
+  onlineUrl: string;
+  mode: AgendaMode;
+  feeSar: number;
+  open: boolean;
+};
+export type AgendaEvent = AgendaEventInput & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  counts: { hq: number; online: number; confirmed: number; awaitingPayment: number };
+};
+export type AgendaRegistration = {
+  id: string;
+  eventId: string;
+  contactId: number;
+  name: string;
+  phone: string;
+  email: string;
+  personaLabel: string;
+  attendance: 'hq' | 'online';
+  member: boolean;
+  paid: boolean;
+  paymentId: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+};
+
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
@@ -313,6 +349,12 @@ export const api = {
   deleteProfile: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/profiles/${id}`),
   profilesConfig: (input: ProfilesConfig) => call<{ config: ProfilesConfig }>('PUT', '/api/admin/profiles/config', input),
   workshopRegistrations: () => call<{ registrations: WorkshopRegistration[] }>('GET', '/api/admin/workshops'),
+  agenda: () => call<{ events: AgendaEvent[] }>('GET', '/api/admin/agenda'),
+  createAgendaEvent: (input: AgendaEventInput) => call<{ event: AgendaEvent }>('POST', '/api/admin/agenda', input),
+  updateAgendaEvent: (id: string, input: Partial<AgendaEventInput>) => call<{ event: AgendaEvent }>('PUT', `/api/admin/agenda/${id}`, input),
+  deleteAgendaEvent: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/agenda/${id}`),
+  agendaRegistrations: (id: string) => call<{ registrations: AgendaRegistration[] }>('GET', `/api/admin/agenda/${id}/registrations`),
+  notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
 };
 
 const TRANSFER_FAILED = 'تعذر رفع الملف. تحقق من الإنترنت ثم حاول مرة أخرى.';

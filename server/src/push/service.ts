@@ -252,6 +252,15 @@ export class PushService {
     });
   }
 
+  /** M41: an agenda attendance fee was paid — the registration is confirmed. */
+  agendaConfirmed(contactId: number, eventTitle: string, eventId: string): void {
+    this.background(contactId, {
+      title: 'تم تأكيد حضورك ✅',
+      body: `حضورك في «${eventTitle}» مؤكد. تفاصيل الفعالية في أجندة النادي.`,
+      data: { type: 'agenda', screen: `/agenda/${eventId}` },
+    });
+  }
+
   /** M11: the administration decided on the member's «شخصية ومسيرة» file. */
   profileDecided(contactId: number, approved: boolean, profileId: string): void {
     this.background(contactId, {
