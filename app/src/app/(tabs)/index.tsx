@@ -93,6 +93,10 @@ export default function HomeScreen() {
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
       </FadeInView>
 
+      {/* «أجندة النادي» (M41) at the TOP of the first page (owner, 2026-09-23: «مهمة جدا توصل في اول صفحة»);
+          «رسائل الإدارة» stays first by his earlier rule. Renders nothing while the agenda is empty. */}
+      <AgendaBlock />
+
       <View style={styles.portals}>
         {content.portals.map((portal, index) => (
           <FadeInView key={portal.key} delay={120 + entranceDelay(index, 80)}>
@@ -100,9 +104,6 @@ export default function HomeScreen() {
           </FadeInView>
         ))}
       </View>
-
-      {/* «أجندة النادي» (M41): the next events, one tap from a confirmed attendance. Renders nothing while empty. */}
-      <AgendaBlock />
 
       {/* «شخصية ومسيرة» (M11): the approved club figures, early on the home. Renders nothing while none are approved. */}
       <PeopleBlock />
