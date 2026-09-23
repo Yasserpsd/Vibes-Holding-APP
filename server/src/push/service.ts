@@ -252,6 +252,17 @@ export class PushService {
     });
   }
 
+  /** M11: the administration decided on the member's «شخصية ومسيرة» file. */
+  profileDecided(contactId: number, approved: boolean, profileId: string): void {
+    this.background(contactId, {
+      title: approved ? 'تم اعتماد ملفك في «شخصية ومسيرة»' : 'تحديث بشأن ملفك في «شخصية ومسيرة»',
+      body: approved
+        ? 'أصبح ملفك ضمن شخصيات نادي المستثمرين الظاهرة في التطبيق.'
+        : 'راجعت الإدارة ملفك وكتبت لك ملاحظتها — افتح طلبك لقراءتها.',
+      data: { type: 'profile', screen: approved ? `/people/${profileId}` : '/people/apply' },
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     this.background(contactId, {
       title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',

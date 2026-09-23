@@ -12,7 +12,7 @@ export type HomePortal = {
   title: string;
   subtitle: string;
   icon: string;
-  target: 'projects' | 'entrepreneurs' | 'advisor';
+  target: 'projects' | 'entrepreneurs' | 'advisor' | 'guide';
 };
 
 export type HomeContent = {

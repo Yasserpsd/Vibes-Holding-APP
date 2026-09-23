@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type CardRequest, type InviteRecord, type InvitesConfig } from '../api';
+import { api, type CardRequest, type InviteRecord, type InvitesConfig, type WorkshopRegistration } from '../api';
 import { formatDateTime, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { AuditEntry, Lead, MailItem, Ticket } from '../types';
 import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, messageOf, Pill, SearchBox, SectionHead, sessionOver, useDebounced, useLoad, useShell, type Tone } from '../ui';
@@ -90,6 +90,44 @@ export function CardRequests() {
                     <button type="button" disabled={busyId === row.id} onClick={() => void markDone(row)}>تم التسليم</button>
                   ),
               },
+            ]}
+          />
+        )}
+      </Async>
+    </>
+  );
+}
+
+/** M10: workshop interest registrations from «دليل المحايد» — the management sends the timing details itself. */
+export function Workshops() {
+  const state = useLoad(() => api.workshopRegistrations(), []);
+  const rows = state.data?.registrations ?? [];
+  const byWorkshop = new Map<string, number>();
+  for (const row of rows) byWorkshop.set(row.workshopTitle, (byWorkshop.get(row.workshopTitle) ?? 0) + 1);
+  return (
+    <>
+      <SectionHead title="تسجيلات الورش" hint={state.data ? `عدد التسجيلات: ${formatNumber(rows.length)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <p className="muted">
+        كل صف اهتمام سجّله مستخدم من صفحة «دليل المحايد» (لا يحتاج عضوية). الورش نفسها ومواعيدها تُعدَّل من «محتوى التطبيق» ← «دليل المحايد والورش»،
+        وفتح التسجيل وإغلاقه من «القيم والأسعار». تفاصيل الموعد ترسلها الإدارة للمسجّلين بنفسها.
+      </p>
+      {byWorkshop.size > 0 ? (
+        <p className="muted">{[...byWorkshop.entries()].map(([title, count]) => `${title}: ${formatNumber(count)}`).join(' · ')}</p>
+      ) : null}
+      <Async state={state} rows={5} empty={() => rows.length === 0} emptyText="لا توجد تسجيلات بعد.">
+        {() => (
+          <DataTable<WorkshopRegistration>
+            caption="تسجيلات الورش"
+            rows={rows}
+            rowKey={(row) => row.id}
+            columns={[
+              { key: 'who', label: 'المسجّل', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
+              { key: 'workshop', label: 'الورشة', cell: (row) => row.workshopTitle },
+              { key: 'persona', label: 'الفئة', cell: (row) => row.personaLabel || '—' },
+              { key: 'phone', label: 'الجوال', cell: (row) => (row.phone ? <bdi dir="ltr" className="num">{row.phone}</bdi> : '—') },
+              { key: 'mail', label: 'البريد', cell: (row) => (row.email ? <bdi dir="ltr" className="num">{row.email}</bdi> : '—') },
+              { key: 'note', label: 'ملاحظته', cell: (row) => row.note || '—' },
+              { key: 'at', label: 'سجّل', cell: (row) => formatDateTime(row.createdAt) },
             ]}
           />
         )}

@@ -19,7 +19,7 @@ const QUERY_KEYS: Record<SyncPart, QueryKey[]> = {
   posts: [['posts'], ['post']],
   projects: [['projects'], ['project'], ['project-brief']],
   news: [['news', 'feed'], ['news', 'decisions']],
-  content: [['content'], ['services'], ['service'], ['membership', 'content'], ['golden'], ['hq', 'overview'], ['videos']],
+  content: [['content'], ['services'], ['service'], ['membership', 'content'], ['golden'], ['hq', 'overview'], ['videos'], ['guide'], ['people'], ['person']],
 };
 const PARTS = Object.keys(QUERY_KEYS) as SyncPart[];
 

@@ -123,6 +123,49 @@ export type ContactThreadSummary = {
   unread: number;
 };
 
+/** M11 «شخصية ومسيرة» — mirrors server/src/profiles/service.ts. */
+export type ProfileLink = { label: string; url: string };
+export type ProfileFields = {
+  name: string;
+  title: string;
+  company: string;
+  bio: string;
+  milestones: string[];
+  links: ProfileLink[];
+  photo: string | null;
+};
+export type ProfileStatus = 'pending' | 'approved' | 'rejected';
+export type Profile = {
+  id: string;
+  contactId: number | null;
+  memberNumber: string;
+  status: ProfileStatus;
+  fields: ProfileFields;
+  /** A member's resubmission awaiting review while `fields` stays public. */
+  draft: ProfileFields | null;
+  note: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+};
+export type ProfilesConfig = { intro: string };
+
+/** M10: a workshop interest registration from «دليل المحايد» — mirrors server/src/workshops/service.ts. */
+export type WorkshopRegistration = {
+  id: string;
+  workshopId: string;
+  workshopTitle: string;
+  contactId: number;
+  name: string;
+  phone: string;
+  email: string;
+  personaLabel: string;
+  note: string;
+  createdAt: string;
+};
+
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
@@ -263,6 +306,13 @@ export const api = {
   saveString: (input: { lang: WordingLang; key: string; value: string | null }) => call<{ ok: true; edit: WordingEdit | null }>('PUT', '/api/admin/strings', input),
   uploadsConfig: () => call<UploadConfig>('GET', '/api/admin/uploads/config'),
   uploadTicket: (file: { filename: string; contentType: string; size: number }) => call<UploadTicket>('POST', '/api/admin/uploads', file),
+  profiles: () => call<{ profiles: Profile[]; config: ProfilesConfig }>('GET', '/api/admin/profiles'),
+  createProfile: (input: { contactId: number | null; fields: ProfileFields }) => call<{ profile: Profile }>('POST', '/api/admin/profiles', input),
+  updateProfile: (id: string, input: Partial<ProfileFields> & { order?: number }) => call<{ profile: Profile }>('PUT', `/api/admin/profiles/${id}`, input),
+  decideProfile: (id: string, action: 'approve' | 'reject', note = '') => call<{ profile: Profile }>('POST', `/api/admin/profiles/${id}/decision`, { action, note }),
+  deleteProfile: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/profiles/${id}`),
+  profilesConfig: (input: ProfilesConfig) => call<{ config: ProfilesConfig }>('PUT', '/api/admin/profiles/config', input),
+  workshopRegistrations: () => call<{ registrations: WorkshopRegistration[] }>('GET', '/api/admin/workshops'),
 };
 
 const TRANSFER_FAILED = 'تعذر رفع الملف. تحقق من الإنترنت ثم حاول مرة أخرى.';

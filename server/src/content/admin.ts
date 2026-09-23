@@ -10,6 +10,8 @@ import { MEMBERSHIP_EN } from './en/membership.js';
 import { SERVICES_EN } from './en/services.js';
 import { VIDEOS_EN } from './en/videos.js';
 import { GOLDEN_CONTENT_KEY, GOLDEN_SEED } from './golden.js';
+import { GUIDE_EN } from './en/guide.js';
+import { GUIDE_CONTENT_KEY, GUIDE_SEED } from './guide.js';
 import { HOME_CONTENT_KEY, HOME_SEED } from './home.js';
 import { HQ_CONTENT_KEY, HQ_SEED } from './hq.js';
 import { at, wordingOf } from './i18n.js';
@@ -32,6 +34,7 @@ export const CONTENT_BLOCKS: readonly ContentBlock[] = [
   { key: 'hq', label: 'مقر النادي', storeKey: HQ_CONTENT_KEY, seed: HQ_SEED, translation: HQ_EN },
   { key: 'about', label: 'عن النادي', storeKey: ABOUT_CONTENT_KEY, seed: ABOUT_SEED, translation: ABOUT_EN },
   { key: 'videos', label: 'مكتبة الفيديو', storeKey: VIDEOS_CONTENT_KEY, seed: VIDEOS_SEED, translation: VIDEOS_EN },
+  { key: 'guide', label: 'دليل المحايد والورش', storeKey: GUIDE_CONTENT_KEY, seed: GUIDE_SEED, translation: GUIDE_EN },
 ];
 
 export type AdminContentItem = { block: ContentBlockKey; path: string; ar: string; en: string; arEdit: ContentEdit | null; enEdit: ContentEdit | null };

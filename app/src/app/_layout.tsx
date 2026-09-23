@@ -107,6 +107,11 @@ export default function RootLayout() {
                 <Stack.Screen name="posts/compose" options={{ ...detailHeader, title: t('compose.screenTitle') }} />
                 <Stack.Screen name="card" options={{ ...detailHeader, title: t('nav.card') }} />
                 <Stack.Screen name="invite" options={{ ...detailHeader, title: t('nav.invite') }} />
+                <Stack.Screen name="people/index" options={{ ...detailHeader, title: t('nav.people') }} />
+                <Stack.Screen name="people/[id]" options={{ ...detailHeader, title: t('nav.person') }} />
+                <Stack.Screen name="people/apply" options={{ ...detailHeader, title: t('nav.peopleApply') }} />
+                <Stack.Screen name="guide" options={{ ...detailHeader, title: t('nav.guide') }} />
+                <Stack.Screen name="workshops" options={{ ...detailHeader, title: t('nav.workshops') }} />
                 <Stack.Screen name="about" options={{ ...detailHeader, title: t('nav.about') }} />
                 <Stack.Screen name="hq/index" options={{ ...detailHeader, title: t('nav.hq') }} />
                 <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />

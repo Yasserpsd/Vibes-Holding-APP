@@ -4,7 +4,6 @@
   "tabs.advisor": "Advisor",
   "tabs.news": "News",
   "tabs.account": "Account",
-
   "nav.project": "Project",
   "nav.golden": "Golden Projects",
   "nav.membership": "Membership",
@@ -32,7 +31,6 @@
   "nav.register": "Create Account",
   "nav.verify": "Verification Code",
   "nav.reset": "Reset Password",
-
   "news.title": "News",
   "news.interestsLink": "My interests",
   "news.decisionsTitle": "Saudi Decisions & Regulations",
@@ -58,7 +56,6 @@
   "news.interests.save": "Save interests",
   "news.interests.none": "With nothing selected, the news is ranked by importance and recency only.",
   "news.interests.count": "{count} interests selected",
-
   "account.title": "My Account",
   "account.guestDescription": "Sign in to reach your membership and your profile.",
   "account.signIn": "Sign in",
@@ -87,14 +84,12 @@
   "account.delete.passwordRequired": "Enter your password to confirm",
   "account.version": "Version {version}",
   "account.versionPreview": "Preview build · version {version}",
-
   "lang.title": "App language",
   "lang.message": "Choose the app language. The app restarts so the screen direction can change.",
   "lang.arabic": "العربية",
   "lang.english": "English",
   "lang.current": "current",
   "lang.cancel": "Cancel",
-
   "common.clubName": "Investors Club",
   "common.underConstruction": "Coming soon",
   "common.password": "Password",
@@ -112,7 +107,6 @@
   "common.millionSar": "SAR {amount} million",
   "common.sar": "SAR {amount}",
   "common.today": "Today",
-
   "errors.noApiUrl": "The server address is not set in this version",
   "errors.network": "Couldn't reach the server. Check your internet connection.",
   "errors.generic": "Something went wrong while loading the data",
@@ -143,7 +137,6 @@
   "errors.code.no_devices": "No devices are registered for notifications yet",
   "errors.code.invalid_token": "The upload permission is not valid or has expired; try again",
   "errors.code.bad_request": "The request is not valid",
-
   "time.now": "now",
   "time.yesterday": "yesterday",
   "time.am": "AM",
@@ -155,7 +148,6 @@
   "time.thursday": "Thursday",
   "time.friday": "Friday",
   "time.saturday": "Saturday",
-
   "welcome.subtitle": "Sign in or create your account to get started.",
   "welcome.signIn": "Sign in",
   "welcome.register": "Create a new account",
@@ -165,7 +157,6 @@
   "welcome.returnText": "Sign in or create your account to keep using the app.",
   "welcome.testNote": "Test version: only the club's admin accounts can sign in, so the guest tour stays available here.",
   "welcome.language": "Language · العربية",
-
   "auth.login.title": "Sign in",
   "auth.login.subtitle": "Use the same Investors Club account you use on the group's websites.",
   "auth.login.adminOnly": "Test version: only the club's admin accounts can sign in.",
@@ -227,18 +218,15 @@
   "auth.reset.sending": "Sending…",
   "auth.reset.save": "Save the password",
   "auth.reset.saving": "Saving…",
-
   "persona.neutral": "Neutral — exploring my direction",
   "persona.entrepreneur": "Entrepreneur — I have a venture",
   "persona.investor": "Investor — seeking opportunities",
-
   "country.sa": "Saudi Arabia",
   "country.ae": "United Arab Emirates",
   "country.kw": "Kuwait",
   "country.qa": "Qatar",
   "country.bh": "Bahrain",
   "country.om": "Oman",
-
   "profile.title": "Edit profile",
   "profile.signInFirst": "Sign in first.",
   "profile.subtitle": "Your email and mobile number are changed through the club's administration.",
@@ -256,13 +244,10 @@
   "profile.saving": "Saving…",
   "profile.nameRequired": "Your name is required",
   "profile.passwordShort": "The new password needs at least 6 characters",
-
   "notFound.title": "Not found",
   "notFound.message": "This page does not exist",
   "notFound.home": "Back to home",
-
   "home.greeting": "Welcome, {name}.",
-
   "projects.sort.latest": "Latest",
   "projects.sort.views": "Most viewed",
   "projects.sort.discover": "Discover",
@@ -273,7 +258,6 @@
   "projects.allStages": "All stages",
   "projects.count": "{count} projects",
   "projects.empty": "No matching projects",
-
   "project.goldenBadge": "Golden",
   "project.golden": "Golden project",
   "project.number": "No. {number}",
@@ -284,7 +268,6 @@
   "project.partnerPage": "Golden partner page",
   "project.discuss": "Discuss the project with the advisor",
   "project.contactCta": "Contact the founder",
-
   "brief.title": "Advisor's summary",
   "brief.unavailable": "The advisor's summary is not available now. You can ask the advisor about the project directly.",
   "brief.strengths": "Strengths",
@@ -295,7 +278,6 @@
   "brief.stageEstimated": "The advisor's estimate from the project's description; the owner did not state its stage.",
   "brief.preparingLabel": "The advisor is preparing the project summary",
   "brief.preparing": "The advisor is reading the project's data and preparing the summary…",
-
   "unlock.guest": "Direct contact with the founder and the pitch deck are available to club members after unlocking the project. Sign in to continue.",
   "unlock.checking": "Checking your Projects Bank balance…",
   "unlock.notAvailable": "Unlocking projects from the app is not available now.",
@@ -323,7 +305,6 @@
   "unlock.now": "Your balance now",
   "unlock.after": "After unlocking",
   "unlock.confirm": "Confirm and open contact",
-
   "contact.title": "Message the management",
   "contact.guest": "Messaging the management is for club members. Sign in to continue.",
   "contact.membersOnly": "Messaging the management at any time is a benefit of the active annual membership. Activate your membership so your words reach the club's management directly.",
@@ -335,7 +316,6 @@
   "contact.admin": "Club management",
   "contact.adminBy": "{name} · Club management",
   "contact.hint": "The management's replies arrive here and as a notification on your device.",
-
   "membership.senderName": "Name: {name}",
   "membership.senderPhone": "Mobile: {phone}",
   "membership.fromApp": "(Request from the Investors Club app)",
@@ -352,7 +332,6 @@
   "membership.daysLeft": "{days} days left",
   "membership.endsOn": "Ends on {date}",
   "membership.advisorBalance": "Advisor balance today: {left} of {limit}",
-
   "store.noPrevious": "No earlier subscription is linked to the {store} account on this device.",
   "store.done": "Your annual membership is active. Welcome to the Investors Club.",
   "store.pending": "Your subscription was received from the store and your membership will be activated within minutes. We will notify you when it is active.",
@@ -378,15 +357,11 @@
   "store.error.storeProblem": "A temporary problem in the store. Try again shortly.",
   "store.error.failed": "The purchase could not be completed in the store.",
   "store.error.unsupported": "This version of the app does not support store purchases.",
-
   "golden.portfolioValue": "Portfolio value",
   "golden.vibesPage": "Vibes Holding's offer page",
   "golden.offerPage": "Offer page",
-
   "portal.allServices": "All club services",
-
   "services.membersOnly": "Members",
-
   "posts.eventBadge": "Event",
   "posts.online": "Online",
   "posts.placeAndOnline": "{place} · and online",
@@ -400,13 +375,11 @@
   "posts.forYou": "For you",
   "posts.forYourCategory": "For your category",
   "posts.compose": "Message the members",
-
   "videos.askAbout": "Ask the advisor about: {title}",
   "videos.all": "All videos",
   "videos.count": "{count} videos",
   "videos.empty": "The channel's videos have not arrived yet. Try again later.",
   "videos.channel": "The club's YouTube channel",
-
   "advisor.ask": "Ask the advisor",
   "advisor.title": "Advisor",
   "advisor.signInDescription": "Sign in to talk to the club's AI advisor. Your conversation is one and the same on the club's website and in the app, with the same account.",
@@ -512,13 +485,10 @@
   "advisor.gate.site_cap": "The advisor has reached its daily limit. Try again later.",
   "advisor.gate.contact": "Sign in first to talk to the advisor.",
   "advisor.gate.other": "The message could not be sent now. Try again shortly.",
-
   "request.senderName": "Name: {name}",
   "request.senderPhone": "Mobile: {phone}",
   "request.fromApp": "(Request from the Investors Club app)",
-
   "notifications.channel": "Club notifications",
-
   "hq.status.pending": "Awaiting confirmation",
   "hq.status.confirmed": "Confirmed",
   "hq.status.rejected": "Declined",
@@ -535,7 +505,6 @@
   "hq.adminNote": "Administration's note: {note}",
   "hq.pass": "Entry barcode",
   "hq.cancelBooking": "Cancel the booking",
-
   "hqBook.title": "Book a visit",
   "hqBook.subtitle": "Pick the time that suits you; the entry barcode arrives once the administration confirms.",
   "hqBook.incomplete": "Pick the day, the time and the purpose of the visit",
@@ -548,7 +517,6 @@
   "hqBook.notePlaceholder": "For example: a meeting with the Projects Bank team",
   "hqBook.sending": "Sending…",
   "hqBook.submit": "Send the booking request",
-
   "hqPass.upcoming": "The barcode activates fifteen minutes before the visit",
   "hqPass.active": "Valid for entry now",
   "hqPass.expired": "The time of this visit has passed",
@@ -561,7 +529,6 @@
   "hqPass.bookedAt": "Booked on",
   "hqPass.qr": "Entry barcode",
   "hqPass.hint": "Show this card at the reception with your membership card. The barcode is valid for this visit only.",
-
   "hqAdmin.filter.pending": "Awaiting confirmation",
   "hqAdmin.filter.confirmed": "Confirmed",
   "hqAdmin.filter.all": "All",
@@ -578,7 +545,6 @@
   "hqAdmin.purpose": "Purpose: {purpose}",
   "hqAdmin.confirm": "Confirm",
   "hqAdmin.decline": "Decline",
-
   "payments.status.created": "Awaiting payment",
   "payments.status.paid": "Paid",
   "payments.status.failed": "Not completed",
@@ -587,7 +553,6 @@
   "payments.subtitle": "Club services paid inside the app",
   "payments.empty": "No payments yet. Services such as pitch deck design and “Make your meetup” are paid from the service page.",
   "payments.memberPrice": "Members' price",
-
   "payment.created.title": "Awaiting payment confirmation",
   "payment.created.text": "If you completed the payment, the result appears here in moments. If not yet, open the payment page again.",
   "payment.paid.title": "Payment successful",
@@ -605,7 +570,6 @@
   "payment.refreshStatus": "Refresh the status",
   "payment.retry": "Try again",
   "payment.all": "All my payments",
-
   "service.missingField": "Complete the request details before paying: {field}",
   "service.handedOver": "We opened WhatsApp with your message ready. Send it from there and the team will contact you.",
   "service.infoOnSite": "Service details on the website",
@@ -619,7 +583,6 @@
   "service.payHint": "Payment through the Paymob gateway inside the app. After the payment, the club team contacts you.",
   "service.bookHq": "Book your HQ visit",
   "service.openProjects": "Open the Projects Bank",
-
   "about.title": "About the Investors Club",
   "about.management": "Club's administration",
   "about.managementGreeting": "Hello, I am contacting you from the Investors Club app.",
@@ -627,7 +590,6 @@
   "about.studioGreeting": "Hello, I would like to ask about booking the studio.",
   "about.email": "Email",
   "about.legal": "Commercial registration {cr} · VAT number {vat}",
-
   "compose.screenTitle": "Send a message",
   "compose.subtitle": "A management message delivered in-app to the audience you choose, with a push notification.",
   "compose.adminOnly": "This page is for the club management only.",
@@ -654,7 +616,6 @@
   "compose.sentPush": "The notification reached {sent} devices.",
   "compose.sentNoDevices": "No devices are registered for notifications in this audience yet; the message shows in the app.",
   "compose.backToInbox": "Back to messages",
-
   "card.subtitle": "Your Investors Club membership with your details and personal number.",
   "card.clubEn": "INVESTORS CLUB",
   "card.numberLabel": "Membership No.",
@@ -685,7 +646,6 @@
   "card.sent": "Your request reached the management; the card will arrive at your address at no charge.",
   "card.needCity": "Write the city.",
   "card.needAddress": "Write the full address.",
-
   "poll.badge": "Poll",
   "poll.openShort": "Share your view",
   "poll.votedShort": "Your vote is in",
@@ -699,7 +659,6 @@
   "poll.confirming": "Recording…",
   "poll.finalHint": "Pick then confirm; your vote is final and cannot be changed",
   "poll.votedFinal": "Your vote is recorded and final",
-
   "invite.title": "Invite a new member",
   "invite.subtitle": "Nominate someone you trust for the club — the administration's gift awaits them",
   "invite.guest": "Invitations are for club members — sign in first.",
@@ -715,5 +674,43 @@
   "invite.empty": "No one has registered with your code yet — share the invitation now.",
   "invite.state.registered": "Registered, awaiting e-mail verification",
   "invite.state.verified": "Account verified",
-  "invite.state.member": "Active member"
+  "invite.state.member": "Active member",
+  "nav.people": "Club Figures",
+  "nav.person": "Profile",
+  "nav.peopleApply": "Submit your profile",
+  "nav.guide": "The Neutral's Guide",
+  "nav.workshops": "Workshops & Meetups",
+  "people.title": "Club Figures",
+  "people.empty": "No approved profiles yet.",
+  "people.all": "View all",
+  "people.applyCta": "Submit your profile",
+  "people.guest": "Sign in to apply in Club Figures.",
+  "people.signIn": "Sign in",
+  "people.membership": "Applying opens after activating the annual membership.",
+  "people.activate": "Activate your membership",
+  "people.form.title": "Job title or position",
+  "people.form.company": "Company (optional)",
+  "people.form.bio": "Your bio: who you are and your journey",
+  "people.form.bioHint": "At least thirty characters.",
+  "people.form.milestones": "Your journey milestones (one per line)",
+  "people.form.links": "Your links (optional — one per line: label | link)",
+  "people.photoNote": "The management adds your photo at approval — you can send it through “Message the management”.",
+  "people.submit": "Send for review",
+  "people.applied": "Your application reached the management; we will notify you of the outcome.",
+  "people.pending": "Your profile awaits the management's review.",
+  "people.pendingEdit": "Your edit awaits review — the approved version is the one shown now.",
+  "people.approved": "Your profile is approved and shown in Club Figures.",
+  "people.view": "Open my profile",
+  "people.editCta": "Edit your profile",
+  "people.rejectedTitle": "The management's note",
+  "people.reapply": "Edit and resend",
+  "people.milestonesTitle": "Journey milestones",
+  "people.linksTitle": "Links",
+  "guide.modeHq": "At the club HQ",
+  "guide.modeOnline": "Online",
+  "guide.modeBoth": "At the HQ and online",
+  "guide.guest": "Sign in (an account is enough, no membership needed) to register your interest in the workshops.",
+  "guide.signIn": "Sign in",
+  "guide.noteField": "A note to the management (optional)",
+  "guide.send": "Confirm registration"
 }

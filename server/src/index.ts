@@ -2,6 +2,7 @@ import { buildApp } from './app.js';
 import { loadConfig, loadDotEnv } from './config.js';
 import { ensureAboutSeed } from './content/about.js';
 import { ensureGoldenSeed } from './content/golden.js';
+import { ensureGuideSeed } from './content/guide.js';
 import { ensureHomeSeed } from './content/home.js';
 import { ensureHqSeed } from './content/hq.js';
 import { ensureMembershipSeed } from './content/membership.js';
@@ -21,6 +22,7 @@ const seeded = {
   about: await ensureAboutSeed(kv),
   hq: await ensureHqSeed(kv),
   videos: await ensureVideosSeed(kv),
+  guide: await ensureGuideSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
 const { app, projects, news, videos, media, sync, analytics } = await buildApp({ config, kv });

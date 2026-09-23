@@ -18,8 +18,8 @@ export type HomePortal = {
   subtitleEn?: string;
   /** Icon family name known to the app; unknown names fall back to a generic icon. */
   icon: string;
-  /** Where the portal leads: the Projects Bank, the entrepreneurs page or the advisor. */
-  target: 'projects' | 'entrepreneurs' | 'advisor';
+  /** Where the portal leads: the Projects Bank, the entrepreneurs page, the advisor or the neutral's guide (M10). */
+  target: 'projects' | 'entrepreneurs' | 'advisor' | 'guide';
 };
 
 export type HomeContent = {
@@ -55,7 +55,8 @@ export const HOME_SEED: HomeContent = {
       titleEn: 'Neutral',
       subtitleEn: 'Exploring my direction',
       icon: 'compass',
-      target: 'advisor',
+      // M10: the neutral is number one — his portal opens his guide, whose first step opens the advisor.
+      target: 'guide',
     },
     {
       key: 'entrepreneur',
@@ -107,8 +108,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 3,
-  updatedAt: '2026-09-21T00:00:00.000Z',
+  version: 4,
+  updatedAt: '2026-09-23T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

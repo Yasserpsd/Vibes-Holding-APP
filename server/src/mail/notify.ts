@@ -211,6 +211,35 @@ export class Notifier {
     ]);
   }
 
+  /** M11: a member applied (or re-applied) to «شخصية ومسيرة» and waits for the review. */
+  profileApplied(member: { name: string; phone: string; email: string; memberNumber: string; resubmission: boolean }): void {
+    this.dispatch(`طلب جديد في «شخصية ومسيرة»: ${member.name || '—'}`, [
+      member.resubmission
+        ? `عدّل أحد الأعضاء ملفه المعتمد في «شخصية ومسيرة» من ${APP_NAME}؛ النسخة المعتمدة ما زالت الظاهرة والتعديل بانتظار المراجعة.`
+        : `قدّم أحد الأعضاء ملفه في «شخصية ومسيرة» من ${APP_NAME} وينتظر الاعتماد.`,
+      '',
+      ...personLines(member),
+      member.memberNumber ? `رقم العضوية: ${member.memberNumber}` : null,
+      '',
+      'المراجعة من لوحة الإدارة: قسم «شخصية ومسيرة» — اعتماد أو رفض مع سبب، ويمكن تعديل النص وإضافة الصورة قبل الاعتماد.',
+    ]);
+  }
+
+  /** M10: someone registered his interest in a workshop from the guide page. */
+  workshopRegistered(registration: { id: string; workshopTitle: string; name: string; phone: string; email: string; personaLabel: string; note: string }): void {
+    this.dispatch(`تسجيل في ورشة: ${registration.workshopTitle} — ${registration.name || '—'}`, [
+      `سجّل أحد مستخدمي ${APP_NAME} اهتمامه بحضور ورشة من صفحة «دليل المحايد».`,
+      '',
+      `الورشة: ${registration.workshopTitle}`,
+      ...personLines(registration),
+      registration.personaLabel ? `الفئة: ${registration.personaLabel}` : null,
+      registration.note ? `ملاحظته: ${registration.note}` : null,
+      `رقم التسجيل: ${registration.id}`,
+      '',
+      'القائمة الكاملة في لوحة الإدارة: قسم «تسجيلات الورش». تفاصيل الموعد والحضور ترسلها الإدارة بنفسها للمسجّلين.',
+    ]);
+  }
+
   serviceRequested(request: ServiceRequestLike): void {
     this.dispatch(`طلب خدمة من التطبيق: ${request.serviceTitle} — ${request.sender?.name || 'زائر'}`, [
       `طلب جديد لخدمة «${request.serviceTitle}» من ${APP_NAME}. فتح التطبيق واتساب (${request.channel}) برسالة الطلب الجاهزة.`,

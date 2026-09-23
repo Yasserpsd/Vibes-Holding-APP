@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -14,6 +14,7 @@ import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { PeopleBlock } from '@/components/PeopleBlock';
 import { PortalCard } from '@/components/PortalCard';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
@@ -66,7 +67,11 @@ export default function HomeScreen() {
       case 'entrepreneurs':
         router.push('/portal/entrepreneurs');
         return;
-      case 'advisor':
+      case 'guide':
+        // M10: the neutral portal opens the neutral's guide; its first step opens the advisor.
+        router.push('/guide' as Href);
+        return;
+      default:
         router.push({ pathname: '/advisor', params: { ctxType: 'portal', ctxId: portal.key, ctxTitle: portal.title, ctxNonce: nonce } });
     }
   };
@@ -94,6 +99,9 @@ export default function HomeScreen() {
           </FadeInView>
         ))}
       </View>
+
+      {/* «شخصية ومسيرة» (M11): the approved club figures, early on the home. Renders nothing while none are approved. */}
+      <PeopleBlock />
 
       <FadeInView delay={220}>
         <SectionHeader title={content.golden.title} subtitle={content.golden.subtitle} cta={content.golden.cta} onPress={() => router.push('/golden')} />

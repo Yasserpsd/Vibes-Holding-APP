@@ -47,6 +47,8 @@ import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { PollsService } from './polls/service.js';
+import { profilesRoutes } from './profiles/routes.js';
+import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
@@ -60,6 +62,8 @@ import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './vide
 import { videosRoutes } from './videos/routes.js';
 import { VideosService } from './videos/service.js';
 import { webhookRoutes } from './webhooks/routes.js';
+import { workshopsRoutes } from './workshops/routes.js';
+import { WorkshopsService } from './workshops/service.js';
 
 export type AppDeps = {
   config: Config;
@@ -199,6 +203,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const hq = new HqService({ kv, log: app.log, notifier, push });
   const card = new CardService({ kv, notifier });
   const contact = new ContactService({ kv, notifier, push });
+  // «شخصية ومسيرة» (M11): member profiles, applied from the app and reviewed in the dashboard.
+  const profiles = new ProfilesService({ kv, notifier, push, onChange: () => moved('content') });
+  // «دليل المحايد» workshops (M10): interest registrations to the management.
+  const workshops = new WorkshopsService({ kv, notifier });
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
   let mediaStore: MediaStore;
   if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
@@ -331,6 +339,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });
   await app.register(contactRoutes, { service: contact, auth });
+  await app.register(profilesRoutes, { service: profiles, auth });
+  await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });

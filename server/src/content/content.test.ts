@@ -111,7 +111,7 @@ test('only a dashboard admin edits a text; each language keeps its own edits; th
   const title = list.items.find((item: { block: string; path: string }) => item.block === 'hq' && item.path === 'title');
   assert.deepEqual([title.ar, title.arEdit.value, title.en, title.enEdit.value], ['مقر النادي', 'مقر النادي بالرياض', 'Club HQ', 'The Club HQ']);
   assert.deepEqual(list.edited, { ar: 1, en: 1 });
-  assert.deepEqual(list.blocks.map((block: { key: string }) => block.key), ['home', 'membership', 'services', 'golden', 'hq', 'about', 'videos']);
+  assert.deepEqual(list.blocks.map((block: { key: string }) => block.key), ['home', 'membership', 'services', 'golden', 'hq', 'about', 'videos', 'guide']);
   assert.ok(list.items.every((item: { en: string }) => item.en.length > 0), 'every text has an English default');
 
   // Back to the block's own text: by asking for it, or by typing it again.

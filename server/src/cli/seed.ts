@@ -2,6 +2,7 @@
 import { loadConfig, loadDotEnv } from '../config.js';
 import { ensureAboutSeed } from '../content/about.js';
 import { ensureGoldenSeed } from '../content/golden.js';
+import { ensureGuideSeed } from '../content/guide.js';
 import { ensureHomeSeed } from '../content/home.js';
 import { ensureHqSeed } from '../content/hq.js';
 import { ensureMembershipSeed } from '../content/membership.js';
@@ -26,6 +27,7 @@ const results = {
   about: await ensureAboutSeed(kv, { force }),
   hq: await ensureHqSeed(kv, { force }),
   videos: await ensureVideosSeed(kv, { force }),
+  guide: await ensureGuideSeed(kv, { force }),
 };
 for (const [name, written] of Object.entries(results)) {
   console.log(written ? `${name}: content written.` : `${name}: content already present (use --force to overwrite).`);

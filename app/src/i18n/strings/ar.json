@@ -4,7 +4,6 @@
   "tabs.advisor": "المستشار",
   "tabs.news": "الأخبار",
   "tabs.account": "حسابي",
-
   "nav.project": "المشروع",
   "nav.golden": "المشاريع الذهبية",
   "nav.membership": "العضوية",
@@ -32,7 +31,6 @@
   "nav.register": "إنشاء حساب",
   "nav.verify": "رمز التفعيل",
   "nav.reset": "استعادة كلمة المرور",
-
   "news.title": "الأخبار",
   "news.interestsLink": "اهتماماتي",
   "news.decisionsTitle": "قرارات وأنظمة المملكة",
@@ -58,7 +56,6 @@
   "news.interests.save": "حفظ الاهتمامات",
   "news.interests.none": "بدون اختيار تُرتَّب الأخبار حسب الأهمية والحداثة فقط.",
   "news.interests.count": "{count} اهتمامات مختارة",
-
   "account.title": "حسابي",
   "account.guestDescription": "سجّل الدخول للوصول إلى عضويتك وملفك الشخصي.",
   "account.signIn": "تسجيل الدخول",
@@ -87,14 +84,12 @@
   "account.delete.passwordRequired": "اكتب كلمة المرور للتأكيد",
   "account.version": "الإصدار {version}",
   "account.versionPreview": "نسخة تجريبية · الإصدار {version}",
-
   "lang.title": "لغة التطبيق",
   "lang.message": "اختر لغة التطبيق. يُعاد تشغيل التطبيق ليتغيّر اتجاه الشاشة.",
   "lang.arabic": "العربية",
   "lang.english": "English",
   "lang.current": "الحالية",
   "lang.cancel": "إلغاء",
-
   "common.clubName": "نادي المستثمرين",
   "common.underConstruction": "قيد الإنشاء",
   "common.password": "كلمة المرور",
@@ -112,7 +107,6 @@
   "common.millionSar": "{amount} مليون ريال",
   "common.sar": "{amount} ريال",
   "common.today": "اليوم",
-
   "errors.noApiUrl": "عنوان الخادم غير مضبوط في هذه النسخة",
   "errors.network": "تعذّر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.",
   "errors.generic": "حدث خطأ أثناء تحميل البيانات",
@@ -143,7 +137,6 @@
   "errors.code.no_devices": "لا توجد أجهزة مسجلة للإشعارات بعد",
   "errors.code.invalid_token": "إذن الرفع غير صالح أو انتهت مدته، أعد المحاولة",
   "errors.code.bad_request": "الطلب غير صالح",
-
   "time.now": "الآن",
   "time.yesterday": "أمس",
   "time.am": "ص",
@@ -155,7 +148,6 @@
   "time.thursday": "الخميس",
   "time.friday": "الجمعة",
   "time.saturday": "السبت",
-
   "welcome.subtitle": "سجّل الدخول أو أنشئ حسابك لتبدأ.",
   "welcome.signIn": "تسجيل الدخول",
   "welcome.register": "إنشاء حساب جديد",
@@ -165,7 +157,6 @@
   "welcome.returnText": "سجّل الدخول أو أنشئ حسابك لمتابعة استخدام التطبيق.",
   "welcome.testNote": "النسخة التجريبية: الدخول متاح لحسابات إدارة النادي فقط، لذلك تبقى المتابعة كضيف متاحة هنا.",
   "welcome.language": "اللغة · English",
-
   "auth.login.title": "تسجيل الدخول",
   "auth.login.subtitle": "بنفس حساب نادي المستثمرين الذي تستخدمه على مواقع المنظومة.",
   "auth.login.adminOnly": "النسخة التجريبية: الدخول متاح لحسابات إدارة النادي فقط.",
@@ -227,18 +218,15 @@
   "auth.reset.sending": "جارٍ الإرسال…",
   "auth.reset.save": "حفظ كلمة المرور",
   "auth.reset.saving": "جارٍ الحفظ…",
-
   "persona.neutral": "محايد — أستكشف توجهي",
   "persona.entrepreneur": "رائد أعمال — لدي مشروع",
   "persona.investor": "مستثمر — أبحث عن فرص",
-
   "country.sa": "السعودية",
   "country.ae": "الإمارات",
   "country.kw": "الكويت",
   "country.qa": "قطر",
   "country.bh": "البحرين",
   "country.om": "عُمان",
-
   "profile.title": "تعديل الملف الشخصي",
   "profile.signInFirst": "سجّل الدخول أولًا.",
   "profile.subtitle": "البريد الإلكتروني ورقم الجوال يتغيّران عبر إدارة النادي.",
@@ -256,13 +244,10 @@
   "profile.saving": "جارٍ الحفظ…",
   "profile.nameRequired": "الاسم مطلوب",
   "profile.passwordShort": "كلمة المرور الجديدة 6 أحرف على الأقل",
-
   "notFound.title": "غير موجود",
   "notFound.message": "هذه الصفحة غير موجودة",
   "notFound.home": "العودة إلى الرئيسية",
-
   "home.greeting": "أهلًا {name}.",
-
   "projects.sort.latest": "الأحدث",
   "projects.sort.views": "الأكثر مشاهدة",
   "projects.sort.discover": "اكتشف",
@@ -273,7 +258,6 @@
   "projects.allStages": "كل المراحل",
   "projects.count": "{count} مشروع",
   "projects.empty": "لا توجد مشاريع مطابقة",
-
   "project.goldenBadge": "ذهبي",
   "project.golden": "مشروع ذهبي",
   "project.number": "رقم {number}",
@@ -284,7 +268,6 @@
   "project.partnerPage": "صفحة الشريك الذهبي",
   "project.discuss": "ناقش المشروع مع المستشار",
   "project.contactCta": "تواصل مع المؤسس",
-
   "brief.title": "ملخص المستشار",
   "brief.unavailable": "ملخص المستشار غير متاح الآن. يمكنك سؤاله عن المشروع مباشرة.",
   "brief.strengths": "نقاط القوة",
@@ -295,7 +278,6 @@
   "brief.stageEstimated": "تقدير المستشار من وصف المشروع؛ صاحب المشروع لم يحدد مرحلته.",
   "brief.preparingLabel": "المستشار يجهّز ملخص المشروع",
   "brief.preparing": "المستشار يقرأ بيانات المشروع ويجهّز الملخص…",
-
   "unlock.guest": "التواصل المباشر مع المؤسس وملف العرض متاحان لأعضاء النادي بعد فتح المشروع. سجّل الدخول للمتابعة.",
   "unlock.checking": "نتحقق من رصيدك في بنك المشاريع…",
   "unlock.notAvailable": "فتح المشاريع من التطبيق غير متاح الآن.",
@@ -323,7 +305,6 @@
   "unlock.now": "رصيدك الآن",
   "unlock.after": "بعد الفتح",
   "unlock.confirm": "تأكيد وفتح التواصل",
-
   "contact.title": "راسل الإدارة",
   "contact.guest": "مراسلة الإدارة متاحة لأعضاء النادي. سجّل الدخول للمتابعة.",
   "contact.membersOnly": "مراسلة الإدارة في أي وقت ميزة لأصحاب العضوية السنوية الفعّالة. فعّل عضويتك لتصل رسائلك إلى إدارة النادي مباشرة.",
@@ -335,7 +316,6 @@
   "contact.admin": "إدارة النادي",
   "contact.adminBy": "{name} · إدارة النادي",
   "contact.hint": "ردود الإدارة تصلك هنا وفي إشعار على جهازك.",
-
   "membership.senderName": "الاسم: {name}",
   "membership.senderPhone": "الجوال: {phone}",
   "membership.fromApp": "(طلب من تطبيق نادي المستثمرين)",
@@ -352,7 +332,6 @@
   "membership.daysLeft": "المتبقي {days} يومًا",
   "membership.endsOn": "تنتهي في {date}",
   "membership.advisorBalance": "رصيد المستشار اليوم: {left} من {limit}",
-
   "store.noPrevious": "لا يوجد اشتراك سابق مرتبط بحساب {store} على هذا الجهاز.",
   "store.done": "تم تفعيل عضويتك السنوية. أهلًا بك في نادي المستثمرين.",
   "store.pending": "تم استلام اشتراكك من المتجر وسيتم تفعيل عضويتك خلال دقائق. سنرسل لك إشعارًا عند التفعيل.",
@@ -378,15 +357,11 @@
   "store.error.storeProblem": "مشكلة مؤقتة في المتجر. حاول مرة أخرى بعد قليل.",
   "store.error.failed": "تعذّر إتمام الشراء من المتجر.",
   "store.error.unsupported": "هذه النسخة من التطبيق لا تدعم الشراء من المتجر.",
-
   "golden.portfolioValue": "قيمة المحفظة",
   "golden.vibesPage": "صفحة عرض فايبز القابضة",
   "golden.offerPage": "صفحة العرض",
-
   "portal.allServices": "كل خدمات النادي",
-
   "services.membersOnly": "للأعضاء",
-
   "posts.eventBadge": "فعالية",
   "posts.online": "عن بُعد",
   "posts.placeAndOnline": "{place} · وعن بُعد",
@@ -400,13 +375,11 @@
   "posts.forYou": "لك خصيصًا",
   "posts.forYourCategory": "لفئتك",
   "posts.compose": "إرسال رسالة للأعضاء",
-
   "videos.askAbout": "اسأل المستشار عن: {title}",
   "videos.all": "كل الفيديوهات",
   "videos.count": "{count} فيديو",
   "videos.empty": "لم تصل فيديوهات القناة بعد، حاول لاحقًا.",
   "videos.channel": "قناة النادي على يوتيوب",
-
   "advisor.ask": "اسأل المستشار",
   "advisor.title": "المستشار",
   "advisor.signInDescription": "سجّل الدخول لتتحدث مع مستشار النادي الذكي. محادثتك واحدة على موقع النادي وفي التطبيق، بنفس الحساب.",
@@ -512,13 +485,10 @@
   "advisor.gate.site_cap": "المستشار وصل إلى حده اليومي. عاود المحاولة لاحقًا.",
   "advisor.gate.contact": "سجّل الدخول أولًا لتتحدث مع المستشار.",
   "advisor.gate.other": "تعذّر إرسال الرسالة الآن. حاول بعد قليل.",
-
   "request.senderName": "الاسم: {name}",
   "request.senderPhone": "الجوال: {phone}",
   "request.fromApp": "(طلب من تطبيق نادي المستثمرين)",
-
   "notifications.channel": "إشعارات النادي",
-
   "hq.status.pending": "بانتظار التأكيد",
   "hq.status.confirmed": "مؤكد",
   "hq.status.rejected": "مرفوض",
@@ -535,7 +505,6 @@
   "hq.adminNote": "ملاحظة الإدارة: {note}",
   "hq.pass": "باركود الدخول",
   "hq.cancelBooking": "إلغاء الحجز",
-
   "hqBook.title": "حجز زيارة",
   "hqBook.subtitle": "اختر الموعد الذي يناسبك، وسيصلك باركود الدخول بعد تأكيد الإدارة.",
   "hqBook.incomplete": "اختر اليوم والوقت والغرض من الزيارة",
@@ -548,7 +517,6 @@
   "hqBook.notePlaceholder": "مثال: اجتماع مع فريق بنك المشاريع",
   "hqBook.sending": "جارٍ الإرسال…",
   "hqBook.submit": "أرسل طلب الحجز",
-
   "hqPass.upcoming": "يُفعّل الباركود قبل الموعد بربع ساعة",
   "hqPass.active": "صالح الآن للدخول",
   "hqPass.expired": "انتهى وقت هذا الموعد",
@@ -561,7 +529,6 @@
   "hqPass.bookedAt": "تاريخ الحجز",
   "hqPass.qr": "باركود الدخول",
   "hqPass.hint": "أبرز هذه البطاقة عند الاستقبال مع بطاقة عضويتك. الباركود صالح لهذا الموعد فقط.",
-
   "hqAdmin.filter.pending": "بانتظار التأكيد",
   "hqAdmin.filter.confirmed": "مؤكدة",
   "hqAdmin.filter.all": "الكل",
@@ -578,7 +545,6 @@
   "hqAdmin.purpose": "الغرض: {purpose}",
   "hqAdmin.confirm": "تأكيد",
   "hqAdmin.decline": "رفض",
-
   "payments.status.created": "بانتظار الدفع",
   "payments.status.paid": "مدفوعة",
   "payments.status.failed": "غير مكتملة",
@@ -587,7 +553,6 @@
   "payments.subtitle": "خدمات النادي المدفوعة من داخل التطبيق",
   "payments.empty": "لا توجد مدفوعات بعد. خدمات مثل تصميم Pitch Deck و«اصنع ملتقاك» تُدفع من صفحة الخدمة.",
   "payments.memberPrice": "سعر الأعضاء",
-
   "payment.created.title": "بانتظار تأكيد الدفع",
   "payment.created.text": "إذا أكملت الدفع تظهر النتيجة هنا خلال لحظات. إن لم تكمله بعد، افتح صفحة الدفع مرة أخرى.",
   "payment.paid.title": "تم الدفع بنجاح",
@@ -605,7 +570,6 @@
   "payment.refreshStatus": "تحديث الحالة",
   "payment.retry": "المحاولة مرة أخرى",
   "payment.all": "كل مدفوعاتي",
-
   "service.missingField": "أكمل تفاصيل الطلب قبل الدفع: {field}",
   "service.handedOver": "فتحنا واتساب برسالتك الجاهزة، أكمل الإرسال من هناك وسيتواصل معك الفريق.",
   "service.infoOnSite": "تفاصيل الخدمة على الموقع",
@@ -619,7 +583,6 @@
   "service.payHint": "الدفع عبر بوابة Paymob داخل التطبيق. بعد إتمام الدفع يتواصل معك فريق النادي.",
   "service.bookHq": "احجز زيارتك للمقر",
   "service.openProjects": "افتح بنك المشاريع",
-
   "about.title": "عن نادي المستثمرين",
   "about.management": "إدارة النادي",
   "about.managementGreeting": "السلام عليكم، أتواصل معكم من تطبيق نادي المستثمرين.",
@@ -627,7 +590,6 @@
   "about.studioGreeting": "السلام عليكم، أرغب في الاستفسار عن حجز الاستديو.",
   "about.email": "البريد الإلكتروني",
   "about.legal": "سجل تجاري {cr} · الرقم الضريبي {vat}",
-
   "compose.screenTitle": "إرسال رسالة",
   "compose.subtitle": "رسالة من الإدارة تصل داخل التطبيق إلى من تختار، مع إشعار لأجهزته.",
   "compose.adminOnly": "هذه الصفحة لإدارة النادي فقط.",
@@ -654,7 +616,6 @@
   "compose.sentPush": "وصل الإشعار إلى {sent} من الأجهزة.",
   "compose.sentNoDevices": "لا توجد أجهزة مسجلة للإشعارات لدى هذا الجمهور بعد، والرسالة ظاهرة في التطبيق.",
   "compose.backToInbox": "رجوع إلى الرسائل",
-
   "card.subtitle": "عضويتك في نادي المستثمرين ببيانات حسابك ورقمك الخاص.",
   "card.clubEn": "INVESTORS CLUB",
   "card.numberLabel": "Membership No.",
@@ -685,7 +646,6 @@
   "card.sent": "وصل طلبك إلى الإدارة، وسيصلك الكارت إلى عنوانك بدون رسوم.",
   "card.needCity": "اكتب المدينة.",
   "card.needAddress": "اكتب العنوان بالتفصيل.",
-
   "poll.badge": "استفتاء",
   "poll.openShort": "شارك برأيك",
   "poll.votedShort": "سجّلنا صوتك",
@@ -699,7 +659,6 @@
   "poll.confirming": "جارٍ التسجيل…",
   "poll.finalHint": "اختر ثم أكّد؛ صوتك نهائي ولا يمكن تغييره",
   "poll.votedFinal": "سجّلنا صوتك، وهو نهائي",
-
   "invite.title": "دعوة عضو جديد",
   "invite.subtitle": "رشّح من تثق به لعضوية النادي، وهدية المدعو على الإدارة",
   "invite.guest": "الدعوات لأعضاء النادي — سجّل الدخول أولًا.",
@@ -715,5 +674,43 @@
   "invite.empty": "لم يسجّل أحد بكودك بعد — شارك الدعوة الآن.",
   "invite.state.registered": "سجّل، بانتظار تفعيل البريد",
   "invite.state.verified": "فعّل حسابه",
-  "invite.state.member": "عضو بعضوية سارية"
+  "invite.state.member": "عضو بعضوية سارية",
+  "nav.people": "شخصية ومسيرة",
+  "nav.person": "الملف",
+  "nav.peopleApply": "قدّم ملفك",
+  "nav.guide": "دليل المحايد",
+  "nav.workshops": "الورش والملتقيات",
+  "people.title": "شخصية ومسيرة",
+  "people.empty": "لم تُعتمد ملفات بعد.",
+  "people.all": "عرض الكل",
+  "people.applyCta": "قدّم ملفك",
+  "people.guest": "سجّل دخولك للتقديم في «شخصية ومسيرة».",
+  "people.signIn": "تسجيل الدخول",
+  "people.membership": "التقديم متاح للأعضاء بعد تفعيل العضوية السنوية.",
+  "people.activate": "فعّل عضويتك",
+  "people.form.title": "الوظيفة أو المنصب",
+  "people.form.company": "الشركة (اختياري)",
+  "people.form.bio": "نبذتك: شخصيتك ومسيرتك",
+  "people.form.bioHint": "ثلاثون حرفًا على الأقل.",
+  "people.form.milestones": "محطات مسيرتك (سطر لكل محطة)",
+  "people.form.links": "روابطك (اختياري — سطر لكل رابط: العنوان | الرابط)",
+  "people.photoNote": "الصورة الشخصية تضيفها الإدارة عند الاعتماد — يمكنك إرسالها من «راسل الإدارة».",
+  "people.submit": "أرسل للمراجعة",
+  "people.applied": "وصل طلبك للإدارة، وسنخطرك بالنتيجة.",
+  "people.pending": "ملفك بانتظار مراجعة الإدارة.",
+  "people.pendingEdit": "تعديلك بانتظار المراجعة — النسخة المعتمدة هي الظاهرة الآن.",
+  "people.approved": "ملفك معتمد وظاهر في «شخصية ومسيرة».",
+  "people.view": "افتح ملفي",
+  "people.editCta": "عدّل ملفك",
+  "people.rejectedTitle": "ملاحظة الإدارة",
+  "people.reapply": "عدّل وأعد الإرسال",
+  "people.milestonesTitle": "محطات المسيرة",
+  "people.linksTitle": "روابط",
+  "guide.modeHq": "في مقر النادي",
+  "guide.modeOnline": "عبر الإنترنت",
+  "guide.modeBoth": "في المقر وعبر الإنترنت",
+  "guide.guest": "سجّل دخولك (حساب واحد يكفي، بلا عضوية) لتسجيل اهتمامك بالورش.",
+  "guide.signIn": "تسجيل الدخول",
+  "guide.noteField": "ملاحظة للإدارة (اختياري)",
+  "guide.send": "تأكيد التسجيل"
 }
