@@ -8,6 +8,7 @@ import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem }
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -95,7 +96,11 @@ export default function NewsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <NewsCard item={item} onPress={() => openItem(item)} />}
+        renderItem={({ item, index }) => (
+          <FadeInView delay={entranceDelay(index)}>
+            <NewsCard item={item} onPress={() => openItem(item)} />
+          </FadeInView>
+        )}
         ListHeaderComponent={header}
         ListEmptyComponent={
           <StateView

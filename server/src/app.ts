@@ -14,6 +14,8 @@ import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
 import { cardRoutes } from './card/routes.js';
 import { CardService } from './card/service.js';
+import { contactRoutes } from './contact/routes.js';
+import { ContactService } from './contact/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { InvitesService } from './invites/service.js';
 import { contentRoutes } from './content/routes.js';
@@ -196,6 +198,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
   const card = new CardService({ kv, notifier });
+  const contact = new ContactService({ kv, notifier, push });
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
   let mediaStore: MediaStore;
   if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
@@ -327,6 +330,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });
+  await app.register(contactRoutes, { service: contact, auth });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });

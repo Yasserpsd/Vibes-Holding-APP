@@ -195,6 +195,22 @@ export class Notifier {
     ]);
   }
 
+  /** M36: a member wrote to the management in «راسل الإدارة» and waits for an answer. */
+  memberMessage(member: { name: string; phone: string; email: string; cardNumber: string; personaLabel: string }, text: string): void {
+    this.dispatch(`رسالة جديدة من عضو: ${member.name || '—'}`, [
+      `بعث أحد الأعضاء رسالة إلى الإدارة من ${APP_NAME} وينتظر الرد.`,
+      '',
+      ...personLines(member),
+      member.cardNumber ? `رقم العضوية: ${member.cardNumber}` : null,
+      member.personaLabel ? `الفئة: ${member.personaLabel}` : null,
+      '',
+      `نص الرسالة:`,
+      text,
+      '',
+      'الرد من لوحة الإدارة: قسم «رسائل الأعضاء». الرد يصل للعضو داخل التطبيق مع إشعار.',
+    ]);
+  }
+
   serviceRequested(request: ServiceRequestLike): void {
     this.dispatch(`طلب خدمة من التطبيق: ${request.serviceTitle} — ${request.sender?.name || 'زائر'}`, [
       `طلب جديد لخدمة «${request.serviceTitle}» من ${APP_NAME}. فتح التطبيق واتساب (${request.channel}) برسالة الطلب الجاهزة.`,

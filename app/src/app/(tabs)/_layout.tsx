@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import type { ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
+import { Animated, type ColorValue } from 'react-native';
 
 import { t, type StringKey } from '@/i18n';
 import { colors, typography } from '@/theme/tokens';
@@ -22,6 +23,23 @@ const TABS: TabDefinition[] = [
   { name: 'news', title: 'tabs.news', icon: 'newspaper', iconOutline: 'newspaper-outline' },
   { name: 'account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
+
+/** M38: the chosen tab's icon pops and settles — the bar answers the finger. */
+function TabIcon({ name, color, size, focused }: { name: IoniconName; color: ColorValue; size: number; focused: boolean }) {
+  const [scale] = useState(() => new Animated.Value(1));
+  useEffect(() => {
+    if (!focused) return;
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.2, speed: 40, bounciness: 12, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }),
+    ]).start();
+  }, [focused, scale]);
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Ionicons name={name} color={color} size={size} />
+    </Animated.View>
+  );
+}
 
 export default function TabsLayout() {
   return (
@@ -45,7 +63,7 @@ export default function TabsLayout() {
           options={{
             title: t(tab.title),
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? tab.icon : tab.iconOutline} color={color} size={size} />
+              <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
             ),
           }}
         />

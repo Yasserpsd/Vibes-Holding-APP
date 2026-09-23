@@ -243,6 +243,15 @@ export class PushService {
     });
   }
 
+  /** M36: the management answered in «راسل الإدارة»; the words stay in the thread (no personal data in a push). */
+  contactReplied(contactId: number): void {
+    this.background(contactId, {
+      title: 'رد من إدارة النادي',
+      body: 'وصلك رد جديد من الإدارة في «راسل الإدارة».',
+      data: { type: 'contact', screen: '/contact' },
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     this.background(contactId, {
       title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',

@@ -4,6 +4,7 @@ import { useGolden } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
@@ -29,7 +30,7 @@ export default function GoldenScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
-      <View style={styles.hero}>
+      <FadeInView style={styles.hero} offset={12}>
         <View style={styles.logoBox}>
           <Image
             source={{ uri: content.umbrella.logoUrl }}
@@ -45,10 +46,12 @@ export default function GoldenScreen() {
           <Text style={styles.valueText}>{formatMillionsSar(content.portfolioValueSarMillions)}</Text>
         </View>
         <AppButton label={t('golden.vibesPage')} icon="open-outline" onPress={() => openLink(content.umbrella.offerUrl)} />
-      </View>
+      </FadeInView>
 
-      {companies.map((company) => (
-        <GoldenCompanyCard key={company.code} company={company} />
+      {companies.map((company, index) => (
+        <FadeInView key={company.code} delay={140 + entranceDelay(index, 70)}>
+          <GoldenCompanyCard company={company} />
+        </FadeInView>
       ))}
 
       <Text style={styles.disclaimer}>{content.disclaimer}</Text>

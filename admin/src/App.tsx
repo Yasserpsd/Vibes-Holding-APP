@@ -4,6 +4,7 @@ import { api, session, type Me } from './api';
 import { Login } from './Login';
 import { Home } from './sections/Home';
 import { Audit, CardRequests, Invites, Leads, Mail, Tickets } from './sections/Lists';
+import { MemberMail } from './sections/MemberMail';
 import { Members } from './sections/Members';
 import { MemberSheet } from './sections/MemberSheet';
 import { Payments } from './sections/Payments';
@@ -23,6 +24,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
+  { key: 'inbox', label: 'رسائل الأعضاء', icon: 'inbox' },
   { key: 'tickets', label: 'التذاكر', icon: 'tickets' },
   { key: 'leads', label: 'العملاء المحتملون', icon: 'leads' },
   { key: 'threads', label: 'المحادثات', icon: 'threads' },
@@ -245,6 +247,7 @@ export function App() {
             {section === 'payments' ? <Payments /> : null}
             {section === 'cards' ? <CardRequests /> : null}
             {section === 'invites' ? <Invites /> : null}
+            {section === 'inbox' ? <MemberMail /> : null}
             {section === 'tickets' ? <Tickets /> : null}
             {section === 'leads' ? <Leads /> : null}
             {section === 'threads' ? <Threads openId={route.thread} onOpen={pickThread} onClose={closeThread} /> : null}

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,14 +19,16 @@ import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-type Props = { projectId: string; projectTitle: string; hasPitchDeck: boolean };
+type Props = { projectId: string; projectTitle: string; hasPitchDeck: boolean; autoStart?: boolean };
 
 /**
  * Unlocking a project: رصيد بنك المشاريع left, a confirm sheet, then the founder's contact data and pitch deck exactly
  * as the server answers them for this member (CLAUDE.md rule 4). Nothing is written to the device: the data lives
  * in the session's query cache only, keyed by account, dropped when the page closes and on sign-out.
+ * M35 framed the same flow as «تواصل مع المؤسس مباشرة»; `autoStart` opens the confirm sheet for a member
+ * who arrived through that button — the deduction still never happens without his confirmation.
  */
-export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) {
+export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart = false }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { status, me } = useAuth();
@@ -35,6 +37,13 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck }: Props) 
   const [confirming, setConfirming] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoStarted = useRef(false);
+  const accessState = query.data?.state;
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || accessState !== 'can_unlock') return;
+    autoStarted.current = true;
+    setConfirming(true);
+  }, [autoStart, accessState]);
 
   if (status === 'loading') return null;
   if (status === 'guest') {

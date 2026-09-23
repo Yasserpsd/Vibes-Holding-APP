@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { eventOf, useLatestPosts, type Post } from '@/api/posts';
+import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
@@ -50,11 +51,7 @@ export function PostCard({ post }: { post: Post }) {
   const event = eventOf(post);
   const targeted = audienceBadge(post);
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push(`/posts/${post.id}` as Href)}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-    >
+    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} style={styles.card}>
       <View style={styles.texts}>
         {targeted ? (
           <View style={styles.audience}>
@@ -111,7 +108,7 @@ export function PostCard({ post }: { post: Post }) {
         </View>
       </View>
       {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" /> : null}
-    </Pressable>
+    </PressScale>
   );
 }
 

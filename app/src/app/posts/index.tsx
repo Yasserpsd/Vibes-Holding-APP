@@ -6,6 +6,7 @@ import { usePosts } from '@/api/posts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { PostCard } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -41,8 +42,10 @@ export default function PostsScreen() {
       <Stack.Screen options={{ title: t('nav.posts') }} />
       {me?.isAdmin ? <AppButton label={t('posts.compose')} icon="send" onPress={() => router.push('/posts/compose' as Href)} /> : null}
       {posts.length === 0 ? <Text style={styles.empty}>{t('posts.empty')}</Text> : null}
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+      {posts.map((post, index) => (
+        <FadeInView key={post.id} delay={entranceDelay(index)}>
+          <PostCard post={post} />
+        </FadeInView>
       ))}
       {query.hasNextPage ? (
         <AppButton

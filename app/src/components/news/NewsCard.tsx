@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { NewsItem } from '@/api/news';
+import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { isRTL } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
@@ -20,7 +21,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
   // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
   const latin = item.lang === 'en' && isRTL();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]}>
+    <PressScale onPress={onPress} style={[styles.card, compact && styles.compact]}>
       <View style={styles.meta}>
         <Text style={styles.source} numberOfLines={1}>
           {item.source.name}
@@ -64,7 +65,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
           </Pressable>
         </View>
       ) : null}
-    </Pressable>
+    </PressScale>
   );
 }
 

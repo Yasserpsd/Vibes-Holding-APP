@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { HomePortal } from '@/api/content';
+import { PressScale } from '@/components/motion';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -11,7 +12,7 @@ type Props = { portal: HomePortal; onPress: () => void };
 /** One of the three home portals: a large gold-accented card. */
 export function PortalCard({ portal, onPress }: Props) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <PressScale onPress={onPress} style={styles.card}>
       <View style={styles.accent} />
       <View style={styles.iconBox}>
         <Ionicons name={iconFor(portal.icon, 'grid-outline')} size={28} color={colors.black} />
@@ -21,7 +22,7 @@ export function PortalCard({ portal, onPress }: Props) {
         <Text style={styles.subtitle}>{portal.subtitle}</Text>
       </View>
       <Ionicons name={chevronForward()} size={22} color={colors.gold} />
-    </Pressable>
+    </PressScale>
   );
 }
 

@@ -9,6 +9,7 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
@@ -36,6 +37,9 @@ const LRM = '‎';
 export default function CardScreen() {
   const { me, status } = useAuth();
   const router = useRouter();
+  // M38: the countdown counts itself up, and a light band sweeps the gold now and then.
+  const daysShown = useCountUp(me?.membership.daysLeft ?? 0);
+  const [cardSize, setCardSize] = useState<{ width: number; height: number } | null>(null);
 
   if (status !== 'signedIn' || !me) {
     return (
@@ -57,8 +61,9 @@ export default function CardScreen() {
     <Screen title={t('nav.card')} subtitle={t('card.subtitle')}>
       <Stack.Screen options={{ title: t('nav.card') }} />
 
+      <FadeInView offset={18}>
       <View style={styles.card}>
-        <View style={styles.cardInner}>
+        <View style={styles.cardInner} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           {/* The metal of the card: soft gold rings and a diagonal sheen, behind everything. */}
           <View pointerEvents="none" style={[styles.ring, styles.ringLarge]} />
           <View pointerEvents="none" style={[styles.ring, styles.ringSmall]} />
@@ -109,7 +114,7 @@ export default function CardScreen() {
                 <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
                 <View style={styles.daysRow}>
                   <Ionicons name="hourglass-outline" size={13} color={colors.gold} />
-                  <Text style={styles.cellValue}>{t('card.daysValue', { days: me.membership.daysLeft })}</Text>
+                  <Text style={styles.cellValue}>{t('card.daysValue', { days: daysShown })}</Text>
                 </View>
               </View>
             ) : null}
@@ -125,8 +130,11 @@ export default function CardScreen() {
               ))}
             </View>
           ) : null}
+
+          {cardSize ? <Sheen width={cardSize.width} height={cardSize.height} /> : null}
         </View>
       </View>
+      </FadeInView>
 
       {active ? <Text style={styles.hint}>{t('card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
 

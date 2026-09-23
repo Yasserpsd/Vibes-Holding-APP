@@ -3,7 +3,6 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
 import { t } from '@/i18n';
-import { formatMillionsSar } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -24,12 +23,6 @@ export function GoldenCompanyCard({ company }: Props) {
           {company.tagline ? <Text style={styles.tagline}>{company.tagline}</Text> : null}
         </View>
       </View>
-      {company.valuationSarMillions !== null ? (
-        <View style={styles.valuationRow}>
-          <Text style={styles.valuationLabel}>{t('golden.valuation')}</Text>
-          <Text style={styles.valuationValue}>{formatMillionsSar(company.valuationSarMillions)}</Text>
-        </View>
-      ) : null}
       <AppButton label={t('golden.offerPage')} variant="outline" icon="open-outline" onPress={() => openLink(company.offerUrl)} />
     </View>
   );
@@ -77,24 +70,5 @@ const styles = StyleSheet.create({
   tagline: {
     ...typography.caption,
     color: colors.textSecondary,
-  },
-  valuationRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceElevated,
-  },
-  valuationLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  valuationValue: {
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.goldLight,
   },
 });

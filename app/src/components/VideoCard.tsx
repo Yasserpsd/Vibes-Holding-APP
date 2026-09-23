@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Video } from '@/api/videos';
+import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
@@ -19,7 +20,7 @@ type Props = {
 /** A YouTube video: thumbnail with a play mark, the title and its short friendly line. */
 export function VideoCard({ video, onPress, width, onAsk }: Props) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, width ? { width } : null, pressed && styles.pressed]}>
+    <PressScale onPress={onPress} style={[styles.card, width ? { width } : null]}>
       <View style={styles.thumbBox}>
         <Image source={{ uri: video.thumbnail }} style={styles.thumb} resizeMode="cover" accessibilityLabel={video.title} />
         <View style={styles.play}>
@@ -43,7 +44,7 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
           </Pressable>
         ) : null}
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 

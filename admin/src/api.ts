@@ -94,6 +94,35 @@ export type InviteRecord = {
 
 export type InvitesConfig = { giftText: string; shareText: string };
 
+/** M36: «راسل الإدارة» — one thread per member; mirrors server/src/contact/service.ts. */
+export type ContactMessage = {
+  id: string;
+  from: 'member' | 'admin';
+  by: string | null;
+  text: string;
+  at: string;
+};
+export type ContactThread = {
+  contactId: number;
+  name: string;
+  phone: string;
+  email: string;
+  personaLabel: string;
+  cardNumber: string;
+  messages: ContactMessage[];
+  updatedAt: string;
+};
+export type ContactThreadSummary = {
+  contactId: number;
+  name: string;
+  personaLabel: string;
+  cardNumber: string;
+  lastText: string;
+  lastFrom: 'member' | 'admin';
+  updatedAt: string;
+  unread: number;
+};
+
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
@@ -190,6 +219,9 @@ export const api = {
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),
+  contactThreads: () => call<{ threads: ContactThreadSummary[] }>('GET', '/api/admin/contact'),
+  contactThread: (contactId: number) => call<{ thread: ContactThread }>('GET', `/api/admin/contact/${contactId}`),
+  contactReply: (contactId: number, text: string) => call<{ message: ContactMessage }>('POST', `/api/admin/contact/${contactId}/reply`, { text }),
   invites: () => call<{ invites: InviteRecord[]; config: InvitesConfig }>('GET', '/api/admin/invites'),
   inviteGift: (id: string, note: string) => call<{ invite: InviteRecord }>('POST', `/api/admin/invites/${id}/gift`, { note }),
   invitesConfig: (input: Partial<InvitesConfig>) => call<{ config: InvitesConfig }>('POST', '/api/admin/invites/config', input),

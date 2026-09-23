@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { eventOf, pollsApi, usePost, type Poll, type PostEvent } from '@/api/posts';
@@ -122,7 +122,7 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
             onPress={() => (canChoose ? setSelected(option.id) : null)}
             style={({ pressed }) => [styles.option, (mine || picked) && styles.optionMine, pressed && canChoose && styles.pressed]}
           >
-            {showCounts ? <View style={[styles.optionFill, { width: `${Math.round(share * 100)}%` }]} /> : null}
+            {showCounts ? <PollFill share={share} /> : null}
             <View style={styles.optionRow}>
               <Ionicons
                 name={mine ? 'checkmark-circle' : picked ? 'radio-button-on' : poll.closed ? 'remove-circle-outline' : 'ellipse-outline'}
@@ -158,6 +158,17 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
       </Text>
     </View>
   );
+}
+
+/** M38: the result bar grows to its share when the counts open, instead of standing there. */
+function PollFill({ share }: { share: number }) {
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const animation = Animated.timing(progress, { toValue: share, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, share]);
+  return <Animated.View style={[styles.optionFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />;
 }
 
 /** When and where the event happens, and the link for attending online (opened in-app). */

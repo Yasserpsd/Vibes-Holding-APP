@@ -8,6 +8,7 @@ import { useProjectFilters, useProjectsList } from '@/api/queries';
 import type { ProjectsSort } from '@/api/types';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
@@ -110,11 +111,14 @@ export default function ProjectsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <ProjectCard
-            project={item}
-            onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
-          />
+        renderItem={({ item, index }) => (
+          <FadeInView delay={entranceDelay(index)}>
+            <ProjectCard
+              project={item}
+              onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
+              onContact={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id), contact: '1' } })}
+            />
+          </FadeInView>
         )}
         ListHeaderComponent={header}
         ListEmptyComponent={

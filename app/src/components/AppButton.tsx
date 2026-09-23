@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ComponentProps } from 'react';
+import { Animated, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
@@ -14,18 +14,25 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function AppButton({ label, onPress, variant = 'primary', icon, style }: Props) {
   const outline = variant === 'outline';
   const color = outline ? colors.gold : colors.black;
+  // M38: the button dips under the finger and springs back — felt on every press in the app.
+  const [scale] = useState(() => new Animated.Value(1));
+  const to = (value: number) => Animated.spring(scale, { toValue: value, speed: 40, bounciness: 5, useNativeDriver: true }).start();
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={() => to(0.96)}
+      onPressOut={() => to(1)}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.base, outline ? styles.outline : styles.primary, pressed && styles.pressed, style]}
+      style={[styles.base, outline ? styles.outline : styles.primary, style, { transform: [{ scale }] }]}
     >
       {icon ? <Ionicons name={icon} size={18} color={color} /> : null}
       <Text style={[styles.label, { color }]}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -47,9 +54,6 @@ const styles = StyleSheet.create({
   outline: {
     backgroundColor: 'transparent',
     borderColor: colors.goldDark,
-  },
-  pressed: {
-    opacity: 0.75,
   },
   label: {
     fontFamily: fonts.semiBold,

@@ -13,6 +13,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { PortalCard } from '@/components/PortalCard';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
@@ -22,7 +23,6 @@ import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
-import { formatMillionsSar } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -80,29 +80,35 @@ export default function HomeScreen() {
       {/* «رسائل الإدارة» is the first thing on the home, above the hero (owner, 2026-09-16 and again 2026-09-22). Renders nothing without posts. */}
       <PostsBlock />
 
-      <View style={styles.hero}>
+      <FadeInView style={styles.hero} offset={12}>
         <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
         <Text style={styles.heroTitle}>{content.hero.title}</Text>
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
-      </View>
+      </FadeInView>
 
       <View style={styles.portals}>
-        {content.portals.map((portal) => (
-          <PortalCard key={portal.key} portal={portal} onPress={() => openPortal(portal, String(Date.now()))} />
+        {content.portals.map((portal, index) => (
+          <FadeInView key={portal.key} delay={120 + entranceDelay(index, 80)}>
+            <PortalCard portal={portal} onPress={() => openPortal(portal, String(Date.now()))} />
+          </FadeInView>
         ))}
       </View>
 
-      <SectionHeader title={content.golden.title} subtitle={content.golden.subtitle} cta={content.golden.cta} onPress={() => router.push('/golden')} />
-      {golden.data ? <GoldenStrip content={golden.data} onPress={() => router.push('/golden')} /> : null}
+      <FadeInView delay={220}>
+        <SectionHeader title={content.golden.title} subtitle={content.golden.subtitle} cta={content.golden.cta} onPress={() => router.push('/golden')} />
+        {golden.data ? <GoldenStrip content={golden.data} onPress={() => router.push('/golden')} /> : null}
+      </FadeInView>
 
-      <MembershipBlock
-        block={content.membership}
-        signedIn={status === 'signedIn'}
-        membership={me?.membership ?? null}
-        statusTexts={membershipContent.data?.statusTexts}
-        onPress={() => router.push('/membership')}
-      />
+      <FadeInView delay={280}>
+        <MembershipBlock
+          block={content.membership}
+          signedIn={status === 'signedIn'}
+          membership={me?.membership ?? null}
+          statusTexts={membershipContent.data?.statusTexts}
+          onPress={() => router.push('/membership')}
+        />
+      </FadeInView>
 
       <SectionHeader title={content.services.title} subtitle={content.services.subtitle} cta={content.services.cta} onPress={() => router.push('/services')} />
       <View style={styles.list}>
@@ -143,15 +149,15 @@ function GoldenStrip({ content, onPress }: { content: GoldenContent; onPress: ()
 
 function GoldenMini({ company, onPress }: { company: GoldenCompany; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.mini, pressed && styles.pressed]}>
+    <PressScale onPress={onPress} style={styles.mini}>
       <View style={styles.miniLogoBox}>
         <Image source={{ uri: company.logoUrl }} style={styles.miniLogo} resizeMode="contain" accessibilityLabel={company.name} />
       </View>
       <Text style={styles.miniName} numberOfLines={2}>
         {company.name}
       </Text>
-      {company.valuationSarMillions !== null ? <Text style={styles.miniValue}>{formatMillionsSar(company.valuationSarMillions)}</Text> : <Text style={styles.miniCode}>{company.code}</Text>}
-    </Pressable>
+      <Text style={styles.miniCode}>{company.code}</Text>
+    </PressScale>
   );
 }
 
@@ -210,7 +216,6 @@ const styles = StyleSheet.create({
   miniLogoBox: { width: 72, height: 72, padding: spacing.xs, borderRadius: radii.md, backgroundColor: colors.white },
   miniLogo: { width: '100%', height: '100%' },
   miniName: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center', minHeight: 40 },
-  miniValue: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldLight },
   miniCode: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.gold },
   membership: {
     gap: spacing.md,

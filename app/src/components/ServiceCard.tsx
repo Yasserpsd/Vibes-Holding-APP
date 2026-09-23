@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
+import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
@@ -13,7 +14,7 @@ type Props = { service: Service; onPress: () => void };
 export function ServiceCard({ service, onPress }: Props) {
   const { locked } = service;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, locked && styles.lockedCard, pressed && styles.pressed]}>
+    <PressScale onPress={onPress} style={[styles.card, locked && styles.lockedCard]}>
       <View style={[styles.iconBox, locked && styles.dim]}>
         <Ionicons name={iconFor(service.icon)} size={22} color={locked ? colors.textMuted : colors.gold} />
       </View>
@@ -40,7 +41,7 @@ export function ServiceCard({ service, onPress }: Props) {
         ) : null}
       </View>
       <Ionicons name={chevronForward()} size={18} color={locked ? colors.textMuted : colors.gold} />
-    </Pressable>
+    </PressScale>
   );
 }
 

@@ -5,6 +5,7 @@ import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from '
 import { useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { FadeInView } from '@/components/motion';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
@@ -14,7 +15,7 @@ import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, contact } = useLocalSearchParams<{ id: string; contact?: string }>();
   const askAdvisor = useAskAdvisor();
   const { width } = useWindowDimensions();
   const query = useProject(id);
@@ -57,13 +58,27 @@ export default function ProjectScreen() {
             {project.number ? <Text style={styles.tag}>{t('project.number', { number: project.number })}</Text> : null}
           </View>
 
-          <View style={styles.infoCard}>
-            {project.companyName ? <InfoRow icon="business-outline" label={t('project.company')} value={project.companyName} /> : null}
-            {project.founderName ? <InfoRow icon="person-outline" label={t('project.founder')} value={project.founderName} /> : null}
-            <InfoRow icon="eye-outline" label={t('project.views')} value={formatNumber(project.viewsCount)} />
-          </View>
+          {/* M35: contact with the founder sits at the top — a golden project offers its partner page instead. */}
+          {project.isGolden && project.goldenPartnerUrl ? (
+            <AppButton label={t('project.partnerPage')} icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
+          ) : null}
 
-          <ProjectBrief projectId={String(project.id)} />
+          <FadeInView delay={80}>
+            <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} autoStart={contact === '1'} />
+          </FadeInView>
+
+          {/* M35: the adviser's table before everything else about the project. */}
+          <FadeInView delay={140}>
+            <ProjectBrief projectId={String(project.id)} />
+          </FadeInView>
+
+          <FadeInView delay={200}>
+            <View style={styles.infoCard}>
+              {project.companyName ? <InfoRow icon="business-outline" label={t('project.company')} value={project.companyName} /> : null}
+              {project.founderName ? <InfoRow icon="person-outline" label={t('project.founder')} value={project.founderName} /> : null}
+              <InfoRow icon="eye-outline" label={t('project.views')} value={formatNumber(project.viewsCount)} />
+            </View>
+          </FadeInView>
 
           {project.details ?? project.detailsEn ? (
             <View style={styles.section}>
@@ -72,13 +87,7 @@ export default function ProjectScreen() {
             </View>
           ) : null}
 
-          {project.isGolden && project.goldenPartnerUrl ? (
-            <AppButton label={t('project.partnerPage')} icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
-          ) : null}
-
           <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
-
-          <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} />
         </ScrollView>
       )}
     </View>
