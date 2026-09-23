@@ -83,9 +83,9 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
-      {/* «رسائل الإدارة» is the first thing on the home, above the hero (owner, 2026-09-16 and again 2026-09-22). Renders nothing without posts. */}
-      <PostsBlock />
-
+      {/* Home order (owner, 2026-09-23, replacing his 2026-09-16 «رسائل الإدارة أول حاجة» rule):
+          the logo and slogan first, then «رسائل الإدارة», then «أجندة النادي», then the portals.
+          Both blocks render nothing while empty. */}
       <FadeInView style={styles.hero} offset={12}>
         <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
@@ -93,8 +93,8 @@ export default function HomeScreen() {
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
       </FadeInView>
 
-      {/* «أجندة النادي» (M41) at the TOP of the first page (owner, 2026-09-23: «مهمة جدا توصل في اول صفحة»);
-          «رسائل الإدارة» stays first by his earlier rule. Renders nothing while the agenda is empty. */}
+      <PostsBlock />
+
       <AgendaBlock />
 
       <View style={styles.portals}>
