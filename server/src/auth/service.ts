@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
-import type { HubClient, HubContact, HubResponse } from '../hub/types.js';
+import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
+import type { SocialIdentity } from './social.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
@@ -206,6 +207,41 @@ export class AuthService {
       const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
       return { pending: true, pendingToken, email: contact.email, mailSent: result.mail_sent === 1, text: result.text ?? '' };
     }
+    await this.gate(uuid, contact);
+    return this.signIn(uuid, contact);
+  }
+
+  /**
+   * M46: sign-in with a Google / Apple identity the server itself verified (social.ts). The hub
+   * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
+   * verified, so there is no code step; the same test-environment gates as password login apply.
+   */
+  async socialLogin(identity: SocialIdentity, ip: string): Promise<SignedInResult> {
+    if (!identity.emailVerified) {
+      throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
+    }
+    const uuid = newUuid();
+    let result: HubResponse;
+    try {
+      result = await this.deps.hub.call('social_login', {
+        uuid,
+        ip,
+        provider: identity.provider,
+        sub: identity.sub,
+        email: identity.email,
+        email_verified: 1,
+        name: identity.name,
+        allow_create: this.registrationOpen ? 1 : 0,
+        page_url: 'app://social',
+      });
+    } catch (error) {
+      if (error instanceof HubError && error.code === 'hub_not_supported') {
+        // The hub plugin is older than 2.8.0: say so instead of a generic failure.
+        throw new AuthError('social_unsupported', 'الدخول بحساب جوجل أو أبل غير متاح حاليًا — سجّل بالبريد وكلمة المرور', 503);
+      }
+      throw error;
+    }
+    const contact = requireContact(result);
     await this.gate(uuid, contact);
     return this.signIn(uuid, contact);
   }

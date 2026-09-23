@@ -11,6 +11,7 @@ import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { AuthService } from './auth/service.js';
+import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
@@ -207,6 +208,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites });
+  // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
+  const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   const hq = new HqService({ kv, log: app.log, notifier, push });
   const card = new CardService({ kv, notifier });
   const contact = new ContactService({ kv, notifier, push });
@@ -330,6 +333,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       registrationOpen: auth.registrationOpen,
       adminOnly: auth.adminOnly,
       adminOtp: auth.adminOtpStatus,
+      social: social.status,
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },
     news: news.status(),
@@ -349,7 +353,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
   await app.register(contentRoutes, { kv, auth, notifier, sync });
   await app.register(appStringsRoutes, { kv, auth, sync });
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social });
   await app.register(advisorRoutes, { service: advisor, auth });
   await app.register(newsRoutes, { service: news, auth, kv });
   await app.register(videosRoutes, { service: videos });

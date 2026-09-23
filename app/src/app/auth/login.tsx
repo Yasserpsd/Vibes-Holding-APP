@@ -9,6 +9,7 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { SocialButtons } from '@/components/SocialButtons';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -48,6 +49,7 @@ export default function LoginScreen() {
   return (
     <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
       {config?.adminOnly ? <Notice text={t('auth.login.adminOnly')} /> : null}
+      <SocialButtons onError={setError} />
       <FormField
         label={t('auth.login.field')}
         latin

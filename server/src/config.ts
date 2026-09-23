@@ -53,6 +53,11 @@ const envSchema = z.object({
   PAYMOB_HMAC_SECRET: z.string().min(10).optional(),
   // Integration id(s) of the payment methods shown at checkout (comma separated).
   PAYMOB_INTEGRATION_ID: z.string().min(1).optional(),
+  // M46 social sign-in: comma-separated token audiences the server accepts (public ids, not secrets).
+  // Google: the OAuth WEB client id (native sign-in issues the ID token for it). Apple: the app bundle ids
+  // (with the .preview twin) and later the web Services ID. Empty = that provider's button stays hidden.
+  GOOGLE_CLIENT_IDS: z.string().min(10).optional(),
+  APPLE_APP_IDS: z.string().min(3).optional(),
   // Management notifications, the same idea as the website's notify_email list. Without SMTP_HOST mails are only logged.
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(465),

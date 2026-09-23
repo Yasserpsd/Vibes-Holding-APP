@@ -11,6 +11,7 @@ import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -106,6 +107,7 @@ export default function RegisterScreen() {
 
   return (
     <Screen title={t('auth.register.title')} subtitle={t('auth.register.subtitle')}>
+      <SocialButtons onError={setSubmitError} />
       <Notice text={t('auth.register.phonePolicy')} />
       <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
       <View style={styles.group}>

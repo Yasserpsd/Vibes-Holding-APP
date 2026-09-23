@@ -39,6 +39,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: APP_ID,
     supportsTablet: false,
+    // M46: «Sign in with Apple» — required by Apple once any social sign-in exists.
+    usesAppleSignIn: true,
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
     },
@@ -71,6 +73,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-localization', { supportsRTL: true }],
     // Member notifications: white club mark on the brand gold (Android small icon), one default channel.
     ['expo-notifications', { icon: './assets/images/notification-icon.png', color: BRAND_GOLD, defaultChannel: 'default' }],
+    // M46: social sign-in in seconds — Google on Android, Apple on iOS (native modules: needs a new build).
+    'expo-apple-authentication',
+    '@react-native-google-signin/google-signin',
   ],
   experiments: { typedRoutes: true },
   extra: {
@@ -78,6 +83,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Public value only. EXPO_PUBLIC_API_URL (EAS environment or app/.env) wins; test builds and
     // updates fall back to the test server so a publish without the variable still works.
     apiBaseUrl: process.env.EXPO_PUBLIC_API_URL ?? (IS_PRODUCTION ? '' : TEST_API_URL),
+    // M46, public value (rule 1 allows it): the Google OAuth WEB client id — native Google sign-in asks
+    // for the ID token with this audience. Empty until the owner creates it in Google Cloud; the app
+    // hides the Google button while it is empty.
+    googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
     supportsRTL: true,
     eas: { projectId: EAS_PROJECT_ID },
   },

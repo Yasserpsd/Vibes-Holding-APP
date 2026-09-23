@@ -7,8 +7,9 @@ import { COUNTRIES, EMAIL_POLICY_TEXT, PHONE_POLICY_TEXT } from '../hub/phone.js
 import { guard, parse, sessionGuard } from './guard.js';
 import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
+import type { SocialVerifier } from './social.js';
 
-export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode };
+export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode; social: SocialVerifier };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
 const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
@@ -30,6 +31,12 @@ const registerSchema = z.object({
 const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });
 const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
+// M46: the provider's ID token (a JWT the server verifies itself); Apple sends the name separately on first sign-in.
+const socialSchema = z.object({
+  provider: z.enum(['google', 'apple']),
+  token: z.string().min(20).max(6000),
+  name: z.string().trim().max(120).optional(),
+});
 const otpChallengeSchema = z.object({ challengeToken: pendingTokenSchema });
 const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema });
 const resetRequestSchema =z.object({ login: loginFieldSchema });
@@ -49,7 +56,7 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -74,6 +81,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     emailPolicy: EMAIL_POLICY_TEXT,
     registrationOpen: service.registrationOpen,
     adminOnly: service.adminOnly,
+    // M46: which social buttons the app may show (audiences configured on the server).
+    social: social.status,
     hubMode,
     testCode: hubMode === 'mock' ? MOCK_CODE : null,
   }));
@@ -115,6 +124,18 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
       return service.login(body.login, body.password, request.ip);
+    }),
+  );
+
+  // M46: sign in (or first-time register) with a Google / Apple account in seconds.
+  app.post(
+    '/api/auth/social',
+    guard(async (request, reply) => {
+      if (limited('social', 12, request, reply)) return;
+      const body = parse(socialSchema, request.body, reply);
+      if (!body) return;
+      const identity = await social.verify(body.provider, body.token);
+      return service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
     }),
   );
 

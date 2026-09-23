@@ -64,6 +64,8 @@ export type HubOp =
   | 'resend_code'
   | 'verify'
   | 'login'
+  // Plugin 2.8.0 (M46): server-verified Google/Apple sign-in — find-or-create the contact by the verified e-mail.
+  | 'social_login'
   | 'logout'
   | 'account'
   | 'profile'

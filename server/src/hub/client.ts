@@ -6,8 +6,8 @@ type LiveHubOptions = { url: string; siteKey: string; log: FastifyBaseLogger; ti
 
 /** `rest_hub()` in the plugin answers this for an op it does not have. */
 const UNKNOWN_OP_TEXT = 'عملية غير معروفة';
-/** Ops of bridge v2 that only the hub's trusted site may call (docs/BRIDGE_V2.md 1.1). */
-const PRIVILEGED_OP = /^(admin_|activate_member$|changes$|publish$)/;
+/** Ops of bridge v2 that only the hub's trusted site may call (docs/BRIDGE_V2.md 1.1; social_login since 2.8.0). */
+const PRIVILEGED_OP = /^(admin_|activate_member$|social_login$|changes$|publish$)/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

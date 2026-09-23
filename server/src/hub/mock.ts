@@ -58,6 +58,8 @@ export class MockHubClient implements HubClient {
         return this.verify(body);
       case 'login':
         return this.login(body);
+      case 'social_login':
+        return this.socialLogin(body);
       case 'logout':
         this.visitors.delete(this.uuid(body, false));
         return { ok: true };
@@ -269,6 +271,38 @@ export class MockHubClient implements HubClient {
       return { ok: true, pending: true, mail_sent: 1, contact: this.publicContact(account), text: `حسابك بانتظار التفعيل — أرسلنا الرمز إلى ${account.email}` };
     }
     return { ok: true, contact: this.publicContact(account) };
+  }
+
+  /** M46 (plugin 2.8.0): the server already verified the provider token — find or create the contact by e-mail. */
+  private socialLogin(body: HubBody): HubResponse {
+    const provider = str(body, 'provider', 20);
+    const email = normEmail(str(body, 'email', 190));
+    const sub = str(body, 'sub', 190);
+    const name = str(body, 'name', 120) || email.slice(0, email.indexOf('@'));
+    if (!email || !sub || (provider !== 'google' && provider !== 'apple')) {
+      throw new HubError('invalid', 'بيانات الدخول غير مكتملة', 400);
+    }
+    let contact = [...this.contacts.values()].find((candidate) => candidate.email === email) ?? null;
+    if (!contact) {
+      if (body.allow_create !== 1 && body.allow_create !== '1') {
+        throw new HubError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
+      }
+      contact = this.create();
+      // The random unusable password makes it a full account (has_account); a reset mail can replace it.
+      Object.assign(contact, { name, email, verified: true, verifiedAt: Date.now(), passHash: hash(`social:${provider}:${sub}:${Date.now()}`) });
+      this.admin.event(contact.id, 'registered');
+      this.admin.event(contact.id, 'verified');
+    } else if (!contact.verified) {
+      // The provider vouches for the e-mail, so a pending account counts as verified now.
+      contact.verified = true;
+      contact.verifiedAt = Date.now();
+      this.admin.event(contact.id, 'verified');
+    }
+    if (!contact.passHash) contact.passHash = hash(`social:${provider}:${sub}`);
+    if (!contact.name) contact.name = name;
+    contact.lastLoginAt = Date.now();
+    this.visitors.set(this.uuid(body), contact.id);
+    return { ok: true, contact: this.publicContact(contact) };
   }
 
   private profile(body: HubBody): HubResponse {

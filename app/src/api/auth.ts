@@ -44,6 +44,8 @@ export type AuthConfig = {
   emailPolicy: string;
   registrationOpen: boolean;
   adminOnly: boolean;
+  /** M46: which social sign-in providers the server accepts; an older server sends none. */
+  social?: { google: boolean; apple: boolean };
   hubMode: 'live' | 'mock';
   testCode: string | null;
 };
@@ -93,6 +95,9 @@ export const authApi = {
   resend: (pendingToken: string) => apiRequest<{ mailSent: boolean; text: string }>('POST', '/api/auth/resend', { body: { pendingToken }, token: null }),
   verify: (pendingToken: string, code: string) => apiRequest<SignedInResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
   login: (login: string, password: string) => apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password }, token: null }),
+  // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
+  social: (provider: 'google' | 'apple', token: string, name?: string) =>
+    apiRequest<SignedInResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
   resetRequest: (login: string) => apiRequest<{ ok: true }>('POST', '/api/auth/reset/request', { body: { login }, token: null }),
   resetConfirm: (login: string, code: string, password: string) =>
     apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password }, token: null }),
