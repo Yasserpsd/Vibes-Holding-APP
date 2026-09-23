@@ -14,7 +14,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const NAME = 'Vibes Web Agent v4.3';
+const NAME = 'Vibes Web Agent v4.4';
 const PROMPT_TARGET = 9000; // characters, contract target (v3.2 carried 44,847)
 const PROMPT_LIMIT = 12000;
 // the hub stores vai_clip(memo, 700) in 2.6.0 and in 2.7.0: a longer MEMO loses its tail on every turn. Raise this, the
@@ -89,6 +89,10 @@ const memoAsk = /\[\[MEMO\]\]\.\.\.\[\[\/MEMO\]\][^\n]*?حتى (\d+) حرف/.exe
 if (!memoAsk || Number(memoAsk[1]) > MEMO_MAX) fail('prompt-v4.md must ask for a MEMO of at most ' + MEMO_MAX + ' characters: the hub stores no more');
 if (prompt.length > PROMPT_LIMIT) fail('prompt-v4.md is ' + prompt.length + ' characters (limit ' + PROMPT_LIMIT + ')');
 if (prompt.length > PROMPT_TARGET) console.warn('build-v4: warning: prompt is ' + prompt.length + ' characters, above the ' + PROMPT_TARGET + ' target');
+// v4.4 (owner, 2026-09-23 night): the automatic pay page is broken live (Paymob Intention 404) — the bot must send
+// the DIRECT Paymob link and must never invent a two-year subscription (that offer does not exist).
+if (!prompt.includes('خارج الخدمة مؤقتًا') || !prompt.includes('لا يوجد أي عرض سنتين')) fail('prompt-v4.md: the v4.4 direct-link redirection or the annual-only rule is missing');
+if (prompt.includes('طريقه الوحيدة صفحة الدفع الآلي')) fail('prompt-v4.md: still sends people to the automatic pay page');
 
 // ───────────────────────── app-site scrub (shared by Build Context and Split Reply) ─────────────────────────
 // Hard rule 3 must not depend on the model obeying: a pay link or the web price of the membership is taken out of every
@@ -343,7 +347,7 @@ if (recentPages.length) {
 const where = site.host || 'الموقع';
 const eventPitch = event === 'identified' && !!b.registered && !isAdmin && !isMember && !appSite && !pitched && !pitchUnknown;
 if (event !== 'identified') lines.push('الحدث: رسالة جديدة من العميل.');
-else if (b.registered) lines.push('الحدث: فعّل حسابه الآن' + (b.social ? ' بحساب Google (بلا رمز بريد)' : ' برمز البريد') + '. رحّب به باسمه بسطر، وأكّد أن حسابه يعمل على كل مواقع المنظومة' + (b.social ? ' بحساب Google نفسه أو بالبريد (يضبط كلمة مروره متى شاء من «نسيت كلمة المرور»)' : ' بالبريد وكلمة المرور نفسيهما') + ' (أزرار المواقع تظهر تحت رسالتك تلقائيًا فلا تسردها). ' + (eventPitch ? 'ثم سطر واحد: الخطوة التالية تفعيل العضوية السنوية من صفحة الدفع الآلي — تسجيل ودفع وتفعيل فوري، ورابطها في الكتالوج — مع أنسب ميزة لفئته في النادي من الكتالوج، وهذا ذكر العضوية الوحيد في هذه الجلسة. ' : '') + 'بلا أفعال أخرى.');
+else if (b.registered) lines.push('الحدث: فعّل حسابه الآن' + (b.social ? ' بحساب Google (بلا رمز بريد)' : ' برمز البريد') + '. رحّب به باسمه بسطر، وأكّد أن حسابه يعمل على كل مواقع المنظومة' + (b.social ? ' بحساب Google نفسه أو بالبريد (يضبط كلمة مروره متى شاء من «نسيت كلمة المرور»)' : ' بالبريد وكلمة المرور نفسيهما') + ' (أزرار المواقع تظهر تحت رسالتك تلقائيًا فلا تسردها). ' + (eventPitch ? 'ثم سطر واحد: الخطوة التالية تفعيل العضوية السنوية من رابط الدفع المباشر في الكتالوج — دفعه يتأكد ويفعّل تلقائيًا — مع أنسب ميزة لفئته في النادي من الكتالوج، وهذا ذكر العضوية الوحيد في هذه الجلسة. ' : '') + 'بلا أفعال أخرى.');
 else if (b.login && isAdmin) lines.push('الحدث: الأدمن ' + c.name + ' سجّل الدخول الآن على ' + where + '. رحّب به باسمه كمدير للمنظومة (بلا أي بيع)، أعطه سطرًا من ملخص العمليات، ثم اعرض خدماتك بأزرار quick_replies: ["كم عميل خلصت معه اليوم؟","أرسل تقرير اليوم الآن","رسالة لكل العملاء الأونلاين","إيميل لغير المشتركين"].');
 else if (b.login) lines.push('الحدث: العميل سجّل الدخول الآن بحسابه على ' + where + (continuing ? ' أثناء جلسة جارية: لا ترحيب جديد — سطر واحد يؤكد أنه مسجّل الآن ثم أكمل الموضوع الجاري.' : ': رحّب به باسمه بسطر، واذكر آخر ما كنتما فيه (من ملفه وسجله) واسأله إن كان يكمل. سطران بلا قائمة.'));
 else lines.push('الحدث: العميل سجّل بياناته الآن (الاسم والجوال' + (c.email ? ' والإيميل' : '') + ')' + (continuing ? ': سطر شكر واحد باسمه ثم أكمل الموضوع الجاري من حيث توقف — بلا ترحيب جديد.' : (b.returning ? ' وهو عميل عائد تعرّفنا عليه من بياناته: رحّب به باسمه واذكر متى وعن ماذا تواصلتما (من ملفه وسجله) واسأله إن كان يكمل. سطران بلا قائمة.' : ': رحّب به باسمه بسطر ثم أكمل ما كان يسأل عنه.')));
@@ -447,7 +451,8 @@ if (services.length) {
 }
 
 // links library
-const links = (Array.isArray(b.links) ? b.links : []).filter(l => l && l.url && !(appSite && (PAY_URL.test(l.url) || PAY_LABEL.test(String(l.label || '')))));
+// v4.4: the automatic pay page is OUT OF SERVICE (Paymob ticket) — its links never enter ANY context, web included
+const links = (Array.isArray(b.links) ? b.links : []).filter(l => l && l.url && !/vai-pay/i.test(String(l.url)) && !(appSite && (PAY_URL.test(l.url) || PAY_LABEL.test(String(l.label || '')))));
 if (links.length) {
   lines.push('مكتبة الروابط المعتمدة — افتحها بـ open_page (على أي موقع في المنظومة) أو أرسلها كزر link، مرة واحدة لكل رابط في الجلسة:');
   for (const l of links) lines.push('• ' + l.label + ' — ' + l.url + (sentBefore(l.url) ? ' (سبق إرساله في هذه الجلسة)' : '') + (l.when ? ' — متى: ' + safe(l.when) : ''));
@@ -532,6 +537,15 @@ splitCode = swap(
   reply = scrubbed.text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   if (dropped + scrubbed.urls) guard.push('app-site:' + (dropped + scrubbed.urls));
   if (scrubbed.prices) guard.push('app-site:price');
+}
+// v4.4: the automatic pay page (?vai-pay) is OUT OF SERVICE (Paymob ticket) — its link never reaches anyone,
+// web included, even copied from an old turn; the direct Paymob links of the context stay untouched.
+{
+  const VAIPAY = /vai-pay/i;
+  let gone = 0;
+  for (let i = clean.length - 1; i >= 0; i--) { const a = clean[i]; if ((a.type === 'link' || a.type === 'open_page') && VAIPAY.test(String(a.url || ''))) { clean.splice(i, 1); gone++; } }
+  reply = reply.replace(/((?:و?(?:ادفع|تدفع|سدّد|اشترك)(?:\s+الآن)?\s+(?:من|عبر)(?:\s+(?:هنا|الرابط|هذا\s+الرابط))?|و?رابط\s*(?:ال)?(?:دفع|اشتراك)|سجّل\s*وادفع(?:\s*من)?|للدفع|للاشتراك)\s*:?\s*)?(https?:\/\/[^\s<>"'«»()\]]+)/g, (m, cta, u) => { if (VAIPAY.test(u)) { gone++; return ''; } return m; });
+  if (gone) { reply = reply.replace(/ {2,}/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); guard.push('vai-pay-out:' + gone); }
 }
 // a surface that cannot draw tables (a widget older than 2.7.0) gets them as short «label: value» lines
 if (!ctx.tables && /^\s*\|.*\|\s*$/m.test(reply)) {
@@ -620,6 +634,7 @@ byName('Sticky Note — Overview').parameters.content = [
   '',
   '**الجديد في v4.0:** الذاكرة الوحيدة هي turns من الهب (Simple Memory مفصولة عمدًا — لا تعد توصيلها) · منع تكرار على مستوى المضمون (آخر ثلاثة ردود موسومة ★) · سجل جلسة في بيانات الوركفلو (ما أُرسل من روابط وكروت وفيديوهات) لأن turns تصل مقصوصة وبلا أفعال · العضوية تُذكر مرة واحدة في الجلسة، وفي موقع التطبيق لا تُذكر من نفسه ويُحذف سعرها وروابط الدفع من السياق ومن الرد · حتى 3 أدوات و6 دورات · جهد medium للتحليل · التعليمات مختصرة (هوية + قواعد + بروتوكول) والحقائق من الكتالوج ومعرفة الهب والأدوات.',
   '',
+  '**الجديد في v4.4 (عاجل):** صفحة الدفع الآلي (?vai-pay) خارج الخدمة مؤقتًا حتى يفعّل Paymob خدمة الـ Intention (التذكرة القائمة) — «المستشار» يرسل رابط الدفع المباشر (Paymob) من الكتالوج ومكتبة الروابط بدلًا منها، وروابط ?vai-pay تُحجب آليًا من السياق ومن الرد على الويب والتطبيق معًا حتى لو وردت في محادثة قديمة · قاعدة صريحة: العضوية سنوية فقط — لا يوجد أي عرض سنتين أو سعر ترويجي آخر إطلاقًا.',
   '**الجديد في v4.3 (M48):** الدفع على الويب صار عبر صفحة الدفع الآلي وحدها (روابط «سجّل وادفع» / ?vai-pay من الكتالوج ومكتبة الروابط): تسجيل + دفع + تفعيل فوري بعد تأكيد الدفع تلقائيًا، والمسجّل دخوله يدفع بلا إعادة كتابة بياناته — «المستشار» لا يرسل روابط Paymob القديمة ولا يطلب إيصالًا ممن لم يدفع بعد (الإثبات يبقى احتياطًا لمن دفع فعلًا، والتفعيل لا يكون إلا من تأكيد الدفع نفسه) · يعرف دخول Google في الويدجت والتطبيق (وApple في iOS) وترحيب خاص لمن سجّل بحساب Google · فلتر وضع التطبيق يحجب روابط ?vai-pay أيضًا.',
   '',
   '**الأدوات:** search_site · get_page · find_projects · get_form · save_note (نادرة).',
@@ -750,7 +765,7 @@ function selfTest() {
     must(block.includes('تشمل: تصوير') && block.includes('[pitchdeck]') && !block.includes('تشمل: شرائح'), 'catalog details only for the services he is asking about');
     must(a.agentInput.includes('يشير الآن إلى: «باقة الإنتاج المتكاملة»') && a.chatInput === 'وش رأيك في هذي الباقة؟', 'agent input carries the focus pointer, chatInput stays raw');
     must(!a.app_site && a.tables && block.includes('العرض: الجداول مدعومة هنا'), 'web with the 2.7.0 widget: tables');
-    must(block.includes('https://vcmem.com/?vai-pay=membership'), 'web: the automatic pay page stays in the links library');
+    must(!/vai-pay/.test(block) && block.includes('https://vcmem.com/payment/'), 'web (v4.4): the vai-pay link is filtered from the links library, the direct one stays');
     must(!(await ctxOf(body({ page: { url: 'https://vcmem.com/', title: 'x' } }))).tables, 'no live text (older widget): no tables');
     must(!(await ctxOf(body({ focus: { type: 'project', id: '12', title: 'مشروع', text: 'نص' } }))).app_site, 'a Projects Bank card on a website is not the app');
     // 2) hints: unchanged matches come marked and shorter, never without their evidence; a new excerpt is new evidence
@@ -830,7 +845,7 @@ function selfTest() {
 
     // Split Reply: the hub/reply body keeps its exact shape
     fresh();
-    const output = 'هذا رأيي في الباقة.\nhttps://paymob.link/abc\nhttps://vcmem.com/?vai-pay=membership\nhttps://evil.example/x\n[[ACTIONS]]{"actions":[{"type":"card","key":"membership"},{"type":"link","label":"ادفع","url":"https://paymob.link/abc"},{"type":"open_page","url":"https://vibesholding.com/pb"},{"type":"video","id":5}]}[[/ACTIONS]]\n[[MEMO]]احتياجه: بودكاست | عُرض عليه: كارت العضوية ' + 'س'.repeat(1500) + '[[/MEMO]]\n[[LEAD]]{"type":"service","reason":"بودكاست","company":"","notes":""}[[/LEAD]]';
+    const output = 'هذا رأيي في الباقة.\nhttps://paymob.link/abc\nسجّل وادفع من https://vcmem.com/?vai-pay=membership\nhttps://evil.example/x\n[[ACTIONS]]{"actions":[{"type":"card","key":"membership"},{"type":"link","label":"ادفع","url":"https://paymob.link/abc"},{"type":"link","label":"سجّل وادفع","url":"https://vcmem.com/?vai-pay=membership"},{"type":"open_page","url":"https://vibesholding.com/pb"},{"type":"video","id":5}]}[[/ACTIONS]]\n[[MEMO]]احتياجه: بودكاست | عُرض عليه: كارت العضوية ' + 'س'.repeat(1500) + '[[/MEMO]]\n[[LEAD]]{"type":"service","reason":"بودكاست","company":"","notes":""}[[/LEAD]]';
     const others = (ctx, route = 'focus') => ({ 'Build Context': { ...ctx, model: 'gpt-x', effort: 'medium', route }, Webhook: { body: body() } });
     const split = async (text, ctx, route) => (await run(splitCode, { output: text }, others(ctx, route)))[0].json;
     const web = await split(output, a);
@@ -838,7 +853,8 @@ function selfTest() {
     must(web.contact_id === 77 && web.user_message_id === 501 && web.route === 'focus/medium', 'ids and route');
     must(web.memo.length === MEMO_MAX && web.memo.startsWith('احتياجه'), 'MEMO kept to what the hub stores');
     must(web.lead && web.lead.type === 'service' && web.actions.length === 4, 'lead and actions parsed');
-    must(web.reply.includes('paymob.link/abc') && web.reply.includes('vai-pay=membership') && !web.reply.includes('evil.example'), 'web: allowed pay links (old and vai-pay) stay, foreign link goes');
+    must(web.reply.includes('paymob.link/abc') && !/vai-pay|سجّل وادفع من/.test(web.reply) && !web.reply.includes('evil.example'), 'web (v4.4): the direct pay link stays, vai-pay (with its hand-over words) and foreign links go');
+    must(!web.actions.some((x) => /vai-pay/.test(String(x.url || ''))) && web.guard.includes('vai-pay-out:2'), 'web (v4.4): the vai-pay button is dropped and the guard says so');
     // the ledger of that full reply reaches the next Build Context, whatever the hub clips
     const next = await ctxOf(body({ message: { id: 506, text: 'طيب وبعدين؟' }, turns: [{ r: 'c', t: 'وش رأيك؟', at: minutesAgo(3) }, { r: 'b', t: ('تحليل. '.repeat(90)).slice(0, 499) + '…', at: minutesAgo(2) }] }));
     must(next.contextBlock.includes('العضوية: ذُكرت له') && next.contextBlock.includes('كروت: membership') && next.contextBlock.includes('فيديوهات: 5') && next.contextBlock.includes('https://vibesholding.com/pb'), 'session ledger: what the full reply carried');
