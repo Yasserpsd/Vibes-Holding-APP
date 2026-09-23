@@ -89,6 +89,8 @@ const envSchema = z.object({
   STORE_PRIVACY_URL: z.string().url().optional(),
   // Expo push service: optional access token when "enhanced push security" is on for the Expo project.
   EXPO_PUSH_ACCESS_TOKEN: z.string().min(10).optional(),
+  // M42: automatic notifications (a published post, a new agenda event, a new Saudi decision). '0' switches them off.
+  AUTO_PUSH: z.enum(['0', '1']).default('1'),
 });
 
 type Env = z.infer<typeof envSchema>;

@@ -12,7 +12,7 @@ const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endT
 export function Agenda() {
   const { signOut, notify } = useShell();
   const state = useLoad(() => api.agenda(), []);
-  const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput } | null>(null);
+  const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput; english: { title: string; blurb: string; place: string } } | null>(null);
   const [rows, setRows] = useState<{ event: AgendaEvent; registrations: AgendaRegistration[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const upcoming = state.data?.events.filter((event) => !pastOf(event)).length ?? 0;
@@ -30,8 +30,10 @@ export function Agenda() {
     if (!editor || busy) return;
     setBusy(true);
     try {
-      if (editor.row) await api.updateAgendaEvent(editor.row.id, editor.input);
-      else await api.createAgendaEvent(editor.input);
+      // M43: the fields always travel when filled; the server keeps them auto while they match the stored English.
+      const english = editor.english.title.trim() || editor.english.blurb.trim() || editor.english.place.trim() ? editor.english : null;
+      if (editor.row) await api.updateAgendaEvent(editor.row.id, { ...editor.input, english });
+      else await api.createAgendaEvent({ ...editor.input, english });
       notify('ok', 'حُفظت الفعالية.');
       setEditor(null);
       state.reload();
@@ -89,7 +91,7 @@ export function Agenda() {
         التطبيق إن وُجدت ولا يتأكد تسجيله إلا بعد نجاح الدفع. رابط الأونلاين لا يظهر إلا للمسجّلين المؤكدين. زر «إشعار» يذكّر كل الأجهزة بالفعالية.
       </p>
       <div className="row-actions" style={{ marginBottom: 12 }}>
-        <button type="button" onClick={() => setEditor({ row: null, input: { ...EMPTY } })}>+ فعالية جديدة</button>
+        <button type="button" onClick={() => setEditor({ row: null, input: { ...EMPTY }, english: { title: '', blurb: '', place: '' } })}>+ فعالية جديدة</button>
       </div>
       <Async state={state} rows={5} empty={() => (state.data?.events.length ?? 0) === 0} emptyText="لا توجد فعاليات بعد — أضف أول فعالية.">
         {(data) => (
@@ -121,7 +123,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, mode: row.mode, feeSar: row.feeSar, open: row.open } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, mode: row.mode, feeSar: row.feeSar, open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -177,6 +179,21 @@ export function Agenda() {
             <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, display: 'flex' }}>
               <input type="checkbox" checked={editor.input.open} onChange={(event) => edit({ open: event.target.checked })} /> التسجيل مفتوح
             </label>
+            <fieldset>
+              <legend>الإنجليزية — تُكتب تلقائيًا عند الحفظ، وتعديلك لها يثبّتها</legend>
+              <label>
+                الاسم بالإنجليزية
+                <input dir="ltr" value={editor.english.title} maxLength={140} onChange={(event) => setEditor({ ...editor, english: { ...editor.english, title: event.target.value } })} placeholder={editor.row?.en ? '' : 'تُترجم تلقائيًا عند الحفظ'} />
+              </label>
+              <label>
+                الوصف بالإنجليزية
+                <textarea dir="ltr" rows={3} maxLength={1000} value={editor.english.blurb} onChange={(event) => setEditor({ ...editor, english: { ...editor.english, blurb: event.target.value } })} placeholder={editor.row?.en ? '' : 'تُترجم تلقائيًا عند الحفظ'} />
+              </label>
+              <label>
+                المكان بالإنجليزية
+                <input dir="ltr" value={editor.english.place} maxLength={200} onChange={(event) => setEditor({ ...editor, english: { ...editor.english, place: event.target.value } })} />
+              </label>
+            </fieldset>
             <div className="row-actions">
               <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
               {editor.row ? <button type="button" className="ghost" disabled={busy} onClick={() => void remove(editor.row as AgendaEvent)}>حذف</button> : null}

@@ -11,7 +11,7 @@ import { MemoryKV } from './store.js';
 import { TemplateBlurbWriter } from './videos/blurbs.js';
 
 // M9: «رسائل الإدارة» — admin posts, the public feed and the push broadcast.
-const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', PUBLIC_URL: 'http://localhost:3000', ADMIN_ORIGINS: 'https://dashboard.example.com/, http://localhost:5173' });
+const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', AUTO_PUSH: '0', PUBLIC_URL: 'http://localhost:3000', ADMIN_ORIGINS: 'https://dashboard.example.com/, http://localhost:5173' });
 
 /** The mock hub makes every verified account an admin; this wrapper can revoke that after sign-in. */
 class RevocableHub implements HubClient {

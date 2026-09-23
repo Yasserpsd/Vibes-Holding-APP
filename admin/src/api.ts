@@ -41,6 +41,9 @@ export type Post = {
   pollResults?: PollResults | null;
   /** How the last hand-over to the hub went: the websites and the assistant hear a post through it. */
   hubSync?: PostHubSync;
+  /** M43: the post's English — AI once, the owner's edit wins (`enAuto: false`). */
+  en?: { title: string; body: string; place: string | null } | null;
+  enAuto?: boolean;
 };
 export type PostKind = 'post' | 'event' | 'poll';
 /** `date` is a day (`2026-10-05`) or an exact time (`2026-10-05T19:30:00+03:00`). */
@@ -54,7 +57,7 @@ export type PostPersona = 'neutral' | 'entrepreneur' | 'investor';
 export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona } | { type: 'member'; contactId: number; name: string };
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 /** `video` is the YouTube link or id, `videoFile` the uploaded video; a post may carry both. */
-export type PostInput = { title: string; body: string; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; audience: PostAudience };
+export type PostInput = { title: string; body: string; english?: { title: string; body: string } | null; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; audience: PostAudience };
 
 /** M30: a member's request for his printed membership card, delivered to his door at no charge. */
 export type CardRequest = {
@@ -185,6 +188,9 @@ export type AgendaEvent = AgendaEventInput & {
   createdAt: string;
   updatedAt: string;
   counts: { hq: number; online: number; confirmed: number; awaitingPayment: number };
+  /** M43: the event's English — AI once, the owner's edit wins (`enAuto: false`). */
+  en?: { title: string; blurb: string; place: string | null } | null;
+  enAuto?: boolean;
 };
 export type AgendaRegistration = {
   id: string;
@@ -350,8 +356,8 @@ export const api = {
   profilesConfig: (input: ProfilesConfig) => call<{ config: ProfilesConfig }>('PUT', '/api/admin/profiles/config', input),
   workshopRegistrations: () => call<{ registrations: WorkshopRegistration[] }>('GET', '/api/admin/workshops'),
   agenda: () => call<{ events: AgendaEvent[] }>('GET', '/api/admin/agenda'),
-  createAgendaEvent: (input: AgendaEventInput) => call<{ event: AgendaEvent }>('POST', '/api/admin/agenda', input),
-  updateAgendaEvent: (id: string, input: Partial<AgendaEventInput>) => call<{ event: AgendaEvent }>('PUT', `/api/admin/agenda/${id}`, input),
+  createAgendaEvent: (input: AgendaEventInput & { english?: { title: string; blurb: string; place: string } | null }) => call<{ event: AgendaEvent }>('POST', '/api/admin/agenda', input),
+  updateAgendaEvent: (id: string, input: Partial<AgendaEventInput> & { english?: { title: string; blurb: string; place: string } | null }) => call<{ event: AgendaEvent }>('PUT', `/api/admin/agenda/${id}`, input),
   deleteAgendaEvent: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/agenda/${id}`),
   agendaRegistrations: (id: string) => call<{ registrations: AgendaRegistration[] }>('GET', `/api/admin/agenda/${id}/registrations`),
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),

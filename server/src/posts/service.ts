@@ -60,6 +60,8 @@ export const postInputSchema = z
     event: z.object({ date: eventDate, place: z.string().trim().max(200).default(''), onlineUrl: httpUrl.nullish() }).nullish(),
     poll: pollInputSchema.nullish(),
     audience: audienceSchema.default({ type: 'all' }),
+    /** M43: the dashboard's own English wording; absent or empty = the automatic translation stands. */
+    english: z.object({ title: z.string().trim().max(140).default(''), body: z.string().trim().max(6000).default('') }).nullish(),
   })
   .refine((input) => input.kind !== 'event' || Boolean(input.event), 'اكتب موعد الفعالية')
   .refine((input) => input.kind !== 'poll' || Boolean(input.poll), 'اكتب خيارات الاستفتاء');
@@ -90,7 +92,13 @@ export type Post = {
   poll?: PostPoll | null;
   /** How the last hand-over to the hub went; `published` = the hub holds a card for this post. */
   hubSync?: PostHubSync;
+  /** M43: the English of the owner's words, written once by AI and editable from the dashboard. */
+  en?: PostEnglish | null;
+  /** False once the owner edited the English himself: automatic retranslation then stops. */
+  enAuto?: boolean;
 };
+
+export type PostEnglish = { title: string; body: string; place: string | null };
 
 export type PostKind = 'post' | 'event' | 'poll';
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
@@ -273,6 +281,16 @@ export class PostsService {
     await this.mutate((posts) => {
       const post = posts.find((entry) => entry.id === id);
       if (post) post.notifiedAt = now.toISOString();
+    });
+  }
+
+  /** M43: the English of the post — `auto: false` records the owner's own wording and stops retranslation. */
+  async setEnglish(id: string, en: PostEnglish | null, auto: boolean): Promise<void> {
+    await this.mutate((posts) => {
+      const post = posts.find((entry) => entry.id === id);
+      if (!post) return;
+      post.en = en;
+      post.enAuto = auto;
     });
   }
 }

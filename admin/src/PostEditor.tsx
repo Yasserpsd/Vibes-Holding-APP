@@ -135,6 +135,9 @@ function MemberPicker({ chosen, onPick }: { chosen: { contactId: number; name: s
 export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [title, setTitle] = useState(post?.title ?? '');
   const [body, setBody] = useState(post?.body ?? '');
+  // M43: the post's English — AI writes it at save; a hand edit here wins for good.
+  const [enTitle, setEnTitle] = useState(post?.en?.title ?? '');
+  const [enBody, setEnBody] = useState(post?.en?.body ?? '');
   const [links, setLinks] = useState<PostLink[]>(post?.links ?? []);
   // Uploaded images and pasted links live side by side: both are just URLs, in display order.
   const [images, setImages] = useState<string[]>(post?.images ?? []);
@@ -311,7 +314,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
     const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
     const pollInput: PostPollInput | null = kind === 'poll' ? { options: cleanOptions, closesAt: pollDay ? (pollTime ? `${pollDay}T${pollTime}:00+03:00` : pollDay) : null, resultsVisible } : null;
-    const input: PostInput = { title: title.trim(), body: body.trim(), links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, poll: pollInput, audience };
+    const input: PostInput = { title: title.trim(), body: body.trim(), english: enTitle.trim() || enBody.trim() ? { title: enTitle.trim(), body: enBody.trim() } : null, links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, poll: pollInput, audience };
     setBusy(true);
     setError(null);
     try {
@@ -461,6 +464,18 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             نص الرسالة
             <textarea value={body} rows={8} maxLength={6000} onChange={(e) => setBody(e.target.value)} />
           </label>
+
+          <fieldset>
+            <legend>الإنجليزية — تُكتب تلقائيًا عند الحفظ، وتعديلك لها يثبّتها</legend>
+            <label>
+              العنوان بالإنجليزية
+              <input dir="ltr" value={enTitle} maxLength={140} onChange={(e) => setEnTitle(e.target.value)} placeholder={post?.en ? '' : 'تُترجم تلقائيًا عند الحفظ'} />
+            </label>
+            <label>
+              النص بالإنجليزية
+              <textarea dir="ltr" value={enBody} rows={4} maxLength={6000} onChange={(e) => setEnBody(e.target.value)} placeholder={post?.en ? '' : 'تُترجم تلقائيًا عند الحفظ'} />
+            </label>
+          </fieldset>
 
           <fieldset>
             <legend>الروابط</legend>

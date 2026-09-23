@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../auth/guard.js';
 import { PERSONAS, type AuthService } from '../auth/service.js';
 import { hubCall, type HubClient } from '../hub/types.js';
+import { langOf, type AppLang } from '../lang.js';
+import type { Translator } from '../translate.js';
 import { MediaService } from '../media/service.js';
 import type { PollsService } from '../polls/service.js';
 import type { PushService } from '../push/service.js';
@@ -11,7 +13,7 @@ import type { SyncService } from '../sync/service.js';
 import type { PostsHubSync } from './hubSync.js';
 import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; translator?: Translator };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -22,9 +24,25 @@ const idSchema = z.object({ id: z.string().uuid() });
 const NOT_FOUND = { error: { code: 'not_found', message: 'المنشور غير موجود' } };
 
 /** What the app sees: no author, no draft fields. `audience` is only its type — the viewer labels «لك خصيصًا» / «لفئتك». */
-function publicPost(post: Post) {
-  const { id, title, body, links, images, youtubeId, pinned, publishedAt } = post;
-  return { id, title, body, links, images, youtubeId, video: post.video ?? null, pinned, publishedAt, kind: post.kind ?? 'post', event: post.event ?? null, audience: audienceOf(post).type };
+function publicPost(post: Post, lang: AppLang = 'ar') {
+  const { id, links, images, youtubeId, pinned, publishedAt } = post;
+  // M43: the English app reads the stored English (AI once, owner-editable); anything untranslated stays Arabic.
+  const en = lang === 'en' ? (post.en ?? null) : null;
+  const event = post.event ? { ...post.event, place: en?.place || post.event.place } : (post.event ?? null);
+  return {
+    id,
+    title: en?.title || post.title,
+    body: en?.body || post.body,
+    links,
+    images,
+    youtubeId,
+    video: post.video ?? null,
+    pinned,
+    publishedAt,
+    kind: post.kind ?? 'post',
+    event,
+    audience: audienceOf(post).type,
+  };
 }
 
 /** M29: the app's admin composer sends a plain targeted message (no media) and its notification in one act. */
@@ -38,7 +56,7 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, translator }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -49,8 +67,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   };
 
   /** M31: the post as the app reads it, with the poll block as THIS viewer may see it. */
-  const viewerPost = async (post: Post, viewer: PostViewer) => ({
-    ...publicPost(post),
+  const viewerPost = async (post: Post, viewer: PostViewer, lang: AppLang = 'ar') => ({
+    ...publicPost(post, lang),
     ...(post.kind === 'poll' ? { poll: await polls.view(post, viewer?.contactId ?? null) } : {}),
   });
 
@@ -100,8 +118,9 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const query = parse(listSchema, request.query, reply);
       if (!query) return;
       const viewer = await viewerOf(request);
+      const lang = langOf(request);
       const { posts, more } = await service.listPublished(query.limit, query.before, viewer);
-      return { posts: await Promise.all(posts.map((post) => viewerPost(post, viewer))), more };
+      return { posts: await Promise.all(posts.map((post) => viewerPost(post, viewer, lang))), more };
     }),
   );
 
@@ -114,7 +133,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const viewer = await viewerOf(request);
       // A targeted post answers the wrong viewer exactly like a missing one: its existence is private too.
       if (!post || post.status !== 'published' || !canSee(post, viewer)) return reply.code(404).send(NOT_FOUND);
-      return { post: await viewerPost(post, viewer) };
+      return { post: await viewerPost(post, viewer, langOf(request)) };
     }),
   );
 
@@ -181,6 +200,24 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         // blocks the post: it is recorded on it (`hubSync`) and tried again on the next edit.
         await hubSync.saved(post, admin.session.uuid);
         await sync.bump('posts');
+        // M43: the English of the owner's words — his own wording from the editor wins for good;
+        // otherwise AI writes it once and rewrites it only while the Arabic changes and he never edited it.
+        const manual = input.english && (input.english.title.trim() !== '' || input.english.body.trim() !== '') ? input.english : null;
+        if (manual && (manual.title !== (post.en?.title ?? '') || manual.body !== (post.en?.body ?? ''))) {
+          await service.setEnglish(post.id, { title: manual.title, body: manual.body, place: post.en?.place ?? null }, false);
+        } else if (translator && translator.mode !== 'off') {
+          const place = post.event?.place ?? '';
+          const arabicChanged = !previous || previous.title !== post.title || previous.body !== post.body || (previous.event?.place ?? '') !== place;
+          if (post.en == null || (post.enAuto !== false && arabicChanged)) {
+            const out = await translator.translate([post.title, post.body, place]);
+            if (out) await service.setEnglish(post.id, { title: out[0] || post.title, body: out[1] || post.body, place: place ? out[2] || place : null }, true);
+          }
+        }
+        // M42 (owner: «بمجرد ما انشر اي رسالة كل الناس يجيلها اشعار فورا»): the FIRST publish notifies
+        // its audience by itself; edits never re-notify, and the manual button stays for reminders.
+        if (autoPush && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
+          void pushPost(post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
+        }
         return await reply.code(mode === 'create' ? 201 : 200).send({ post: (await service.get(post.id)) ?? post });
       } catch (error) {
         if (error instanceof InvalidVideoError) return reply.code(400).send({ error: { code: 'invalid', message: error.message } });

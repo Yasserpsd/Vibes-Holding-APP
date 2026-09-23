@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
+import type { PushService } from '../push/service.js';
+import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
@@ -51,7 +53,13 @@ export type Audience = { prefs: NewsPrefs | null; persona: string };
 
 type Indexed = { item: NewsItem; tokens: Set<string> };
 type Fresh = { source: NewsSource; entry: FeedEntry };
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl; /** Called after a run that stored new items (/api/sync). */ onChange?: () => void };
+type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl; /** Called after a run that stored new items (/api/sync). */ onChange?: () => void; /** M42: a NEW Saudi decision notifies every device (capped per day). */ push?: PushService };
+
+/** M42: which decisions were already announced, and how many went out today (Riyadh). */
+export const NEWS_PUSH_KEY = 'push:news:decisions';
+const NEWS_PUSH_DAILY_MAX = 3;
+const NEWS_PUSH_SEEN_MAX = 600;
+type NewsPushState = { seen: string[]; day: string; sentToday: number };
 
 export function newsIdOf(url: string): string {
   return createHash('sha1').update(url).digest('hex').slice(0, 16);
@@ -130,6 +138,7 @@ export class NewsService {
       this.lastError = null;
       await this.persist();
       if (added > 0) this.deps.onChange?.();
+      await this.pushNewDecisions();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
         'news refreshed',
@@ -332,6 +341,44 @@ export class NewsService {
       .map((item) => ({ item, score: scoreOf(item, wanted, now) }))
       .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
     return paginate(scored.map(({ item }) => item), query, this.updatedAt, wanted.size > 0);
+  }
+
+  /**
+   * M42 (owner: «عايز الأخبار برده ترسل اشعار»): every NEW item of «قرارات وأنظمة المملكة» notifies all
+   * devices with the source's own title (rule 7: nothing is written by us), capped per Riyadh day so the
+   * feed's volume never becomes noise. The first run only records what already exists.
+   */
+  private async pushNewDecisions(): Promise<void> {
+    const push = this.deps.push;
+    if (!push) return;
+    try {
+      const current = this.visible('ar').filter((item) => item.decision);
+      const stored = await this.deps.kv.get<NewsPushState>(NEWS_PUSH_KEY);
+      const today = riyadhDay(Date.now());
+      if (!stored) {
+        await this.deps.kv.set(NEWS_PUSH_KEY, { seen: current.map((item) => item.id), day: today, sentToday: 0 } satisfies NewsPushState);
+        return;
+      }
+      const seen = new Set(stored.seen);
+      const fresh = current.filter((item) => !seen.has(item.id)).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+      if (fresh.length === 0) return;
+      let sentToday = stored.day === today ? stored.sentToday : 0;
+      for (const item of fresh) {
+        if (sentToday >= NEWS_PUSH_DAILY_MAX) break;
+        const outcome = await push.broadcast({
+          title: `${DECISIONS_TITLE} 🇸🇦`,
+          body: item.title,
+          data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` },
+        });
+        if (outcome.sent === 0) break;
+        sentToday += 1;
+      }
+      // Everything new is recorded either way: a decision beyond today's cap is skipped, never sent stale later.
+      const nextSeen = [...stored.seen, ...fresh.map((item) => item.id)].slice(-NEWS_PUSH_SEEN_MAX);
+      await this.deps.kv.set(NEWS_PUSH_KEY, { seen: nextSeen, day: today, sentToday } satisfies NewsPushState);
+    } catch (error) {
+      this.deps.log.error({ err: error }, 'news decision notifications failed');
+    }
   }
 
   /** The fixed section, newest first, the same for everyone. */

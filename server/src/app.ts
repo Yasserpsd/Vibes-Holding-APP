@@ -57,6 +57,7 @@ import { PostsService, postMediaUrls } from './posts/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
 import type { KV } from './store.js';
+import { OffTranslator, OpenAITranslator, type Translator } from './translate.js';
 import { FeedService } from './sync/feed.js';
 import { syncRoutes } from './sync/routes.js';
 import { SyncService, type SyncKey } from './sync/service.js';
@@ -166,13 +167,17 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
         ? new MockPbBridge({ projects, demo: !hub })
         : new OffPbBridge());
   const sessions = new SessionStore(kv, config.SESSION_DAYS);
+  // Member push notifications (Expo push service); tokens come from the app after login.
+  const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
+  const autoPush = config.AUTO_PUSH === '1';
   // News: OpenAI labels the items when a key is set; otherwise keywords. Neither writes a word of news.
   const newsClassifier: Classifier =
     classifier ??
     (config.OPENAI_API_KEY
       ? new OpenAIClassifier({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log })
       : new KeywordClassifier());
-  const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl, onChange: () => moved('news') });
+  // M42: a new Saudi decision notifies every device by itself (capped per day) unless AUTO_PUSH=0.
+  const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl, onChange: () => moved('news'), push: autoPush ? push : undefined });
   // Videos: the channel feed (or the Data API with a key); blurbs are marketing lines written once.
   const blurbWriter: BlurbWriter =
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
@@ -200,8 +205,6 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites });
-  // Member push notifications (Expo push service); tokens come from the app after login.
-  const push = new PushService({ kv, log: app.log, fetchImpl, accessToken: config.EXPO_PUSH_ACCESS_TOKEN });
   const hq = new HqService({ kv, log: app.log, notifier, push });
   const card = new CardService({ kv, notifier });
   const contact = new ContactService({ kv, notifier, push });
@@ -282,6 +285,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       privacyUrl: config.STORE_PRIVACY_URL,
     },
   });
+  // M43: the owner's own words (posts, agenda events) get their English once from AI; he edits it from the dashboard.
+  const translator: Translator = config.OPENAI_API_KEY
+    ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl })
+    : new OffTranslator();
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
   const agenda = new AgendaService({ kv, notifier, push, payments, onChange: () => moved('content') });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
@@ -346,13 +353,13 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(contactRoutes, { service: contact, auth });
   await app.register(profilesRoutes, { service: profiles, auth });
   await app.register(workshopsRoutes, { service: workshops, auth });
-  await app.register(agendaRoutes, { service: agenda, auth });
+  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
-  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync });
+  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
   await app.register(dashboardRoutes, { service: dashboard, auth });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });

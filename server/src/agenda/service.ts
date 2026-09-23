@@ -39,9 +39,15 @@ export type AgendaEvent = {
   open: boolean;
   createdAt: string;
   updatedAt: string;
+  /** M43: the English of the owner's words, written once by AI and editable from the dashboard. */
+  en?: AgendaEnglish | null;
+  /** False once the owner edited the English himself: automatic retranslation then stops. */
+  enAuto?: boolean;
 };
 
-export type AgendaEventInput = Omit<AgendaEvent, 'id' | 'createdAt' | 'updatedAt'>;
+export type AgendaEnglish = { title: string; blurb: string; place: string | null };
+
+export type AgendaEventInput = Omit<AgendaEvent, 'id' | 'createdAt' | 'updatedAt' | 'en' | 'enAuto'>;
 
 export type AgendaRegistration = {
   id: string;
@@ -118,17 +124,19 @@ export class AgendaService {
     return (await this.loadEvents()).find((event) => event.id === id) ?? null;
   }
 
-  private toPublic(event: AgendaEvent, mine: AgendaRegistration | null, me: Me | null): PublicAgendaEvent {
-    const { id, title, blurb, date, time, endTime, place, mode, feeSar, open } = event;
+  private toPublic(event: AgendaEvent, mine: AgendaRegistration | null, me: Me | null, lang: 'ar' | 'en' = 'ar'): PublicAgendaEvent {
+    const { id, date, time, endTime, mode, feeSar, open } = event;
+    // M43: the English app reads the stored English (AI once, owner-editable); anything untranslated stays Arabic.
+    const en = lang === 'en' ? (event.en ?? null) : null;
     const confirmedOnline = Boolean(mine && mine.paid && mine.attendance === 'online');
     return {
       id,
-      title,
-      blurb,
+      title: en?.title || event.title,
+      blurb: en?.blurb || event.blurb,
       date,
       time,
       endTime,
-      place,
+      place: en?.place || event.place,
       mode,
       feeSar,
       open,
@@ -139,19 +147,30 @@ export class AgendaService {
   }
 
   /** The upcoming events (today included, Riyadh time) with the viewer's own state. */
-  async forViewer(me: Me | null, now = Date.now()): Promise<PublicAgendaEvent[]> {
+  async forViewer(me: Me | null, lang: 'ar' | 'en' = 'ar', now = Date.now()): Promise<PublicAgendaEvent[]> {
     const today = riyadhDay(now);
     const [events, registrations] = await Promise.all([this.loadEvents(), this.loadRegs()]);
     const mineByEvent = new Map<string, AgendaRegistration>();
     if (me) for (const registration of registrations) if (registration.contactId === me.id) mineByEvent.set(registration.eventId, registration);
-    return events.filter((event) => event.date >= today).map((event) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me));
+    return events.filter((event) => event.date >= today).map((event) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang));
   }
 
-  async viewerEvent(id: string, me: Me | null): Promise<PublicAgendaEvent | null> {
+  async viewerEvent(id: string, me: Me | null, lang: 'ar' | 'en' = 'ar'): Promise<PublicAgendaEvent | null> {
     const event = await this.event(id);
     if (!event) return null;
     const mine = me ? ((await this.loadRegs()).find((entry) => entry.eventId === id && entry.contactId === me.id) ?? null) : null;
-    return this.toPublic(event, mine, me);
+    return this.toPublic(event, mine, me, lang);
+  }
+
+  /** M43: the English of the event — `auto: false` records the owner's own wording and stops retranslation. */
+  async setEnglish(id: string, en: AgendaEnglish | null, auto: boolean): Promise<AgendaEvent | null> {
+    return this.mutateEvents((events) => {
+      const event = events.find((entry) => entry.id === id);
+      if (!event) return null;
+      event.en = en;
+      event.enAuto = auto;
+      return event;
+    });
   }
 
   /**
