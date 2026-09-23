@@ -208,6 +208,34 @@ export type AgendaRegistration = {
   confirmedAt: string | null;
 };
 
+/** M44 «روابط الدفع» — mirrors server/src/paylinks/service.ts. */
+export type PayLinkKind = 'membership' | 'workshop' | 'other';
+export type PayLink = {
+  id: string;
+  kind: PayLinkKind;
+  label: string;
+  amountSar: number;
+  days: number | null;
+  contactId: number | null;
+  contactName: string;
+  customer: { name: string; phone: string; email: string };
+  paymentId: string;
+  checkoutUrl: string;
+  createdBy: string;
+  createdAt: string;
+  paidAt: string | null;
+  activation: 'auto' | 'done' | 'failed' | 'none';
+  activationNote: string | null;
+  status?: 'created' | 'paid' | 'failed';
+};
+export type PayLinkInput = {
+  kind: PayLinkKind;
+  label: string;
+  amountSar: number;
+  days: number;
+  customer: { name: string; phone: string; email: string };
+};
+
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
@@ -361,6 +389,8 @@ export const api = {
   deleteAgendaEvent: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/agenda/${id}`),
   agendaRegistrations: (id: string) => call<{ registrations: AgendaRegistration[] }>('GET', `/api/admin/agenda/${id}/registrations`),
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
+  paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
+  createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
 };
 
 const TRANSFER_FAILED = 'تعذر رفع الملف. تحقق من الإنترنت ثم حاول مرة أخرى.';

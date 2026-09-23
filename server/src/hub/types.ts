@@ -71,6 +71,8 @@ export type HubOp =
   | 'reset_confirm'
   | 'delete_account'
   | 'activate_member'
+  // Site-facing since 2.7.x («for other plugins on satellite sites»): membership state by phone/e-mail (M44 payment links).
+  | 'member_status'
   | 'message'
   | 'poll'
   | 'history'
@@ -102,6 +104,8 @@ export type HubResponse = {
   /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
   referred_by?: number;
   referred_name?: string;
+  /** `member_status` (M44): whether a contact matched the phone/e-mail. */
+  found?: boolean;
   sent?: boolean;
   text?: string;
   contact?: HubContact | null;
@@ -288,6 +292,7 @@ export type HubResults = {
   admin_grant: { ok: true; contact: HubContact; event: HubEvent };
   admin_set_role: { ok: true; contact: HubContact };
   activate_member: { ok: true; contact: HubContact; already: boolean };
+  member_status: { ok: true; found?: boolean; is_member?: 0 | 1; source?: string; contact?: HubContact | null };
   changes: { ok: true; cursor: number; items: HubChange[] };
   publish: { ok: true; id: number };
   feed: { ok: true; items: HubFeedItem[] };

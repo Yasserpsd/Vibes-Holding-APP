@@ -173,27 +173,27 @@ export class PaymentsService {
   }
 
   /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
-  private async createPayment(me: Me, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean }, now: number): Promise<Payment> {
+  private async createPayment(customer: { contactId: number; name: string; email: string; phone: string }, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean }, now: number): Promise<Payment> {
     const id = randomUUID();
-    const [firstName = '', ...rest] = me.name.trim().split(/\s+/);
+    const [firstName = '', ...rest] = customer.name.trim().split(/\s+/);
     const intention = await this.deps.gateway.createIntention({
       paymentId: id,
       amountCents: input.amount * 100,
       currency: input.currency,
       itemName: input.title,
       description: `${input.title} — تطبيق نادي المستثمرين`,
-      customer: { firstName, lastName: rest.join(' '), email: me.email, phone: me.phone },
+      customer: { firstName, lastName: rest.join(' '), email: customer.email || 'no-reply@vcmem.com', phone: customer.phone || '0500000000' },
       notificationUrl: `${this.deps.publicUrl}/api/payments/paymob/webhook`,
       redirectionUrl: `${this.deps.publicUrl}/pay/return?payment=${id}`,
-      extras: { app: 'investorsclub', payment: id, service: input.key, contact: String(me.id) },
+      extras: { app: 'investorsclub', payment: id, service: input.key, contact: String(customer.contactId) },
     });
     const stamp = new Date(now).toISOString();
     const payment: Payment = {
       id,
-      contactId: me.id,
-      name: me.name,
-      email: me.email,
-      phone: me.phone,
+      contactId: customer.contactId,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
       serviceKey: input.key,
       serviceTitle: input.title,
       answers: input.answers,
@@ -235,14 +235,18 @@ export class PaymentsService {
     const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
     if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
     const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
-    const payment = await this.createPayment(me, { key: service.key, title: service.title, answers, amount: price.amount, currency: price.currency, memberPrice: price.memberPrice }, now);
+    const payment = await this.createPayment(
+      { contactId: me.id, name: me.name, email: me.email, phone: me.phone },
+      { key: service.key, title: service.title, answers, amount: price.amount, currency: price.currency, memberPrice: price.memberPrice },
+      now,
+    );
     return this.toPublic(payment);
   }
 
   /** M41 «أجندة النادي»: the attendance fee of a visitor without an active membership (a real-world service, rule 3 intact). */
   async startAgenda(me: Me, input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number }, now = Date.now()): Promise<PublicPayment> {
     const payment = await this.createPayment(
-      me,
+      { contactId: me.id, name: me.name, email: me.email, phone: me.phone },
       {
         key: `agenda:${input.eventId}`,
         title: `حضور فعالية: ${input.eventTitle}`,
@@ -254,6 +258,23 @@ export class PaymentsService {
       now,
     );
     return this.toPublic(payment);
+  }
+
+  /**
+   * M44 «روابط الدفع»: the owner sells by a link he creates in the dashboard (a real-world sale outside
+   * the app — never shown inside it, rule 3 intact). The customer may hold no app account at all.
+   */
+  async startLink(input: { kind: string; label: string; amountSar: number; customer: { contactId: number; name: string; email: string; phone: string } }, now = Date.now()): Promise<Payment> {
+    return this.createPayment(
+      input.customer,
+      { key: `link:${input.kind}`, title: input.label, answers: [], amount: input.amountSar, currency: 'SAR', memberPrice: false },
+      now,
+    );
+  }
+
+  /** M44: one payment by id for the dashboard's links list. */
+  async byId(id: string): Promise<Payment | null> {
+    return (await this.load()).find((entry) => entry.id === id) ?? null;
   }
 
   /** Paymob's transaction-processed callback: the only path that marks a payment paid or failed. */
@@ -298,8 +319,10 @@ export class PaymentsService {
     }
     if (result.changed) {
       this.deps.log.info({ payment: result.payment.id, status: result.payment.status }, 'payment updated from the gateway callback');
-      if (result.payment.status === 'paid') this.deps.notifier.paymentPaid(this.toMail(result.payment));
-      else this.deps.notifier.paymentFailed(this.toMail(result.payment));
+      // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
+      const linkSale = result.payment.serviceKey.startsWith('link:');
+      if (result.payment.status === 'paid' && !linkSale) this.deps.notifier.paymentPaid(this.toMail(result.payment));
+      else if (result.payment.status !== 'paid' && !linkSale) this.deps.notifier.paymentFailed(this.toMail(result.payment));
       if (result.payment.status === 'paid' || result.payment.status === 'failed') {
         const { id, contactId, serviceTitle, amount, currency, status } = result.payment;
         this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });

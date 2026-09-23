@@ -78,6 +78,11 @@ export class MockHubClient implements HubClient {
         return this.deleteAccount(body);
       case 'activate_member':
         return this.activateMember(body);
+      case 'member_status': {
+        // M44: the hub answers other systems about a person's membership by phone or e-mail.
+        const contact = this.findAccount(str(body, 'email', 190)) ?? this.findAccount(str(body, 'phone', 40));
+        return contact ? { ok: true, found: true, contact: this.publicContact(contact) } : { ok: true, found: false };
+      }
       case 'config':
         return this.chat.config();
       case 'message': {

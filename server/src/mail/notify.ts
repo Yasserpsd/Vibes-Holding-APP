@@ -247,6 +247,44 @@ export class Notifier {
     ]);
   }
 
+  /** M44: a payment-link sale was PAID — the mail says exactly what, who, and what happened to the activation. */
+  payLinkPaid(
+    link: { kind: 'membership' | 'workshop' | 'other'; label: string; amountSar: number; days: number | null; contactId: number | null; contactName: string; customer: { name: string; phone: string; email: string }; paymentId: string; activation: string; activationNote: string | null },
+    payment: { transactionId: string | null },
+    memberEnd: string,
+  ): void {
+    const kindLabel = link.kind === 'membership' ? 'عضوية سنوية' : link.kind === 'workshop' ? 'ورشة / فعالية' : 'أخرى';
+    const who = link.customer.name || link.contactName || '—';
+    this.dispatch(`✅ دفعة ${kindLabel}: ${link.label} — ${who} (${link.amountSar} ريال)`, [
+      `دفعة ناجحة عبر رابط دفع أنشأته الإدارة من اللوحة — النوع والعميل معروفان بالكامل.`,
+      '',
+      `النوع: ${kindLabel}`,
+      `الوصف: ${link.label}`,
+      `المبلغ: ${link.amountSar} ريال`,
+      '',
+      `العميل: ${who}`,
+      link.customer.phone ? `جواله: ${link.customer.phone}` : null,
+      link.customer.email ? `بريده: ${link.customer.email}` : null,
+      payment.transactionId ? `رقم عملية البوابة: ${payment.transactionId}` : null,
+      `رقم العملية عندنا: ${link.paymentId}`,
+      '',
+      link.kind !== 'membership'
+        ? 'التفعيل: لا يلزم — بيع بلا عضوية.'
+        : link.activation === 'done'
+          ? `التفعيل: ✅ تم تفعيل العضوية تلقائيًا لحساب ${link.contactName || `#${link.contactId}`}${memberEnd ? ` حتى ${memberEnd}` : ''} — لا شيء عليك.`
+          : `التفعيل: ⚠️ لم يتم تلقائيًا (${link.activationNote ?? 'راجع الهاب'}) — فعّل يدويًا من لوحة الأعضاء.`,
+    ]);
+  }
+
+  /** M44: a payment-link attempt failed at the gateway. */
+  payLinkFailed(link: { kind: string; label: string; amountSar: number; customer: { name: string } }, payment: { failureReason: string | null }): void {
+    this.dispatch(`❌ محاولة دفع لم تكتمل: ${link.label} (${link.amountSar} ريال)`, [
+      `محاولة دفع عبر رابط الإدارة لم تنجح${link.customer.name ? ` — العميل: ${link.customer.name}` : ''}.`,
+      payment.failureReason ? `سبب البوابة: ${payment.failureReason}` : null,
+      'الرابط ما زال صالحًا: يمكن للعميل المحاولة مرة أخرى بنفس الرابط.',
+    ]);
+  }
+
   /** M10: someone registered his interest in a workshop from the guide page. */
   workshopRegistered(registration: { id: string; workshopTitle: string; name: string; phone: string; email: string; personaLabel: string; note: string }): void {
     this.dispatch(`تسجيل في ورشة: ${registration.workshopTitle} — ${registration.name || '—'}`, [
