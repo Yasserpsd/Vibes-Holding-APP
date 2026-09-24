@@ -14,7 +14,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const NAME = 'Vibes Web Agent v4.6';
+const NAME = 'Vibes Web Agent v4.7';
 const PROMPT_TARGET = 9000; // characters, contract target (v3.2 carried 44,847)
 const PROMPT_LIMIT = 12000;
 // the hub stores vai_clip(memo, 700) in 2.6.0 and in 2.7.0: a longer MEMO loses its tail on every turn. Raise this, the
@@ -93,6 +93,7 @@ if (prompt.length > PROMPT_TARGET) console.warn('build-v4: warning: prompt is ' 
 // the DIRECT Paymob link and must never invent a two-year subscription (that offer does not exist).
 if (!prompt.includes('صفحة الدفع الموحدة') || !prompt.includes('لا يوجد أي عرض سنتين')) fail('prompt-v4.md: the unified-gate payment line or the annual-only rule is missing');
 if (prompt.includes('خارج الخدمة مؤقتًا')) fail('prompt-v4.md: still declares the pay page out of service (v4.4 leftover)');
+if (!prompt.includes('شركاء النجاح: التقديم فيه حصري') || !prompt.includes('تُرَدّ له قيمته فورًا')) fail('prompt-v4.md: the success-partners members-only rule or the member-workshops refund fact is missing');
 
 // ───────────────────────── app-site scrub (shared by Build Context and Split Reply) ─────────────────────────
 // Hard rule 3 must not depend on the model obeying: a pay link or the web price of the membership is taken out of every
@@ -624,6 +625,7 @@ byName('Sticky Note — Overview').parameters.content = [
   '',
   '**الجديد في v4.0:** الذاكرة الوحيدة هي turns من الهب (Simple Memory مفصولة عمدًا — لا تعد توصيلها) · منع تكرار على مستوى المضمون (آخر ثلاثة ردود موسومة ★) · سجل جلسة في بيانات الوركفلو (ما أُرسل من روابط وكروت وفيديوهات) لأن turns تصل مقصوصة وبلا أفعال · العضوية تُذكر مرة واحدة في الجلسة، وفي موقع التطبيق لا تُذكر من نفسه ويُحذف سعرها وروابط الدفع من السياق ومن الرد · حتى 3 أدوات و6 دورات · جهد medium للتحليل · التعليمات مختصرة (هوية + قواعد + بروتوكول) والحقائق من الكتالوج ومعرفة الهب والأدوات.',
   '',
+  '**الجديد في v4.7:** معاملة الأدمن VIP (مدير لا عميل — صيغة تنفيذية، صفر بيع)، شركاء النجاح حصري للأعضاء السنويين المفعّلين (البناء يفشل لو القاعدة اختفت)، ورش العمل بدون رسوم للأعضاء (ودفع العضو يُرَدّ فورًا)، بيع مقنع مربوط باحتياج العميل بالأرقام، والأسعار دائمًا من الكتالوج والصفحات الحية لحظة السؤال.',
   '**الجديد في v4.6:** قروبات الواتساب أُلغيت نهائيًا من مفهوم النادي (قرار المالك 2026-09-24) — لا ذكر لمجموعات أو قروبات في أي رد؛ ومزايا العضوية بلا سطر القروبات (هب 2.11.2 ينظف الكتالوج الحي).',
   '**الجديد في v4.5 (M52 — توحيد بوابة الدفع):** صفحة الدفع الموحدة (?vai-pay) رجعت هي طريق الدفع على الويب — تشتغل الآن بالوضع المباشر داخل البلجن (تجمع بيانات الدافع وكلمة مروره ثم تحوّله لرابط الخدمة المباشر، وتفعيل تلقائي متتبع) — «المستشار» يرسلها من الكتالوج ومكتبة الروابط ولا يرسل روابط Paymob القديمة؛ حجب وضع التطبيق كما هو (القاعدة 3)، وقاعدة «العضوية سنوية فقط — لا سنتين» باقية.',
   '**الجديد في v4.4 (عاجل):** صفحة الدفع الآلي (?vai-pay) خارج الخدمة مؤقتًا حتى يفعّل Paymob خدمة الـ Intention (التذكرة القائمة) — «المستشار» يرسل رابط الدفع المباشر (Paymob) من الكتالوج ومكتبة الروابط بدلًا منها، وروابط ?vai-pay تُحجب آليًا من السياق ومن الرد على الويب والتطبيق معًا حتى لو وردت في محادثة قديمة · قاعدة صريحة: العضوية سنوية فقط — لا يوجد أي عرض سنتين أو سعر ترويجي آخر إطلاقًا.',
