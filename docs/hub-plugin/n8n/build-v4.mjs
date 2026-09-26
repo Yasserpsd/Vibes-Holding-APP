@@ -14,7 +14,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const NAME = 'Vibes Web Agent v4.8';
+const NAME = 'Vibes Web Agent v4.9';
 const PROMPT_TARGET = 9000; // characters, contract target (v3.2 carried 44,847)
 const PROMPT_LIMIT = 12000;
 // the hub stores vai_clip(memo, 700) in 2.6.0 and in 2.7.0: a longer MEMO loses its tail on every turn. Raise this, the
@@ -94,6 +94,7 @@ if (prompt.length > PROMPT_TARGET) console.warn('build-v4: warning: prompt is ' 
 if (!prompt.includes('صفحة الدفع الموحدة') || !prompt.includes('لا يوجد أي عرض سنتين')) fail('prompt-v4.md: the unified-gate payment line or the annual-only rule is missing');
 if (prompt.includes('خارج الخدمة مؤقتًا')) fail('prompt-v4.md: still declares the pay page out of service (v4.4 leftover)');
 if (!prompt.includes('شركاء النجاح: التقديم فيه حصري') || !prompt.includes('تُرَدّ له قيمته فورًا')) fail('prompt-v4.md: the success-partners members-only rule or the member-workshops refund fact is missing');
+if (!prompt.includes('wa.me/966538461110') || !prompt.includes('عبقري تسجيل')) fail('prompt-v4.md: the podcast WhatsApp handoff or the persona-selling line is missing (v4.9)');
 
 // ───────────────────────── app-site scrub (shared by Build Context and Split Reply) ─────────────────────────
 // Hard rule 3 must not depend on the model obeying: a pay link or the web price of the membership is taken out of every
@@ -625,6 +626,7 @@ byName('Sticky Note — Overview').parameters.content = [
   '',
   '**الجديد في v4.0:** الذاكرة الوحيدة هي turns من الهب (Simple Memory مفصولة عمدًا — لا تعد توصيلها) · منع تكرار على مستوى المضمون (آخر ثلاثة ردود موسومة ★) · سجل جلسة في بيانات الوركفلو (ما أُرسل من روابط وكروت وفيديوهات) لأن turns تصل مقصوصة وبلا أفعال · العضوية تُذكر مرة واحدة في الجلسة، وفي موقع التطبيق لا تُذكر من نفسه ويُحذف سعرها وروابط الدفع من السياق ومن الرد · حتى 3 أدوات و6 دورات · جهد medium للتحليل · التعليمات مختصرة (هوية + قواعد + بروتوكول) والحقائق من الكتالوج ومعرفة الهب والأدوات.',
   '',
+  '**الجديد في v4.9 (طلب المالك 2026-09-27):** بيع أذكى بكثير: ترشيح العضوية السنوية بثقة وبلا تردد مع شرح المزايا حسب شخصية المحدث (مستثمر/رائد أعمال/محايد) وقيادة المحادثة نحو التسجيل بخطوات صغيرة («عبقري تسجيل») · بودكاست الملتقى: الأسعار من الكتالوج لحظة السؤال وأي حجز أو تفاصيل تحويل فوري لواتساب الاستوديو +966 53 846 1110 (البناء يفشل لو اختفى الرقم أو السطر).',
   '**الجديد في v4.8 (M56):** إيموجي معبرة باعتدال في ردود المستشار (1–3، ولا شيء في الجاد) — مع خاصية تفاعل العميل بالإيموجي على رسائله في الويدجت (2.14.0).',
   '**الجديد في v4.7:** معاملة الأدمن VIP (مدير لا عميل — صيغة تنفيذية، صفر بيع)، شركاء النجاح حصري للأعضاء السنويين المفعّلين (البناء يفشل لو القاعدة اختفت)، ورش العمل بدون رسوم للأعضاء (ودفع العضو يُرَدّ فورًا)، بيع مقنع مربوط باحتياج العميل بالأرقام، والأسعار دائمًا من الكتالوج والصفحات الحية لحظة السؤال.',
   '**الجديد في v4.6:** قروبات الواتساب أُلغيت نهائيًا من مفهوم النادي (قرار المالك 2026-09-24) — لا ذكر لمجموعات أو قروبات في أي رد؛ ومزايا العضوية بلا سطر القروبات (هب 2.11.2 ينظف الكتالوج الحي).',
