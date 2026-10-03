@@ -402,6 +402,10 @@ button.pick { border-color: var(--gold); color: var(--gold); }
   .thread { block-size: calc(100dvh - 150px); position: sticky; top: 24px; }
   .thread-back { display: none; }
 }
+/* M16: a form submission's answers, folded under its row. */
+.answers { margin: 8px 0 0; padding-inline-start: 18px; display: grid; gap: 4px; max-inline-size: 48ch; }
+.answers li { white-space: normal; overflow-wrap: anywhere; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

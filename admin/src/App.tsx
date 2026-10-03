@@ -5,6 +5,7 @@ import { Login } from './Login';
 import { Agenda } from './sections/Agenda';
 import { Home } from './sections/Home';
 import { Audit, CardRequests, Invites, Leads, Mail, Tickets, Workshops } from './sections/Lists';
+import { Forms } from './sections/Forms';
 import { MemberMail } from './sections/MemberMail';
 import { Members } from './sections/Members';
 import { People } from './sections/People';
@@ -32,6 +33,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'agenda', label: 'أجندة النادي', icon: 'agenda' },
   { key: 'people', label: 'شخصية ومسيرة', icon: 'people' },
   { key: 'workshops', label: 'تسجيلات الورش', icon: 'workshops' },
+  { key: 'forms', label: 'نماذج التسجيل', icon: 'forms' },
   { key: 'tickets', label: 'التذاكر', icon: 'tickets' },
   { key: 'leads', label: 'العملاء المحتملون', icon: 'leads' },
   { key: 'threads', label: 'المحادثات', icon: 'threads' },
@@ -259,6 +261,7 @@ export function App() {
             {section === 'agenda' ? <Agenda /> : null}
             {section === 'people' ? <People /> : null}
             {section === 'workshops' ? <Workshops /> : null}
+            {section === 'forms' ? <Forms /> : null}
             {section === 'tickets' ? <Tickets /> : null}
             {section === 'leads' ? <Leads /> : null}
             {section === 'threads' ? <Threads openId={route.thread} onOpen={pickThread} onClose={closeThread} /> : null}

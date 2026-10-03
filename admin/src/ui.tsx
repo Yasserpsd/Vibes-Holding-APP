@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { AccountFilter } from './types';
 
-export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'workshops' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news';
+export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {
@@ -92,6 +92,7 @@ const ICONS = {
   agenda: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-12ZM4 9.5h16M8.5 3.5v3M15.5 3.5v3M8 13.5h3M8 16.5h5.5M14.5 13l1.5 1.5 3-3',
   paylinks: 'M9.5 14.5l5-5M8 10.5 5.75 12.75a3.18 3.18 0 0 0 4.5 4.5L12.5 15M11.5 9l2.25-2.25a3.18 3.18 0 0 1 4.5 4.5L16 13.5M17 17.5c2-.4 3-1.4 3-3M4 6.5c0 1.6 1 2.6 3 3',
   workshops: 'M3 4.5h18M5 4.5h14v9.5H5V4.5ZM12 14v2M8.5 20l3.5-3.5 3.5 3.5M8.5 8l2.5 2.5L15.5 6',
+  forms: 'M9 4.5h6v3H9zM9 4.5H6v16h12v-16h-3M9 12h6M9 15.5h4M9.5 8.5l1 1 2-2',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
   close: 'M6 6l12 12M18 6 6 18',

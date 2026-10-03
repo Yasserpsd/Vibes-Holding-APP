@@ -155,6 +155,25 @@ export type Profile = {
 };
 export type ProfilesConfig = { intro: string };
 
+/** M16: a registration-form submission — mirrors server/src/forms/service.ts. */
+export type FormSubmission = {
+  id: string;
+  formKey: string;
+  formTitle: string;
+  contactId: number | null;
+  name: string;
+  phone: string;
+  email: string;
+  personaLabel: string;
+  answers: { key: string; label: string; value: string }[];
+  createdAt: string;
+  handled: boolean;
+  handledBy: string | null;
+  handledAt: string | null;
+};
+export type FormInfo = { key: string; title: string; open: boolean };
+export type NotifySettings = { recipients: string[]; source: 'dashboard' | 'env'; envRecipients: string[]; by: string | null; at: string | null };
+
 /** M10: a workshop interest registration from «دليل المحايد» — mirrors server/src/workshops/service.ts. */
 export type WorkshopRegistration = {
   id: string;
@@ -383,6 +402,11 @@ export const api = {
   deleteProfile: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/profiles/${id}`),
   profilesConfig: (input: ProfilesConfig) => call<{ config: ProfilesConfig }>('PUT', '/api/admin/profiles/config', input),
   workshopRegistrations: () => call<{ registrations: WorkshopRegistration[] }>('GET', '/api/admin/workshops'),
+  formSubmissions: () => call<{ submissions: FormSubmission[]; forms: FormInfo[] }>('GET', '/api/admin/forms'),
+  formHandled: (id: string, handled: boolean) => call<{ submission: FormSubmission }>('POST', `/api/admin/forms/${id}/handled`, { handled }),
+  notifySettings: () => call<{ settings: NotifySettings }>('GET', '/api/admin/notify'),
+  saveNotifySettings: (recipients: string[]) => call<{ settings: NotifySettings }>('PUT', '/api/admin/notify', { recipients }),
+  resetNotifySettings: () => call<{ settings: NotifySettings }>('DELETE', '/api/admin/notify'),
   agenda: () => call<{ events: AgendaEvent[] }>('GET', '/api/admin/agenda'),
   createAgendaEvent: (input: AgendaEventInput & { english?: { title: string; blurb: string; place: string } | null }) => call<{ event: AgendaEvent }>('POST', '/api/admin/agenda', input),
   updateAgendaEvent: (id: string, input: Partial<AgendaEventInput> & { english?: { title: string; blurb: string; place: string } | null }) => call<{ event: AgendaEvent }>('PUT', `/api/admin/agenda/${id}`, input),

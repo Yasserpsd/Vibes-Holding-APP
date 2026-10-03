@@ -59,10 +59,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       detail: "Three practical days that take your venture from the idea to a clear execution plan, with the club's experts.",
       priceLabel: 'SAR 290 instead of 1,200',
       memberLabel: '50% discount for members',
-      action: {
-        message: 'I would like to register for the “Your venture from idea to execution” workshop.',
-        fields: [{ key: 'mode', label: 'How you will attend', options: ['In person in Riyadh', 'Online'] }],
-      },
+      action: { label: 'Register for the workshop' },
     },
     {
       key: 'studio',

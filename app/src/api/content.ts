@@ -33,6 +33,7 @@ export type ServiceAction =
   | { type: 'whatsapp'; phone: string; message: string; fields: ServiceField[] }
   | { type: 'paymob'; message: string; fields: ServiceField[]; amount: number; memberAmount: number | null; currency: 'SAR' }
   | { type: 'link'; url: string; label: string }
+  | { type: 'form'; formKey: string; label: string }
   | { type: 'advisor'; prompt: string }
   | { type: 'hq' }
   | { type: 'projects' };

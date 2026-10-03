@@ -8,6 +8,7 @@ import { ensureHqSeed } from './content/hq.js';
 import { ensureMembershipSeed } from './content/membership.js';
 import { ensureServicesSeed } from './content/services.js';
 import { ensureVideosSeed } from './content/videos.js';
+import { ensureFormsSeed } from './forms/content.js';
 import { ensureNewsSourcesSeed } from './news/sources.js';
 import { createKV } from './store.js';
 
@@ -23,6 +24,7 @@ const seeded = {
   hq: await ensureHqSeed(kv),
   videos: await ensureVideosSeed(kv),
   guide: await ensureGuideSeed(kv),
+  forms: await ensureFormsSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
 const { app, projects, golden, news, videos, media, sync, analytics } = await buildApp({ config, kv });

@@ -25,6 +25,8 @@ import { contentRoutes } from './content/routes.js';
 import { GoldenOffersService } from './golden/service.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
+import { formsRoutes } from './forms/routes.js';
+import { FormsService } from './forms/service.js';
 import { hqRoutes } from './hq/routes.js';
 import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
@@ -32,6 +34,7 @@ import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
 import { LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
+import { NotifyRecipients } from './mail/recipients.js';
 import { membershipRoutes } from './membership/routes.js';
 import { MembershipService } from './membership/service.js';
 import { KeywordClassifier, type Classifier } from './news/classify.js';
@@ -220,6 +223,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const profiles = new ProfilesService({ kv, notifier, push, onChange: () => moved('content') });
   // «دليل المحايد» workshops (M10): interest registrations to the management.
   const workshops = new WorkshopsService({ kv, notifier });
+  // M16: the websites' registration forms, native; and the dashboard's notification-recipients list.
+  const forms = new FormsService({ kv, notifier });
+  const notifyRecipients = new NotifyRecipients({ kv, envRecipients: parseRecipients(config.NOTIFY_EMAIL), notifier });
+  await notifyRecipients.init();
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
   let mediaStore: MediaStore;
   if (config.S3_BUCKET && config.S3_ENDPOINT && config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY) {
@@ -366,6 +373,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(contactRoutes, { service: contact, auth });
   await app.register(profilesRoutes, { service: profiles, auth });
   await app.register(workshopsRoutes, { service: workshops, auth });
+  await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(invitesRoutes, { service: invites, auth });

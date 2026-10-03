@@ -124,6 +124,7 @@ export default function ServiceScreen() {
           onAdvisor={askAdvisor}
           onHq={() => router.push('/hq')}
           onProjects={() => router.push('/projects')}
+          onForm={(formKey) => router.push({ pathname: '/form/[key]', params: { key: formKey } })}
         />
       )}
       {payError ? <Notice tone="warning" text={payError} /> : null}
@@ -147,9 +148,10 @@ type ActionPanelProps = {
   onAdvisor: (prompt?: string) => void;
   onHq: () => void;
   onProjects: () => void;
+  onForm: (formKey: string) => void;
 };
 
-function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects }: ActionPanelProps) {
+function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm }: ActionPanelProps) {
   switch (action.type) {
     case 'whatsapp':
       return (
@@ -190,6 +192,8 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
       );
     case 'link':
       return <AppButton label={action.label} icon="open-outline" onPress={() => void openLink(action.url)} />;
+    case 'form':
+      return <AppButton label={action.label} icon="create-outline" onPress={() => onForm(action.formKey)} />;
     case 'advisor':
       return <AppButton label={t('advisor.ask')} icon="sparkles-outline" onPress={() => onAdvisor(action.prompt)} />;
     case 'hq':

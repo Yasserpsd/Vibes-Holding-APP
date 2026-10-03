@@ -25,6 +25,8 @@ export type ServiceAction =
   | { type: 'paymob'; message: string; fields: ServiceField[]; amount: number; memberAmount: number | null; currency: 'SAR' }
   /** Opens a web page (registration form, service page) in the in-app browser. */
   | { type: 'link'; url: string; label: string }
+  /** Opens a native in-app registration form (M16, server/src/forms). */
+  | { type: 'form'; formKey: string; label: string }
   /** Opens the advisor tab with a suggested first message. */
   | { type: 'advisor'; prompt: string }
   /** In-app flows. */
@@ -119,7 +121,7 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: null,
       memberLabel: 'أولوية للأعضاء',
       access: 'everyone',
-      action: { type: 'link', url: 'https://pvspaces.com/sp/', label: 'سجّل مشروعك' },
+      action: { type: 'form', formKey: 'success-partners', label: 'سجّل مشروعك' },
       infoUrl: null,
       order: 2,
     },
@@ -150,9 +152,7 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: '290 ريالًا بدلًا من 1,200',
       memberLabel: 'خصم 50% للأعضاء',
       access: 'everyone',
-      action: management('أرغب في التسجيل في ورشة «مشروعك من الفكرة إلى التنفيذ».', [
-        { key: 'mode', label: 'طريقة الحضور', options: ['حضوريًا في الرياض', 'عبر الإنترنت'] },
-      ]),
+      action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
       order: 4,
     },
@@ -319,8 +319,8 @@ export const SERVICES_SEED: ServicesContent = {
       order: 15,
     },
   ],
-  version: 3,
-  updatedAt: '2026-09-20T00:00:00.000Z',
+  version: 4,
+  updatedAt: '2026-10-04T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

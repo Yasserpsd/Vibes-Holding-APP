@@ -96,26 +96,35 @@ function gatewayName(provider: string): string {
 }
 
 export class Notifier {
-  constructor(private readonly deps: NotifierDeps) {}
+  /** The active list: the variable's at construction, the dashboard's once one is saved (M16). */
+  private recipients: string[];
+
+  constructor(private readonly deps: NotifierDeps) {
+    this.recipients = deps.recipients;
+  }
+
+  setRecipients(recipients: string[]): void {
+    this.recipients = recipients;
+  }
 
   get configured(): boolean {
-    return this.deps.mailer.configured && this.deps.recipients.length > 0;
+    return this.deps.mailer.configured && this.recipients.length > 0;
   }
 
   status(): { configured: boolean; recipients: number } {
-    return { configured: this.configured, recipients: this.deps.recipients.length };
+    return { configured: this.configured, recipients: this.recipients.length };
   }
 
   private dispatch(subject: string, lines: (string | null)[]): void {
     const fullSubject = `${SUBJECT_PREFIX}${this.deps.appEnv === 'test' ? ' [تجريبي]' : ''} ${subject}`;
     const body = lines.filter((line): line is string => line !== null);
     const text = [...body, '', `التاريخ: ${riyadhDateTime(Date.now())} (الرياض)`, `المصدر: ${APP_NAME}`].join('\n');
-    if (!this.deps.recipients.length) {
-      this.deps.log.info({ subject: fullSubject }, 'notification skipped: NOTIFY_EMAIL is not set');
+    if (!this.recipients.length) {
+      this.deps.log.info({ subject: fullSubject }, 'notification skipped: no recipients (NOTIFY_EMAIL or the dashboard list)');
       return;
     }
     this.deps.mailer
-      .send({ to: this.deps.recipients, subject: fullSubject, text })
+      .send({ to: this.recipients, subject: fullSubject, text })
       .then((sent) => this.deps.log.info({ subject: fullSubject, sent }, 'notification'))
       .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject }, 'notification mail failed'));
   }
@@ -297,6 +306,21 @@ export class Notifier {
       `رقم التسجيل: ${registration.id}`,
       '',
       'القائمة الكاملة في لوحة الإدارة: قسم «تسجيلات الورش». تفاصيل الموعد والحضور ترسلها الإدارة بنفسها للمسجّلين.',
+    ]);
+  }
+
+  /** M16: a registration form (شركاء النجاح, the workshop…) was filled inside the app. */
+  formSubmitted(submission: { formTitle: string; name: string; phone: string; email: string; personaLabel: string; contactId: number | null; answers: { label: string; value: string }[]; id: string }): void {
+    this.dispatch(`تسجيل جديد: ${submission.formTitle} — ${submission.name || '—'}`, [
+      `وصل تسجيل جديد في نموذج «${submission.formTitle}» من ${APP_NAME}.`,
+      '',
+      ...personLines(submission.contactId !== null || submission.name || submission.phone || submission.email ? submission : null),
+      submission.personaLabel ? `الفئة: ${submission.personaLabel}` : null,
+      '',
+      ...answerLines(submission.answers),
+      `رقم التسجيل: ${submission.id}`,
+      '',
+      'القائمة الكاملة في لوحة الإدارة: قسم «نماذج التسجيل». بعد التواصل علّم التسجيل «تمت المعالجة».',
     ]);
   }
 
