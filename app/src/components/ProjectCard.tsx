@@ -16,7 +16,7 @@ type Props = {
 
 export function ProjectCard({ project, onPress, onContact }: Props) {
   return (
-    <PressScale onPress={onPress} style={styles.card}>
+    <PressScale onPress={onPress} style={[styles.card, project.isGolden && styles.cardGolden]}>
       <View style={styles.imageBox}>
         {project.image ? (
           <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" />
@@ -25,6 +25,8 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
             <Ionicons name="briefcase-outline" size={40} color={colors.goldDark} />
           </View>
         )}
+        {/* A soft scrim keeps the pills readable over any image. */}
+        <View style={styles.scrim} />
         {project.isGolden ? (
           <View style={styles.goldenBadge}>
             <Ionicons name="star" size={12} color={colors.black} />
@@ -38,6 +40,10 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
             </Text>
           </View>
         ) : null}
+        <View style={styles.viewsPill}>
+          <Ionicons name="eye-outline" size={13} color={colors.goldLight} />
+          <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
+        </View>
       </View>
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
@@ -53,13 +59,13 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
             {project.excerpt}
           </Text>
         ) : null}
-        <View style={styles.metaRow}>
-          {project.sector ? <Text style={styles.tag}>{project.sector.name}</Text> : null}
-          <View style={styles.views}>
-            <Ionicons name="eye-outline" size={14} color={colors.textMuted} />
-            <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
+        {project.sector ? (
+          <View style={styles.metaRow}>
+            <Text style={styles.tag} numberOfLines={1}>
+              {project.sector.name}
+            </Text>
           </View>
-        </View>
+        ) : null}
         {!project.isGolden && onContact ? (
           <PressScale onPress={onContact} style={styles.contactCta} accessibilityLabel={t('project.contactCta')}>
             <Ionicons name="chatbubbles-outline" size={16} color={colors.black} />
@@ -73,14 +79,19 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
+  // The golden projects wear the brand: a gold hairline over a faint gold wash.
+  cardGolden: {
+    borderColor: colors.goldDark,
+    backgroundColor: '#1A160D',
+  },
   imageBox: {
-    height: 150,
+    height: 168,
     backgroundColor: colors.surfaceElevated,
   },
   image: {
@@ -91,6 +102,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  scrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 56,
+    backgroundColor: 'rgba(8, 8, 8, 0.35)',
+  },
   goldenBadge: {
     position: 'absolute',
     top: spacing.sm,
@@ -98,8 +117,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.gold,
   },
@@ -113,11 +132,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: spacing.sm,
     start: spacing.sm,
-    maxWidth: '70%',
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
+    maxWidth: '60%',
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: 'rgba(10, 10, 10, 0.78)',
+    backgroundColor: colors.overlay,
     borderWidth: 1,
     borderColor: colors.goldDark,
   },
@@ -126,6 +145,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     color: colors.goldLight,
+  },
+  viewsPill: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    end: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.overlay,
   },
   body: {
     padding: spacing.md,
@@ -137,6 +168,7 @@ const styles = StyleSheet.create({
   },
   company: {
     ...typography.caption,
+    fontFamily: fonts.medium,
     color: colors.goldLight,
   },
   excerpt: {
@@ -152,21 +184,20 @@ const styles = StyleSheet.create({
   },
   tag: {
     ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.goldLight,
     paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
-  },
-  views: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginStart: 'auto',
+    backgroundColor: colors.goldSoft,
+    alignSelf: 'flex-start',
   },
   viewsText: {
     ...typography.caption,
-    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.goldLight,
   },
   contactCta: {
     flexDirection: 'row',

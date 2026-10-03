@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { useVideos, type Video } from '@/api/videos';
@@ -10,10 +11,12 @@ import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
+import { playVideo } from '@/lib/player';
 import { spacing } from '@/theme/tokens';
 
-/** The club's YouTube library: curated picks first, then every upload, newest first. */
+/** The club's YouTube library: curated picks first, then every upload, newest first; videos play in-app (M19). */
 export default function VideosScreen() {
+  const router = useRouter();
   const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useVideos();
   const first = data?.pages[0];
   const askAdvisor = useAskAdvisor();
@@ -38,7 +41,7 @@ export default function VideosScreen() {
           <SectionHeader title={first.featuredTitle} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
             {first.featured.map((video) => (
-              <VideoCard key={video.id} video={video} width={240} onPress={() => void openLink(video.url)} onAsk={() => askAbout(video)} />
+              <VideoCard key={video.id} video={video} width={240} onPress={() => playVideo(router, { url: video.url, title: video.title, poster: video.thumbnail })} onAsk={() => askAbout(video)} />
             ))}
           </ScrollView>
         </>
@@ -48,7 +51,7 @@ export default function VideosScreen() {
       {items.length ? (
         <View style={styles.list}>
           {items.map((video) => (
-            <VideoCard key={video.id} video={video} onPress={() => void openLink(video.url)} onAsk={() => askAbout(video)} />
+            <VideoCard key={video.id} video={video} onPress={() => playVideo(router, { url: video.url, title: video.title, poster: video.thumbnail })} onAsk={() => askAbout(video)} />
           ))}
         </View>
       ) : (

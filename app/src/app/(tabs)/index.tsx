@@ -26,7 +26,7 @@ import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
-import { openLink } from '@/lib/openLink';
+import { playVideo } from '@/lib/player';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const clubLogo = require('../../../assets/images/club-logo.png');
@@ -87,10 +87,13 @@ export default function HomeScreen() {
           the logo and slogan first, then «رسائل الإدارة», then «أجندة النادي», then the portals.
           Both blocks render nothing while empty. */}
       <FadeInView style={styles.hero} offset={12}>
-        <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+        <View style={styles.logoRing}>
+          <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+        </View>
         <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
         <Text style={styles.heroTitle}>{content.hero.title}</Text>
         <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${content.hero.subtitle}` : content.hero.subtitle}</Text>
+        <View style={styles.heroDivider} />
       </FadeInView>
 
       <PostsBlock />
@@ -135,7 +138,7 @@ export default function HomeScreen() {
           <SectionHeader title={content.videos.title} subtitle={content.videos.subtitle} cta={content.videos.cta} onPress={() => router.push('/videos')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
             {featured.slice(0, 6).map((video) => (
-              <VideoCard key={video.id} video={video} width={240} onPress={() => void openLink(video.url)} />
+              <VideoCard key={video.id} video={video} width={240} onPress={() => playVideo(router, { url: video.url, title: video.title, poster: video.thumbnail })} />
             ))}
           </ScrollView>
         </>
@@ -208,7 +211,19 @@ function FooterLink({ icon, label, onPress }: { icon: IoniconName; label: string
 
 const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: spacing.xs, paddingTop: spacing.sm },
-  logo: { width: 84, height: 84, marginBottom: spacing.xs },
+  logoRing: {
+    width: 108,
+    height: 108,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.goldDark,
+    backgroundColor: colors.goldSoft,
+    marginBottom: spacing.xs,
+  },
+  logo: { width: 80, height: 80 },
+  heroDivider: { width: 72, height: 2, borderRadius: 1, backgroundColor: colors.goldDark, marginTop: spacing.sm, opacity: 0.8 },
   eyebrow: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold, letterSpacing: 1 },
   heroTitle: { fontFamily: fonts.bold, fontSize: 26, lineHeight: 40, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },

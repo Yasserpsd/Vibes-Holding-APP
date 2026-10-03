@@ -16,6 +16,10 @@ export const colors = {
   textSecondary: '#B5B5B5',
   textMuted: '#7A7A7A',
 
+  // M17 visual polish: translucent accents shared by the cards.
+  goldSoft: 'rgba(201, 162, 39, 0.14)',
+  overlay: 'rgba(8, 8, 8, 0.72)',
+
   success: '#2E9E6B',
   warning: '#D9A21B',
   danger: '#D14343',
@@ -34,6 +38,7 @@ export const radii = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 20,
   pill: 999,
 } as const;
 

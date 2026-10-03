@@ -35,6 +35,11 @@ export type NewsSource = {
    * an entry that names the country neither in its title nor in its opening lines is never collected.
    */
   saudiOnly?: boolean;
+  /**
+   * M61: extra ranking points for every item of this source (owner 2026-10-04: «ركز أوي على أرقام»).
+   * Added to the feed score next to tier, freshness and interests.
+   */
+  boost?: number;
 };
 
 export type NewsSourcesContent = { sources: NewsSource[]; updatedAt: string; /** Seed revision already merged into this list (see sources.ts). */ seedVersion?: number };
@@ -50,7 +55,8 @@ export const NEWS_TOPICS = [
   { key: 'industry', label: 'الصناعة واللوجستيات', labelEn: 'Industry & Logistics' },
   { key: 'retail', label: 'التجزئة والتجارة الإلكترونية', labelEn: 'Retail & E-commerce' },
   { key: 'tourism', label: 'السياحة والترفيه', labelEn: 'Tourism & Entertainment' },
-  { key: 'sports', label: 'الرياضة (الجانب الاستثماري)', labelEn: 'Sports (the business side)' },
+  // M61 (owner, 2026-10-04): sports became a full section — «الناس تحب الأخبار الرياضية» — no longer business-angle-only.
+  { key: 'sports', label: 'الرياضة', labelEn: 'Sports' },
 ] as const;
 
 export type TopicKey = (typeof NEWS_TOPICS)[number]['key'];
@@ -77,7 +83,7 @@ export type Classification = {
   topics: TopicKey[];
   /** An official Saudi decision, law, regulation, licence or ruling («قرارات وأنظمة المملكة»). */
   decision: boolean;
-  /** Sports items are kept only with a money angle; other items: relevant to business at all. */
+  /** Sports: the story has a money angle (M61: it is shown either way); other items: relevant to business at all. */
   businessAngle: boolean;
   /** 0–100: how useful the item is to Saudi investors and entrepreneurs. */
   relevance: number;

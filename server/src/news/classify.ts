@@ -118,7 +118,8 @@ export function classifyByKeywords(item: ClassifyInput): Classification {
   const sports = SPORTS.test(item.title);
   const money = MONEY.test(text);
   if (sports) {
-    return { topics: money ? ['sports', ...topics.slice(0, 2)] : ['sports'], decision: false, businessAngle: money, relevance: money ? 45 : 10 };
+    // M61 (owner, 2026-10-04): sports is club content in its own right; a money angle only lifts it further.
+    return { topics: money ? ['sports', ...topics.slice(0, 2)] : ['sports'], decision: false, businessAngle: money, relevance: money ? 70 : 55 };
   }
   const business = BUSINESS.test(text);
   // Protocol, aid and conflict headlines stay hidden even when the snippet mentions money.

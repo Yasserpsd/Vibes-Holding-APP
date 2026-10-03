@@ -34,7 +34,8 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'okaz-local', name: 'عكاظ', url: 'https://www.okaz.com.sa/rssFeed/1', tier: 'saudi', lang: 'ar', enabled: true, hint: 'عكاظ — المحليات (قرارات وأنظمة)' },
   { id: 'aawsat-economy', name: 'الشرق الأوسط', url: 'https://aawsat.com/feed/economy', tier: 'saudi', lang: 'ar', enabled: true, hint: 'الشرق الأوسط — قسم الاقتصاد' },
   { id: 'aleqt', name: 'الاقتصادية', url: bing('site:aleqt.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة الاقتصادية' },
-  { id: 'argaam', name: 'أرقام', url: bing('site:argaam.com'), tier: 'saudi', lang: 'ar', enabled: false, hint: 'أرقام — أخبار الأسواق والشركات (صفحات الموقع لا تفتح من الخادم: مهلة)' },
+  // Bing answers nothing for a bare `site:argaam.com` query; a query word next to it fills the feed (probed 2026-10-04, pages 3/3 OK).
+  { id: 'argaam', name: 'أرقام', url: bing('أرقام site:argaam.com'), tier: 'saudi', lang: 'ar', enabled: true, boost: 25, hint: 'أرقام — المصدر الأساسي لأخبار الأسواق والشركات السعودية' },
   { id: 'maaal', name: 'معال', url: bing('site:maaal.com'), tier: 'saudi', lang: 'ar', enabled: false, hint: 'صحيفة معال الاقتصادية (الموقع يرفض طلبات الخادم: 403)' },
   { id: 'saudigazette-business', name: 'Saudi Gazette', url: 'https://saudigazette.com.sa/rssFeed/73', tier: 'saudi', lang: 'en', enabled: true, hint: 'Saudi Gazette — Business', saudiOnly: true },
   { id: 'arabnews', name: 'Arab News', url: 'https://www.arabnews.com/rss.xml', tier: 'saudi', lang: 'en', enabled: true, hint: 'Arab News — all sections', saudiOnly: true },
@@ -75,6 +76,14 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'forbesme-saudi', name: 'Forbes ME', url: bing('site:forbesmiddleeast.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'Forbes Middle East — items about Saudi Arabia only', saudiOnly: true },
   { id: 'meed-saudi', name: 'MEED', url: bing('site:meed.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'MEED — Gulf projects and business, Saudi items', saudiOnly: true },
   { id: 'arabianbusiness-saudi', name: 'Arabian Business', url: bing('site:arabianbusiness.com Saudi', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Arabian Business — article pages refuse server requests (403)', saudiOnly: true },
+  // M61 (owner, 2026-10-04): a real sports section — «زود الأخبار الرياضية كتير… الناس تحب الأخبار الرياضية».
+  // Probed 2026-10-04 with news:probe: the four enabled ones fetch feed + article pages cleanly; beIN pages refuse
+  // the server, and MBC/SSC publish no crawlable news feed at all (nothing to poll, so no row for them).
+  { id: 'arriyadiyah', name: 'الرياضية', url: bing('site:arriyadiyah.com'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة الرياضية — أخبار الرياضة السعودية والأندية' },
+  { id: 'kooora', name: 'كووورة', url: bing('site:kooora.com'), tier: 'global', lang: 'ar', enabled: true, hint: 'كووورة — أخبار كرة القدم العربية والعالمية' },
+  { id: 'goal-saudi', name: 'Goal', url: bing('site:goal.com الدوري السعودي'), tier: 'global', lang: 'ar', enabled: true, hint: 'Goal عربي — الدوري السعودي وكرة القدم' },
+  { id: 'okaz-sports', name: 'عكاظ', url: bing('site:okaz.com.sa رياضة'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'عكاظ — القسم الرياضي' },
+  { id: 'beinsports-ar', name: 'beIN SPORTS', url: bing('site:beinsports.com'), tier: 'global', lang: 'ar', enabled: false, hint: 'beIN SPORTS — صفحات المقالات ترفض طلبات الخادم' },
 ];
 
 /**
@@ -83,8 +92,11 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  * 2 = M27: the English sources; Arab News and Saudi Gazette turned on and read for their Saudi stories; the SPA
  * feeds get their language in the URL (see `spa()`).
  * 3 = M34: eleven more Arabic sources and eleven more English ones (probed 2026-09-23; the refusing ones disabled).
+ * 4 = M61 (owner, 2026-10-04): أرقام is THE primary source (on, fixed query, boost 25); واس fully off («ألغي واس
+ *     تمامًا وأنا لو حبيت أفعلها» — the rows stay for his dashboard toggle); BBC عربي، اليوم، الوطن، المدينة، مكة،
+ *     البلد ومباشر kept but off («خليهم موجودين ولكن غير مفعلين اللي أحب أفعله أنا»); sports sources added.
  */
-export const NEWS_SEED_VERSION = 3;
+export const NEWS_SEED_VERSION = 4;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -94,6 +106,24 @@ const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = 
     'spa-political': { url: spa(2) },
     'spa-tourism': { url: spa(7) },
     'spa-tech': { url: spa(12) },
+  },
+  4: {
+    argaam: { enabled: true, url: bing('أرقام site:argaam.com'), boost: 25, hint: 'أرقام — المصدر الأساسي لأخبار الأسواق والشركات السعودية' },
+    'spa-economy': { enabled: false },
+    'spa-general': { enabled: false },
+    'spa-political': { enabled: false },
+    'spa-tourism': { enabled: false },
+    'spa-tech': { enabled: false },
+    'spa-en-economy': { enabled: false },
+    'spa-en-general': { enabled: false },
+    'spa-en-political': { enabled: false },
+    'bbc-arabic-business': { enabled: false },
+    alyaum: { enabled: false },
+    'alwatan-sa': { enabled: false },
+    almadina: { enabled: false },
+    makkah: { enabled: false },
+    albilad: { enabled: false },
+    'mubasher-sa': { enabled: false },
   },
 };
 
@@ -122,6 +152,10 @@ const OUTLET_NAMES: Record<string, string> = {
   'makkahnewspaper.com': 'مكة',
   'asharqbusiness.com': 'الشرق للأعمال',
   'independentarabia.com': 'اندبندنت عربية',
+  'arriyadiyah.com': 'الرياضية',
+  'kooora.com': 'كووورة',
+  'goal.com': 'Goal',
+  'beinsports.com': 'beIN SPORTS',
 };
 
 /** The same, for items of the English feed: an outlet keeps its English name there. */
@@ -173,7 +207,8 @@ function isSource(value: unknown): value is NewsSource {
     (source.tier === 'official' || source.tier === 'saudi' || source.tier === 'global') &&
     (source.lang === 'ar' || source.lang === 'en') &&
     typeof source.enabled === 'boolean' &&
-    (source.saudiOnly === undefined || typeof source.saudiOnly === 'boolean')
+    (source.saudiOnly === undefined || typeof source.saudiOnly === 'boolean') &&
+    (source.boost === undefined || typeof source.boost === 'number')
   );
 }
 

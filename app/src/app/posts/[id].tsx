@@ -16,6 +16,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
+import { playVideo } from '@/lib/player';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /** One «رسائل الإدارة» post or event: text, the event's date and place, images, a YouTube or uploaded video and link buttons, all opened in-app. */
@@ -55,10 +56,10 @@ export default function PostScreen() {
           {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
           {post.kind === 'poll' && post.poll ? <PollCard postId={post.id} initial={post.poll} /> : null}
           {post.youtubeId ? (
-            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label={t('posts.playYoutube')} />
+            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label={t('posts.playYoutube')} title={post.title} />
           ) : null}
-          {/* Uploaded video: no native player (the change ships over the air), the in-app browser plays the file. */}
-          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} /> : null}
+          {/* M19: the uploaded video plays in the in-app player (expo-video); old binaries keep the in-app browser. */}
+          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} title={post.title} /> : null}
           {post.images.map((uri) => (
             <Image key={uri} source={{ uri }} style={styles.image} resizeMode="contain" />
           ))}
@@ -197,13 +198,14 @@ function EventCard({ event }: { event: PostEvent }) {
   );
 }
 
-/** A video as a tappable tile: its poster (a plain dark tile without one) under a play mark; opens in-app. */
-function VideoTile({ url, poster, posterFit, label }: { url: string; poster: string | null; posterFit: 'cover' | 'contain'; label: string }) {
+/** A video as a tappable tile: its poster (a plain dark tile without one) under a play mark; plays in-app (M19). */
+function VideoTile({ url, poster, posterFit, label, title }: { url: string; poster: string | null; posterFit: 'cover' | 'contain'; label: string; title?: string }) {
+  const router = useRouter();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={() => void openLink(url)}
+      onPress={() => playVideo(router, { url, title: title ?? label, poster })}
       style={({ pressed }) => [styles.video, pressed && styles.pressed]}
     >
       {poster ? <Image source={{ uri: poster }} style={styles.videoImage} resizeMode={posterFit} /> : <View style={styles.videoImage} />}

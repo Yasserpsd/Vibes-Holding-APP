@@ -11,10 +11,11 @@ type Props = {
   onPress?: () => void;
 };
 
-/** Section title with an optional «عرض الكل» link on the far side. */
+/** Section title behind a small gold accent bar, with an optional «عرض الكل» link on the far side. */
 export function SectionHeader({ title, subtitle, cta, onPress }: Props) {
   return (
     <View style={styles.row}>
+      <View style={styles.accent} />
       <View style={styles.texts}>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -31,6 +32,7 @@ export function SectionHeader({ title, subtitle, cta, onPress }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.sm },
+  accent: { width: 4, alignSelf: 'stretch', minHeight: 24, borderRadius: 2, backgroundColor: colors.gold, marginBottom: 2 },
   texts: { flex: 1, gap: 2 },
   title: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

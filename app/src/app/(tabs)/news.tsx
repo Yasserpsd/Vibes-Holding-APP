@@ -37,7 +37,10 @@ export default function NewsScreen() {
   const chips = useMemo(() => {
     const all = topics.data?.topics ?? [];
     const chosen = new Set(interests);
-    return [...all.filter((item) => chosen.has(item.key)), ...all.filter((item) => !chosen.has(item.key))];
+    // M61: sports leads the row (owner: «الناس تحب الأخبار الرياضية»), then the member's interests, then the rest.
+    const sports = all.filter((item) => item.key === 'sports');
+    const rest = all.filter((item) => item.key !== 'sports');
+    return [...sports, ...rest.filter((item) => chosen.has(item.key)), ...rest.filter((item) => !chosen.has(item.key))];
   }, [topics.data, interests]);
   const askForInterests = signedIn && prefs.data !== undefined && !prefs.data.saved;
 

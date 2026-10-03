@@ -76,15 +76,17 @@ test('reads page meta tags in any attribute order', () => {
   assert.equal(extractMeta('<title>Only</title>').title, 'Only');
 });
 
-test('keyword classifier flags Saudi decisions, hides sports without money and off-topic items', () => {
+test('keyword classifier flags Saudi decisions, keeps sports visible (M61) and hides off-topic items', () => {
   const decision = classifyByKeywords({ id: '1', title: 'مجلس الوزراء يوافق على نظام الاستثمار الجديد', snippet: null, source: 'واس', tier: 'official', lang: 'ar', hint: null });
   assert.equal(decision.decision, true);
   assert.ok(decision.relevance >= 75);
   const sports = classifyByKeywords({ id: '2', title: 'الهلال يفوز في مباراة الدوري', snippet: null, source: 'عكاظ', tier: 'saudi', lang: 'ar', hint: null });
   assert.deepEqual(sports.topics, ['sports']);
   assert.equal(sports.businessAngle, false);
+  assert.ok(sports.relevance >= 30, 'M61: sports is shown on its own merit');
   const sportsMoney = classifyByKeywords({ id: '3', title: 'صفقة انتقال لاعب بقيمة 200 مليون ريال', snippet: null, source: 'عكاظ', tier: 'saudi', lang: 'ar', hint: null });
   assert.equal(sportsMoney.businessAngle, true);
+  assert.ok(sportsMoney.relevance > sports.relevance, 'a money angle lifts a sports item');
   const weather = classifyByKeywords({ id: '4', title: 'أمطار على منطقة المدينة المنورة', snippet: null, source: 'واس', tier: 'official', lang: 'ar', hint: null });
   assert.equal(weather.decision, false);
   assert.ok(weather.relevance < 30);
@@ -171,12 +173,12 @@ test('refresh keeps only verified, on-topic items and reports source failures', 
   const status = news.status();
   assert.equal(status.classifier, 'keywords');
   assert.equal(status.count, 4, 'missing page is never stored');
-  assert.equal(status.visible, 3, 'sports without money is hidden');
+  assert.equal(status.visible, 4, 'M61: sports is visible without a money angle');
   assert.equal(status.decisions, 1);
   assert.equal(status.sources.find((source) => source.id === 'broken')?.ok, false);
   assert.equal(status.sources.find((source) => source.id === 'off'), undefined);
   const health = await app.inject({ method: 'GET', url: '/health' });
-  assert.equal(health.json().news.visible, 3);
+  assert.equal(health.json().news.visible, 4);
 });
 
 test('serves the fixed decisions section and the general feed to guests', async () => {
@@ -188,9 +190,9 @@ test('serves the fixed decisions section and the general feed to guests', async 
   assert.equal(decisions.json().items[0].source.tierLabel, 'مصدر رسمي');
 
   const feed = await app.inject({ method: 'GET', url: '/api/news/feed' });
-  assert.equal(feed.json().total, 3);
+  assert.equal(feed.json().total, 4);
   assert.equal(feed.json().personalized, false);
-  assert.ok(feed.json().items.every((item: { url: string }) => !item.url.includes('/sports')));
+  assert.ok(feed.json().items.some((item: { url: string }) => item.url.includes('/sports')), 'M61: sports rides the feed');
   const decisionItem = feed.json().items.find((item: { url: string }) => item.url.endsWith('/decision'));
   assert.equal(decisionItem.snippet, 'وافق المجلس', 'the feed snippet is the source text');
 

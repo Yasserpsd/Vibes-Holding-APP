@@ -26,7 +26,6 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         <Text style={styles.source} numberOfLines={1}>
           {item.source.name}
         </Text>
-        <Text style={styles.dot}>·</Text>
         <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
         {item.decision ? (
           <View style={styles.badge}>
@@ -73,16 +72,26 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   compact: { width: 260, paddingVertical: spacing.sm + 4 },
   pressed: { opacity: 0.8 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  source: { ...typography.caption, color: colors.goldLight, flexShrink: 1 },
-  dot: { ...typography.caption, color: colors.textMuted },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  source: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: fonts.medium,
+    color: colors.goldLight,
+    flexShrink: 1,
+    paddingVertical: 1,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.goldSoft,
+  },
   time: { ...typography.caption, color: colors.textMuted },
   badge: {
     flexDirection: 'row',
@@ -100,7 +109,7 @@ const styles = StyleSheet.create({
   title: { ...typography.subtitle, color: colors.textPrimary },
   snippet: { ...typography.caption, color: colors.textSecondary },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
-  image: { width: 88, height: 88, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
+  image: { width: 92, height: 92, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   tags: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   tag: {

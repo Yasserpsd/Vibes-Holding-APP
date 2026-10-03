@@ -76,6 +76,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // M46: social sign-in in seconds — Google on Android, Apple on iOS (native modules: needs a new build).
     'expo-apple-authentication',
     '@react-native-google-signin/google-signin',
+    // M19: videos play inside the app — expo-video for uploaded files, react-native-webview for the
+    // YouTube embedded player (native modules: need a new build; old binaries keep the in-app browser).
+    'expo-video',
   ],
   experiments: { typedRoutes: true },
   extra: {

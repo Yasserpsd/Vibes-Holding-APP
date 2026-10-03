@@ -42,9 +42,10 @@ const RECENCY_HALF_LIFE_H = 36;
 
 /** Interests assumed from the persona until the member picks their own. */
 const PERSONA_TOPICS: Record<string, TopicKey[]> = {
-  neutral: ['economy', 'markets', 'tech'],
-  entrepreneur: ['startups', 'economy', 'tech', 'retail', 'finance'],
-  investor: ['markets', 'economy', 'realestate', 'finance', 'energy'],
+  // M61: sports sits in every persona's defaults (owner, 2026-10-04: «الناس تحب الأخبار الرياضية»).
+  neutral: ['economy', 'markets', 'tech', 'sports'],
+  entrepreneur: ['startups', 'economy', 'tech', 'retail', 'finance', 'sports'],
+  investor: ['markets', 'economy', 'realestate', 'finance', 'energy', 'sports'],
 };
 
 /** `lang` picks the feed: Arabic sources for the Arabic app, English sources for the English one (never translated, rule 7). */
@@ -75,6 +76,8 @@ function prefsKey(contactId: number): string {
  */
 export class NewsService {
   private items = new Map<string, Indexed>();
+  /** M61: per-source ranking boost (owner: «ركز أوي على أرقام»), refreshed with the sources on every run. */
+  private boosts = new Map<string, number>();
   private updatedAt: string | null = null;
   private lastError: string | null = null;
   private sourceStatus = new Map<string, SourceStatus>();
@@ -86,6 +89,7 @@ export class NewsService {
   async start(): Promise<void> {
     const snapshot = await this.deps.kv.get<NewsSnapshot>(NEWS_SNAPSHOT_KEY);
     if (snapshot?.items) this.load(snapshot.items, snapshot.updatedAt);
+    this.loadBoosts(await getNewsSources(this.deps.kv));
     const minutes = this.deps.config.NEWS_REFRESH_MINUTES;
     if (minutes <= 0) {
       this.deps.log.warn('NEWS_REFRESH_MINUTES=0: news polling is disabled');
@@ -115,10 +119,16 @@ export class NewsService {
     this.updatedAt = updatedAt;
   }
 
+  private loadBoosts(sources: NewsSource[]): void {
+    this.boosts = new Map(sources.filter((source) => typeof source.boost === 'number' && source.boost !== 0).map((source) => [source.id, source.boost!]));
+  }
+
   private async doRefresh(): Promise<void> {
     const cutoff = Date.now() - this.deps.config.NEWS_MAX_AGE_DAYS * 86_400_000;
     try {
-      const sources = (await getNewsSources(this.deps.kv)).filter((source) => source.enabled);
+      const all = await getNewsSources(this.deps.kv);
+      this.loadBoosts(all);
+      const sources = all.filter((source) => source.enabled);
       const fresh = await this.collect(sources, cutoff);
       const verified = await this.verify(fresh);
       const classified = await this.classify(verified);
@@ -254,9 +264,9 @@ export class NewsService {
       const input = inputs[index];
       if (!label || !input) return { ...item, hidden: true };
       const decision = label.decision && decisionGuard(input, label.topics);
-      const sportsOnly = label.topics.includes('sports') && !label.businessAngle;
+      // M61: sports items are shown on their own merit (owner, 2026-10-04); only off-topic items stay hidden.
       const offTopic = !decision && label.relevance < MIN_RELEVANCE;
-      return { ...item, ...label, decision, hidden: sportsOnly || offTopic };
+      return { ...item, ...label, decision, hidden: offTopic };
     });
   }
 
@@ -338,7 +348,7 @@ export class NewsService {
     if (query.topic) rows = rows.filter((item) => item.topics.includes(query.topic as TopicKey));
     const now = Date.now();
     const scored = rows
-      .map((item) => ({ item, score: scoreOf(item, wanted, now) }))
+      .map((item) => ({ item, score: scoreOf(item, wanted, now) + (this.boosts.get(item.sourceId) ?? 0) }))
       .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
     return paginate(scored.map(({ item }) => item), query, this.updatedAt, wanted.size > 0);
   }
