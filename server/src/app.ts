@@ -22,6 +22,7 @@ import { ContactService } from './contact/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { InvitesService } from './invites/service.js';
 import { contentRoutes } from './content/routes.js';
+import { GoldenOffersService } from './golden/service.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
 import { hqRoutes } from './hq/routes.js';
@@ -102,7 +103,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -155,6 +156,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // Fire and forget: a version that kv could not save is logged, never an unhandled rejection.
   const moved = (...keys: SyncKey[]): void => void sync.bump(...keys).catch((error: unknown) => app.log.error({ err: error, keys }, 'sync version not saved'));
   const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects') });
+  // Native golden offer pages, pulled from each company's web /offer/ page (PROJECT_BRIEF §5.1).
+  const golden = new GoldenOffersService({ kv, config, log: app.log, fetchImpl, onChange: () => moved('content') });
   // The server's own mock hub comes with a demo club, so the dashboard can be checked locally.
   const hubClient: HubClient =
     hub ??
@@ -337,6 +340,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },
     news: news.status(),
+    golden: golden.status(),
     videos: videos.status(),
     mail: notifier.status(),
     payments: {
@@ -351,7 +355,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   }));
 
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
-  await app.register(contentRoutes, { kv, auth, notifier, sync });
+  await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
   await app.register(appStringsRoutes, { kv, auth, sync });
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social });
   await app.register(advisorRoutes, { service: advisor, auth });
@@ -390,5 +394,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics };
 }

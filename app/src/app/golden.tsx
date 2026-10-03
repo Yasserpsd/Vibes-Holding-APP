@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useGolden } from '@/api/queries';
@@ -8,10 +9,10 @@ import { entranceDelay, FadeInView } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
-import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export default function GoldenScreen() {
+  const router = useRouter();
   const query = useGolden();
   const content = query.data;
   useAdvisorScreen({ type: 'screen', id: 'golden', title: content?.title ?? t('nav.golden') });
@@ -45,7 +46,8 @@ export default function GoldenScreen() {
           <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
           <Text style={styles.valueText}>{formatMillionsSar(content.portfolioValueSarMillions)}</Text>
         </View>
-        <AppButton label={t('golden.vibesPage')} icon="open-outline" onPress={() => openLink(content.umbrella.offerUrl)} />
+        {/* §5.1: the umbrella's offer opens as a native page in the app, never in the browser. */}
+        <AppButton label={t('golden.vibesPage')} icon="reader-outline" onPress={() => router.push(`/golden/${content.umbrella.code}`)} />
       </FadeInView>
 
       {companies.map((company, index) => (

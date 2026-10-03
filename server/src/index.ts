@@ -25,12 +25,13 @@ const seeded = {
   guide: await ensureGuideSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
-const { app, projects, news, videos, media, sync, analytics } = await buildApp({ config, kv });
+const { app, projects, golden, news, videos, media, sync, analytics } = await buildApp({ config, kv });
 // A newer seed (for example the membership copy) is content the app should fetch again.
 if (Object.values(seeded).some(Boolean)) await sync.bump('content');
 
 app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded, hub: config.HUB_MODE }, 'storage ready');
 await projects.start();
+await golden.start();
 await news.start();
 await videos.start();
 media.start();
@@ -39,6 +40,7 @@ analytics.start();
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutting down');
   projects.stop();
+  golden.stop();
   news.stop();
   videos.stop();
   media.stop();

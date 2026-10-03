@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiRequest } from './client';
-import type { GoldenContent, ProjectAccess, ProjectBrief, ProjectUnlockResult, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
+import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectUnlockResult, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
 
 export const PAGE_SIZE = 20;
 
@@ -77,4 +77,35 @@ export function useGolden() {
     queryFn: () => apiGet<GoldenContent>('/api/golden'),
     staleTime: 10 * 60_000,
   });
+}
+
+/** The native offer page of one golden company (§5.1): blocks pulled from its web page by the server. */
+export function useGoldenOffer(code: string | undefined) {
+  return useQuery({
+    queryKey: ['golden', 'offer', code],
+    queryFn: () => apiGet<GoldenOffer>(`/api/golden/offer/${encodeURIComponent(code ?? '')}`),
+    enabled: Boolean(code),
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** «سجّل اهتمامك» on the offer page: the management is mailed, nothing leaves the app. */
+export function sendGoldenInterest(code: string, body: { name: string; phone: string; note: string }) {
+  return apiRequest<{ ok: boolean }>('POST', `/api/golden/offer/${encodeURIComponent(code)}/interest`, { body });
+}
+
+/** The in-app page for a golden company's web offer link, when the link belongs to one (§5.1: never leave the app). */
+export function goldenCodeForUrl(content: GoldenContent | undefined, url: string | null): string | null {
+  if (!content || !url) return null;
+  const hostOf = (value: string): string | null => {
+    try {
+      return new URL(value).hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  };
+  const host = hostOf(url);
+  if (!host) return null;
+  const match = [content.umbrella, ...content.companies].find((company) => hostOf(company.offerUrl) === host);
+  return match?.code ?? null;
 }

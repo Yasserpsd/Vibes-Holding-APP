@@ -50,6 +50,21 @@ export type ProjectsFilters = {
   updatedAt: string | null;
 };
 
+// Mirrors server/src/golden/parse.ts and /api/golden/offer/:code — the native offer page (§5.1).
+export type OfferBlock =
+  | { type: 'heading'; level: 1 | 2 | 3; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'bullet'; text: string }
+  | { type: 'image'; url: string };
+
+export type GoldenOffer = {
+  company: { code: string; name: string; tagline: string | null; logoUrl: string };
+  blocks: OfferBlock[];
+  /** `null` while the server has not pulled this company's web page yet. */
+  fetchedAt: string | null;
+  disclaimer: string;
+};
+
 export type GoldenCompany = {
   code: string;
   name: string;

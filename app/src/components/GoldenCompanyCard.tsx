@@ -1,9 +1,9 @@
+import { useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
 import { t } from '@/i18n';
-import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export function GoldenCompanyCard({ company }: Props) {
+  const router = useRouter();
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -23,7 +24,8 @@ export function GoldenCompanyCard({ company }: Props) {
           {company.tagline ? <Text style={styles.tagline}>{company.tagline}</Text> : null}
         </View>
       </View>
-      <AppButton label={t('golden.offerPage')} variant="outline" icon="open-outline" onPress={() => openLink(company.offerUrl)} />
+      {/* §5.1: the offer opens as a native page in the app, never in the browser. */}
+      <AppButton label={t('golden.offerPage')} variant="outline" icon="reader-outline" onPress={() => router.push(`/golden/${company.code}`)} />
     </View>
   );
 }

@@ -309,6 +309,17 @@ export class Notifier {
     ]);
   }
 
+  /** «سجّل اهتمامك» on a golden company's in-app offer page (PROJECT_BRIEF §5.1): the CTA stays in-app. */
+  goldenInterest(request: { companyName: string; code: string; sender: Person | null; name: string; phone: string; note: string }): void {
+    this.dispatch(`تسجيل اهتمام بشراكة: ${request.companyName}`, [
+      `سجّل ${request.sender ? 'عضو' : 'زائر'} اهتمامه بفرصة الشراكة في «${request.companyName}» من صفحة العرض داخل ${APP_NAME}.`,
+      '',
+      ...(request.sender ? personLines(request.sender) : [`الاسم: ${request.name || '—'}`, `الجوال: ${request.phone || '—'}`]),
+      request.note.trim() ? `ملاحظة: ${request.note.trim()}` : null,
+      `الشركة: ${request.companyName} (${request.code})`,
+    ]);
+  }
+
   paymentStarted(payment: PaymentLike): void {
     this.dispatch(`بدء دفع من التطبيق: ${payment.serviceTitle} — ${payment.name}`, [
       `بدأ العضو عملية دفع لخدمة «${payment.serviceTitle}» من ${APP_NAME}. لم يكتمل الدفع بعد.`,

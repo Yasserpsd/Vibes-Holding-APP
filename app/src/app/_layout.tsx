@@ -93,6 +93,7 @@ export default function RootLayout() {
                 <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
                 <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: t('nav.project') }} />
                 <Stack.Screen name="golden" options={{ ...detailHeader, title: t('nav.golden') }} />
+                <Stack.Screen name="golden/[code]" options={{ ...detailHeader, title: t('nav.goldenOffer') }} />
                 <Stack.Screen name="membership" options={{ ...detailHeader, title: t('nav.membership') }} />
                 <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: t('nav.profileEdit') }} />
                 <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: t('nav.newsItem') }} />

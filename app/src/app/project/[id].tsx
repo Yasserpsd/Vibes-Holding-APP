@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { useProject } from '@/api/queries';
+import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { FadeInView } from '@/components/motion';
@@ -16,10 +16,14 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
   const { id, contact } = useLocalSearchParams<{ id: string; contact?: string }>();
+  const router = useRouter();
   const askAdvisor = useAskAdvisor();
   const { width } = useWindowDimensions();
   const query = useProject(id);
+  const golden = useGolden();
   const project = query.data?.project;
+  // §5.1: a partner page that belongs to a golden company opens as the native offer page.
+  const partnerCode = goldenCodeForUrl(golden.data, project?.goldenPartnerUrl ?? null);
   const advisorContext = project ? ({ type: 'project', id: project.id, title: project.title } as const) : null;
   // The floating «اسأل المستشار» button opens the advisor with this project as the context.
   useAdvisorScreen(advisorContext);
@@ -60,7 +64,11 @@ export default function ProjectScreen() {
 
           {/* M35: contact with the founder sits at the top — a golden project offers its partner page instead. */}
           {project.isGolden && project.goldenPartnerUrl ? (
-            <AppButton label={t('project.partnerPage')} icon="open-outline" onPress={() => openLink(project.goldenPartnerUrl ?? '')} />
+            <AppButton
+              label={t('project.partnerPage')}
+              icon={partnerCode ? 'reader-outline' : 'open-outline'}
+              onPress={() => (partnerCode ? router.push(`/golden/${partnerCode}`) : openLink(project.goldenPartnerUrl ?? ''))}
+            />
           ) : null}
 
           <FadeInView delay={80}>
