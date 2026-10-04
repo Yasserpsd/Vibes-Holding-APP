@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { usePass, type PassState } from '@/api/hq';
 import { AppButton } from '@/components/AppButton';
+import { FadeInView, PopIn, Sheen } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatArabicDateTime, weekdayOf } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const STATE: Record<PassState, { text: StringKey; color: string; icon: 'time-outline' | 'checkmark-circle' | 'close-circle' }> = {
   upcoming: { text: 'hqPass.upcoming', color: colors.warning, icon: 'time-outline' },
@@ -21,6 +23,8 @@ const STATE: Record<PassState, { text: StringKey; color: string; icon: 'time-out
 export default function PassScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, error, refetch } = usePass(id);
+  // The gold head is measured once laid out, so the metal sheen knows how far to travel.
+  const [headSize, setHeadSize] = useState<{ width: number; height: number } | null>(null);
 
   if (!data) {
     return (
@@ -36,48 +40,53 @@ export default function PassScreen() {
 
   return (
     <Screen>
-      <View style={styles.ticket}>
-        <View style={styles.head}>
-          <View style={styles.logoBadge}>
-            <Image source={require('../../../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+      <FadeInView offset={18}>
+        <View style={[styles.ticket, pass.state === 'active' && styles.ticketActive]}>
+          <View style={styles.head} onLayout={(event) => setHeadSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+            <View style={styles.logoBadge}>
+              <Image source={require('../../../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+            </View>
+            <View style={styles.headText}>
+              <Text style={styles.club}>{t('common.clubName')}</Text>
+              <Text style={styles.kind}>{t('hqPass.kind')}</Text>
+            </View>
+            {headSize ? <Sheen width={headSize.width} height={headSize.height} /> : null}
           </View>
-          <View style={styles.headText}>
-            <Text style={styles.club}>{t('common.clubName')}</Text>
-            <Text style={styles.kind}>{t('hqPass.kind')}</Text>
-          </View>
-        </View>
 
-        <View style={styles.body}>
-          <Text style={styles.label}>{t('hqPass.name')}</Text>
-          <Text style={styles.name}>{pass.name}</Text>
-          <View style={styles.grid}>
-            <Cell label={t('hqPass.day')} value={`${weekday} ${formatArabicDate(pass.visit.date)}`} />
-            <Cell label={t('hqPass.time')} value={t('hqPass.timeRange', { from: pass.visit.time, to: pass.visit.endTime })} />
+          <View style={styles.body}>
+            <Text style={styles.label}>{t('hqPass.name')}</Text>
+            <Text style={styles.name}>{pass.name}</Text>
+            <View style={styles.grid}>
+              <Cell label={t('hqPass.day')} value={`${weekday} ${formatArabicDate(pass.visit.date)}`} />
+              <Cell label={t('hqPass.time')} value={t('hqPass.timeRange', { from: pass.visit.time, to: pass.visit.endTime })} />
+            </View>
+            <View style={styles.grid}>
+              <Cell label={t('hqPass.purpose')} value={pass.visit.purpose} />
+              <Cell label={t('hqPass.bookedAt')} value={formatArabicDateTime(pass.visit.createdAt)} />
+            </View>
+            {pass.visit.adminNote ? <Text style={styles.note}>{t('hq.adminNote', { note: pass.visit.adminNote })}</Text> : null}
           </View>
-          <View style={styles.grid}>
-            <Cell label={t('hqPass.purpose')} value={pass.visit.purpose} />
-            <Cell label={t('hqPass.bookedAt')} value={formatArabicDateTime(pass.visit.createdAt)} />
-          </View>
-          {pass.visit.adminNote ? <Text style={styles.note}>{t('hq.adminNote', { note: pass.visit.adminNote })}</Text> : null}
-        </View>
 
-        <View style={styles.tear}>
-          <View style={[styles.notch, styles.notchStart]} />
-          <View style={styles.dashes} />
-          <View style={[styles.notch, styles.notchEnd]} />
-        </View>
+          <View style={styles.tear}>
+            <View style={[styles.notch, styles.notchStart]} />
+            <View style={styles.dashes} />
+            <View style={[styles.notch, styles.notchEnd]} />
+          </View>
 
-        <View style={styles.stub}>
-          <View style={styles.qrBox}>
-            <Image source={{ uri: pass.qr }} style={styles.qr} resizeMode="contain" accessibilityLabel={t('hqPass.qr')} />
-          </View>
-          <Text style={styles.code}>{pass.code.split(':').pop()}</Text>
-          <View style={[styles.state, { borderColor: state.color }]}>
-            <Ionicons name={state.icon} size={20} color={state.color} />
-            <Text style={[styles.stateText, { color: state.color }]}>{t(state.text)}</Text>
+          <View style={styles.stub}>
+            <View style={styles.qrBox}>
+              <Image source={{ uri: pass.qr }} style={styles.qr} resizeMode="contain" accessibilityLabel={t('hqPass.qr')} />
+            </View>
+            <Text style={styles.code}>{pass.code.split(':').pop()}</Text>
+            <PopIn delay={200}>
+              <View style={[styles.state, { borderColor: state.color }]}>
+                <Ionicons name={state.icon} size={20} color={state.color} />
+                <Text style={[styles.stateText, { color: state.color }]}>{t(state.text)}</Text>
+              </View>
+            </PopIn>
           </View>
         </View>
-      </View>
+      </FadeInView>
 
       <Text style={styles.hint}>{t('hqPass.hint')}</Text>
       <AppButton label={t('common.refresh')} variant="outline" icon="refresh-outline" onPress={() => void refetch()} />
@@ -97,14 +106,31 @@ function Cell({ label, value }: { label: string; value: string }) {
 const NOTCH = 22;
 
 const styles = StyleSheet.create({
-  ticket: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface, overflow: 'hidden' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.gold },
+  ticket: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.surface,
+    experimental_backgroundImage: gradients.surface,
+    boxShadow: shadows.lift,
+    overflow: 'hidden',
+  },
+  // A pass at the door breathes success: the frame picks up a soft halo.
+  ticketActive: { boxShadow: shadows.glowGoldFaint },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+  },
   // The logo is drawn for dark backgrounds: a black badge keeps it readable on the gold header.
-  logoBadge: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  logoBadge: { width: 56, height: 56, borderRadius: radii.pill, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 40, height: 40 },
   headText: { flex: 1, gap: 2 },
-  club: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.black, textAlign: textStart },
-  kind: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.black, textAlign: textStart, opacity: 0.8 },
+  club: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldInk, textAlign: textStart },
+  kind: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldInk, textAlign: textStart, opacity: 0.8 },
   body: { gap: spacing.sm, padding: spacing.md },
   label: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   name: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.textPrimary, textAlign: textStart },
@@ -114,14 +140,15 @@ const styles = StyleSheet.create({
   note: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   tear: { height: NOTCH, flexDirection: 'row', alignItems: 'center' },
   dashes: { flex: 1, marginHorizontal: NOTCH / 2, borderTopWidth: 1, borderColor: colors.goldDark, borderStyle: 'dashed' },
-  notch: { position: 'absolute', width: NOTCH, height: NOTCH, borderRadius: NOTCH / 2, backgroundColor: colors.black, borderWidth: 1, borderColor: colors.goldDark },
+  notch: { position: 'absolute', width: NOTCH, height: NOTCH, borderRadius: NOTCH / 2, backgroundColor: colors.black, borderWidth: 1, borderColor: colors.borderGold },
   notchStart: { start: -NOTCH / 2 },
   notchEnd: { end: -NOTCH / 2 },
   stub: { alignItems: 'center', gap: spacing.sm, padding: spacing.md, paddingTop: spacing.sm },
+  // The QR stays on pristine white — the scanner's needs beat the theme here.
   qrBox: { padding: spacing.sm, borderRadius: radii.md, backgroundColor: colors.white },
   qr: { width: 200, height: 200 },
   code: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.textMuted, textAlign: 'center', writingDirection: 'ltr' },
-  state: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.pill, borderWidth: 1 },
+  state: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },
   stateText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22 },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 });

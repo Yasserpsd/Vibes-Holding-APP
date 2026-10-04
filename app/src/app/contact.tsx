@@ -9,13 +9,14 @@ import { ApiError, errorMessage } from '@/api/client';
 import { contactApi, useContactThread, type ContactMessage } from '@/api/contact';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView, PressScale } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M36: «راسل الإدارة» — a member with an active annual membership writes to the management at any
@@ -43,10 +44,12 @@ export default function ContactScreen() {
     // The brief's door: without an active annual membership the member meets the membership screen.
     body = (
       <View style={styles.gate}>
-        <FadeInView style={styles.gateCard}>
-          <Ionicons name="ribbon-outline" size={40} color={colors.gold} />
-          <Text style={styles.gateText}>{t('contact.membersOnly')}</Text>
-          <AppButton label={t('contact.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+        <FadeInView>
+          <GlassCard golden style={styles.gateCard}>
+            <Ionicons name="ribbon-outline" size={40} color={colors.gold} />
+            <Text style={styles.gateText}>{t('contact.membersOnly')}</Text>
+            <AppButton label={t('contact.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          </GlassCard>
         </FadeInView>
       </View>
     );
@@ -69,6 +72,7 @@ function Thread({ query }: { query: ThreadQuery }) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [outbox, setOutbox] = useState<ContactMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const scroller = useRef<ScrollView>(null);
@@ -124,14 +128,22 @@ function Thread({ query }: { query: ThreadQuery }) {
         <TextInput
           value={text}
           onChangeText={setText}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={t('contact.placeholder')}
           placeholderTextColor={colors.textMuted}
-          style={styles.input}
+          style={[styles.input, focused && styles.inputFocused]}
           multiline
           maxLength={2000}
         />
-        <PressScale onPress={() => void send()} accessibilityLabel={t('contact.send')} style={[styles.sendButton, (!text.trim() || sending) && styles.sendDisabled]}>
-          {sending ? <ActivityIndicator color={colors.black} size="small" /> : <Ionicons name="send" size={18} color={colors.black} style={styles.sendIcon} />}
+        <PressScale onPress={() => void send()} accessibilityLabel={t('contact.send')} glow glowRadius={radii.pill} style={[styles.sendButton, (!text.trim() || sending) && styles.sendDisabled]}>
+          {sending ? (
+            <ActivityIndicator color={colors.goldInk} size="small" />
+          ) : (
+            <PopIn key={outbox.length}>
+              <Ionicons name="send" size={18} color={colors.goldInk} style={styles.sendIcon} />
+            </PopIn>
+          )}
         </PressScale>
       </View>
       <Text style={styles.hint}>{t('contact.hint')}</Text>
@@ -162,10 +174,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
   },
   gateText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   thread: { flex: 1 },
@@ -178,8 +186,8 @@ const styles = StyleSheet.create({
   bubbleWrapMine: { alignSelf: 'flex-end' },
   bubbleWrapTheirs: { alignSelf: 'flex-start' },
   bubble: { gap: 4, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1 },
-  bubbleMine: { backgroundColor: 'rgba(201, 162, 39, 0.16)', borderColor: colors.goldDark, borderBottomLeftRadius: radii.sm },
-  bubbleTheirs: { backgroundColor: colors.surface, borderColor: colors.border, borderBottomRightRadius: radii.sm },
+  bubbleMine: { backgroundColor: colors.goldSoft, borderColor: colors.borderGold, borderBottomEndRadius: radii.sm },
+  bubbleTheirs: { backgroundColor: colors.surface, borderColor: colors.border, borderBottomStartRadius: radii.sm },
   bubblePending: { opacity: 0.65 },
   bubbleBy: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
   bubbleText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
@@ -208,6 +216,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     textAlign: textStart,
   },
+  // Focus lights the field: a golden border with the faintest halo.
+  inputFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   sendButton: {
     width: 44,
     height: 44,

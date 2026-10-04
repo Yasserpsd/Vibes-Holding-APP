@@ -1,8 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Animated, StyleSheet, TextInput, View } from 'react-native';
 
+import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+import { inputStart } from '@/i18n/direction';
+import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 type Props = {
   value: string;
@@ -14,33 +17,46 @@ type Props = {
 
 export function Composer({ value, onChange, onSend, busy }: Props) {
   const canSend = !busy && value.trim().length > 0;
+  const showSpinner = busy && value.trim().length > 0;
+  const [focused, setFocused] = useState(false);
+  // Crossfade between the send mark and the spinner instead of swapping them cold.
+  const [cross] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.timing(cross, { toValue: showSpinner ? 1 : 0, duration: 160, useNativeDriver: true }).start();
+  }, [cross, showSpinner]);
   return (
     <View style={styles.bar}>
       <TextInput
-        style={styles.input}
+        style={[styles.input, focused && styles.inputFocused]}
         value={value}
         onChangeText={onChange}
         placeholder={t('advisor.placeholder')}
         placeholderTextColor={colors.textMuted}
         multiline
         maxLength={4000}
-        textAlign="right"
+        textAlign={inputStart()}
         editable={!busy}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         accessibilityLabel={t('advisor.messageLabel')}
       />
-      <Pressable
+      <PressScale
         onPress={onSend}
         disabled={!canSend}
-        style={({ pressed }) => [styles.send, !canSend && styles.sendDisabled, pressed && canSend && styles.sendPressed]}
-        accessibilityRole="button"
+        glow
+        glowRadius={radii.pill}
+        style={[styles.send, canSend ? styles.sendReady : styles.sendDisabled]}
         accessibilityLabel={t('advisor.send')}
       >
-        {busy && value.trim().length > 0 ? (
-          <ActivityIndicator color={colors.black} size="small" />
-        ) : (
-          <Ionicons name="send" size={20} color={colors.black} style={styles.sendIcon} />
-        )}
-      </Pressable>
+        <PopIn key={canSend ? 'ready' : 'idle'}>
+          <Animated.View style={{ opacity: cross.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
+            <Ionicons name="send" size={20} color={colors.goldInk} style={styles.sendIcon} />
+          </Animated.View>
+          <Animated.View style={[StyleSheet.absoluteFill, styles.spinner, { opacity: cross }]}>
+            <ActivityIndicator color={colors.goldInk} size="small" />
+          </Animated.View>
+        </PopIn>
+      </PressScale>
     </View>
   );
 }
@@ -71,6 +87,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
+  // The field lights up golden while the member writes.
+  inputFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   send: {
     width: 44,
     height: 44,
@@ -79,8 +97,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sendReady: { experimental_backgroundImage: gradients.gold, boxShadow: shadows.glowGold },
   sendDisabled: { backgroundColor: colors.goldDark, opacity: 0.6 },
-  sendPressed: { backgroundColor: colors.goldLight },
+  spinner: { alignItems: 'center', justifyContent: 'center' },
   // Ionicons "send" points to the right; the reading direction here is right-to-left.
   sendIcon: { transform: [{ scaleX: -1 }] },
 });

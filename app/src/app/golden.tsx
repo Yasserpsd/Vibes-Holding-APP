@@ -1,15 +1,17 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useGolden } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
-import { entranceDelay, FadeInView } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function GoldenScreen() {
   const router = useRouter();
@@ -18,6 +20,10 @@ export default function GoldenScreen() {
   useAdvisorScreen({ type: 'screen', id: 'golden', title: content?.title ?? t('nav.golden') });
   // Keeps the disclaimer at the end clear of the floating «اسأل المستشار» button.
   const clearance = useAskAdvisorClearance();
+  // V2: the portfolio number counts up to its value — measured, not pasted.
+  const portfolioShown = useCountUp(content?.portfolioValueSarMillions ?? 0);
+  // The hero's metal sheen sweeps the card's rendered size.
+  const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   if (!content) {
     return (
@@ -31,23 +37,35 @@ export default function GoldenScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
-      <FadeInView style={styles.hero} offset={12}>
-        <View style={styles.logoBox}>
-          <Image
-            source={{ uri: content.umbrella.logoUrl }}
-            style={styles.logo}
-            resizeMode="contain"
-            accessibilityLabel={content.umbrella.name}
-          />
-        </View>
-        <Text style={styles.heroTitle}>{content.umbrella.name}</Text>
-        <Text style={styles.intro}>{content.intro}</Text>
-        <View style={styles.valueBadge}>
-          <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
-          <Text style={styles.valueText}>{formatMillionsSar(content.portfolioValueSarMillions)}</Text>
-        </View>
-        {/* §5.1: the umbrella's offer opens as a native page in the app, never in the browser. */}
-        <AppButton label={t('golden.vibesPage')} icon="reader-outline" onPress={() => router.push(`/golden/${content.umbrella.code}`)} />
+      <FadeInView offset={12}>
+        <GlassCard golden radius={radii.xl} style={styles.heroCard}>
+          <View
+            style={styles.hero}
+            onLayout={({ nativeEvent: { layout } }) => {
+              const width = Math.round(layout.width);
+              const height = Math.round(layout.height);
+              setHeroSize((size) => (size.width === width && size.height === height ? size : { width, height }));
+            }}
+          >
+            <View style={styles.logoBox}>
+              <Image
+                source={{ uri: content.umbrella.logoUrl }}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel={content.umbrella.name}
+              />
+            </View>
+            <Text style={styles.heroTitle}>{content.umbrella.name}</Text>
+            <Text style={styles.intro}>{content.intro}</Text>
+            <View style={styles.valueBadge}>
+              <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
+              <Text style={styles.valueText}>{formatMillionsSar(portfolioShown)}</Text>
+            </View>
+            {/* §5.1: the umbrella's offer opens as a native page in the app, never in the browser. */}
+            <AppButton label={t('golden.vibesPage')} icon="reader-outline" onPress={() => router.push(`/golden/${content.umbrella.code}`)} />
+          </View>
+          {heroSize.width > 0 ? <Sheen width={heroSize.width} height={heroSize.height} /> : null}
+        </GlassCard>
       </FadeInView>
 
       {companies.map((company, index) => (
@@ -64,14 +82,12 @@ export default function GoldenScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
+  // The portfolio hero earns the full golden halo; the company cards below keep the faint one.
+  heroCard: { boxShadow: shadows.glowGold },
   hero: {
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
   },
   logoBox: {
     width: 120,
@@ -89,7 +105,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldSoft,
   },
   valueLabel: { ...typography.caption, color: colors.textMuted },
   valueText: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.goldLight },

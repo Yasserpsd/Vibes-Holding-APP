@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { Animated, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GoldGradient } from '@/components/lux';
+import { FadeInView, PressScale, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 import { contextParams, type ChatContext } from './context';
 
@@ -108,40 +110,38 @@ export function AskAdvisorButton() {
   return <FloatingButton key={current.owner} registration={current} />;
 }
 
+/** The hero affordance of the app: it slides in, breathes a golden halo, and dips under the finger. */
 function FloatingButton({ registration }: { registration: Registration }) {
   const ask = useAskAdvisor();
   const insets = useSafeAreaInsets();
-  const [entrance] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    Animated.timing(entrance, { toValue: 1, duration: 260, delay: 120, useNativeDriver: true }).start();
-  }, [entrance]);
+  const breath = usePulse(0.3, 0.9, 1900);
 
   const bottom = insets.bottom + BUTTON_OFFSET + (registration.aboveTabBar ? TAB_BAR_HEIGHT : 0);
-  const translateY = entrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.anchor, { bottom, opacity: entrance, transform: [{ translateY }] }]}>
-      <Pressable
+    <FadeInView delay={120} duration={260} offset={12} style={[styles.anchor, { bottom }]}>
+      <PressScale
         onPress={() => ask(registration.context)}
-        accessibilityRole="button"
+        glow
+        glowRadius={radii.pill}
         accessibilityLabel={t('advisor.askAbout', { title: registration.context.title })}
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+        style={styles.button}
       >
-        <View style={styles.mark}>
-          <Ionicons name="sparkles" size={16} color={colors.black} />
-        </View>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.halo, { opacity: breath }]} />
+        <GoldGradient variant="gold" style={styles.mark}>
+          <Ionicons name="sparkles" size={16} color={colors.goldInk} />
+        </GoldGradient>
         <Text style={styles.label} numberOfLines={1}>
           {t('advisor.ask')}
         </Text>
-      </Pressable>
-    </Animated.View>
+      </PressScale>
+    </FadeInView>
   );
 }
 
 const styles = StyleSheet.create({
   // `end` is the left edge in the forced RTL layout, away from the text's starting side.
-  anchor: { position: 'absolute', end: spacing.md },
+  anchor: { position: 'absolute', end: spacing.md, pointerEvents: 'box-none' },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -153,13 +153,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gold,
     backgroundColor: colors.surfaceElevated,
-    shadowColor: colors.gold,
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    experimental_backgroundImage: gradients.surface,
+    boxShadow: shadows.glowGoldFaint,
   },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  mark: { width: MARK_SIZE, height: MARK_SIZE, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
+  // The slow breathing neon halo around the button.
+  halo: { borderRadius: radii.pill, boxShadow: shadows.glowGold },
+  mark: { width: MARK_SIZE, height: MARK_SIZE, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   label: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.goldLight },
 });

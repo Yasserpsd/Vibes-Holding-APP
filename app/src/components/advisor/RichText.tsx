@@ -190,10 +190,10 @@ const styles = StyleSheet.create({
   headingLarge: { fontFamily: fonts.semiBold, fontSize: 17, lineHeight: 28, color: colors.goldLight },
   heading: { fontFamily: fonts.semiBold, color: colors.goldLight },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: 'stretch' },
-  table: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.goldDark, overflow: 'hidden', alignSelf: 'stretch' },
+  table: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGold, overflow: 'hidden', alignSelf: 'stretch' },
   // In the forced RTL layout a row starts on the right, so the first column is the right one, as Arabic reads.
   tableRow: { flexDirection: 'row' },
-  tableHead: { backgroundColor: 'rgba(201, 162, 39, 0.14)' },
+  tableHead: { backgroundColor: colors.goldSoft },
   rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   rowAlt: { backgroundColor: colors.surface },
   cellFit: { flex: 1, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },

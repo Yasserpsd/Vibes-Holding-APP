@@ -1,8 +1,9 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
+import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
@@ -43,6 +44,7 @@ export default function WatchScreen() {
         mediaPlaybackRequiresUserAction={false}
         setSupportMultipleWindows={false}
         startInLoadingState
+        renderLoading={() => <LoadingGhost />}
       />
     );
   } else if (!youtubeId && url && video) {
@@ -60,13 +62,31 @@ export default function WatchScreen() {
         )}
       </View>
       <ScrollView contentContainerStyle={styles.below}>
-        {title ? <Text style={styles.title}>{title}</Text> : null}
+        {title ? (
+          <FadeInView delay={40}>
+            <Text style={styles.title}>{title}</Text>
+          </FadeInView>
+        ) : null}
         {youtubeId ? (
-          <AppButton label={t('watch.openYoutube')} variant="outline" icon="logo-youtube" onPress={() => void openLink(url || `https://www.youtube.com/watch?v=${youtubeId}`)} />
+          <FadeInView delay={110}>
+            <AppButton label={t('watch.openYoutube')} variant="outline" icon="logo-youtube" onPress={() => void openLink(url || `https://www.youtube.com/watch?v=${youtubeId}`)} />
+          </FadeInView>
         ) : url && !player ? (
-          <AppButton label={t('watch.openBrowser')} variant="outline" icon="open-outline" onPress={() => void openLink(url)} />
+          <FadeInView delay={110}>
+            <AppButton label={t('watch.openBrowser')} variant="outline" icon="open-outline" onPress={() => void openLink(url)} />
+          </FadeInView>
         ) : null}
       </ScrollView>
+    </View>
+  );
+}
+
+/** V2: a breathing ghost slab over the player while the embed loads — no bare spinner. */
+function LoadingGhost() {
+  const pulse = usePulse(0.35, 0.8);
+  return (
+    <View style={styles.ghostWrap}>
+      <Animated.View style={[styles.ghost, { opacity: pulse }]} />
     </View>
   );
 }
@@ -87,6 +107,14 @@ const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.black },
   webContainer: { backgroundColor: colors.black },
   media: { width: '100%', height: '100%' },
+  ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: colors.black },
+  ghost: {
+    flex: 1,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+  },
   fallbackBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.surface, borderRadius: radii.lg, margin: spacing.md },
   fallbackText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   below: { padding: spacing.md, gap: spacing.md },

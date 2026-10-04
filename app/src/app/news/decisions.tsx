@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { useDecisions } from '@/api/news';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -18,8 +19,16 @@ export default function DecisionsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <NewsCard item={item} onPress={() => router.push({ pathname: '/news/[id]', params: { id: item.id } })} />}
-        ListHeaderComponent={<Text style={styles.intro}>{t('news.decisionsIntro')}</Text>}
+        renderItem={({ item, index }) => (
+          <FadeInView delay={entranceDelay(index)}>
+            <NewsCard item={item} onPress={() => router.push({ pathname: '/news/[id]', params: { id: item.id } })} />
+          </FadeInView>
+        )}
+        ListHeaderComponent={
+          <FadeInView offset={10}>
+            <Text style={styles.intro}>{t('news.decisionsIntro')}</Text>
+          </FadeInView>
+        }
         ListEmptyComponent={
           <StateView loading={list.isPending} error={list.error} onRetry={() => list.refetch()} empty={!list.isPending && !list.error} emptyText={t('news.decisionsEmptyList')} />
         }
@@ -28,8 +37,15 @@ export default function DecisionsScreen() {
           if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        refreshing={list.isRefetching && !list.isFetchingNextPage}
-        onRefresh={() => list.refetch()}
+        refreshControl={
+          <RefreshControl
+            refreshing={list.isRefetching && !list.isFetchingNextPage}
+            onRefresh={() => list.refetch()}
+            tintColor={colors.gold}
+            colors={[colors.gold]}
+            progressBackgroundColor={colors.surfaceElevated}
+          />
+        }
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />

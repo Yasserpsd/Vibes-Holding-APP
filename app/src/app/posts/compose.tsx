@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { adminMessagesApi, type MemberHit, type MessageAudience } from '@/api/posts';
@@ -9,6 +9,8 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
@@ -102,68 +104,95 @@ export default function ComposeScreen() {
     <Screen title={t('compose.screenTitle')} subtitle={t('compose.subtitle')}>
       <Stack.Screen options={{ title: t('compose.screenTitle') }} />
 
-      <Text style={styles.label}>{t('compose.audience')}</Text>
-      <View style={styles.chips}>
-        {AUDIENCES.map((entry) => (
-          <Chip key={entry.key} label={t(entry.label)} selected={entry.key === audience} onPress={() => setAudience(entry.key)} />
-        ))}
-      </View>
+      <FadeInView delay={entranceDelay(1)}>
+        <Text style={styles.label}>{t('compose.audience')}</Text>
+        <View style={styles.chips}>
+          {AUDIENCES.map((entry) => (
+            <Chip key={entry.key} label={t(entry.label)} selected={entry.key === audience} onPress={() => setAudience(entry.key)} />
+          ))}
+        </View>
+      </FadeInView>
 
       {audience === 'member' ? (
         member ? (
-          <View style={styles.chosen}>
-            <Text style={styles.chosenName}>{t('compose.chosen', { name: member.name || member.email })}</Text>
-            <AppButton label={t('compose.change')} variant="outline" icon="swap-horizontal" onPress={() => setMember(null)} />
-          </View>
+          <FadeInView offset={10}>
+            <GlassCard golden style={styles.chosen}>
+              <Text style={styles.chosenName}>{t('compose.chosen', { name: member.name || member.email })}</Text>
+              <AppButton label={t('compose.change')} variant="outline" icon="swap-horizontal" onPress={() => setMember(null)} />
+            </GlassCard>
+          </FadeInView>
         ) : (
-          <View style={styles.search}>
+          <FadeInView offset={10} style={styles.search}>
             <FormField label={t('compose.searchLabel')} hint={t('compose.searchHint')} value={search} onChangeText={setSearch} onSubmitEditing={() => void findMembers()} returnKeyType="search" />
-            <AppButton label={searching ? '…' : t('compose.search')} variant="outline" icon="search" onPress={() => (searching ? null : void findMembers())} />
+            <AppButton label={t('compose.search')} variant="outline" icon="search" loading={searching} onPress={() => (searching ? null : void findMembers())} />
             {hits ? (
               hits.length ? (
-                hits.map((hit) => (
-                  <Pressable
-                    key={hit.id}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setMember(hit);
-                      setHits(null);
-                      setSearch('');
-                    }}
-                    style={({ pressed }) => [styles.hit, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.hitName}>{hit.name || hit.email}</Text>
-                    <Text style={styles.hitMeta}>{[hit.personaLabel, hit.email].filter(Boolean).join(' · ')}</Text>
-                  </Pressable>
+                hits.map((hit, index) => (
+                  <FadeInView key={hit.id} delay={entranceDelay(index)} offset={10}>
+                    <PressScale
+                      onPress={() => {
+                        setMember(hit);
+                        setHits(null);
+                        setSearch('');
+                      }}
+                      accessibilityLabel={hit.name || hit.email}
+                      glow
+                      glowRadius={radii.lg}
+                      style={styles.hit}
+                    >
+                      <Text style={styles.hitName}>{hit.name || hit.email}</Text>
+                      <Text style={styles.hitMeta}>{[hit.personaLabel, hit.email].filter(Boolean).join(' · ')}</Text>
+                    </PressScale>
+                  </FadeInView>
                 ))
               ) : (
                 <Text style={styles.empty}>{t('compose.noResults')}</Text>
               )
             ) : null}
-          </View>
+          </FadeInView>
         )
       ) : null}
 
-      <FormField label={t('compose.titleField')} value={title} onChangeText={setTitle} maxLength={140} />
-      <FormField label={t('compose.bodyField')} value={body} onChangeText={setBody} multiline maxLength={6000} />
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField label={t('compose.titleField')} value={title} onChangeText={setTitle} maxLength={140} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(3)}>
+        <FormField label={t('compose.bodyField')} value={body} onChangeText={setBody} multiline maxLength={6000} />
+      </FadeInView>
 
-      {error ? <Notice tone="warning" text={error} /> : null}
-      {done ? <Notice tone="success" text={done} /> : null}
-      <AppButton label={busy ? t('compose.sending') : t('compose.send')} icon="send" onPress={() => (busy ? null : void send())} />
+      {error ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={error} />
+        </FadeInView>
+      ) : null}
+      {done ? (
+        <FadeInView offset={8}>
+          <Notice tone="success" text={done} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(4)}>
+        <AppButton label={busy ? t('compose.sending') : t('compose.send')} icon="send" loading={busy} onPress={() => (busy ? null : void send())} />
+      </FadeInView>
       {done ? <AppButton label={t('compose.backToInbox')} variant="outline" icon="mail-open-outline" onPress={() => router.back()} /> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, marginBottom: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   search: { gap: spacing.sm },
-  chosen: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
+  chosen: { gap: spacing.sm, padding: spacing.md },
   chosenName: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
-  hit: { gap: 2, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  hit: {
+    gap: 2,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
   hitName: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
   hitMeta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   empty: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  pressed: { opacity: 0.85 },
 });

@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { membershipApi, useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { FadeInView, PopIn, PressScale, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -20,7 +22,7 @@ import {
   storeName,
   type StoreOffer,
 } from '@/lib/purchases';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Phase = 'loading' | 'ready' | 'unavailable' | 'busy' | 'activating' | 'done' | 'pending';
 
@@ -40,6 +42,8 @@ export function StorePurchaseCard({ title }: { title: string }) {
   const [offer, setOffer] = useState<StoreOffer | null>(null);
   const [manageUrl, setManageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // V2: the card measures itself so the gold sheen can sweep its full width.
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const contactId = me?.id ?? null;
   const active = me?.membership.status === 'active';
   const supported = hasStorePurchases();
@@ -133,8 +137,21 @@ export function StorePurchaseCard({ title }: { title: string }) {
   };
 
   if (!me || isLoading) return null;
-  if (phase === 'done') return <Notice tone="success" text={t('store.done')} />;
-  if (phase === 'pending') return <Notice tone="warning" text={t('store.pending')} />;
+  if (phase === 'done') {
+    // The paid moment: the success notice (checkmark) springs in under a golden halo.
+    return (
+      <PopIn style={styles.doneGlow}>
+        <Notice tone="success" text={t('store.done')} />
+      </PopIn>
+    );
+  }
+  if (phase === 'pending') {
+    return (
+      <FadeInView offset={8}>
+        <Notice tone="warning" text={t('store.pending')} />
+      </FadeInView>
+    );
+  }
   if (!config || !apiKey) return active ? null : <Notice text={t('store.comingSoon', { store: storeName() })} />;
   if (!supported) return active ? null : <Notice tone="warning" text={t('store.unsupported')} />;
   if (active) {
@@ -142,41 +159,46 @@ export function StorePurchaseCard({ title }: { title: string }) {
   }
 
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <Ionicons name="storefront-outline" size={22} color={colors.gold} />
-        <Text style={styles.title}>{title}</Text>
-      </View>
-      {phase === 'loading' ? <Progress text={t('store.loadingPrice')} /> : null}
-      {phase === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
-      {phase === 'activating' ? <Progress text={t('store.activating')} /> : null}
-      {phase === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
-      {phase === 'ready' && offer ? (
-        <>
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{offer.product.priceString}</Text>
-            <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
-          </View>
-          <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />
-        </>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {phase === 'ready' || phase === 'unavailable' ? (
-        <Pressable onPress={() => void restore()} accessibilityRole="button" style={styles.restore}>
-          <Ionicons name="refresh-outline" size={16} color={colors.goldLight} />
-          <Text style={styles.restoreText}>{t('store.restore')}</Text>
-        </Pressable>
-      ) : null}
-      <Text style={styles.legal}>
-        {t('store.legal', { store: storeName() })}
-      </Text>
-      {config.environment === 'test' ? <Text style={styles.legal}>{t('store.testEnv')}</Text> : null}
-      {config.termsUrl || config.privacyUrl ? (
-        <View style={styles.links}>
-          {config.termsUrl ? <LinkText label={t('store.terms')} url={config.termsUrl} /> : null}
-          {config.privacyUrl ? <LinkText label={t('store.privacy')} url={config.privacyUrl} /> : null}
+    <View onLayout={(event) => setSize(event.nativeEvent.layout)}>
+      <GlassCard golden style={styles.card}>
+        {size.width > 0 ? <Sheen width={size.width} height={size.height} /> : null}
+        <View style={styles.header}>
+          <Ionicons name="storefront-outline" size={22} color={colors.gold} />
+          <Text style={styles.title}>{title}</Text>
         </View>
-      ) : null}
+        <FadeInView key={phase} offset={6} duration={260} style={styles.phase}>
+          {phase === 'loading' ? <Progress text={t('store.loadingPrice')} /> : null}
+          {phase === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
+          {phase === 'activating' ? <Progress text={t('store.activating')} /> : null}
+          {phase === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
+          {phase === 'ready' && offer ? (
+            <>
+              <PopIn style={styles.priceRow}>
+                <Text style={styles.price}>{offer.product.priceString}</Text>
+                <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
+              </PopIn>
+              <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />
+            </>
+          ) : null}
+          {phase === 'ready' || phase === 'unavailable' ? (
+            <PressScale onPress={() => void restore()} style={styles.restore} wrapStyle={styles.restoreWrap}>
+              <Ionicons name="refresh-outline" size={16} color={colors.goldLight} />
+              <Text style={styles.restoreText}>{t('store.restore')}</Text>
+            </PressScale>
+          ) : null}
+        </FadeInView>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Text style={styles.legal}>
+          {t('store.legal', { store: storeName() })}
+        </Text>
+        {config.environment === 'test' ? <Text style={styles.legal}>{t('store.testEnv')}</Text> : null}
+        {config.termsUrl || config.privacyUrl ? (
+          <View style={styles.links}>
+            {config.termsUrl ? <LinkText label={t('store.terms')} url={config.termsUrl} /> : null}
+            {config.privacyUrl ? <LinkText label={t('store.privacy')} url={config.privacyUrl} /> : null}
+          </View>
+        ) : null}
+      </GlassCard>
     </View>
   );
 }
@@ -192,23 +214,26 @@ function Progress({ text }: { text: string }) {
 
 function LinkText({ label, url }: { label: string; url: string }) {
   return (
-    <Pressable onPress={() => void openLink(url)} accessibilityRole="link">
+    <PressScale onPress={() => void openLink(url)} accessibilityRole="link">
       <Text style={styles.link}>{label}</Text>
-    </Pressable>
+    </PressScale>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
+  card: { gap: spacing.sm, padding: spacing.md },
+  doneGlow: { borderRadius: radii.md, boxShadow: shadows.glowGold },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  phase: { gap: spacing.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, justifyContent: 'flex-start' },
   price: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 32, color: colors.gold },
   period: { ...typography.caption, color: colors.textSecondary },
   progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   muted: { ...typography.body, color: colors.textSecondary, textAlign: textStart, flex: 1 },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
-  restore: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', paddingVertical: spacing.xs },
+  restoreWrap: { alignSelf: 'flex-start' },
+  restore: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
   restoreText: { ...typography.caption, color: colors.goldLight },
   legal: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   links: { flexDirection: 'row', gap: spacing.md },

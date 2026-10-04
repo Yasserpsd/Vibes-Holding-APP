@@ -10,13 +10,15 @@ import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 /** M16: a website registration form, native — the fields come from the server, the answers go back to it. */
 export default function RegistrationFormScreen() {
@@ -42,14 +44,22 @@ export default function RegistrationFormScreen() {
   return (
     <Screen title={form.title} subtitle={form.intro}>
       {!form.open ? (
-        <Notice tone="warning" text={form.closedText} />
+        <FadeInView>
+          <Notice tone="warning" text={form.closedText} />
+        </FadeInView>
       ) : form.access === 'signedIn' && !signedIn ? (
         <>
-          <Notice tone="warning" text={t('form.guest')} />
-          <AppButton label={t('form.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          <FadeInView>
+            <Notice tone="warning" text={t('form.guest')} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(1)}>
+            <AppButton label={t('form.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          </FadeInView>
         </>
       ) : alreadySent ? (
-        <Notice tone="success" text={t('form.alreadySent')} />
+        <FadeInView>
+          <Notice tone="success" text={t('form.alreadySent')} />
+        </FadeInView>
       ) : (
         // Mounted once the account is known, so the fields start prefilled without an effect.
         <Form key={form.key} form={form} me={me} />
@@ -89,22 +99,37 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
   };
 
   if (sent) {
+    // V2: the confirmation lands with a golden pop — celebratory, but quiet.
     return (
-      <View style={styles.success}>
-        <Ionicons name="checkmark-circle" size={48} color={colors.gold} />
+      <FadeInView offset={12} style={styles.success}>
+        <PopIn delay={120}>
+          <Ionicons name="checkmark-circle" size={48} color={colors.gold} />
+        </PopIn>
         <Text style={styles.successText}>{form.successText}</Text>
-      </View>
+      </FadeInView>
     );
   }
 
   return (
     <>
-      {form.fields.map((field) => (
-        <Field key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
+      {form.fields.map((field, index) => (
+        <FadeInView key={field.key} delay={entranceDelay(index)}>
+          <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
+        </FadeInView>
       ))}
-      {problem ? <Notice tone="warning" text={problem} /> : null}
-      {submit.error ? <Notice tone="warning" text={submit.error.message} /> : null}
-      <AppButton label={submit.isPending ? '…' : form.submitLabel} icon="paper-plane-outline" onPress={send} />
+      {problem ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={problem} />
+        </FadeInView>
+      ) : null}
+      {submit.error ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={submit.error.message} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(form.fields.length)}>
+        <AppButton label={form.submitLabel} icon="paper-plane-outline" loading={submit.isPending} onPress={send} />
+      </FadeInView>
     </>
   );
 }
@@ -113,18 +138,24 @@ function Field({ field, value, onChange }: { field: FormFieldDef; value: string;
   if (field.type === 'agree') {
     const on = value === AGREED;
     return (
-      <View style={styles.agree}>
+      <GlassCard golden={on} style={styles.agree}>
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: on }}
           style={styles.agreeRow}
           onPress={() => onChange(on ? '' : AGREED)}
         >
-          <Ionicons name={on ? 'checkbox' : 'square-outline'} size={24} color={on ? colors.gold : colors.textMuted} />
+          {on ? (
+            <PopIn>
+              <Ionicons name="checkbox" size={24} color={colors.gold} />
+            </PopIn>
+          ) : (
+            <Ionicons name="square-outline" size={24} color={colors.textMuted} />
+          )}
           <Text style={styles.agreeLabel}>{field.label}</Text>
         </Pressable>
         {field.url ? <AppButton label={t('form.openAgreement')} variant="outline" icon="open-outline" onPress={() => void openLink(field.url ?? '')} /> : null}
-      </View>
+      </GlassCard>
     );
   }
   if (field.type === 'select') {
@@ -161,10 +192,6 @@ const styles = StyleSheet.create({
   agree: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   agreeLabel: { ...typography.caption, color: colors.textPrimary, flex: 1, textAlign: textStart },

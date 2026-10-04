@@ -4,13 +4,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { usePeople, type Person } from '@/api/people';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { PersonAvatar } from '@/components/PeopleBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** M11 «شخصية ومسيرة»: the approved club figures, and the member's way to apply. */
 export default function PeopleScreen() {
@@ -23,11 +24,13 @@ export default function PeopleScreen() {
     <Screen title={t('people.title')} subtitle={people.data?.intro ?? ''}>
       <Stack.Screen options={{ title: t('nav.people') }} />
 
-      <AppButton
-        label={t('people.applyCta')}
-        icon="sparkles-outline"
-        onPress={() => router.push((status === 'signedIn' ? '/people/apply' : '/auth/login') as Href)}
-      />
+      <FadeInView offset={10}>
+        <AppButton
+          label={t('people.applyCta')}
+          icon="sparkles-outline"
+          onPress={() => router.push((status === 'signedIn' ? '/people/apply' : '/auth/login') as Href)}
+        />
+      </FadeInView>
 
       {!people.data ? (
         <StateView loading={people.isLoading} error={people.error} onRetry={() => void people.refetch()} />
@@ -46,16 +49,20 @@ export default function PeopleScreen() {
 
 function PersonRow({ person, onPress }: { person: Person; onPress: () => void }) {
   return (
-    <PressScale onPress={onPress} style={styles.row} accessibilityRole="button" accessibilityLabel={person.name}>
-      <PersonAvatar person={person} size={56} />
-      <View style={styles.rowText}>
-        <Text style={styles.rowName} numberOfLines={1}>
-          {person.name}
-        </Text>
-        <Text style={styles.rowTitle} numberOfLines={2}>
-          {[person.title, person.company].filter(Boolean).join(' · ')}
-        </Text>
-      </View>
+    <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={person.name}>
+      <GlassCard style={styles.row}>
+        <View style={styles.avatarRing}>
+          <PersonAvatar person={person} size={56} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {person.name}
+          </Text>
+          <Text style={styles.rowTitle} numberOfLines={2}>
+            {[person.title, person.company].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+      </GlassCard>
     </PressScale>
   );
 }
@@ -67,10 +74,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
+  },
+  avatarRing: {
+    borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.borderGold,
+    padding: 2,
+    boxShadow: shadows.glowGoldFaint,
   },
   rowText: { flex: 1, gap: 2 },
   rowName: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },

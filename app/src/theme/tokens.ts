@@ -1,28 +1,63 @@
-// Design tokens — premium gold on black with white text.
-// Initial palette approved by the owner for M1; final palette is confirmed at the design step.
+// Design tokens — premium champagne gold on deep black, tuned to the official logo gradient.
+// V2 (full visual overhaul): neon glows, gradients and glass surfaces, all core-RN so OTA-safe.
 
 export const colors = {
-  gold: '#C9A227',
-  goldLight: '#E2C25A',
-  goldDark: '#9A7B1A',
+  // Champagne gold scale sampled from the official logo (highlight → body → shadow).
+  gold: '#D9A83C',
+  goldLight: '#F2CE74',
+  goldDark: '#A67C22',
+  // The neon accent: brighter than the body gold, used for glows and active states.
+  goldNeon: '#FFD865',
+  // Ink for text sitting on gold surfaces (buttons, gold bubbles).
+  goldInk: '#141005',
 
-  black: '#0B0B0B',
-  surface: '#161616',
-  surfaceElevated: '#1F1F1F',
-  border: '#2A2A2A',
+  black: '#070708',
+  surface: '#131316',
+  surfaceElevated: '#1C1C21',
+  border: '#28282E',
 
   white: '#FFFFFF',
   textPrimary: '#FFFFFF',
-  textSecondary: '#B5B5B5',
-  textMuted: '#7A7A7A',
+  textSecondary: '#B9B9C0',
+  textMuted: '#7E7E86',
 
-  // M17 visual polish: translucent accents shared by the cards.
-  goldSoft: 'rgba(201, 162, 39, 0.14)',
-  overlay: 'rgba(8, 8, 8, 0.72)',
+  // Translucent accents shared by the cards.
+  goldSoft: 'rgba(217, 168, 60, 0.14)',
+  goldFaint: 'rgba(217, 168, 60, 0.07)',
+  // Hairline gold for premium card borders — visible but quiet.
+  borderGold: 'rgba(230, 186, 84, 0.38)',
+  borderGoldSoft: 'rgba(230, 186, 84, 0.18)',
+  // Glass surface for overlays and floating bars.
+  glass: 'rgba(22, 22, 26, 0.86)',
+  overlay: 'rgba(5, 5, 6, 0.74)',
 
-  success: '#2E9E6B',
+  success: '#34B27B',
   warning: '#D9A21B',
-  danger: '#D14343',
+  danger: '#E05252',
+} as const;
+
+// Neon glows and depth shadows (RN boxShadow — works on iOS and Android with the new architecture).
+export const shadows = {
+  /** Soft golden halo for hero surfaces and primary buttons. */
+  glowGold: '0 0 24px rgba(255, 216, 101, 0.25)',
+  /** Stronger halo for the moments that should feel electric (active tab, membership card). */
+  glowGoldStrong: '0 0 34px rgba(255, 216, 101, 0.4)',
+  /** Whisper of gold around bordered cards. */
+  glowGoldFaint: '0 0 16px rgba(255, 216, 101, 0.14)',
+  /** Depth without color: lifts floating elements off the black. */
+  lift: '0 10px 30px rgba(0, 0, 0, 0.55)',
+} as const;
+
+// CSS gradients for experimental_backgroundImage (always pair with a backgroundColor fallback).
+export const gradients = {
+  /** The brand gold, lit from the top-start corner like the logo. */
+  gold: 'linear-gradient(135deg, #F7DA8A 0%, #E6BA54 38%, #C2912E 78%, #A67C22 100%)',
+  /** Subtle vertical sheen that makes dark cards feel machined, not flat. */
+  surface: 'linear-gradient(180deg, #1E1E24 0%, #131316 100%)',
+  /** Barely-there golden wash for highlighted dark surfaces. */
+  goldWash: 'linear-gradient(160deg, rgba(242, 206, 116, 0.16) 0%, rgba(242, 206, 116, 0.03) 55%, rgba(0, 0, 0, 0) 100%)',
+  /** Screen backdrop: deep black with a faint golden dawn at the top. */
+  screen: 'linear-gradient(180deg, #121014 0%, #070708 34%)',
 } as const;
 
 export const spacing = {
@@ -39,6 +74,7 @@ export const radii = {
   md: 12,
   lg: 16,
   xl: 20,
+  xxl: 28,
   pill: 999,
 } as const;
 
@@ -51,6 +87,7 @@ export const fonts = {
 } as const;
 
 export const typography = {
+  display: { fontFamily: fonts.bold, fontSize: 30, lineHeight: 44 },
   title: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 36 },
   subtitle: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28 },
   body: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 26 },

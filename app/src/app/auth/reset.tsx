@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
@@ -6,11 +7,12 @@ import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, typography } from '@/theme/tokens';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
@@ -65,8 +67,15 @@ export default function ResetPasswordScreen() {
   if (step === 'done') {
     return (
       <Screen title={t('auth.reset.title')}>
-        <Notice tone="success" text={t('auth.reset.done')} />
-        <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+        <PopIn style={styles.doneIcon}>
+          <Ionicons name="checkmark-circle" size={64} color={colors.success} />
+        </PopIn>
+        <FadeInView delay={entranceDelay(1)}>
+          <Notice tone="success" text={t('auth.reset.done')} />
+        </FadeInView>
+        <FadeInView delay={entranceDelay(2)}>
+          <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+        </FadeInView>
       </Screen>
     );
   }
@@ -76,33 +85,45 @@ export default function ResetPasswordScreen() {
       title={t('auth.reset.title')}
       subtitle={step === 'request' ? t('auth.reset.subtitleRequest') : t('auth.reset.subtitleConfirm', { login: login.trim() })}
     >
-      {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
-      <FormField
-        label={t('auth.login.field')}
-        latin
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        value={login}
-        onChangeText={setLogin}
-        editable={step === 'request'}
-      />
-      {step === 'confirm' ? (
-        <>
-          <FormField label={t('auth.verify.code')} latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />
-          <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint={t('auth.register.passwordHint')} />
-        </>
+      <FadeInView key={step} style={styles.fields}>
+        {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
+        <FormField
+          label={t('auth.login.field')}
+          latin
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          value={login}
+          onChangeText={setLogin}
+          editable={step === 'request'}
+        />
+        {step === 'confirm' ? (
+          <>
+            <FormField label={t('auth.verify.code')} latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />
+            <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint={t('auth.register.passwordHint')} />
+          </>
+        ) : null}
+      </FadeInView>
+      {error ? (
+        <FadeInView offset={8}>
+          <Text style={styles.error}>{error}</Text>
+        </FadeInView>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
       {step === 'request' ? (
-        <AppButton label={busy ? t('auth.reset.sending') : t('auth.reset.send')} icon="mail-outline" onPress={() => void request()} />
+        <FadeInView key="request-submit" delay={entranceDelay(1)}>
+          <AppButton label={t('auth.reset.send')} icon="mail-outline" loading={busy} onPress={() => void request()} />
+        </FadeInView>
       ) : (
-        <AppButton label={busy ? t('auth.reset.saving') : t('auth.reset.save')} icon="key-outline" onPress={() => void confirm()} />
+        <FadeInView key="confirm-submit" delay={entranceDelay(1)}>
+          <AppButton label={t('auth.reset.save')} icon="key-outline" loading={busy} onPress={() => void confirm()} />
+        </FadeInView>
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  fields: { gap: spacing.md },
+  doneIcon: { alignSelf: 'center', marginTop: spacing.md },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
 });

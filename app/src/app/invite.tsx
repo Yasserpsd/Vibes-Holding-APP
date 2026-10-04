@@ -1,17 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 
 import { useMyInvites, type Invitee, type InviteeState } from '@/api/invites';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PressScale, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // Left-to-right mark: keeps the Latin membership number readable inside Arabic lines (Android RTL).
 const LRM = '‎';
@@ -36,6 +39,8 @@ export default function InviteScreen() {
   const { me, status } = useAuth();
   const router = useRouter();
   const invites = useMyInvites(status === 'signedIn');
+  // V2: the code box is the hero — a light band sweeps it, so its size is measured once laid out.
+  const [codeSize, setCodeSize] = useState<{ width: number; height: number } | null>(null);
 
   if (status !== 'signedIn' || !me) {
     return (
@@ -66,31 +71,49 @@ export default function InviteScreen() {
         <StateView loading={invites.isLoading} error={invites.error} onRetry={() => void invites.refetch()} />
       ) : (
         <>
-          <Text style={styles.gift}>{data.giftText}</Text>
+          <FadeInView delay={entranceDelay(0)}>
+            <Text style={styles.gift}>{data.giftText}</Text>
+          </FadeInView>
 
-          <View style={styles.codeBox}>
-            <Text style={styles.codeLabel}>{t('invite.codeLabel')}</Text>
-            <Text style={styles.code}>{`${LRM}${data.code}`}</Text>
-            <Text style={styles.codeHint}>{t('invite.codeHint')}</Text>
-          </View>
+          <FadeInView delay={entranceDelay(1)}>
+            <PressScale glow glowRadius={radii.lg} accessibilityRole="none">
+              <View
+                style={styles.codeBox}
+                onLayout={(event) => setCodeSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+              >
+                <Text style={styles.codeLabel}>{t('invite.codeLabel')}</Text>
+                <Text style={styles.code}>{`${LRM}${data.code}`}</Text>
+                <Text style={styles.codeHint}>{t('invite.codeHint')}</Text>
+                {codeSize ? <Sheen width={codeSize.width} height={codeSize.height} /> : null}
+              </View>
+            </PressScale>
+          </FadeInView>
 
-          {data.eligible ? (
-            <AppButton label={t('invite.share')} icon="share-social-outline" onPress={() => void share()} />
-          ) : (
-            <>
-              <Notice tone="warning" text={t('invite.locked')} />
-              <AppButton label={t('invite.activate')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
-            </>
-          )}
+          <FadeInView delay={entranceDelay(2)}>
+            {data.eligible ? (
+              <AppButton label={t('invite.share')} icon="share-social-outline" onPress={() => void share()} />
+            ) : (
+              <View style={styles.lockedBlock}>
+                <Notice tone="warning" text={t('invite.locked')} />
+                <AppButton label={t('invite.activate')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
+              </View>
+            )}
+          </FadeInView>
 
-          <View style={styles.listHead}>
-            <Text style={styles.listTitle}>{t('invite.invitedTitle')}</Text>
-            <Text style={styles.listHint}>{t('invite.invitedHint')}</Text>
-          </View>
+          <FadeInView delay={entranceDelay(3)}>
+            <View style={styles.listHead}>
+              <Text style={styles.listTitle}>{t('invite.invitedTitle')}</Text>
+              <Text style={styles.listHint}>{t('invite.invitedHint')}</Text>
+            </View>
+          </FadeInView>
           {data.invited.length === 0 ? (
-            <Text style={styles.empty}>{t('invite.empty')}</Text>
+            <StateView empty emptyText={t('invite.empty')} />
           ) : (
-            data.invited.map((person, index) => <InviteeRow key={`${person.at}-${index}`} person={person} />)
+            data.invited.map((person, index) => (
+              <FadeInView key={`${person.at}-${index}`} delay={entranceDelay(index + 4)}>
+                <InviteeRow person={person} />
+              </FadeInView>
+            ))
           )}
         </>
       )}
@@ -100,7 +123,7 @@ export default function InviteScreen() {
 
 function InviteeRow({ person }: { person: Invitee }) {
   return (
-    <View style={styles.row}>
+    <GlassCard radius={radii.md} style={styles.row}>
       <Ionicons name={STATE_ICON[person.state]} size={20} color={person.state === 'registered' ? colors.textMuted : colors.gold} />
       <View style={styles.rowText}>
         <Text style={styles.rowName} numberOfLines={1}>
@@ -108,7 +131,7 @@ function InviteeRow({ person }: { person: Invitee }) {
         </Text>
         <Text style={styles.rowState}>{`${t(STATE_KEY[person.state])} · ${formatArabicDate(person.at)}`}</Text>
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -122,23 +145,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
     alignItems: 'center',
+    boxShadow: shadows.glowGold,
+    overflow: 'hidden',
   },
   codeLabel: { ...typography.caption, color: colors.textSecondary },
   code: { ...typography.title, color: colors.gold, letterSpacing: 2, fontVariant: ['tabular-nums'] },
   codeHint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  lockedBlock: { gap: spacing.md },
   listHead: { gap: 2, marginTop: spacing.md },
   listTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   listHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   rowText: { flex: 1, gap: 2 },
   rowName: { ...typography.body, color: colors.textPrimary, textAlign: textStart },

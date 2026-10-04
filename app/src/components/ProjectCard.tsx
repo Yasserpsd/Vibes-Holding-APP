@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import type { PublicProject } from '@/api/types';
-import { PressScale } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { PressScale, Sheen } from '@/components/motion';
 import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   project: PublicProject;
@@ -14,84 +16,100 @@ type Props = {
   onContact?: () => void;
 };
 
+/** Fixed image strip height; the sheen only needs the measured width. */
+const IMAGE_HEIGHT = 168;
+
 export function ProjectCard({ project, onPress, onContact }: Props) {
+  // The cover fades in once it arrives instead of popping over the dark surface.
+  const [imageOpacity] = useState(() => new Animated.Value(0));
+  const [imageWidth, setImageWidth] = useState(0);
+  const golden = project.isGolden;
   return (
-    <PressScale onPress={onPress} style={[styles.card, project.isGolden && styles.cardGolden]}>
-      <View style={styles.imageBox}>
-        {project.image ? (
-          <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" />
-        ) : (
-          <View style={[styles.image, styles.imageFallback]}>
-            <Ionicons name="briefcase-outline" size={40} color={colors.goldDark} />
+    <PressScale onPress={onPress} glow glowRadius={radii.xl}>
+      <GlassCard golden={golden} radius={radii.xl} style={golden ? styles.cardGolden : null}>
+        <View style={styles.imageBox} onLayout={(event) => setImageWidth(event.nativeEvent.layout.width)}>
+          {project.image ? (
+            <Animated.Image
+              source={{ uri: project.image }}
+              style={[styles.image, { opacity: imageOpacity }]}
+              resizeMode="cover"
+              onLoad={() => Animated.timing(imageOpacity, { toValue: 1, duration: 320, useNativeDriver: true }).start()}
+            />
+          ) : (
+            <View style={[styles.image, styles.imageFallback]}>
+              <Ionicons name="briefcase-outline" size={40} color={colors.goldDark} />
+            </View>
+          )}
+          {/* A soft scrim keeps the pills readable over any image. */}
+          <View style={styles.scrim} />
+          {/* V2: golden projects catch the light — a slow metal sheen across the cover. */}
+          {golden && imageWidth > 0 ? <Sheen width={imageWidth} height={IMAGE_HEIGHT} /> : null}
+          {golden ? (
+            <View style={styles.goldenBadge}>
+              <Ionicons name="star" size={12} color={colors.goldInk} />
+              <Text style={styles.goldenText}>{t('project.goldenBadge')}</Text>
+            </View>
+          ) : null}
+          {project.stage ? (
+            <View style={styles.stagePill}>
+              <Text style={styles.stagePillText} numberOfLines={1}>
+                {project.stage.name}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.viewsPill}>
+            <Ionicons name="eye-outline" size={13} color={colors.goldLight} />
+            <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
           </View>
-        )}
-        {/* A soft scrim keeps the pills readable over any image. */}
-        <View style={styles.scrim} />
-        {project.isGolden ? (
-          <View style={styles.goldenBadge}>
-            <Ionicons name="star" size={12} color={colors.black} />
-            <Text style={styles.goldenText}>{t('project.goldenBadge')}</Text>
-          </View>
-        ) : null}
-        {project.stage ? (
-          <View style={styles.stagePill}>
-            <Text style={styles.stagePillText} numberOfLines={1}>
-              {project.stage.name}
-            </Text>
-          </View>
-        ) : null}
-        <View style={styles.viewsPill}>
-          <Ionicons name="eye-outline" size={13} color={colors.goldLight} />
-          <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
         </View>
-      </View>
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={2}>
-          {project.title}
-        </Text>
-        {project.companyName ? (
-          <Text style={styles.company} numberOfLines={1}>
-            {project.companyName}
+        <View style={styles.body}>
+          <Text style={styles.title} numberOfLines={2}>
+            {project.title}
           </Text>
-        ) : null}
-        {project.excerpt ? (
-          <Text style={styles.excerpt} numberOfLines={2}>
-            {project.excerpt}
-          </Text>
-        ) : null}
-        {project.sector ? (
-          <View style={styles.metaRow}>
-            <Text style={styles.tag} numberOfLines={1}>
-              {project.sector.name}
+          {project.companyName ? (
+            <Text style={styles.company} numberOfLines={1}>
+              {project.companyName}
             </Text>
-          </View>
-        ) : null}
-        {!project.isGolden && onContact ? (
-          <PressScale onPress={onContact} style={styles.contactCta} accessibilityLabel={t('project.contactCta')}>
-            <Ionicons name="chatbubbles-outline" size={16} color={colors.black} />
-            <Text style={styles.contactCtaText}>{t('project.contactCta')}</Text>
-          </PressScale>
-        ) : null}
-      </View>
+          ) : null}
+          {project.excerpt ? (
+            <Text style={styles.excerpt} numberOfLines={2}>
+              {project.excerpt}
+            </Text>
+          ) : null}
+          {project.sector ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.tag} numberOfLines={1}>
+                {project.sector.name}
+              </Text>
+            </View>
+          ) : null}
+          {!golden && onContact ? (
+            <PressScale
+              onPress={onContact}
+              glow
+              glowRadius={radii.md}
+              wrapStyle={styles.contactWrap}
+              style={styles.contactCta}
+              accessibilityLabel={t('project.contactCta')}
+            >
+              <Ionicons name="chatbubbles-outline" size={16} color={colors.goldInk} />
+              <Text style={styles.contactCtaText}>{t('project.contactCta')}</Text>
+            </PressScale>
+          ) : null}
+        </View>
+      </GlassCard>
     </PressScale>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  // The golden projects wear the brand: a gold hairline over a faint gold wash.
+  // The golden projects wear the brand: a faint gold wash under the gold hairline.
   cardGolden: {
-    borderColor: colors.goldDark,
-    backgroundColor: '#1A160D',
+    backgroundColor: colors.goldFaint,
+    experimental_backgroundImage: gradients.goldWash,
   },
   imageBox: {
-    height: 168,
+    height: IMAGE_HEIGHT,
     backgroundColor: colors.surfaceElevated,
   },
   image: {
@@ -108,7 +126,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 56,
-    backgroundColor: 'rgba(8, 8, 8, 0.35)',
+    backgroundColor: colors.overlay,
   },
   goldenBadge: {
     position: 'absolute',
@@ -121,12 +139,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
   },
   goldenText: {
     fontFamily: fonts.semiBold,
     fontSize: 11,
     lineHeight: 16,
-    color: colors.black,
+    color: colors.goldInk,
   },
   stagePill: {
     position: 'absolute',
@@ -199,20 +219,23 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: colors.goldLight,
   },
+  contactWrap: {
+    marginTop: spacing.sm,
+  },
   contactCta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    marginTop: spacing.sm,
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
   },
   contactCtaText: {
     fontFamily: fonts.semiBold,
     fontSize: 13,
     lineHeight: 20,
-    color: colors.black,
+    color: colors.goldInk,
   },
 });

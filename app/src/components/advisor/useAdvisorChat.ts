@@ -13,9 +13,12 @@ const OPTIMISTIC_BASE = 1e15;
 
 export type ChatStatus = 'loading' | 'ready' | 'error';
 
+/** A hub message plus the stable list key that survives the optimistic-id swap. */
+export type ChatMessage = AdvisorMessage & { clientKey?: number };
+
 type ChatState = {
   status: ChatStatus;
-  messages: AdvisorMessage[];
+  messages: ChatMessage[];
   profile: AdvisorProfile | null;
   /** The hub is waiting for the workflow's reply. */
   waiting: boolean;
@@ -42,7 +45,7 @@ const initialState: ChatState = {
 /** How a send ended. `contextRefused`: the server took the message only without its context, so the «تسأل عن» pill no longer holds. */
 export type SendOutcome = { accepted: boolean; contextRefused: boolean };
 
-function mergeMessages(current: AdvisorMessage[], incoming: AdvisorMessage[]): AdvisorMessage[] {
+function mergeMessages(current: ChatMessage[], incoming: AdvisorMessage[]): ChatMessage[] {
   if (!incoming.length) return current;
   const known = new Set(current.map((message) => message.id));
   const fresh = incoming.filter((message) => !known.has(message.id));
@@ -111,7 +114,7 @@ export function useAdvisorChat() {
       if (!trimmed) return { accepted: false, contextRefused: false };
       optimisticCount.current += 1;
       const tempId = OPTIMISTIC_BASE + optimisticCount.current;
-      const draft: AdvisorMessage = { id: tempId, role: 'user', text: trimmed, at: new Date().toISOString(), by: null, image: null, audio: null, actions: [] };
+      const draft: ChatMessage = { id: tempId, clientKey: tempId, role: 'user', text: trimmed, at: new Date().toISOString(), by: null, image: null, audio: null, actions: [] };
       setState((prev) => ({ ...prev, messages: [...prev.messages, draft], sending: true, sendError: null, gate: null }));
       try {
         const result = await advisorApi.send(trimmed, context);

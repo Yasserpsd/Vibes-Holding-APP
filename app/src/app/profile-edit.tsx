@@ -7,6 +7,7 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
@@ -74,16 +75,38 @@ export default function ProfileEditScreen() {
 
   return (
     <Screen title={t('profile.title')} subtitle={t('profile.subtitle')}>
-      <FormField label={t('profile.name')} value={form.name} onChangeText={set('name')} textContentType="name" />
-      <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
-      <FormField label={t('profile.company')} value={form.company} onChangeText={set('company')} textContentType="organizationName" />
-      <FormField label={t('profile.city')} value={form.city} onChangeText={set('city')} textContentType="addressCity" />
-      <FormField label={t('profile.website')} latin autoCapitalize="none" keyboardType="url" value={form.website} onChangeText={set('website')} placeholder="https://" />
-      <FormField label={t('profile.bio')} multiline value={form.bio} onChangeText={set('bio')} />
-      <FormField label={t('profile.social')} latin autoCapitalize="none" multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
-      <FormField label={t('profile.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={form.password} onChangeText={set('password')} hint={t('profile.newPasswordHint')} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <AppButton label={busy ? t('profile.saving') : t('profile.save')} icon="save-outline" onPress={() => void save()} />
+      <FadeInView delay={entranceDelay(0)}>
+        <FormField label={t('profile.name')} value={form.name} onChangeText={set('name')} textContentType="name" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(1)}>
+        <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField label={t('profile.company')} value={form.company} onChangeText={set('company')} textContentType="organizationName" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(3)}>
+        <FormField label={t('profile.city')} value={form.city} onChangeText={set('city')} textContentType="addressCity" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(4)}>
+        <FormField label={t('profile.website')} latin autoCapitalize="none" keyboardType="url" value={form.website} onChangeText={set('website')} placeholder="https://" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(5)}>
+        <FormField label={t('profile.bio')} multiline value={form.bio} onChangeText={set('bio')} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(6)}>
+        <FormField label={t('profile.social')} latin autoCapitalize="none" multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(7)}>
+        <FormField label={t('profile.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={form.password} onChangeText={set('password')} hint={t('profile.newPasswordHint')} />
+      </FadeInView>
+      {error ? (
+        <FadeInView offset={6}>
+          <Text style={styles.error}>{error}</Text>
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(8)}>
+        <AppButton label={busy ? t('profile.saving') : t('profile.save')} icon="save-outline" loading={busy} onPress={() => void save()} />
+      </FadeInView>
     </Screen>
   );
 }

@@ -9,13 +9,14 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
-import { FadeInView, Sheen, useCountUp } from '@/components/motion';
+import { GlassCard, NeonPulse } from '@/components/lux';
+import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const PERSONA_KEY: Record<string, StringKey> = { neutral: 'persona.neutral', entrepreneur: 'persona.entrepreneur', investor: 'persona.investor' };
 
@@ -63,6 +64,8 @@ export default function CardScreen() {
 
       <FadeInView offset={18}>
       <View style={styles.card}>
+        {/* V2: the card frame breathes a golden neon halo — the one neon element of this screen. */}
+        <NeonPulse radius={radii.lg} intensity="strong" />
         <View style={styles.cardInner} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           {/* The metal of the card: soft gold rings and a diagonal sheen, behind everything. */}
           <View pointerEvents="none" style={[styles.ring, styles.ringLarge]} />
@@ -136,9 +139,13 @@ export default function CardScreen() {
       </View>
       </FadeInView>
 
-      {active ? <Text style={styles.hint}>{t('card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
+      <FadeInView delay={entranceDelay(1)}>
+        {active ? <Text style={styles.hint}>{t('card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
+      </FadeInView>
 
-      <PrintBlock active={active} />
+      <FadeInView delay={entranceDelay(2)}>
+        <PrintBlock active={active} />
+      </FadeInView>
     </Screen>
   );
 }
@@ -195,28 +202,30 @@ function PrintBlock({ active }: { active: boolean }) {
   };
 
   return (
-    <View style={styles.print}>
+    <GlassCard style={styles.print}>
       <Text style={styles.printTitle}>{t('card.printTitle')}</Text>
       <Text style={styles.printText}>{t('card.printText')}</Text>
       {!active ? (
         <Text style={styles.hint}>{t('card.printMembersOnly')}</Text>
       ) : sent ? (
-        <Notice tone="success" text={t('card.sent')} />
+        <FadeInView offset={8}>
+          <Notice tone="success" text={t('card.sent')} />
+        </FadeInView>
       ) : pending ? (
         <Notice tone="success" text={t('card.printPending')} />
       ) : open ? (
-        <View style={styles.form}>
+        <FadeInView offset={12} style={styles.form}>
           <FormField label={t('card.city')} value={city} onChangeText={setCity} maxLength={80} />
           <FormField label={t('card.address')} hint={t('card.addressHint')} value={address} onChangeText={setAddress} multiline maxLength={300} />
           <FormField label={t('card.phoneField')} value={phone} onChangeText={setPhone} latin keyboardType="phone-pad" maxLength={30} />
           <FormField label={t('card.noteField')} value={note} onChangeText={setNote} maxLength={300} />
           {error ? <Notice tone="warning" text={error} /> : null}
-          <AppButton label={busy ? t('card.sending') : t('card.submit')} icon="paper-plane-outline" onPress={() => (busy ? null : void submit())} />
-        </View>
+          <AppButton label={busy ? t('card.sending') : t('card.submit')} icon="paper-plane-outline" loading={busy} onPress={() => (busy ? null : void submit())} />
+        </FadeInView>
       ) : (
         <AppButton label={t('card.printButton')} icon="print-outline" onPress={() => (isLoading ? null : setOpen(true))} />
       )}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -230,11 +239,7 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.black,
     padding: 5,
-    shadowColor: colors.gold,
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
+    boxShadow: shadows.glowGoldStrong,
   },
   cardInner: {
     borderRadius: radii.lg - 5,
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
   contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.textSecondary, textAlign: textStart, flexShrink: 1 },
 
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  print: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  print: { gap: spacing.sm, padding: spacing.md },
   printTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   printText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   form: { gap: spacing.sm },

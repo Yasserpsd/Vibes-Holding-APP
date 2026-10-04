@@ -1,19 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AdvisorGate, AdvisorMessage, AdvisorProfile } from '@/api/advisor';
+import type { AdvisorGate, AdvisorProfile } from '@/api/advisor';
+import type { ChatMessage } from '@/components/advisor/useAdvisorChat';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { GlassCard, GoldHairline } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn, SkeletonCards, usePulse } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { showAdvisorBalance } from '@/lib/advisorBalance';
 import { formatArabicDate, formatNumber } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 import { Composer } from './Composer';
 import { CONTEXT_ICONS, toApiContext, welcomeStarters, type ChatContext, type ChatOpening } from './context';
@@ -24,7 +27,7 @@ import { useAdvisorChat } from './useAdvisorChat';
 const IOS_TAB_BAR_HEIGHT = 49;
 
 type Props = { context: ChatContext | null; opening?: ChatOpening | null; onClearContext: () => void };
-type Item = { message: AdvisorMessage; dayLabel: string | null };
+type Item = { message: ChatMessage; dayLabel: string | null };
 
 function dayKey(iso: string): string {
   const date = new Date(iso);
@@ -40,7 +43,7 @@ function dayLabel(key: string): string {
   return formatArabicDate(key);
 }
 
-function withDayLabels(messages: AdvisorMessage[]): Item[] {
+function withDayLabels(messages: ChatMessage[]): Item[] {
   let previous = '';
   return messages.map((message) => {
     const key = dayKey(message.at);
@@ -97,19 +100,15 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="sparkles" size={22} color={colors.black} />
+          <Ionicons name="sparkles" size={22} color={colors.goldInk} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>{botNameOf(chat.profile)}</Text>
           <Text style={styles.subtitle}>{chat.human ? t('advisor.staffFollowing') : t('advisor.oneConversation')}</Text>
         </View>
-        {nearlyOut ? (
-          <View style={styles.credit}>
-            <Ionicons name="flash-outline" size={14} color={colors.gold} />
-            <Text style={styles.creditText}>{t('advisor.creditToday', { left: formatNumber(dailyLeft) })}</Text>
-          </View>
-        ) : null}
+        {nearlyOut ? <CreditPill left={dailyLeft} /> : null}
       </View>
+      <GoldHairline />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -117,20 +116,20 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
         keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_TAB_BAR_HEIGHT + insets.bottom : 0}
       >
         {chat.status === 'loading' ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.gold} size="large" />
+          <View style={styles.skeleton}>
+            <SkeletonCards count={4} />
           </View>
         ) : chat.status === 'error' ? (
-          <View style={styles.center}>
+          <FadeInView style={styles.center}>
             <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
             <Text style={styles.errorText}>{chat.loadError ?? t('advisor.loadFailed')}</Text>
             <AppButton label={t('common.retry')} variant="outline" icon="refresh-outline" onPress={() => void chat.load()} />
-          </View>
+          </FadeInView>
         ) : (
           <FlatList
             ref={listRef}
             data={items}
-            keyExtractor={(item) => String(item.message.id)}
+            keyExtractor={(item) => String(item.message.clientKey ?? item.message.id)}
             renderItem={({ item }) => (
               <View>
                 {item.dayLabel ? <Text style={styles.day}>{item.dayLabel}</Text> : null}
@@ -156,18 +155,22 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
 
         {chat.gate ? <GateNotice gate={chat.gate} onDismiss={chat.dismissGate} onMembership={() => router.push('/membership')} /> : null}
         {chat.sendError ? (
-          <Pressable onPress={chat.dismissError} style={styles.notice}>
-            <Notice text={chat.sendError} tone="warning" />
-          </Pressable>
+          <FadeInView offset={8} duration={220}>
+            <Pressable onPress={chat.dismissError} style={styles.notice}>
+              <Notice text={chat.sendError} tone="warning" />
+            </Pressable>
+          </FadeInView>
         ) : null}
         {context ? (
-          <View style={styles.context}>
-            <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
-            <Text style={styles.contextText} numberOfLines={1}>{t('advisor.askingAbout', { title: context.title })}</Text>
-            <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('advisor.clearContext')}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </Pressable>
-          </View>
+          <FadeInView offset={8} duration={220}>
+            <View style={styles.context}>
+              <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
+              <Text style={styles.contextText} numberOfLines={1}>{t('advisor.askingAbout', { title: context.title })}</Text>
+              <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('advisor.clearContext')}>
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </Pressable>
+            </View>
+          </FadeInView>
         ) : null}
         <Composer value={draft} onChange={setDraft} onSend={() => void submit(draft)} busy={busy} />
       </KeyboardAvoidingView>
@@ -188,64 +191,117 @@ const GATE_KEYS: Record<AdvisorGate['type'] | 'expired', StringKey> = {
   other: 'advisor.gate.other',
 };
 
+/** The near-empty daily balance breathes so the member notices it before the gate does. */
+function CreditPill({ left }: { left: number }) {
+  const pulse = usePulse(0.55, 1, 900);
+  return (
+    <Animated.View style={[styles.credit, { opacity: pulse }]}>
+      <Ionicons name="flash-outline" size={14} color={colors.gold} />
+      <Text style={styles.creditText}>{t('advisor.creditToday', { left: formatNumber(left) })}</Text>
+    </Animated.View>
+  );
+}
+
 /** The hub's welcome and quick menu are Arabic (the owner's own wording): the English version uses the app's strings. */
 function Welcome({ profile, empty, onSuggestion }: { profile: AdvisorProfile | null; empty: boolean; onSuggestion: (text: string) => void }) {
   if (!empty || !profile) return null;
   const suggestions = getLang() === 'ar' ? profile.suggestions : welcomeStarters();
   return (
-    <View style={styles.welcome}>
-      <Text style={styles.welcomeText}>{hubText(profile.welcome, 'advisor.welcome')}</Text>
-      {suggestions.length ? (
-        <View style={styles.suggestions}>
-          {suggestions.map((suggestion) => (
-            <Chip key={suggestion} label={suggestion} onPress={() => onSuggestion(suggestion)} />
-          ))}
-        </View>
-      ) : null}
-    </View>
+    <FadeInView>
+      <GlassCard golden style={styles.welcome}>
+        <Text style={styles.welcomeText}>{hubText(profile.welcome, 'advisor.welcome')}</Text>
+        {suggestions.length ? (
+          <View style={styles.suggestions}>
+            {suggestions.map((suggestion, index) => (
+              <PopIn key={suggestion} delay={entranceDelay(index, 70)}>
+                <Chip label={suggestion} onPress={() => onSuggestion(suggestion)} />
+              </PopIn>
+            ))}
+          </View>
+        ) : null}
+      </GlassCard>
+    </FadeInView>
   );
 }
 
 /** The advisor's opening move, rendered like one of its bubbles with the suggested answers underneath. */
 function OpeningCard({ opening, botName, onReply }: { opening: ChatOpening; botName: string; onReply: (text: string) => void }) {
   return (
-    <View style={styles.opening}>
-      <View style={styles.openingBubble}>
+    <FadeInView offset={12} style={styles.opening}>
+      <GlassCard golden style={styles.openingBubble}>
         <Text style={styles.openingTitle}>{`${botName} · ${opening.title}`}</Text>
         <Text style={styles.openingText}>{opening.text}</Text>
-      </View>
+      </GlassCard>
       {opening.quickReplies.length ? (
         <View style={styles.suggestions}>
-          {opening.quickReplies.map((reply) => (
-            <Chip key={reply} label={reply} onPress={() => onReply(reply)} />
+          {opening.quickReplies.map((reply, index) => (
+            <PopIn key={reply} delay={entranceDelay(index, 70)}>
+              <Chip label={reply} onPress={() => onReply(reply)} />
+            </PopIn>
           ))}
         </View>
       ) : null}
-    </View>
+    </FadeInView>
   );
 }
 
+/** Three golden dots breathing in turn while the advisor writes. */
 function Typing({ name }: { name: string }) {
   return (
-    <View style={styles.typing}>
-      <ActivityIndicator color={colors.gold} size="small" />
-      <Text style={styles.typingText}>{t('advisor.typing', { name })}</Text>
-    </View>
+    <FadeInView offset={6} duration={200}>
+      <View style={styles.typing} accessible accessibilityLabel={t('advisor.typing', { name })}>
+        <TypingDot delay={0} />
+        <TypingDot delay={150} />
+        <TypingDot delay={300} />
+        <Text style={styles.typingText}>{t('advisor.typing', { name })}</Text>
+      </View>
+    </FadeInView>
+  );
+}
+
+function TypingDot({ delay }: { delay: number }) {
+  const [bounce] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(delay),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounce, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(bounce, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.delay(300),
+        ]),
+      ),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [bounce, delay]);
+  return (
+    <Animated.View
+      style={[
+        styles.typingDot,
+        {
+          opacity: bounce.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+          transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }],
+        },
+      ]}
+    />
   );
 }
 
 function GateNotice({ gate, onDismiss, onMembership }: { gate: AdvisorGate; onDismiss: () => void; onMembership: () => void }) {
   return (
-    <View style={styles.gate}>
-      <View style={styles.gateRow}>
-        <Ionicons name={gate.membership ? 'lock-closed-outline' : 'time-outline'} size={20} color={colors.goldLight} />
-        <Text style={styles.gateText}>{hubText(gate.text, GATE_KEYS[gate.expired ? 'expired' : gate.type])}</Text>
-        <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={18} color={colors.textMuted} />
-        </Pressable>
-      </View>
-      {gate.membership ? <AppButton label={t('advisor.membershipScreen')} icon="ribbon-outline" onPress={onMembership} /> : null}
-    </View>
+    <FadeInView offset={10} duration={260}>
+      <GlassCard golden radius={radii.md} style={styles.gate}>
+        <View style={styles.gateRow}>
+          <Ionicons name={gate.membership ? 'lock-closed-outline' : 'time-outline'} size={20} color={colors.goldLight} />
+          <Text style={styles.gateText}>{hubText(gate.text, GATE_KEYS[gate.expired ? 'expired' : gate.type])}</Text>
+          <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
+        {gate.membership ? <AppButton label={t('advisor.membershipScreen')} icon="ribbon-outline" onPress={onMembership} /> : null}
+      </GlassCard>
+    </FadeInView>
   );
 }
 
@@ -253,6 +309,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.black },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
+  skeleton: { flex: 1, padding: spacing.md },
   errorText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   header: {
     flexDirection: 'row',
@@ -260,29 +317,46 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
-  avatar: { width: 40, height: 40, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.glowGoldFaint,
+  },
   headerText: { flex: 1 },
   title: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-  credit: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.pill, backgroundColor: colors.surface },
+  credit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+  },
   creditText: { ...typography.caption, color: colors.gold, fontFamily: fonts.medium },
   list: { padding: spacing.md, paddingBottom: spacing.lg },
   day: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginVertical: spacing.sm },
-  welcome: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  welcome: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md },
   welcomeText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   // In the forced RTL layout flex-start is the right edge, where the advisor's bubbles sit.
   opening: { alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm },
-  openingBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.lg, gap: spacing.xs, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.goldDark },
+  openingBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
   openingTitle: { ...typography.caption, color: colors.gold, textAlign: textStart },
   openingText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
-  typing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  typingText: { ...typography.caption, color: colors.textSecondary },
+  typing: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs },
+  typingText: { ...typography.caption, color: colors.textMuted, marginStart: spacing.xs },
+  typingDot: { width: 7, height: 7, borderRadius: radii.pill, backgroundColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   notice: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
-  gate: { gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.gold },
+  gate: { gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md },
   gateRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   gateText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   context: {
@@ -296,7 +370,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderGoldSoft,
     alignSelf: 'flex-start',
     maxWidth: '100%',
   },

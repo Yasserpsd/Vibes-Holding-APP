@@ -5,6 +5,7 @@ import { useApplyProfile, useMyProfile, type MyProfile, type PersonLink } from '
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -83,23 +84,63 @@ function ApplyForm({ profile, onOpenProfile }: { profile: MyProfile | null; onOp
 
   return (
     <>
-      {sent ? <Notice tone="success" text={t('people.applied')} /> : null}
-      {profile?.status === 'pending' ? <Notice tone="info" text={t('people.pending')} /> : null}
-      {profile?.status === 'approved' && profile.draft ? <Notice tone="info" text={t('people.pendingEdit')} /> : null}
-      {profile?.status === 'approved' && !profile.draft && !sent ? <Notice tone="success" text={t('people.approved')} /> : null}
-      {profile?.status === 'rejected' && profile.note ? <Notice tone="warning" text={`${t('people.rejectedTitle')}: ${profile.note}`} /> : null}
+      {sent ? (
+        <FadeInView offset={8}>
+          <Notice tone="success" text={t('people.applied')} />
+        </FadeInView>
+      ) : null}
+      {profile?.status === 'pending' ? (
+        <FadeInView offset={10}>
+          <Notice tone="info" text={t('people.pending')} />
+        </FadeInView>
+      ) : null}
+      {profile?.status === 'approved' && profile.draft ? (
+        <FadeInView offset={10}>
+          <Notice tone="info" text={t('people.pendingEdit')} />
+        </FadeInView>
+      ) : null}
+      {profile?.status === 'approved' && !profile.draft && !sent ? (
+        <FadeInView offset={10}>
+          <Notice tone="success" text={t('people.approved')} />
+        </FadeInView>
+      ) : null}
+      {profile?.status === 'rejected' && profile.note ? (
+        <FadeInView offset={10}>
+          <Notice tone="warning" text={`${t('people.rejectedTitle')}: ${profile.note}`} />
+        </FadeInView>
+      ) : null}
       {profile?.status === 'approved' ? (
-        <AppButton label={t('people.view')} variant="outline" icon="person-circle-outline" onPress={() => onOpenProfile(profile.id)} />
+        <FadeInView delay={entranceDelay(1)}>
+          <AppButton label={t('people.view')} variant="outline" icon="person-circle-outline" onPress={() => onOpenProfile(profile.id)} />
+        </FadeInView>
       ) : null}
 
-      <FormField label={t('people.form.title')} value={title} onChangeText={setTitle} maxLength={80} />
-      <FormField label={t('people.form.company')} value={company} onChangeText={setCompany} maxLength={120} />
-      <FormField label={t('people.form.bio')} hint={t('people.form.bioHint')} value={bio} onChangeText={setBio} maxLength={1200} multiline />
-      <FormField label={t('people.form.milestones')} value={milestones} onChangeText={setMilestones} multiline />
-      <FormField label={t('people.form.links')} value={links} onChangeText={setLinks} multiline latin autoCapitalize="none" autoCorrect={false} />
-      <Notice tone="info" text={t('people.photoNote')} />
-      {apply.error ? <Notice tone="warning" text={apply.error.message} /> : null}
-      <AppButton label={busy ? '…' : profile?.status === 'rejected' ? t('people.reapply') : t('people.submit')} icon="paper-plane-outline" onPress={submit} />
+      <FadeInView delay={entranceDelay(1)}>
+        <FormField label={t('people.form.title')} value={title} onChangeText={setTitle} maxLength={80} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField label={t('people.form.company')} value={company} onChangeText={setCompany} maxLength={120} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(3)}>
+        <FormField label={t('people.form.bio')} hint={t('people.form.bioHint')} value={bio} onChangeText={setBio} maxLength={1200} multiline />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(4)}>
+        <FormField label={t('people.form.milestones')} value={milestones} onChangeText={setMilestones} multiline />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(5)}>
+        <FormField label={t('people.form.links')} value={links} onChangeText={setLinks} multiline latin autoCapitalize="none" autoCorrect={false} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(6)}>
+        <Notice tone="info" text={t('people.photoNote')} />
+      </FadeInView>
+      {apply.error ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={apply.error.message} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(7)}>
+        <AppButton label={profile?.status === 'rejected' ? t('people.reapply') : t('people.submit')} icon="paper-plane-outline" loading={busy} onPress={submit} />
+      </FadeInView>
     </>
   );
 }

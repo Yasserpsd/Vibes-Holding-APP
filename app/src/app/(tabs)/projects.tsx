@@ -1,20 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProjectFilters, useProjectsList } from '@/api/queries';
 import type { ProjectsSort } from '@/api/types';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
-import { entranceDelay, FadeInView } from '@/components/motion';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
 const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
@@ -27,6 +27,7 @@ const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
 export default function ProjectsScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [sort, setSort] = useState<ProjectsSort>('latest');
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
@@ -42,67 +43,85 @@ export default function ProjectsScreen() {
 
   const header = (
     <View style={styles.header}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{t('tabs.projects')}</Text>
-        <Pressable onPress={() => router.push('/golden')} style={styles.goldenLink} accessibilityRole="link">
-          <Ionicons name="star" size={16} color={colors.gold} />
-          <Text style={styles.goldenLinkText}>{t('nav.golden')}</Text>
-        </Pressable>
-      </View>
+      <FadeInView delay={entranceDelay(0)}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{t('tabs.projects')}</Text>
+          <PressScale onPress={() => router.push('/golden')} style={styles.goldenLink} accessibilityRole="link">
+            <Ionicons name="star" size={16} color={colors.gold} />
+            <Text style={styles.goldenLinkText}>{t('nav.golden')}</Text>
+          </PressScale>
+        </View>
+      </FadeInView>
 
-      <View style={styles.searchBox}>
-        <Ionicons name="search-outline" size={20} color={colors.textMuted} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder={t('projects.searchPlaceholder')}
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {search ? (
-          <Pressable onPress={() => setSearch('')} accessibilityLabel={t('projects.clearSearch')} hitSlop={8}>
-            <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-          </Pressable>
-        ) : null}
-      </View>
+      <FadeInView delay={entranceDelay(1)}>
+        <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
+          <Ionicons name="search-outline" size={20} color={searchFocused ? colors.gold : colors.textMuted} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder={t('projects.searchPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.gold}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {search ? (
+            <PressScale onPress={() => setSearch('')} accessibilityLabel={t('projects.clearSearch')} hitSlop={8}>
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+            </PressScale>
+          ) : null}
+        </View>
+      </FadeInView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {sorts.map((option) => (
-          <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
-        ))}
-      </ScrollView>
-
-      {filters.data && filters.data.sectors.length > 0 ? (
+      <FadeInView delay={entranceDelay(2)}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label={t('projects.allSectors')} selected={!sector} onPress={() => setSector(undefined)} />
-          {filters.data.sectors.map((option) => (
-            <Chip
-              key={option.slug}
-              label={`${option.name} (${formatNumber(option.count)})`}
-              selected={sector === option.slug}
-              onPress={() => setSector(sector === option.slug ? undefined : option.slug)}
-            />
+          {sorts.map((option) => (
+            <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
           ))}
         </ScrollView>
+      </FadeInView>
+
+      {filters.data && filters.data.sectors.length > 0 ? (
+        <FadeInView delay={entranceDelay(3)}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+            <Chip label={t('projects.allSectors')} selected={!sector} onPress={() => setSector(undefined)} />
+            {filters.data.sectors.map((option) => (
+              <Chip
+                key={option.slug}
+                label={`${option.name} (${formatNumber(option.count)})`}
+                selected={sector === option.slug}
+                onPress={() => setSector(sector === option.slug ? undefined : option.slug)}
+              />
+            ))}
+          </ScrollView>
+        </FadeInView>
       ) : null}
 
       {filters.data && filters.data.stages.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label={t('projects.allStages')} selected={!stage} onPress={() => setStage(undefined)} />
-          {filters.data.stages.map((option) => (
-            <Chip
-              key={option.slug}
-              label={`${option.name} (${formatNumber(option.count)})`}
-              selected={stage === option.slug}
-              onPress={() => setStage(stage === option.slug ? undefined : option.slug)}
-            />
-          ))}
-        </ScrollView>
+        <FadeInView delay={entranceDelay(4)}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+            <Chip label={t('projects.allStages')} selected={!stage} onPress={() => setStage(undefined)} />
+            {filters.data.stages.map((option) => (
+              <Chip
+                key={option.slug}
+                label={`${option.name} (${formatNumber(option.count)})`}
+                selected={stage === option.slug}
+                onPress={() => setStage(stage === option.slug ? undefined : option.slug)}
+              />
+            ))}
+          </ScrollView>
+        </FadeInView>
       ) : null}
 
-      {typeof total === 'number' ? <Text style={styles.count}>{t('projects.count', { count: formatNumber(total) })}</Text> : null}
+      {typeof total === 'number' ? (
+        // Keyed by the total: a new filter result fades its count in instead of snapping.
+        <FadeInView key={total} offset={6} duration={320}>
+          <Text style={styles.count}>{t('projects.count', { count: formatNumber(total) })}</Text>
+        </FadeInView>
+      ) : null}
     </View>
   );
 
@@ -135,8 +154,15 @@ export default function ProjectsScreen() {
           if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        refreshing={list.isRefetching && !list.isFetchingNextPage}
-        onRefresh={() => list.refetch()}
+        refreshControl={
+          <RefreshControl
+            refreshing={list.isRefetching && !list.isFetchingNextPage}
+            onRefresh={() => list.refetch()}
+            tintColor={colors.gold}
+            colors={[colors.gold]}
+            progressBackgroundColor={colors.surfaceElevated}
+          />
+        }
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyboardShouldPersistTaps="handled"
@@ -163,6 +189,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+  },
+  // Focus lights the box: golden border with a faint neon halo.
+  searchBoxFocused: {
+    borderColor: colors.gold,
+    boxShadow: shadows.glowGoldFaint,
   },
   searchInput: { ...typography.body, flex: 1, color: colors.textPrimary, paddingVertical: spacing.sm + 2 },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },

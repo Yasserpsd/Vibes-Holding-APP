@@ -3,6 +3,8 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { Sheen } from '@/components/motion';
 import { t } from '@/i18n';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -10,13 +12,19 @@ type Props = {
   company: GoldenCompany;
 };
 
+/** Fixed logo square, so the sheen sweeps it without measuring. */
+const LOGO_SIZE = 72;
+
 export function GoldenCompanyCard({ company }: Props) {
   const router = useRouter();
   return (
-    <View style={styles.card}>
+    // V2: the golden companies wear the premium glass surface with the gold hairline.
+    <GlassCard golden style={styles.card}>
       <View style={styles.header}>
         <View style={styles.logoBox}>
           <Image source={{ uri: company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={company.name} />
+          {/* A light band sweeps the logo box like brushed metal. */}
+          <Sheen width={LOGO_SIZE} height={LOGO_SIZE} />
         </View>
         <View style={styles.titles}>
           <Text style={styles.code}>{company.code}</Text>
@@ -26,7 +34,7 @@ export function GoldenCompanyCard({ company }: Props) {
       </View>
       {/* §5.1: the offer opens as a native page in the app, never in the browser. */}
       <AppButton label={t('golden.offerPage')} variant="outline" icon="reader-outline" onPress={() => router.push(`/golden/${company.code}`)} />
-    </View>
+    </GlassCard>
   );
 }
 
@@ -34,10 +42,6 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -45,11 +49,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   logoBox: {
-    width: 72,
-    height: 72,
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
     padding: spacing.xs,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
     backgroundColor: colors.white,
+    overflow: 'hidden',
   },
   logo: {
     width: '100%',

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type AccessibilityRole, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radii, spacing } from '@/theme/tokens';
+import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
 /**
  * M38: the app's motion, with the core `Animated` API only — no new native module, so every
@@ -44,17 +44,33 @@ type PressScaleProps = {
   style?: StyleProp<ViewStyle>;
   /** The animated wrapper (margins, flex within the parent). */
   wrapStyle?: StyleProp<ViewStyle>;
+  /** V2: a golden halo rises around the card while the finger is down. */
+  glow?: boolean;
+  /** Corner radius of the glow halo; match the card's borderRadius. */
+  glowRadius?: number;
   accessibilityRole?: AccessibilityRole;
   accessibilityLabel?: string;
+  /** Forwarded to the inner Pressable so selected/checked states keep announcing. */
+  accessibilityState?: AccessibilityState;
   hitSlop?: number;
 };
 
-/** A touch the finger can feel: the card dips under the press and springs back. */
-export function PressScale({ children, onPress, onLongPress, disabled, style, wrapStyle, accessibilityRole = 'button', accessibilityLabel, hitSlop }: PressScaleProps) {
+/** A touch the finger can feel: the card dips under the press and springs back (optionally lighting up). */
+export function PressScale({ children, onPress, onLongPress, disabled, style, wrapStyle, glow = false, glowRadius = radii.lg, accessibilityRole = 'button', accessibilityLabel, accessibilityState, hitSlop }: PressScaleProps) {
   const [scale] = useState(() => new Animated.Value(1));
-  const to = (value: number) => Animated.spring(scale, { toValue: value, speed: 40, bounciness: 5, useNativeDriver: true }).start();
+  const [halo] = useState(() => new Animated.Value(0));
+  const to = (value: number) => {
+    Animated.spring(scale, { toValue: value, speed: 40, bounciness: 5, useNativeDriver: true }).start();
+    if (glow) Animated.timing(halo, { toValue: value < 1 ? 1 : 0, duration: 180, useNativeDriver: true }).start();
+  };
   return (
     <Animated.View style={[wrapStyle, { transform: [{ scale }] }]}>
+      {glow ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { opacity: halo, borderRadius: glowRadius, borderWidth: 1, borderColor: colors.borderGold, boxShadow: shadows.glowGold }]}
+        />
+      ) : null}
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -63,11 +79,50 @@ export function PressScale({ children, onPress, onLongPress, disabled, style, wr
         onPressOut={() => to(1)}
         accessibilityRole={accessibilityRole}
         accessibilityLabel={accessibilityLabel}
+        accessibilityState={accessibilityState}
         hitSlop={hitSlop}
         style={style}
       >
         {children}
       </Pressable>
+    </Animated.View>
+  );
+}
+
+/** A slow, weightless float for hero marks (the emblem breathing over the welcome screen). */
+export function Floating({ children, amplitude = 7, duration = 2600, style }: { children: ReactNode; amplitude?: number; duration?: number; style?: StyleProp<ViewStyle> }) {
+  const [drift] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(drift, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [drift, duration]);
+  return (
+    <Animated.View style={[style, { transform: [{ translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] }) }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Badges and icons pop into place with a spring — sharper than a fade for small elements. */
+export function PopIn({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
+  const [pop] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(delay),
+      Animated.spring(pop, { toValue: 1, speed: 16, bounciness: 9, useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [pop, delay]);
+  return (
+    <Animated.View style={[style, { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }] }]}>
+      {children}
     </Animated.View>
   );
 }

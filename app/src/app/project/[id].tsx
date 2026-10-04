@@ -1,18 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
+import { Animated, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { FadeInView, PopIn } from '@/components/motion';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
+import { isRTL } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
   const { id, contact } = useLocalSearchParams<{ id: string; contact?: string }>();
@@ -30,6 +33,8 @@ export default function ProjectScreen() {
   // Keeps the last card (the unlock button) clear of that floating button.
   const clearance = useAskAdvisorClearance();
   const imageWidth = width - spacing.md * 2;
+  // V2: the gallery's page indicator follows the swipes.
+  const [page, setPage] = useState(0);
 
   return (
     <View style={styles.screen}>
@@ -39,36 +44,73 @@ export default function ProjectScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
           {project.gallery.length > 0 ? (
-            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.gallery}>
-              {project.gallery.map((uri) => (
-                <Image key={uri} source={{ uri }} style={[styles.galleryImage, { width: imageWidth }]} resizeMode="cover" />
-              ))}
-            </ScrollView>
+            <FadeInView>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.gallery}
+                onMomentumScrollEnd={({ nativeEvent }) => {
+                  // Android reports raw left-origin scrollX even under RTL (snap targeting is the
+                  // only RTL-converted part), so the logical page counts from the far end there.
+                  const maxOffset = nativeEvent.contentSize.width - nativeEvent.layoutMeasurement.width;
+                  const logicalX =
+                    Platform.OS === 'android' && isRTL()
+                      ? maxOffset - nativeEvent.contentOffset.x
+                      : Math.abs(nativeEvent.contentOffset.x);
+                  const index = Math.round(logicalX / imageWidth);
+                  setPage(Math.min(project.gallery.length - 1, Math.max(0, index)));
+                }}
+              >
+                {project.gallery.map((uri) => (
+                  <GalleryImage key={uri} uri={uri} width={imageWidth} />
+                ))}
+              </ScrollView>
+              {project.gallery.length > 1 ? (
+                <View style={styles.dots}>
+                  {project.gallery.map((uri, index) => (
+                    <View key={uri} style={[styles.dot, index === page && styles.dotActive]} />
+                  ))}
+                </View>
+              ) : null}
+            </FadeInView>
           ) : null}
 
           {project.isGolden ? (
-            <View style={styles.goldenBadge}>
-              <Ionicons name="star" size={14} color={colors.black} />
-              <Text style={styles.goldenText}>{t('project.golden')}</Text>
-            </View>
+            <PopIn delay={60} style={styles.goldenWrap}>
+              <View style={styles.goldenBadge}>
+                <Ionicons name="star" size={14} color={colors.goldInk} />
+                <Text style={styles.goldenText}>{t('project.golden')}</Text>
+              </View>
+            </PopIn>
           ) : null}
 
-          <Text style={styles.title}>{project.title}</Text>
-          {project.titleEn ? <Text style={styles.titleEn}>{project.titleEn}</Text> : null}
+          <FadeInView delay={30}>
+            <Text style={styles.title}>{project.title}</Text>
+          </FadeInView>
+          {project.titleEn ? (
+            <FadeInView delay={50}>
+              <Text style={styles.titleEn}>{project.titleEn}</Text>
+            </FadeInView>
+          ) : null}
 
-          <View style={styles.tags}>
-            {project.sector ? <Text style={styles.tag}>{project.sector.name}</Text> : null}
-            {project.stage ? <Text style={styles.tag}>{project.stage.name}</Text> : null}
-            {project.number ? <Text style={styles.tag}>{t('project.number', { number: project.number })}</Text> : null}
-          </View>
+          <FadeInView delay={70}>
+            <View style={styles.tags}>
+              {project.sector ? <Text style={styles.tag}>{project.sector.name}</Text> : null}
+              {project.stage ? <Text style={styles.tag}>{project.stage.name}</Text> : null}
+              {project.number ? <Text style={styles.tag}>{t('project.number', { number: project.number })}</Text> : null}
+            </View>
+          </FadeInView>
 
           {/* M35: contact with the founder sits at the top — a golden project offers its partner page instead. */}
           {project.isGolden && project.goldenPartnerUrl ? (
-            <AppButton
-              label={t('project.partnerPage')}
-              icon={partnerCode ? 'reader-outline' : 'open-outline'}
-              onPress={() => (partnerCode ? router.push(`/golden/${partnerCode}`) : openLink(project.goldenPartnerUrl ?? ''))}
-            />
+            <FadeInView delay={60}>
+              <AppButton
+                label={t('project.partnerPage')}
+                icon={partnerCode ? 'reader-outline' : 'open-outline'}
+                onPress={() => (partnerCode ? router.push(`/golden/${partnerCode}`) : openLink(project.goldenPartnerUrl ?? ''))}
+              />
+            </FadeInView>
           ) : null}
 
           <FadeInView delay={80}>
@@ -81,23 +123,42 @@ export default function ProjectScreen() {
           </FadeInView>
 
           <FadeInView delay={200}>
-            <View style={styles.infoCard}>
+            <GlassCard style={styles.infoCard}>
               {project.companyName ? <InfoRow icon="business-outline" label={t('project.company')} value={project.companyName} /> : null}
               {project.founderName ? <InfoRow icon="person-outline" label={t('project.founder')} value={project.founderName} /> : null}
               <InfoRow icon="eye-outline" label={t('project.views')} value={formatNumber(project.viewsCount)} />
-            </View>
+            </GlassCard>
           </FadeInView>
 
           {project.details ?? project.detailsEn ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('project.about')}</Text>
-              <Text style={styles.body}>{project.details ?? project.detailsEn}</Text>
-            </View>
+            <FadeInView delay={240}>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>{t('project.about')}</Text>
+                <Text style={styles.body}>{project.details ?? project.detailsEn}</Text>
+              </View>
+            </FadeInView>
           ) : null}
 
-          <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          <FadeInView delay={280}>
+            <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          </FadeInView>
         </ScrollView>
       )}
+    </View>
+  );
+}
+
+/** A gallery page that fades in once its image arrives, instead of popping over the placeholder. */
+function GalleryImage({ uri, width }: { uri: string; width: number }) {
+  const [reveal] = useState(() => new Animated.Value(0));
+  return (
+    <View style={[styles.galleryImage, { width }]}>
+      <Animated.Image
+        source={{ uri }}
+        style={[StyleSheet.absoluteFill, { opacity: reveal }]}
+        resizeMode="cover"
+        onLoad={() => Animated.timing(reveal, { toValue: 1, duration: 320, useNativeDriver: true }).start()}
+      />
     </View>
   );
 }
@@ -121,8 +182,17 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md },
   gallery: { borderRadius: radii.lg, overflow: 'hidden' },
   galleryImage: { height: 220, backgroundColor: colors.surfaceElevated },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    marginTop: spacing.sm,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dotActive: { width: 16, backgroundColor: colors.gold, boxShadow: shadows.glowGoldFaint },
+  goldenWrap: { alignSelf: 'flex-start' },
   goldenBadge: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -130,8 +200,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
   },
-  goldenText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.black },
+  goldenText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
   title: { ...typography.title, color: colors.textPrimary },
   titleEn: { ...typography.body, color: colors.textSecondary },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -142,15 +214,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.goldDark,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
   },
   infoCard: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   infoLabel: { ...typography.caption, color: colors.textMuted, minWidth: 72 },

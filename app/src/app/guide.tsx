@@ -4,12 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useGuide, type GuideStep } from '@/api/guide';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M10 «دليل المحايد» (owner: «المحايد عندي رقم 1»): the neutral's road inside the club —
@@ -46,26 +47,33 @@ export default function GuideScreen() {
       ) : (
         <>
           {data.steps.map((step, index) => (
-            <FadeInView key={step.key} delay={entranceDelay(index, 90)} style={styles.step}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepNumber}>{index + 1}</Text>
-              </View>
-              <View style={styles.stepBody}>
-                <Text style={styles.stepTitle}>{step.title}</Text>
-                <Text style={styles.stepText}>{step.text}</Text>
-                <AppButton label={step.cta} variant={index === 0 ? 'primary' : 'outline'} onPress={() => open(step, String(Date.now()))} />
-              </View>
+            <FadeInView key={step.key} delay={entranceDelay(index, 90)}>
+              <GlassCard golden={index === 0} style={styles.step}>
+                <View style={styles.stepRail}>
+                  <View style={[styles.stepBadge, index === 0 && styles.stepBadgeActive]}>
+                    <Text style={[styles.stepNumber, index === 0 && styles.stepNumberActive]}>{index + 1}</Text>
+                  </View>
+                  {index < data.steps.length - 1 ? <View style={styles.railLine} /> : null}
+                </View>
+                <View style={styles.stepBody}>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
+                  <Text style={styles.stepText}>{step.text}</Text>
+                  <AppButton label={step.cta} variant={index === 0 ? 'primary' : 'outline'} onPress={() => open(step, String(Date.now()))} />
+                </View>
+              </GlassCard>
             </FadeInView>
           ))}
 
-          <FadeInView delay={420} style={styles.benefits}>
-            <Text style={styles.benefitsTitle}>{data.benefitsTitle}</Text>
-            {data.benefits.map((benefit) => (
-              <View key={benefit} style={styles.benefitRow}>
-                <Ionicons name="checkmark-circle-outline" size={18} color={colors.gold} />
-                <Text style={styles.benefitText}>{benefit}</Text>
-              </View>
-            ))}
+          <FadeInView delay={420}>
+            <GlassCard style={styles.benefits}>
+              <Text style={styles.benefitsTitle}>{data.benefitsTitle}</Text>
+              {data.benefits.map((benefit) => (
+                <View key={benefit} style={styles.benefitRow}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.gold} />
+                  <Text style={styles.benefitText}>{benefit}</Text>
+                </View>
+              ))}
+            </GlassCard>
           </FadeInView>
         </>
       )}
@@ -78,32 +86,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
+  // The road reads as one golden rail: each badge hangs on the line to the next step.
+  stepRail: { alignItems: 'center' },
   stepBadge: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.gold,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
+  // The first step is where the neutral stands: gold-filled, softly lit.
+  stepBadgeActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.goldLight,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
   stepNumber: { color: colors.gold, fontFamily: fonts.bold, fontSize: 16 },
+  stepNumberActive: { color: colors.goldInk },
+  railLine: { flex: 1, width: 2, borderRadius: 1, backgroundColor: colors.borderGoldSoft, marginTop: spacing.xs },
   stepBody: { flex: 1, gap: spacing.sm },
   stepTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   stepText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   benefits: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   benefitsTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },

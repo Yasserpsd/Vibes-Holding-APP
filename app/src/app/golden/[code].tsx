@@ -1,7 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -21,12 +21,13 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
-import { entranceDelay, FadeInView } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * A golden company's offer page, native in-app (PROJECT_BRIEF §5.1): the blocks the server pulled
@@ -41,6 +42,8 @@ export default function GoldenOfferScreen() {
   useAdvisorScreen({ type: 'screen', id: 'golden', title: offer?.company.name ?? t('nav.goldenOffer') });
   const clearance = useAskAdvisorClearance();
   const [asking, setAsking] = useState(false);
+  // The hero's metal sheen sweeps the card's rendered size.
+  const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   if (!offer) {
     return (
@@ -54,20 +57,32 @@ export default function GoldenOfferScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ title: offer.company.name }} />
       <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
-        <FadeInView style={styles.hero} offset={12}>
-          <View style={styles.logoBox}>
-            <Image source={{ uri: offer.company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={offer.company.name} />
-          </View>
-          <View style={styles.heroTexts}>
-            <Text style={styles.heroName}>{offer.company.name}</Text>
-            {offer.company.tagline ? <Text style={styles.heroTagline}>{offer.company.tagline}</Text> : null}
-          </View>
+        <FadeInView offset={12}>
+          <GlassCard golden radius={radii.lg}>
+            <View
+              style={styles.hero}
+              onLayout={({ nativeEvent: { layout } }) => {
+                const width = Math.round(layout.width);
+                const height = Math.round(layout.height);
+                setHeroSize((size) => (size.width === width && size.height === height ? size : { width, height }));
+              }}
+            >
+              <View style={styles.logoBox}>
+                <Image source={{ uri: offer.company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={offer.company.name} />
+              </View>
+              <View style={styles.heroTexts}>
+                <Text style={styles.heroName}>{offer.company.name}</Text>
+                {offer.company.tagline ? <Text style={styles.heroTagline}>{offer.company.tagline}</Text> : null}
+              </View>
+            </View>
+            {heroSize.width > 0 ? <Sheen width={heroSize.width} height={heroSize.height} /> : null}
+          </GlassCard>
         </FadeInView>
 
         {offer.blocks.length === 0 ? (
-          <View style={styles.pendingBox}>
+          <GlassCard style={styles.pendingBox}>
             <Text style={styles.pendingText}>{t('offer.pending')}</Text>
-          </View>
+          </GlassCard>
         ) : (
           offer.blocks.map((block, index) => (
             <FadeInView key={index} delay={entranceDelay(Math.min(index, 8), 40)}>
@@ -149,13 +164,16 @@ function InterestSheet({ visible, code, companyName, onClose }: SheetProps) {
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.handle} />
           {sent ? (
-            <>
+            <FadeInView key="sent" style={styles.sheetBody} offset={10}>
+              <PopIn style={styles.sentIcon}>
+                <Ionicons name="checkmark-circle" size={48} color={colors.goldNeon} />
+              </PopIn>
               <Text style={styles.sheetTitle}>{t('offer.sentTitle')}</Text>
               <Text style={styles.sheetText}>{t('offer.sentText')}</Text>
               <AppButton label={t('common.close')} icon="checkmark-outline" onPress={close} />
-            </>
+            </FadeInView>
           ) : (
-            <>
+            <FadeInView key="form" style={styles.sheetBody} offset={10}>
               <Text style={styles.sheetTitle}>{t('offer.interestTitle', { company: companyName })}</Text>
               <Text style={styles.sheetText}>{signedIn ? t('offer.interestTextMember') : t('offer.interestTextGuest')}</Text>
               {!signedIn ? (
@@ -166,9 +184,9 @@ function InterestSheet({ visible, code, companyName, onClose }: SheetProps) {
               ) : null}
               <FormField label={t('offer.note')} value={note} onChangeText={setNote} multiline />
               {error ? <Notice tone="warning" text={error} /> : null}
-              {busy ? <ActivityIndicator color={colors.gold} /> : <AppButton label={t('offer.send')} icon="paper-plane-outline" onPress={() => void submit()} />}
+              <AppButton label={t('offer.send')} icon="paper-plane-outline" loading={busy} onPress={() => void submit()} />
               <AppButton label={t('common.cancel')} variant="outline" onPress={close} />
-            </>
+            </FadeInView>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -184,10 +202,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
   },
   logoBox: { width: 72, height: 72, padding: spacing.xs, borderRadius: radii.md, backgroundColor: colors.white },
   logo: { width: '100%', height: '100%' },
@@ -202,20 +216,24 @@ const styles = StyleSheet.create({
   bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.gold, marginTop: 9 },
   bulletText: { ...typography.body, flex: 1, color: colors.textSecondary, textAlign: textStart },
   image: { width: '100%', aspectRatio: 16 / 9, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
-  pendingBox: { padding: spacing.lg, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  pendingBox: { padding: spacing.lg },
   pendingText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
   disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.md },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
+  backdrop: { flex: 1, backgroundColor: colors.overlay },
   sheet: {
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderTopStartRadius: radii.xxl,
+    borderTopEndRadius: radii.xxl,
     borderTopWidth: 1,
-    borderColor: colors.goldDark,
+    borderColor: colors.borderGold,
     backgroundColor: colors.surface,
+    experimental_backgroundImage: gradients.surface,
+    boxShadow: shadows.glowGoldFaint,
   },
+  sheetBody: { gap: spacing.md },
+  sentIcon: { alignSelf: 'center' },
   handle: { alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.xs },
   sheetTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   sheetText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
@@ -13,6 +13,8 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -22,7 +24,7 @@ import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { composeRequest, openWhatsApp } from '@/lib/whatsapp';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** One service: what it is, what it costs, and the action (in-app payment, WhatsApp handover, web form, advisor, HQ, Projects Bank). */
 export default function ServiceScreen() {
@@ -85,52 +87,73 @@ export default function ServiceScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <View style={styles.iconBox}>
-          <Ionicons name={iconFor(service.icon)} size={28} color={colors.gold} />
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>{service.title}</Text>
-          {service.priceLabel || service.memberLabel ? (
-            <View style={styles.labels}>
-              {service.priceLabel ? <Text style={styles.price}>{service.priceLabel}</Text> : null}
-              {service.memberLabel ? <Text style={styles.member}>{service.memberLabel}</Text> : null}
+      <FadeInView delay={entranceDelay(0)}>
+        <View style={styles.header}>
+          <PopIn>
+            <View style={styles.iconBox}>
+              <Ionicons name={iconFor(service.icon)} size={28} color={colors.gold} />
             </View>
-          ) : null}
+          </PopIn>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>{service.title}</Text>
+            {service.priceLabel || service.memberLabel ? (
+              <View style={styles.labels}>
+                {service.priceLabel ? <Text style={styles.price}>{service.priceLabel}</Text> : null}
+                {service.memberLabel ? <Text style={styles.member}>{service.memberLabel}</Text> : null}
+              </View>
+            ) : null}
+          </View>
         </View>
-      </View>
-      <Text style={styles.summary}>{service.summary}</Text>
+      </FadeInView>
+      <FadeInView delay={entranceDelay(1)}>
+        <Text style={styles.summary}>{service.summary}</Text>
+      </FadeInView>
       {service.detail
         ? service.detail.split('\n').map((paragraph, index) => (
-            <Text key={index} style={styles.paragraph}>
-              {paragraph}
-            </Text>
+            <FadeInView key={index} delay={entranceDelay(index + 2)}>
+              <Text style={styles.paragraph}>{paragraph}</Text>
+            </FadeInView>
           ))
         : null}
 
       {service.locked || !service.action ? (
+        // LockedNotice animates its own entrance; wrapping it again double-animates.
         <LockedNotice text={lockedText} guest={status !== 'signedIn'} />
       ) : (
-        <ActionPanel
-          action={service.action}
-          price={service.price}
-          signedIn={status === 'signedIn'}
-          paying={paying}
-          answers={answers}
-          onAnswer={(field, value) => setAnswers((current) => ({ ...current, [field]: value }))}
-          onWhatsApp={(action) => void handOver(action)}
-          onPay={() => void pay()}
-          onLogin={() => router.push('/auth/login')}
-          onAdvisor={askAdvisor}
-          onHq={() => router.push('/hq')}
-          onProjects={() => router.push('/projects')}
-          onForm={(formKey) => router.push({ pathname: '/form/[key]', params: { key: formKey } })}
-        />
+        <FadeInView delay={entranceDelay(3)}>
+          <ActionPanel
+            action={service.action}
+            price={service.price}
+            signedIn={status === 'signedIn'}
+            paying={paying}
+            answers={answers}
+            onAnswer={(field, value) => setAnswers((current) => ({ ...current, [field]: value }))}
+            onWhatsApp={(action) => void handOver(action)}
+            onPay={() => void pay()}
+            onLogin={() => router.push('/auth/login')}
+            onAdvisor={askAdvisor}
+            onHq={() => router.push('/hq')}
+            onProjects={() => router.push('/projects')}
+            onForm={(formKey) => router.push({ pathname: '/form/[key]', params: { key: formKey } })}
+          />
+        </FadeInView>
       )}
-      {payError ? <Notice tone="warning" text={payError} /> : null}
-      {handedOver ? <Notice tone="info" text={t('service.handedOver')} /> : null}
+      {payError ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={payError} />
+        </FadeInView>
+      ) : null}
+      {handedOver ? (
+        <FadeInView offset={8}>
+          <Notice tone="info" text={t('service.handedOver')} />
+        </FadeInView>
+      ) : null}
 
-      {service.infoUrl ? <AppButton label={t('service.infoOnSite')} variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} /> : null}
+      {service.infoUrl ? (
+        <FadeInView delay={entranceDelay(4)}>
+          <AppButton label={t('service.infoOnSite')} variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} />
+        </FadeInView>
+      ) : null}
     </Screen>
   );
 }
@@ -155,17 +178,17 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
   switch (action.type) {
     case 'whatsapp':
       return (
-        <View style={styles.panel}>
+        <GlassCard style={styles.panel}>
           {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
           <AppButton label={t('service.sendWhatsApp')} icon="logo-whatsapp" onPress={() => onWhatsApp(action)} />
-        </View>
+        </GlassCard>
       );
     case 'paymob':
       return (
-        <View style={styles.panel}>
+        <GlassCard golden style={styles.panel}>
           {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
@@ -182,13 +205,11 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
               <Text style={styles.payHint}>{t('service.signInToPay')}</Text>
               <AppButton label={t('service.signInButton')} icon="log-in-outline" onPress={onLogin} />
             </>
-          ) : paying ? (
-            <ActivityIndicator color={colors.gold} />
           ) : (
-            <AppButton label={t('service.payNow')} icon="card-outline" onPress={onPay} />
+            <AppButton label={t('service.payNow')} icon="card-outline" loading={paying} onPress={onPay} />
           )}
           <Text style={styles.payHint}>{t('service.payHint')}</Text>
-        </View>
+        </GlassCard>
       );
     case 'link':
       return <AppButton label={action.label} icon="open-outline" onPress={() => void openLink(action.url)} />;
@@ -240,9 +261,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.goldSoft,
     borderWidth: 1,
-    borderColor: colors.goldDark,
+    borderColor: colors.borderGold,
+    boxShadow: shadows.glowGoldFaint,
   },
   headerText: { flex: 1, gap: 4 },
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
@@ -254,10 +276,6 @@ const styles = StyleSheet.create({
   panel: {
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   panelTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   field: { gap: spacing.xs },

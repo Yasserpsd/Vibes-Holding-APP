@@ -5,12 +5,14 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNewsItem } from '@/api/news';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { isRTL } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** The item as the source published it, with the link to the original page and the advisor shortcut. */
 export default function NewsItemScreen() {
@@ -33,39 +35,61 @@ export default function NewsItemScreen() {
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
-          {item.image ?<Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" /> : null}
-          <View style={styles.meta}>
-            <Text style={styles.source}>{item.source.name}</Text>
-            <View style={styles.tierPill}>
-              <Text style={styles.tier} numberOfLines={1}>
-                {item.source.tierLabel}
-              </Text>
-            </View>
-            <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
-          </View>
-          {item.decision ? (
-            <View style={styles.badge}>
-              <Ionicons name="ribbon-outline" size={14} color={colors.black} />
-              <Text style={styles.badgeText}>{t('news.decisionsTitle')}</Text>
-            </View>
+          {item.image ? (
+            <FadeInView delay={entranceDelay(0)}>
+              <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+            </FadeInView>
           ) : null}
-          <Text style={[styles.title, latin && styles.latin]}>{item.title}</Text>
-          {item.snippet ? <Text style={[styles.body, latin && styles.latin]}>{item.snippet}</Text> : null}
-          {item.topics.length > 0 ? (
-            <View style={styles.tags}>
-              {item.topics.map((topic) => (
-                <Text key={topic.key} style={styles.tag}>
-                  {topic.label}
+          <FadeInView delay={entranceDelay(1)}>
+            <View style={styles.meta}>
+              <Text style={styles.source}>{item.source.name}</Text>
+              <View style={styles.tierPill}>
+                <Text style={styles.tier} numberOfLines={1}>
+                  {item.source.tierLabel}
                 </Text>
-              ))}
+              </View>
+              <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
             </View>
+          </FadeInView>
+          {item.decision ? (
+            <PopIn delay={entranceDelay(2)} style={styles.badgeWrap}>
+              <View style={styles.badge}>
+                <Ionicons name="ribbon-outline" size={14} color={colors.goldInk} />
+                <Text style={styles.badgeText}>{t('news.decisionsTitle')}</Text>
+              </View>
+            </PopIn>
           ) : null}
-          <AppButton label={t('news.readSource')} icon="open-outline" onPress={() => void openLink(item.url)} />
-          <AppButton label={t('news.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
-          <View style={styles.noteCard}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.goldLight} />
-            <Text style={styles.noteText}>{t('news.sourceNote')}</Text>
-          </View>
+          <FadeInView delay={entranceDelay(3)}>
+            <Text style={[styles.title, latin && styles.latin]}>{item.title}</Text>
+          </FadeInView>
+          {item.snippet ? (
+            <FadeInView delay={entranceDelay(4)}>
+              <Text style={[styles.body, latin && styles.latin]}>{item.snippet}</Text>
+            </FadeInView>
+          ) : null}
+          {item.topics.length > 0 ? (
+            <FadeInView delay={entranceDelay(5)}>
+              <View style={styles.tags}>
+                {item.topics.map((topic) => (
+                  <Text key={topic.key} style={styles.tag}>
+                    {topic.label}
+                  </Text>
+                ))}
+              </View>
+            </FadeInView>
+          ) : null}
+          <FadeInView delay={entranceDelay(6)}>
+            <AppButton label={t('news.readSource')} icon="open-outline" onPress={() => void openLink(item.url)} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(7)}>
+            <AppButton label={t('news.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(8)}>
+            <GlassCard style={styles.noteCard}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.goldLight} />
+              <Text style={styles.noteText}>{t('news.sourceNote')}</Text>
+            </GlassCard>
+          </FadeInView>
         </ScrollView>
       )}
     </View>
@@ -75,15 +99,16 @@ export default function NewsItemScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
-  image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
+  image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, boxShadow: shadows.lift },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   source: { ...typography.body, color: colors.goldLight },
   // Padding sits on a View: Android measures a padded Text too narrow and truncates it.
   tierPill: { paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
   tier: { ...typography.caption, color: colors.textSecondary },
   time: { ...typography.caption, color: colors.textMuted },
+  // The pop wrapper hugs the badge so the spring scales it around its own center.
+  badgeWrap: { alignSelf: 'flex-start' },
   badge: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -91,8 +116,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
   },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.black },
+  badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
   title: { ...typography.title, color: colors.textPrimary },
   body: { ...typography.body, color: colors.textSecondary },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
@@ -106,15 +133,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.goldDark,
   },
+  // The card chrome (border, machined surface, lift) comes from the GlassCard.
   noteCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   noteText: { ...typography.caption, flex: 1, color: colors.textSecondary },
 });

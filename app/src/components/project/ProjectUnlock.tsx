@@ -10,6 +10,8 @@ import { projectAccessKey, projectsApi, useProjectAccess } from '@/api/queries';
 import type { ProjectAccess, ProjectContact, ProjectsBalance } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn, PressScale, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { hubText, t } from '@/i18n';
 import { arrowForward, chevronForward, textStart } from '@/i18n/direction';
@@ -17,7 +19,7 @@ import { formatNumber } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { projectId: string; projectTitle: string; hasPitchDeck: boolean; autoStart?: boolean };
 
@@ -115,17 +117,7 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
         </Frame>
       );
     case 'unlocked':
-      return (
-        <View style={styles.box}>
-          <View style={styles.row}>
-            <Ionicons name="lock-open-outline" size={20} color={colors.success} />
-            <Text style={styles.title}>{t('unlock.contactTitle')}</Text>
-          </View>
-          {access.contact ? <ContactList contact={access.contact} projectTitle={projectTitle} /> : null}
-          {access.balance ? <BalanceRow balance={access.balance} /> : null}
-          <Text style={styles.hint}>{t('unlock.private')}</Text>
-        </View>
-      );
+      return <UnlockedBox contact={access.contact} balance={access.balance} projectTitle={projectTitle} />;
     case 'can_unlock':
       return (
         <Frame
@@ -134,7 +126,11 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
         >
           {access.balance ? <BalanceRow balance={access.balance} /> : null}
           <AppButton label={t('unlock.open')} icon="lock-open-outline" onPress={() => setConfirming(true)} />
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? (
+            <FadeInView offset={8}>
+              <Notice tone="warning" text={error} />
+            </FadeInView>
+          ) : null}
           <ConfirmSheet
             visible={confirming}
             busy={unlocking}
@@ -152,23 +148,54 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
 
 function Frame({ icon, text, quiet = false, children }: { icon: IoniconName; text: string; quiet?: boolean; children?: ReactNode }) {
   return (
-    <View style={[styles.box, quiet && styles.boxQuiet]}>
+    <GlassCard golden={!quiet} radius={radii.lg} style={styles.box}>
       <View style={styles.row}>
         <Ionicons name={icon} size={20} color={quiet ? colors.textMuted : colors.goldLight} />
         <Text style={[styles.text, quiet && styles.textQuiet]}>{text}</Text>
       </View>
       {children}
-    </View>
+    </GlassCard>
+  );
+}
+
+/** The emotional peak: the founder's data revealed under a golden glow, a sheen crossing the card. */
+function UnlockedBox({ contact, balance, projectTitle }: { contact: ProjectContact | null; balance: ProjectsBalance | null; projectTitle: string }) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  return (
+    <GlassCard golden radius={radii.lg} style={styles.boxUnlocked}>
+      <View
+        style={styles.box}
+        onLayout={(event) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+      >
+        <View style={styles.row}>
+          <PopIn>
+            <Ionicons name="lock-open-outline" size={20} color={colors.success} />
+          </PopIn>
+          <Text style={styles.title}>{t('unlock.contactTitle')}</Text>
+        </View>
+        {contact ? <ContactList contact={contact} projectTitle={projectTitle} /> : null}
+        {balance ? (
+          <FadeInView delay={entranceDelay(5)} offset={10}>
+            <BalanceRow balance={balance} />
+          </FadeInView>
+        ) : null}
+        <FadeInView delay={entranceDelay(6)} offset={10}>
+          <Text style={styles.hint}>{t('unlock.private')}</Text>
+        </FadeInView>
+      </View>
+      {size.width > 0 ? <Sheen width={size.width} height={size.height} /> : null}
+    </GlassCard>
   );
 }
 
 function BalanceRow({ balance }: { balance: ProjectsBalance }) {
   const total = balance.credits + balance.granted;
+  const left = useCountUp(balance.left);
   return (
     <View style={styles.balance}>
       <Ionicons name="wallet-outline" size={18} color={colors.gold} />
       <Text style={styles.balanceLabel}>{t('unlock.balance')}</Text>
-      <Text style={styles.balanceValue}>{t('unlock.balanceLeft', { left: formatNumber(balance.left), total: formatNumber(total) })}</Text>
+      <Text style={styles.balanceValue}>{t('unlock.balanceLeft', { left: formatNumber(left), total: formatNumber(total) })}</Text>
     </View>
   );
 }
@@ -179,27 +206,29 @@ function ContactList({ contact, projectTitle }: { contact: ProjectContact; proje
   const greeting = t('unlock.greeting', { title: projectTitle });
   return (
     <View style={styles.contacts}>
-      {contact.whatsapp ? <ContactRow icon="logo-whatsapp" label={t('unlock.whatsapp')} value={contact.whatsapp} latin onPress={() => void openWhatsApp(contact.whatsapp, greeting)} /> : null}
-      {contact.email ? <ContactRow icon="mail-outline" label={t('unlock.email')} value={contact.email} latin onPress={() => void Linking.openURL(`mailto:${contact.email}`).catch(() => undefined)} /> : null}
-      {contact.website ? <ContactRow icon="globe-outline" label={t('unlock.website')} value={contact.website} latin onPress={() => void openLink(contact.website)} /> : null}
-      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label={t('unlock.pitch')} value={t('unlock.openPitch')} onPress={() => void openLink(contact.pitchUrl)} /> : null}
+      {contact.whatsapp ? <ContactRow icon="logo-whatsapp" label={t('unlock.whatsapp')} value={contact.whatsapp} latin delay={entranceDelay(1)} onPress={() => void openWhatsApp(contact.whatsapp, greeting)} /> : null}
+      {contact.email ? <ContactRow icon="mail-outline" label={t('unlock.email')} value={contact.email} latin delay={entranceDelay(2)} onPress={() => void Linking.openURL(`mailto:${contact.email}`).catch(() => undefined)} /> : null}
+      {contact.website ? <ContactRow icon="globe-outline" label={t('unlock.website')} value={contact.website} latin delay={entranceDelay(3)} onPress={() => void openLink(contact.website)} /> : null}
+      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label={t('unlock.pitch')} value={t('unlock.openPitch')} delay={entranceDelay(4)} onPress={() => void openLink(contact.pitchUrl)} /> : null}
     </View>
   );
 }
 
-function ContactRow({ icon, label, value, latin = false, onPress }: { icon: IoniconName; label: string; value: string; latin?: boolean; onPress: () => void }) {
+function ContactRow({ icon, label, value, latin = false, delay = 0, onPress }: { icon: IoniconName; label: string; value: string; latin?: boolean; delay?: number; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.contact, pressed && styles.pressed]}>
-      <Ionicons name={icon} size={20} color={colors.gold} />
-      <View style={styles.contactTexts}>
-        <Text style={styles.contactLabel}>{label}</Text>
-        {/* The left-to-right mark keeps a leading «+» in front of the number: Android ignores writingDirection. */}
-        <Text style={[styles.contactValue, latin && styles.latin]} numberOfLines={1}>
-          {latin ? `‎${value}` : value}
-        </Text>
-      </View>
-      <Ionicons name={chevronForward()} size={16} color={colors.goldDark} />
-    </Pressable>
+    <FadeInView delay={delay} offset={10}>
+      <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.contact}>
+        <Ionicons name={icon} size={20} color={colors.gold} />
+        <View style={styles.contactTexts}>
+          <Text style={styles.contactLabel}>{label}</Text>
+          {/* The left-to-right mark keeps a leading «+» in front of the number: Android ignores writingDirection. */}
+          <Text style={[styles.contactValue, latin && styles.latin]} numberOfLines={1}>
+            {latin ? `‎${value}` : value}
+          </Text>
+        </View>
+        <Ionicons name={chevronForward()} size={16} color={colors.goldDark} />
+      </PressScale>
+    </FadeInView>
   );
 }
 
@@ -213,17 +242,19 @@ function ConfirmSheet({ visible, busy, projectTitle, balance, onConfirm, onClose
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('unlock.close')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.handle} />
-        <Text style={styles.sheetTitle}>{t('unlock.confirmTitle')}</Text>
-        <Text style={styles.sheetText}>{t('unlock.confirmText', { title: projectTitle })}</Text>
-        {balance ? (
-          <View style={styles.sheetFigures}>
-            <Figure label={t('unlock.now')} value={formatNumber(balance.left)} />
-            <Ionicons name={arrowForward()} size={18} color={colors.textMuted} />
-            <Figure label={t('unlock.after')} value={formatNumber(Math.max(0, balance.left - 1))} highlight />
-          </View>
-        ) : null}
-        {busy ? <ActivityIndicator color={colors.gold} /> : <AppButton label={t('unlock.confirm')} icon="lock-open-outline" onPress={onConfirm} />}
-        <AppButton label={t('common.cancel')} variant="outline" onPress={onClose} />
+        <FadeInView delay={120} offset={12} style={styles.sheetBody}>
+          <Text style={styles.sheetTitle}>{t('unlock.confirmTitle')}</Text>
+          <Text style={styles.sheetText}>{t('unlock.confirmText', { title: projectTitle })}</Text>
+          {balance ? (
+            <View style={styles.sheetFigures}>
+              <Figure label={t('unlock.now')} value={formatNumber(balance.left)} />
+              <Ionicons name={arrowForward()} size={18} color={colors.textMuted} />
+              <Figure label={t('unlock.after')} value={formatNumber(Math.max(0, balance.left - 1))} highlight />
+            </View>
+          ) : null}
+          <AppButton label={t('unlock.confirm')} icon="lock-open-outline" loading={busy} onPress={onConfirm} />
+          <AppButton label={t('common.cancel')} variant="outline" onPress={onClose} />
+        </FadeInView>
       </View>
     </Modal>
   );
@@ -239,8 +270,8 @@ function Figure({ label, value, highlight = false }: { label: string; value: str
 }
 
 const styles = StyleSheet.create({
-  box: { gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
-  boxQuiet: { borderColor: colors.border },
+  box: { gap: spacing.md, padding: spacing.md },
+  boxUnlocked: { boxShadow: shadows.glowGold },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   title: { ...typography.subtitle, flex: 1, color: colors.textPrimary, textAlign: textStart },
   text: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: textStart },
@@ -256,9 +287,9 @@ const styles = StyleSheet.create({
   contactValue: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   // Phone numbers, e-mails and links read left to right, still aligned with the Arabic labels.
   latin: { writingDirection: 'ltr' },
-  pressed: { opacity: 0.8 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
-  sheet: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, borderTopWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
+  backdrop: { flex: 1, backgroundColor: colors.overlay },
+  sheet: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, borderTopWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.surface },
+  sheetBody: { gap: spacing.md },
   handle: { alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.xs },
   sheetTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   sheetText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },

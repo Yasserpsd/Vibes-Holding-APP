@@ -38,10 +38,18 @@ export default function PostsScreen() {
   }
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} />}>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
       <Stack.Screen options={{ title: t('nav.posts') }} />
-      {me?.isAdmin ? <AppButton label={t('posts.compose')} icon="send" onPress={() => router.push('/posts/compose' as Href)} /> : null}
-      {posts.length === 0 ? <Text style={styles.empty}>{t('posts.empty')}</Text> : null}
+      {me?.isAdmin ? (
+        <FadeInView offset={10}>
+          <AppButton label={t('posts.compose')} icon="send" onPress={() => router.push('/posts/compose' as Href)} />
+        </FadeInView>
+      ) : null}
+      {posts.length === 0 ? (
+        <FadeInView offset={10}>
+          <Text style={styles.empty}>{t('posts.empty')}</Text>
+        </FadeInView>
+      ) : null}
       {posts.map((post, index) => (
         <FadeInView key={post.id} delay={entranceDelay(index)}>
           <PostCard post={post} />
@@ -52,6 +60,7 @@ export default function PostsScreen() {
           label={query.isFetchingNextPage ? t('common.loadingMore') : t('common.loadMore')}
           variant="outline"
           icon="chevron-down"
+          loading={query.isFetchingNextPage}
           onPress={() => void query.fetchNextPage()}
         />
       ) : null}

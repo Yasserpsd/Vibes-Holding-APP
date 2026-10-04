@@ -6,7 +6,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -16,7 +17,7 @@ import { textStart } from '@/i18n/direction';
 import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { formatArabicDate } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
 const MODE_KEY: Record<AgendaEvent['mode'], StringKey> = { hq: 'agenda.modeHq', online: 'agenda.modeOnline', both: 'agenda.modeBoth' };
@@ -66,7 +67,7 @@ export default function AgendaEventScreen() {
       ) : (
         <>
           <FadeInView style={styles.head} offset={10}>
-            <EventDateBadge date={event.date} />
+            <EventDateBadge date={event.date} highlight />
             <View style={styles.headText}>
               <Text style={styles.title}>{event.title}</Text>
               <Text style={styles.meta}>{`${formatArabicDate(event.date)}${timeLine(event) ? ` · ${timeLine(event)}` : ''}`}</Text>
@@ -80,22 +81,30 @@ export default function AgendaEventScreen() {
             </FadeInView>
           ) : null}
 
-          <FadeInView delay={160} style={styles.infoCard}>
-            {event.place && event.mode !== 'online' ? (
+          <FadeInView delay={160}>
+            <GlassCard style={styles.infoCard}>
+              {event.place && event.mode !== 'online' ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="location-outline" size={18} color={colors.gold} />
+                  <Text style={styles.infoText}>{`${t('agenda.place')}: ${event.place}`}</Text>
+                </View>
+              ) : null}
               <View style={styles.infoRow}>
-                <Ionicons name="location-outline" size={18} color={colors.gold} />
-                <Text style={styles.infoText}>{`${t('agenda.place')}: ${event.place}`}</Text>
+                <Ionicons name="pricetag-outline" size={18} color={colors.gold} />
+                <View style={styles.feePill}>
+                  <Text style={styles.feeText} numberOfLines={1}>
+                    {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
+                  </Text>
+                </View>
               </View>
-            ) : null}
-            <View style={styles.infoRow}>
-              <Ionicons name="pricetag-outline" size={18} color={colors.gold} />
-              <Text style={styles.infoText}>{event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}</Text>
-            </View>
+            </GlassCard>
           </FadeInView>
 
           {event.mine?.paid ? (
             <>
-              <Notice tone="success" text={`${t('agenda.confirmed')} — ${event.mine.attendance === 'hq' ? t('agenda.attHq') : t('agenda.attOnline')}`} />
+              <PopIn style={styles.confirmGlow}>
+                <Notice tone="success" text={`${t('agenda.confirmed')} — ${event.mine.attendance === 'hq' ? t('agenda.attHq') : t('agenda.attOnline')}`} />
+              </PopIn>
               {event.onlineUrl ? <AppButton label={t('agenda.onlineLink')} icon="videocam-outline" onPress={() => void openLink(event.onlineUrl as string)} /> : null}
             </>
           ) : !signedIn ? (
@@ -109,15 +118,20 @@ export default function AgendaEventScreen() {
             <>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}
               {event.mustPay ? <Notice tone="info" text={t('agenda.payNote')} /> : null}
-              {error ? <Notice tone="warning" text={error} /> : null}
+              {error ? (
+                <FadeInView offset={8}>
+                  <Notice tone="warning" text={error} />
+                </FadeInView>
+              ) : null}
               {event.mode !== 'online' ? (
-                <AppButton label={register.isPending ? '…' : registerLabel(t('agenda.registerHq'))} icon="business-outline" onPress={() => tap('hq')} />
+                <AppButton label={registerLabel(t('agenda.registerHq'))} icon="business-outline" loading={register.isPending} onPress={() => tap('hq')} />
               ) : null}
               {event.mode !== 'hq' ? (
                 <AppButton
-                  label={register.isPending ? '…' : registerLabel(t('agenda.registerOnline'))}
+                  label={registerLabel(t('agenda.registerOnline'))}
                   icon="videocam-outline"
                   variant={event.mode === 'online' ? 'primary' : 'outline'}
+                  loading={register.isPending}
                   onPress={() => tap('online')}
                 />
               ) : null}
@@ -138,11 +152,19 @@ const styles = StyleSheet.create({
   infoCard: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   infoText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  // The fee reads as a golden pill, not a plain line.
+  feePill: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+  },
+  feeText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  // The confirmed moment glows — celebratory, but classy.
+  confirmGlow: { borderRadius: radii.md, boxShadow: shadows.glowGold },
 });

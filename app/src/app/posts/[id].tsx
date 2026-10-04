@@ -1,14 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { eventOf, pollsApi, usePost, type Poll, type PostEvent } from '@/api/posts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, GrowBar, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { audienceBadge } from '@/components/PostsBlock';
 import { StateView } from '@/components/StateView';
@@ -17,7 +19,7 @@ import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { playVideo } from '@/lib/player';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** One «رسائل الإدارة» post or event: text, the event's date and place, images, a YouTube or uploaded video and link buttons, all opened in-app. */
 export default function PostScreen() {
@@ -39,32 +41,56 @@ export default function PostScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
           <View style={styles.meta}>
-            <View style={styles.badge}>
-              <Ionicons name={event ? 'calendar' : isPoll ? 'stats-chart' : 'megaphone-outline'} size={14} color={colors.black} />
+            <PopIn style={styles.badge}>
+              <Ionicons name={event ? 'calendar' : isPoll ? 'stats-chart' : 'megaphone-outline'} size={14} color={colors.goldInk} />
               <Text style={styles.badgeText}>{event ? t('posts.event') : isPoll ? t('poll.badge') : t('nav.posts')}</Text>
-            </View>
+            </PopIn>
             {audienceBadge(post) ? (
-              <View style={styles.badge}>
-                <Ionicons name="person" size={14} color={colors.black} />
+              <PopIn delay={80} style={styles.badge}>
+                <Ionicons name="person" size={14} color={colors.goldInk} />
                 <Text style={styles.badgeText}>{audienceBadge(post)}</Text>
-              </View>
+              </PopIn>
             ) : null}
             {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
           </View>
-          <Text style={styles.title}>{post.title}</Text>
-          {event ? <EventCard event={event} /> : null}
-          {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
-          {post.kind === 'poll' && post.poll ? <PollCard postId={post.id} initial={post.poll} /> : null}
+          <FadeInView delay={entranceDelay(1)}>
+            <Text style={styles.title}>{post.title}</Text>
+          </FadeInView>
+          {event ? (
+            <FadeInView delay={entranceDelay(2)}>
+              <EventCard event={event} />
+            </FadeInView>
+          ) : null}
+          {post.body ? (
+            <FadeInView delay={entranceDelay(3)}>
+              <Text style={styles.body}>{post.body}</Text>
+            </FadeInView>
+          ) : null}
+          {post.kind === 'poll' && post.poll ? (
+            <FadeInView delay={entranceDelay(4)}>
+              <PollCard postId={post.id} initial={post.poll} />
+            </FadeInView>
+          ) : null}
           {post.youtubeId ? (
-            <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label={t('posts.playYoutube')} title={post.title} />
+            <FadeInView delay={entranceDelay(5)}>
+              <VideoTile url={`https://www.youtube.com/watch?v=${post.youtubeId}`} poster={`https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`} posterFit="cover" label={t('posts.playYoutube')} title={post.title} />
+            </FadeInView>
           ) : null}
           {/* M19: the uploaded video plays in the in-app player (expo-video); old binaries keep the in-app browser. */}
-          {post.video?.url ? <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} title={post.title} /> : null}
-          {post.images.map((uri) => (
-            <Image key={uri} source={{ uri }} style={styles.image} resizeMode="contain" />
+          {post.video?.url ? (
+            <FadeInView delay={entranceDelay(5)}>
+              <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} title={post.title} />
+            </FadeInView>
+          ) : null}
+          {post.images.map((uri, index) => (
+            <FadeInView key={uri} delay={entranceDelay(6 + index)}>
+              <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+            </FadeInView>
           ))}
-          {post.links.map((link) => (
-            <AppButton key={`${link.label}:${link.url}`} label={link.label} variant="outline" icon="open-outline" onPress={() => void openLink(link.url)} />
+          {post.links.map((link, index) => (
+            <FadeInView key={`${link.label}:${link.url}`} delay={entranceDelay(7 + index)}>
+              <AppButton label={link.label} variant="outline" icon="open-outline" onPress={() => void openLink(link.url)} />
+            </FadeInView>
           ))}
         </ScrollView>
       )}
@@ -110,34 +136,47 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
 
   return (
     <View style={styles.poll}>
-      {poll.options.map((option) => {
+      {poll.options.map((option, index) => {
         const mine = option.id === poll.myVote;
         const picked = canChoose && option.id === selected;
         const votes = option.votes ?? 0;
         const share = showCounts && (poll.totalVotes ?? 0) > 0 ? votes / (poll.totalVotes as number) : 0;
         return (
-          <Pressable
+          <PressScale
             key={option.id}
-            accessibilityRole="button"
+            disabled={!canChoose}
+            onPress={() => setSelected(option.id)}
+            accessibilityLabel={option.label}
             accessibilityState={{ selected: mine || picked, disabled: !canChoose }}
-            onPress={() => (canChoose ? setSelected(option.id) : null)}
-            style={({ pressed }) => [styles.option, (mine || picked) && styles.optionMine, pressed && canChoose && styles.pressed]}
+            glow={canChoose}
+            glowRadius={radii.lg}
+            style={[styles.option, (mine || picked) && styles.optionMine]}
           >
-            {showCounts ? <PollFill share={share} /> : null}
             <View style={styles.optionRow}>
-              <Ionicons
-                name={mine ? 'checkmark-circle' : picked ? 'radio-button-on' : poll.closed ? 'remove-circle-outline' : 'ellipse-outline'}
-                size={20}
-                color={mine || picked ? colors.gold : colors.textMuted}
-              />
+              {mine ? (
+                <PopIn>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
+                </PopIn>
+              ) : (
+                <Ionicons name={picked ? 'radio-button-on' : poll.closed ? 'remove-circle-outline' : 'ellipse-outline'} size={20} color={picked ? colors.gold : colors.textMuted} />
+              )}
               <Text style={[styles.optionLabel, (mine || picked) && styles.optionLabelMine]}>{option.label}</Text>
               {showCounts ? <Text style={styles.optionVotes}>{`${Math.round(share * 100)}%`}</Text> : null}
             </View>
-          </Pressable>
+            {showCounts ? (
+              <View style={styles.optionBar}>
+                <GrowBar percent={share * 100} height={6} delay={entranceDelay(index)} />
+              </View>
+            ) : null}
+          </PressScale>
         );
       })}
 
-      {canChoose && selected ? <AppButton label={busy ? t('poll.confirming') : t('poll.confirm')} icon="checkmark-circle-outline" onPress={() => void confirm()} /> : null}
+      {canChoose && selected ? (
+        <FadeInView offset={8} duration={260}>
+          <AppButton label={busy ? t('poll.confirming') : t('poll.confirm')} icon="checkmark-circle-outline" loading={busy} onPress={() => void confirm()} />
+        </FadeInView>
+      ) : null}
       {!me ? (
         <>
           <Notice tone="warning" text={t('poll.signIn')} />
@@ -161,22 +200,11 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
   );
 }
 
-/** M38: the result bar grows to its share when the counts open, instead of standing there. */
-function PollFill({ share }: { share: number }) {
-  const [progress] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    const animation = Animated.timing(progress, { toValue: share, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: false });
-    animation.start();
-    return () => animation.stop();
-  }, [progress, share]);
-  return <Animated.View style={[styles.optionFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />;
-}
-
 /** When and where the event happens, and the link for attending online (opened in-app). */
 function EventCard({ event }: { event: PostEvent }) {
   const onlineUrl = event.onlineUrl;
   return (
-    <View style={styles.event}>
+    <GlassCard golden style={styles.event}>
       <View style={styles.eventRow}>
         <Ionicons name="calendar-outline" size={20} color={colors.gold} />
         <View style={styles.eventTexts}>
@@ -194,25 +222,20 @@ function EventCard({ event }: { event: PostEvent }) {
         </View>
       ) : null}
       {onlineUrl ? <AppButton label={t('posts.onlineLink')} icon="videocam-outline" onPress={() => void openLink(onlineUrl)} /> : null}
-    </View>
+    </GlassCard>
   );
 }
 
-/** A video as a tappable tile: its poster (a plain dark tile without one) under a play mark; plays in-app (M19). */
+/** A video as a tappable tile: its poster (a plain dark tile without one) under a glowing play mark; plays in-app (M19). */
 function VideoTile({ url, poster, posterFit, label, title }: { url: string; poster: string | null; posterFit: 'cover' | 'contain'; label: string; title?: string }) {
   const router = useRouter();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={() => playVideo(router, { url, title: title ?? label, poster })}
-      style={({ pressed }) => [styles.video, pressed && styles.pressed]}
-    >
+    <PressScale accessibilityLabel={label} onPress={() => playVideo(router, { url, title: title ?? label, poster })} glow glowRadius={radii.lg} style={styles.video}>
       {poster ? <Image source={{ uri: poster }} style={styles.videoImage} resizeMode={posterFit} /> : <View style={styles.videoImage} />}
       <View style={styles.play}>
-        <Ionicons name="play" size={28} color={colors.black} />
+        <Ionicons name="play" size={28} color={colors.goldInk} />
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -229,23 +252,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
   },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.black },
+  badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
   time: { ...typography.caption, color: colors.textMuted },
   title: { ...typography.title, color: colors.textPrimary },
   body: { ...typography.body, color: colors.textSecondary },
   poll: { gap: spacing.sm },
-  option: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' },
-  optionMine: { borderColor: colors.gold },
-  optionFill: { position: 'absolute', top: 0, bottom: 0, start: 0, backgroundColor: colors.goldDark, opacity: 0.28 },
+  option: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    experimental_backgroundImage: gradients.surface,
+    overflow: 'hidden',
+  },
+  optionMine: { borderColor: colors.borderGold, boxShadow: shadows.glowGoldFaint },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.md },
+  optionBar: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm + 2 },
   optionLabel: { ...typography.body, flex: 1, color: colors.textPrimary, textAlign: textStart },
   optionLabelMine: { fontFamily: fonts.semiBold, color: colors.goldLight },
   optionVotes: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLight, writingDirection: 'ltr' },
   pollMeta: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  event: { gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.surface },
+  event: { gap: spacing.md, padding: spacing.md },
   eventRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  eventRowBorder: { paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  eventRowBorder: { paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderGoldSoft },
   eventTexts: { flex: 1 },
   eventLabel: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   eventValue: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
@@ -259,10 +291,11 @@ const styles = StyleSheet.create({
     top: 72,
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
   },
-  pressed: { opacity: 0.85 },
 });

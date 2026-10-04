@@ -7,6 +7,7 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
@@ -48,37 +49,59 @@ export default function LoginScreen() {
 
   return (
     <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
-      {config?.adminOnly ? <Notice text={t('auth.login.adminOnly')} /> : null}
-      <SocialButtons onError={setError} />
-      <FormField
-        label={t('auth.login.field')}
-        latin
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        textContentType="username"
-        value={login}
-        onChangeText={setLogin}
-        placeholder={t('auth.login.placeholder')}
-      />
-      <FormField
-        label={t('common.password')}
-        latin
-        secureTextEntry
-        autoCapitalize="none"
-        textContentType="password"
-        value={password}
-        onChangeText={setPassword}
-        onSubmitEditing={submit}
-        returnKeyType="go"
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <AppButton label={busy ? t('auth.login.busy') : t('auth.login.submit')} icon="log-in-outline" onPress={() => (busy ? undefined : void submit())} />
-      <Link href="/auth/reset" style={styles.link}>
-        {t('auth.login.forgot')}
-      </Link>
+      {config?.adminOnly ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice text={t('auth.login.adminOnly')} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(1)}>
+        <SocialButtons onError={setError} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField
+          label={t('auth.login.field')}
+          latin
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="username"
+          value={login}
+          onChangeText={setLogin}
+          placeholder={t('auth.login.placeholder')}
+        />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(3)}>
+        <FormField
+          label={t('common.password')}
+          latin
+          secureTextEntry
+          autoCapitalize="none"
+          textContentType="password"
+          value={password}
+          onChangeText={setPassword}
+          onSubmitEditing={submit}
+          returnKeyType="go"
+        />
+      </FadeInView>
+      {error ? (
+        <FadeInView offset={8}>
+          <Text style={styles.error}>{error}</Text>
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(4)}>
+        <AppButton label={t('auth.login.submit')} icon="log-in-outline" loading={busy} onPress={() => void submit()} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(5)}>
+        <Link href="/auth/reset" asChild>
+          <PressScale>
+            <Text style={styles.link}>{t('auth.login.forgot')}</Text>
+          </PressScale>
+        </Link>
+      </FadeInView>
       {config?.registrationOpen === false ? null : (
-        <AppButton label={t('auth.login.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+        <FadeInView delay={entranceDelay(6)}>
+          <AppButton label={t('auth.login.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+        </FadeInView>
       )}
     </Screen>
   );

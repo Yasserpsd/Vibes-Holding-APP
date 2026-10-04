@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FadeInView } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -11,10 +12,14 @@ export function Notice({ text, tone = 'info' }: Props) {
   const color = tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : colors.goldLight;
   const icon = tone === 'warning' ? 'warning-outline' : tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline';
   return (
-    <View style={[styles.box, { borderColor: color }]}>
-      <Ionicons name={icon} size={18} color={color} />
-      <Text style={styles.text}>{text}</Text>
-    </View>
+    <FadeInView offset={8}>
+      <View style={[styles.box, tone === 'info' ? styles.boxGold : { borderColor: color }]}>
+        <View style={styles.iconChip}>
+          <Ionicons name={icon} size={16} color={color} />
+        </View>
+        <Text style={styles.text}>{text}</Text>
+      </View>
+    </FadeInView>
   );
 }
 
@@ -27,6 +32,19 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     backgroundColor: colors.surface,
+  },
+  // Gold tone reads as a soft golden wash instead of a hard outline.
+  boxGold: {
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldSoft,
+  },
+  iconChip: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.goldFaint,
   },
   text: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
 });

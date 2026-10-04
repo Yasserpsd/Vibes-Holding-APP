@@ -1,16 +1,18 @@
 import { Redirect, useRouter } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
 import { useGuestGate } from '@/auth/GuestGate';
 import { AppButton } from '@/components/AppButton';
+import { GoldGradient } from '@/components/lux';
+import { entranceDelay, FadeInView, Floating, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { languageChoiceOffered, t } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-const clubLogo = require('../../assets/images/club-logo.png');
+const clubEmblem = require('../../assets/images/club-emblem.png');
 
 /**
  * The gate every visitor meets first: sign in, create an account, or look around as a guest for one
@@ -28,42 +30,77 @@ export default function WelcomeScreen() {
   const guestOffered = !guestOver || testBuild;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
-        <Text style={styles.title}>{guestOver ? t('welcome.returnTitle') : t('common.clubName')}</Text>
-        <Text style={styles.subtitle}>{guestOver ? t('welcome.returnText') : t('welcome.subtitle')}</Text>
-        <View style={styles.actions}>
-          <AppButton label={t('welcome.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
-          {config?.registrationOpen === false ? null : (
-            <AppButton label={t('welcome.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
-          )}
-          {guestOffered ? (
-            <>
-              <AppButton label={t('welcome.guest')} variant="outline" icon="eye-outline" onPress={startGuest} />
-              <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
-            </>
+    <GoldGradient variant="screen" style={styles.backdrop}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <FadeInView delay={entranceDelay(0)} style={styles.hero}>
+            <View style={styles.halo} />
+            <Floating>
+              <Image source={clubEmblem} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+            </Floating>
+          </FadeInView>
+          <FadeInView delay={entranceDelay(1)}>
+            <Text style={styles.title}>{guestOver ? t('welcome.returnTitle') : t('common.clubName')}</Text>
+          </FadeInView>
+          <FadeInView delay={entranceDelay(2)}>
+            <Text style={styles.subtitle}>{guestOver ? t('welcome.returnText') : t('welcome.subtitle')}</Text>
+          </FadeInView>
+          <View style={styles.actions}>
+            <FadeInView delay={entranceDelay(3)}>
+              <AppButton label={t('welcome.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+            </FadeInView>
+            {config?.registrationOpen === false ? null : (
+              <FadeInView delay={entranceDelay(4)}>
+                <AppButton label={t('welcome.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+              </FadeInView>
+            )}
+            {guestOffered ? (
+              <>
+                <FadeInView delay={entranceDelay(5)}>
+                  <AppButton label={t('welcome.guest')} variant="outline" icon="eye-outline" onPress={startGuest} />
+                </FadeInView>
+                <FadeInView delay={entranceDelay(6)}>
+                  <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
+                </FadeInView>
+              </>
+            ) : null}
+          </View>
+          {testBuild && guestOver ? (
+            <FadeInView delay={entranceDelay(7)}>
+              <Notice tone="warning" text={t('welcome.testNote')} />
+            </FadeInView>
           ) : null}
-        </View>
-        {testBuild && guestOver ? <Notice tone="warning" text={t('welcome.testNote')} /> : null}
-        {languageChoiceOffered(false) ? (
-          <Pressable onPress={chooseLanguage} accessibilityRole="button" hitSlop={8} style={({ pressed }) => pressed && styles.pressed}>
-            <Text style={styles.language}>{t('welcome.language')}</Text>
-          </Pressable>
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
+          {languageChoiceOffered(false) ? (
+            <FadeInView delay={entranceDelay(8)}>
+              <PressScale onPress={chooseLanguage} hitSlop={8}>
+                <Text style={styles.language}>{t('welcome.language')}</Text>
+              </PressScale>
+            </FadeInView>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
+    </GoldGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.black },
+  backdrop: { flex: 1, backgroundColor: colors.black },
+  safeArea: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
-  logo: { width: 112, height: 112, alignSelf: 'center' },
+  hero: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
+  // The soft golden halo breathing behind the floating emblem — the screen's single hero glow.
+  halo: {
+    position: 'absolute',
+    width: 108,
+    height: 108,
+    borderRadius: radii.pill,
+    backgroundColor: colors.goldFaint,
+    boxShadow: shadows.glowGoldStrong,
+  },
+  logo: { width: 112, height: 112 },
   title: { ...typography.title, color: colors.gold, textAlign: 'center' },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   actions: { gap: spacing.sm + 4, marginTop: spacing.md },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   language: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
-  pressed: { opacity: 0.7 },
 });

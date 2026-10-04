@@ -1,19 +1,23 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem } from '@/api/news';
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
-import { entranceDelay, FadeInView } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
+
+// The decisions strip snaps card by card: the compact NewsCard width (260) plus the strip gap.
+const STRIP_SNAP = 260 + spacing.sm;
 
 export default function NewsScreen() {
   const router = useRouter();
@@ -48,49 +52,67 @@ export default function NewsScreen() {
 
   const header = (
     <View style={styles.header}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{t('news.title')}</Text>
-        {signedIn ? (
-          <Pressable onPress={() => router.push('/news/interests')} style={styles.headerLink} accessibilityRole="button" hitSlop={8}>
-            <Ionicons name="options-outline" size={16} color={colors.gold} />
-            <Text style={styles.headerLinkText}>{t('news.interestsLink')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <FadeInView delay={entranceDelay(0)}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{t('news.title')}</Text>
+          {signedIn ? (
+            <PressScale onPress={() => router.push('/news/interests')} style={styles.headerLink} hitSlop={8}>
+              <Ionicons name="options-outline" size={16} color={colors.gold} />
+              <Text style={styles.headerLinkText}>{t('news.interestsLink')}</Text>
+            </PressScale>
+          ) : null}
+        </View>
+      </FadeInView>
 
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>{topics.data?.decisionsTitle ?? t('news.decisionsTitle')}</Text>
+      <FadeInView delay={entranceDelay(1)} style={styles.block}>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>{topics.data?.decisionsTitle ?? t('news.decisionsTitle')}</Text>
+          {decisionItems.length > 0 ? (
+            <PressScale onPress={() => router.push('/news/decisions')} accessibilityRole="link" hitSlop={8}>
+              <Text style={styles.sectionLink}>{t('news.viewAll')}</Text>
+            </PressScale>
+          ) : null}
+        </View>
         {decisionItems.length > 0 ? (
-          <Pressable onPress={() => router.push('/news/decisions')} accessibilityRole="link" hitSlop={8}>
-            <Text style={styles.sectionLink}>{t('news.viewAll')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {decisionItems.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-          {decisionItems.map((item) => (
-            <NewsCard key={item.id} item={item} compact onPress={() => openItem(item)} />
-          ))}
-        </ScrollView>
-      ) : (
-        <Text style={styles.sectionEmpty}>{decisions.isPending ? t('news.decisionsLoading') : t('news.decisionsEmpty')}</Text>
-      )}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.strip}
+            snapToInterval={STRIP_SNAP}
+            decelerationRate="fast"
+          >
+            {decisionItems.map((item) => (
+              <NewsCard key={item.id} item={item} compact onPress={() => openItem(item)} />
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={styles.sectionEmpty}>{decisions.isPending ? t('news.decisionsLoading') : t('news.decisionsEmpty')}</Text>
+        )}
+      </FadeInView>
 
       {askForInterests ? (
-        <Pressable onPress={() => router.push('/news/interests')} accessibilityRole="button" style={({ pressed }) => [styles.banner, pressed && styles.pressed]}>
-          <Ionicons name="sparkles-outline" size={20} color={colors.gold} />
-          <Text style={styles.bannerText}>{t('news.pickInterests')}</Text>
-          <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
-        </Pressable>
+        <FadeInView delay={entranceDelay(2)}>
+          <PressScale onPress={() => router.push('/news/interests')} glow glowRadius={radii.lg}>
+            <GlassCard golden style={styles.banner}>
+              <Ionicons name="sparkles-outline" size={20} color={colors.gold} />
+              <Text style={styles.bannerText}>{t('news.pickInterests')}</Text>
+              <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
+            </GlassCard>
+          </PressScale>
+        </FadeInView>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Chip label={t('news.all')} selected={!topic} onPress={() => setTopic(undefined)} />
-        {chips.map((item) => (
-          <Chip key={item.key} label={item.label} selected={topic === item.key} onPress={() => setTopic(topic === item.key ? undefined : item.key)} />
-        ))}
-      </ScrollView>
-      <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
+      <FadeInView delay={entranceDelay(3)}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label={t('news.all')} selected={!topic} onPress={() => setTopic(undefined)} />
+          {chips.map((item) => (
+            <Chip key={item.key} label={item.label} selected={topic === item.key} onPress={() => setTopic(topic === item.key ? undefined : item.key)} />
+          ))}
+        </ScrollView>
+      </FadeInView>
+      <FadeInView delay={entranceDelay(4)}>
+        <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
+      </FadeInView>
     </View>
   );
 
@@ -119,11 +141,18 @@ export default function NewsScreen() {
           if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-        onRefresh={() => {
-          void feed.refetch();
-          void decisions.refetch();
-        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={feed.isRefetching && !feed.isFetchingNextPage}
+            onRefresh={() => {
+              void feed.refetch();
+              void decisions.refetch();
+            }}
+            tintColor={colors.gold}
+            colors={[colors.gold]}
+            progressBackgroundColor={colors.surfaceElevated}
+          />
+        }
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
@@ -136,6 +165,7 @@ const styles = StyleSheet.create({
   // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
   listContent: { paddingHorizontal: spacing.md, paddingBottom: ASK_ADVISOR_CLEARANCE },
   header: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  block: { gap: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.gold },
   headerLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
@@ -145,18 +175,14 @@ const styles = StyleSheet.create({
   sectionLink: { ...typography.caption, color: colors.goldLight },
   sectionEmpty: { ...typography.caption, color: colors.textMuted },
   strip: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  // The card chrome (border, surface, glow) comes from the golden GlassCard.
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.sm + 4,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-    backgroundColor: colors.surface,
   },
   bannerText: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
-  pressed: { opacity: 0.8 },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
   count: { ...typography.caption, color: colors.textMuted },
   separator: { height: spacing.sm },

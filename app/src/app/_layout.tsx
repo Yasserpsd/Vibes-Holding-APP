@@ -21,7 +21,7 @@ import { initI18n, t } from '@/i18n';
 import { isRTL, syncDirection } from '@/i18n/direction';
 import { syncStrings } from '@/i18n/remote';
 import { installNotificationHandler } from '@/lib/notifications';
-import { colors, fonts } from '@/theme/tokens';
+import { colors, fonts, typography } from '@/theme/tokens';
 
 installNotificationHandler();
 SplashScreen.preventAutoHideAsync();
@@ -36,10 +36,12 @@ const detailHeader = {
   headerShown: true,
   headerStyle: { backgroundColor: colors.surface },
   headerTintColor: colors.gold,
-  headerTitleStyle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textPrimary },
+  headerTitleStyle: { fontFamily: fonts.semiBold, fontSize: typography.subtitle.fontSize, color: colors.textPrimary },
   headerTitleAlign: 'center' as const,
   headerBackButtonDisplayMode: 'minimal' as const,
   headerShadowVisible: false,
+  // V2: detail pages rise in with a fade — softer than the default hard slide.
+  animation: 'fade_from_bottom' as const,
 };
 
 export default function RootLayout() {

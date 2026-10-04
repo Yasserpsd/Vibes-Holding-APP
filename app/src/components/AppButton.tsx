@@ -1,36 +1,47 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps } from 'react';
-import { Animated, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, fonts, radii, spacing } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type Props = {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline';
+  /** `primary` glows like the logo's metal; `outline` is a lit hairline; `ghost` is text-quiet. */
+  variant?: 'primary' | 'outline' | 'ghost';
   icon?: IoniconName;
   style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+  /** Shows a spinner in place of the icon and mutes the press. */
+  loading?: boolean;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function AppButton({ label, onPress, variant = 'primary', icon, style }: Props) {
-  const outline = variant === 'outline';
-  const color = outline ? colors.gold : colors.black;
+export function AppButton({ label, onPress, variant = 'primary', icon, style, disabled = false, loading = false }: Props) {
+  const primary = variant === 'primary';
+  const color = primary ? colors.goldInk : colors.gold;
+  const muted = disabled || loading;
   // M38: the button dips under the finger and springs back — felt on every press in the app.
   const [scale] = useState(() => new Animated.Value(1));
   const to = (value: number) => Animated.spring(scale, { toValue: value, speed: 40, bounciness: 5, useNativeDriver: true }).start();
   return (
     <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => to(0.96)}
+      onPress={muted ? undefined : onPress}
+      onPressIn={() => !muted && to(0.96)}
       onPressOut={() => to(1)}
+      disabled={muted}
       accessibilityRole="button"
-      style={[styles.base, outline ? styles.outline : styles.primary, style, { transform: [{ scale }] }]}
+      accessibilityState={{ disabled: muted, busy: loading }}
+      style={[styles.base, styles[variant], muted && styles.muted, style, { transform: [{ scale }] }]}
     >
-      {icon ? <Ionicons name={icon} size={18} color={color} /> : null}
+      {loading ? (
+        <ActivityIndicator size="small" color={color} />
+      ) : icon ? (
+        <Ionicons name={icon} size={18} color={color} />
+      ) : null}
       <Text style={[styles.label, { color }]}>{label}</Text>
     </AnimatedPressable>
   );
@@ -49,11 +60,20 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    borderColor: colors.goldLight,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
   },
   outline: {
+    backgroundColor: colors.goldFaint,
+    borderColor: colors.borderGold,
+  },
+  ghost: {
     backgroundColor: 'transparent',
-    borderColor: colors.goldDark,
+    borderColor: 'transparent',
+  },
+  muted: {
+    opacity: 0.55,
   },
   label: {
     fontFamily: fonts.semiBold,

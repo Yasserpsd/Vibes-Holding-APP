@@ -3,13 +3,14 @@ import { Stack, useRouter, type Href } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAgenda, type AgendaEvent } from '@/api/agenda';
+import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { getLang, t, type StringKey } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
 const MODE_KEY: Record<AgendaEvent['mode'], StringKey> = { hq: 'agenda.modeHq', online: 'agenda.modeOnline', both: 'agenda.modeBoth' };
@@ -30,7 +31,7 @@ export default function AgendaScreen() {
       ) : (
         events.map((event, index) => (
           <FadeInView key={event.id} delay={entranceDelay(index, 70)}>
-            <EventCard event={event} onPress={() => router.push(`/agenda/${event.id}` as Href)} />
+            <EventCard event={event} highlight={index === 0} onPress={() => router.push(`/agenda/${event.id}` as Href)} />
           </FadeInView>
         ))
       )}
@@ -38,43 +39,45 @@ export default function AgendaScreen() {
   );
 }
 
-export function EventDateBadge({ date, size = 'md' }: { date: string; size?: 'sm' | 'md' }) {
+export function EventDateBadge({ date, size = 'md', highlight = false }: { date: string; size?: 'sm' | 'md'; highlight?: boolean }) {
   const day = date.slice(8, 10);
   const month = new Date(`${date}T12:00:00Z`).toLocaleDateString(getLang() === 'en' ? 'en' : 'ar', { month: 'short' });
   const small = size === 'sm';
   return (
-    <View style={[styles.badge, small && styles.badgeSm]}>
+    <View style={[styles.badge, small && styles.badgeSm, highlight && styles.badgeGlow]}>
       <Text style={[styles.badgeDay, small && styles.badgeDaySm]}>{day}</Text>
       <Text style={styles.badgeMonth}>{month}</Text>
     </View>
   );
 }
 
-function EventCard({ event, onPress }: { event: AgendaEvent; onPress: () => void }) {
+function EventCard({ event, highlight, onPress }: { event: AgendaEvent; highlight?: boolean; onPress: () => void }) {
   const mine = event.mine;
   return (
-    <PressScale onPress={onPress} style={styles.card} accessibilityRole="button" accessibilityLabel={event.title}>
-      <EventDateBadge date={event.date} />
-      <View style={styles.cardBody}>
-        <Text style={styles.title} numberOfLines={2}>
-          {event.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {`${formatArabicDate(event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
-        </Text>
-        <Text style={styles.fee} numberOfLines={1}>
-          {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
-        </Text>
-        {mine ? (
-          <View style={styles.minePill}>
-            <Ionicons name={mine.paid ? 'checkmark-circle' : 'time-outline'} size={14} color={mine.paid ? colors.success : colors.warning} />
-            <Text style={[styles.mineText, { color: mine.paid ? colors.success : colors.warning }]} numberOfLines={1}>
-              {mine.paid ? t('agenda.confirmed') : t('agenda.pendingPay')}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
+    <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
+      <GlassCard golden={highlight} style={styles.card}>
+        <EventDateBadge date={event.date} highlight={highlight} />
+        <View style={styles.cardBody}>
+          <Text style={styles.title} numberOfLines={2}>
+            {event.title}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {`${formatArabicDate(event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
+          </Text>
+          <Text style={styles.fee} numberOfLines={1}>
+            {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
+          </Text>
+          {mine ? (
+            <View style={styles.minePill}>
+              <Ionicons name={mine.paid ? 'checkmark-circle' : 'time-outline'} size={14} color={mine.paid ? colors.success : colors.warning} />
+              <Text style={[styles.mineText, { color: mine.paid ? colors.success : colors.warning }]} numberOfLines={1}>
+                {mine.paid ? t('agenda.confirmed') : t('agenda.pendingPay')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
+      </GlassCard>
     </PressScale>
   );
 }
@@ -86,10 +89,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   cardBody: { flex: 1, gap: 4 },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
@@ -101,12 +100,14 @@ const styles = StyleSheet.create({
     width: 58,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.borderGold,
     backgroundColor: colors.surface,
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: 2,
   },
+  // The next upcoming event's date carries the neon: a lit gold frame and a faint halo.
+  badgeGlow: { borderColor: colors.gold, backgroundColor: colors.surfaceElevated, boxShadow: shadows.glowGoldFaint },
   badgeSm: { width: 48, paddingVertical: spacing.xs },
   badgeDay: { color: colors.gold, fontFamily: fonts.bold, fontSize: 22, lineHeight: 26 },
   badgeDaySm: { fontSize: 18, lineHeight: 22 },

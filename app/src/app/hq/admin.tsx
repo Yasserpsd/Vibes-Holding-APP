@@ -8,6 +8,8 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -67,15 +69,23 @@ export default function HqAdminScreen() {
 
   return (
     <Screen title={t('hqAdmin.fullTitle')} subtitle={t('hqAdmin.subtitle')}>
-      <View style={styles.chips}>
+      <FadeInView delay={entranceDelay(1)} style={styles.chips}>
         {FILTERS.map((entry) => (
           <Chip key={entry.key} label={t(entry.label)} selected={entry.key === filter} onPress={() => setFilter(entry.key)} />
         ))}
-      </View>
-      {actionError ? <Notice tone="warning" text={actionError} /> : null}
+      </FadeInView>
+      {actionError ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={actionError} />
+        </FadeInView>
+      ) : null}
       {data ? (
         data.visits.length ? (
-          data.visits.map((visit) => <AdminRow key={visit.id} visit={visit} busy={busyId === visit.id} onDecide={(status) => void decide(visit, status)} />)
+          data.visits.map((visit, index) => (
+            <FadeInView key={visit.id} delay={entranceDelay(index)}>
+              <AdminRow visit={visit} busy={busyId === visit.id} onDecide={(status) => void decide(visit, status)} />
+            </FadeInView>
+          ))
         ) : (
           <Text style={styles.empty}>{t('hqAdmin.empty')}</Text>
         )
@@ -84,11 +94,15 @@ export default function HqAdminScreen() {
       )}
 
       <SectionHeader title={t('hqAdmin.verifyTitle')} subtitle={t('hqAdmin.verifySubtitle')} />
-      <FormField label={t('hqAdmin.code')} value={code} onChangeText={setCode} latin autoCapitalize="none" placeholder="VCHQ:…" />
-      <AppButton label={t('hqAdmin.verify')} icon="qr-code-outline" onPress={() => void verify()} />
-      {verifyResult ? (
-        <Notice tone={verifyResult.valid ? 'success' : 'warning'} text={verifyResult.visit ? `${verifyResult.text} · ${verifyResult.visit.name} · ${weekdayOf(verifyResult.visit.date)} ${formatArabicDate(verifyResult.visit.date)} · ${verifyResult.visit.time}` : verifyResult.text} />
-      ) : null}
+      <GlassCard golden style={styles.verifyCard}>
+        <FormField label={t('hqAdmin.code')} value={code} onChangeText={setCode} latin autoCapitalize="none" placeholder="VCHQ:…" />
+        <AppButton label={t('hqAdmin.verify')} icon="qr-code-outline" onPress={() => void verify()} />
+        {verifyResult ? (
+          <PopIn key={`${verifyResult.valid}:${verifyResult.text}`}>
+            <Notice tone={verifyResult.valid ? 'success' : 'warning'} text={verifyResult.visit ? `${verifyResult.text} · ${verifyResult.visit.name} · ${weekdayOf(verifyResult.visit.date)} ${formatArabicDate(verifyResult.visit.date)} · ${verifyResult.visit.time}` : verifyResult.text} />
+          </PopIn>
+        ) : null}
+      </GlassCard>
     </Screen>
   );
 }
@@ -96,7 +110,7 @@ export default function HqAdminScreen() {
 function AdminRow({ visit, busy, onDecide }: { visit: AdminVisit; busy: boolean; onDecide: (status: 'confirmed' | 'rejected') => void }) {
   const weekday = weekdayOf(visit.date);
   return (
-    <View style={styles.visit}>
+    <GlassCard style={styles.visit}>
       <Text style={styles.name}>{visit.name}</Text>
       <Text style={[styles.meta, styles.latin]}>{`${visit.phone} · ${visit.email}`}</Text>
       <Text style={styles.meta}>{t('hqAdmin.visitMeta', { day: `${weekday} ${formatArabicDate(visit.date)}`, from: visit.time, to: visit.endTime })}</Text>
@@ -104,22 +118,24 @@ function AdminRow({ visit, busy, onDecide }: { visit: AdminVisit; busy: boolean;
       <Text style={styles.status}>{t(`hq.status.${visit.status}`)}</Text>
       {visit.status === 'pending' ? (
         <View style={styles.actions}>
-          <AppButton label={busy ? '…' : t('hqAdmin.confirm')} icon="checkmark" onPress={() => (busy ? null : onDecide('confirmed'))} style={styles.action} />
+          <AppButton label={t('hqAdmin.confirm')} icon="checkmark" loading={busy} onPress={() => (busy ? null : onDecide('confirmed'))} style={styles.action} />
           <AppButton label={t('hqAdmin.decline')} variant="outline" icon="close" onPress={() => (busy ? null : onDecide('rejected'))} style={styles.action} />
         </View>
       ) : null}
-    </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
-  visit: { gap: 4, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  visit: { gap: 4, padding: spacing.md },
   name: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   latin: { writingDirection: 'ltr' },
   status: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   action: { flex: 1 },
+  // The scanned code is checked inside a gold-framed card: the desk's own little stage.
+  verifyCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg },
 });

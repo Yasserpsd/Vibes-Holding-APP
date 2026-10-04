@@ -10,6 +10,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -69,56 +70,71 @@ export default function BookVisitScreen() {
 
   return (
     <Screen title={t('hqBook.title')} subtitle={t('hqBook.subtitle')}>
-      <Text style={styles.label}>{t('hqBook.day')}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-        {data.days.map((day) => (
-          <Chip
-            key={day.date}
-            label={`${weekdayName(day.weekday)} ${formatArabicDate(day.date)}`}
-            selected={day.date === selectedDate}
-            onPress={() => {
-              setDate(day.date);
-              setTime(null);
-            }}
-          />
-        ))}
-      </ScrollView>
-
-      <Text style={styles.label}>{t('hqBook.time')}</Text>
-      {slots.data ? (
-        <View style={styles.chips}>
-          {slots.data.slots.map((slot) => (
+      <FadeInView delay={entranceDelay(1)}>
+        <Text style={styles.label}>{t('hqBook.day')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+          {data.days.map((day) => (
             <Chip
-              key={slot.time}
-              label={slot.available ? t('hqBook.slot', { from: slot.time, to: slot.endTime }) : t('hqBook.slotFull', { time: slot.time })}
-              selected={slot.time === time}
-              onPress={() => (slot.available ? setTime(slot.time) : null)}
+              key={day.date}
+              label={`${weekdayName(day.weekday)} ${formatArabicDate(day.date)}`}
+              selected={day.date === selectedDate}
+              onPress={() => {
+                setDate(day.date);
+                setTime(null);
+              }}
             />
           ))}
+        </ScrollView>
+      </FadeInView>
+
+      <FadeInView delay={entranceDelay(2)}>
+        <Text style={styles.label}>{t('hqBook.time')}</Text>
+        {slots.data ? (
+          <View style={styles.chips}>
+            {slots.data.slots.map((slot) => (
+              <Chip
+                key={slot.time}
+                label={slot.available ? t('hqBook.slot', { from: slot.time, to: slot.endTime }) : t('hqBook.slotFull', { time: slot.time })}
+                selected={slot.time === time}
+                onPress={() => (slot.available ? setTime(slot.time) : null)}
+              />
+            ))}
+          </View>
+        ) : (
+          <StateView loading={slots.isLoading} error={slots.error} onRetry={() => void slots.refetch()} />
+        )}
+      </FadeInView>
+
+      <FadeInView delay={entranceDelay(3)}>
+        <Text style={styles.label}>{t('hqBook.purpose')}</Text>
+        <View style={styles.chips}>
+          {data.content.purposes.map((option) => (
+            <Chip key={option} label={option} selected={option === purpose} onPress={() => setPurpose(option)} />
+          ))}
         </View>
-      ) : (
-        <StateView loading={slots.isLoading} error={slots.error} onRetry={() => void slots.refetch()} />
-      )}
+      </FadeInView>
 
-      <Text style={styles.label}>{t('hqBook.purpose')}</Text>
-      <View style={styles.chips}>
-        {data.content.purposes.map((option) => (
-          <Chip key={option} label={option} selected={option === purpose} onPress={() => setPurpose(option)} />
-        ))}
-      </View>
+      <FadeInView delay={entranceDelay(4)}>
+        <FormField label={t('hqBook.note')} value={note} onChangeText={setNote} multiline placeholder={t('hqBook.notePlaceholder')} />
+      </FadeInView>
 
-      <FormField label={t('hqBook.note')} value={note} onChangeText={setNote} multiline placeholder={t('hqBook.notePlaceholder')} />
-
-      {submitError ? <Notice tone="warning" text={submitError} /> : null}
-      <AppButton label={busy ? t('hqBook.sending') : t('hqBook.submit')} icon="calendar-outline" onPress={() => (busy ? null : void submit())} />
-      <Text style={styles.hint}>{data.content.rules[0] ?? ''}</Text>
+      {submitError ? (
+        <FadeInView offset={8}>
+          <Notice tone="warning" text={submitError} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(5)}>
+        <AppButton label={busy ? t('hqBook.sending') : t('hqBook.submit')} icon="calendar-outline" loading={busy} onPress={() => (busy ? null : void submit())} />
+        <Text style={[styles.hint, styles.hintSpace]}>{data.content.rules[0] ?? ''}</Text>
+      </FadeInView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
+  label: { ...typography.subtitle, color: colors.gold, textAlign: textStart, marginBottom: spacing.sm },
   strip: { gap: spacing.xs, paddingVertical: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  hintSpace: { marginTop: spacing.md },
 });

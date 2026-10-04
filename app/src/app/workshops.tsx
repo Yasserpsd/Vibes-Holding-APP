@@ -7,6 +7,7 @@ import { useGuide, useMyWorkshops, useRegisterWorkshop, type GuideWorkshop } fro
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -74,6 +75,8 @@ function WorkshopCard({
   const register = useRegisterWorkshop();
   const [asking, setAsking] = useState(false);
   const [note, setNote] = useState('');
+  // A closed workshop dims by color, not by a blanket opacity wash.
+  const closed = !registered && !workshop.open;
 
   const send = () => {
     if (register.isPending) return;
@@ -81,17 +84,22 @@ function WorkshopCard({
   };
 
   return (
-    <View style={styles.card}>
+    // A registered workshop wears the golden hairline and its faint halo.
+    <GlassCard golden={registered} style={styles.card}>
       <View style={styles.head}>
-        <Text style={styles.title}>{workshop.title}</Text>
+        <Text style={[styles.title, closed && styles.titleClosed]}>{workshop.title}</Text>
         <View style={styles.modePill}>
-          <Ionicons name={workshop.mode === 'online' ? 'globe-outline' : workshop.mode === 'hq' ? 'business-outline' : 'sync-outline'} size={14} color={colors.gold} />
+          <Ionicons
+            name={workshop.mode === 'online' ? 'globe-outline' : workshop.mode === 'hq' ? 'business-outline' : 'sync-outline'}
+            size={14}
+            color={closed ? colors.textMuted : colors.gold}
+          />
           <Text style={styles.modeText} numberOfLines={1}>
             {t(MODE_KEY[workshop.mode])}
           </Text>
         </View>
       </View>
-      <Text style={styles.blurb}>{workshop.blurb}</Text>
+      <Text style={[styles.blurb, closed && styles.blurbClosed]}>{workshop.blurb}</Text>
       <View style={styles.scheduleRow}>
         <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
         <Text style={styles.schedule}>{workshop.schedule}</Text>
@@ -102,15 +110,15 @@ function WorkshopCard({
       ) : !workshop.open ? (
         <Text style={styles.closed}>{texts.closedText}</Text>
       ) : !signedIn ? null : asking ? (
-        <>
+        <FadeInView style={styles.form} offset={10}>
           <FormField label={t('guide.noteField')} value={note} onChangeText={setNote} maxLength={300} multiline />
           {register.error ? <Notice tone="warning" text={register.error.message} /> : null}
-          <AppButton label={register.isPending ? '…' : t('guide.send')} icon="paper-plane-outline" onPress={send} />
-        </>
+          <AppButton label={t('guide.send')} icon="paper-plane-outline" loading={register.isPending} onPress={send} />
+        </FadeInView>
       ) : (
         <AppButton label={texts.registerCta} variant="outline" icon="hand-right-outline" onPress={() => setAsking(true)} />
       )}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -118,13 +126,10 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  titleClosed: { color: colors.textMuted },
   modePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,7 +142,9 @@ const styles = StyleSheet.create({
   },
   modeText: { ...typography.caption, color: colors.textSecondary },
   blurb: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
+  blurbClosed: { color: colors.textMuted },
   scheduleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   schedule: { ...typography.caption, color: colors.textMuted, textAlign: textStart, flex: 1 },
   closed: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  form: { gap: spacing.sm },
 });

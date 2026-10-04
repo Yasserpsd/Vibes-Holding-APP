@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView, SkeletonCards } from '@/components/motion';
+import { FadeInView, SkeletonCards, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   loading?: boolean;
@@ -17,6 +17,8 @@ type Props = {
 
 /** Loading, error and empty states for list and detail screens. */
 export function StateView({ loading, error, onRetry, empty, emptyText }: Props) {
+  // Hook order must not depend on which state renders.
+  const pulse = usePulse(0.55, 1, 900);
   if (loading) {
     // M38: ghost cards breathe while the list loads, instead of a bare spinner.
     return (
@@ -27,19 +29,37 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
   }
   if (error) {
     return (
-      <FadeInView style={styles.box}>
-        <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
-        <Text style={styles.text}>{errorMessage(error)}</Text>
-        {onRetry ? <AppButton label={t('common.retry')} variant="outline" icon="refresh" onPress={onRetry} /> : null}
-      </FadeInView>
+      <View style={styles.box}>
+        <FadeInView offset={10}>
+          <View style={styles.iconRing}>
+            <Ionicons name="cloud-offline-outline" size={32} color={colors.goldLight} />
+          </View>
+        </FadeInView>
+        <FadeInView delay={90} offset={10}>
+          <Text style={styles.text}>{errorMessage(error)}</Text>
+        </FadeInView>
+        {onRetry ? (
+          <FadeInView delay={180} offset={10}>
+            <AppButton label={t('common.retry')} variant="outline" icon="refresh" onPress={onRetry} />
+          </FadeInView>
+        ) : null}
+      </View>
     );
   }
   if (empty) {
     return (
-      <FadeInView style={styles.box}>
-        <Ionicons name="search-outline" size={36} color={colors.textMuted} />
-        <Text style={styles.text}>{emptyText ?? t('common.noResults')}</Text>
-      </FadeInView>
+      <View style={styles.box}>
+        <FadeInView offset={10}>
+          <Animated.View style={{ opacity: pulse }}>
+            <View style={styles.iconRing}>
+              <Ionicons name="search-outline" size={32} color={colors.goldLight} />
+            </View>
+          </Animated.View>
+        </FadeInView>
+        <FadeInView delay={90} offset={10}>
+          <Text style={styles.text}>{emptyText ?? t('common.noResults')}</Text>
+        </FadeInView>
+      </View>
     );
   }
   return null;
@@ -55,6 +75,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.lg,
+  },
+  iconRing: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
     ...typography.body,

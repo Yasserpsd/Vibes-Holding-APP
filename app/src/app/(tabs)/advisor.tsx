@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AdvisorChat } from '@/components/advisor/AdvisorChat';
 import { openingFor, parseContextParams, type ChatContext, type ChatOpening, type ContextParams } from '@/components/advisor/context';
 import { AppButton } from '@/components/AppButton';
+import { entranceDelay, FadeInView } from '@/components/motion';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { t } from '@/i18n';
 import { colors, spacing } from '@/theme/tokens';
@@ -53,12 +54,12 @@ export default function AdvisorScreen() {
         title={t('advisor.title')}
         description={t('advisor.signInDescription')}
       >
-        <View style={styles.actions}>
+        <FadeInView delay={entranceDelay(2)} style={styles.actions}>
           <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
           {config?.registrationOpen === false ? null : (
             <AppButton label={t('auth.register.title')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
           )}
-        </View>
+        </FadeInView>
       </PlaceholderScreen>
     );
   }

@@ -9,10 +9,11 @@ import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView, GrowBar } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
-import { fonts } from '@/theme/tokens';
+import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
 type Params = { pendingToken?: string; email?: string; text?: string; interests?: string };
 
@@ -28,6 +29,7 @@ export default function VerifyScreen() {
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(!pendingToken);
   const [cooldown, setCooldown] = useState(0);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -80,32 +82,51 @@ export default function VerifyScreen() {
 
   return (
     <Screen title={t('auth.verify.title')} subtitle={t('auth.verify.subtitle', { email: email || t('auth.verify.yourEmail') })}>
-      {info ? <Notice tone="success" text={info} /> : null}
-      {config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
-      <FormField
-        label={t('auth.verify.code')}
-        latin
-        keyboardType="number-pad"
-        textContentType="oneTimeCode"
-        maxLength={6}
-        value={code}
-        onChangeText={(value) => setCode(value.replace(/\D/g, ''))}
-        onSubmitEditing={() => void submit()}
-        error={error}
-        style={styles.code}
-        editable={!expired}
-      />
+      {info ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="success" text={info} />
+        </FadeInView>
+      ) : null}
+      {config?.testCode ? (
+        <FadeInView delay={entranceDelay(1)}>
+          <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} />
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField
+          label={t('auth.verify.code')}
+          latin
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          maxLength={6}
+          value={code}
+          onChangeText={(value) => setCode(value.replace(/\D/g, ''))}
+          onSubmitEditing={() => void submit()}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          error={error}
+          style={[styles.code, focused && styles.codeFocused]}
+          editable={!expired}
+        />
+      </FadeInView>
       {expired ? (
-        <AppButton label={t('auth.verify.backToLogin')} icon="arrow-undo-outline" onPress={() => router.replace('/auth/login')} />
+        <FadeInView offset={8}>
+          <AppButton label={t('auth.verify.backToLogin')} icon="arrow-undo-outline" onPress={() => router.replace('/auth/login')} />
+        </FadeInView>
       ) : (
         <>
-          <AppButton label={busy ? t('auth.verify.busy') : t('auth.verify.submit')} icon="checkmark-circle-outline" onPress={() => void submit()} />
-          <AppButton
-            label={cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('auth.verify.resend')}
-            variant="outline"
-            icon="mail-outline"
-            onPress={() => void resend()}
-          />
+          <FadeInView delay={entranceDelay(3)}>
+            <AppButton label={t('auth.verify.submit')} icon="checkmark-circle-outline" loading={busy} onPress={() => void submit()} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(4)} style={styles.resendBlock}>
+            <AppButton
+              label={cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('auth.verify.resend')}
+              variant="outline"
+              icon="mail-outline"
+              onPress={() => void resend()}
+            />
+            {cooldown > 0 ? <GrowBar percent={(cooldown / 60) * 100} height={4} /> : null}
+          </FadeInView>
         </>
       )}
     </Screen>
@@ -113,5 +134,9 @@ export default function VerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  code: { fontFamily: fonts.semiBold, fontSize: 24, letterSpacing: 8, textAlign: 'center' },
+  // The one-time code reads like a minted number: large, centered, spaced.
+  code: { fontFamily: fonts.semiBold, fontSize: 28, letterSpacing: 10, textAlign: 'center' },
+  // While typing, the box lights up with the golden focus halo.
+  codeFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
+  resendBlock: { gap: spacing.sm },
 });

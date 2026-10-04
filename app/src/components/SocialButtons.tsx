@@ -7,6 +7,8 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { availableSocialProvider, socialSignIn } from '@/auth/social';
 import { AppButton } from '@/components/AppButton';
+import { GoldHairline } from '@/components/lux';
+import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -44,24 +46,25 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
   };
 
   return (
-    <View>
+    <FadeInView>
       <AppButton
-        label={busy ? t('auth.login.busy') : t(provider === 'google' ? 'auth.social.google' : 'auth.social.apple')}
+        label={t(provider === 'google' ? 'auth.social.google' : 'auth.social.apple')}
         icon={provider === 'google' ? 'logo-google' : 'logo-apple'}
         variant="outline"
+        loading={busy}
         onPress={() => void press()}
       />
       <View style={styles.divider}>
-        <View style={styles.line} />
+        <GoldHairline style={styles.line} />
         <Text style={styles.or}>{t('auth.social.or')}</Text>
-        <View style={styles.line} />
+        <GoldHairline style={styles.line} />
       </View>
-    </View>
+    </FadeInView>
   );
 }
 
 const styles = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  line: { flex: 1 },
   or: { ...typography.caption, color: colors.textMuted },
 });

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { useNewsTopics } from '@/api/news';
@@ -9,6 +9,7 @@ import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
@@ -16,7 +17,7 @@ import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { isEmail, isLocalPhone } from '@/lib/validation';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Form = {
   name: string;
@@ -34,6 +35,29 @@ type Form = {
 };
 
 const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [] };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * A persona radio row that dips under the finger like every V2 surface. Kept local (instead of
+ * PressScale) because the radio needs `accessibilityState={{ selected }}` on the pressable itself.
+ */
+function PersonaRow({ selected, onPress, children }: { selected: boolean; onPress: () => void; children: ReactNode }) {
+  const [scale] = useState(() => new Animated.Value(1));
+  const to = (value: number) => Animated.spring(scale, { toValue: value, speed: 40, bounciness: 5, useNativeDriver: true }).start();
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => to(0.97)}
+      onPressOut={() => to(1)}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[styles.persona, selected && styles.personaSelected, { transform: [{ scale }] }]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -99,103 +123,137 @@ export default function RegisterScreen() {
   if (!config.registrationOpen) {
     return (
       <Screen title={t('auth.register.title')}>
-        <Notice tone="warning" text={t('auth.register.closed')} />
-        <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={t('auth.register.closed')} />
+        </FadeInView>
+        <FadeInView delay={entranceDelay(1)}>
+          <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.replace('/auth/login')} />
+        </FadeInView>
       </Screen>
     );
   }
 
   return (
     <Screen title={t('auth.register.title')} subtitle={t('auth.register.subtitle')}>
-      <SocialButtons onError={setSubmitError} />
-      <Notice text={t('auth.register.phonePolicy')} />
-      <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
-      <View style={styles.group}>
+      <FadeInView delay={entranceDelay(0)}>
+        <SocialButtons onError={setSubmitError} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(1)}>
+        <Notice text={t('auth.register.phonePolicy')} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(2)}>
+        <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(3)} style={styles.group}>
         <Text style={styles.label}>{t('auth.register.country')}</Text>
         <View style={styles.chips}>
           {config.countries.map((item) => (
             <Chip key={item.code} label={`${item.flag} ${tOptional(`country.${item.code}`) ?? item.name}`} selected={item.code === form.country} onPress={() => set('country')(item.code)} />
           ))}
         </View>
-      </View>
-      <FormField
-        label={t('auth.register.phone')}
-        latin
-        keyboardType="phone-pad"
-        textContentType="telephoneNumber"
-        value={form.phone}
-        onChangeText={set('phone')}
-        placeholder={country?.example}
-        hint={t('auth.register.phoneHint', { example: country?.example ?? '0558318777' })}
-        error={errors.phone}
-      />
-      <FormField
-        label={t('auth.register.email')}
-        latin
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="emailAddress"
-        value={form.email}
-        onChangeText={set('email')}
-        hint={t('auth.register.emailPolicy')}
-        error={errors.email}
-      />
-      <FormField
-        label={t('common.password')}
-        latin
-        secureTextEntry
-        autoCapitalize="none"
-        textContentType="newPassword"
-        value={form.password}
-        onChangeText={set('password')}
-        hint={t('auth.register.passwordHint')}
-        error={errors.password}
-      />
-      <View style={styles.group}>
+      </FadeInView>
+      <FadeInView delay={entranceDelay(4)}>
+        <FormField
+          label={t('auth.register.phone')}
+          latin
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          value={form.phone}
+          onChangeText={set('phone')}
+          placeholder={country?.example}
+          hint={t('auth.register.phoneHint', { example: country?.example ?? '0558318777' })}
+          error={errors.phone}
+        />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(5)}>
+        <FormField
+          label={t('auth.register.email')}
+          latin
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          value={form.email}
+          onChangeText={set('email')}
+          hint={t('auth.register.emailPolicy')}
+          error={errors.email}
+        />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(6)}>
+        <FormField
+          label={t('common.password')}
+          latin
+          secureTextEntry
+          autoCapitalize="none"
+          textContentType="newPassword"
+          value={form.password}
+          onChangeText={set('password')}
+          hint={t('auth.register.passwordHint')}
+          error={errors.password}
+        />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(7)} style={styles.group}>
         <Text style={styles.label}>{t('auth.register.persona')}</Text>
         {config.personas.map((item) => {
           const selected = item.key === form.persona;
           return (
-            <Pressable
-              key={item.key}
-              onPress={() => set('persona')(item.key)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              style={({ pressed }) => [styles.persona, selected && styles.personaSelected, pressed && styles.pressed]}
-            >
-              <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? colors.gold : colors.textMuted} />
+            <PersonaRow key={item.key} selected={selected} onPress={() => set('persona')(item.key)}>
+              {selected ? (
+                <PopIn>
+                  <Ionicons name="radio-button-on" size={20} color={colors.gold} />
+                </PopIn>
+              ) : (
+                <Ionicons name="radio-button-off" size={20} color={colors.textMuted} />
+              )}
               <Text style={[styles.personaText, selected && styles.personaTextSelected]}>{tOptional(`persona.${item.key}`) ?? item.label}</Text>
-            </Pressable>
+            </PersonaRow>
           );
         })}
-        {errors.persona ? <Text style={styles.error}>{errors.persona}</Text> : null}
-      </View>
-      <FormField label={t('auth.register.bio')} multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder={t('auth.register.bioPlaceholder')} />
-      <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
-      <FormField
-        label={t('auth.register.inviteCode')}
-        latin
-        autoCapitalize="characters"
-        autoCorrect={false}
-        value={form.inviteCode}
-        onChangeText={set('inviteCode')}
-        hint={t('auth.register.inviteCodeHint')}
-        placeholder="I-0000000000"
-      />
+        {errors.persona ? (
+          <FadeInView offset={8}>
+            <Text style={styles.error}>{errors.persona}</Text>
+          </FadeInView>
+        ) : null}
+      </FadeInView>
+      <FadeInView delay={entranceDelay(8)}>
+        <FormField label={t('auth.register.bio')} multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder={t('auth.register.bioPlaceholder')} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(9)}>
+        <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(10)}>
+        <FormField
+          label={t('auth.register.inviteCode')}
+          latin
+          autoCapitalize="characters"
+          autoCorrect={false}
+          value={form.inviteCode}
+          onChangeText={set('inviteCode')}
+          hint={t('auth.register.inviteCodeHint')}
+          placeholder="I-0000000000"
+        />
+      </FadeInView>
       {topics.data && topics.data.topics.length > 0 ? (
-        <View style={styles.group}>
+        <FadeInView delay={entranceDelay(11)} style={styles.group}>
           <Text style={styles.label}>{t('auth.register.interests')}</Text>
           <View style={styles.chips}>
             {topics.data.topics.map((topic) => (
               <Chip key={topic.key} label={topic.label} selected={form.interests.includes(topic.key)} onPress={() => toggleInterest(topic.key)} />
             ))}
           </View>
-        </View>
+        </FadeInView>
       ) : null}
-      {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
-      <AppButton label={busy ? t('auth.register.busy') : t('auth.register.submit')} icon="person-add-outline" onPress={() => void submit()} />
-      <Text style={styles.footnote}>{t('auth.register.footnote')}</Text>
+      {submitError ? (
+        <FadeInView offset={8}>
+          <Text style={styles.error}>{submitError}</Text>
+        </FadeInView>
+      ) : null}
+      <FadeInView delay={entranceDelay(12)}>
+        <AppButton label={t('auth.register.submit')} icon="person-add-outline" loading={busy} onPress={() => void submit()} />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(13)}>
+        <Text style={styles.footnote}>{t('auth.register.footnote')}</Text>
+      </FadeInView>
     </Screen>
   );
 }
@@ -214,10 +272,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  personaSelected: { borderColor: colors.gold, backgroundColor: colors.surfaceElevated },
-  pressed: { opacity: 0.8 },
+  // The chosen persona lights up: soft gold fill, hairline gold border, a whisper of neon.
+  personaSelected: { borderColor: colors.borderGold, backgroundColor: colors.goldSoft, boxShadow: shadows.glowGoldFaint },
   personaText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
-  personaTextSelected: { color: colors.textPrimary },
+  personaTextSelected: { color: colors.goldLight },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 });

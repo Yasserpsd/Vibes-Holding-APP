@@ -3,7 +3,8 @@ import { useRouter, type Href } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { eventOf, useLatestPosts, type Post } from '@/api/posts';
-import { PressScale } from '@/components/motion';
+import { GlassCard } from '@/components/lux';
+import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
@@ -28,12 +29,16 @@ export function PostsBlock() {
   if (posts.length === 0) return null;
 
   return (
-    <View style={styles.block}>
-      <SectionHeader title={t('nav.posts')} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </View>
+    <FadeInView delay={140}>
+      <View style={styles.block}>
+        <SectionHeader title={t('nav.posts')} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
+        {posts.map((post, index) => (
+          <FadeInView key={post.id} delay={entranceDelay(index, 70)}>
+            <PostCard post={post} />
+          </FadeInView>
+        ))}
+      </View>
+    </FadeInView>
   );
 }
 
@@ -44,70 +49,73 @@ export function audienceBadge(post: Pick<Post, 'audience'>): string | null {
   return null;
 }
 
-/** One post as a tappable card (home block and the posts list). */
+/** One post as a tappable card (home block and the posts list); a pinned post wears a soft golden wash. */
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
   const thumbnail = thumbnailOf(post);
   const event = eventOf(post);
   const targeted = audienceBadge(post);
   return (
-    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} style={styles.card}>
-      <View style={styles.texts}>
-        {targeted ? (
-          <View style={styles.audience}>
-            <View style={styles.audienceBadge}>
-              <Ionicons name="person" size={12} color={colors.black} />
-              <Text style={styles.audienceBadgeText}>{targeted}</Text>
+    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={radii.lg}>
+      <GlassCard radius={radii.lg} style={[styles.card, post.pinned && styles.cardPinned]}>
+        {post.pinned ? <View pointerEvents="none" style={styles.pinnedWash} /> : null}
+        <View style={styles.texts}>
+          {targeted ? (
+            <View style={styles.audience}>
+              <View style={styles.audienceBadge}>
+                <Ionicons name="person" size={12} color={colors.black} />
+                <Text style={styles.audienceBadgeText}>{targeted}</Text>
+              </View>
             </View>
+          ) : null}
+          <View style={styles.titleRow}>
+            {post.pinned ? <Ionicons name="pin" size={14} color={colors.gold} /> : null}
+            <Text style={styles.title} numberOfLines={2}>
+              {post.title}
+            </Text>
           </View>
-        ) : null}
-        <View style={styles.titleRow}>
-          {post.pinned ? <Ionicons name="pin" size={14} color={colors.gold} /> : null}
-          <Text style={styles.title} numberOfLines={2}>
-            {post.title}
-          </Text>
+          {event ? (
+            <View style={styles.event}>
+              <View style={styles.eventBadge}>
+                <Ionicons name="calendar" size={12} color={colors.black} />
+                <Text style={styles.eventBadgeText}>{t('posts.eventBadge')}</Text>
+              </View>
+              <Text style={styles.eventWhen} numberOfLines={1}>
+                {formatEventDate(event.date)}
+              </Text>
+            </View>
+          ) : null}
+          {post.kind === 'poll' ? (
+            <View style={styles.event}>
+              <View style={styles.eventBadge}>
+                <Ionicons name="stats-chart" size={12} color={colors.black} />
+                <Text style={styles.eventBadgeText}>{t('poll.badge')}</Text>
+              </View>
+              <Text style={styles.eventWhen} numberOfLines={1}>
+                {post.poll?.closed ? t('poll.closedShort') : post.poll?.myVote ? t('poll.votedShort') : t('poll.openShort')}
+              </Text>
+            </View>
+          ) : null}
+          {event && (event.place || event.onlineUrl) ? (
+            <View style={styles.eventPlace}>
+              <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />
+              <Text style={styles.eventPlaceText} numberOfLines={1}>
+                {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
+              </Text>
+            </View>
+          ) : null}
+          {post.body ? (
+            <Text style={styles.body} numberOfLines={2}>
+              {post.body}
+            </Text>
+          ) : null}
+          <View style={styles.metaRow}>
+            {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
+            {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
+          </View>
         </View>
-        {event ? (
-          <View style={styles.event}>
-            <View style={styles.eventBadge}>
-              <Ionicons name="calendar" size={12} color={colors.black} />
-              <Text style={styles.eventBadgeText}>{t('posts.eventBadge')}</Text>
-            </View>
-            <Text style={styles.eventWhen} numberOfLines={1}>
-              {formatEventDate(event.date)}
-            </Text>
-          </View>
-        ) : null}
-        {post.kind === 'poll' ? (
-          <View style={styles.event}>
-            <View style={styles.eventBadge}>
-              <Ionicons name="stats-chart" size={12} color={colors.black} />
-              <Text style={styles.eventBadgeText}>{t('poll.badge')}</Text>
-            </View>
-            <Text style={styles.eventWhen} numberOfLines={1}>
-              {post.poll?.closed ? t('poll.closedShort') : post.poll?.myVote ? t('poll.votedShort') : t('poll.openShort')}
-            </Text>
-          </View>
-        ) : null}
-        {event && (event.place || event.onlineUrl) ? (
-          <View style={styles.eventPlace}>
-            <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />
-            <Text style={styles.eventPlaceText} numberOfLines={1}>
-              {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
-            </Text>
-          </View>
-        ) : null}
-        {post.body ? (
-          <Text style={styles.body} numberOfLines={2}>
-            {post.body}
-          </Text>
-        ) : null}
-        <View style={styles.metaRow}>
-          {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
-          {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
-        </View>
-      </View>
-      {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" /> : null}
+        {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" /> : null}
+      </GlassCard>
     </PressScale>
   );
 }
@@ -120,12 +128,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  pressed: { opacity: 0.85 },
+  cardPinned: { borderColor: colors.borderGoldSoft },
+  pinnedWash: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, backgroundColor: colors.goldFaint },
   texts: { flex: 1, gap: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   title: { ...typography.body, flex: 1, color: colors.textPrimary },
