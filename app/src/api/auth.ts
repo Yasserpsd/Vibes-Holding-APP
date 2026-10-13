@@ -35,7 +35,8 @@ export type Me = {
   cardNumber?: string;
 };
 
-export type Country = { code: string; name: string; dial: string; flag: string; example: string; pattern: string };
+/** M64: `nameEn` arrives with the world country list; an older server sends none. */
+export type Country = { code: string; name: string; nameEn?: string; dial: string; flag: string; example: string; pattern: string };
 
 export type AuthConfig = {
   countries: Country[];

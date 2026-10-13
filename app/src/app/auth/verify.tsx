@@ -44,7 +44,7 @@ export default function VerifyScreen() {
 
   const submit = async () => {
     if (busy || !pendingToken) return;
-    if (!/^\d{6}$/.test(code)) {
+    if (!/^\d{4,6}$/.test(code)) {
       setError(t('auth.verify.codeRequired'));
       return;
     }

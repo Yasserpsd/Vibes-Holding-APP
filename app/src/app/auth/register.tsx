@@ -8,6 +8,7 @@ import { useNewsTopics } from '@/api/news';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -76,7 +77,8 @@ export default function RegisterScreen() {
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
     if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
-    if (!isLocalPhone(form.phone, country?.pattern)) next.phone = t('auth.register.error.phone', { example: country?.example ?? '0558318777' });
+    if (!isLocalPhone(form.phone, country?.pattern))
+      next.phone = country?.example ? t('auth.register.error.phone', { example: country.example }) : t('auth.register.error.phoneNoExample');
     if (!isEmail(form.email)) next.email = t('auth.register.error.email');
     if (form.password.length < 6) next.password = t('auth.register.error.password');
     if (!form.persona) next.persona = t('auth.register.error.persona');
@@ -146,11 +148,7 @@ export default function RegisterScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(3)} style={styles.group}>
         <Text style={styles.label}>{t('auth.register.country')}</Text>
-        <View style={styles.chips}>
-          {config.countries.map((item) => (
-            <Chip key={item.code} label={`${item.flag} ${tOptional(`country.${item.code}`) ?? item.name}`} selected={item.code === form.country} onPress={() => set('country')(item.code)} />
-          ))}
-        </View>
+        <CountryPicker countries={config.countries} selected={form.country} onSelect={set('country')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(4)}>
         <FormField
@@ -160,8 +158,8 @@ export default function RegisterScreen() {
           textContentType="telephoneNumber"
           value={form.phone}
           onChangeText={set('phone')}
-          placeholder={country?.example}
-          hint={t('auth.register.phoneHint', { example: country?.example ?? '0558318777' })}
+          placeholder={country?.example || undefined}
+          hint={country?.example ? t('auth.register.phoneHint', { example: country.example }) : t('auth.register.phoneHintNoExample')}
           error={errors.phone}
         />
       </FadeInView>

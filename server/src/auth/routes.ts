@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
 import { MOCK_CODE } from '../hub/mock.js';
-import { COUNTRIES, EMAIL_POLICY_TEXT, PHONE_POLICY_TEXT } from '../hub/phone.js';
+import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { guard, parse, sessionGuard } from './guard.js';
 import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
@@ -13,7 +13,8 @@ export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode; social
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
 const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
-const codeSchema = z.string().trim().regex(/^\d{6}$/, 'الرمز 6 أرقام');
+// hub 2.15.5 sends 4-digit codes; 6 stays accepted while pre-upgrade codes are still in flight
+const codeSchema = z.string().trim().regex(/^\d{4,6}$/, 'الرمز 4 أرقام');
 const loginFieldSchema = z.string().trim().min(3).max(190);
 const pendingTokenSchema = z.string().min(32).max(128);
 
@@ -71,10 +72,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     countries: COUNTRIES.map((country) => ({
       code: country.code,
       name: country.name,
+      nameEn: country.nameEn,
       dial: country.dial,
       flag: country.flag,
       example: country.example,
-      pattern: country.local.source,
+      pattern: country.local ? country.local.source : GENERIC_PATTERN,
     })),
     personas: PERSONAS,
     phonePolicy: PHONE_POLICY_TEXT,

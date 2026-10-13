@@ -1,25 +1,20 @@
-/** GCC phone rules, mirrored from the hub (vai_gcc_countries / vai_phone_intl / vai_phone_local). */
-export type Country = {
-  code: string;
-  name: string;
-  dial: string;
-  flag: string;
-  example: string;
-  /** Local mobile number pattern (digits only). */
-  local: RegExp;
-};
+/** Phone rules, mirrored from the hub (vai_gcc_countries / vai_phone_intl / vai_phone_local).
+ * Since the world list (2.16.0): GCC keep strict local rules, every other country passes a
+ * generic length check (5–12 digits after the dial code, E.164 total of 15 max).
+ */
+import { COUNTRY_ROWS, type CountryRow } from './countries.js';
 
-export const COUNTRIES: readonly Country[] = [
-  { code: 'sa', name: 'السعودية', dial: '966', flag: '🇸🇦', example: '0558318777', local: /^0?5\d{8}$/ },
-  { code: 'ae', name: 'الإمارات', dial: '971', flag: '🇦🇪', example: '0501234567', local: /^0?5\d{8}$/ },
-  { code: 'kw', name: 'الكويت', dial: '965', flag: '🇰🇼', example: '51234567', local: /^[569]\d{7}$/ },
-  { code: 'qa', name: 'قطر', dial: '974', flag: '🇶🇦', example: '55123456', local: /^[3567]\d{7}$/ },
-  { code: 'bh', name: 'البحرين', dial: '973', flag: '🇧🇭', example: '36123456', local: /^[3679]\d{7}$/ },
-  { code: 'om', name: 'عُمان', dial: '968', flag: '🇴🇲', example: '91234567', local: /^[79]\d{7}$/ },
-];
+export type Country = CountryRow;
 
-export const PHONE_POLICY_TEXT = 'التسجيل متاح للسعوديين والمقيمين ودول مجلس التعاون. اكتب رقم الجوال بدون مسافات وبدون رمز الدولة بهذا الشكل: 0558318777، أو اختر دولتك من القائمة.';
-export const EMAIL_POLICY_TEXT = 'نقبل التسجيل ببريد Gmail أو iCloud أو Outlook، أو بريد عمل بدومين سعودي (.sa)';
+export const COUNTRIES: readonly Country[] = COUNTRY_ROWS;
+
+/** Generic world rule for countries without a strict pattern (digits after the dial code, leading zeros stripped). */
+const GENERIC_LOCAL = /^\d{5,12}$/;
+/** Loose client-side pattern sent to the app for countries without a strict rule. */
+export const GENERIC_PATTERN = '^0*\\d{5,12}$';
+
+export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة — في السعودية مثلًا بهذا الشكل: 0558318777.';
+export const EMAIL_POLICY_TEXT = 'نقبل التسجيل بأي بريد إلكتروني صحيح، شخصي أو بريد عمل — يصلك عليه رمز التفعيل';
 
 export function countryByCode(code: string | undefined): Country | undefined {
   return COUNTRIES.find((country) => country.code === (code ?? 'sa').toLowerCase());
@@ -32,8 +27,13 @@ export function phoneIntl(countryCode: string | undefined, local: string): strin
   let digits = local.replace(/\D+/g, '');
   if (digits.startsWith(`00${country.dial}`)) digits = digits.slice(2 + country.dial.length);
   else if (digits.startsWith(country.dial) && digits.length > country.dial.length + 7) digits = digits.slice(country.dial.length);
-  if (!country.local.test(digits)) return '';
-  return country.dial + digits.replace(/^0+/, '');
+  if (country.local) {
+    if (!country.local.test(digits)) return '';
+    return country.dial + digits.replace(/^0+/, '');
+  }
+  const generic = digits.replace(/^0+/, '');
+  if (!GENERIC_LOCAL.test(generic) || (country.dial + generic).length > 15) return '';
+  return country.dial + generic;
 }
 
 /** Display form: Saudi numbers as 05XXXXXXXX; other countries as plain digits. */

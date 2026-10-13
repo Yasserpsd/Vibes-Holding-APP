@@ -16,7 +16,6 @@ import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, ty
  */
 export const MOCK_CODE = '123456';
 const MOCK_DAILY_LIMIT = 20;
-const ALLOWED_DOMAINS = ['gmail.com', 'icloud.com', 'outlook.com', 'hotmail.com', 'live.com'];
 const PERSONAS = ['neutral', 'entrepreneur', 'investor'];
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -26,9 +25,9 @@ const isoDate = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 /** Bridge v2 answers carry fields the generic `HubResponse` does not list (see `HubResults`). */
 const answer = <T extends { ok: true }>(value: T): HubResponse => value as unknown as HubResponse;
 
+/** Mirrors the live hub default (allowed_email_domains = '*'): any well-formed address is accepted. */
 function emailAllowed(email: string): boolean {
-  const domain = email.slice(email.lastIndexOf('@') + 1);
-  return ALLOWED_DOMAINS.includes(domain) || domain.endsWith('.sa');
+  return email !== '';
 }
 
 export class MockHubClient implements HubClient {

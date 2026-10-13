@@ -142,12 +142,18 @@ test('validation and rejected inputs use Arabic messages', async () => {
   assert.equal(badPhone.statusCode, 400);
   assert.match(badPhone.json().error.message, /[؀-ۿ]/);
 
-  const badDomain = await post('/api/auth/register', { ...registration, email: 'x@yahoo.com', phone: '0551112222' });
-  assert.equal(badDomain.statusCode, 400);
-  assert.equal(badDomain.json().error.code, 'email_domain');
+  // M64 (world list): any valid address registers now; only a malformed one is rejected.
+  const badEmail = await post('/api/auth/register', { ...registration, email: 'not-an-email', phone: '0551112222' });
+  assert.equal(badEmail.statusCode, 400);
+  assert.match(badEmail.json().error.message, /[؀-ۿ]/);
 
   const duplicate = await post('/api/auth/register', registration);
   assert.equal(duplicate.statusCode, 409);
+
+  // M64: a non-GCC country passes the generic world rule (Egypt, with and without the leading zero).
+  const world = await post('/api/auth/register', { ...registration, country: 'eg', phone: '01012345678', email: 'world@yahoo.com' });
+  assert.equal(world.statusCode, 200, world.body);
+  assert.equal(world.json().pending, true);
 
   const noToken = await app.inject({ method: 'GET', url: '/api/me' });
   assert.equal(noToken.statusCode, 401);
