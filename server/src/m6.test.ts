@@ -80,12 +80,12 @@ test('home, about and membership content follow the wording rules', async () => 
   const membership = await get('/api/membership');
   assert.equal(membership.statusCode, 200);
   assert.equal(membership.json().title, 'العضوية السنوية لنادي المستثمرين');
-  assert.equal(membership.json().groups.length, 6);
+  assert.equal(membership.json().groups.length, 7);
   // Older app versions still get the flat lists.
-  assert.equal(membership.json().benefits.length, 23);
+  assert.equal(membership.json().benefits.length, 28);
   // Rule 3: the web price block of the owner's page and its pay links never reach the app.
   assert.ok(!/1,900|3,900|160 ريال|paymob|اشترك الآن/.test(membership.body));
-  assert.equal(membership.json().comingSoon.length, 4);
+  assert.equal(membership.json().comingSoon.length, 1);
 
   const hq = await get('/api/hq');
   const services = await get('/api/services');
@@ -103,7 +103,7 @@ test('services are listed for everyone but member-only ones are locked without a
   const guest = await get('/api/services');
   assert.equal(guest.statusCode, 200);
   const list = guest.json();
-  assert.equal(list.services.length, 15);
+  assert.equal(list.services.length, 14);
   assert.equal(list.groups.length, 3);
   assert.equal(list.isMember, false);
   const studio = list.services.find((service: { key: string }) => service.key === 'studio');

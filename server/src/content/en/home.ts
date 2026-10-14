@@ -29,6 +29,11 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: "Member services and the group's benefits in one place",
     cta: 'All services',
   },
+  partners: {
+    title: 'Our partners',
+    subtitle: "Your personal promo code opens the club partners' discounts",
+    cta: 'All partners',
+  },
   videos: {
     title: 'Video library',
     subtitle: "The club's story, its meetups and the group's companies",

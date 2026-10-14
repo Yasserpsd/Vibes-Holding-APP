@@ -5,6 +5,7 @@ import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react
 
 import { useMembershipContent } from '@/api/auth';
 import { useHomeContent, useServices, type HomeContent, type HomePortal } from '@/api/content';
+import { usePartners, type Partner } from '@/api/partners';
 import { useGolden } from '@/api/queries';
 import type { GoldenCompany, GoldenContent } from '@/api/types';
 import { useLatestPosts } from '@/api/posts';
@@ -45,6 +46,7 @@ export default function HomeScreen() {
   const golden = useGolden();
   const services = useServices();
   const videos = useVideos();
+  const partners = usePartners();
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const membershipContent = useMembershipContent();
@@ -54,7 +56,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([home.refetch(), golden.refetch(), services.refetch(), videos.refetch(), latestPosts.refetch()]);
+    await Promise.all([home.refetch(), golden.refetch(), services.refetch(), videos.refetch(), partners.refetch(), latestPosts.refetch()]);
     setRefreshing(false);
   };
 
@@ -161,6 +163,26 @@ export default function HomeScreen() {
         </View>
       </FadeInView>
 
+      {/* M68 «شركاؤنا»: renders only when the server already carries the block and at least one partner is visible. */}
+      {content.partners && (partners.data?.partners.length ?? 0) > 0 ? (
+        <FadeInView delay={340}>
+          <SectionHeader title={content.partners.title} subtitle={content.partners.subtitle} cta={content.partners.cta} onPress={() => router.push('/partners' as Href)} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.strip}
+            snapToInterval={MINI_WIDTH + spacing.sm}
+            decelerationRate="fast"
+          >
+            {(partners.data?.partners ?? []).map((partner, index) => (
+              <FadeInView key={partner.id} delay={entranceDelay(index)}>
+                <PartnerMini partner={partner} onPress={() => router.push('/partners' as Href)} />
+              </FadeInView>
+            ))}
+          </ScrollView>
+        </FadeInView>
+      ) : null}
+
       {featured.length ? (
         <FadeInView delay={360}>
           <SectionHeader title={content.videos.title} subtitle={content.videos.subtitle} cta={content.videos.cta} onPress={() => router.push('/videos')} />
@@ -221,6 +243,28 @@ function GoldenMini({ company, onPress }: { company: GoldenCompany; onPress: () 
           {company.name}
         </Text>
         <Text style={styles.miniCode}>{company.code}</Text>
+      </GlassCard>
+    </PressScale>
+  );
+}
+
+/** A partner on the home strip: the logo and the name; the card opens the partners page. */
+function PartnerMini({ partner, onPress }: { partner: Partner; onPress: () => void }) {
+  return (
+    <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityLabel={partner.name}>
+      <GlassCard radius={radii.lg} style={styles.mini}>
+        <View style={styles.miniLogoBox}>
+          {partner.logoUrl ? (
+            <Image source={{ uri: partner.logoUrl }} style={styles.miniLogo} resizeMode="contain" accessibilityLabel={partner.name} />
+          ) : (
+            <View style={styles.miniLogoFallback}>
+              <Ionicons name="business-outline" size={28} color={colors.gold} />
+            </View>
+          )}
+        </View>
+        <Text style={styles.miniName} numberOfLines={2}>
+          {partner.name}
+        </Text>
       </GlassCard>
     </PressScale>
   );
@@ -294,6 +338,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   miniLogo: { width: '100%', height: '100%' },
+  miniLogoFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   miniName: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center', minHeight: 40 },
   miniCode: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.gold },
   membership: {

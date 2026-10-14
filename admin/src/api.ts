@@ -415,7 +415,55 @@ export const api = {
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
+  partners: () => call<{ settings: PartnersSettings; partners: Partner[] }>('GET', '/api/admin/partners'),
+  createPartner: (input: PartnerInput) => call<{ partner: Partner }>('POST', '/api/admin/partners', input),
+  updatePartner: (id: string, input: Partial<PartnerInput>) => call<{ partner: Partner }>('PUT', `/api/admin/partners/${id}`, input),
+  deletePartner: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/partners/${id}`),
+  savePartnersSettings: (input: Partial<PartnersSettings>) => call<{ settings: PartnersSettings }>('PUT', '/api/admin/partners/settings', input),
+  promoLookup: (code: string) => call<{ promo: PromoRecord | null }>('GET', `/api/admin/partners/promo/${encodeURIComponent(code)}`),
 };
+
+/** M68 «شركاؤنا» — mirrors server/src/partners/service.ts. */
+export type Partner = {
+  id: string;
+  name: string;
+  nameEn: string;
+  description: string;
+  descriptionEn: string;
+  discount: string;
+  discountEn: string;
+  url: string;
+  logoUrl: string | null;
+  order: number;
+  visible: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type PartnerInput = {
+  name: string;
+  nameEn?: string;
+  description?: string;
+  descriptionEn?: string;
+  discount?: string;
+  discountEn?: string;
+  url: string;
+  logoUrl?: string | null;
+  order?: number;
+  visible?: boolean;
+};
+export type PartnersSettings = {
+  title: string;
+  titleEn: string;
+  intro: string;
+  introEn: string;
+  codeTitle: string;
+  codeTitleEn: string;
+  codeHint: string;
+  codeHintEn: string;
+  membersOnlyText: string;
+  membersOnlyTextEn: string;
+};
+export type PromoRecord = { code: string; contactId: number; name: string; persona: string; personaLabel: string; cardNumber: string; issuedAt: string };
 
 const TRANSFER_FAILED = 'تعذر رفع الملف. تحقق من الإنترنت ثم حاول مرة أخرى.';
 const cancelled = () => new ApiError('تم إلغاء الرفع.', 0, 'aborted');

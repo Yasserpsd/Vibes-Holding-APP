@@ -33,7 +33,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       key: 'success-partners',
       title: 'Success Partners',
       summary: 'Register your venture to be reviewed by a specialised committee and listed in the Projects Bank if approved.',
-      detail: "The Success Partners programme is the source of the group's distinctive ventures. After registration a specialised committee reviews your venture, and it is presented to investors in the Projects Bank only once approved. Subscribed members get priority in applying and in presentation.",
+      detail: "The Success Partners programme is the source of the group's distinctive ventures. After registration a specialised committee reviews and assesses your venture within 10 working days, and once it meets the acceptance criteria it moves to the Projects Bank and is shown to the club's members. Subscribed members get priority in applying and in presentation.",
       memberLabel: 'Priority for members',
       action: { label: 'Register your venture' },
     },
@@ -84,7 +84,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     {
       key: 'theater',
       title: 'Club theatre and meeting room',
-      summary: 'The club theatre and the meeting room (8 people with Zoom) at the club HQ, at a 50% discount for members.',
+      summary: 'A theatre seating up to 80 people and a meeting room for 8 people with a Zoom subscription, at the club HQ at a 50% discount for members.',
       memberLabel: '50% discount for members',
       action: {
         message: 'I would like to book the club theatre or the meeting room.',
@@ -96,13 +96,11 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'consultation',
-      title: "Online consultation with the club's experts",
-      summary: "An online consultation session with the club's experts, at no charge for subscribed members.",
+      title: 'Online consultation with a smart advisor',
+      summary: 'An online consultation session with a smart AI-powered advisor, at no extra fees for subscribed members.',
+      detail: 'It helps you understand your idea and set your next steps, with a daily renewing usage balance around the clock.',
       memberLabel: 'No charge for members',
-      action: {
-        message: "I would like to book an online consultation with the club's experts.",
-        fields: [{ key: 'topic', label: 'Consultation topic' }],
-      },
+      action: { prompt: 'I would like an online consultation: I have an idea and need help understanding it and setting my next steps.' },
     },
     {
       key: 'famous',
@@ -113,9 +111,9 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'repost',
-      title: "Publishing your venture on the club's platforms",
-      summary: "Publishing your venture 3 times a month on the club's groups, platforms and the app.",
-      memberLabel: '3 times a month for members',
+      title: "Highlighting your venture on the club's platforms",
+      summary: "Your venture re-highlighted once a month to all club members on the club's platforms and the app.",
+      memberLabel: 'Once a month for members',
       action: {
         message: "I would like to publish my venture on the club's platforms.",
         fields: [{ key: 'project', label: 'Venture name or its link in the Projects Bank' }],
@@ -126,13 +124,6 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       title: 'Projects Bank balance',
       summary: 'A balance worth SAR 2,500 that opens the details of 5 complete real ventures you pick yourself.',
       memberLabel: 'Included in the membership',
-    },
-    {
-      key: 'groups',
-      title: 'Club groups',
-      summary: "Joining the club members' groups and contacting investors and entrepreneurs directly.",
-      memberLabel: 'For subscribed members',
-      action: { message: 'I would like to join the club groups.' },
     },
     {
       key: 'momentum',

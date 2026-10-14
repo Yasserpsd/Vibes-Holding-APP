@@ -21,6 +21,8 @@ export type HomeContent = {
   golden: { title: string; subtitle: string; cta: string };
   membership: { title: string; subtitle: string; cta: string; activeText: string };
   services: { title: string; subtitle: string; cta: string };
+  /** M68 «شركاؤنا»: an older server sends no key and the home hides the strip. */
+  partners?: { title: string; subtitle: string; cta: string };
   videos: { title: string; subtitle: string; cta: string };
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
   neutralOpening: { title: string; text: string; quickReplies: string[] };

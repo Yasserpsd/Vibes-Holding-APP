@@ -28,7 +28,7 @@ export type AdvisorGate = { type: AdvisorGateType; text: string; membership: boo
 export type AdvisorProfile = { botName: string; welcome: string; suggestions: string[] };
 export type PortalKey = 'neutral' | 'entrepreneur' | 'investor';
 /** Screens the server knows by name (`{type:'screen'}`, docs/BRIDGE_V2.md 5.2). */
-export type ScreenKey = 'home' | 'projects' | 'golden' | 'membership' | 'services' | 'hq' | 'news' | 'videos' | 'posts' | 'advisor' | 'account' | 'about';
+export type ScreenKey = 'home' | 'projects' | 'golden' | 'membership' | 'services' | 'partners' | 'hq' | 'news' | 'videos' | 'posts' | 'advisor' | 'account' | 'about';
 /** What the member looks at. The app sends only type and id: the server builds the text from its own public data. */
 export type AdvisorContext =
   | { type: 'project'; id: number }

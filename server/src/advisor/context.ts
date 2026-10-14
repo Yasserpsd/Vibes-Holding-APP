@@ -5,6 +5,7 @@ import { getHqContent } from '../content/hq.js';
 import { getMembershipContent } from '../content/membership.js';
 import { getServicesContent } from '../content/services.js';
 import type { AppLang } from '../lang.js';
+import { PartnersService } from '../partners/service.js';
 import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import { stripContacts } from '../projectsBank/redact.js';
@@ -170,6 +171,12 @@ export class ContextResolver {
       case 'about': {
         const content = await getAboutContent(kv);
         return done('عن النادي', lines(content.sections.map((section) => section.title)));
+      }
+      case 'partners': {
+        // M68: the program and the visible partners only — a member's personal code never enters the context.
+        const partners = new PartnersService({ kv });
+        const [settings, list] = await Promise.all([partners.settings(), partners.visible('ar')]);
+        return done(settings.title, lines([settings.intro, settings.codeHint, ...list.map((partner) => `• ${partner.name}${partner.discount ? `: ${partner.discount}` : ''}`)]));
       }
       default: {
         const known = SCREENS[id];

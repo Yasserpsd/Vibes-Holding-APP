@@ -10,6 +10,7 @@ import { MemberMail } from './sections/MemberMail';
 import { Members } from './sections/Members';
 import { People } from './sections/People';
 import { MemberSheet } from './sections/MemberSheet';
+import { Partners } from './sections/Partners';
 import { Paylinks } from './sections/Paylinks';
 import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
@@ -27,6 +28,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'members', label: 'الأعضاء', icon: 'members' },
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'paylinks', label: 'روابط الدفع', icon: 'paylinks' },
+  { key: 'partners', label: 'شركاؤنا', icon: 'partners' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
   { key: 'inbox', label: 'رسائل الأعضاء', icon: 'inbox' },
@@ -255,6 +257,7 @@ export function App() {
             {section === 'members' ? <Members key={memberFilter.turn} initial={memberFilter.state} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
             {section === 'paylinks' ? <Paylinks /> : null}
+            {section === 'partners' ? <Partners /> : null}
             {section === 'cards' ? <CardRequests /> : null}
             {section === 'invites' ? <Invites /> : null}
             {section === 'inbox' ? <MemberMail /> : null}

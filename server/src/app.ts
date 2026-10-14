@@ -44,6 +44,8 @@ import { NewsService } from './news/service.js';
 import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, paymobKeyMode, paymobKeyShape, type PaymobGateway } from './payments/paymob.js';
 import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
+import { partnersRoutes } from './partners/routes.js';
+import { PartnersService } from './partners/service.js';
 import { payLinksRoutes } from './paylinks/routes.js';
 import { PayLinksService } from './paylinks/service.js';
 import { ProjectAccessService } from './projectsBank/access.js';
@@ -306,6 +308,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     : new OffTranslator();
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
   const agenda = new AgendaService({ kv, notifier, push, payments, onChange: () => moved('content') });
+  // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
+  const partners = new PartnersService({ kv, onChange: () => moved('content') });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
   const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log });
@@ -376,6 +380,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
   await app.register(payLinksRoutes, { service: paylinks, auth });
+  await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });

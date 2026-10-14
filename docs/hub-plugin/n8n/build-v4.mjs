@@ -14,9 +14,10 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const NAME = 'Vibes Web Agent v4.9';
+const NAME = 'Vibes Web Agent v4.10';
 const PROMPT_TARGET = 9000; // characters, contract target (v3.2 carried 44,847)
-const PROMPT_LIMIT = 12000;
+// v4.10 grew the membership facts (worldwide + HQ specs + «شركاؤنا»): the ceiling follows.
+const PROMPT_LIMIT = 13000;
 // the hub stores vai_clip(memo, 700) in 2.6.0 and in 2.7.0: a longer MEMO loses its tail on every turn. Raise this, the
 // number in prompt-v4.md and the hub's clip together, never one alone.
 const MEMO_MAX = 700;
@@ -95,6 +96,13 @@ if (!prompt.includes('صفحة الدفع الموحدة') || !prompt.includes('
 if (prompt.includes('خارج الخدمة مؤقتًا')) fail('prompt-v4.md: still declares the pay page out of service (v4.4 leftover)');
 if (!prompt.includes('شركاء النجاح: التقديم فيه حصري') || !prompt.includes('تُرَدّ له قيمته فورًا')) fail('prompt-v4.md: the success-partners members-only rule or the member-workshops refund fact is missing');
 if (!prompt.includes('wa.me/966538461110') || !prompt.includes('عبقري تسجيل')) fail('prompt-v4.md: the podcast WhatsApp handoff or the persona-selling line is missing (v4.9)');
+// v4.10 (the owner's new vcmem membership page, 2026-10-14): worldwide membership, the real HQ specs,
+// the 10-working-days assessment, the once-a-month re-highlight and the «شركاؤنا» promo codes.
+if (!prompt.includes('10 أيام عمل') || !prompt.includes('مرة كل شهر')) fail('prompt-v4.md: the 10-working-days assessment or the once-a-month re-highlight fact is missing (v4.10)');
+if (prompt.includes('3 مرات شهريًا') || prompt.includes('خلال 3 أيام')) fail('prompt-v4.md: an old publishing-pace fact survived (3 مرات شهريًا / خلال 3 أيام) — v4.10 replaced both');
+if (!prompt.includes('شركاؤنا') || !prompt.includes('برومو كود')) fail('prompt-v4.md: the «شركاؤنا» promo-code fact is missing (v4.10)');
+if (!prompt.includes('من السعودية إلى العالم') || !prompt.includes('شارع الأمير محمد بن عبدالعزيز')) fail('prompt-v4.md: the worldwide line or the HQ address is missing (v4.10)');
+if (prompt.includes('استشارات الخبراء') || prompt.includes('خبراء النادي')) fail('prompt-v4.md: the old experts-consultation wording survived — the consultation is with the smart advisor now (v4.10)');
 
 // ───────────────────────── app-site scrub (shared by Build Context and Split Reply) ─────────────────────────
 // Hard rule 3 must not depend on the model obeying: a pay link or the web price of the membership is taken out of every
@@ -626,6 +634,7 @@ byName('Sticky Note — Overview').parameters.content = [
   '',
   '**الجديد في v4.0:** الذاكرة الوحيدة هي turns من الهب (Simple Memory مفصولة عمدًا — لا تعد توصيلها) · منع تكرار على مستوى المضمون (آخر ثلاثة ردود موسومة ★) · سجل جلسة في بيانات الوركفلو (ما أُرسل من روابط وكروت وفيديوهات) لأن turns تصل مقصوصة وبلا أفعال · العضوية تُذكر مرة واحدة في الجلسة، وفي موقع التطبيق لا تُذكر من نفسه ويُحذف سعرها وروابط الدفع من السياق ومن الرد · حتى 3 أدوات و6 دورات · جهد medium للتحليل · التعليمات مختصرة (هوية + قواعد + بروتوكول) والحقائق من الكتالوج ومعرفة الهب والأدوات.',
   '',
+  '**الجديد في v4.10 (توجه العضوية الجديد، 2026-10-14):** حقائق صفحة العضوية الجديدة على vcmem: العضوية عالمية «من السعودية إلى العالم» والفعاليات تُبث أونلاين · المقر: العليا، شارع الأمير محمد بن عبدالعزيز — 400 م²، 15 مكتبًا، مسرح 80 شخصًا، غرفة اجتماعات 8 أشخاص بـZoom، استوديو بودكاست وحاضنة أعمال · تقييم المشروع خلال 10 أيام عمل (بدل 3 أيام) وإعادة إبرازه مرة كل شهر (بدل 3 مرات شهريًا) · الاستشارة الأونلاين مع مستشار ذكي (لا «خبراء النادي») · برنامج «شركاؤنا»: برومو كود شخصي ثابت (5 حروف وأرقام) لكل عضو مشترك يفتح خصومات كل الشركاء، يجده في التطبيق وعلى كارت العضوية (البناء يفشل لو غابت هذه الحقائق أو رجعت القديمة).',
   '**الجديد في v4.9 (طلب المالك 2026-09-27):** بيع أذكى بكثير: ترشيح العضوية السنوية بثقة وبلا تردد مع شرح المزايا حسب شخصية المحدث (مستثمر/رائد أعمال/محايد) وقيادة المحادثة نحو التسجيل بخطوات صغيرة («عبقري تسجيل») · بودكاست الملتقى: الأسعار من الكتالوج لحظة السؤال وأي حجز أو تفاصيل تحويل فوري لواتساب الاستوديو +966 53 846 1110 (البناء يفشل لو اختفى الرقم أو السطر).',
   '**الجديد في v4.8 (M56):** إيموجي معبرة باعتدال في ردود المستشار (1–3، ولا شيء في الجاد) — مع خاصية تفاعل العميل بالإيموجي على رسائله في الويدجت (2.14.0).',
   '**الجديد في v4.7:** معاملة الأدمن VIP (مدير لا عميل — صيغة تنفيذية، صفر بيع)، شركاء النجاح حصري للأعضاء السنويين المفعّلين (البناء يفشل لو القاعدة اختفت)، ورش العمل بدون رسوم للأعضاء (ودفع العضو يُرَدّ فورًا)، بيع مقنع مربوط باحتياج العميل بالأرقام، والأسعار دائمًا من الكتالوج والصفحات الحية لحظة السؤال.',

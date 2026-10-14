@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { cardApi, usePrintRequest } from '@/api/card';
 import { errorMessage } from '@/api/client';
+import { usePartners } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
@@ -41,6 +42,9 @@ export default function CardScreen() {
   // M38: the countdown counts itself up, and a light band sweeps the gold now and then.
   const daysShown = useCountUp(me?.membership.daysLeft ?? 0);
   const [cardSize, setCardSize] = useState<{ width: number; height: number } | null>(null);
+  // M68: the member's partners promo code, printed on the card beside the membership number.
+  const partners = usePartners();
+  const promoCode = partners.data?.promo?.code ?? null;
 
   if (status !== 'signedIn' || !me) {
     return (
@@ -98,10 +102,20 @@ export default function CardScreen() {
             {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
           </View>
 
-          {me.cardNumber ? (
-            <View style={styles.numberBlock}>
-              <Text style={styles.numberLabel}>{t('card.numberLabel')}</Text>
-              <Text style={styles.number}>{me.cardNumber}</Text>
+          {me.cardNumber || (active && promoCode) ? (
+            <View style={styles.numberRow}>
+              {me.cardNumber ? (
+                <View style={[styles.numberBlock, styles.numberCell]}>
+                  <Text style={styles.numberLabel}>{t('card.numberLabel')}</Text>
+                  <Text style={styles.number}>{me.cardNumber}</Text>
+                </View>
+              ) : null}
+              {active && promoCode ? (
+                <View style={styles.numberBlock}>
+                  <Text style={styles.numberLabel}>{t('card.promoLabel')}</Text>
+                  <Text style={styles.number} selectable>{promoCode}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -143,7 +157,13 @@ export default function CardScreen() {
         {active ? <Text style={styles.hint}>{t('card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
       </FadeInView>
 
-      <FadeInView delay={entranceDelay(2)}>
+      {active && promoCode ? (
+        <FadeInView delay={entranceDelay(2)}>
+          <AppButton label={t('card.partnersLink')} variant="outline" icon="pricetags-outline" onPress={() => router.push('/partners' as Href)} />
+        </FadeInView>
+      ) : null}
+
+      <FadeInView delay={entranceDelay(3)}>
         <PrintBlock active={active} />
       </FadeInView>
     </Screen>
@@ -289,6 +309,8 @@ const styles = StyleSheet.create({
   },
   holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: textStart },
 
+  numberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
+  numberCell: { flex: 1 },
   numberBlock: { gap: 1 },
   numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
   number: {

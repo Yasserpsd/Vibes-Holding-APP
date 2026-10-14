@@ -33,6 +33,14 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "nav.hqAdmin": "طلبات الزيارة",
     "nav.payment": "الدفع",
     "nav.payments": "مدفوعاتي",
+    "nav.partners": "شركاؤنا",
+    "card.promoLabel": "Promo Code",
+    "card.partnersLink": "برومو كودك يفتح خصومات شركائنا",
+    "partners.share": "مشاركة الكود",
+    "partners.shareMessage": "برومو كود عضويتي في نادي المستثمرين: {code}",
+    "partners.visit": "الشراء من الشريك",
+    "partners.activate": "تفعيل العضوية",
+    "partners.empty": "تُضاف جهات الشركاء هنا تباعًا، تابعنا.",
     "nav.card": "كارت العضوية",
     "nav.invite": "دعوة عضو جديد",
     "nav.login": "تسجيل الدخول",
@@ -807,6 +815,14 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "nav.hqAdmin": "Visit Requests",
     "nav.payment": "Payment",
     "nav.payments": "My Payments",
+    "nav.partners": "Our partners",
+    "card.promoLabel": "Promo Code",
+    "card.partnersLink": "Your promo code opens our partners’ discounts",
+    "partners.share": "Share the code",
+    "partners.shareMessage": "My Investors Club membership promo code: {code}",
+    "partners.visit": "Buy from the partner",
+    "partners.activate": "Activate the membership",
+    "partners.empty": "Partner companies are added here one after another — stay tuned.",
     "nav.card": "Membership card",
     "nav.invite": "Invite a new member",
     "nav.login": "Sign In",
@@ -1596,6 +1612,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "time": "الوقت والأيام",
     "people": "شخصية ومسيرة",
     "guide": "دليل المحايد والورش",
-    "agenda": "أجندة النادي"
+    "agenda": "أجندة النادي",
+    "partners": "شركاؤنا"
   }
 };
