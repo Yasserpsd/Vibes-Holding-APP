@@ -12,6 +12,8 @@ export type AgendaEvent = {
   title: string;
   blurb: string;
   date: string;
+  /** M70: every day the event runs (a multi-day workshop); an older server sends none. */
+  dates?: string[];
   time: string;
   endTime: string;
   place: string;

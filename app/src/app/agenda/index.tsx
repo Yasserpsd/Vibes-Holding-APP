@@ -9,7 +9,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { getLang, t, type StringKey } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
-import { formatArabicDate } from '@/lib/format';
+import { formatEventDays } from '@/lib/format';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -61,8 +61,8 @@ function EventCard({ event, highlight, onPress }: { event: AgendaEvent; highligh
           <Text style={styles.title} numberOfLines={2}>
             {event.title}
           </Text>
-          <Text style={styles.meta} numberOfLines={1}>
-            {`${formatArabicDate(event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
+          <Text style={styles.meta} numberOfLines={2}>
+            {`${formatEventDays(event.dates, event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
           </Text>
           <Text style={styles.fee} numberOfLines={1}>
             {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}

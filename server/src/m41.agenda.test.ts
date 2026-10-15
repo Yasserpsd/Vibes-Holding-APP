@@ -180,3 +180,33 @@ test('the dashboard sees counts and the registrations of an event, and can edit 
   assert.equal(removed.statusCode, 200);
   assert.equal((await get(`/api/admin/agenda/${feeEventId}/registrations`, adminToken)).json().registrations.length, 0);
 });
+
+// M70: a workshop runs over several hand-picked days with one time for all of them.
+test('multi-day workshops: days are normalized, the agenda keeps them until the last day, one-day lists collapse', async () => {
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const later = new Date(Date.now() + 12 * 86_400_000).toISOString().slice(0, 10);
+  // Hand-picked, unsorted, with a duplicate; the first day has already passed.
+  const created = await send('POST', '/api/admin/agenda', { title: 'ورشة على ثلاثة أيام', date: soon, dates: [later, yesterday, soon, soon], time: '18:00', mode: 'both', feeSar: 0, open: true }, adminToken);
+  assert.equal(created.statusCode, 201, created.body);
+  const event = created.json().event;
+  assert.deepEqual(event.dates, [yesterday, soon, later], 'sorted and deduped');
+  assert.equal(event.date, yesterday, 'date mirrors the first day');
+
+  // Still on the public agenda (the last day is ahead), and registration still opens mid-run.
+  const agenda = await get('/api/agenda', memberToken);
+  const shown = (agenda.json().events as { id: string; dates: string[] }[]).find((entry) => entry.id === event.id);
+  assert.ok(shown, 'listed although the first day passed');
+  assert.deepEqual(shown?.dates, [yesterday, soon, later]);
+  const registered = await send('POST', `/api/agenda/${event.id}/register`, { attendance: 'online' }, memberToken);
+  assert.equal(registered.statusCode, 201, registered.body);
+  assert.equal(registered.json().registration.paid, true);
+
+  // Collapsing to one day: the list leaves, the public payload still carries [date].
+  const collapsed = await send('PUT', `/api/admin/agenda/${event.id}`, { dates: [soon] }, adminToken);
+  assert.equal(collapsed.json().event.dates, undefined);
+  assert.equal(collapsed.json().event.date, soon);
+  const single = await get(`/api/agenda/${event.id}`, memberToken);
+  assert.deepEqual(single.json().event.dates, [soon]);
+
+  await send('DELETE', `/api/admin/agenda/${event.id}`, undefined, adminToken);
+});

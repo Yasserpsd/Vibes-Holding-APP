@@ -15,7 +15,7 @@ import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
-import { formatArabicDate } from '@/lib/format';
+import { formatEventDays } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -70,7 +70,7 @@ export default function AgendaEventScreen() {
             <EventDateBadge date={event.date} highlight />
             <View style={styles.headText}>
               <Text style={styles.title}>{event.title}</Text>
-              <Text style={styles.meta}>{`${formatArabicDate(event.date)}${timeLine(event) ? ` · ${timeLine(event)}` : ''}`}</Text>
+              <Text style={styles.meta}>{`${formatEventDays(event.dates, event.date)}${timeLine(event) ? ` · ${timeLine(event)}` : ''}`}</Text>
               <Text style={styles.meta}>{t(MODE_KEY[event.mode])}</Text>
             </View>
           </FadeInView>

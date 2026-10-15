@@ -194,6 +194,8 @@ export type AgendaEventInput = {
   title: string;
   blurb: string;
   date: string;
+  /** M70: every day a multi-day workshop runs (the server sorts, dedupes and mirrors `date` = first day); [] or absent = single day. */
+  dates?: string[];
   time: string;
   endTime: string;
   place: string;

@@ -23,6 +23,31 @@ export function formatArabicDate(isoDate: string): string {
   return month ? `${Number(match[3])} ${month} ${match[1]}` : isoDate;
 }
 
+/**
+ * M70: the days a multi-day workshop runs, in words (never a hyphen between two numbers).
+ * Consecutive days read «من 3 إلى 5 نوفمبر 2026»; hand-picked days of one month read
+ * «3، 5، 7 نوفمبر 2026»; across months, the full dates joined by «، ». One day = formatArabicDate.
+ */
+export function formatEventDays(dates: string[] | undefined, date: string): string {
+  const days = dates && dates.length > 1 ? dates : null;
+  if (!days) return formatArabicDate(date);
+  const first = days[0] ?? date;
+  const last = days.at(-1) ?? date;
+  const en = getLang() === 'en';
+  const sameMonth = days.every((day) => day.slice(0, 7) === first.slice(0, 7));
+  const consecutive = days.every((day, index) => index === 0 || Date.parse(`${day}T12:00:00Z`) - Date.parse(`${days[index - 1]}T12:00:00Z`) === 86_400_000);
+  if (consecutive) {
+    const start = sameMonth ? String(Number(first.slice(8, 10))) : formatArabicDate(first);
+    return en ? `${start} to ${formatArabicDate(last)}` : `من ${start} إلى ${formatArabicDate(last)}`;
+  }
+  if (sameMonth) {
+    const tail = formatArabicDate(last);
+    const headDays = days.slice(0, -1).map((day) => String(Number(day.slice(8, 10))));
+    return en ? `${headDays.join(', ')} and ${tail}` : `${headDays.join('، ')} و${tail}`;
+  }
+  return days.map(formatArabicDate).join(en ? ', ' : '، ');
+}
+
 /** Arabic counted noun: singular and dual without a numeral (ساعة، ساعتين), 3 to 10 with the plural (5 ساعات), 11 and up with the singular (15 ساعة). */
 function arabicCount(count: number, singular: string, dual: string, plural: string): string {
   if (count === 1) return singular;

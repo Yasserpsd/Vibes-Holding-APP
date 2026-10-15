@@ -23,7 +23,8 @@ export function Agenda() {
   }
 
   function pastOf(event: AgendaEvent): boolean {
-    return event.date < new Date().toISOString().slice(0, 10);
+    // M70: a multi-day workshop ends with its LAST day.
+    return (event.dates?.at(-1) ?? event.date) < new Date().toISOString().slice(0, 10);
   }
 
   async function save() {
@@ -32,8 +33,12 @@ export function Agenda() {
     try {
       // M43: the fields always travel when filled; the server keeps them auto while they match the stored English.
       const english = editor.english.title.trim() || editor.english.blurb.trim() || editor.english.place.trim() ? editor.english : null;
-      if (editor.row) await api.updateAgendaEvent(editor.row.id, { ...editor.input, english });
-      else await api.createAgendaEvent({ ...editor.input, english });
+      // M70: in the editor `input.dates` holds the EXTRA days; the payload carries the full list
+      // (first day included) — or [] so the server collapses the event back to a single day.
+      const extra = (editor.input.dates ?? []).filter(Boolean);
+      const payload = { ...editor.input, dates: extra.length ? [editor.input.date, ...extra] : [] };
+      if (editor.row) await api.updateAgendaEvent(editor.row.id, { ...payload, english });
+      else await api.createAgendaEvent({ ...payload, english });
       notify('ok', 'حُفظت الفعالية.');
       setEditor(null);
       state.reload();
@@ -100,7 +105,16 @@ export function Agenda() {
             rows={data.events}
             rowKey={(row) => row.id}
             columns={[
-              { key: 'when', label: 'الموعد', cell: (row) => <bdi dir="ltr" className="num">{`${row.date}${row.time ? ` ${row.time}` : ''}`}</bdi> },
+              {
+                key: 'when',
+                label: 'الموعد',
+                cell: (row) => (
+                  <>
+                    <bdi dir="ltr" className="num">{`${row.date}${row.time ? ` ${row.time}` : ''}`}</bdi>
+                    {row.dates && row.dates.length > 1 ? <> <Pill tone="ok">{`${formatNumber(row.dates.length)} أيام`}</Pill></> : null}
+                  </>
+                ),
+              },
               { key: 'title', label: 'الفعالية', cell: (row) => row.title },
               { key: 'mode', label: 'الحضور', cell: (row) => MODE_LABEL[row.mode] },
               { key: 'fee', label: 'رسوم غير الأعضاء', cell: (row) => (row.feeSar > 0 ? `${formatNumber(row.feeSar)} ر.س` : 'بدون رسوم') },
@@ -123,7 +137,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, mode: row.mode, feeSar: row.feeSar, open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, mode: row.mode, feeSar: row.feeSar, open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -145,9 +159,21 @@ export function Agenda() {
               <textarea rows={3} maxLength={1000} value={editor.input.blurb} onChange={(event) => edit({ blurb: event.target.value })} />
             </label>
             <label>
-              اليوم
+              اليوم{(editor.input.dates ?? []).length ? ' الأول' : ''}
               <input type="date" value={editor.input.date} onChange={(event) => edit({ date: event.target.value })} required />
             </label>
+            <fieldset>
+              <legend>ورشة على عدة أيام؟ أضف باقي الأيام — اختر الأيام اللي تناسبك (نفس الوقت كل يوم)</legend>
+              {(editor.input.dates ?? []).map((day, index) => (
+                <label key={index} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <input type="date" value={day} onChange={(event) => edit({ dates: (editor.input.dates ?? []).map((entry, at) => (at === index ? event.target.value : entry)) })} />
+                  <button type="button" className="ghost" onClick={() => edit({ dates: (editor.input.dates ?? []).filter((_entry, at) => at !== index) })}>حذف اليوم</button>
+                </label>
+              ))}
+              <div className="row-actions">
+                <button type="button" onClick={() => edit({ dates: [...(editor.input.dates ?? []), ''] })} disabled={(editor.input.dates ?? []).length >= 13}>+ يوم إضافي</button>
+              </div>
+            </fieldset>
             <label>
               من الساعة (اختياري)
               <input type="time" value={editor.input.time} onChange={(event) => edit({ time: event.target.value })} />

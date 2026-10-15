@@ -15,6 +15,8 @@ const eventSchema = z.object({
   title: z.string().trim().min(3, 'اكتب اسم الفعالية').max(140),
   blurb: z.string().trim().max(1000).default(''),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, 'اكتب اليوم بصيغة 2026-10-05'),
+  /** M70: every day a multi-day workshop runs (hand-picked; the service sorts, dedupes and keeps `date` = the first day). */
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, 'اكتب اليوم بصيغة 2026-10-05')).max(14, 'بحد أقصى 14 يومًا').optional(),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u, 'اكتب الوقت بصيغة 19:00').or(z.literal('')).default(''),
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u, 'اكتب الوقت بصيغة 21:00').or(z.literal('')).default(''),
   place: z.string().trim().max(200).default(''),

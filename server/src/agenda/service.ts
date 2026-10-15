@@ -28,6 +28,12 @@ export type AgendaEvent = {
   blurb: string;
   /** Riyadh day `2026-10-05`; `time`/`endTime` are `19:00` texts (may stay empty). */
   date: string;
+  /**
+   * M70: every day a multi-day workshop runs (sorted, deduped, hand-picked allowed; one time for
+   * all days). Absent or empty = the single `date`; `date` always mirrors the first entry so the
+   * ordering and every pre-M70 reader keep working.
+   */
+  dates?: string[];
   time: string;
   endTime: string;
   place: string;
@@ -67,8 +73,14 @@ export type AgendaRegistration = {
   confirmedAt: string | null;
 };
 
+/** The days an event runs: the `dates` list of a multi-day workshop, or the single `date`. */
+export const eventDays = (event: Pick<AgendaEvent, 'date' | 'dates'>): string[] => (event.dates?.length ? event.dates : [event.date]);
+const lastDay = (event: Pick<AgendaEvent, 'date' | 'dates'>): string => eventDays(event).at(-1) ?? event.date;
+
 /** What the viewer sees about one event, with his own registration state folded in. */
 export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'date' | 'time' | 'endTime' | 'place' | 'mode' | 'feeSar' | 'open'> & {
+  /** M70: every day the event runs (always at least the single `date`); an older app ignores it. */
+  dates: string[];
   mine: { attendance: AgendaAttendance; paid: boolean } | null;
   /** True when THIS viewer would pay the fee (signed-in, no active membership, fee > 0). */
   mustPay: boolean;
@@ -134,6 +146,7 @@ export class AgendaService {
       title: en?.title || event.title,
       blurb: en?.blurb || event.blurb,
       date,
+      dates: eventDays(event),
       time,
       endTime,
       place: en?.place || event.place,
@@ -152,7 +165,8 @@ export class AgendaService {
     const [events, registrations] = await Promise.all([this.loadEvents(), this.loadRegs()]);
     const mineByEvent = new Map<string, AgendaRegistration>();
     if (me) for (const registration of registrations) if (registration.contactId === me.id) mineByEvent.set(registration.eventId, registration);
-    return events.filter((event) => event.date >= today).map((event) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang));
+    // M70: a workshop stays on the agenda (and open) until its LAST day has passed.
+    return events.filter((event) => lastDay(event) >= today).map((event) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang));
   }
 
   async viewerEvent(id: string, me: Me | null, lang: 'ar' | 'en' = 'ar'): Promise<PublicAgendaEvent | null> {
@@ -181,7 +195,7 @@ export class AgendaService {
     const event = await this.event(eventId);
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
     if (!event.open) throw new RequestError('closed', 'التسجيل في هذه الفعالية مغلق حاليًا', 409);
-    if (event.date < riyadhDay(now)) throw new RequestError('closed', 'هذه الفعالية انتهت', 409);
+    if (lastDay(event) < riyadhDay(now)) throw new RequestError('closed', 'هذه الفعالية انتهت', 409);
     if (event.mode !== 'both' && event.mode !== attendance) {
       throw new RequestError('invalid', event.mode === 'hq' ? 'هذه الفعالية حضورية فقط' : 'هذه الفعالية أونلاين فقط', 400);
     }
@@ -285,9 +299,17 @@ export class AgendaService {
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   }
 
+  /** M70: the day list arrives hand-picked from the dashboard — sorted and deduped here, a single day collapses to `date`, and `date` mirrors the first day. */
+  private static normalizeDays<T extends { date?: string; dates?: string[] }>(fields: T): T {
+    if (fields.dates === undefined) return fields;
+    const days = [...new Set(fields.dates)].sort();
+    if (days.length <= 1) return { ...fields, dates: undefined, date: days[0] ?? fields.date };
+    return { ...fields, dates: days, date: days[0] };
+  }
+
   async create(input: AgendaEventInput, now = Date.now()): Promise<AgendaEvent> {
     const stamp = new Date(now).toISOString();
-    const event: AgendaEvent = { ...input, id: randomUUID(), createdAt: stamp, updatedAt: stamp };
+    const event: AgendaEvent = { ...AgendaService.normalizeDays(input), id: randomUUID(), createdAt: stamp, updatedAt: stamp };
     await this.mutateEvents((events) => {
       events.push(event);
     });
@@ -298,7 +320,9 @@ export class AgendaService {
     return this.mutateEvents((events) => {
       const event = events.find((entry) => entry.id === id);
       if (!event) return null;
-      Object.assign(event, patch, { updatedAt: new Date(now).toISOString() });
+      // A single-day edit of a multi-day event keeps the first day in step with the list.
+      const fields = AgendaService.normalizeDays({ ...patch, ...(patch.dates === undefined && patch.date !== undefined && event.dates?.length ? { dates: [patch.date, ...event.dates.slice(1)] } : {}) });
+      Object.assign(event, fields, { updatedAt: new Date(now).toISOString() });
       return event;
     });
   }
@@ -328,9 +352,12 @@ export class AgendaService {
   async notify(eventId: string): Promise<{ sent: number; failed: number; dropped: number }> {
     const event = await this.event(eventId);
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
+    // M70: a multi-day workshop announces its span in words (never a hyphen between two numbers).
+    const days = eventDays(event);
+    const when = days.length > 1 ? `من ${days[0]} إلى ${days.at(-1)}` : event.date;
     const outcome = await this.deps.push.broadcast({
       title: 'أجندة النادي 📅',
-      body: `${event.title}${event.date ? ` — ${event.date}` : ''}${event.time ? ` ${event.time}` : ''}. سجّل حضورك من التطبيق.`,
+      body: `${event.title}${when ? ` — ${when}` : ''}${event.time ? ` ${event.time}` : ''}. سجّل حضورك من التطبيق.`,
       data: { type: 'agenda', screen: `/agenda/${event.id}` },
     });
     if (outcome.sent === 0) throw new RequestError('no_devices', 'لا توجد أجهزة مسجلة للإشعارات بعد', 409);
