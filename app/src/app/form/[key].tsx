@@ -47,13 +47,23 @@ export default function RegistrationFormScreen() {
         <FadeInView>
           <Notice tone="warning" text={form.closedText} />
         </FadeInView>
-      ) : form.access === 'signedIn' && !signedIn ? (
+      ) : form.access !== 'everyone' && !signedIn ? (
         <>
           <FadeInView>
             <Notice tone="warning" text={t('form.guest')} />
           </FadeInView>
           <FadeInView delay={entranceDelay(1)}>
             <AppButton label={t('form.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          </FadeInView>
+        </>
+      ) : form.access === 'member' && me?.membership.status !== 'active' ? (
+        // M73: the server refuses non-members anyway; this is the friendly face of that gate.
+        <>
+          <FadeInView>
+            <Notice tone="warning" text={t('form.membersOnly')} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(1)}>
+            <AppButton label={t('form.membership')} icon="star-outline" onPress={() => router.push('/membership')} />
           </FadeInView>
         </>
       ) : alreadySent ? (

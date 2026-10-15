@@ -19,7 +19,8 @@ export type FormDef = {
   key: string;
   title: string;
   intro: string;
-  access: 'everyone' | 'signedIn';
+  /** M73: 'member' = subscribed members only (the server refuses everyone else). */
+  access: 'everyone' | 'signedIn' | 'member';
   once: boolean;
   open: boolean;
   closedText: string;

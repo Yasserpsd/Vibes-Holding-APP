@@ -122,6 +122,9 @@ export default function HomeScreen() {
         </FadeInView>
       </View>
 
+      {/* M73 (owner, 2026-10-16): «شخصية ومسيرة» leads the home — «في البداية خالص… ده قسم مهم جدًا عندي». */}
+      <PeopleBlock block={content.famous} />
+
       <PostsBlock />
 
       <AgendaBlock />
@@ -133,9 +136,6 @@ export default function HomeScreen() {
           </FadeInView>
         ))}
       </View>
-
-      {/* «شخصية ومسيرة» (M11): the approved club figures, early on the home. Renders nothing while none are approved. */}
-      <PeopleBlock />
 
       <FadeInView delay={220}>
         <SectionHeader title={content.golden.title} subtitle={content.golden.subtitle} cta={content.golden.cta} onPress={() => router.push('/golden')} />

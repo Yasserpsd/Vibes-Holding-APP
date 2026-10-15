@@ -30,6 +30,8 @@ export type HomeContent = {
   services: { title: string; subtitle: string; cta: string };
   /** M68 «شركاؤنا»: the partners strip; an older stored block has no key and the app hides the strip. */
   partners?: { title: string; subtitle: string; cta: string };
+  /** M73 «شخصية ومسيرة»: the member-spotlight card at the VERY TOP of home (the owner's call); absent on an older stored block = hidden. */
+  famous?: { title: string; subtitle: string; cta: string };
   videos: { title: string; subtitle: string; cta: string };
   /** The entrepreneurs portal page: intro plus the keys of the services it lists. */
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
@@ -100,6 +102,12 @@ export const HOME_SEED: HomeContent = {
     subtitle: 'برومو كودك الخاص يفتح لك خصومات شركاء النادي',
     cta: 'كل الشركاء',
   },
+  // M73 (owner, 2026-10-16): «سيرة ومسيرة تبقى في البداية خالص في الصفحة الرئيسية — ده قسم مهم جدًا عندي».
+  famous: {
+    title: 'شخصية ومسيرة',
+    subtitle: 'مساحة أسبوعية تُعرّف بأعضاء النادي وتُبرز خبراتهم وتبني علاقات نوعية بينهم — قدّم بنفسك، التقديم للأعضاء المشتركين فقط',
+    cta: 'قدّم من هنا',
+  },
   videos: {
     title: 'مكتبة الفيديو',
     subtitle: 'قصة النادي وملتقياته وشركات المنظومة',
@@ -115,8 +123,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 6,
-  updatedAt: '2026-10-14T00:00:00.000Z',
+  version: 7,
+  updatedAt: '2026-10-16T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

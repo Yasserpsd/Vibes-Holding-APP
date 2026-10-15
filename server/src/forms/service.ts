@@ -89,7 +89,11 @@ export class FormsService {
     const arabic = await getFormsContent(this.deps.kv, 'ar');
     const form = arabic.forms.find((entry) => entry.key === formKey);
     if (!form) throw new RequestError('not_found', 'هذا النموذج غير موجود', 404);
-    if (form.access === 'signedIn' && !me) throw new RequestError('unauthorized', 'سجّل الدخول أولًا', 401);
+    if (form.access !== 'everyone' && !me) throw new RequestError('unauthorized', 'سجّل الدخول أولًا', 401);
+    // M73: the «شخصية ومسيرة» application is for subscribed members only — the server is the gate, never the client.
+    if (form.access === 'member' && me?.membership.status !== 'active') {
+      throw new RequestError('members_only', 'هذا النموذج للأعضاء المشتركين فقط — فعّل عضويتك السنوية ثم قدّم', 403);
+    }
     if (!form.open) throw new RequestError('closed', form.closedText || 'التسجيل مغلق حاليًا', 409);
 
     // The app of either language sends the choice it shows; both readings of the list are accepted.

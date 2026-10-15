@@ -34,6 +34,11 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: "Your personal promo code opens the club partners' discounts",
     cta: 'All partners',
   },
+  famous: {
+    title: 'Profile & Journey',
+    subtitle: "A weekly space introducing the club's members, highlighting their expertise and building quality connections — apply yourself; applying is for subscribed members only",
+    cta: 'Apply here',
+  },
   videos: {
     title: 'Video library',
     subtitle: "The club's story, its meetups and the group's companies",

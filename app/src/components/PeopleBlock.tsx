@@ -2,6 +2,7 @@ import { useRouter, type Href } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { usePeople, type Person } from '@/api/people';
+import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PressScale, entranceDelay } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -9,25 +10,37 @@ import { t } from '@/i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
- * M11 «شخصية ومسيرة»: the approved club figures as a strip early on the home.
- * Renders nothing while no profile is approved.
+ * M11 «شخصية ومسيرة»: the approved club figures as a strip on the home.
+ * M73: with the server's `famous` block the section leads the home — its wording comes from the
+ * dashboard, an apply button opens the members-only form, and the section shows even while no
+ * profile is approved yet (the apply path matters first). Without the block: the old behaviour.
  */
-export function PeopleBlock() {
+export function PeopleBlock({ block }: { block?: { title: string; subtitle: string; cta: string } }) {
   const router = useRouter();
   const people = usePeople();
   const items = people.data?.people ?? [];
-  if (items.length === 0) return null;
+  if (!block && items.length === 0) return null;
 
   return (
     <FadeInView delay={180}>
-      <SectionHeader title={t('people.title')} subtitle={people.data?.intro ?? ''} cta={t('people.all')} onPress={() => router.push('/people' as Href)} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-        {items.slice(0, 10).map((person, index) => (
-          <FadeInView key={person.id} delay={entranceDelay(index, 70)}>
-            <PersonCard person={person} onPress={() => router.push(`/people/${person.id}` as Href)} />
-          </FadeInView>
-        ))}
-      </ScrollView>
+      <SectionHeader
+        title={block?.title ?? t('people.title')}
+        subtitle={block?.subtitle ?? people.data?.intro ?? ''}
+        cta={items.length > 0 ? t('people.all') : null}
+        onPress={() => router.push('/people' as Href)}
+      />
+      {items.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+          {items.slice(0, 10).map((person, index) => (
+            <FadeInView key={person.id} delay={entranceDelay(index, 70)}>
+              <PersonCard person={person} onPress={() => router.push(`/people/${person.id}` as Href)} />
+            </FadeInView>
+          ))}
+        </ScrollView>
+      ) : null}
+      {block ? (
+        <AppButton label={block.cta} icon="sparkles-outline" variant="outline" onPress={() => router.push('/form/famous' as Href)} />
+      ) : null}
     </FadeInView>
   );
 }

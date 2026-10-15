@@ -228,7 +228,8 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: null,
       memberLabel: 'بدون رسوم للأعضاء',
       access: 'member',
-      action: management('أرغب في الظهور في لقاء «شخصية ومسيرة».'),
+      // M73: the application became a full in-app form (members only, enforced server-side).
+      action: { type: 'form', formKey: 'famous', label: 'قدّم من هنا' },
       infoUrl: null,
       order: 9,
     },
@@ -305,8 +306,8 @@ export const SERVICES_SEED: ServicesContent = {
       order: 15,
     },
   ],
-  version: 6,
-  updatedAt: '2026-10-15T00:00:00.000Z',
+  version: 7,
+  updatedAt: '2026-10-16T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

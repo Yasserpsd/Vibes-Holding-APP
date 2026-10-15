@@ -196,3 +196,46 @@ test('the notification recipients: env fallback, dashboard list, validation, res
   await send('POST', '/api/forms/success-partners', { answers: { ...PARTNER_ANSWERS, company: 'شركة الرجوع' } });
   assert.deepEqual(mailer.sent.at(-1)!.to, ['admin@vcmem.com']);
 });
+
+// M73 «شخصية ومسيرة»: the spotlight application is a full in-app form, for subscribed members only.
+test('the famous form takes the full spotlight profile, and only an active member may send it', async () => {
+  const FAMOUS_ANSWERS = {
+    jobTitle: 'الرئيس التنفيذي لمجموعة تجريبية للتجارة',
+    city: 'جازان',
+    specialty: 'إنشاء وإدارة المشاريع الزراعية',
+    experience: 'أكثر من 20 سنة',
+    bio: 'مهندس زراعي بدأ باحثًا ثم أسّس مجموعته الخاصة.',
+    achievements: 'رفع الطاقة الإنتاجية ودعم مزارعي المنطقة.',
+    benefit: 'استشارات زراعية ودراسات جدوى اقتصادية.',
+    seeking: 'فرص تعاون لنقل الخبرة إلى مناطق أخرى.',
+    whatsapp: '+966500000009',
+    email: 'spotlight@example.com',
+    linkedin: 'https://www.linkedin.com/in/example',
+  };
+
+  const def = await get('/api/forms/famous');
+  assert.equal(def.statusCode, 200);
+  assert.equal(def.json().form.access, 'member');
+  assert.ok((def.json().form.fields as { key: string }[]).some((field) => field.key === 'achievements'));
+
+  // A guest is asked to sign in; a signed-in account WITHOUT an active membership is refused by the server itself.
+  assert.equal((await send('POST', '/api/forms/famous', { answers: FAMOUS_ANSWERS })).statusCode, 401);
+  const refused = await send('POST', '/api/forms/famous', { answers: FAMOUS_ANSWERS }, memberToken);
+  assert.equal(refused.statusCode, 403, refused.body);
+  assert.equal(refused.json().error.code, 'members_only');
+
+  // An ACTIVE member passes, and the answers land for the dashboard with the mail.
+  const mailCount = mailer.sent.length;
+  const active = await signUp('m16.famous+member@gmail.com', '0558618849');
+  hub.members.add(active.id);
+  await get('/api/me?fresh=1', active.token);
+  // The catalogue points the famous service at the form — the action shows to the active member (a locked service carries none).
+  const services = await get('/api/services', active.token);
+  const famousService = (services.json().services as { key: string; action: { type: string; formKey?: string } | null }[]).find((entry) => entry.key === 'famous');
+  assert.deepEqual(famousService?.action, { type: 'form', formKey: 'famous', label: 'قدّم من هنا' }, JSON.stringify(famousService));
+  const sent = await send('POST', '/api/forms/famous', { answers: FAMOUS_ANSWERS }, active.token);
+  assert.equal(sent.statusCode, 201, sent.body);
+  assert.equal(sent.json().submission.formKey, 'famous');
+  assert.equal(mailer.sent.length, mailCount + 1);
+  assert.match(mailer.sent.at(-1)!.text, /جازان/);
+});

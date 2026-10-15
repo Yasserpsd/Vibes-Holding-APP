@@ -615,6 +615,8 @@
   "payment.retry": "Try again",
   "payment.all": "All my payments",
   "form.guest": "Sign in to your account to complete this form.",
+  "form.membersOnly": "This form is for subscribed members only — activate your annual membership, then apply.",
+  "form.membership": "About the membership",
   "form.signIn": "Sign in",
   "form.missing": "Fill in “{field}” first",
   "form.agree": "Tick “{field}” first",

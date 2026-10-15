@@ -74,5 +74,27 @@ export const FORMS_EN: Translation<FormsContent> = {
         { key: 'terms', label: "I agree to the workshop's terms and conditions." },
       ],
     },
+    {
+      key: 'famous',
+      title: 'Apply for «Profile & Journey»',
+      intro:
+        '«Profile & Journey» is a space that introduces the members of the Investors Club, highlights their expertise and builds quality connections between members. If you believe you have something of value for you and for the club’s members, fill in your details here — the club’s committee reviews the applications and picks the profiles periodically. Applying is for subscribed members only.',
+      closedText: 'Applications for «Profile & Journey» are currently paused. Follow the club’s announcements.',
+      submitLabel: 'Send my application',
+      successText: 'We received your «Profile & Journey» application 🌹 The club’s committee reviews the applications and picks the profiles periodically; the management will contact you once you are selected.',
+      fields: [
+        { key: 'jobTitle', label: 'Job title and organisation', placeholder: 'For example: CEO of Khabot Trading Group' },
+        { key: 'city', label: 'City of residence' },
+        { key: 'specialty', label: 'Specialty', placeholder: 'For example: building and managing agricultural ventures' },
+        { key: 'experience', label: 'Years of experience', placeholder: 'For example: more than 20 years' },
+        { key: 'bio', label: 'About you', placeholder: 'Your education, career and what you founded' },
+        { key: 'achievements', label: 'Your top achievements and what sets you apart' },
+        { key: 'benefit', label: 'How can club members benefit from you?' },
+        { key: 'seeking', label: 'What are you looking for from club members?' },
+        { key: 'whatsapp', label: 'Mobile and WhatsApp' },
+        { key: 'email', label: 'E-mail' },
+        { key: 'linkedin', label: 'Your professional profile — LinkedIn or your website (optional)' },
+      ],
+    },
   ],
 };

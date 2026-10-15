@@ -107,7 +107,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       title: 'Profile and Journey',
       summary: "Your appearance in a “Profile and Journey” interview on the club's platforms, at no charge for subscribed members.",
       memberLabel: 'No charge for members',
-      action: { message: 'I would like to appear in a “Profile and Journey” interview.' },
+      action: { label: 'Apply here' },
     },
     {
       key: 'repost',

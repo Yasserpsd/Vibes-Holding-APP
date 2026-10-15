@@ -23,6 +23,8 @@ export type HomeContent = {
   services: { title: string; subtitle: string; cta: string };
   /** M68 «شركاؤنا»: an older server sends no key and the home hides the strip. */
   partners?: { title: string; subtitle: string; cta: string };
+  /** M73 «شخصية ومسيرة» leads the home; an older server sends none and the old people strip stands. */
+  famous?: { title: string; subtitle: string; cta: string };
   videos: { title: string; subtitle: string; cta: string };
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
   neutralOpening: { title: string; text: string; quickReplies: string[] };
