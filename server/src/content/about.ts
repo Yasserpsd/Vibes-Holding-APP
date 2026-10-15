@@ -3,7 +3,7 @@ import type { KV } from '../store.js';
 import { localizeBlock } from './edits.js';
 import { ABOUT_EN } from './en/about.js';
 
-/** «عنّا»: the club, the operator and the فيبس فينشرز ecosystem. Editable server content. */
+/** «عنّا»: the club, the operator and the Vibes Ventures ecosystem. Editable server content. */
 export type AboutSection = {
   key: string;
   title: string;
@@ -40,7 +40,7 @@ export const ABOUT_SEED: AboutContent = {
       key: 'club',
       title: 'نادي المستثمرين',
       paragraphs: [
-        'نادي المستثمرين® علامة تجارية مملوكة لفيبس فينشرز، ويضم أكثر من 11,000 عضو من المستثمرين ورواد الأعمال والمهتمين بعالم الأعمال في المملكة.',
+        'نادي المستثمرين® علامة تجارية مملوكة لـ Vibes Ventures، ويضم أكثر من 11,000 عضو من المستثمرين ورواد الأعمال والمهتمين بعالم الأعمال في المملكة.',
         'يجمع النادي ثلاث فئات: المستثمرون الباحثون عن فرص شراكة واعدة، ورواد الأعمال أصحاب المشاريع المميزة، والأعضاء المحايدون الذين يتابعون الفرص ويحددون توجههم لاحقًا.',
         'عضوية سنوية واحدة هي المسار الوحيد للانضمام إلى النادي، وتفتح لصاحبها كل مزايا النادي لعام كامل.',
       ],
@@ -77,9 +77,9 @@ export const ABOUT_SEED: AboutContent = {
     },
     {
       key: 'vibes',
-      title: 'فيبس فينشرز',
+      title: 'Vibes Ventures',
       paragraphs: [
-        'شركة فيبس فينشرز القابضة (VIBES VENTURES COMPANY HOLDING) هي الشركة الأم للمنظومة ومالكة علامة نادي المستثمرين®. تأسست في صيف 2022 برؤية غير تقليدية، وبنت نموذج عمل تشاركيًا يجمع بين الشركة وأعضاء النادي.',
+        'شركة Vibes Ventures Company Holding هي الشركة الأم للمنظومة ومالكة علامة نادي المستثمرين®. تأسست في صيف 2022 برؤية غير تقليدية، وبنت نموذج عمل تشاركيًا يجمع بين الشركة وأعضاء النادي.',
         'المؤسس: م. سالم المسرحي. المقر: برج الجوهرة، شارع الأمير محمد بن عبدالعزيز (التحلية)، حي العليا، الرياض.',
       ],
       bullets: [
@@ -93,7 +93,7 @@ export const ABOUT_SEED: AboutContent = {
   ],
   ecosystem: {
     title: 'شركات المنظومة',
-    intro: 'الشركات التي تحمل علامة V تحت مظلة فيبس فينشرز، وتقدّم خدماتها لأعضاء النادي بمزايا خاصة.',
+    intro: 'الشركات التي تحمل علامة V تحت مظلة Vibes Ventures، وتقدّم خدماتها لأعضاء النادي بمزايا خاصة.',
     companies: [
       { name: 'المجتمع الافتراضي', role: 'المشغّل الرسمي لنادي المستثمرين', url: 'https://vcmem.com/' },
       { name: 'PV لحاضنات ومسرعات الأعمال', role: 'حاضنة أعمال: بيئة متكاملة من الفكرة إلى السوق', url: 'https://pvspaces.com/' },
@@ -114,7 +114,7 @@ export const ABOUT_SEED: AboutContent = {
     email: 'info@vcmem.com',
     websites: [
       { label: 'نادي المستثمرين', url: 'https://vcmem.com/' },
-      { label: 'فيبس فينشرز', url: 'https://vibesholding.com/' },
+      { label: 'Vibes Ventures', url: 'https://vibesholding.com/' },
     ],
   },
   legal: {
@@ -122,7 +122,7 @@ export const ABOUT_SEED: AboutContent = {
     cr: '2050179051',
     vat: '311933896300003',
     address: 'الرياض، حي العليا',
-    trademark: 'نادي المستثمرين® علامة تجارية مسجلة لشركة فيبس فينشرز القابضة (VIBES VENTURES COMPANY HOLDING).',
+    trademark: 'نادي المستثمرين® علامة تجارية مسجلة لشركة Vibes Ventures Company Holding.',
   },
   version: 3,
   updatedAt: '2026-10-15T00:00:00.000Z',

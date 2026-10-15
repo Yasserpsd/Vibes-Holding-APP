@@ -4,10 +4,10 @@ import type { Mailer } from './mailer.js';
 
 /**
  * Management notifications: one plain-text Arabic e-mail per action, in the style of the website's
- * own notifications (subject prefix [Vibes AI], Riyadh time), sent to the NOTIFY_EMAIL list.
+ * own notifications (subject prefix [Vibes Ventures], Riyadh time), sent to the NOTIFY_EMAIL list.
  * Sending never blocks or fails a request: mails go out in the background and errors are logged.
  */
-const SUBJECT_PREFIX = '[Vibes AI]';
+const SUBJECT_PREFIX = '[Vibes Ventures]';
 const APP_NAME = 'تطبيق نادي المستثمرين';
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 

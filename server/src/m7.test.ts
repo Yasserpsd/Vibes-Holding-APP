@@ -100,7 +100,7 @@ test('service requests e-mail the management before the WhatsApp handover', asyn
   assert.equal(mailer.sent.length, before + 1);
   const mail = lastMail();
   assert.deepEqual(mail.to, ['admin@vcmem.com', 'second@vcmem.com']);
-  assert.ok(mail.subject.startsWith('[Vibes AI] [تجريبي] طلب خدمة من التطبيق:'), mail.subject);
+  assert.ok(mail.subject.startsWith('[Vibes Ventures] [تجريبي] طلب خدمة من التطبيق:'), mail.subject);
   assert.ok(mail.text.includes('الباقة: الكاملة') && mail.text.includes('الاسم: عضو تجريبي'), mail.text);
 
   const locked = await post('/api/services/studio/request', { answers: {} });

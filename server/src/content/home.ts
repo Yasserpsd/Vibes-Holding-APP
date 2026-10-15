@@ -80,7 +80,7 @@ export const HOME_SEED: HomeContent = {
     },
   ],
   golden: {
-    title: 'المشاريع الذهبية من فيبس فينشرز',
+    title: 'المشاريع الذهبية من Vibes Ventures',
     subtitle: 'الشركات التي تحمل علامة V تحت مظلة المنظومة',
     cta: 'عرض الكل',
   },
