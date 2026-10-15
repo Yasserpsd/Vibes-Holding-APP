@@ -109,7 +109,7 @@ export const ABOUT_SEED: AboutContent = {
   },
   contact: {
     title: 'تواصل معنا',
-    management: '+966558318777',
+    management: '+966503844438',
     studio: '+966538461110',
     email: 'info@vcmem.com',
     websites: [
@@ -124,8 +124,8 @@ export const ABOUT_SEED: AboutContent = {
     address: 'الرياض، حي العليا',
     trademark: 'نادي المستثمرين® علامة تجارية مسجلة لشركة فيبس فينشرز القابضة (VIBES VENTURES COMPANY HOLDING).',
   },
-  version: 2,
-  updatedAt: '2026-09-12T00:00:00.000Z',
+  version: 3,
+  updatedAt: '2026-10-15T00:00:00.000Z',
 };
 
 export async function ensureAboutSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {

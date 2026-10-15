@@ -72,7 +72,7 @@ export type PublicService = Omit<Service, 'action'> & { locked: boolean; action:
 export const SERVICES_CONTENT_KEY = 'content:services';
 
 /** The only management number and the studio number (docs/PROJECT_BRIEF.md section 1). */
-export const MANAGEMENT_WHATSAPP = '+966558318777';
+export const MANAGEMENT_WHATSAPP = '+966503844438';
 export const STUDIO_WHATSAPP = '+966538461110';
 
 const management = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: MANAGEMENT_WHATSAPP, message, fields });
@@ -305,8 +305,8 @@ export const SERVICES_SEED: ServicesContent = {
       order: 15,
     },
   ],
-  version: 5,
-  updatedAt: '2026-10-14T00:00:00.000Z',
+  version: 6,
+  updatedAt: '2026-10-15T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */
