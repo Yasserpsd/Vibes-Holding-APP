@@ -87,7 +87,9 @@ test('the brief is written in the app\'s language and cached apart from the Arab
   const all = [bilingual, arabicOnly, other];
   const english = await service.brief(bilingual, all, Date.now(), 'en');
   assert.equal(english.disclaimer, BRIEF_DISCLAIMER_EN);
-  assert.deepEqual(english.table.slice(0, 4).map((row) => [row.label, row.value]), [['Project number', '10'], ['Company', 'Fahem Company'], ['Sector', 'Technology and Software'], ['Stage', 'Launch and operation']]);
+  assert.deepEqual(english.table[0] && [english.table[0].label, english.table[0].value], ['Company', 'Fahem Company']);
+  // Duplicated page facts (number, sector, stage) left the table.
+  assert.ok(english.table.every((row) => !['Project number', 'Sector', 'Stage'].includes(row.label)), JSON.stringify(english.table));
   assert.deepEqual([english.stage.label, english.stage.steps[0], english.stage.steps[4]], ['Launch and operation', 'Idea', 'Growth and expansion']);
   assert.equal(english.summary, 'An intelligent legal assistant.');
   assert.ok(english.table.some((row) => row.label === 'Business model' && row.value === 'monthly subscription.'), 'the founder\'s English «label: value» line');
@@ -96,7 +98,7 @@ test('the brief is written in the app\'s language and cached apart from the Arab
   assert.ok(rival && rival.title === 'تطبيق مواعيد' && rival.sector === 'Technology and Software' && rival.why.startsWith('Works in the same sector (Technology and Software)'), JSON.stringify(rival));
 
   const arabic = await service.brief(bilingual, all, Date.now(), 'ar');
-  assert.deepEqual([arabic.disclaimer, arabic.table[0]?.label, arabic.stage.label], [BRIEF_DISCLAIMER, 'رقم المشروع', 'إطلاق وتشغيل']);
+  assert.deepEqual([arabic.disclaimer, arabic.table[0]?.label, arabic.stage.label], [BRIEF_DISCLAIMER, 'الشركة', 'إطلاق وتشغيل']);
   assert.ok((await kv.get(briefKey(1))) && (await kv.get(briefKey(1, 'en'))), 'two cache entries');
   assert.notEqual(briefKey(1), briefKey(1, 'en'));
 });

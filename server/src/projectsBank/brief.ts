@@ -44,7 +44,7 @@ export const BRIEF_DISCLAIMER_EN = "An automatic summary from the project's publ
 /** The Arabic brief keeps its key of M13; the English one sits beside it. */
 export const briefKey = (id: number, lang: AppLang = 'ar'): string => (lang === 'en' ? `projects:brief:${id}:en` : `projects:brief:${id}`);
 
-const VERSION = 5;
+const VERSION = 6;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
@@ -55,8 +55,8 @@ const AI_PER_HOUR = 90;
 type BriefText = {
   unknownStage: string;
   disclaimer: string;
-  labels: { number: string; company: string; sector: string; stage: string; deck: string; updated: string };
-  deck: { members: string; none: string };
+  labels: { company: string; deck: string; updated: string };
+  deck: { members: string };
   summaryFallback: (title: string, sector: string | null) => string;
   strengths: { detailed: string; deck: string; golden: string; pastLaunch: string; fallback: string };
   risks: { unreviewed: string; noStage: string; early: string; short: string; crowded: string; noDeck: string };
@@ -69,8 +69,8 @@ const TEXT: Record<AppLang, BriefText> = {
   ar: {
     unknownStage: 'غير محددة',
     disclaimer: BRIEF_DISCLAIMER,
-    labels: { number: 'رقم المشروع', company: 'الشركة', sector: 'القطاع', stage: 'المرحلة', deck: 'ملف العرض', updated: 'آخر تحديث' },
-    deck: { members: 'متاح للأعضاء بعد فتح المشروع', none: 'غير مرفق' },
+    labels: { company: 'الشركة', deck: 'ملف العرض', updated: 'آخر تحديث' },
+    deck: { members: 'متاح للأعضاء بعد فتح المشروع' },
     summaryFallback: (title, sector) => `${title}${sector ? `: مشروع في قطاع ${sector}` : ''}.`,
     strengths: {
       detailed: 'وصف تفصيلي يشرح فكرة المشروع ونموذج عمله',
@@ -97,8 +97,8 @@ const TEXT: Record<AppLang, BriefText> = {
   en: {
     unknownStage: 'Not specified',
     disclaimer: BRIEF_DISCLAIMER_EN,
-    labels: { number: 'Project number', company: 'Company', sector: 'Sector', stage: 'Stage', deck: 'Pitch deck', updated: 'Last update' },
-    deck: { members: 'Available to members after unlocking the project', none: 'Not attached' },
+    labels: { company: 'Company', deck: 'Pitch deck', updated: 'Last update' },
+    deck: { members: 'Available to members after unlocking the project' },
     summaryFallback: (title, sector) => `${title}${sector ? `: a project in the ${sector} sector` : ''}.`,
     strengths: {
       detailed: 'A detailed description explains the project idea and its business model',
@@ -220,12 +220,12 @@ const dayFormat = (lang: AppLang): Intl.DateTimeFormat => (dayFormats[lang] ??= 
 
 function factRows(project: PublicProject, lang: AppLang): BriefRow[] {
   const text = TEXT[lang];
+  // The project page already shows the number, sector and stage as tags (and the stage on the
+  // stepper below the table), so those rows left the table; a «غير مرفق» deck row said nothing
+  // the risks list does not say better. Only facts written nowhere else on the page stay.
   const rows: [string, string | null][] = [
-    [text.labels.number, project.number],
     [text.labels.company, project.companyName],
-    [text.labels.sector, project.sector?.name ?? null],
-    [text.labels.stage, project.stage?.name ?? null],
-    [text.labels.deck, project.hasPitchDeck && !project.isGolden ? text.deck.members : text.deck.none],
+    [text.labels.deck, project.hasPitchDeck && !project.isGolden ? text.deck.members : null],
     [text.labels.updated, project.modifiedAt ? dayFormat(lang).format(new Date(project.modifiedAt)) : null],
   ];
   return rows.filter((row): row is [string, string] => Boolean(row[1])).map(([label, value]) => ({ label, value: fixWording(stripContacts(value), lang) })).filter((row) => row.value);

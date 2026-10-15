@@ -10,11 +10,12 @@ import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/As
 import { Chip } from '@/components/Chip';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
+import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
-import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
 const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
@@ -31,6 +32,7 @@ export default function ProjectsScreen() {
   const [sort, setSort] = useState<ProjectsSort>('latest');
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const q = useDebounced(search.trim());
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'projects', title: t('tabs.projects') }, true);
@@ -77,42 +79,36 @@ export default function ProjectsScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(2)}>
+        {/* One row: the sorts, then «فلترة» opening the sheet (the sector/stage chip rows used to crowd the header). */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {sorts.map((option) => (
             <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
           ))}
+          {filters.data && (filters.data.sectors.length > 0 || filters.data.stages.length > 0) ? (
+            <PressScale
+              onPress={() => setFiltersOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('projects.filterTitle')}
+              style={[styles.filterButton, (sector || stage) && styles.filterButtonActive]}
+            >
+              <Ionicons name="options-outline" size={15} color={sector || stage ? colors.goldInk : colors.goldLight} />
+              <Text style={[styles.filterButtonText, (sector || stage) && styles.filterButtonTextActive]}>{t('projects.filter')}</Text>
+            </PressScale>
+          ) : null}
         </ScrollView>
       </FadeInView>
 
-      {filters.data && filters.data.sectors.length > 0 ? (
-        <FadeInView delay={entranceDelay(3)}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <Chip label={t('projects.allSectors')} selected={!sector} onPress={() => setSector(undefined)} />
-            {filters.data.sectors.map((option) => (
-              <Chip
-                key={option.slug}
-                label={`${option.name} (${formatNumber(option.count)})`}
-                selected={sector === option.slug}
-                onPress={() => setSector(sector === option.slug ? undefined : option.slug)}
-              />
-            ))}
-          </ScrollView>
-        </FadeInView>
-      ) : null}
-
-      {filters.data && filters.data.stages.length > 0 ? (
-        <FadeInView delay={entranceDelay(4)}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <Chip label={t('projects.allStages')} selected={!stage} onPress={() => setStage(undefined)} />
-            {filters.data.stages.map((option) => (
-              <Chip
-                key={option.slug}
-                label={`${option.name} (${formatNumber(option.count)})`}
-                selected={stage === option.slug}
-                onPress={() => setStage(stage === option.slug ? undefined : option.slug)}
-              />
-            ))}
-          </ScrollView>
+      {sector || stage ? (
+        // The chosen filters stay visible as removable chips.
+        <FadeInView offset={6}>
+          <View style={styles.activeFilters}>
+            {sector ? (
+              <Chip label={`${filters.data?.sectors.find((option) => option.slug === sector)?.name ?? sector} ✕`} selected onPress={() => setSector(undefined)} />
+            ) : null}
+            {stage ? (
+              <Chip label={`${filters.data?.stages.find((option) => option.slug === stage)?.name ?? stage} ✕`} selected onPress={() => setStage(undefined)} />
+            ) : null}
+          </View>
         </FadeInView>
       ) : null}
 
@@ -167,6 +163,17 @@ export default function ProjectsScreen() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyboardShouldPersistTaps="handled"
       />
+      <ProjectFiltersSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        sectors={filters.data?.sectors ?? []}
+        stages={filters.data?.stages ?? []}
+        sector={sector}
+        stage={stage}
+        onSector={setSector}
+        onStage={setStage}
+        total={total}
+      />
     </SafeAreaView>
   );
 }
@@ -197,6 +204,22 @@ const styles = StyleSheet.create({
   },
   searchInput: { ...typography.body, flex: 1, color: colors.textPrimary, paddingVertical: spacing.sm + 2 },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  // «فلترة» rides the sorts row; it lights up gold while a filter is on.
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm + 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldFaint,
+  },
+  filterButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
+  filterButtonText: { ...typography.caption, color: colors.goldLight },
+  filterButtonTextActive: { color: colors.goldInk, fontFamily: fonts.semiBold },
+  activeFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   count: { ...typography.caption, color: colors.textMuted },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },

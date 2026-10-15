@@ -98,7 +98,8 @@ test('with a key the model words the brief; its rows about contact and its inven
   assert.equal(brief.summary, goodAnswer.summary);
   assert.equal(brief.disclaimer, BRIEF_DISCLAIMER);
   const labels = brief.table.map((row) => row.label);
-  assert.ok(labels.includes('رقم المشروع') && labels.includes('العملاء') && labels.includes('نموذج الدخل'));
+  assert.ok(labels.includes('العملاء') && labels.includes('نموذج الدخل'));
+  assert.ok(!labels.includes('رقم المشروع') && !labels.includes('القطاع') && !labels.includes('المرحلة'), 'duplicated page facts stay out of the table');
   assert.ok(!labels.includes('التواصل') && !labels.includes('حجم السوق'), 'no contact row, no number the text does not have');
   assert.deepEqual(brief.strengths, ['حضور في 3 مدن مع 120 عيادة', 'خدمة بدون رسوم للمرضى']);
   assert.deepEqual(brief.competitors, [{ id: 2, title: rival.title, sector: 'تقنية', stage: 'نمو', why: 'يخدم الشريحة نفسها من المرضى بحجز المواعيد.' }]);

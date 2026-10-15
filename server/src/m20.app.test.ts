@@ -231,7 +231,9 @@ test('brief without an OpenAI key: the rules write it from public fields, contac
   assert.equal(brief.stage.steps.length, 5);
   assert.ok(brief.disclaimer.includes('المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد'));
   const labels = brief.table.map((row: { label: string }) => row.label);
-  assert.ok(['رقم المشروع', 'الشركة', 'القطاع', 'المرحلة', 'نموذج العمل'].every((label) => labels.includes(label)), labels.join('، '));
+  assert.ok(['الشركة', 'نموذج العمل'].every((label) => labels.includes(label)), labels.join('، '));
+  // The page shows the number, sector and stage as tags (and the stage on the stepper): never again as table rows.
+  assert.ok(!labels.some((label: string) => ['رقم المشروع', 'القطاع', 'المرحلة'].includes(label)), labels.join('، '));
   // The owner's rule: what the project is, never who founded it or what it asks for.
   assert.ok(!labels.some((label: string) => /المؤسس|المطلوب|التمويل|الاستثمار/.test(label)), labels.join('، '));
   assert.ok(!labels.some((label: string) => /عائد|تواصل/.test(label)), 'no promised returns, no contact rows');

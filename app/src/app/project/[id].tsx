@@ -6,7 +6,6 @@ import { Animated, Platform, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn } from '@/components/motion';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
@@ -102,6 +101,26 @@ export default function ProjectScreen() {
             </View>
           </FadeInView>
 
+          {/* Founder and views in one quiet line — they used to occupy a whole card further down. */}
+          {project.founderName || project.viewsCount ? (
+            <FadeInView delay={90}>
+              <View style={styles.metaRow}>
+                {project.founderName ? (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="person-circle-outline" size={16} color={colors.goldDark} />
+                    <Text style={styles.metaText} numberOfLines={1}>
+                      {project.founderName}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.metaItem}>
+                  <Ionicons name="eye-outline" size={15} color={colors.goldDark} />
+                  <Text style={styles.metaText}>{formatNumber(project.viewsCount)}</Text>
+                </View>
+              </View>
+            </FadeInView>
+          ) : null}
+
           {/* M35: contact with the founder sits at the top — a golden project offers its partner page instead. */}
           {project.isGolden && project.goldenPartnerUrl ? (
             <FadeInView delay={60}>
@@ -120,14 +139,6 @@ export default function ProjectScreen() {
           {/* M35: the adviser's table before everything else about the project. */}
           <FadeInView delay={140}>
             <ProjectBrief projectId={String(project.id)} />
-          </FadeInView>
-
-          <FadeInView delay={200}>
-            <GlassCard style={styles.infoCard}>
-              {project.companyName ? <InfoRow icon="business-outline" label={t('project.company')} value={project.companyName} /> : null}
-              {project.founderName ? <InfoRow icon="person-outline" label={t('project.founder')} value={project.founderName} /> : null}
-              <InfoRow icon="eye-outline" label={t('project.views')} value={formatNumber(project.viewsCount)} />
-            </GlassCard>
           </FadeInView>
 
           {project.details ?? project.detailsEn ? (
@@ -159,20 +170,6 @@ function GalleryImage({ uri, width }: { uri: string; width: number }) {
         resizeMode="cover"
         onLoad={() => Animated.timing(reveal, { toValue: 1, duration: 320, useNativeDriver: true }).start()}
       />
-    </View>
-  );
-}
-
-type InfoRowProps = { icon: 'business-outline' | 'person-outline' | 'eye-outline'; label: string; value: string };
-
-function InfoRow({ icon, label, value }: InfoRowProps) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={colors.gold} />
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={2}>
-        {value}
-      </Text>
     </View>
   );
 }
@@ -217,13 +214,9 @@ const styles = StyleSheet.create({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  infoCard: {
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  infoLabel: { ...typography.caption, color: colors.textMuted, minWidth: 72 },
-  infoValue: { ...typography.body, flex: 1, color: colors.textPrimary },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.md },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, maxWidth: '70%' },
+  metaText: { ...typography.caption, color: colors.textSecondary },
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.gold },
   body: { ...typography.body, color: colors.textSecondary },
