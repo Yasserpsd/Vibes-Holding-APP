@@ -81,9 +81,12 @@ Recipe (after the production service is up, details approved by the owner first)
 5. Put the credentials in App Store Connect → App Review Information, and Google Play →
    App access → «All or some functionality is restricted» + instructions.
 
-Proposed details (owner approves/changes): e-mail `megavc2024+review@gmail.com` (the code
-lands in the owner's own inbox; any mailbox he controls works), name «Store Review», persona
-مستثمر, a fresh strong password kept in the consoles only. Never give reviewers an admin account.
+Agreed details (owner, 2026-10-16): e-mail **`ceo@vibesholding.com`** (the code mail lands
+there), name «Store Review», persona مستثمر, phone = a number the owner picks that is NOT
+registered to any existing hub account (the hub refuses a duplicate phone), a fresh strong
+password kept in the store consoles only. The owner performs the registration and types the
+password himself (accounts and credentials stay his); Claude preps the exact steps. Never
+give reviewers an admin account.
 
 ## 5. Store consoles — checklists (owner signs in and clicks; Claude preps each step)
 
