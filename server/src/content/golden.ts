@@ -42,10 +42,10 @@ const company = (
 // Initial content from docs/PROJECT_BRIEF.md section 5.1. The dashboard edits it later.
 export const GOLDEN_SEED: GoldenContent = {
   title: 'المشاريع الذهبية',
-  intro: 'الشركات التي تحمل علامة V تحت مظلة فايبز القابضة.',
+  intro: 'الشركات التي تحمل علامة V تحت مظلة فيبس فينشرز.',
   portfolioValueSarMillions: 161,
   disclaimer: 'المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد',
-  umbrella: company('V', 'فايبز القابضة', null, 'https://vibesholding.com/offer/', 'فايبز-القابضة.png', 0),
+  umbrella: company('V', 'فيبس فينشرز', null, 'https://vibesholding.com/offer/', 'فايبز-القابضة.png', 0),
   companies: [
     company('01', 'وديني', 31, 'https://wdeny.com/offer/', 'Wdeny-logo-png.webp', 1),
     company(

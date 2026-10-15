@@ -1,6 +1,6 @@
 # Investors Club App — تطبيق نادي المستثمرين
 
-Monorepo for the نادي المستثمرين mobile app (Vibes Holding ecosystem), published by شركة المجتمع الافتراضي للاستثمار (vcmem.com).
+Monorepo for the نادي المستثمرين mobile app (Vibes Ventures ecosystem — brand name «فيبس فينشرز», never «فايبز القابضة»), published by شركة المجتمع الافتراضي للاستثمار (vcmem.com).
 Full scope, business facts, integrations and milestones: `docs/PROJECT_BRIEF.md`. Read the relevant section before building any feature, and update the milestone status there when a milestone is done.
 
 ## Repo layout

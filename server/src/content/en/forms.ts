@@ -54,7 +54,7 @@ export const FORMS_EN: Translation<FormsContent> = {
         {
           key: 'ownership',
           label:
-            'I accept that Vibes Holding receives a 10% official ownership stake in my business if any partnership with club members is completed, under the terms of the Success Partners programme agreement.',
+            'I accept that Vibes Ventures receives a 10% official ownership stake in my business if any partnership with club members is completed, under the terms of the Success Partners programme agreement.',
         },
         { key: 'nda', label: 'I have read the non-disclosure agreement (NDA) and all of its clauses, and I agree to and abide by all of its terms and conditions.' },
       ],

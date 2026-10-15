@@ -14,7 +14,7 @@ export const HOME_EN: Translation<HomeContent> = {
     { key: 'investor', title: 'Investor', subtitle: 'Seeking opportunities' },
   ],
   golden: {
-    title: 'Golden Projects from Vibes Holding',
+    title: 'Golden Projects from Vibes Ventures',
     subtitle: "The companies carrying the V mark under the group's umbrella",
     cta: 'View all',
   },

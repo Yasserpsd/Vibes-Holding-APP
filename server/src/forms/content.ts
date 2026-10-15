@@ -118,7 +118,7 @@ export const FORMS_SEED: FormsContent = {
         {
           key: 'ownership',
           label:
-            'قبلت أن تحصل فايبز القابضة على نسبة 10% كملكية رسمية في نشاطك في حال إتمام أي شراكة مع أعضاء النادي، وفق بنود وضوابط اتفاقية برنامج شركاء النجاح.',
+            'قبلت أن تحصل فيبس فينشرز على نسبة 10% كملكية رسمية في نشاطك في حال إتمام أي شراكة مع أعضاء النادي، وفق بنود وضوابط اتفاقية برنامج شركاء النجاح.',
           type: 'agree',
           required: true,
           url: 'https://vibesholding.com/sp/',
@@ -153,7 +153,7 @@ export const FORMS_SEED: FormsContent = {
       order: 2,
     },
   ],
-  version: 1,
+  version: 2,
   updatedAt: '2026-10-04T00:00:00.000Z',
 };
 

@@ -10,7 +10,7 @@ export const ABOUT_EN: Translation<AboutContent> = {
       key: 'club',
       title: 'The Investors Club',
       paragraphs: [
-        'Investors Club® is a trademark owned by Vibes Holding, with more than 11,000 members: investors, entrepreneurs and people interested in the world of business in the Kingdom.',
+        'Investors Club® is a trademark owned by Vibes Ventures, with more than 11,000 members: investors, entrepreneurs and people interested in the world of business in the Kingdom.',
         'The club brings three categories together: investors looking for promising partnership opportunities, entrepreneurs with distinctive ventures, and neutral members who follow the opportunities and set their direction later.',
         'One annual membership is the only way to join the club, and it opens every club benefit to its holder for a full year.',
       ],
@@ -37,9 +37,9 @@ export const ABOUT_EN: Translation<AboutContent> = {
     },
     {
       key: 'vibes',
-      title: 'Vibes Holding',
+      title: 'Vibes Ventures',
       paragraphs: [
-        "Thabthabat Investment Holding Company (Vibes Holding) is the parent company of the group and the owner of the Investors Club® trademark. Founded in the summer of 2022 with an unconventional vision, it built a participatory business model that brings the company and the club's members together.",
+        "Thabthabat Investment Holding Company (Vibes Ventures) is the parent company of the group and the owner of the Investors Club® trademark. Founded in the summer of 2022 with an unconventional vision, it built a participatory business model that brings the company and the club's members together.",
         'Founder: Eng. Salem Al-Masrahi. Headquarters: Al Jawhara Tower, Prince Mohammed bin Abdulaziz Street (Tahlia), Al Olaya district, Riyadh.',
       ],
       bullets: [
@@ -50,7 +50,7 @@ export const ABOUT_EN: Translation<AboutContent> = {
   ],
   ecosystem: {
     title: "The group's companies",
-    intro: 'The companies carrying the V mark under the umbrella of Vibes Holding, offering their services to club members with special benefits.',
+    intro: 'The companies carrying the V mark under the umbrella of Vibes Ventures, offering their services to club members with special benefits.',
     companies: [
       { name: 'Virtual Community', role: 'The official operator of the Investors Club' },
       { name: 'PV Business Incubators and Accelerators', role: 'A business incubator: a complete environment from the idea to the market' },
@@ -66,11 +66,11 @@ export const ABOUT_EN: Translation<AboutContent> = {
   },
   contact: {
     title: 'Contact us',
-    websites: [{ label: 'Investors Club' }, { label: 'Vibes Holding' }],
+    websites: [{ label: 'Investors Club' }, { label: 'Vibes Ventures' }],
   },
   legal: {
     operator: 'Virtual Community Investment Company',
     address: 'Riyadh, Al Olaya district',
-    trademark: 'Investors Club® is a registered trademark of Vibes Holding (Thabthabat Investment Holding Company).',
+    trademark: 'Investors Club® is a registered trademark of Vibes Ventures (Thabthabat Investment Holding Company).',
   },
 };

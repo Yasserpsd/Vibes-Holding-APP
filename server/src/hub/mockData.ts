@@ -67,7 +67,7 @@ export type MockState = {
 
 export const MOCK_SITES: Record<string, string> = {
   'vcmem.com': 'نادي المستثمرين',
-  'vibesholding.com': 'فايبز القابضة',
+  'vibesholding.com': 'فيبس فينشرز',
   app: 'تطبيق نادي المستثمرين',
 };
 /** Web prices exist on the hub's side only; the app server must keep them away from the app (rule 3). */

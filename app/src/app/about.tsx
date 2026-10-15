@@ -16,7 +16,7 @@ import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-/** «عنّا»: the club, its operator, فايبز القابضة and the ecosystem. All copy comes from the server. */
+/** «عنّا»: the club, its operator, فيبس فينشرز and the ecosystem. All copy comes from the server. */
 export default function AboutScreen() {
   const { data, isLoading, error, refetch } = useAboutContent();
   useAdvisorScreen({ type: 'screen', id: 'about', title: t('about.title') });
