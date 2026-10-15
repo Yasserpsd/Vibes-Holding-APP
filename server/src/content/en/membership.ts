@@ -8,7 +8,7 @@ const GROUPS_EN: Translation<MembershipGroup>[] = [
     title: 'Why it is worth it even before you set your direction',
     items: [
       { text: 'A full year of meetups included in your membership, and an online consultation with a smart advisor at no extra fees — a year in which you learn before putting a single riyal into any venture' },
-      { text: 'The Projects Bank balance alone is SAR 2,500 — more than your subscription itself — and it opens the complete details of 5 ventures for you' },
+      { text: 'The Projects Bank balance alone is SAR 2,500 ($667) — more than your subscription itself — and it opens the complete details of 5 ventures for you' },
       { text: 'And once you set your direction, you find the theatre, your website and app design and the group’s services at a 50% discount' },
       { text: 'Entry to the club HQ in Riyadh and attendance of its meetups, for subscribed members only' },
     ],
@@ -38,7 +38,7 @@ const GROUPS_EN: Translation<MembershipGroup>[] = [
     title: 'A business incubator and a Projects Bank of more than 260 ventures',
     items: [
       { text: 'Submit your venture to be considered for listing, and browse the ventures that passed the screening and valuation' },
-      { text: 'A SAR 2,500 balance in the Projects Bank: open the complete details of five ventures you pick, and contact their founders directly to discuss partnership opportunities' },
+      { text: 'A SAR 2,500 ($667) balance in the Projects Bank: open the complete details of five ventures you pick, and contact their founders directly to discuss partnership opportunities' },
       { text: 'Your venture assessed within 10 working days: once it meets the acceptance criteria it moves to the Projects Bank and is shown to the club’s members' },
       { text: 'Fresh visibility for your venture all year: your venture is re-highlighted once a month to all club members' },
     ],
@@ -82,7 +82,7 @@ export const MEMBERSHIP_EN: Translation<MembershipContent> = {
   subtitle: 'Not sure of your direction yet? This membership was designed for you first',
   intro: [
     'The Investors Club® is an exclusive business community for neutral members, entrepreneurs and investors, serving its members through one app and a permanent HQ in the heart of the Saudi capital, Riyadh.',
-    'From Saudi Arabia to the world… your membership travels with you: a full year to use every benefit of the club, connect with its members, explore the ventures and the partnership opportunities and join its meetups online — building relationships that may open doors money alone does not open.',
+    'From Saudi Arabia to the world… your membership travels with you: a full year to use every benefit of the club, in person at the club HQ in Riyadh, Saudi Arabia, and online, exploring the ventures and the partnership opportunities — building relationships that may open doors money alone does not open.',
     'And when you reach Riyadh, the club is your second home in the world of business: a meeting room to receive your guests, an equipped HQ seating up to 80 people with a complete stage for hosting your own meetups and workshops, 15 offices for temporary use, a podcast studio to carry your message, and a business incubator for your venture — all available to you as a member, with discounts that lighten your business costs.',
     'A full year to discover your direction — your gateway to the world of business. The annual membership does not merely give you attendance; it gives you a whole year to build relationships, discover opportunities and form partnerships that turn into real steps and results.',
   ].join('\n\n'),

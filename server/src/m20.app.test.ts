@@ -388,7 +388,7 @@ test('advisor contexts are built on the server from public data: no founder cont
   assert.ok((await ask({ type: 'service', id: 'pitch-deck' })).context?.text.includes('خدمة:'));
   assert.ok((await ask({ type: 'portal', id: 'investor' })).context?.title.includes('المستثمر'));
   const membership = await ask({ type: 'screen', id: 'membership' });
-  assert.ok(membership.context?.text.includes('رصيد بقيمة 2,500 ريال في بنك المشاريع'));
+  assert.ok(membership.context?.text.includes('رصيد بقيمة 2,500 ريال'));
   assert.ok(!/1,900|3,900|paymob/.test(membership.context?.text ?? ''), 'rule 3');
   const golden = await ask({ type: 'screen', id: 'golden' });
   assert.ok(golden.context?.text.includes('المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد'), 'valuations carry the disclaimer');

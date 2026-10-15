@@ -50,9 +50,12 @@ export const MEMBERSHIP_CONTENT_KEY = 'content:membership';
 
 const item = (text: string, link: MembershipItemLink | null = null): MembershipItem => ({ text, link });
 
-// The owner's membership page wording of 2026-10-14 (the «لم تحدّد وجهتك بعد» worldwide direction).
-// The web price block and every pay link of that page stay on the web (CLAUDE.md rule 3): the app
-// shows the store's own price at purchase time.
+// The owner's membership page wording, last synced with his 2026-10-16 paste (the «لم تحدّد وجهتك
+// بعد» worldwide direction, in-person + online, dollar equivalents on the bank balance).
+// The web price block (1,900 / 3,900 and their $ values) and every pay link of that page stay on
+// the web (CLAUDE.md rule 3): the app shows the store's own price at purchase time.
+// NOTE: the page no longer lists the «شركاؤنا» promo-code line; the app keeps it (the partners
+// program is live in-app) until the owner says to drop it.
 const GROUPS: MembershipGroup[] = [
   {
     key: 'why',
@@ -61,7 +64,8 @@ const GROUPS: MembershipGroup[] = [
     comingSoon: false,
     items: [
       item('عام كامل من الملتقيات المشمولة بعضويتك، واستشارة أونلاين مع مستشار ذكي بدون رسوم إضافية، تتعلّم فيه قبل أن تضع ريالًا في أي مشروع'),
-      item('رصيد بنك المشاريع وحده 2,500 ريال — أكثر من قيمة اشتراكك نفسه — ويفتح لك التفاصيل الكاملة لـ5 مشاريع', { type: 'route', path: '/projects' }),
+      // ‎ keeps the Latin ($667) reading left-to-right inside the Arabic sentence.
+      item('رصيد بنك المشاريع وحده 2,500 ريال ‎($667)‎ — أكثر من قيمة اشتراكك نفسه — ويفتح لك التفاصيل الكاملة لـ5 مشاريع', { type: 'route', path: '/projects' }),
       item('وحين تحدّد وجهتك، تجد المسرح وتصميم موقعك وتطبيقك وخدمات المنظومة بخصم 50%', { type: 'route', path: '/services' }),
       item('دخول مقر النادي بالرياض وحضور ملتقياته للأعضاء المشتركين فقط', { type: 'route', path: '/hq' }),
     ],
@@ -97,7 +101,7 @@ const GROUPS: MembershipGroup[] = [
     comingSoon: false,
     items: [
       item('قدّم مشروعك للنظر في إدراجه، واستعرض المشاريع التي اجتازت الفحص والتقييم', { type: 'route', path: '/projects' }),
-      item('رصيد بقيمة 2,500 ريال في بنك المشاريع: اطّلع على التفاصيل الكاملة لخمسة مشاريع تختارها، وتواصل مباشرةً مع مؤسسيها لمناقشة فرص الشراكة', { type: 'route', path: '/projects' }),
+      item('رصيد بقيمة 2,500 ريال ‎($667)‎ في بنك المشاريع: اطّلع على التفاصيل الكاملة لخمسة مشاريع تختارها، وتواصل مباشرةً مع مؤسسيها لمناقشة فرص الشراكة', { type: 'route', path: '/projects' }),
       item('تقييم مشروعك خلال 10 أيام عمل: بعد استيفاء معايير القبول يُحال إلى بنك المشاريع ويُعرض على أعضاء النادي', { type: 'route', path: '/service/success-partners' }),
       item('ظهور متجدد لمشروعك طوال العام: إعادة إبراز مشروعك مرة كل شهر لكافة أعضاء النادي', { type: 'route', path: '/service/repost' }),
     ],
@@ -151,7 +155,7 @@ export const MEMBERSHIP_SEED: MembershipContent = {
   subtitle: 'لم تحدّد وجهتك بعد؟ هذه العضوية صُمّمت لك أنت أولًا',
   intro: [
     'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
-    'من السعودية إلى العالم… عضويتك معك أينما كنت؛ فلديك عام كامل تستفيد فيه من جميع مزايا النادي، وتتواصل مع أعضائه، وتستكشف المشاريع وفرص الشراكة، وتشارك في ملتقياته عبر الإنترنت، لتبني علاقات قد تفتح لك أبوابًا لا يفتحها المال وحده.',
+    'من السعودية إلى العالم… عضويتك معك أينما كنت؛ فلديك عام كامل تستفيد فيه من جميع مزايا النادي، حضوريًا في مقر النادي بمدينة الرياض بالمملكة العربية السعودية وعبر الإنترنت، وتستكشف المشاريع وفرص الشراكة، لتبني علاقات قد تفتح لك أبوابًا لا يفتحها المال وحده.',
     'وحين تصل إلى الرياض، فالنادي بيتك الثاني في عالم الأعمال: قاعة اجتماعات لاستقبال ضيوفك، ومقر مجهّز يتسع لـ80 شخصًا مع منصة متكاملة لاستضافة ملتقياتك وورش عملك الخاصة، و15 مكتبًا للاستخدام المؤقت، واستوديو بودكاست لتصل رسالتك، وحاضنة أعمال تحتضن مشروعك — كلها متاحة لك بصفتك عضوًا، مع خصومات تخفّف تكاليف أعمالك.',
     'عام كامل تكتشف فيه وجهتك — بوابتك إلى عالم الأعمال. العضوية السنوية لا تمنحك مجرد حضور، بل تمنحك عامًا كاملًا لصناعة علاقات، واكتشاف فرص، وبناء شراكات تتحول إلى خطوات ونتائج واقعية.',
   ].join('\n\n'),
@@ -166,8 +170,8 @@ export const MEMBERSHIP_SEED: MembershipContent = {
     expired: 'انتهت عضويتك، برجاء تجديد عضويتك.',
   },
   activationNote: 'الاشتراك في العضوية السنوية من داخل التطبيق يتوفر مع الإصدار القادم عبر متجر التطبيقات.',
-  version: 5,
-  updatedAt: '2026-10-14T00:00:00.000Z',
+  version: 6,
+  updatedAt: '2026-10-16T00:00:00.000Z',
 };
 
 /** Writes the seed when no membership content exists yet, or when the stored seed is older than this one. */
