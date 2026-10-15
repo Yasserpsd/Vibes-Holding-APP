@@ -51,6 +51,8 @@ export type Me = {
   bio: string;
   jobTitle: string;
   company: string;
+  /** M69: «فرد / شركة» chosen at registration; '' on accounts older than hub 2.18.0 (treated as فرد). */
+  memberType: 'individual' | 'company' | '';
   city: string;
   website: string;
   social: string;
@@ -65,6 +67,9 @@ export type Me = {
 
 export type RegisterInput = {
   name: string;
+  /** M69: «فرد / شركة» — a company registration carries the company name. */
+  memberType: 'individual' | 'company';
+  companyName?: string;
   country: string;
   phone: string;
   email: string;
@@ -123,6 +128,7 @@ export function toMe(contact: HubContact): Me {
     bio: contact.bio,
     jobTitle: contact.job_title,
     company: contact.company,
+    memberType: contact.member_type ?? '',
     city: contact.city,
     website: contact.website,
     social: contact.social,
@@ -164,6 +170,8 @@ export class AuthService {
       uuid,
       ip,
       name: input.name,
+      member_type: input.memberType,
+      company_name: input.memberType === 'company' ? (input.companyName ?? '') : '',
       country: input.country,
       phone: input.phone,
       email: input.email,

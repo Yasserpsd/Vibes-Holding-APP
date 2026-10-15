@@ -22,6 +22,9 @@ import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Form = {
   name: string;
+  /** M69: «فرد / شركة» — choosing شركة reveals the required company-name field. */
+  memberType: 'individual' | 'company';
+  companyName: string;
   country: string;
   phone: string;
   email: string;
@@ -35,7 +38,9 @@ type Form = {
   interests: string[];
 };
 
-const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [] };
+const EMPTY: Form = { name: '', memberType: 'individual', companyName: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [] };
+
+const MEMBER_TYPES = ['individual', 'company'] as const;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -77,6 +82,7 @@ export default function RegisterScreen() {
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
     if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
+    if (form.memberType === 'company' && form.companyName.trim().length < 2) next.companyName = t('auth.register.error.companyName');
     if (!isLocalPhone(form.phone, country?.pattern))
       next.phone = country?.example ? t('auth.register.error.phone', { example: country.example }) : t('auth.register.error.phoneNoExample');
     if (!isEmail(form.email)) next.email = t('auth.register.error.email');
@@ -94,6 +100,8 @@ export default function RegisterScreen() {
     try {
       const result = await authApi.register({
         name: form.name.trim(),
+        memberType: form.memberType,
+        companyName: form.memberType === 'company' ? form.companyName.trim() : undefined,
         country: form.country,
         phone: form.phone.trim(),
         email: form.email.trim(),
@@ -145,6 +153,39 @@ export default function RegisterScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
         <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(2)} style={styles.group}>
+        <Text style={styles.label}>{t('auth.register.memberType')}</Text>
+        <View style={styles.memberTypes}>
+          {MEMBER_TYPES.map((item) => {
+            const selected = item === form.memberType;
+            return (
+              <View key={item} style={styles.memberType}>
+                <PersonaRow selected={selected} onPress={() => setForm((current) => ({ ...current, memberType: item }))}>
+                  {selected ? (
+                    <PopIn>
+                      <Ionicons name="radio-button-on" size={20} color={colors.gold} />
+                    </PopIn>
+                  ) : (
+                    <Ionicons name="radio-button-off" size={20} color={colors.textMuted} />
+                  )}
+                  <Text style={[styles.personaText, selected && styles.personaTextSelected]}>{t(`auth.register.memberType.${item}`)}</Text>
+                </PersonaRow>
+              </View>
+            );
+          })}
+        </View>
+        {form.memberType === 'company' ? (
+          <FadeInView offset={8}>
+            <FormField
+              label={t('auth.register.companyName')}
+              value={form.companyName}
+              onChangeText={set('companyName')}
+              error={errors.companyName}
+              textContentType="organizationName"
+            />
+          </FadeInView>
+        ) : null}
       </FadeInView>
       <FadeInView delay={entranceDelay(3)} style={styles.group}>
         <Text style={styles.label}>{t('auth.register.country')}</Text>
@@ -259,6 +300,9 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   group: { gap: spacing.sm },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  // M69: «فرد / شركة» side by side right under the name field.
+  memberTypes: { flexDirection: 'row', gap: spacing.sm },
+  memberType: { flex: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   persona: {
     flexDirection: 'row',

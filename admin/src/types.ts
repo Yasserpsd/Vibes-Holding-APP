@@ -19,6 +19,8 @@ export type Account = {
   persona: string;
   job_title: string;
   company: string;
+  /** M69: «فرد / شركة» chosen at registration; absent/'' on a pre-2.18.0 hub (treated as فرد). */
+  member_type?: 'individual' | 'company' | '';
   city: string;
   created_at: string;
   verified_at: string | null;

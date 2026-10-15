@@ -121,6 +121,7 @@ export class MockAdmin {
       persona: contact.persona,
       job_title: contact.jobTitle,
       company: contact.company,
+      member_type: contact.memberType,
       city: contact.city,
       created_at: hubTime(contact.createdAt),
       verified_at: contact.verifiedAt !== null ? hubTime(contact.verifiedAt) : null,

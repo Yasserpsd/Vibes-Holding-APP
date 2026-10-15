@@ -27,6 +27,8 @@ export type HubContact = {
   social: string;
   avatar: string;
   company: string;
+  /** M69 (plugin 2.18.0): «فرد / شركة» chosen at registration; '' on pre-2.18.0 contacts (treated as individual). */
+  member_type: 'individual' | 'company' | '';
   city: string;
   bio: string;
   pending_pay: 0 | 1;
@@ -141,6 +143,8 @@ export type HubAccount = {
   persona: string;
   job_title: string;
   company: string;
+  /** M69: absent on a pre-2.18.0 hub. */
+  member_type?: 'individual' | 'company' | '';
   city: string;
   created_at: string;
   verified_at: string | null;

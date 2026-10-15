@@ -161,6 +161,40 @@ test('validation and rejected inputs use Arabic messages', async () => {
   assert.equal(badToken.statusCode, 401);
 });
 
+// M69: «فرد / شركة» on registration — a company account requires the company name and keeps it.
+// Its own app instance: the shared one has already spent the register rate-limit budget of this IP.
+test('member type: company requires a name, individual is the default', async () => {
+  const built = await buildApp({ config, kv: new MemoryKV(), hub: new MockHubClient() });
+  const send = (url: string, payload: Record<string, unknown>) => built.app.inject({ method: 'POST', url, payload });
+  try {
+    const base = { ...registration, phone: '0553334444', email: 'm69@gmail.com' };
+
+    const missingName = await send('/api/auth/register', { ...base, memberType: 'company' });
+    assert.equal(missingName.statusCode, 400);
+    assert.match(missingName.json().error.message, /اسم الشركة/);
+
+    const badType = await send('/api/auth/register', { ...base, memberType: 'partnership', companyName: 'شركة التقنية' });
+    assert.equal(badType.statusCode, 400);
+
+    const company = await send('/api/auth/register', { ...base, memberType: 'company', companyName: 'شركة الرؤية للاستثمار' });
+    assert.equal(company.statusCode, 200, company.body);
+    const verified = await send('/api/auth/verify', { pendingToken: company.json().pendingToken, code: MOCK_CODE });
+    assert.equal(verified.statusCode, 200, verified.body);
+    assert.equal(verified.json().me.memberType, 'company');
+    assert.equal(verified.json().me.company, 'شركة الرؤية للاستثمار');
+
+    // No memberType in the payload = «فرد», and the company name is ignored when sent anyway.
+    const individual = await send('/api/auth/register', { ...registration, phone: '0555556666', email: 'm69b@gmail.com', companyName: 'تُتجاهل' });
+    assert.equal(individual.statusCode, 200, individual.body);
+    const soloVerified = await send('/api/auth/verify', { pendingToken: individual.json().pendingToken, code: MOCK_CODE });
+    assert.equal(soloVerified.statusCode, 200, soloVerified.body);
+    assert.equal(soloVerified.json().me.memberType, 'individual');
+    assert.equal(soloVerified.json().me.company, '');
+  } finally {
+    await built.app.close();
+  }
+});
+
 test('delete account needs the password and ends the session', async () => {
   const login = await post('/api/auth/login', { login: registration.email, password: registration.password });
   const { token } = login.json();

@@ -190,7 +190,12 @@ export class MockHubClient implements HubClient {
     const persona = str(body, 'persona', 20).toLowerCase();
     const bio = str(body, 'bio', 600);
     const password = typeof body.password === 'string' ? body.password : '';
+    // M69 (plugin 2.18.0): «فرد / شركة» — a company registration must carry the company name.
+    const memberType = str(body, 'member_type', 20).toLowerCase() || 'individual';
+    const companyName = str(body, 'company_name', 190);
     if (!name) throw new HubError('invalid', 'الاسم مطلوب', 400);
+    if (memberType !== 'individual' && memberType !== 'company') throw new HubError('invalid', 'اختر نوع الحساب: فرد أو شركة', 400);
+    if (memberType === 'company' && companyName.trim().length < 2) throw new HubError('company_name', 'اكتب اسم الشركة لإكمال التسجيل', 400);
     const phoneNorm = phoneIntl(country, str(body, 'phone', 40));
     if (!phoneNorm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص — اكتبه بدون مسافات وبدون رمز الدولة', 400);
     if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر فئتك: محايد، رائد أعمال، أو مستثمر', 400);
@@ -215,6 +220,8 @@ export class MockHubClient implements HubClient {
       jobTitle: str(body, 'job_title', 150),
       persona,
       bio,
+      memberType,
+      ...(memberType === 'company' ? { company: companyName } : {}),
       passHash: hash(password),
       verified: false,
     });
@@ -379,6 +386,7 @@ export class MockHubClient implements HubClient {
       social: contact.social,
       avatar: contact.avatar,
       company: contact.company,
+      member_type: contact.memberType,
       city: contact.city,
       bio: contact.bio,
       pending_pay: contact.passHash && contact.verified && !contact.isMember ? 1 : 0,

@@ -22,6 +22,8 @@ export type MockContact = {
   persona: string;
   bio: string;
   company: string;
+  /** M69: «فرد / شركة» chosen at registration ('' = legacy contact, treated as individual). */
+  memberType: 'individual' | 'company' | '';
   city: string;
   website: string;
   social: string;
@@ -94,6 +96,7 @@ export function blankContact(id: number, now: number): MockContact {
     persona: '',
     bio: '',
     company: '',
+    memberType: '',
     city: '',
     website: '',
     social: '',

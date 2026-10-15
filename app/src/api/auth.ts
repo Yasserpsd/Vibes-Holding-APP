@@ -24,6 +24,8 @@ export type Me = {
   bio: string;
   jobTitle: string;
   company: string;
+  /** M69: «فرد / شركة» chosen at registration; an older server sends none. */
+  memberType?: 'individual' | 'company' | '';
   city: string;
   website: string;
   social: string;
@@ -53,6 +55,9 @@ export type AuthConfig = {
 
 export type RegisterInput = {
   name: string;
+  /** M69: «فرد / شركة» — a company registration carries the company name. */
+  memberType: 'individual' | 'company';
+  companyName?: string;
   country: string;
   phone: string;
   email: string;

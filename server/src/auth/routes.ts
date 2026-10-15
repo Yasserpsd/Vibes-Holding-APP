@@ -18,17 +18,25 @@ const codeSchema = z.string().trim().regex(/^\d{4,6}$/, 'الرمز 4 أرقام
 const loginFieldSchema = z.string().trim().min(3).max(190);
 const pendingTokenSchema = z.string().min(32).max(128);
 
-const registerSchema = z.object({
-  name: z.string().trim().min(2, 'الاسم مطلوب').max(120),
-  country: z.string().trim().toLowerCase().max(5).default('sa'),
-  phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
-  email: z.string().trim().min(5, 'البريد الإلكتروني مطلوب').max(190),
-  password: passwordSchema,
-  persona: personaSchema,
-  bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
-  jobTitle: z.string().trim().max(150).optional(),
-  inviteCode: z.string().trim().max(30).optional(),
-});
+const registerSchema = z
+  .object({
+    name: z.string().trim().min(2, 'الاسم مطلوب').max(120),
+    // M69: «فرد» is the default; «شركة» requires the company name (hub plugin 2.18.0 stores both).
+    memberType: z.enum(['individual', 'company']).default('individual'),
+    companyName: z.string().trim().max(190).optional(),
+    country: z.string().trim().toLowerCase().max(5).default('sa'),
+    phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
+    email: z.string().trim().min(5, 'البريد الإلكتروني مطلوب').max(190),
+    password: passwordSchema,
+    persona: personaSchema,
+    bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
+    jobTitle: z.string().trim().max(150).optional(),
+    inviteCode: z.string().trim().max(30).optional(),
+  })
+  .refine((body) => body.memberType !== 'company' || (body.companyName ?? '').length >= 2, {
+    message: 'اكتب اسم الشركة لإكمال التسجيل',
+    path: ['companyName'],
+  });
 const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });
 const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });

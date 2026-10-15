@@ -260,6 +260,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         <dl className="fields">
           <Field label="البريد الإلكتروني" ltr>{account.email || '—'}</Field>
           <Field label="الجوال" ltr>{account.phone || '—'}</Field>
+          {account.member_type ? <Field label="نوع الحساب">{account.member_type === 'company' ? `🏢 شركة${account.company ? ` — ${account.company}` : ''}` : 'فرد'}</Field> : null}
           {account.job_title || account.company ? <Field label="العمل">{[account.job_title, account.company].filter(Boolean).join(' · ')}</Field> : null}
           {account.city ? <Field label="المدينة">{account.city}</Field> : null}
           <Field label="سجّل في">{formatDateTime(account.created_at)}</Field>
