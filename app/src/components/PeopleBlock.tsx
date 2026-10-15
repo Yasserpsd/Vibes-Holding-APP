@@ -39,7 +39,7 @@ export function PeopleBlock({ block }: { block?: { title: string; subtitle: stri
         </ScrollView>
       ) : null}
       {block ? (
-        <AppButton label={block.cta} icon="sparkles-outline" variant="outline" onPress={() => router.push('/form/famous' as Href)} />
+        <AppButton label={block.cta} icon="sparkles-outline" variant="outline" onPress={() => router.push('/people/apply' as Href)} />
       ) : null}
     </FadeInView>
   );

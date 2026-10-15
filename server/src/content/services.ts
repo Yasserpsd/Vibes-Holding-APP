@@ -27,6 +27,8 @@ export type ServiceAction =
   | { type: 'link'; url: string; label: string }
   /** Opens a native in-app registration form (M16, server/src/forms). */
   | { type: 'form'; formKey: string; label: string }
+  /** M73: opens an in-app screen by its route (e.g. the «شخصية ومسيرة» application). */
+  | { type: 'route'; path: string; label: string }
   /** Opens the advisor tab with a suggested first message. */
   | { type: 'advisor'; prompt: string }
   /** In-app flows. */
@@ -228,8 +230,8 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: null,
       memberLabel: 'بدون رسوم للأعضاء',
       access: 'member',
-      // M73: the application became a full in-app form (members only, enforced server-side).
-      action: { type: 'form', formKey: 'famous', label: 'قدّم من هنا' },
+      // M73: «قدّم من هنا» opens the M11 application (apply → committee review → published).
+      action: { type: 'route', path: '/people/apply', label: 'قدّم من هنا' },
       infoUrl: null,
       order: 9,
     },

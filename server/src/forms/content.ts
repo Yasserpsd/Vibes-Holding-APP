@@ -152,36 +152,9 @@ export const FORMS_SEED: FormsContent = {
       ],
       order: 2,
     },
-    // M73 «شخصية ومسيرة» (owner, 2026-10-16, with the sample spotlight of الخليل المدخلي): the
-    // weekly member spotlight takes applications IN-APP, from subscribed members only (the
-    // service refuses anyone else; rule enforced server-side). The fields mirror the spotlight's
-    // own sections, so the committee can publish from the answers as they are.
-    {
-      key: 'famous',
-      title: 'التقديم في «شخصية ومسيرة»',
-      intro:
-        '«شخصية ومسيرة» مساحة للتعريف بأعضاء نادي المستثمرين وإبراز خبراتهم وتعزيز التعارف وبناء العلاقات النوعية بين الأعضاء. إن كان لديك ما تظن أنه ذو قيمة وسيفيدك ويفيد أعضاء النادي، فاملأ بياناتك هنا — تراجع لجنة النادي الطلبات وتختار الشخصيات دوريًّا. التقديم للأعضاء المشتركين فقط.',
-      access: 'member',
-      once: false,
-      open: true,
-      closedText: 'التقديم في «شخصية ومسيرة» متوقف حاليًا. تابع إعلانات النادي.',
-      submitLabel: 'إرسال طلبي',
-      successText: 'استلمنا طلبك في «شخصية ومسيرة» 🌹 تراجع لجنة النادي الطلبات وتختار الشخصيات دوريًّا، وستتواصل معك الإدارة عند اختيارك.',
-      fields: [
-        { key: 'jobTitle', label: 'المسمى الوظيفي وجهة العمل', type: 'text', required: true, placeholder: 'مثال: الرئيس التنفيذي لمجموعة خبوت للتجارة' },
-        { key: 'city', label: 'مدينة الإقامة', type: 'text', required: true },
-        { key: 'specialty', label: 'التخصص', type: 'text', required: true, placeholder: 'مثال: إنشاء وإدارة المشاريع الزراعية' },
-        { key: 'experience', label: 'سنوات الخبرة', type: 'text', required: true, placeholder: 'مثال: أكثر من 20 سنة' },
-        { key: 'bio', label: 'نبذة عنك', type: 'textarea', required: true, placeholder: 'تعليمك ومسيرتك المهنية وما أسّسته' },
-        { key: 'achievements', label: 'أبرز إنجازاتك وما يميزك', type: 'textarea', required: true },
-        { key: 'benefit', label: 'كيف يمكن لأعضاء النادي الاستفادة منك؟', type: 'textarea', required: true },
-        { key: 'seeking', label: 'ماذا تبحث عنه من أعضاء النادي؟', type: 'textarea', required: true },
-        { key: 'whatsapp', label: 'الجوال والواتساب', type: 'text', required: true, latin: true, prefill: 'phone' },
-        { key: 'email', label: 'البريد الإلكتروني', type: 'text', required: true, latin: true, prefill: 'email' },
-        { key: 'linkedin', label: 'حسابك المهني — لينكدإن أو موقعك (اختياري)', type: 'text', required: false, latin: true, placeholder: 'https://…' },
-      ],
-      order: 3,
-    },
+    // M73 note: the «شخصية ومسيرة» application lives in the M11 profiles pipeline (/people/apply:
+    // apply → committee review → published as it is), NOT here — a forms inbox would have made the
+    // admin retype every approved profile. The 'member' access level stays available for later forms.
   ],
   version: 3,
   updatedAt: '2026-10-16T00:00:00.000Z',

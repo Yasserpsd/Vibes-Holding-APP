@@ -6,7 +6,7 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 
 /** M11 «شخصية ومسيرة»: review the members' applications, edit or enter profiles, order the public list. */
 
-const EMPTY: ProfileFields = { name: '', title: '', company: '', bio: '', milestones: [], links: [], photo: null };
+const EMPTY: ProfileFields = { name: '', title: '', company: '', specialty: '', city: '', bio: '', milestones: [], achievements: [], benefit: [], seeking: '', phone: '', email: '', links: [], photo: null };
 
 function statusOf(row: Profile): { label: string; tone: Tone } {
   if (row.draft) return { label: 'تعديل بانتظار المراجعة', tone: 'gold' };
@@ -28,7 +28,7 @@ function linksFromText(text: string): ProfileFields['links'] {
     .filter((link) => link.url);
 }
 
-type EditorState = { row: Profile | null; fields: ProfileFields; milestonesText: string; linksText: string; order: number };
+type EditorState = { row: Profile | null; fields: ProfileFields; milestonesText: string; achievementsText: string; benefitText: string; linksText: string; order: number };
 
 export function People() {
   const { signOut, notify } = useShell();
@@ -62,13 +62,13 @@ export function People() {
   }
 
   function open(row: Profile | null) {
-    const fields = row ? row.fields : EMPTY;
-    setEditor({ row, fields, milestonesText: toLines(fields.milestones), linksText: linksToText(fields.links), order: row?.order ?? 100 });
+    const fields = row ? { ...EMPTY, ...row.fields } : EMPTY;
+    setEditor({ row, fields, milestonesText: toLines(fields.milestones), achievementsText: toLines(fields.achievements ?? []), benefitText: toLines(fields.benefit ?? []), linksText: linksToText(fields.links), order: row?.order ?? 100 });
   }
 
   async function save() {
     if (!editor || busy) return;
-    const fields: ProfileFields = { ...editor.fields, milestones: fromLines(editor.milestonesText), links: linksFromText(editor.linksText) };
+    const fields: ProfileFields = { ...editor.fields, milestones: fromLines(editor.milestonesText), achievements: fromLines(editor.achievementsText), benefit: fromLines(editor.benefitText), links: linksFromText(editor.linksText) };
     setBusy(true);
     try {
       if (editor.row) await api.updateProfile(editor.row.id, { ...fields, order: editor.order });
@@ -229,12 +229,40 @@ export function People() {
                 <input value={editor.fields.company} maxLength={120} onChange={(event) => edit({ company: event.target.value })} />
               </label>
               <label>
+                المجال والخبرة
+                <input value={editor.fields.specialty ?? ''} maxLength={160} onChange={(event) => edit({ specialty: event.target.value })} placeholder="مثال: إنشاء وإدارة المشاريع الزراعية — أكثر من 20 سنة" />
+              </label>
+              <label>
+                المدينة
+                <input value={editor.fields.city ?? ''} maxLength={80} onChange={(event) => edit({ city: event.target.value })} />
+              </label>
+              <label>
                 النبذة
                 <textarea rows={5} maxLength={1200} value={editor.fields.bio} onChange={(event) => edit({ bio: event.target.value })} required />
               </label>
               <label>
                 محطات المسيرة (سطر لكل محطة)
                 <textarea rows={4} value={editor.milestonesText} onChange={(event) => setEditor({ ...editor, milestonesText: event.target.value })} />
+              </label>
+              <label>
+                أبرز الإنجازات وما يميزه (سطر لكل إنجاز)
+                <textarea rows={4} value={editor.achievementsText} onChange={(event) => setEditor({ ...editor, achievementsText: event.target.value })} />
+              </label>
+              <label>
+                كيف يمكن لأعضاء النادي الاستفادة منه؟ (سطر لكل نقطة)
+                <textarea rows={3} value={editor.benefitText} onChange={(event) => setEditor({ ...editor, benefitText: event.target.value })} />
+              </label>
+              <label>
+                ما الذي يبحث عنه؟
+                <textarea rows={2} maxLength={600} value={editor.fields.seeking ?? ''} onChange={(event) => edit({ seeking: event.target.value })} />
+              </label>
+              <label>
+                الجوال والواتساب (يظهر للأعضاء)
+                <input dir="ltr" value={editor.fields.phone ?? ''} maxLength={40} onChange={(event) => edit({ phone: event.target.value })} />
+              </label>
+              <label>
+                البريد الإلكتروني (يظهر للأعضاء)
+                <input dir="ltr" value={editor.fields.email ?? ''} maxLength={190} onChange={(event) => edit({ email: event.target.value })} />
               </label>
               <label>
                 الروابط (سطر لكل رابط: «العنوان | الرابط» أو الرابط وحده)

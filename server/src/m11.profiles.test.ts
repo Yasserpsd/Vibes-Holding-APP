@@ -42,8 +42,16 @@ const send = (method: 'POST' | 'PUT' | 'DELETE', url: string, payload: Record<st
 const application = {
   title: 'رئيس تنفيذي',
   company: 'شركة الاختبار للاستثمار',
+  // M73: the spotlight sections.
+  specialty: 'إنشاء وإدارة المشاريع الاستثمارية — أكثر من 20 سنة',
+  city: 'جازان',
   bio: 'مسيرة ممتدة في بناء الشركات الناشئة وقيادة فرق الاستثمار داخل المملكة وخارجها.',
   milestones: ['تأسيس أول شركة عام 2015', 'قيادة جولة استثمارية كبرى'],
+  achievements: ['رفع الطاقة الإنتاجية بنسبة كبيرة خلال عام واحد', 'تعزيز الصادرات إلى أوروبا واليابان'],
+  benefit: ['استشارات متخصصة', 'دراسات جدوى اقتصادية'],
+  seeking: 'فرص تعاون لنقل الخبرة إلى مناطق أخرى في المملكة.',
+  phone: '+966500000011',
+  email: 'spotlight@example.test',
   links: [{ label: 'الموقع', url: 'https://example.test/ceo' }],
 };
 
@@ -122,6 +130,14 @@ test('the admin approves: the profile is public with its words, and the detail p
   assert.equal(person.statusCode, 200);
   assert.match(person.json().person.bio as string, /قيادة فرق الاستثمار/);
   assert.equal((person.json().person.milestones as string[]).length, 2);
+  // M73: the spotlight sections come back on the public page.
+  assert.equal(person.json().person.city, 'جازان');
+  assert.match(person.json().person.specialty as string, /20 سنة/);
+  assert.equal((person.json().person.achievements as string[]).length, 2);
+  assert.equal((person.json().person.benefit as string[]).length, 2);
+  assert.match(person.json().person.seeking as string, /فرص تعاون/);
+  assert.equal(person.json().person.phone, '+966500000011');
+  assert.equal(person.json().person.email, 'spotlight@example.test');
 });
 
 test('an edit of an approved profile waits as a draft while the public keeps the approved words', async () => {

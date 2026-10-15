@@ -38,6 +38,8 @@ export type ServiceAction =
   | { type: 'paymob'; message: string; fields: ServiceField[]; amount: number; memberAmount: number | null; currency: 'SAR' }
   | { type: 'link'; url: string; label: string }
   | { type: 'form'; formKey: string; label: string }
+  /** M73: opens an in-app screen by its route (e.g. the «شخصية ومسيرة» application). */
+  | { type: 'route'; path: string; label: string }
   | { type: 'advisor'; prompt: string }
   | { type: 'hq' }
   | { type: 'projects' };

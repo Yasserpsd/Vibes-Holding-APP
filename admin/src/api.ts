@@ -132,8 +132,16 @@ export type ProfileFields = {
   name: string;
   title: string;
   company: string;
+  /** M73: the spotlight sections (absent on profiles stored before it). */
+  specialty?: string;
+  city?: string;
   bio: string;
   milestones: string[];
+  achievements?: string[];
+  benefit?: string[];
+  seeking?: string;
+  phone?: string;
+  email?: string;
   links: ProfileLink[];
   photo: string | null;
 };

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -135,6 +135,7 @@ export default function ServiceScreen() {
             onHq={() => router.push('/hq')}
             onProjects={() => router.push('/projects')}
             onForm={(formKey) => router.push({ pathname: '/form/[key]', params: { key: formKey } })}
+            onRoute={(path) => router.push(path as Href)}
           />
         </FadeInView>
       )}
@@ -172,9 +173,10 @@ type ActionPanelProps = {
   onHq: () => void;
   onProjects: () => void;
   onForm: (formKey: string) => void;
+  onRoute: (path: string) => void;
 };
 
-function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm }: ActionPanelProps) {
+function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm, onRoute }: ActionPanelProps) {
   switch (action.type) {
     case 'whatsapp':
       return (
@@ -215,6 +217,8 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
       return <AppButton label={action.label} icon="open-outline" onPress={() => void openLink(action.url)} />;
     case 'form':
       return <AppButton label={action.label} icon="create-outline" onPress={() => onForm(action.formKey)} />;
+    case 'route':
+      return <AppButton label={action.label} icon="create-outline" onPress={() => onRoute(action.path)} />;
     case 'advisor':
       return <AppButton label={t('advisor.ask')} icon="sparkles-outline" onPress={() => onAdvisor(action.prompt)} />;
     case 'hq':

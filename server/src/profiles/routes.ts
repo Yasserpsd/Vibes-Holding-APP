@@ -15,14 +15,25 @@ const linkSchema = z.object({
 const applySchema = z.object({
   title: z.string().trim().min(2, 'اكتب وظيفتك أو منصبك').max(80),
   company: z.string().trim().max(120).default(''),
+  // M73: the spotlight sections the owner asked for (2026-10-16).
+  specialty: z.string().trim().min(2, 'اكتب مجالك وخبرتك').max(160),
+  city: z.string().trim().min(2, 'اكتب مدينتك').max(80),
   bio: z.string().trim().min(30, 'اكتب نبذة أوفى عن شخصيتك ومسيرتك').max(1200),
   milestones: z.array(z.string().trim().min(3).max(140)).min(1, 'أضف محطة واحدة على الأقل من مسيرتك').max(10),
+  achievements: z.array(z.string().trim().min(3).max(300)).max(10).default([]),
+  benefit: z.array(z.string().trim().min(3).max(200)).max(10).default([]),
+  seeking: z.string().trim().max(600).default(''),
+  phone: z.string().trim().max(40).default(''),
+  email: z.string().trim().max(190).default(''),
   links: z.array(linkSchema).max(5).default([]),
 });
 
 const fieldsSchema = applySchema.extend({
   name: z.string().trim().min(2).max(80),
   photo: z.string().trim().max(500).nullable().default(null),
+  // The member must state them; the admin's manual entry may leave them for later.
+  specialty: z.string().trim().max(160).default(''),
+  city: z.string().trim().max(80).default(''),
 });
 
 const updateSchema = fieldsSchema.partial().extend({ order: z.number().int().min(0).max(9999).optional() });

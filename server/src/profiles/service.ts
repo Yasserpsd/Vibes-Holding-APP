@@ -24,13 +24,32 @@ export type ProfileFields = {
   /** الوظيفة أو المنصب */
   title: string;
   company: string;
+  /** M73 (owner, 2026-10-16, the spotlight sections): «المجال والخبرة». */
+  specialty: string;
+  /** «المدينة». */
+  city: string;
   bio: string;
   /** «محطات المسيرة» — short lines in the member's order. */
   milestones: string[];
+  /** «أبرز الإنجازات وما يميزه» — lines like the milestones. */
+  achievements: string[];
+  /** «كيف يمكن لأعضاء النادي الاستفادة منه؟» — lines. */
+  benefit: string[];
+  /** «ما الذي يبحث عنه؟» */
+  seeking: string;
+  /** «وسائل التواصل» the member chose to publish to the other members. */
+  phone: string;
+  email: string;
   links: ProfileLink[];
   /** Set from the dashboard (uploads or a pasted URL); the app form cannot pick photos on the current binary. */
   photo: string | null;
 };
+
+/** Profiles stored before M73 lack the spotlight fields; every reader sees them defaulted. */
+export function withFieldDefaults(fields: ProfileFields): ProfileFields {
+  const stored: Partial<ProfileFields> = fields; // a pre-M73 row misses the new keys at runtime
+  return { specialty: '', city: '', achievements: [], benefit: [], seeking: '', phone: '', email: '', ...stored } as ProfileFields;
+}
 
 export type ProfileStatus = 'pending' | 'approved' | 'rejected';
 
@@ -60,7 +79,8 @@ export const DEFAULT_PROFILES_CONFIG: ProfilesConfig = {
 };
 
 export type PublicPerson = { id: string; name: string; title: string; company: string; photo: string | null };
-export type PublicPersonFull = PublicPerson & { bio: string; milestones: string[]; links: ProfileLink[] };
+export type PublicPersonFull = PublicPerson &
+  Pick<ProfileFields, 'specialty' | 'city' | 'bio' | 'milestones' | 'achievements' | 'benefit' | 'seeking' | 'phone' | 'email' | 'links'>;
 
 export function publicPerson(profile: Profile): PublicPerson {
   const { id } = profile;
@@ -69,8 +89,8 @@ export function publicPerson(profile: Profile): PublicPerson {
 }
 
 export function publicPersonFull(profile: Profile): PublicPersonFull {
-  const { bio, milestones, links } = profile.fields;
-  return { ...publicPerson(profile), bio, milestones, links };
+  const { specialty, city, bio, milestones, achievements, benefit, seeking, phone, email, links } = withFieldDefaults(profile.fields);
+  return { ...publicPerson(profile), specialty, city, bio, milestones, achievements, benefit, seeking, phone, email, links };
 }
 
 /** What the applying member sees about his own file. */
@@ -78,7 +98,7 @@ export type MyProfile = { id: string; status: ProfileStatus; fields: ProfileFiel
 
 export function myProfile(profile: Profile): MyProfile {
   const { id, status, fields, draft, note } = profile;
-  return { id, status, fields, draft, note };
+  return { id, status, fields: withFieldDefaults(fields), draft: draft ? withFieldDefaults(draft) : null, note };
 }
 
 export type ProfileInput = Omit<ProfileFields, 'photo' | 'name'> & { name?: string };
@@ -148,12 +168,21 @@ export class ProfilesService {
       throw new RequestError('membership_required', 'التقديم في «شخصية ومسيرة» متاح بعد تفعيل العضوية السنوية', 403);
     }
     const at = now.toISOString();
+    const lines = (items: string[]): string[] => items.map((line) => line.trim()).filter(Boolean);
     const submitted: ProfileFields = {
       name: me.name,
       title: input.title.trim(),
       company: input.company.trim(),
+      specialty: input.specialty.trim(),
+      city: input.city.trim(),
       bio: input.bio.trim(),
-      milestones: input.milestones.map((line) => line.trim()).filter(Boolean),
+      milestones: lines(input.milestones),
+      achievements: lines(input.achievements),
+      benefit: lines(input.benefit),
+      seeking: input.seeking.trim(),
+      // The member chooses what the other members may reach him on; empty fields publish nothing.
+      phone: input.phone.trim(),
+      email: input.email.trim(),
       links: input.links.map((link) => ({ label: link.label.trim(), url: link.url.trim() })),
       photo: null,
     };
@@ -225,7 +254,7 @@ export class ProfilesService {
       const profile = items.find((entry) => entry.id === id);
       if (!profile) return null;
       const { order, ...fields } = patch;
-      profile.fields = { ...profile.fields, ...fields };
+      profile.fields = { ...withFieldDefaults(profile.fields), ...fields };
       if (typeof order === 'number') profile.order = order;
       profile.updatedAt = now.toISOString();
       return profile;
