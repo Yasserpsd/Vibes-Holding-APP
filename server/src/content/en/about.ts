@@ -39,7 +39,7 @@ export const ABOUT_EN: Translation<AboutContent> = {
       key: 'vibes',
       title: 'Vibes Ventures',
       paragraphs: [
-        "Thabthabat Investment Holding Company (Vibes Ventures) is the parent company of the group and the owner of the Investors Club® trademark. Founded in the summer of 2022 with an unconventional vision, it built a participatory business model that brings the company and the club's members together.",
+        "Vibes Ventures Company Holding is the parent company of the group and the owner of the Investors Club® trademark. Founded in the summer of 2022 with an unconventional vision, it built a participatory business model that brings the company and the club's members together.",
         'Founder: Eng. Salem Al-Masrahi. Headquarters: Al Jawhara Tower, Prince Mohammed bin Abdulaziz Street (Tahlia), Al Olaya district, Riyadh.',
       ],
       bullets: [
@@ -71,6 +71,6 @@ export const ABOUT_EN: Translation<AboutContent> = {
   legal: {
     operator: 'Virtual Community Investment Company',
     address: 'Riyadh, Al Olaya district',
-    trademark: 'Investors Club® is a registered trademark of Vibes Ventures (Thabthabat Investment Holding Company).',
+    trademark: 'Investors Club® is a registered trademark of Vibes Ventures Company Holding.',
   },
 };

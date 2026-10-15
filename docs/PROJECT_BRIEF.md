@@ -4,7 +4,7 @@ Last updated: 2026-09-16 (owner's closing-scope decisions recorded in §5.5 and 
 
 ## 1. Entities and contacts
 - Publisher and membership seller: شركة المجتمع الافتراضي للاستثمار, the official operator of نادي المستثمرين (vcmem.com). CR 2050179051, VAT 311933896300003, Riyadh, Al Olaya.
-- Parent: فيبس فينشرز (شركة ذبذبات للاستثمار القابضة), owner of the «نادي المستثمرين®» trademark. Founder: م. سالم المسرحي.
+- Parent: فيبس فينشرز — legal name شركة فيبس فينشرز القابضة / VIBES VENTURES COMPANY HOLDING (renamed 2026-10-15; formerly شركة ذبذبات للاستثمار القابضة), owner of the «نادي المستثمرين®» trademark. Founder: م. سالم المسرحي.
 - Management (the only management number): +966 55 831 8777.
 - Studio bookings (بودكاست الملتقى): +966 53 846 1110.
 - Club size: 11,000+ members. Target 20,000, then 100,000 after the app launch.
