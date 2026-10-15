@@ -54,8 +54,8 @@ const item = (text: string, link: MembershipItemLink | null = null): MembershipI
 // بعد» worldwide direction, in-person + online, dollar equivalents on the bank balance).
 // The web price block (1,900 / 3,900 and their $ values) and every pay link of that page stay on
 // the web (CLAUDE.md rule 3): the app shows the store's own price at purchase time.
-// NOTE: the page no longer lists the «شركاؤنا» promo-code line; the app keeps it (the partners
-// program is live in-app) until the owner says to drop it.
+// NOTE: the page no longer lists the «شركاؤنا» promo-code line, but the app KEEPS it — the
+// owner confirmed (2026-10-16): «سيبه — برنامج شركاؤنا شغال في الأبليكشن».
 const GROUPS: MembershipGroup[] = [
   {
     key: 'why',
