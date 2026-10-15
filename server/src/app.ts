@@ -20,6 +20,7 @@ import { CardService } from './card/service.js';
 import { contactRoutes } from './contact/routes.js';
 import { ContactService } from './contact/service.js';
 import { invitesRoutes } from './invites/routes.js';
+import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { contentRoutes } from './content/routes.js';
 import { GoldenOffersService } from './golden/service.js';
@@ -298,8 +299,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       androidKey: config.REVENUECAT_PUBLIC_KEY_ANDROID,
       iosKey: config.REVENUECAT_PUBLIC_KEY_IOS,
       secretKey: config.REVENUECAT_SECRET_KEY,
-      termsUrl: config.STORE_TERMS_URL,
-      privacyUrl: config.STORE_PRIVACY_URL,
+      // M8: the server serves its own legal pages; the variables stay as overrides.
+      termsUrl: config.STORE_TERMS_URL || `${config.PUBLIC_URL}/legal/terms`,
+      privacyUrl: config.STORE_PRIVACY_URL || `${config.PUBLIC_URL}/legal/privacy`,
     },
   });
   // M43: the owner's own words (posts, agenda events) get their English once from AI; he edits it from the dashboard.
@@ -382,6 +384,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });
+  await app.register(legalRoutes, { notifier });
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });

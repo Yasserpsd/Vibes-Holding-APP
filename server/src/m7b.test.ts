@@ -97,7 +97,8 @@ test('store settings: public keys and product ids for the app, secrets stay out'
     appUserIdPrefix: 'vc-',
     environment: 'test',
     termsUrl: 'https://vcmem.com/terms',
-    privacyUrl: null,
+    // M8: without STORE_PRIVACY_URL the server points at its own /legal page.
+    privacyUrl: 'http://localhost:3000/legal/privacy',
     restCheck: true,
   });
   assert.ok(!store.body.includes('sk_test'));

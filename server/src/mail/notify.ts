@@ -187,6 +187,22 @@ export class Notifier {
     ]);
   }
 
+  /** M8: the web deletion page (legal/) — the deletion itself stays a verified manual step, never automatic. */
+  accountDeletionRequested(request: { email: string; name: string; phone: string; note: string; ip: string }): void {
+    this.dispatch(`طلب حذف حساب من صفحة الويب: ${request.email}`, [
+      `وصل طلب حذف حساب من صفحة «حذف الحساب» العامة (وليس من داخل ${APP_NAME}).`,
+      'مطلوب: التحقق من ملكية الحساب عبر البريد المسجل ثم تنفيذ الحذف خلال 30 يومًا كحد أقصى والرد على صاحبه.',
+      '',
+      `البريد المكتوب في الطلب: ${request.email}`,
+      request.name ? `الاسم: ${request.name}` : null,
+      request.phone ? `الجوال: ${request.phone}` : null,
+      request.note ? `ملاحظة صاحب الطلب: ${request.note}` : null,
+      `عنوان IP: ${request.ip}`,
+      '',
+      'تنبيه: النموذج عام ولا يتحقق من هوية المرسل — لا تحذفوا حسابًا قبل تأكيد صاحبه من بريده المسجل.',
+    ]);
+  }
+
   /** M30: a member asked for his membership card printed and delivered (his own choice, no charge). */
   cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string }): void {
     this.dispatch(`طلب طباعة كارت العضوية: ${request.name}`, [
