@@ -114,7 +114,7 @@ Club story `CnWMWS_nDpM` · 11,000+ members `KUzcLImZc-c` · How the club works 
 - Club gold logo (transparent): https://vcmem.com/wp-content/uploads/2025/11/لوجو-نادي-المستثمرين-جوولد-شفاف.png
 - شركاء النجاح: https://vcmem.com/wp-content/uploads/2025/08/English-PNG-copy.webp
 - بنك المشاريع: https://vcmem.com/wp-content/uploads/2026/09/بنك-المشاريع.png
-- Vibes Ventures: https://vcmem.com/wp-content/uploads/2025/11/Vibes-Logo-png-small.webp
+- Vibes Ventures (OFFICIAL since 2026-10-16, blue/black V + silver «VIBES VENTURES HOLDING», white background): https://vibesholding.com/wp-content/uploads/2026/10/vibes-ventures-logo.png — the PNGs (2000px + 600px) sit in the New Era folder until the owner uploads them; the old Vibes-Logo-png-small.webp and فايبز-القابضة.png are retired.
 - PV: https://vcmem.com/wp-content/uploads/2026/09/PV.png
 - Zoom icon: https://vcmem.com/wp-content/uploads/2026/09/zoom-video-meeting-app-icon-free-vector-copy.webp
 - Visual identity: premium gold with black and white. The final palette is confirmed with the owner at the design step.

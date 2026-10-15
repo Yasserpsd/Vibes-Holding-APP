@@ -88,7 +88,9 @@ export const ABOUT_SEED: AboutContent = {
       ],
       url: 'https://vibesholding.com/',
       urlLabel: 'vibesholding.com',
-      logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/08/فايبز-القابضة.png',
+      // The official 2026-10 logo (owner, 2026-10-16). The file must sit in vibesholding's media
+      // library under this exact name — the upload step is in the New Era run-steps file.
+      logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/10/vibes-ventures-logo.png',
     },
   ],
   ecosystem: {
@@ -124,8 +126,8 @@ export const ABOUT_SEED: AboutContent = {
     address: 'الرياض، حي العليا',
     trademark: 'نادي المستثمرين® علامة تجارية مسجلة لشركة Vibes Ventures Company Holding.',
   },
-  version: 3,
-  updatedAt: '2026-10-15T00:00:00.000Z',
+  version: 4,
+  updatedAt: '2026-10-16T00:00:00.000Z',
 };
 
 export async function ensureAboutSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {

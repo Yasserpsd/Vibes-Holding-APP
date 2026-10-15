@@ -45,7 +45,8 @@ export const GOLDEN_SEED: GoldenContent = {
   intro: 'الشركات التي تحمل علامة V تحت مظلة Vibes Ventures.',
   portfolioValueSarMillions: 161,
   disclaimer: 'المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد',
-  umbrella: company('V', 'Vibes Ventures', null, 'https://vibesholding.com/offer/', 'فايبز-القابضة.png', 0),
+  // The official 2026-10 logo lives in /2026/10/, not the LOGO_BASE month — a full URL instead of logo().
+  umbrella: { ...company('V', 'Vibes Ventures', null, 'https://vibesholding.com/offer/', '', 0), logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/10/vibes-ventures-logo.png' },
   companies: [
     company('01', 'وديني', 31, 'https://wdeny.com/offer/', 'Wdeny-logo-png.webp', 1),
     company(
