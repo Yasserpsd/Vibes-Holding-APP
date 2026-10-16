@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { FadeInView } from '@/components/motion';
+import { usePaper } from '@/components/paper';
 import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -15,12 +16,14 @@ type Props = TextInputProps & {
 
 export function FormField({ label, hint, error, latin = false, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
+  // M85: inside a PaperCard the field wears the light palette on its own.
+  const paper = usePaper();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, paper && styles.paperLabel]}>{label}</Text>
       <TextInput
-        placeholderTextColor={colors.textMuted}
-        selectionColor={colors.gold}
+        placeholderTextColor={paper ? colors.paperMuted : colors.textMuted}
+        selectionColor={paper ? colors.paperGold : colors.gold}
         multiline={multiline}
         {...inputProps}
         onFocus={(event) => {
@@ -33,9 +36,10 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
         }}
         style={[
           styles.input,
+          paper && styles.paperInput,
           latin ? styles.latin : { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
           multiline && styles.multiline,
-          focused && !error ? styles.inputFocused : null,
+          focused && !error ? (paper ? styles.paperInputFocused : styles.inputFocused) : null,
           error ? styles.inputError : null,
           style,
         ]}
@@ -45,7 +49,7 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
           <Text style={styles.error}>{error}</Text>
         </FadeInView>
       ) : hint ? (
-        <Text style={styles.hint}>{hint}</Text>
+        <Text style={[styles.hint, paper && styles.paperHint]}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -71,4 +75,9 @@ const styles = StyleSheet.create({
   inputError: { borderColor: colors.danger },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
+  // M85: the field on paper — ink on white, a quiet dark-gold focus.
+  paperLabel: { color: colors.paperInkSoft },
+  paperInput: { color: colors.paperInk, backgroundColor: colors.paperCard, borderColor: colors.paperBorder },
+  paperInputFocused: { borderColor: colors.paperGold },
+  paperHint: { color: colors.paperMuted },
 });

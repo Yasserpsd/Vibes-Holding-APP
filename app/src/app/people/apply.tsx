@@ -7,6 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { PaperCard } from '@/components/paper';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -136,6 +137,8 @@ function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; 
         </FadeInView>
       ) : null}
 
+      {/* M85 (owner): the application fields sit on one paper sheet. */}
+      <PaperCard pinned>
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('people.form.title')} value={title} onChangeText={setTitle} maxLength={80} />
       </FadeInView>
@@ -183,6 +186,7 @@ function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; 
       <FadeInView delay={entranceDelay(14)}>
         <AppButton label={profile?.status === 'rejected' ? t('people.reapply') : t('people.submit')} icon="paper-plane-outline" loading={busy} onPress={submit} />
       </FadeInView>
+      </PaperCard>
     </>
   );
 }

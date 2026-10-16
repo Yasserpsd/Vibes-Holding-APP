@@ -10,15 +10,15 @@ import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
-import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
+import { PaperCard, usePaper } from '@/components/paper';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /** M16: a website registration form, native — the fields come from the server, the answers go back to it. */
 export default function RegistrationFormScreen() {
@@ -121,7 +121,8 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
   }
 
   return (
-    <>
+    // M85 (owner): the whole registration form sits on one paper sheet.
+    <PaperCard pinned>
       {form.fields.map((field, index) => (
         <FadeInView key={field.key} delay={entranceDelay(index)}>
           <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
@@ -140,15 +141,16 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
       <FadeInView delay={entranceDelay(form.fields.length)}>
         <AppButton label={form.submitLabel} icon="paper-plane-outline" loading={submit.isPending} onPress={send} />
       </FadeInView>
-    </>
+    </PaperCard>
   );
 }
 
 function Field({ field, value, onChange }: { field: FormFieldDef; value: string; onChange: (value: string) => void }) {
+  const paper = usePaper();
   if (field.type === 'agree') {
     const on = value === AGREED;
     return (
-      <GlassCard golden={on} style={styles.agree}>
+      <View style={[styles.agree, paper && styles.paperAgree, on && paper && styles.paperAgreeOn]}>
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: on }}
@@ -157,21 +159,21 @@ function Field({ field, value, onChange }: { field: FormFieldDef; value: string;
         >
           {on ? (
             <PopIn>
-              <Ionicons name="checkbox" size={24} color={colors.gold} />
+              <Ionicons name="checkbox" size={24} color={paper ? colors.paperGold : colors.gold} />
             </PopIn>
           ) : (
-            <Ionicons name="square-outline" size={24} color={colors.textMuted} />
+            <Ionicons name="square-outline" size={24} color={paper ? colors.paperMuted : colors.textMuted} />
           )}
-          <Text style={styles.agreeLabel}>{field.label}</Text>
+          <Text style={[styles.agreeLabel, paper && styles.paperAgreeLabel]}>{field.label}</Text>
         </Pressable>
         {field.url ? <AppButton label={t('form.openAgreement')} variant="outline" icon="open-outline" onPress={() => void openLink(field.url ?? '')} /> : null}
-      </GlassCard>
+      </View>
     );
   }
   if (field.type === 'select') {
     return (
       <View style={styles.select}>
-        <Text style={styles.selectLabel}>{field.label}</Text>
+        <Text style={[styles.selectLabel, paper && styles.paperSelectLabel]}>{field.label}</Text>
         <View style={styles.chips}>
           {(field.options ?? []).map((option) => (
             <Chip key={option} label={option} selected={value === option} onPress={() => onChange(value === option ? '' : option)} />
@@ -202,7 +204,16 @@ const styles = StyleSheet.create({
   agree: {
     gap: spacing.sm,
     padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
+  // M85: the agreement box on paper.
+  paperAgree: { backgroundColor: colors.paperCard, borderColor: colors.paperBorder },
+  paperAgreeOn: { borderColor: colors.paperGold },
+  paperAgreeLabel: { color: colors.paperInk },
+  paperSelectLabel: { color: colors.paperInkSoft },
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   agreeLabel: { ...typography.caption, color: colors.textPrimary, flex: 1, textAlign: textStart },
   success: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xl },

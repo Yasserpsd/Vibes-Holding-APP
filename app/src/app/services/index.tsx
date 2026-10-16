@@ -8,7 +8,7 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
-import { ServiceCard } from '@/components/ServiceCard';
+import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { spacing } from '@/theme/tokens';
@@ -43,11 +43,14 @@ export default function ServicesScreen() {
             <FadeInView delay={entranceDelay(order++)}>
               <SectionHeader title={group.title} />
             </FadeInView>
-            {items.map((service) => (
-              <FadeInView key={service.key} delay={entranceDelay(order++)}>
-                <ServiceCard service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
-              </FadeInView>
-            ))}
+            {/* M85 (owner, from the reference app): a compact 2-column grid of light tiles instead of full-width rows. */}
+            <View style={serviceGridStyle}>
+              {items.map((service) => (
+                <FadeInView key={service.key} delay={entranceDelay(order++)} style={serviceTileWrapStyle}>
+                  <ServiceTile service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
+                </FadeInView>
+              ))}
+            </View>
           </View>
         );
       })}

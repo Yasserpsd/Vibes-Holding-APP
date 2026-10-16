@@ -34,6 +34,23 @@ export const colors = {
   success: '#34B27B',
   warning: '#D9A21B',
   danger: '#E05252',
+
+  // M85 «paper» light zones (owner): ivory surfaces with ink text, breaking the single dark tone.
+  paper: '#FAF7F0',
+  paperCard: '#FFFFFF',
+  paperInk: '#17130A',
+  paperInkSoft: '#57503F',
+  paperMuted: '#8C8472',
+  paperBorder: '#E7E0D1',
+  /** Gold dark enough to read on paper. */
+  paperGold: '#8A6D1D',
+} as const;
+
+// M85: each service group wears its own soft accent on the light tiles (icon tint + CTA).
+export const serviceAccents = {
+  entrepreneur: { ink: '#8A6D1D', tint: '#F7EFD8' },
+  member: { ink: '#0E7A5F', tint: '#E2F3EC' },
+  discount: { ink: '#6D4FC2', tint: '#EDE8FA' },
 } as const;
 
 // Neon glows and depth shadows (RN boxShadow — works on iOS and Android with the new architecture).

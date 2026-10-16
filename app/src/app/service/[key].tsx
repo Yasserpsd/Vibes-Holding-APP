@@ -13,7 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
-import { GlassCard } from '@/components/lux';
+import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -178,40 +178,41 @@ type ActionPanelProps = {
 
 function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm, onRoute }: ActionPanelProps) {
   switch (action.type) {
+    // M85 (owner): the request forms sit on PAPER — ivory sheet, ink text, the eye rests.
     case 'whatsapp':
       return (
-        <GlassCard style={styles.panel}>
-          {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
+        <PaperCard pinned>
+          {action.fields.length ? <Text style={styles.paperTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
           <AppButton label={t('service.sendWhatsApp')} icon="logo-whatsapp" onPress={() => onWhatsApp(action)} />
-        </GlassCard>
+        </PaperCard>
       );
     case 'paymob':
       return (
-        <GlassCard golden style={styles.panel}>
-          {action.fields.length ? <Text style={styles.panelTitle}>{t('service.requestDetails')}</Text> : null}
+        <PaperCard pinned>
+          {action.fields.length ? <Text style={styles.paperTitle}>{t('service.requestDetails')}</Text> : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
           {price ? (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{t('service.amount')}</Text>
-              <Text style={styles.priceValue}>{amountLabel(price)}</Text>
-              {price.memberPrice ? <Text style={styles.priceNote}>{t('service.memberPrice')}</Text> : null}
+              <Text style={styles.paperPriceLabel}>{t('service.amount')}</Text>
+              <Text style={styles.paperPriceValue}>{amountLabel(price)}</Text>
+              {price.memberPrice ? <Text style={styles.paperPriceNote}>{t('service.memberPrice')}</Text> : null}
             </View>
           ) : null}
           {!signedIn ? (
             <>
-              <Text style={styles.payHint}>{t('service.signInToPay')}</Text>
+              <Text style={styles.paperPayHint}>{t('service.signInToPay')}</Text>
               <AppButton label={t('service.signInButton')} icon="log-in-outline" onPress={onLogin} />
             </>
           ) : (
             <AppButton label={t('service.payNow')} icon="card-outline" loading={paying} onPress={onPay} />
           )}
-          <Text style={styles.payHint}>{t('service.payHint')}</Text>
-        </GlassCard>
+          <Text style={styles.paperPayHint}>{t('service.payHint')}</Text>
+        </PaperCard>
       );
     case 'link':
       return <AppButton label={action.label} icon="open-outline" onPress={() => void openLink(action.url)} />;
@@ -242,10 +243,11 @@ function parseAnswers(raw: string | undefined): Record<string, string> {
 }
 
 function FieldInput({ field, value, onChange }: { field: ServiceField; value: string; onChange: (value: string) => void }) {
+  const paper = usePaper();
   if (field.options?.length) {
     return (
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>{field.label}</Text>
+        <Text style={[styles.fieldLabel, paper && styles.paperFieldLabel]}>{field.label}</Text>
         <View style={styles.chips}>
           {field.options.map((option) => (
             <Chip key={option} label={option} selected={value === option} onPress={() => onChange(value === option ? '' : option)} />
@@ -290,4 +292,11 @@ const styles = StyleSheet.create({
   priceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
   priceNote: { ...typography.caption, color: colors.goldLight },
   payHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  // M85: the same texts, in ink on the paper sheet.
+  paperTitle: { ...typography.subtitle, color: colors.paperGold, textAlign: textStart },
+  paperFieldLabel: { color: colors.paperInkSoft },
+  paperPriceLabel: { ...typography.caption, color: colors.paperInkSoft },
+  paperPriceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.paperGold },
+  paperPriceNote: { ...typography.caption, color: colors.paperGold },
+  paperPayHint: { ...typography.caption, color: colors.paperMuted, textAlign: textStart },
 });

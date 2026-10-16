@@ -22,7 +22,7 @@ import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
-import { ServiceCard } from '@/components/ServiceCard';
+import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
@@ -179,11 +179,16 @@ export default function HomeScreen() {
           cta={ctaOf('services')?.label ?? content.services.cta}
           onPress={() => pushRoute(ctaOf('services')?.route ?? '/services')}
         />
-        <View style={styles.list}>
-          {personaKey === 'entrepreneur' ? <PartnersPlusCard onPress={() => pushRoute('/service/success-partners')} /> : null}
+        {personaKey === 'entrepreneur' ? (
+          <View style={styles.list}>
+            <PartnersPlusCard onPress={() => pushRoute('/service/success-partners')} />
+          </View>
+        ) : null}
+        {/* M85: the light 2-column tiles, on the home too. */}
+        <View style={serviceGridStyle}>
           {teaser.map((service, index) => (
-            <FadeInView key={service.key} delay={entranceDelay(index)}>
-              <ServiceCard service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
+            <FadeInView key={service.key} delay={entranceDelay(index)} style={serviceTileWrapStyle}>
+              <ServiceTile service={service} onPress={() => router.push({ pathname: '/service/[key]', params: { key: service.key } })} />
             </FadeInView>
           ))}
         </View>
