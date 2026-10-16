@@ -37,7 +37,7 @@ One Railway project, a second service next to the test one. Owner clicks in Rail
 
 | Piece | Test (today) | Production (to create) |
 |---|---|---|
-| API service | `vibes-holding-app-production.up.railway.app` (name says production, env is TEST) | new service from the same repo, root `server/`, suggested name `club-api-prod` |
+| API service | `vibes-holding-app-production.up.railway.app` (name says production, env is TEST) | **`club-api-prod`** → `https://club-api-prod-production.up.railway.app` (created 2026-10-16, root `/server`, branch `main`, port 8080) |
 | Postgres | attached to test | its own new Postgres (never share the test DB) |
 | `APP_ENV` | `test` | `production` |
 | Hub | live hub, test site key | live hub, a **second trusted site row** in the hub's «المواقع» page («خادم التطبيق — الإنتاج», admin powers ticked) → its own `HUB_SITE_KEY` |
