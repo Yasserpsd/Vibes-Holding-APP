@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api';
 import { daysText, formatDay, formatNumber, formatRelative } from '../format';
-import type { Account, AccountFilter, AccountRow } from '../types';
+import type { Account, AccountFilter, AccountRow, PersonaFilter } from '../types';
 import { AsyncPage, Chips, ErrorCard, Pill, SearchBox, SectionHead, useDebounced, useLoad, useShell, type Tone } from '../ui';
+
+// M86 (owner): «اعرف كام مستثمر وكام رائد أعمال وكام محايد — بوتون أدوس عليها ويتفلتر لوحده».
+const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
+  { value: 'all', label: 'كل الفئات' },
+  { value: 'neutral', label: 'محايد' },
+  { value: 'entrepreneur', label: 'رائد أعمال' },
+  { value: 'investor', label: 'مستثمر' },
+];
 
 const PER_PAGE = 25;
 const FILTERS: { value: AccountFilter; label: string }[] = [
@@ -90,20 +98,26 @@ function Row({ account }: { account: AccountRow }) {
 /** Every account of the hub: search, the states with their counts, and beside each annual member what he has left. The shell remounts it to open on another state. */
 export function Members({ initial, stamp }: { initial: AccountFilter; stamp: number }) {
   const [filter, setFilter] = useState<AccountFilter>(initial);
+  const [persona, setPersona] = useState<PersonaFilter>('all');
   const [text, setText] = useState('');
   const [page, setPage] = useState(1);
   const q = useDebounced(text.trim());
-  const state = useLoad(() => api.accounts({ q, state: filter, page, perPage: PER_PAGE }), [q, filter, page, stamp]);
+  const state = useLoad(() => api.accounts({ q, state: filter, persona, page, perPage: PER_PAGE }), [q, filter, persona, page, stamp]);
+  // M86: the category counts over ALL accounts — the buttons show them and a tap filters the list.
+  const personas = useLoad(() => api.personas('all'), [stamp]);
 
-  useEffect(() => setPage(1), [q, filter]);
+  useEffect(() => setPage(1), [q, filter, persona]);
 
   const counts = state.data?.counts;
+  const personaCount = (value: PersonaFilter): number | null =>
+    personas.data ? (value === 'all' ? personas.data.total : personas.data[value]) : null;
   return (
     <>
       <SectionHead title="الأعضاء" hint={state.data ? `الحسابات في هذا العرض: ${formatNumber(state.data.total)}` : undefined} onReload={state.reload} busy={state.loading} />
       <div className="filters">
         <SearchBox value={text} onChange={setText} placeholder="ابحث بالاسم أو البريد أو الجوال" />
         <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: counts?.[entry.value] ?? null }))} value={filter} onChange={setFilter} />
+        <Chips label="الفئة" options={PERSONA_FILTERS.map((entry) => ({ ...entry, count: personaCount(entry.value) }))} value={persona} onChange={setPersona} />
       </div>
       <AsyncPage state={state} onPage={setPage} rows={8} emptyText={q ? 'لا توجد حسابات تطابق البحث.' : 'لا توجد حسابات في هذه الحالة.'}>
         {(data) => (

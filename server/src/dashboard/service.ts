@@ -191,8 +191,27 @@ export class DashboardService {
   }
 
   /** The hub's list with the Projects Bank «رصيد» beside every active member, through one `balances` call. */
-  async accounts(admin: AdminActor, query: { q: string; state: string; page: number; perPage: number }): Promise<Omit<HubResults['admin_accounts'], 'items'> & { items: (HubAccount & { pb: PbBeside | null })[]; pbError: SectionError | null }> {
-    const result = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage });
+  async accounts(
+    admin: AdminActor,
+    query: { q: string; state: string; page: number; perPage: number; persona?: string },
+  ): Promise<Omit<HubResults['admin_accounts'], 'items'> & { items: (HubAccount & { pb: PbBeside | null })[]; pbError: SectionError | null }> {
+    let result: HubResults['admin_accounts'];
+    if (query.persona && query.persona !== 'all') {
+      // M86 (owner): the hub list has no persona filter yet, so the server sweeps it (pages of 100,
+      // capped at 1000 like `personas()`), keeps the chosen category and pages the match locally.
+      const matched: HubAccount[] = [];
+      let counts: Record<string, number> = {};
+      for (let page = 1; page <= 10; page += 1) {
+        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100 });
+        counts = slice.counts;
+        matched.push(...slice.items.filter((account) => account.persona === query.persona));
+        if (page * 100 >= slice.total) break;
+      }
+      const start = (query.page - 1) * query.perPage;
+      result = { ok: true, total: matched.length, page: query.page, per_page: query.perPage, items: matched.slice(start, start + query.perPage), counts };
+    } else {
+      result = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage });
+    }
     const members = result.items.filter((account) => account.state === 'member');
     let balances: Record<string, PbBalanceLite> = {};
     let pbError: SectionError | null = null;
@@ -250,11 +269,11 @@ export class DashboardService {
     });
   }
 
-  /** M33: the active members by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
-  async personas(admin: AdminActor): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number }> {
+  /** M33/M86: accounts by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
+  async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number }> {
     const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0 };
     for (let page = 1; page <= 10; page += 1) {
-      const result = await this.hub(admin, 'admin_accounts', { q: '', state: 'member', page, per_page: 100 });
+      const result = await this.hub(admin, 'admin_accounts', { q: '', state, page, per_page: 100 });
       for (const account of result.items) {
         counts.total += 1;
         if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;

@@ -11,7 +11,14 @@ const q = z.string().trim().max(120).default('');
 const paging = { page: z.coerce.number().int().min(1).max(100_000).default(1), per_page: z.coerce.number().int().min(1).max(100).default(25) };
 const idSchema = z.object({ id: z.coerce.number().int().positive() });
 const homeSchema = z.object({ days: z.coerce.number().int().min(7).max(180).default(30) });
-const accountsSchema = z.object({ q, state: z.enum(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'), ...paging });
+const accountsSchema = z.object({
+  q,
+  state: z.enum(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
+  // M86 (owner): one tap filters the members by their category.
+  persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor']).default('all'),
+  ...paging,
+});
+const personasSchema = z.object({ state: z.enum(['member', 'all']).default('all') });
 const paymentsSchema = z.object({ q, status: z.enum(['all', 'ok', 'failed']).default('all'), action: z.string().trim().max(40).default(''), ...paging });
 const listSchema = z.object({ q, ...paging });
 const leadsSchema = z.object({ q, ltype: z.string().trim().max(40).default(''), ...paging });
@@ -52,7 +59,19 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const query = parse(accountsSchema, request.query, reply);
       if (!query) return;
-      return service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page });
+      return service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona });
+    }),
+  );
+
+  // M86: «كام مستثمر وكام رائد أعمال وكام محايد» — the counts behind the members screen's category buttons.
+  app.get(
+    '/api/admin/personas',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const query = parse(personasSchema, request.query, reply);
+      if (!query) return;
+      return service.personas(admin, query.state);
     }),
   );
 

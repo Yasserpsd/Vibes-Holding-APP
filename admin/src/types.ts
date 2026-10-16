@@ -8,6 +8,7 @@ export type Listed<T> = { ok: true; total: number; page: number; per_page: numbe
 export type AccountState = 'pending' | 'unpaid' | 'member' | 'expired' | 'lead';
 /** The filters of the members list: the states plus the two roles and «all» (which leaves the leads out). */
 export type AccountFilter = 'all' | 'pending' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
+export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor';
 
 export type Account = {
   id: number;
