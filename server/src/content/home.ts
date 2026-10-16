@@ -140,7 +140,7 @@ export const HOME_SEED: HomeContent = {
     cta: 'قدّم من هنا',
   },
   videos: {
-    title: 'مكتبة الفيديو',
+    title: 'تعرف علينا',
     subtitle: 'قصة النادي وملتقياته وشركات المنظومة',
     cta: 'كل الفيديوهات',
   },

@@ -57,9 +57,11 @@ export function PostCard({ post }: { post: Post }) {
   const targeted = audienceBadge(post);
   return (
     <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={radii.lg}>
-      <GlassCard radius={radii.lg} style={[styles.card, post.pinned && styles.cardPinned]}>
+      {/* M76 (owner): a post WITH media leads with a big banner image — visual cards, not a wall of text. */}
+      <GlassCard radius={radii.lg} style={[styles.card, thumbnail ? styles.cardMedia : null, post.pinned && styles.cardPinned]}>
         {post.pinned ? <View pointerEvents="none" style={styles.pinnedWash} /> : null}
-        <View style={styles.texts}>
+        {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.banner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
+        <View style={[styles.texts, thumbnail ? styles.textsPadded : null]}>
           {targeted ? (
             <View style={styles.audience}>
               <View style={styles.audienceBadge}>
@@ -114,7 +116,6 @@ export function PostCard({ post }: { post: Post }) {
             {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
           </View>
         </View>
-        {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" /> : null}
       </GlassCard>
     </PressScale>
   );
@@ -129,6 +130,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
   },
+  // M76: the media card — the banner on top, full-bleed, texts padded underneath.
+  cardMedia: { flexDirection: 'column', alignItems: 'stretch', padding: 0, gap: 0, overflow: 'hidden' },
+  banner: { width: '100%', height: 160, backgroundColor: colors.surfaceElevated },
+  textsPadded: { padding: spacing.md },
   cardPinned: { borderColor: colors.borderGoldSoft },
   pinnedWash: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, backgroundColor: colors.goldFaint },
   texts: { flex: 1, gap: spacing.xs },
@@ -146,5 +151,4 @@ const styles = StyleSheet.create({
   eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   time: { ...typography.caption, color: colors.textMuted },
-  thumbnail: { width: 72, height: 72, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
 });

@@ -6,7 +6,7 @@ import { Animated, Platform, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView, PopIn } from '@/components/motion';
+import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
@@ -141,12 +141,10 @@ export default function ProjectScreen() {
             <ProjectBrief projectId={String(project.id)} />
           </FadeInView>
 
+          {/* M80 (owner): the original text hides behind «اقرأ المزيد», collapsed by default. */}
           {project.details ?? project.detailsEn ? (
             <FadeInView delay={240}>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('project.about')}</Text>
-                <Text style={styles.body}>{project.details ?? project.detailsEn}</Text>
-              </View>
+              <ReadMore text={project.details ?? project.detailsEn ?? ''} />
             </FadeInView>
           ) : null}
 
@@ -155,6 +153,28 @@ export default function ProjectScreen() {
           </FadeInView>
         </ScrollView>
       )}
+    </View>
+  );
+}
+
+/** M80: the project's raw description behind an «اقرأ المزيد» expander — a tap reveals the original wording. */
+function ReadMore({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.section}>
+      <PressScale onPress={() => setOpen((current) => !current)} accessibilityRole="button" accessibilityLabel={t('project.about')} style={styles.readMoreHeader}>
+        <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+        <Text style={styles.sectionTitle}>{t('project.about')}</Text>
+        <View style={styles.readMorePill}>
+          <Text style={styles.readMorePillText}>{open ? t('project.readLess') : t('project.readMore')}</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.goldLight} />
+        </View>
+      </PressScale>
+      {open ? (
+        <FadeInView offset={8}>
+          <Text style={styles.body}>{text}</Text>
+        </FadeInView>
+      ) : null}
     </View>
   );
 }
@@ -220,4 +240,18 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.gold },
   body: { ...typography.body, color: colors.textSecondary },
+  readMoreHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  readMorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+    marginStart: 'auto',
+  },
+  readMorePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
 });

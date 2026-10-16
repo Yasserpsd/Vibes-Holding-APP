@@ -77,6 +77,8 @@ export default function HqScreen() {
             <AppButton label={t('hq.openMap')} variant="outline" icon="map-outline" onPress={() => void openLink(content.mapUrl)} style={styles.action} />
             <AppButton label={t('hq.tour')} variant="outline" icon="play-circle-outline" onPress={() => void openLink(`https://www.youtube.com/watch?v=${content.tourVideoId}`)} style={styles.action} />
           </View>
+          {/* M76 (owner): right after the map — a DIRECT booking CTA, the first actionable thing. */}
+          {data.access === 'member' ? <AppButton label={t('hq.bookNow')} icon="calendar-outline" onPress={() => router.push('/hq/book')} /> : null}
         </GlassCard>
       </FadeInView>
 

@@ -17,7 +17,7 @@
   "nav.services": "خدمات النادي",
   "nav.service": "الخدمة",
   "nav.form": "نموذج التسجيل",
-  "nav.videos": "مكتبة الفيديو",
+  "nav.videos": "تعرف علينا",
   "nav.watch": "المشاهدة",
   "watch.openYoutube": "المشاهدة على يوتيوب",
   "watch.openBrowser": "فتح الفيديو في المتصفح",
@@ -86,7 +86,7 @@
   "account.menu.hq": "مقر النادي وزياراتي",
   "account.menu.payments": "مدفوعاتي",
   "account.menu.services": "خدمات النادي",
-  "account.menu.videos": "مكتبة الفيديو",
+  "account.menu.videos": "تعرف علينا",
   "account.menu.about": "عنّا",
   "account.menu.hqAdmin": "طلبات زيارة المقر (إدارة)",
   "account.menu.language": "اللغة (English)",
@@ -810,5 +810,12 @@
   "agenda.feeTag": "رسوم لغير الأعضاء",
   "home.partnersPlus": "انضم إلى شركاء النجاح",
   "home.partnersPlusHint": "سجّل مشروعك واعرضه على مستثمري النادي",
-  "home.quick.title": "اختصاراتك"
+  "home.quick.title": "اختصاراتك",
+  "home.intro.title": "تعرف علينا أكتر",
+  "home.intro.subtitle": "دقائق تعرّفك بنادي المستثمرين ومنظومة Vibes Ventures",
+  "home.intro.play": "شاهد الفيديو",
+  "home.intro.later": "لاحقًا",
+  "project.readMore": "اقرأ المزيد",
+  "project.readLess": "إخفاء",
+  "hq.bookNow": "احجز موعدًا فورًا"
 }

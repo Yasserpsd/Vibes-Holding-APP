@@ -44,6 +44,9 @@ function BriefBody({ brief }: { brief: Brief }) {
           </View>
           {brief.summary ? <Text style={styles.summary}>{brief.summary}</Text> : null}
 
+          {/* M80 (owner): the stage stepper FIRST — «اول حاجة مرحلة المشروع الشكل المميز ده» — then the table. */}
+          <StageStepper stage={brief.stage} />
+
           {brief.table.length ? (
             <View style={styles.table}>
               {brief.table.map((row, index) => (
@@ -59,8 +62,6 @@ function BriefBody({ brief }: { brief: Brief }) {
             </View>
           ) : null}
 
-          <StageStepper stage={brief.stage} />
-
           <Points title={t('brief.strengths')} icon="trending-up-outline" tone={colors.success} items={brief.strengths} />
           <Points title={t('brief.risks')} icon="alert-circle-outline" tone={colors.warning} items={brief.risks} />
         </GlassCard>
@@ -69,7 +70,11 @@ function BriefBody({ brief }: { brief: Brief }) {
       {brief.competitors.length ? (
         <FadeInView delay={entranceDelay(1)}>
           <View style={styles.competitors}>
-            <Text style={styles.sectionTitle}>{t('brief.competitors')}</Text>
+            {/* M80 (owner): every big heading carries its icon. */}
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="git-compare-outline" size={18} color={colors.gold} />
+              <Text style={styles.sectionTitle}>{t('brief.competitors')}</Text>
+            </View>
             {brief.competitors.map((competitor) => (
               <PressScale
                 key={competitor.id}
@@ -256,7 +261,8 @@ const styles = StyleSheet.create({
   pointText: { ...typography.caption, fontSize: 14, lineHeight: 22, flex: 1, color: colors.textSecondary, textAlign: textStart },
 
   competitors: { gap: spacing.sm },
-  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
+  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   competitor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
   competitorTexts: { flex: 1, gap: spacing.xs },
   competitorTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },

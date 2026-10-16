@@ -20,7 +20,7 @@ export const VIDEOS_CONTENT_KEY = 'content:videos';
 
 // Curated picks from docs/PROJECT_BRIEF.md section 5.4; the channel feed fills in the titles and the rest.
 export const VIDEOS_SEED: VideosContent = {
-  title: 'مكتبة الفيديو',
+  title: 'تعرف علينا',
   intro: 'كل فيديوهات قناة نادي المستثمرين على يوتيوب: قصة النادي، الملتقيات، وشركات المنظومة.',
   channelUrl: 'https://www.youtube.com/@investorscl/videos',
   featuredTitle: 'ابدأ من هنا',
@@ -34,8 +34,8 @@ export const VIDEOS_SEED: VideosContent = {
     { id: 'vLI-G989nIk', label: 'تطبيق سكة' },
     { id: 'XERenNWNziA', label: 'جولة في مقر النادي' },
   ],
-  version: 1,
-  updatedAt: '2026-09-12T00:00:00.000Z',
+  version: 2,
+  updatedAt: '2026-10-17T00:00:00.000Z',
 };
 
 export async function ensureVideosSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {

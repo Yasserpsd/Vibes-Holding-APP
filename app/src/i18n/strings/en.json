@@ -17,7 +17,7 @@
   "nav.services": "Club Services",
   "nav.service": "Service",
   "nav.form": "Registration form",
-  "nav.videos": "Video Library",
+  "nav.videos": "Get to Know Us",
   "nav.watch": "Watch",
   "watch.openYoutube": "Watch on YouTube",
   "watch.openBrowser": "Open the video in the browser",
@@ -86,7 +86,7 @@
   "account.menu.hq": "Club headquarters and my visits",
   "account.menu.payments": "My payments",
   "account.menu.services": "Club services",
-  "account.menu.videos": "Video library",
+  "account.menu.videos": "Get to know us",
   "account.menu.about": "About us",
   "account.menu.hqAdmin": "Headquarters visit requests (admin)",
   "account.menu.language": "Language (العربية)",
@@ -810,5 +810,12 @@
   "agenda.feeTag": "Fee for non-members",
   "home.partnersPlus": "Join Success Partners",
   "home.partnersPlusHint": "Register your venture and present it to the club investors",
-  "home.quick.title": "Your shortcuts"
+  "home.quick.title": "Your shortcuts",
+  "home.intro.title": "Get to know us",
+  "home.intro.subtitle": "A few minutes introducing the Investors Club and the Vibes Ventures group",
+  "home.intro.play": "Watch the film",
+  "home.intro.later": "Later",
+  "project.readMore": "Read more",
+  "project.readLess": "Hide",
+  "hq.bookNow": "Book a visit now"
 }

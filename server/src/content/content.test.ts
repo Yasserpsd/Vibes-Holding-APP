@@ -82,8 +82,8 @@ test('the app reads every block in its language; the logic keeps the Arabic stru
   assert.equal((await get('/api/about', 'en')).json().sections[1].bullets[0], 'Success Partners: a venture starts by registering, and a specialised committee reviews it before it is approved.');
   const hq = (await get('/api/hq', 'en')).json();
   assert.deepEqual([hq.content.title, hq.content.hours.open, hq.lockedText], ['Club HQ', HQ_SEED.hours.open, 'Sign in to your account and activate your annual membership to book an HQ visit.']);
-  assert.equal((await get('/api/videos', 'en')).json().title, 'Video library');
-  assert.equal((await get('/api/videos')).json().title, 'مكتبة الفيديو');
+  assert.equal((await get('/api/videos', 'en')).json().title, 'Get to know us');
+  assert.equal((await get('/api/videos')).json().title, 'تعرف علينا');
 });
 
 test('only a dashboard admin edits a text; each language keeps its own edits; the app hears of it', async () => {

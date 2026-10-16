@@ -40,7 +40,7 @@ export const HOME_EN: Translation<HomeContent> = {
     cta: 'Apply here',
   },
   videos: {
-    title: 'Video library',
+    title: 'Get to know us',
     subtitle: "The club's story, its meetups and the group's companies",
     cta: 'All videos',
   },

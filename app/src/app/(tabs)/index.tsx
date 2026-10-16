@@ -14,6 +14,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AgendaBlock } from '@/components/AgendaBlock';
 import { AppButton } from '@/components/AppButton';
+import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline, NeonPulse } from '@/components/lux';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
@@ -237,6 +238,8 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
+      {/* M84: the one-time «تعرف علينا أكتر» film popup — first open only. */}
+      <IntroVideoPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
       <View style={styles.hero}>
         <FadeInView offset={12}>

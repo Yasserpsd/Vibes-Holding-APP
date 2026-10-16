@@ -3,7 +3,7 @@ import type { VideosContent } from '../videos.js';
 
 /** The video library page in English; the picks and the channel are the Arabic block's. */
 export const VIDEOS_EN: Translation<VideosContent> = {
-  title: 'Video library',
+  title: 'Get to know us',
   intro: "Every video of the Investors Club channel on YouTube: the club's story, the meetups and the group's companies.",
   featuredTitle: 'Start here',
   featured: [
