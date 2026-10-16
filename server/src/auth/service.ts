@@ -154,9 +154,9 @@ export class AuthService {
     return config.HUB_MODE === 'mock' || config.APP_ENV === 'production' || config.HUB_ALLOW_TEST_REGISTRATION === '1';
   }
 
-  /** Preview builds sign in hub admins only (CLAUDE.md rule 9). */
+  /** M79-launch (owner, 2026-10-17): the preview is open for everyone to try the personas; AUTH_ADMIN_ONLY=1 restores the old rule-9 gate. */
   get adminOnly(): boolean {
-    return this.deps.config.APP_ENV !== 'production';
+    return this.deps.config.APP_ENV !== 'production' && this.deps.config.AUTH_ADMIN_ONLY === '1';
   }
 
   async register(input: RegisterInput, ip: string): Promise<PendingResult> {

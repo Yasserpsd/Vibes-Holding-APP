@@ -819,7 +819,16 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "home.intro.later": "لاحقًا",
     "project.readMore": "اقرأ المزيد",
     "project.readLess": "إخفاء",
-    "hq.bookNow": "احجز موعدًا فورًا"
+    "hq.bookNow": "احجز موعدًا فورًا",
+    "tabs.inbox": "الإشعارات",
+    "inbox.subtitle": "كل جديد النادي في مكان واحد: رسائل الإدارة والفعاليات والأخبار والمشاريع",
+    "inbox.empty": "لا جديد حتى الآن — كل ما يحدث في النادي سيظهر هنا.",
+    "inbox.allNews": "كل الأخبار",
+    "inbox.kind.post": "رسالة من الإدارة",
+    "inbox.kind.event": "فعالية",
+    "inbox.kind.news": "خبر",
+    "inbox.kind.project": "مشروع في البنك",
+    "inbox.kind.person": "شخصية ومسيرة"
   },
   "en": {
     "tabs.home": "Home",
@@ -1640,7 +1649,16 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "home.intro.later": "Later",
     "project.readMore": "Read more",
     "project.readLess": "Hide",
-    "hq.bookNow": "Book a visit now"
+    "hq.bookNow": "Book a visit now",
+    "tabs.inbox": "Alerts",
+    "inbox.subtitle": "Everything new at the club in one place: admin messages, events, news and projects",
+    "inbox.empty": "Nothing new yet — everything happening at the club will show here.",
+    "inbox.allNews": "All the news",
+    "inbox.kind.post": "Admin message",
+    "inbox.kind.event": "Event",
+    "inbox.kind.news": "News",
+    "inbox.kind.project": "Bank project",
+    "inbox.kind.person": "Profile & Journey"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -1651,6 +1669,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "country": "أسماء الدول",
     "profile": "تعديل الملف الشخصي",
     "home": "الرئيسية",
+    "inbox": "مركز الإشعارات",
     "projects": "بنك المشاريع (القائمة)",
     "project": "صفحة المشروع",
     "brief": "ملخص المستشار للمشروع",

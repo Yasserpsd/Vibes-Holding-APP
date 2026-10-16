@@ -10,10 +10,12 @@ type Props = {
   subtitle?: string | null;
   cta?: string | null;
   onPress?: () => void;
+  /** M75: an unread count pinned beside the title («+3»); 0 hides it. */
+  badge?: number;
 };
 
 /** Section title behind a small gold accent bar, with an optional «عرض الكل» link on the far side. */
-export function SectionHeader({ title, subtitle, cta, onPress }: Props) {
+export function SectionHeader({ title, subtitle, cta, onPress, badge = 0 }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.accent} />
@@ -21,6 +23,11 @@ export function SectionHeader({ title, subtitle, cta, onPress }: Props) {
         {/* M77 (owner): the CTA sits on the TITLE line, parallel to it, never bouncing to the subtitle's bottom. */}
         <View style={styles.titleRow}>
           <Text style={styles.title}>{title}</Text>
+          {badge > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 9 ? '+9' : `+${badge}`}</Text>
+            </View>
+          ) : null}
           {cta && onPress ? (
             <PressScale onPress={onPress} hitSlop={8} accessibilityRole="button" wrapStyle={styles.ctaWrap} style={styles.cta}>
               <Text style={styles.ctaText}>{cta}</Text>
@@ -53,4 +60,15 @@ const styles = StyleSheet.create({
   ctaWrap: { flexShrink: 0 },
   cta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   ctaText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  // M75: the unread «+N» pill.
+  badge: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    boxShadow: shadows.glowGoldFaint,
+  },
+  badgeText: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 17, color: '#141005' },
 });

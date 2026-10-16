@@ -817,5 +817,14 @@
   "home.intro.later": "Later",
   "project.readMore": "Read more",
   "project.readLess": "Hide",
-  "hq.bookNow": "Book a visit now"
+  "hq.bookNow": "Book a visit now",
+  "tabs.inbox": "Alerts",
+  "inbox.subtitle": "Everything new at the club in one place: admin messages, events, news and projects",
+  "inbox.empty": "Nothing new yet — everything happening at the club will show here.",
+  "inbox.allNews": "All the news",
+  "inbox.kind.post": "Admin message",
+  "inbox.kind.event": "Event",
+  "inbox.kind.news": "News",
+  "inbox.kind.project": "Bank project",
+  "inbox.kind.person": "Profile & Journey"
 }

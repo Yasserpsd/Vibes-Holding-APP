@@ -817,5 +817,14 @@
   "home.intro.later": "لاحقًا",
   "project.readMore": "اقرأ المزيد",
   "project.readLess": "إخفاء",
-  "hq.bookNow": "احجز موعدًا فورًا"
+  "hq.bookNow": "احجز موعدًا فورًا",
+  "tabs.inbox": "الإشعارات",
+  "inbox.subtitle": "كل جديد النادي في مكان واحد: رسائل الإدارة والفعاليات والأخبار والمشاريع",
+  "inbox.empty": "لا جديد حتى الآن — كل ما يحدث في النادي سيظهر هنا.",
+  "inbox.allNews": "كل الأخبار",
+  "inbox.kind.post": "رسالة من الإدارة",
+  "inbox.kind.event": "فعالية",
+  "inbox.kind.news": "خبر",
+  "inbox.kind.project": "مشروع في البنك",
+  "inbox.kind.person": "شخصية ومسيرة"
 }

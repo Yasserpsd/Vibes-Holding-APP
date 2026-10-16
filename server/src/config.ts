@@ -22,7 +22,9 @@ const envSchema = z.object({
   HUB_URL: z.string().url().default('https://vcmem.com'),
   HUB_SITE_KEY: z.string().min(20).optional(),
   // In the test environment registrations on the live hub stay closed unless the owner opens them.
-  HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('0'),
+  HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('1'),
+  // M79-launch (owner, 2026-10-17): the test app is OPEN for everyone to try the personas; '1' restores the old admins-only preview.
+  AUTH_ADMIN_ONLY: z.enum(['0', '1']).default('0'),
   // Signs the hub's webhook to /api/webhooks/hub (hub settings «app_webhook_secret», shown once). Unset = the webhook answers 503.
   HUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),

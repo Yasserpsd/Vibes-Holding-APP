@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { ProjectCard } from '@/components/ProjectCard';
 import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
+import { markSeen } from '@/lib/seen';
 import { formatNumber } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -36,6 +37,12 @@ export default function ProjectsScreen() {
   const q = useDebounced(search.trim());
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'projects', title: t('tabs.projects') }, true);
+  // M75: opening the bank clears its +N badge.
+  useFocusEffect(
+    useCallback(() => {
+      markSeen('projects');
+    }, []),
+  );
 
   const filters = useProjectFilters();
   const list = useProjectsList({ q, sort, sector, stage });

@@ -5,7 +5,8 @@ import { Animated, StyleSheet, View, type ColorValue } from 'react-native';
 
 import { PopIn } from '@/components/motion';
 import { t, type StringKey } from '@/i18n';
-import { colors, gradients, radii, shadows, typography } from '@/theme/tokens';
+import { useTabBadges } from '@/lib/badges';
+import { colors, fonts, gradients, radii, shadows, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -21,7 +22,8 @@ const TABS: TabDefinition[] = [
   { name: 'index', title: 'tabs.home', icon: 'home', iconOutline: 'home-outline' },
   { name: 'projects', title: 'tabs.projects', icon: 'briefcase', iconOutline: 'briefcase-outline' },
   { name: 'advisor', title: 'tabs.advisor', icon: 'sparkles', iconOutline: 'sparkles-outline' },
-  { name: 'news', title: 'tabs.news', icon: 'newspaper', iconOutline: 'newspaper-outline' },
+  // M75 (owner): the news tab became the fixed «الإشعارات» center for every persona.
+  { name: 'news', title: 'tabs.inbox', icon: 'notifications', iconOutline: 'notifications-outline' },
   { name: 'account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
 
@@ -48,6 +50,9 @@ function TabIcon({ name, color, size, focused }: { name: IoniconName; color: Col
 }
 
 export default function TabsLayout() {
+  // M75: «+N» on the tabs — fresh things since this device last looked.
+  const badges = useTabBadges();
+  const badgeOf = (name: string): number => (name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : 0);
   return (
     <Tabs
       screenOptions={{
@@ -80,6 +85,8 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, focused, size }) => (
               <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
             ),
+            tabBarBadge: badgeOf(tab.name) > 0 ? (badgeOf(tab.name) > 9 ? '+9' : `+${badgeOf(tab.name)}`) : undefined,
+            tabBarBadgeStyle: styles.badge,
           }}
         />
       ))}
@@ -97,6 +104,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldSoft,
     borderWidth: 1,
     borderColor: colors.borderGoldSoft,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  // M75: the «+N» pill on a tab — small, golden, impossible to miss.
+  badge: {
+    backgroundColor: colors.gold,
+    color: colors.goldInk,
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    lineHeight: 14,
+    minWidth: 20,
     boxShadow: shadows.glowGoldFaint,
   },
 });

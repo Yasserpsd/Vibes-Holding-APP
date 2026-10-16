@@ -1,5 +1,5 @@
-import { Stack, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
+import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet, Text } from 'react-native';
 
 import { usePosts } from '@/api/posts';
@@ -11,6 +11,7 @@ import { PostCard } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
+import { markSeen } from '@/lib/seen';
 import { colors, typography } from '@/theme/tokens';
 
 /** Every «رسائل الإدارة» post, pinned first, then newest; older pages load on demand. M29: it is the member's inbox. */
@@ -20,6 +21,12 @@ export default function PostsScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   useAdvisorScreen({ type: 'screen', id: 'posts', title: t('nav.posts') });
+  // M75: reading the admin messages clears their unread count.
+  useFocusEffect(
+    useCallback(() => {
+      markSeen('posts');
+    }, []),
+  );
   const posts = query.data?.pages.flatMap((page) => page.posts) ?? [];
 
   const onRefresh = async () => {

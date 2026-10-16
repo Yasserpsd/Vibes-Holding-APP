@@ -92,7 +92,7 @@ test('only a dashboard admin edits; the app reads the edits of its language', as
   const home = list.items.find((item: { key: string }) => item.key === 'tabs.home');
   assert.deepEqual([home.ar, home.arEdit.value, home.en, home.enEdit.value, home.group], ['الرئيسية', 'الصفحة الرئيسية', 'Home', 'Start', 'tabs']);
   assert.deepEqual(list.edited, { ar: 1, en: 1 });
-  assert.ok(list.groups.some((group: { key: string; label: string; count: number }) => group.key === 'tabs' && group.count === 5));
+  assert.ok(list.groups.some((group: { key: string; label: string; count: number }) => group.key === 'tabs' && group.count === 6));
 
   // Back to the app's own text: by asking for it, or by typing it again.
   assert.equal((await put({ lang: 'ar', key: 'tabs.home', value: null })).json().edit, null);

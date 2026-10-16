@@ -42,7 +42,8 @@ test('auth config lists GCC countries and personas without caching', async () =>
   assert.equal(body.countries[0].code, 'sa');
   assert.equal(body.personas.length, 3);
   assert.equal(body.registrationOpen, true);
-  assert.equal(body.adminOnly, true);
+  // M79-launch: the test app is open by default — anyone registers and signs in to try the personas.
+  assert.equal(body.adminOnly, false);
   assert.equal(body.testCode, MOCK_CODE);
 });
 
@@ -211,8 +212,8 @@ test('delete account needs the password and ends the session', async () => {
   assert.equal(gone.statusCode, 401);
 });
 
-test('test environment closes registration on the live hub and admits admins only', async () => {
-  const liveConfig = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'live', HUB_SITE_KEY: 'x'.repeat(40) });
+test('the owner can still close test registration and restore the admins-only preview', async () => {
+  const liveConfig = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'live', HUB_SITE_KEY: 'x'.repeat(40), HUB_ALLOW_TEST_REGISTRATION: '0', AUTH_ADMIN_ONLY: '1' });
   const hub = new MockHubClient();
   const original = hub.call.bind(hub);
   // Pretend the hub says this account is not an admin.
