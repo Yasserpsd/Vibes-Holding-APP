@@ -86,6 +86,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   mustPay: boolean;
   /** Only for a confirmed online attendee. */
   onlineUrl: string | null;
+  /** M77: the event's last day has passed — the app keeps it listed, faded. */
+  past: boolean;
 };
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
@@ -136,7 +138,7 @@ export class AgendaService {
     return (await this.loadEvents()).find((event) => event.id === id) ?? null;
   }
 
-  private toPublic(event: AgendaEvent, mine: AgendaRegistration | null, me: Me | null, lang: 'ar' | 'en' = 'ar'): PublicAgendaEvent {
+  private toPublic(event: AgendaEvent, mine: AgendaRegistration | null, me: Me | null, lang: 'ar' | 'en' = 'ar', past = false): PublicAgendaEvent {
     const { id, date, time, endTime, mode, feeSar, open } = event;
     // M43: the English app reads the stored English (AI once, owner-editable); anything untranslated stays Arabic.
     const en = lang === 'en' ? (event.en ?? null) : null;
@@ -152,28 +154,41 @@ export class AgendaService {
       place: en?.place || event.place,
       mode,
       feeSar,
-      open,
+      // A finished event never registers, whatever the stored flag says.
+      open: open && !past,
       mine: mine ? { attendance: mine.attendance, paid: mine.paid } : null,
       mustPay: Boolean(me && me.membership.status !== 'active' && feeSar > 0),
       onlineUrl: confirmedOnline && event.onlineUrl ? event.onlineUrl : null,
+      past,
     };
   }
 
-  /** The upcoming events (today included, Riyadh time) with the viewer's own state. */
+  /** M77: a finished event stays listed (faded in the app) this many days before it leaves the agenda. */
+  private static readonly PAST_KEPT_DAYS = 90;
+
+  /** The upcoming events first (today included, Riyadh time), then the recently finished ones flagged `past`, with the viewer's own state. */
   async forViewer(me: Me | null, lang: 'ar' | 'en' = 'ar', now = Date.now()): Promise<PublicAgendaEvent[]> {
     const today = riyadhDay(now);
+    const keptFrom = riyadhDay(now - AgendaService.PAST_KEPT_DAYS * 24 * 60 * 60 * 1000);
     const [events, registrations] = await Promise.all([this.loadEvents(), this.loadRegs()]);
     const mineByEvent = new Map<string, AgendaRegistration>();
     if (me) for (const registration of registrations) if (registration.contactId === me.id) mineByEvent.set(registration.eventId, registration);
+    const publish = (event: AgendaEvent, past: boolean) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang, past);
     // M70: a workshop stays on the agenda (and open) until its LAST day has passed.
-    return events.filter((event) => lastDay(event) >= today).map((event) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang));
+    const upcoming = events.filter((event) => lastDay(event) >= today).map((event) => publish(event, false));
+    // M77 (owner, 2026-10-16): «الورش السابقة تفضل موجودة ولكن باهتة» — the most recent first, after the upcoming ones.
+    const past = events
+      .filter((event) => lastDay(event) < today && lastDay(event) >= keptFrom)
+      .sort((a, b) => lastDay(b).localeCompare(lastDay(a)))
+      .map((event) => publish(event, true));
+    return [...upcoming, ...past];
   }
 
   async viewerEvent(id: string, me: Me | null, lang: 'ar' | 'en' = 'ar'): Promise<PublicAgendaEvent | null> {
     const event = await this.event(id);
     if (!event) return null;
     const mine = me ? ((await this.loadRegs()).find((entry) => entry.eventId === id && entry.contactId === me.id) ?? null) : null;
-    return this.toPublic(event, mine, me, lang);
+    return this.toPublic(event, mine, me, lang, lastDay(event) < riyadhDay(Date.now()));
   }
 
   /** M43: the English of the event — `auto: false` records the owner's own wording and stops retranslation. */

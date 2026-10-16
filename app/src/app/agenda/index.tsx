@@ -31,7 +31,7 @@ export default function AgendaScreen() {
       ) : (
         events.map((event, index) => (
           <FadeInView key={event.id} delay={entranceDelay(index, 70)}>
-            <EventCard event={event} highlight={index === 0} onPress={() => router.push(`/agenda/${event.id}` as Href)} />
+            <EventCard event={event} highlight={index === 0 && !event.past} onPress={() => router.push(`/agenda/${event.id}` as Href)} />
           </FadeInView>
         ))
       )}
@@ -53,9 +53,11 @@ export function EventDateBadge({ date, size = 'md', highlight = false }: { date:
 
 function EventCard({ event, highlight, onPress }: { event: AgendaEvent; highlight?: boolean; onPress: () => void }) {
   const mine = event.mine;
+  // M77 (owner): a finished event stays on the list, faded — «تفضل موجودة ولكن باهتة».
+  const past = event.past === true;
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
-      <GlassCard golden={highlight} style={styles.card}>
+      <GlassCard golden={highlight} style={[styles.card, past && styles.pastCard]}>
         <EventDateBadge date={event.date} highlight={highlight} />
         <View style={styles.cardBody}>
           <Text style={styles.title} numberOfLines={2}>
@@ -65,7 +67,7 @@ function EventCard({ event, highlight, onPress }: { event: AgendaEvent; highligh
             {`${formatEventDays(event.dates, event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
           </Text>
           <Text style={styles.fee} numberOfLines={1}>
-            {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
+            {past ? t('agenda.past') : event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
           </Text>
           {mine ? (
             <View style={styles.minePill}>
@@ -90,6 +92,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
   },
+  // M77: the faded look of a finished event.
+  pastCard: { opacity: 0.45 },
   cardBody: { flex: 1, gap: 4 },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

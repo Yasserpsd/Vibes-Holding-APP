@@ -155,9 +155,21 @@ test('closed events and past days refuse registrations', async () => {
 
   const past = await send('POST', '/api/admin/agenda', { title: 'فعالية فاتت', date: '2026-01-01', mode: 'both', open: true }, adminToken);
   assert.equal((await send('POST', `/api/agenda/${past.json().event.id}/register`, { attendance: 'hq' }, memberToken)).statusCode, 409);
-  // The public agenda hides past events; the dashboard still sees them.
+  // M77: an event finished long ago (over 90 days) leaves the public agenda; the dashboard still sees it.
   const pub = await get('/api/agenda');
   assert.ok(!(pub.json().events as { id: string }[]).some((entry) => entry.id === past.json().event.id));
+
+  // M77 (owner): a RECENTLY finished event stays listed — flagged `past`, closed, and AFTER the upcoming ones.
+  const recentDay = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+  const recent = await send('POST', '/api/admin/agenda', { title: 'ورشة انتهت للتو', date: recentDay, mode: 'both', open: true }, adminToken);
+  const listed = (await get('/api/agenda')).json().events as { id: string; past: boolean; open: boolean }[];
+  const entry = listed.find((item) => item.id === recent.json().event.id);
+  assert.ok(entry, 'the recent past event is listed');
+  assert.equal(entry?.past, true);
+  assert.equal(entry?.open, false);
+  assert.ok(listed.filter((item) => !item.past).every((item) => listed.indexOf(item) < listed.indexOf(entry as (typeof listed)[0])), 'upcoming events come first');
+  assert.equal((await send('POST', `/api/agenda/${recent.json().event.id}/register`, { attendance: 'hq' }, memberToken)).statusCode, 409);
+  await send('DELETE', `/api/admin/agenda/${recent.json().event.id}`, undefined, adminToken);
 });
 
 test('the dashboard sees counts and the registrations of an event, and can edit and delete', async () => {

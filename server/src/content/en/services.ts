@@ -16,6 +16,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
   services: [
     {
       key: 'meetup',
+      cta: 'Request your meetup',
       title: 'Make your meetup',
       summary: "A meetup in your name, attended by the club's investors and entrepreneurs, which we organise for you from the idea to the stage.",
       detail: "You choose the meetup's topic and audience, and the club team handles the organisation, invitations and production at the club HQ in Riyadh or online. Subscribed members get a 50% discount.",
@@ -31,6 +32,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'success-partners',
+      cta: 'Register your venture',
       title: 'Success Partners',
       summary: 'Register your venture to be reviewed by a specialised committee and listed in the Projects Bank if approved.',
       detail: "The Success Partners programme is the source of the group's distinctive ventures. After registration a specialised committee reviews and assesses your venture within 10 working days, and once it meets the acceptance criteria it moves to the Projects Bank and is shown to the club's members. Subscribed members get priority in applying and in presentation.",
@@ -39,6 +41,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'pitch-deck',
+      cta: 'Order your deck',
       title: 'Pitch deck design',
       summary: 'A professional presentation of your venture prepared by the PV Business Incubators and Accelerators team.',
       detail: "It covers writing the venture's story, a brief financial model and slide design with a professional identity ready to present to investors.",
@@ -54,6 +57,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'workshop',
+      cta: 'Join the workshop',
       title: 'Workshops',
       summary: 'The “Your venture from idea to execution” workshop: 17 to 19 October 2026 at the club HQ and online.',
       detail: "Three practical days that take your venture from the idea to a clear execution plan, with the club's experts.",
@@ -63,6 +67,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'studio',
+      cta: 'Book the studio',
       title: 'Al-Moltaqa podcast: studio booking',
       summary: "The studio packages (basic, advanced, full, theatre, outdoor filming) at a 50% discount for members; booking through the studio's WhatsApp.",
       detail: 'Choose the package and your preferred time, and the studio team will contact you on WhatsApp to confirm the booking and the details.',
@@ -77,12 +82,14 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'hq-visit',
+      cta: 'Book your visit',
       title: 'Club HQ visit',
       summary: 'Book your visit to the club HQ in Riyadh; once the administration confirms, you receive the entry barcode for your appointment.',
       memberLabel: 'For subscribed members',
     },
     {
       key: 'theater',
+      cta: 'Book the space',
       title: 'Club theatre and meeting room',
       summary: 'A theatre seating up to 80 people and a meeting room for 8 people with a Zoom subscription, at the club HQ at a 50% discount for members.',
       memberLabel: '50% discount for members',
@@ -96,6 +103,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'consultation',
+      cta: 'Start your consultation',
       title: 'Online consultation with a smart advisor',
       summary: 'An online consultation session with a smart AI-powered advisor, at no extra fees for subscribed members.',
       detail: 'It helps you understand your idea and set your next steps, with a daily renewing usage balance around the clock.',
@@ -104,6 +112,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'famous',
+      cta: 'Apply here',
       title: 'Profile and Journey',
       summary: "Your appearance in a “Profile and Journey” interview on the club's platforms, at no charge for subscribed members.",
       memberLabel: 'No charge for members',
@@ -111,6 +120,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'repost',
+      cta: 'Request a feature',
       title: "Highlighting your venture on the club's platforms",
       summary: "Your venture re-highlighted once a month to all club members on the club's platforms and the app.",
       memberLabel: 'Once a month for members',
@@ -121,12 +131,14 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'credit',
+      cta: 'Use your credit',
       title: 'Projects Bank balance',
       summary: 'A balance worth SAR 2,500 that opens the details of 5 complete real ventures you pick yourself.',
       memberLabel: 'Included in the membership',
     },
     {
       key: 'momentum',
+      cta: 'Request the service',
       title: 'Momentum: websites, apps and marketing',
       summary: 'Website and app design, digital marketing packages and influencer advertising at a 50% discount for members.',
       memberLabel: '50% discount for members',
@@ -137,6 +149,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'franchise',
+      cta: 'Request the kit',
       title: 'Franchise package',
       summary: 'The franchise package from Franchment to expand your brand, at a 50% discount for members.',
       memberLabel: '50% discount for members',
@@ -147,6 +160,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     },
     {
       key: 'manfaz',
+      cta: 'Get the code',
       title: '“Manfaz” products discount code',
       summary: 'A discount code of up to 20% on “Manfaz” products from Quick Deals Trading.',
       memberLabel: 'Up to 20% for members',

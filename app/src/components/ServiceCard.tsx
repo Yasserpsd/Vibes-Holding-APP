@@ -41,6 +41,17 @@ export function ServiceCard({ service, onPress }: Props) {
               {service.memberLabel ? <Text style={[styles.member, locked && styles.lockedGold]}>{service.memberLabel}</Text> : null}
             </View>
           ) : null}
+          {/* M74 (owner): every service carries its imperative CTA — «سجّل», «احجز»… */}
+          {service.cta && !locked ? (
+            <View style={styles.ctaRow}>
+              <View style={styles.ctaPill}>
+                <Text style={styles.ctaText} numberOfLines={1}>
+                  {service.cta}
+                </Text>
+                <Ionicons name={chevronForward()} size={12} color={colors.goldInk} />
+              </View>
+            </View>
+          ) : null}
         </View>
         <Ionicons name={chevronForward()} size={18} color={locked ? colors.textMuted : colors.gold} />
       </GlassCard>
@@ -91,4 +102,16 @@ const styles = StyleSheet.create({
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 2 },
   price: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.textPrimary },
   member: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  ctaRow: { flexDirection: 'row', marginTop: spacing.xs },
+  ctaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  ctaText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
 });

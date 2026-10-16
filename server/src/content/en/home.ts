@@ -44,6 +44,38 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: "The club's story, its meetups and the group's companies",
     cta: 'All videos',
   },
+  projectsBank: {
+    title: 'Projects Bank',
+    subtitle: 'Over 260 ventures that passed screening and evaluation, waiting for a partner like you',
+    cta: 'Browse the projects',
+  },
+  personas: {
+    guest: {
+      heroSubtitle: 'Choose your gateway and explore the club: meetups, services, partnership opportunities and a smart advisor.',
+    },
+    neutral: {
+      heroSubtitle: 'Explore the meetups and club services, get to know the group, and set your direction with confidence.',
+      ctas: {
+        projectsBank: { label: 'Discover the projects' },
+        agenda: { label: 'Attend the next meetup' },
+      },
+    },
+    entrepreneur: {
+      heroSubtitle: "Your venture deserves the club's stage: services that take it further and a chance to present it to investors.",
+      ctas: {
+        golden: { label: 'Join the Vibes Ventures Golden Projects' },
+        projectsBank: { label: 'Submit your venture to the bank' },
+        services: { label: 'All your services' },
+      },
+    },
+    investor: {
+      heroSubtitle: 'Real partnership opportunities await you: the Projects Bank, the meetups and the business community in one place.',
+      ctas: {
+        projectsBank: { label: 'Explore partnership opportunities' },
+        golden: { label: 'Discover the golden opportunities' },
+      },
+    },
+  },
   entrepreneurs: {
     title: 'Entrepreneurs Portal',
     intro: 'Three services take your venture a step further: a meetup in your name, presenting your venture to investors through Success Partners, and a professional pitch deck.',

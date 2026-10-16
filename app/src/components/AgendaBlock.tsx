@@ -11,16 +11,17 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 168;
 
-/** M41: the next events of «أجندة النادي» as a strip on the home. Renders nothing while the agenda is empty. */
-export function AgendaBlock() {
+/** M41 (renamed «أحدث الفعاليات», M77): the next events as a strip on the home. Renders nothing while nothing is upcoming. */
+export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
   const router = useRouter();
   const agenda = useAgenda();
-  const events = agenda.data?.events ?? [];
+  // M77: the finished events stay on the agenda page (faded); the home strip keeps only what is coming.
+  const events = (agenda.data?.events ?? []).filter((event) => !event.past);
   if (events.length === 0) return null;
 
   return (
     <FadeInView delay={160}>
-      <SectionHeader title={t('agenda.title')} subtitle={t('agenda.subtitle')} cta={t('agenda.all')} onPress={() => router.push('/agenda' as Href)} />
+      <SectionHeader title={t('agenda.title')} subtitle={t('agenda.subtitle')} cta={ctaLabel ?? t('agenda.all')} onPress={() => router.push('/agenda' as Href)} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

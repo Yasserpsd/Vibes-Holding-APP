@@ -51,6 +51,8 @@ export type Service = {
   action: ServiceAction;
   infoUrl: string | null;
   order: number;
+  /** M74: the imperative call to action on the service card («سجّل», «احجز»…); an older stored row has none. */
+  cta?: string;
 };
 
 export type ServicesContent = {
@@ -111,6 +113,7 @@ export const SERVICES_SEED: ServicesContent = {
       ]),
       infoUrl: 'https://vibesholding.com/urmeet/',
       order: 1,
+      cta: 'اطلب ملتقاك',
     },
     {
       key: 'success-partners',
@@ -126,6 +129,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'form', formKey: 'success-partners', label: 'سجّل مشروعك' },
       infoUrl: null,
       order: 2,
+      cta: 'سجّل مشروعك',
     },
     {
       key: 'pitch-deck',
@@ -143,6 +147,7 @@ export const SERVICES_SEED: ServicesContent = {
       ]),
       infoUrl: null,
       order: 3,
+      cta: 'اطلب تصميمك',
     },
     {
       key: 'workshop',
@@ -157,6 +162,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
       order: 4,
+      cta: 'سجّل في الورشة',
     },
     {
       key: 'studio',
@@ -174,6 +180,7 @@ export const SERVICES_SEED: ServicesContent = {
       ]),
       infoUrl: 'https://almoltaqapodcast.com/studio/',
       order: 5,
+      cta: 'احجز الاستديو',
     },
     {
       key: 'hq-visit',
@@ -188,6 +195,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'hq' },
       infoUrl: null,
       order: 6,
+      cta: 'احجز زيارتك',
     },
     {
       key: 'theater',
@@ -205,6 +213,7 @@ export const SERVICES_SEED: ServicesContent = {
       ]),
       infoUrl: null,
       order: 7,
+      cta: 'احجز القاعة',
     },
     {
       key: 'consultation',
@@ -219,6 +228,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'advisor', prompt: 'أرغب في استشارة أونلاين: لديّ فكرة وأحتاج من يساعدني على فهمها وتحديد خطواتي التالية.' },
       infoUrl: null,
       order: 8,
+      cta: 'ابدأ استشارتك',
     },
     {
       key: 'famous',
@@ -234,6 +244,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'route', path: '/people/apply', label: 'قدّم من هنا' },
       infoUrl: null,
       order: 9,
+      cta: 'قدّم من هنا',
     },
     {
       key: 'repost',
@@ -248,6 +259,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: management('أرغب في نشر مشروعي على منصات النادي.', [{ key: 'project', label: 'اسم المشروع أو رابطه في بنك المشاريع' }]),
       infoUrl: null,
       order: 10,
+      cta: 'اطلب الإبراز',
     },
     {
       key: 'credit',
@@ -262,6 +274,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: { type: 'projects' },
       infoUrl: null,
       order: 11,
+      cta: 'استخدم رصيدك',
     },
     {
       key: 'momentum',
@@ -278,6 +291,7 @@ export const SERVICES_SEED: ServicesContent = {
       ]),
       infoUrl: 'https://momentummix.com/',
       order: 13,
+      cta: 'اطلب الخدمة',
     },
     {
       key: 'franchise',
@@ -292,6 +306,7 @@ export const SERVICES_SEED: ServicesContent = {
       action: management('أرغب في الاستفادة من خصم الأعضاء على حقيبة الامتياز.', [{ key: 'brand', label: 'العلامة التجارية' }]),
       infoUrl: 'https://franchment.com/',
       order: 14,
+      cta: 'اطلب الحقيبة',
     },
     {
       key: 'manfaz',
@@ -306,10 +321,11 @@ export const SERVICES_SEED: ServicesContent = {
       action: management('أرغب في الحصول على كود خصم منتجات «منفذ».'),
       infoUrl: null,
       order: 15,
+      cta: 'اطلب الكود',
     },
   ],
-  version: 7,
-  updatedAt: '2026-10-16T00:00:00.000Z',
+  version: 8,
+  updatedAt: '2026-10-17T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

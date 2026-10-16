@@ -22,6 +22,33 @@ export type HomePortal = {
   target: 'projects' | 'entrepreneurs' | 'advisor' | 'guide';
 };
 
+/** M74: a persona-matched call to action on a home block — `route` is an app path (expo-router). */
+export type HomeCta = { label: string; route: string };
+
+/** M74: the home blocks the app can reorder per persona; unknown names are ignored by the app. */
+export type HomeSectionKey =
+  | 'famous'
+  | 'posts'
+  | 'agenda'
+  | 'portals'
+  | 'quickActions'
+  | 'projectsBank'
+  | 'golden'
+  | 'membership'
+  | 'services'
+  | 'partners'
+  | 'videos';
+
+/** M74: how the home reads for one persona (or a guest): its own copy, block order and block CTAs. */
+export type HomePersonaVariant = {
+  /** Replaces the hero subtitle so the opening line speaks to this persona. */
+  heroSubtitle?: string;
+  /** The block order for this persona; blocks left out keep the app's default order after the listed ones. */
+  order?: HomeSectionKey[];
+  /** Per-block CTA overrides (label + app route). */
+  ctas?: Partial<Record<HomeSectionKey, HomeCta>>;
+};
+
 export type HomeContent = {
   hero: { eyebrow: string; title: string; subtitle: string };
   portals: HomePortal[];
@@ -30,9 +57,13 @@ export type HomeContent = {
   services: { title: string; subtitle: string; cta: string };
   /** M68 «شركاؤنا»: the partners strip; an older stored block has no key and the app hides the strip. */
   partners?: { title: string; subtitle: string; cta: string };
-  /** M73 «شخصية ومسيرة»: the member-spotlight card at the VERY TOP of home (the owner's call); absent on an older stored block = hidden. */
+  /** M73 «شخصية ومسيرة» (owner, 2026-10-16 second call: the section sits LOW on the home, not first); absent on an older stored block = hidden. */
   famous?: { title: string; subtitle: string; cta: string };
   videos: { title: string; subtitle: string; cta: string };
+  /** M84: the Projects Bank home block with the auto-rotating image carousel; absent on an older stored block = hidden. */
+  projectsBank?: { title: string; subtitle: string; cta: string };
+  /** M74: per-persona home variants (guest included). Absent on an older stored block = one home for everyone. */
+  personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   /** The entrepreneurs portal page: intro plus the keys of the services it lists. */
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
   /** The advisor opens the conversation itself when a visitor arrives from the neutral portal. */
@@ -113,6 +144,44 @@ export const HOME_SEED: HomeContent = {
     subtitle: 'قصة النادي وملتقياته وشركات المنظومة',
     cta: 'كل الفيديوهات',
   },
+  // M84: the Projects Bank earns its own home block with the rotating project images.
+  projectsBank: {
+    title: 'بنك المشاريع',
+    subtitle: 'أكثر من 260 مشروعًا اجتازت الفحص والتقييم، بانتظار شريك مثلك',
+    cta: 'تصفّح المشاريع',
+  },
+  // M74: the home speaks to the persona — copy, order and CTAs per gateway (the owner edits the texts from the dashboard).
+  personas: {
+    guest: {
+      heroSubtitle: 'اختر بوابتك واستكشف النادي: ملتقيات وخدمات وفرص شراكة ومستشار ذكي.',
+      order: ['portals', 'posts', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
+    },
+    neutral: {
+      heroSubtitle: 'استكشف الملتقيات وخدمات النادي وتعرّف على المنظومة، وحدّد وجهتك بثقة.',
+      order: ['posts', 'quickActions', 'agenda', 'services', 'projectsBank', 'golden', 'membership', 'partners', 'videos', 'famous'],
+      ctas: {
+        projectsBank: { label: 'تعرّف على المشاريع', route: '/projects' },
+        agenda: { label: 'احضر الملتقى القادم', route: '/agenda' },
+      },
+    },
+    entrepreneur: {
+      heroSubtitle: 'مشروعك يستحق منصة النادي: خدمات تأخذه خطوة أبعد وفرصة تعرضه على المستثمرين.',
+      order: ['posts', 'quickActions', 'agenda', 'services', 'projectsBank', 'golden', 'membership', 'partners', 'videos', 'famous'],
+      ctas: {
+        golden: { label: 'انضم إلى مشاريع Vibes Ventures الذهبية', route: '/service/success-partners' },
+        projectsBank: { label: 'قدّم مشروعك للبنك', route: '/service/success-partners' },
+        services: { label: 'كل خدماتك', route: '/services' },
+      },
+    },
+    investor: {
+      heroSubtitle: 'فرص شراكة حقيقية بانتظارك: بنك المشاريع والملتقيات ومجتمع الأعمال في مكان واحد.',
+      order: ['posts', 'quickActions', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
+      ctas: {
+        projectsBank: { label: 'استكشف فرص الشراكة', route: '/projects' },
+        golden: { label: 'اكتشف الفرص الذهبية', route: '/golden' },
+      },
+    },
+  },
   entrepreneurs: {
     title: 'بوابة رواد الأعمال',
     intro: 'ثلاث خدمات تأخذ مشروعك خطوة أبعد: ملتقى باسمك، عرض مشروعك على المستثمرين عبر شركاء النجاح، وعرض تقديمي احترافي.',
@@ -123,8 +192,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 7,
-  updatedAt: '2026-10-16T00:00:00.000Z',
+  version: 8,
+  updatedAt: '2026-10-17T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

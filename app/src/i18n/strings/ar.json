@@ -783,7 +783,7 @@
   "guide.send": "تأكيد التسجيل",
   "nav.agenda": "أجندة النادي",
   "nav.agendaEvent": "الفعالية",
-  "agenda.title": "أجندة النادي",
+  "agenda.title": "أحدث الفعاليات",
   "agenda.subtitle": "فعاليات النادي على مدار السنة — سجّل حضورك بضغطة واحدة.",
   "agenda.empty": "لا توجد فعاليات قادمة حاليًا — تابعنا قريبًا.",
   "agenda.all": "عرض الكل",
@@ -807,5 +807,8 @@
   "agenda.place": "المكان",
   "agenda.timeRange": "من {from} إلى {to}",
   "agenda.withFee": "{label} — {fee} ريال",
-  "agenda.feeTag": "رسوم لغير الأعضاء"
+  "agenda.feeTag": "رسوم لغير الأعضاء",
+  "home.partnersPlus": "انضم إلى شركاء النجاح",
+  "home.partnersPlusHint": "سجّل مشروعك واعرضه على مستثمري النادي",
+  "home.quick.title": "اختصاراتك"
 }

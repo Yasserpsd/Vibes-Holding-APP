@@ -11,7 +11,8 @@ production — every go-live step needs the owner's explicit word.
 - Apple Developer + Google Play Console accounts: **info@vibesholding.com** (created 2026-10-11).
 - Legal entity behind the hub: شركة المجتمع الافتراضي للاستثمار (vcmem.com).
 - App ids: production **com.vcmem.investorsclub**, preview **com.vcmem.investorsclub.preview**.
-- App name: production «نادي المستثمرين», preview «نادي المستثمرين (تجريبي)».
+- App name: the OFFICIAL store listing name on BOTH stores is **«Investors Club»** (owner, 2026-10-17); preview builds stay «نادي المستثمرين (تجريبي)». (The on-device launcher name can stay Arabic or follow the stores — owner decides at submission.)
+- App icon: the OFFICIAL icon is the club MARK alone (the golden «i» roundel already used at the app's start) — no wordmark text (owner, 2026-10-17).
 - Subscription: entitlement `membership`, product **`club_membership_annual`** (annual, auto-renewing), name «العضوية السنوية لنادي المستثمرين». Sold in-app only (CLAUDE.md rule 3).
 - EAS project `41f3ea2d-5f89-4e33-87c1-ccb795d9166a`, owner `vibes-holding`, runtime 1.1.0.
 
@@ -102,7 +103,7 @@ the vcmem.com widget. Note: the hub refuses a duplicate phone across accounts.
 
 ### App Store Connect (M7 iOS + M8)
 - [ ] Accept the latest agreements; complete **Paid Apps** agreement, banking and tax forms.
-- [ ] Create the app: bundle id `com.vcmem.investorsclub`, name «نادي المستثمرين», primary language Arabic, primary category Business (or Finance — owner's call; wording = business club, no promised returns).
+- [ ] Create the app: bundle id `com.vcmem.investorsclub`, name **«Investors Club»** (owner's official store name, 2026-10-17), primary language Arabic, primary category Business (or Finance — owner's call; wording = business club, no promised returns).
 - [ ] Subscription group «العضوية» → auto-renewable `club_membership_annual`, 1 year, price (owner), localized name «العضوية السنوية لنادي المستثمرين», description without «مجاني» (always «بدون رسوم» if ever needed).
 - [ ] App Privacy answers (section 6) + privacy policy URL + Terms (EULA) URL from section 2.
 - [ ] App Review Information: demo account + a note that content is Arabic, membership unlocks via the demo account.

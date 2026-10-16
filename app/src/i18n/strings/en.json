@@ -783,7 +783,7 @@
   "guide.send": "Confirm registration",
   "nav.agenda": "Club Agenda",
   "nav.agendaEvent": "Event",
-  "agenda.title": "Club Agenda",
+  "agenda.title": "Latest Events",
   "agenda.subtitle": "The club's events all year — register your attendance with one tap.",
   "agenda.empty": "No upcoming events right now — stay tuned.",
   "agenda.all": "View all",
@@ -807,5 +807,8 @@
   "agenda.place": "Place",
   "agenda.timeRange": "From {from} to {to}",
   "agenda.withFee": "{label} — {fee} SAR",
-  "agenda.feeTag": "Fee for non-members"
+  "agenda.feeTag": "Fee for non-members",
+  "home.partnersPlus": "Join Success Partners",
+  "home.partnersPlusHint": "Register your venture and present it to the club investors",
+  "home.quick.title": "Your shortcuts"
 }

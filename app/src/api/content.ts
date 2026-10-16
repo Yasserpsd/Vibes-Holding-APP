@@ -15,6 +15,30 @@ export type HomePortal = {
   target: 'projects' | 'entrepreneurs' | 'advisor' | 'guide';
 };
 
+/** M74: a persona-matched call to action on a home block — `route` is an app path. */
+export type HomeCta = { label: string; route: string };
+
+/** M74: the home blocks the server can reorder per persona; unknown names are ignored. */
+export type HomeSectionKey =
+  | 'famous'
+  | 'posts'
+  | 'agenda'
+  | 'portals'
+  | 'quickActions'
+  | 'projectsBank'
+  | 'golden'
+  | 'membership'
+  | 'services'
+  | 'partners'
+  | 'videos';
+
+/** M74: how the home reads for one persona (or a guest). */
+export type HomePersonaVariant = {
+  heroSubtitle?: string;
+  order?: HomeSectionKey[];
+  ctas?: Partial<Record<HomeSectionKey, HomeCta>>;
+};
+
 export type HomeContent = {
   hero: { eyebrow: string; title: string; subtitle: string };
   portals: HomePortal[];
@@ -23,9 +47,13 @@ export type HomeContent = {
   services: { title: string; subtitle: string; cta: string };
   /** M68 «شركاؤنا»: an older server sends no key and the home hides the strip. */
   partners?: { title: string; subtitle: string; cta: string };
-  /** M73 «شخصية ومسيرة» leads the home; an older server sends none and the old people strip stands. */
+  /** M73 «شخصية ومسيرة»; an older server sends none and the block hides. */
   famous?: { title: string; subtitle: string; cta: string };
   videos: { title: string; subtitle: string; cta: string };
+  /** M84: the Projects Bank home block; an older server sends none and the block hides. */
+  projectsBank?: { title: string; subtitle: string; cta: string };
+  /** M74: per-persona home variants; an older server sends none and one home serves everyone. */
+  personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
   neutralOpening: { title: string; text: string; quickReplies: string[] };
   updatedAt: string;
@@ -62,6 +90,8 @@ export type Service = {
   price: { amount: number; currency: string; memberPrice: boolean } | null;
   infoUrl: string | null;
   order: number;
+  /** M74: the imperative call to action on the service card; an older server sends none. */
+  cta?: string;
 };
 
 export type ServicesList = {

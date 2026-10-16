@@ -785,7 +785,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "guide.send": "تأكيد التسجيل",
     "nav.agenda": "أجندة النادي",
     "nav.agendaEvent": "الفعالية",
-    "agenda.title": "أجندة النادي",
+    "agenda.title": "أحدث الفعاليات",
     "agenda.subtitle": "فعاليات النادي على مدار السنة — سجّل حضورك بضغطة واحدة.",
     "agenda.empty": "لا توجد فعاليات قادمة حاليًا — تابعنا قريبًا.",
     "agenda.all": "عرض الكل",
@@ -809,7 +809,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "agenda.place": "المكان",
     "agenda.timeRange": "من {from} إلى {to}",
     "agenda.withFee": "{label} — {fee} ريال",
-    "agenda.feeTag": "رسوم لغير الأعضاء"
+    "agenda.feeTag": "رسوم لغير الأعضاء",
+    "home.partnersPlus": "انضم إلى شركاء النجاح",
+    "home.partnersPlusHint": "سجّل مشروعك واعرضه على مستثمري النادي",
+    "home.quick.title": "اختصاراتك"
   },
   "en": {
     "tabs.home": "Home",
@@ -1596,7 +1599,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "guide.send": "Confirm registration",
     "nav.agenda": "Club Agenda",
     "nav.agendaEvent": "Event",
-    "agenda.title": "Club Agenda",
+    "agenda.title": "Latest Events",
     "agenda.subtitle": "The club's events all year — register your attendance with one tap.",
     "agenda.empty": "No upcoming events right now — stay tuned.",
     "agenda.all": "View all",
@@ -1620,7 +1623,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "agenda.place": "Place",
     "agenda.timeRange": "From {from} to {to}",
     "agenda.withFee": "{label} — {fee} SAR",
-    "agenda.feeTag": "Fee for non-members"
+    "agenda.feeTag": "Fee for non-members",
+    "home.partnersPlus": "Join Success Partners",
+    "home.partnersPlusHint": "Register your venture and present it to the club investors",
+    "home.quick.title": "Your shortcuts"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
