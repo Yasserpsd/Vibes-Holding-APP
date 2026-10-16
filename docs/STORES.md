@@ -90,12 +90,13 @@ Recipe (after the production service is up, details approved by the owner first)
 5. Put the credentials in App Store Connect → App Review Information, and Google Play →
    App access → «All or some functionality is restricted» + instructions.
 
-Agreed details (owner, 2026-10-16): e-mail **`ceo@vibesholding.com`** (the code mail lands
-there), name «Store Review», persona مستثمر, phone = a number the owner picks that is NOT
-registered to any existing hub account (the hub refuses a duplicate phone), a fresh strong
-password kept in the store consoles only. The owner performs the registration and types the
-password himself (accounts and credentials stay his); Claude preps the exact steps. Never
-give reviewers an admin account.
+**Status (2026-10-16): CREATED.** The owner registered **`ceo@vibesholding.com`** on the hub
+himself, it holds an ACTIVE ANNUAL MEMBERSHIP and he verified the sign-in works (2026-10-16;
+an app login check waits for the first production build). It is a normal member, NOT admin
+(reviewers never get admin).
+The password stays with the owner and goes into App Store Connect → App Review Information and
+Google Play → App access when the consoles are set up. Quick optional check: sign in with it in
+the vcmem.com widget. Note: the hub refuses a duplicate phone across accounts.
 
 ## 5. Store consoles — checklists (owner signs in and clicks; Claude preps each step)
 
