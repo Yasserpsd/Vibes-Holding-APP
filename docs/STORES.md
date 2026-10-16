@@ -33,6 +33,15 @@ server's URLs** once that service exists (section 3), e.g. `https://<prod-domain
 
 ## 3. Production environment (prepared, NOT live)
 
+**Status (2026-10-16, done with the owner in the browser):** `club-api-prod` is UP at
+`https://club-api-prod-production.up.railway.app` — `APP_ENV=production`, its own Postgres
+(service name **`Postgres-DmnD`**; the rename to Postgres-prod did not stick, references use
+the real name), live hub (the test site key for now — a separate production site row is still
+recommended before launch), SMTP active, Paymob test keys in live mode (real keys at go-live).
+Removed from the copy of the test variables: `S3_*` (5), `UPLOADS_SWEEP`, `HUB_WEBHOOK_SECRET`,
+`REVENUECAT_PUBLIC_KEY_ANDROID`; `APPLE_APP_IDS=com.vcmem.investorsclub`. No users are pointed
+at it: the preview app still talks to the test server, and no production build exists yet.
+
 One Railway project, a second service next to the test one. Owner clicks in Railway; Claude preps.
 
 | Piece | Test (today) | Production (to create) |
