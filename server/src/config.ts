@@ -25,6 +25,8 @@ const envSchema = z.object({
   HUB_ALLOW_TEST_REGISTRATION: z.enum(['0', '1']).default('1'),
   // M79-launch (owner, 2026-10-17): the test app is OPEN for everyone to try the personas; '1' restores the old admins-only preview.
   AUTH_ADMIN_ONLY: z.enum(['0', '1']).default('0'),
+  // M87: the advisor's daily persona push; '0' kills it cold.
+  COMPANION_PUSH: z.enum(['0', '1']).default('1'),
   // Signs the hub's webhook to /api/webhooks/hub (hub settings «app_webhook_secret», shown once). Unset = the webhook answers 503.
   HUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),

@@ -64,6 +64,7 @@ import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
+import { CompanionService } from './companion/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
 import type { KV } from './store.js';
@@ -109,7 +110,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -312,6 +313,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const agenda = new AgendaService({ kv, notifier, push, payments, onChange: () => moved('content') });
   // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
   const partners = new PartnersService({ kv, onChange: () => moved('content') });
+  // M87: the advisor's daily persona push — templates over live data, zero AI cost at send time.
+  const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
   const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log });
@@ -410,5 +413,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion };
 }
