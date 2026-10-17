@@ -3,11 +3,9 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useAgenda } from '@/api/agenda';
 import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { usePartners, type Partner } from '@/api/partners';
-import { usePeople } from '@/api/people';
-import { useGolden, useProjectsList } from '@/api/queries';
+import { useGolden } from '@/api/queries';
 import type { GoldenCompany, GoldenContent } from '@/api/types';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
@@ -31,8 +29,7 @@ import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
-import { formatNumber } from '@/lib/format';
-import { GoldDust, GoldTicker } from '@/components/wow';
+import { GoldDust } from '@/components/wow';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
@@ -55,10 +52,6 @@ export default function HomeScreen() {
   const services = useServices();
   const videos = useVideos();
   const partners = usePartners();
-  // M85f ticker sources (the badges hook and the carousel share these cache entries).
-  const projectsList = useProjectsList({ q: '', sort: 'latest' });
-  const agenda = useAgenda();
-  const people = usePeople();
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,18 +102,6 @@ export default function HomeScreen() {
 
   const greeting = status === 'signedIn' && me ? t('home.greeting', { name: me.name.split(' ')[0] }) : '';
   const featured = videos.data?.pages[0]?.featured ?? [];
-
-  // M85f: the live gold ticker — honest numbers from the queries this screen holds anyway.
-  const projectsTotal = projectsList.data?.pages[0]?.total ?? 0;
-  const goldenCount = golden.data ? golden.data.companies.length + 1 : 0;
-  const peopleCount = people.data?.people.length ?? 0;
-  const nextEvent = (agenda.data?.events ?? []).find((event) => !event.past);
-  const tickerItems = [
-    projectsTotal > 0 ? t('wow.tickerProjects', { count: formatNumber(projectsTotal) }) : null,
-    nextEvent ? t('wow.tickerEvent', { title: nextEvent.title }) : null,
-    goldenCount > 0 ? t('wow.tickerGolden', { count: formatNumber(goldenCount) }) : null,
-    peopleCount > 0 ? t('wow.tickerPeople', { count: formatNumber(peopleCount) }) : null,
-  ].filter((item): item is string => item !== null);
 
   // M74: the home follows the account's persona — a signed-in account without one reads the neutral variant.
   const signedIn = status === 'signedIn';
@@ -300,13 +281,6 @@ export default function HomeScreen() {
           <GoldHairline style={styles.heroDivider} />
         </FadeInView>
       </View>
-
-      {/* M85f: the live gold ticker — stock-exchange energy under the hero. */}
-      {tickerItems.length > 0 ? (
-        <FadeInView delay={360} offset={6}>
-          <GoldTicker items={tickerItems} />
-        </FadeInView>
-      ) : null}
 
       {order.map((key) => sections[key]?.() ?? null)}
 
