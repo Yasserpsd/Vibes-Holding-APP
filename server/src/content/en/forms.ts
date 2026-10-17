@@ -74,5 +74,23 @@ export const FORMS_EN: Translation<FormsContent> = {
         { key: 'terms', label: "I agree to the workshop's terms and conditions." },
       ],
     },
+    {
+      key: 'app-publish',
+      title: 'Publish your app on both stores',
+      intro:
+        'With your annual membership the club publishes your app on Google Play and the App Store at no charge. Fill in your app details and the management will contact you to collect the files and complete the publishing.',
+      closedText: "Publishing requests are paused for now. Follow the club's announcements or message the management.",
+      submitLabel: 'Send the publishing request',
+      successText: 'We received your publishing request; the management will contact you to collect the files and store accounts and complete the publishing.',
+      fields: [
+        { key: 'appName', label: 'App name' },
+        { key: 'summary', label: 'A brief description of the app and what it offers' },
+        { key: 'platforms', label: 'Requested platforms', options: ['Android and iOS together', 'Android only', 'iOS only'] },
+        { key: 'status', label: 'App status', options: ['Ready to publish', 'In development', 'An idea that needs building first'] },
+        { key: 'link', label: 'A demo link or the app website (optional)' },
+        { key: 'whatsapp', label: 'WhatsApp number for contact' },
+        { key: 'ownership', label: 'I confirm that I own the app or am officially authorised to publish it.' },
+      ],
+    },
   ],
 };

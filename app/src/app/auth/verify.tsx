@@ -37,9 +37,11 @@ export default function VerifyScreen() {
     return () => clearTimeout(id);
   }, [cooldown]);
 
+  // M78 (owner): «اي حد يسجل بعديها يظهرله بوابة الدفع مباشر» — a fresh account lands straight
+  // on the membership screen (its payment lives there: the store sheet in-app, rule 3).
   const finish = () => {
     if (router.canDismiss()) router.dismissAll();
-    else router.replace('/account');
+    router.replace('/membership');
   };
 
   const submit = async () => {

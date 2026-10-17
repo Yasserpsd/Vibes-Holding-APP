@@ -826,5 +826,7 @@
   "inbox.kind.event": "Event",
   "inbox.kind.news": "News",
   "inbox.kind.project": "Bank project",
-  "inbox.kind.person": "Profile & Journey"
+  "inbox.kind.person": "Profile & Journey",
+  "gate.subscribe": "Subscribe now",
+  "membership.registerAndPay": "Register and pay now"
 }

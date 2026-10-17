@@ -149,6 +149,22 @@ export const SERVICES_SEED: ServicesContent = {
       order: 3,
       cta: 'اطلب تصميمك',
     },
+    // M83 (owner, 2026-10-17): «لرائد الأعمال يقدر ينشر تطبيقه علي جوجل وiOS بدون رسوم اهم حاجه يكون معاه عضوية».
+    {
+      key: 'app-publish',
+      title: 'انشر تطبيقك على المتجرين',
+      summary: 'النادي ينشر تطبيقك على Google Play وApp Store بدون رسوم — ميزة حصرية للأعضاء المشتركين.',
+      detail: 'املأ بيانات تطبيقك وتتواصل معك الإدارة لاستلام الملفات وإتمام النشر على المتجرين. الشرط الوحيد عضوية سنوية سارية.',
+      icon: 'cloud-upload',
+      group: 'entrepreneur',
+      priceLabel: null,
+      memberLabel: 'بدون رسوم للأعضاء',
+      access: 'member',
+      action: { type: 'form', formKey: 'app-publish', label: 'املأ بيانات تطبيقك' },
+      infoUrl: null,
+      order: 4,
+      cta: 'انشر تطبيقك',
+    },
     {
       key: 'workshop',
       title: 'ورش العمل',
@@ -161,7 +177,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'everyone',
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
-      order: 4,
+      order: 5,
       cta: 'سجّل في الورشة',
     },
     {
@@ -179,7 +195,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'time', label: 'الوقت المفضل', placeholder: 'مثال: الثلاثاء 4 عصرًا' },
       ]),
       infoUrl: 'https://almoltaqapodcast.com/studio/',
-      order: 5,
+      order: 6,
       cta: 'احجز الاستديو',
     },
     {
@@ -194,7 +210,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'hq' },
       infoUrl: null,
-      order: 6,
+      order: 7,
       cta: 'احجز زيارتك',
     },
     {
@@ -212,7 +228,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'time', label: 'الموعد المفضل' },
       ]),
       infoUrl: null,
-      order: 7,
+      order: 8,
       cta: 'احجز القاعة',
     },
     {
@@ -227,7 +243,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'advisor', prompt: 'أرغب في استشارة أونلاين: لديّ فكرة وأحتاج من يساعدني على فهمها وتحديد خطواتي التالية.' },
       infoUrl: null,
-      order: 8,
+      order: 9,
       cta: 'ابدأ استشارتك',
     },
     {
@@ -243,7 +259,7 @@ export const SERVICES_SEED: ServicesContent = {
       // M73: «قدّم من هنا» opens the M11 application (apply → committee review → published).
       action: { type: 'route', path: '/people/apply', label: 'قدّم من هنا' },
       infoUrl: null,
-      order: 9,
+      order: 10,
       cta: 'قدّم من هنا',
     },
     {
@@ -258,7 +274,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: management('أرغب في نشر مشروعي على منصات النادي.', [{ key: 'project', label: 'اسم المشروع أو رابطه في بنك المشاريع' }]),
       infoUrl: null,
-      order: 10,
+      order: 11,
       cta: 'اطلب الإبراز',
     },
     {
@@ -273,7 +289,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'projects' },
       infoUrl: null,
-      order: 11,
+      order: 12,
       cta: 'استخدم رصيدك',
     },
     {
@@ -324,7 +340,7 @@ export const SERVICES_SEED: ServicesContent = {
       cta: 'اطلب الكود',
     },
   ],
-  version: 8,
+  version: 9,
   updatedAt: '2026-10-17T00:00:00.000Z',
 };
 

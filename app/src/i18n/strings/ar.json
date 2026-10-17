@@ -826,5 +826,7 @@
   "inbox.kind.event": "فعالية",
   "inbox.kind.news": "خبر",
   "inbox.kind.project": "مشروع في البنك",
-  "inbox.kind.person": "شخصية ومسيرة"
+  "inbox.kind.person": "شخصية ومسيرة",
+  "gate.subscribe": "اشترك في العضوية الآن",
+  "membership.registerAndPay": "سجّل وادفع الآن"
 }

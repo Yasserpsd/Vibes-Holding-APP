@@ -62,8 +62,10 @@ export default function MembershipScreen() {
         </FadeInView>
       ) : null}
       {status === 'guest' ? (
-        <FadeInView delay={entranceDelay(2)}>
-          <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+        <FadeInView delay={entranceDelay(2)} style={styles.guestActions}>
+          {/* M78 (owner): «اختيار مباشر انه يدخل يسجل ويدفع» — registration flows straight back here, where the payment lives. */}
+          <AppButton label={t('membership.registerAndPay')} icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+          <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
         </FadeInView>
       ) : null}
 
@@ -108,6 +110,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
 }
 
 const styles = StyleSheet.create({
+  guestActions: { gap: spacing.sm },
   intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   group: {
     paddingHorizontal: spacing.md,

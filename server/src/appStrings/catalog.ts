@@ -828,7 +828,9 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "inbox.kind.event": "فعالية",
     "inbox.kind.news": "خبر",
     "inbox.kind.project": "مشروع في البنك",
-    "inbox.kind.person": "شخصية ومسيرة"
+    "inbox.kind.person": "شخصية ومسيرة",
+    "gate.subscribe": "اشترك في العضوية الآن",
+    "membership.registerAndPay": "سجّل وادفع الآن"
   },
   "en": {
     "tabs.home": "Home",
@@ -1658,7 +1660,9 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "inbox.kind.event": "Event",
     "inbox.kind.news": "News",
     "inbox.kind.project": "Bank project",
-    "inbox.kind.person": "Profile & Journey"
+    "inbox.kind.person": "Profile & Journey",
+    "gate.subscribe": "Subscribe now",
+    "membership.registerAndPay": "Register and pay now"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -1669,6 +1673,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "country": "أسماء الدول",
     "profile": "تعديل الملف الشخصي",
     "home": "الرئيسية",
+    "gate": "بوابة الاشتراك",
     "inbox": "مركز الإشعارات",
     "projects": "بنك المشاريع (القائمة)",
     "project": "صفحة المشروع",

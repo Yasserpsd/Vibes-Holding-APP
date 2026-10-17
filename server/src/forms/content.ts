@@ -155,9 +155,33 @@ export const FORMS_SEED: FormsContent = {
     // M73 note: the «شخصية ومسيرة» application lives in the M11 profiles pipeline (/people/apply:
     // apply → committee review → published as it is), NOT here — a forms inbox would have made the
     // admin retype every approved profile. The 'member' access level stays available for later forms.
+    // M83 (owner, 2026-10-17): the club publishes the entrepreneur's app on both stores — the one
+    // condition is an active annual membership, so this is the first 'member' form.
+    {
+      key: 'app-publish',
+      title: 'نشر تطبيقك على المتجرين',
+      intro:
+        'بعضويتك السنوية ينشر النادي تطبيقك على Google Play وApp Store بدون رسوم. املأ بيانات تطبيقك وستتواصل معك الإدارة لاستلام الملفات وإتمام النشر.',
+      access: 'member',
+      once: false,
+      open: true,
+      closedText: 'استقبال طلبات النشر متوقف حاليًا. تابع إعلانات النادي أو راسل الإدارة.',
+      submitLabel: 'أرسل طلب النشر',
+      successText: 'استلمنا طلب نشر تطبيقك، وستتواصل معك الإدارة لاستلام الملفات وحسابات المتاجر وإتمام النشر.',
+      fields: [
+        { key: 'appName', label: 'اسم التطبيق', type: 'text', required: true },
+        { key: 'summary', label: 'وصف مختصر للتطبيق وما يقدمه', type: 'textarea', required: true },
+        { key: 'platforms', label: 'المنصات المطلوبة', type: 'select', required: true, options: ['Android وiOS معًا', 'Android فقط', 'iOS فقط'] },
+        { key: 'status', label: 'حالة التطبيق', type: 'select', required: true, options: ['جاهز للنشر', 'قيد التطوير', 'فكرة أحتاج تطويرها أولًا'] },
+        { key: 'link', label: 'رابط تجريبي أو موقع التطبيق (اختياري)', type: 'text', required: false, latin: true },
+        { key: 'whatsapp', label: 'رقم واتساب للتواصل', type: 'text', required: true, latin: true, prefill: 'phone' },
+        { key: 'ownership', label: 'أقرّ بأنني مالك التطبيق أو مفوَّض رسميًا بنشره.', type: 'agree', required: true },
+      ],
+      order: 3,
+    },
   ],
-  version: 3,
-  updatedAt: '2026-10-16T00:00:00.000Z',
+  version: 4,
+  updatedAt: '2026-10-17T00:00:00.000Z',
 };
 
 /** Writes the seed when no forms content exists yet, or when the stored seed is older than this one. */

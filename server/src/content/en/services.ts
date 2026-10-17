@@ -56,6 +56,15 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       },
     },
     {
+      key: 'app-publish',
+      cta: 'Publish your app',
+      title: 'Publish your app on both stores',
+      summary: 'The club publishes your app on Google Play and the App Store at no charge — an exclusive benefit for subscribed members.',
+      detail: 'Fill in your app details and the management contacts you to collect the files and complete the publishing on both stores. The one condition is an active annual membership.',
+      memberLabel: 'No fees for members',
+      action: { label: 'Fill in your app details' },
+    },
+    {
       key: 'workshop',
       cta: 'Join the workshop',
       title: 'Workshops',

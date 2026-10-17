@@ -31,7 +31,8 @@ export function LockedNotice({ text, guest }: Props) {
         </View>
         <View style={styles.actions}>
           {guest ? <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
-          <AppButton label={t('account.benefits')} variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          {/* M83 (owner): every lock answers with the DIRECT subscribe door — «اشترك في العضوية مباشر». */}
+          <AppButton label={t('gate.subscribe')} variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={() => router.push('/membership')} />
         </View>
       </GlassCard>
     </FadeInView>
