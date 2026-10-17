@@ -88,7 +88,9 @@ export const HOME_SEED: HomeContent = {
   hero: {
     eyebrow: 'نادي المستثمرين',
     title: 'مجتمع راقٍ يؤمن بأن الفكر ثروة',
-    subtitle: 'اختر بوابتك وابدأ رحلتك في المنظومة: فرص شراكة، خدمات أعمال، ومستشار ذكي.',
+    // M82 (owner, 2026-10-17): the CANONICAL definition leads the home — verbatim first paragraph.
+    subtitle:
+      'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
   },
   // The owner's wording and order (2026-09-21): the neutral member first.
   portals: [
@@ -188,7 +190,9 @@ export const HOME_SEED: HomeContent = {
   // M74: the home speaks to the persona — copy, order and CTAs per gateway (the owner edits the texts from the dashboard).
   personas: {
     guest: {
-      heroSubtitle: 'اختر بوابتك واستكشف النادي: ملتقيات وخدمات وفرص شراكة ومستشار ذكي.',
+      // The guest reads the official definition too; the portals row below is his «اختر بوابتك».
+      heroSubtitle:
+        'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
       order: ['portals', 'posts', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
     },
     neutral: {
@@ -230,8 +234,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 9,
-  updatedAt: '2026-10-17T12:00:00.000Z',
+  version: 10,
+  updatedAt: '2026-10-17T16:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

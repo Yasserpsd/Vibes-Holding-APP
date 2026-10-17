@@ -232,8 +232,10 @@ export class NewsService {
       title: entry.title,
       snippet: snippet && snippet !== entry.title ? snippet : null,
       url: entry.url,
-      // Sites with a JSON detail (SPA) put their logo in og:image: only the entry's own image counts there.
+      // Sites with a JSON detail (SPA) put their logo in og:image: only the entry's own image counts as the photo,
+      // but the logo is kept as the brand fallback (owner, 2026-10-17: every item must show an image).
       image: entry.image ?? (entry.detailUrl ? null : page.image),
+      brandImage: entry.detailUrl ? page.image : null,
       publishedAt: entry.publishedAt ?? page.publishedAt ?? now,
       verifiedAt: now,
       classifiedBy: this.deps.classifier.mode,
@@ -427,7 +429,8 @@ export function toPublic(item: NewsItem): PublicNewsItem {
     title: item.title,
     snippet: item.snippet,
     url: item.url,
-    image: item.image,
+    // Every item carries an image when the source offers one: the article photo, else the source's brand image.
+    image: item.image ?? item.brandImage ?? null,
     publishedAt: item.publishedAt,
     source: { id: item.sourceId, name: item.sourceName, tier: item.tier, tierLabel: tierLabel(item.tier, item.lang) },
     topics: item.topics.map((key) => ({ key, label: topicLabel(key, item.lang) })),

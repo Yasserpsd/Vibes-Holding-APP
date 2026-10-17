@@ -48,7 +48,8 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
               </Text>
             ) : null}
           </View>
-          {!compact && item.image ? <FadingImage uri={item.image} /> : null}
+          {/* Owner (2026-10-17): every item shows a visual — the source's picture, else a branded placeholder. */}
+          {!compact ? item.image ? <FadingImage uri={item.image} /> : <ImageFallback /> : null}
         </View>
         {!compact ? (
           <View style={styles.footer}>
@@ -69,6 +70,15 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         ) : null}
       </GlassCard>
     </PressScale>
+  );
+}
+
+/** No picture from the source: a quiet golden newspaper block keeps the card visual. */
+function ImageFallback() {
+  return (
+    <View style={[styles.image, styles.imageFallback]}>
+      <Ionicons name="newspaper-outline" size={30} color={colors.goldDark} />
+    </View>
   );
 }
 
@@ -125,6 +135,7 @@ const styles = StyleSheet.create({
   snippet: { ...typography.caption, color: colors.textSecondary },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
   image: { width: 92, height: 92, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden' },
+  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldFaint, borderWidth: 1, borderColor: colors.borderGoldSoft },
   imageFill: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   tags: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },

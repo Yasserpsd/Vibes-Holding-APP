@@ -6,7 +6,8 @@ export const HOME_EN: Translation<HomeContent> = {
   hero: {
     eyebrow: 'Investors Club',
     title: 'A refined community that believes ideas are wealth',
-    subtitle: 'Choose your portal and start your journey in the group: partnership opportunities, business services and a smart advisor.',
+    subtitle:
+      'The Investors Club® is an exclusive business community for neutrals, entrepreneurs and investors, serving its members through one app and a permanent HQ in the heart of the Saudi capital, Riyadh.',
   },
   portals: [
     { key: 'neutral', title: 'Neutral', subtitle: 'Exploring my direction' },
@@ -68,7 +69,8 @@ export const HOME_EN: Translation<HomeContent> = {
   },
   personas: {
     guest: {
-      heroSubtitle: 'Choose your gateway and explore the club: meetups, services, partnership opportunities and a smart advisor.',
+      heroSubtitle:
+        'The Investors Club® is an exclusive business community for neutrals, entrepreneurs and investors, serving its members through one app and a permanent HQ in the heart of the Saudi capital, Riyadh.',
     },
     neutral: {
       heroSubtitle: "Explore the meetups and the members' stories, and let your advisor accompany you until you set your direction with confidence.",

@@ -11,8 +11,11 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
+import { View } from 'react-native';
+
 import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
+import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
@@ -87,7 +90,10 @@ export default function RootLayout() {
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}
             <LocaleProvider direction={isRTL() ? 'rtl' : 'ltr'}>
-              <Stack
+              {/* The Stack and the fixed bottom bar share the column: detail screens sit ABOVE the bar, never behind it. */}
+              <View style={{ flex: 1 }}>
+                <View style={{ flex: 1 }}>
+                  <Stack
                 screenOptions={{
                   headerShown: false,
                   contentStyle: { backgroundColor: colors.black },
@@ -134,7 +140,11 @@ export default function RootLayout() {
                 <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
                 <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: t('nav.reset') }} />
-              </Stack>
+                  </Stack>
+                </View>
+                {/* Owner (2026-10-17): the bottom bar is FIXED on every page — this renders it wherever the (tabs) bar is not. */}
+                <GlobalTabBar />
+              </View>
             </LocaleProvider>
             {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
             <AskAdvisorButton />

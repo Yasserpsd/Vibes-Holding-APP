@@ -116,7 +116,9 @@ function FloatingButton({ registration }: { registration: Registration }) {
   const insets = useSafeAreaInsets();
   const breath = usePulse(0.3, 0.9, 1900);
 
-  const bottom = insets.bottom + BUTTON_OFFSET + (registration.aboveTabBar ? TAB_BAR_HEIGHT : 0);
+  // The bottom bar is now FIXED on every page (GlobalTabBar on stack screens, the Tabs bar on tab screens),
+  // so the button always stands on a bar, never on the bare bottom edge.
+  const bottom = insets.bottom + BUTTON_OFFSET + TAB_BAR_HEIGHT;
 
   return (
     <FadeInView delay={120} duration={260} offset={12} style={[styles.anchor, { bottom }]}>

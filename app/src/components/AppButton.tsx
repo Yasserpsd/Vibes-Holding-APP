@@ -42,7 +42,10 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
       ) : icon ? (
         <Ionicons name={icon} size={18} color={color} />
       ) : null}
-      <Text style={[styles.label, { color }]}>{label}</Text>
+      {/* A definite width (flex) keeps Android from dropping the last Arabic word of the label. */}
+      <Text style={[styles.label, icon || loading ? styles.labelBeside : null, { color }]} numberOfLines={2}>
+        {label}
+      </Text>
     </AnimatedPressable>
   );
 }
@@ -75,9 +78,15 @@ const styles = StyleSheet.create({
   muted: {
     opacity: 0.55,
   },
+  // flexShrink lets a long Arabic label wrap instead of silently dropping its last word (Android row measurement).
   label: {
     fontFamily: fonts.semiBold,
     fontSize: 15,
     lineHeight: 22,
+    flexShrink: 1,
+    textAlign: 'center',
   },
+  // Beside an icon the text gets the row's remaining width outright: Android's row measurement
+  // otherwise drops the label's last Arabic word even with room to spare.
+  labelBeside: { flexGrow: 1, flexBasis: 0 },
 });

@@ -102,6 +102,8 @@ export type NewsItem = Classification & {
   snippet: string | null;
   url: string;
   image: string | null;
+  /** The source's own brand image (its og:image when the article carries no photo) — the public payload falls back to it. */
+  brandImage?: string | null;
   publishedAt: string;
   /** When the server fetched the article page successfully. */
   verifiedAt: string;
