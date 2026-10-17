@@ -11,7 +11,7 @@ import { useProjectsList } from '@/api/queries';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
-import { entranceDelay, FadeInView, PressScale, SkeletonCards } from '@/components/motion';
+import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t, type StringKey } from '@/i18n';
@@ -132,9 +132,12 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={item.title}>
       <GlassCard radius={radii.lg} style={styles.row}>
-        <View style={[styles.iconBox, fresh && styles.iconBoxFresh]}>
-          <Ionicons name={meta.icon} size={20} color={fresh ? colors.goldInk : colors.gold} />
-        </View>
+        {/* M84e: the type icon pops into its box as the row enters. */}
+        <PopIn delay={100}>
+          <View style={[styles.iconBox, fresh && styles.iconBoxFresh]}>
+            <Ionicons name={meta.icon} size={20} color={fresh ? colors.goldInk : colors.gold} />
+          </View>
+        </PopIn>
         <View style={styles.texts}>
           <View style={styles.kindRow}>
             <Text style={styles.kind}>{t(meta.label)}</Text>

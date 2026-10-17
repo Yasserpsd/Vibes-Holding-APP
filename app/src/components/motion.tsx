@@ -127,6 +127,33 @@ export function PopIn({ children, delay = 0, style }: { children: ReactNode; del
   );
 }
 
+/**
+ * M84e: an attention shake — the content swings a few degrees and settles. One-shot on mount;
+ * `repeatEvery` re-runs it as a gentle periodic nudge (keep that to one element per screen).
+ */
+export function Wiggle({ children, delay = 0, repeatEvery, style }: { children: ReactNode; delay?: number; repeatEvery?: number; style?: StyleProp<ViewStyle> }) {
+  const [swing] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const shake = () =>
+      Animated.sequence([
+        Animated.timing(swing, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(swing, { toValue: -1, duration: 140, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(swing, { toValue: 0.6, duration: 120, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(swing, { toValue: 0, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      ]);
+    const animation = repeatEvery
+      ? Animated.loop(Animated.sequence([Animated.delay(delay), shake(), Animated.delay(repeatEvery)]))
+      : Animated.sequence([Animated.delay(delay), shake()]);
+    animation.start();
+    return () => animation.stop();
+  }, [swing, delay, repeatEvery]);
+  return (
+    <Animated.View style={[style, { transform: [{ rotate: swing.interpolate({ inputRange: [-1, 1], outputRange: ['-9deg', '9deg'] }) }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 /** A soft opacity loop for skeletons and waiting states. */
 export function usePulse(from = 0.4, to = 1, duration = 700): Animated.Value {
   const [pulse] = useState(() => new Animated.Value(from));

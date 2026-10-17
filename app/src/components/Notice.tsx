@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FadeInView } from '@/components/motion';
+import { FadeInView, PopIn, Wiggle } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -14,9 +14,20 @@ export function Notice({ text, tone = 'info' }: Props) {
   return (
     <FadeInView offset={8}>
       <View style={[styles.box, tone === 'info' ? styles.boxGold : { borderColor: color }]}>
-        <View style={styles.iconChip}>
-          <Ionicons name={icon} size={16} color={color} />
-        </View>
+        {/* M84e: a warning shakes once to be seen; the others pop into place. */}
+        {tone === 'warning' ? (
+          <Wiggle delay={260}>
+            <View style={styles.iconChip}>
+              <Ionicons name={icon} size={16} color={color} />
+            </View>
+          </Wiggle>
+        ) : (
+          <PopIn delay={120}>
+            <View style={styles.iconChip}>
+              <Ionicons name={icon} size={16} color={color} />
+            </View>
+          </PopIn>
+        )}
         <Text style={styles.text}>{text}</Text>
       </View>
     </FadeInView>

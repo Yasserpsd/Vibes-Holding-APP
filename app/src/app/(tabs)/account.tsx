@@ -178,7 +178,9 @@ function CompanionToggleRow() {
   const muted = toggle.isPending ? !(query.data?.muted ?? false) : (query.data?.muted ?? false);
   return (
     <View style={styles.row}>
-      <Ionicons name="sparkles-outline" size={22} color={colors.gold} />
+      <PopIn delay={80}>
+        <Ionicons name="sparkles-outline" size={22} color={colors.gold} />
+      </PopIn>
       <Text style={styles.rowLabel}>{t('account.companion')}</Text>
       <Switch
         value={!muted}
@@ -208,7 +210,10 @@ function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
   const color = danger ? colors.danger : colors.gold;
   return (
     <PressScale onPress={onPress} style={styles.row}>
-      <Ionicons name={icon} size={22} color={color} />
+      {/* M84e: every menu icon pops into place — the reorganized groups read icon-first. */}
+      <PopIn delay={80}>
+        <Ionicons name={icon} size={22} color={color} />
+      </PopIn>
       <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
       <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
     </PressScale>

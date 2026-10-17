@@ -3,7 +3,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
-import { FadeInView, SkeletonCards, usePulse } from '@/components/motion';
+import { FadeInView, SkeletonCards, usePulse, Wiggle } from '@/components/motion';
 import { t } from '@/i18n';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -31,9 +31,12 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
     return (
       <View style={styles.box}>
         <FadeInView offset={10}>
-          <View style={styles.iconRing}>
-            <Ionicons name="cloud-offline-outline" size={32} color={colors.goldLight} />
-          </View>
+          {/* M84e: the offline cloud nudges every few seconds — the eye lands on the retry. */}
+          <Wiggle delay={400} repeatEvery={3600}>
+            <View style={styles.iconRing}>
+              <Ionicons name="cloud-offline-outline" size={32} color={colors.goldLight} />
+            </View>
+          </Wiggle>
         </FadeInView>
         <FadeInView delay={90} offset={10}>
           <Text style={styles.text}>{errorMessage(error)}</Text>

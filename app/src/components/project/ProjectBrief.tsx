@@ -5,7 +5,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useProjectBrief } from '@/api/queries';
 import type { ProjectBrief as Brief } from '@/api/types';
 import { GlassCard } from '@/components/lux';
-import { entranceDelay, FadeInView, GrowBar, PressScale, usePulse } from '@/components/motion';
+import { entranceDelay, FadeInView, GrowBar, PopIn, PressScale, usePulse, Wiggle } from '@/components/motion';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { topicIcon, type IoniconName } from '@/lib/icons';
@@ -52,8 +52,10 @@ function BriefBody({ brief }: { brief: Brief }) {
               {brief.table.map((row, index) => (
                 <View key={`${row.label}:${index}`} style={[styles.tableRow, index > 0 && styles.tableRowBorder, index % 2 === 1 && styles.tableRowAlt]}>
                   <View style={styles.labelCell}>
-                    {/* M80: every fact row carries its own signpost icon. */}
-                    <Ionicons name={topicIcon(row.label)} size={14} color={colors.goldDark} style={styles.labelIcon} />
+                    {/* M80: every fact row carries its own signpost icon — M84e: it pops in, row after row. */}
+                    <PopIn delay={entranceDelay(index, 50)} style={styles.labelIcon}>
+                      <Ionicons name={topicIcon(row.label)} size={14} color={colors.goldDark} />
+                    </PopIn>
                     <Text style={styles.labelText}>{row.label}</Text>
                   </View>
                   <View style={styles.valueCell}>
@@ -74,7 +76,9 @@ function BriefBody({ brief }: { brief: Brief }) {
           <View style={styles.competitors}>
             {/* M80 (owner): every big heading carries its icon. */}
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="git-compare-outline" size={18} color={colors.gold} />
+              <PopIn delay={160}>
+                <Ionicons name="git-compare-outline" size={18} color={colors.gold} />
+              </PopIn>
               <Text style={styles.sectionTitle}>{t('brief.competitors')}</Text>
             </View>
             {brief.competitors.map((competitor) => (
@@ -117,7 +121,10 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
   return (
     <View style={styles.stage}>
       <View style={styles.stageHeader}>
-        <Ionicons name="flag-outline" size={16} color={colors.gold} />
+        {/* M84e: the stage flag waves once as the card settles. */}
+        <Wiggle delay={500}>
+          <Ionicons name="flag-outline" size={16} color={colors.gold} />
+        </Wiggle>
         <Text style={styles.blockTitle}>{t('brief.stage')}</Text>
         <View style={styles.stagePill}>
           <Text style={styles.stagePillText} numberOfLines={1}>
@@ -170,7 +177,9 @@ function Points({ title, icon, tone, items }: { title: string; icon: IoniconName
   return (
     <View style={styles.points}>
       <View style={styles.pointsHeader}>
-        <Ionicons name={icon} size={18} color={tone} />
+        <PopIn delay={160}>
+          <Ionicons name={icon} size={18} color={tone} />
+        </PopIn>
         <Text style={styles.blockTitle}>{title}</Text>
       </View>
       {items.map((item) => (

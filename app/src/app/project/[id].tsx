@@ -198,9 +198,12 @@ function RichText({ text }: { text: string }) {
         if (heading) {
           return (
             <View key={index} style={styles.richHeading}>
-              <View style={styles.richIconBadge}>
-                <Ionicons name={topicIcon(clean)} size={15} color={colors.gold} />
-              </View>
+              {/* M84e: each heading's gold badge pops into place as the reader reaches it. */}
+              <PopIn delay={100}>
+                <View style={styles.richIconBadge}>
+                  <Ionicons name={topicIcon(clean)} size={15} color={colors.gold} />
+                </View>
+              </PopIn>
               <Text style={styles.richHeadingText}>{clean.replace(/[:：]$/u, '')}</Text>
             </View>
           );

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
-import { PressScale } from '@/components/motion';
+import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
@@ -22,9 +22,12 @@ export function ServiceTile({ service, onPress }: Props) {
     <PressScale onPress={onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
       <View style={[styles.card, locked && styles.lockedCard]}>
         <View style={styles.topRow}>
-          <View style={[styles.badge, { backgroundColor: locked ? colors.paperBorder : accent.tint }]}>
-            <Ionicons name={iconFor(service.icon)} size={22} color={locked ? colors.paperMuted : accent.ink} />
-          </View>
+          {/* M84e: the icon badge pops into place — the tile's icon leads, alive. */}
+          <PopIn delay={120}>
+            <View style={[styles.badge, { backgroundColor: locked ? colors.paperBorder : accent.tint }]}>
+              <Ionicons name={iconFor(service.icon)} size={22} color={locked ? colors.paperMuted : accent.ink} />
+            </View>
+          </PopIn>
           {locked ? (
             <View style={[styles.pill, styles.lockPill]}>
               <Ionicons name="lock-closed" size={10} color={colors.paperGold} />
