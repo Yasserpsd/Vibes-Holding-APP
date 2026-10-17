@@ -11,8 +11,9 @@ import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { isRTL } from '@/i18n/direction';
+import { isRTL, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
+import { topicIcon } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -172,9 +173,52 @@ function ReadMore({ text }: { text: string }) {
       </PressScale>
       {open ? (
         <FadeInView offset={8}>
-          <Text style={styles.body}>{text}</Text>
+          <RichText text={text} />
         </FadeInView>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * M80 (owner): «عن المشروع» with visual signposting instead of a wall of text — heading-like lines
+ * get a topic icon, list lines get golden diamonds, and plain paragraphs stay paragraphs.
+ */
+function RichText({ text }: { text: string }) {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (
+    <View style={styles.rich}>
+      {lines.map((line, index) => {
+        const bullet = /^([-•*◦▪–]|[0-9٠-٩]{1,2}[).\-–])\s*/u.exec(line);
+        const clean = bullet ? line.slice(bullet[0].length) : line;
+        const heading = !bullet && clean.length <= 48 && (/[:：]$/u.test(clean) || !/[.؟!،;]/u.test(clean));
+        if (heading) {
+          return (
+            <View key={index} style={styles.richHeading}>
+              <View style={styles.richIconBadge}>
+                <Ionicons name={topicIcon(clean)} size={15} color={colors.gold} />
+              </View>
+              <Text style={styles.richHeadingText}>{clean.replace(/[:：]$/u, '')}</Text>
+            </View>
+          );
+        }
+        if (bullet) {
+          return (
+            <View key={index} style={styles.richBullet}>
+              <Text style={styles.richDiamond}>◆</Text>
+              <Text style={styles.richBulletText}>{clean}</Text>
+            </View>
+          );
+        }
+        return (
+          <Text key={index} style={styles.body}>
+            {line}
+          </Text>
+        );
+      })}
     </View>
   );
 }
@@ -254,4 +298,21 @@ const styles = StyleSheet.create({
     marginStart: 'auto',
   },
   readMorePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  // M80: the signposted «عن المشروع».
+  rich: { gap: spacing.sm },
+  richHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  richIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.goldSoft,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+  },
+  richHeadingText: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.goldLight, flex: 1, textAlign: textStart },
+  richBullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingStart: spacing.xs },
+  richDiamond: { fontSize: 9, lineHeight: 24, color: colors.gold },
+  richBulletText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
 });

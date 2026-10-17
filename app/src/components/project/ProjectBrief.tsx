@@ -8,7 +8,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, GrowBar, PressScale, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
-import type { IoniconName } from '@/lib/icons';
+import { topicIcon, type IoniconName } from '@/lib/icons';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -52,6 +52,8 @@ function BriefBody({ brief }: { brief: Brief }) {
               {brief.table.map((row, index) => (
                 <View key={`${row.label}:${index}`} style={[styles.tableRow, index > 0 && styles.tableRowBorder, index % 2 === 1 && styles.tableRowAlt]}>
                   <View style={styles.labelCell}>
+                    {/* M80: every fact row carries its own signpost icon. */}
+                    <Ionicons name={topicIcon(row.label)} size={14} color={colors.goldDark} style={styles.labelIcon} />
                     <Text style={styles.labelText}>{row.label}</Text>
                   </View>
                   <View style={styles.valueCell}>
@@ -115,6 +117,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
   return (
     <View style={styles.stage}>
       <View style={styles.stageHeader}>
+        <Ionicons name="flag-outline" size={16} color={colors.gold} />
         <Text style={styles.blockTitle}>{t('brief.stage')}</Text>
         <View style={styles.stagePill}>
           <Text style={styles.stagePillText} numberOfLines={1}>
@@ -230,9 +233,10 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.surfaceElevated },
   tableRowAlt: { backgroundColor: colors.surface },
   tableRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  labelCell: { width: '36%', paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm, borderEndWidth: StyleSheet.hairlineWidth, borderEndColor: colors.border, backgroundColor: colors.goldFaint },
+  labelCell: { width: '36%', flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm, borderEndWidth: StyleSheet.hairlineWidth, borderEndColor: colors.border, backgroundColor: colors.goldFaint },
+  labelIcon: { marginTop: 3 },
   valueCell: { flex: 1, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm },
-  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, textAlign: textStart },
+  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, textAlign: textStart, flex: 1 },
   valueText: { ...typography.caption, fontSize: 14, lineHeight: 22, color: colors.textPrimary, textAlign: textStart },
 
   blockTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
