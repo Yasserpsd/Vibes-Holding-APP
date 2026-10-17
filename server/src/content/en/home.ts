@@ -49,14 +49,31 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: 'Over 260 ventures that passed screening and evaluation, waiting for a partner like you',
     cta: 'Browse the projects',
   },
+  advisor: {
+    title: 'Your smart advisor is with you',
+    subtitle: 'He accompanies you on your journey inside the club and suggests your next step by your interest.',
+    cta: 'Ask the advisor',
+    chips: [{ label: 'Book an HQ visit' }, { label: 'Attend the next meetup' }, { label: 'Record your podcast episode' }, { label: 'Explore the Projects Bank' }],
+  },
+  podcast: {
+    title: 'Record your episode at the club studio',
+    subtitle: 'The podcast studio is your stage: introduce yourself and your field to the club community with an episode in your name.',
+    cta: 'Book the studio',
+  },
+  savings: {
+    title: 'Your membership saves you',
+    subtitle: 'While you explore your direction, the membership lightens your costs:',
+    items: ['Workshops and meetups with no fees for members', 'An annual credit that opens the club services for you', "Our partners' discounts with your personal member code"],
+    cta: 'See the membership',
+  },
   personas: {
     guest: {
       heroSubtitle: 'Choose your gateway and explore the club: meetups, services, partnership opportunities and a smart advisor.',
     },
     neutral: {
-      heroSubtitle: 'Explore the meetups and club services, get to know the group, and set your direction with confidence.',
+      heroSubtitle: "Explore the meetups and the members' stories, and let your advisor accompany you until you set your direction with confidence.",
       ctas: {
-        projectsBank: { label: 'Discover the projects' },
+        projectsBank: { label: 'Explore the projects for inspiration' },
         agenda: { label: 'Attend the next meetup' },
       },
     },

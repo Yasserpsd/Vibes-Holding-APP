@@ -4,7 +4,7 @@ import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAgenda } from '@/api/agenda';
-import { useHomeContent, useServices, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
+import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { usePartners, type Partner } from '@/api/partners';
 import { usePeople } from '@/api/people';
 import { useGolden, useProjectsList } from '@/api/queries';
@@ -175,6 +175,27 @@ export default function HomeScreen() {
           <ProjectsBankCarousel />
         </FadeInView>
       ) : null,
+    // M74-8 (owner): the advisor as the neutral's companion — next-step suggestion chips, one tap to the conversation.
+    advisor: () =>
+      content.advisor ? (
+        <FadeInView key="advisor" delay={210}>
+          <AdvisorCompanionCard block={content.advisor} onChip={pushRoute} onOpen={() => router.push('/advisor' as Href)} />
+        </FadeInView>
+      ) : null,
+    // M74-7 (owner): the podcast studio featured — the member's stage to introduce himself and his field.
+    podcast: () =>
+      content.podcast ? (
+        <FadeInView key="podcast" delay={230}>
+          <PodcastStageCard block={content.podcast} onPress={() => pushRoute(ctaOf('podcast')?.route ?? content.podcast?.route ?? '/service/studio')} />
+        </FadeInView>
+      ) : null,
+    // M74-5: what the membership saves while he explores his direction.
+    savings: () =>
+      content.savings ? (
+        <FadeInView key="savings" delay={250}>
+          <SavingsCard block={content.savings} onPress={() => pushRoute(ctaOf('savings')?.route ?? '/membership')} />
+        </FadeInView>
+      ) : null,
     golden: () => (
       <FadeInView key="golden" delay={220}>
         <SectionHeader
@@ -343,6 +364,85 @@ function QuickAction({ icon, label, onPress }: { icon: IoniconName; label: strin
   );
 }
 
+/** M74-8: the advisor-as-companion card — the neutral's central guide; every chip is a suggested next step. */
+function AdvisorCompanionCard({ block, onChip, onOpen }: { block: NonNullable<HomeContent['advisor']>; onChip: (route: string) => void; onOpen: () => void }) {
+  return (
+    <GlassCard golden radius={radii.xl} style={styles.advisorCard}>
+      <View style={styles.advisorHead}>
+        <Floating amplitude={2} duration={2400}>
+          <GoldGradient style={styles.advisorIcon}>
+            <Ionicons name="sparkles" size={22} color={colors.goldInk} />
+          </GoldGradient>
+        </Floating>
+        <View style={styles.advisorTexts}>
+          <Text style={styles.advisorTitle}>{block.title}</Text>
+          <Text style={styles.advisorSubtitle}>{block.subtitle}</Text>
+        </View>
+      </View>
+      <View style={styles.advisorChips}>
+        {block.chips.map((chip) => (
+          <PressScale key={chip.label} onPress={() => onChip(chip.route)} glow glowRadius={radii.pill} accessibilityRole="button" accessibilityLabel={chip.label} style={styles.advisorChip}>
+            <Text style={styles.advisorChipText}>{chip.label}</Text>
+          </PressScale>
+        ))}
+      </View>
+      <PressScale onPress={onOpen} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={block.cta}>
+        <GoldGradient style={styles.advisorCta}>
+          <Ionicons name="chatbubbles" size={18} color={colors.goldInk} />
+          <Text style={styles.advisorCtaText}>{block.cta}</Text>
+        </GoldGradient>
+      </PressScale>
+    </GlassCard>
+  );
+}
+
+/** M74-7: the featured podcast card — the studio as the member's stage. */
+function PodcastStageCard({ block, onPress }: { block: NonNullable<HomeContent['podcast']>; onPress: () => void }) {
+  return (
+    <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={block.cta}>
+      <GlassCard golden radius={radii.xl} style={styles.podcastCard}>
+        <Floating amplitude={2} duration={2600}>
+          <GoldGradient style={styles.podcastIcon}>
+            <Ionicons name="mic" size={26} color={colors.goldInk} />
+          </GoldGradient>
+        </Floating>
+        <View style={styles.podcastTexts}>
+          <Text style={styles.podcastTitle}>{block.title}</Text>
+          <Text style={styles.podcastSubtitle}>{block.subtitle}</Text>
+          <View style={styles.podcastCtaRow}>
+            <Text style={styles.podcastCta}>{block.cta}</Text>
+            <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+          </View>
+        </View>
+      </GlassCard>
+    </PressScale>
+  );
+}
+
+/** M74-5: what the membership saves while he explores — golden bullets, one quiet CTA to the membership screen. */
+function SavingsCard({ block, onPress }: { block: NonNullable<HomeContent['savings']>; onPress: () => void }) {
+  return (
+    <GlassCard radius={radii.xl} style={styles.savingsCard}>
+      <Text style={styles.savingsTitle}>{block.title}</Text>
+      <Text style={styles.savingsSubtitle}>{block.subtitle}</Text>
+      <View style={styles.savingsList}>
+        {block.items.map((item) => (
+          <View key={item} style={styles.savingsRow}>
+            <Ionicons name="diamond" size={12} color={colors.gold} />
+            <Text style={styles.savingsItem}>{item}</Text>
+          </View>
+        ))}
+      </View>
+      <PressScale onPress={onPress} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={block.cta}>
+        <View style={styles.savingsCta}>
+          <Text style={styles.savingsCtaText}>{block.cta}</Text>
+          <Ionicons name={chevronForward()} size={16} color={colors.gold} />
+        </View>
+      </PressScale>
+    </GlassCard>
+  );
+}
+
 /** M74 (owner): the VERY distinctive «+» of رائد الأعمال — it opens the شركاء النجاح gate. */
 function PartnersPlusCard({ onPress }: { onPress: () => void }) {
   return (
@@ -475,6 +575,74 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   quickLabel: { ...typography.caption, fontSize: 10, lineHeight: 15, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center' },
+  // M74-8: the advisor companion card.
+  advisorCard: { gap: spacing.sm, padding: spacing.md, marginTop: spacing.sm },
+  advisorHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  advisorIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.glowGoldFaint,
+  },
+  advisorTexts: { flex: 1, gap: 2 },
+  advisorTitle: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
+  advisorSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  advisorChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  advisorChip: {
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+  },
+  advisorChipText: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary },
+  advisorCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  advisorCtaText: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldInk },
+  // M74-7: the podcast stage card.
+  podcastCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm },
+  podcastIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.glowGold,
+  },
+  podcastTexts: { flex: 1, gap: 2 },
+  podcastTitle: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
+  podcastSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  podcastCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  podcastCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.gold },
+  // M74-5: the savings card.
+  savingsCard: { gap: spacing.xs, padding: spacing.md, marginTop: spacing.sm },
+  savingsTitle: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
+  savingsSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  savingsList: { gap: spacing.xs, marginTop: 2 },
+  savingsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  savingsItem: { ...typography.body, fontSize: 13, lineHeight: 21, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  savingsCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    marginTop: spacing.xs,
+  },
+  savingsCtaText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.gold },
   // M74: the entrepreneur's «+» to شركاء النجاح — deliberately unlike every other card.
   plusCard: {
     flexDirection: 'row',

@@ -30,7 +30,10 @@ export type HomeSectionKey =
   | 'membership'
   | 'services'
   | 'partners'
-  | 'videos';
+  | 'videos'
+  | 'advisor'
+  | 'podcast'
+  | 'savings';
 
 /** M74: how the home reads for one persona (or a guest). */
 export type HomePersonaVariant = {
@@ -52,6 +55,12 @@ export type HomeContent = {
   videos: { title: string; subtitle: string; cta: string };
   /** M84: the Projects Bank home block; an older server sends none and the block hides. */
   projectsBank?: { title: string; subtitle: string; cta: string };
+  /** M74-8: the advisor-as-companion card; chips are next-step suggestions (label + app route). */
+  advisor?: { title: string; subtitle: string; cta: string; chips: HomeCta[] };
+  /** M74-7: the featured podcast card — the studio as the member's stage. */
+  podcast?: { title: string; subtitle: string; cta: string; route: string };
+  /** M74-5: what the membership saves while exploring. */
+  savings?: { title: string; subtitle: string; items: string[]; cta: string };
   /** M74: per-persona home variants; an older server sends none and one home serves everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };

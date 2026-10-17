@@ -37,7 +37,10 @@ export type HomeSectionKey =
   | 'membership'
   | 'services'
   | 'partners'
-  | 'videos';
+  | 'videos'
+  | 'advisor'
+  | 'podcast'
+  | 'savings';
 
 /** M74: how the home reads for one persona (or a guest): its own copy, block order and block CTAs. */
 export type HomePersonaVariant = {
@@ -62,6 +65,12 @@ export type HomeContent = {
   videos: { title: string; subtitle: string; cta: string };
   /** M84: the Projects Bank home block with the auto-rotating image carousel; absent on an older stored block = hidden. */
   projectsBank?: { title: string; subtitle: string; cta: string };
+  /** M74-8: the advisor-as-companion card (central to the neutral's journey); chips are next-step suggestions. */
+  advisor?: { title: string; subtitle: string; cta: string; chips: HomeCta[] };
+  /** M74-7: the featured podcast card — the studio as the member's stage to introduce himself. */
+  podcast?: { title: string; subtitle: string; cta: string; route: string };
+  /** M74-5: what the membership saves while he explores; the CTA leads to the membership screen. */
+  savings?: { title: string; subtitle: string; items: string[]; cta: string };
   /** M74: per-persona home variants (guest included). Absent on an older stored block = one home for everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   /** The entrepreneurs portal page: intro plus the keys of the services it lists. */
@@ -150,6 +159,32 @@ export const HOME_SEED: HomeContent = {
     subtitle: 'أكثر من 260 مشروعًا اجتازت الفحص والتقييم، بانتظار شريك مثلك',
     cta: 'تصفّح المشاريع',
   },
+  // M74-8 (owner, 2026-10-17): the advisor accompanies the neutral and suggests his next step.
+  advisor: {
+    title: 'مستشارك الذكي معك',
+    subtitle: 'يرافقك في رحلتك داخل النادي ويقترح خطوتك القادمة حسب اهتمامك.',
+    cta: 'اسأل المستشار',
+    chips: [
+      { label: 'احجز زيارة للمقر', route: '/hq' },
+      { label: 'احضر الملتقى القادم', route: '/agenda' },
+      { label: 'سجّل حلقتك في البودكاست', route: '/service/studio' },
+      { label: 'استكشف بنك المشاريع', route: '/projects' },
+    ],
+  },
+  // M74-7 (owner): the studio is the neutral's stage — he records an episode introducing himself and his field.
+  podcast: {
+    title: 'سجّل حلقتك في استوديو النادي',
+    subtitle: 'استوديو البودكاست منصّتك: قدّم نفسك ومجالك لمجتمع النادي بحلقة باسمك.',
+    cta: 'احجز الاستوديو',
+    route: '/service/studio',
+  },
+  // M74-5: the membership's economics while he explores (wording rules: «بدون رسوم», «رصيد»).
+  savings: {
+    title: 'عضويتك توفّر عليك',
+    subtitle: 'وأنت تستكشف وجهتك، العضوية تخفّف تكاليفك:',
+    items: ['ورش العمل والملتقيات بدون رسوم للأعضاء', 'رصيد سنوي يفتح لك خدمات النادي', 'خصومات شركائنا برمز العضو الخاص بك'],
+    cta: 'تعرّف على العضوية',
+  },
   // M74: the home speaks to the persona — copy, order and CTAs per gateway (the owner edits the texts from the dashboard).
   personas: {
     guest: {
@@ -157,10 +192,13 @@ export const HOME_SEED: HomeContent = {
       order: ['portals', 'posts', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
     },
     neutral: {
-      heroSubtitle: 'استكشف الملتقيات وخدمات النادي وتعرّف على المنظومة، وحدّد وجهتك بثقة.',
-      order: ['posts', 'quickActions', 'agenda', 'services', 'projectsBank', 'golden', 'membership', 'partners', 'videos', 'famous'],
+      // M74-6..8 (owner-approved, 2026-10-17): the neutral's home is a discovery journey — events and the
+      // companion advisor first, then the inspiration content (شخصية ومسيرة / تعرف علينا / the podcast stage),
+      // the Projects Bank as a window, and what the membership saves him while he explores.
+      heroSubtitle: 'استكشف الملتقيات وقصص الأعضاء، ودع مستشارك يرافقك حتى تحدّد وجهتك بثقة.',
+      order: ['posts', 'agenda', 'advisor', 'quickActions', 'famous', 'videos', 'podcast', 'projectsBank', 'services', 'savings', 'golden', 'partners'],
       ctas: {
-        projectsBank: { label: 'تعرّف على المشاريع', route: '/projects' },
+        projectsBank: { label: 'استكشف المشاريع للإلهام', route: '/projects' },
         agenda: { label: 'احضر الملتقى القادم', route: '/agenda' },
       },
     },
@@ -192,8 +230,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 8,
-  updatedAt: '2026-10-17T00:00:00.000Z',
+  version: 9,
+  updatedAt: '2026-10-17T12:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */
