@@ -88,7 +88,7 @@ Also from the owner: nothing should require leaving the app; every web link in �
 - 06 — القضمة السريعة — 10M — qbarabia.com/offer/
 - 07 — الصفقات السريعة للتجارة — 10M — qdtco.com/offer/
 - 08 — مومنتوم — 10M — momentummix.com/offer
-- 09 — الصفقات السريعة للاستثمار — 10M — qdealsi.com/
+- 09 — الصفقات السريعة للاستثمار — 10M — qdealsi.com/offer/ (confirmed live 2026-10-17; the old record without /offer/ was wrong)
 - 10 — تمكين الامتياز — 10M — franchment.com/offer
 
 Logos are in `https://vibesholding.com/wp-content/uploads/2026/08/`: فايبز-القابضة.png, Wdeny-logo-png.webp, لوجو-المجتمع-الافتراضي.png, PV.png, Seka.webp, Al-Moltaqa.webp, القضمة-السريعة.png, الصفقات-السريعة-للتجارة.webp, مومنتوم-scaled.png, الصفقات-السريعة-للاستثمار.png, تمكين-الامتياز.png. Seed them as editable server content; do not hardcode.

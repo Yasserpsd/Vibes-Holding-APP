@@ -64,7 +64,7 @@ export const GOLDEN_SEED: GoldenContent = {
     company('06', 'القضمة السريعة', 10, 'https://qbarabia.com/offer/', 'القضمة-السريعة.png', 6),
     company('07', 'الصفقات السريعة للتجارة', 10, 'https://qdtco.com/offer/', 'الصفقات-السريعة-للتجارة.webp', 7),
     company('08', 'مومنتوم', 10, 'https://momentummix.com/offer', 'مومنتوم-scaled.png', 8),
-    company('09', 'الصفقات السريعة للاستثمار', 10, 'https://qdealsi.com/', 'الصفقات-السريعة-للاستثمار.png', 9),
+    company('09', 'الصفقات السريعة للاستثمار', 10, 'https://qdealsi.com/offer/', 'الصفقات-السريعة-للاستثمار.png', 9),
     company('10', 'تمكين الامتياز', 10, 'https://franchment.com/offer', 'تمكين-الامتياز.png', 10),
   ],
   updatedAt: '2026-09-11T00:00:00.000Z',
