@@ -113,7 +113,7 @@ export const ABOUT_SEED: AboutContent = {
   },
   contact: {
     title: 'تواصل معنا',
-    management: '+966503844438',
+    management: '+966551623111',
     studio: '+966538461110',
     email: 'info@vcmem.com',
     websites: [

@@ -78,7 +78,7 @@ export type PublicService = Omit<Service, 'action'> & { locked: boolean; action:
 export const SERVICES_CONTENT_KEY = 'content:services';
 
 /** The only management number and the studio number (docs/PROJECT_BRIEF.md section 1). */
-export const MANAGEMENT_WHATSAPP = '+966503844438';
+export const MANAGEMENT_WHATSAPP = '+966551623111';
 export const STUDIO_WHATSAPP = '+966538461110';
 
 const management = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: MANAGEMENT_WHATSAPP, message, fields });
