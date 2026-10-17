@@ -65,6 +65,7 @@ import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
+import { companionRoutes } from './companion/routes.js';
 import { CompanionService } from './companion/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
@@ -386,6 +387,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
   await app.register(badgesRoutes, { auth, agenda, profiles, payments });
+  await app.register(companionRoutes, { service: companion, auth });
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });

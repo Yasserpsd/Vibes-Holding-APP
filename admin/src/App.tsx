@@ -15,6 +15,7 @@ import { Paylinks } from './sections/Paylinks';
 import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
 import { Threads } from './sections/Threads';
+import { Companion } from './sections/Companion';
 import { Content } from './sections/Content';
 import { News } from './sections/News';
 import { Stats } from './sections/Stats';
@@ -45,6 +46,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'wording', label: 'نصوص التطبيق', icon: 'wording' },
   { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
   { key: 'news', label: 'مصادر الأخبار', icon: 'news' },
+  { key: 'companion', label: 'المستشار اليومي', icon: 'companion' },
 ];
 /** A phone's bar holds four sections and «المزيد»; a desk's rail lists them all. */
 const BAR: SectionKey[] = ['home', 'members', 'payments', 'threads'];
@@ -274,6 +276,7 @@ export function App() {
             {section === 'wording' ? <Wording /> : null}
             {section === 'content' ? <Content /> : null}
             {section === 'news' ? <News /> : null}
+            {section === 'companion' ? <Companion /> : null}
           </Boundary>
         </main>
 

@@ -430,6 +430,10 @@ export const api = {
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
+  // M87b «المستشار اليومي»: the daily-push template pools, their preview, and the mute count.
+  companion: () => call<CompanionData>('GET', '/api/admin/companion'),
+  saveCompanion: (templates: CompanionTemplates) => call<CompanionData & { ok: true }>('PUT', '/api/admin/companion', templates),
+  resetCompanion: () => call<CompanionData & { ok: true }>('DELETE', '/api/admin/companion'),
   // M81 «صور التطبيق»: code-defined image slots the owner fills with uploads.
   contentImages: () => call<{ slots: ImageSlot[] }>('GET', '/api/admin/content/images'),
   saveContentImage: (key: string, url: string | null) => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url }),
@@ -443,6 +447,20 @@ export const api = {
 
 /** M81 «صور التطبيق» — mirrors server/src/content/images.ts. */
 export type ImageSlot = { key: string; label: string; group: string; url: string | null };
+
+/** M87b «المستشار اليومي» — mirrors server/src/companion/service.ts. */
+export type CompanionPersona = 'investor' | 'entrepreneur' | 'neutral';
+export type CompanionTemplate = { title: string; body: string };
+export type CompanionTemplates = Record<CompanionPersona, CompanionTemplate[]>;
+export type CompanionData = {
+  templates: CompanionTemplates;
+  edited: boolean;
+  enabled: boolean;
+  lastDay: string | null;
+  mutedCount: number;
+  preview: Record<CompanionPersona, CompanionTemplate>;
+  placeholders: { key: string; label: string }[];
+};
 
 /** M68 «شركاؤنا» — mirrors server/src/partners/service.ts. */
 export type Partner = {

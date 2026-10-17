@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
-import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
+import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
 import { AppButton } from '@/components/AppButton';
@@ -118,6 +120,8 @@ export default function AccountScreen() {
 
       <FadeInView delay={entranceDelay(6, 90)}>
         <MenuGroup title={t('account.group.preferences')}>
+          {/* M87b: the daily advisor message, on or off — server-side, follows the account. */}
+          <CompanionToggleRow />
           {languageChoiceOffered(me?.isAdmin === true) ? <MenuRow icon="language-outline" label={t('account.menu.language')} onPress={chooseLanguage} /> : null}
           <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
           {me?.isAdmin ? <MenuRow icon="key-outline" label={t('account.menu.hqAdmin')} onPress={() => router.push('/hq/admin')} /> : null}
@@ -159,6 +163,31 @@ function ProfileHeader({ me }: { me: Me }) {
         <Text style={styles.contact}>{me.email}</Text>
         <Text style={styles.contact}>{me.phone}</Text>
       </View>
+    </View>
+  );
+}
+
+/** M87b: «رسالة المستشار اليومية» — the switch flips the server-side mute (the wave then skips this member). */
+function CompanionToggleRow() {
+  const queryClient = useQueryClient();
+  const query = useQuery({ queryKey: ['companion', 'me'], queryFn: companionApi.me, staleTime: 5 * 60_000 });
+  const toggle = useMutation({
+    mutationFn: (muted: boolean) => companionApi.setMuted(muted),
+    onSuccess: (answer) => queryClient.setQueryData(['companion', 'me'], answer),
+  });
+  const muted = toggle.isPending ? !(query.data?.muted ?? false) : (query.data?.muted ?? false);
+  return (
+    <View style={styles.row}>
+      <Ionicons name="sparkles-outline" size={22} color={colors.gold} />
+      <Text style={styles.rowLabel}>{t('account.companion')}</Text>
+      <Switch
+        value={!muted}
+        disabled={query.isLoading || toggle.isPending}
+        onValueChange={(on) => toggle.mutate(!on)}
+        trackColor={{ false: colors.surfaceElevated, true: colors.goldDark }}
+        thumbColor={muted ? colors.textMuted : colors.gold}
+        accessibilityLabel={t('account.companion')}
+      />
     </View>
   );
 }

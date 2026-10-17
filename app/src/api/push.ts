@@ -8,3 +8,9 @@ export const pushApi = {
   /** Called before the local session is cleared, so the token still belongs to a signed-in request. */
   unregister: (token: string, sessionToken: string) => apiRequest<{ ok: true }>('DELETE', '/api/push/tokens', { body: { token }, token: sessionToken }),
 };
+
+// M87b: the member's mute switch for the advisor's daily message (server-side, follows the account).
+export const companionApi = {
+  me: () => apiRequest<{ muted: boolean }>('GET', '/api/companion/me'),
+  setMuted: (muted: boolean) => apiRequest<{ muted: boolean }>('PUT', '/api/companion/me', { body: { muted } }),
+};

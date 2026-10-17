@@ -118,8 +118,10 @@ export class PushService {
   }
 
   /** M29: devices whose account carried this persona at the last registration. */
-  async tokensForPersona(persona: string): Promise<string[]> {
-    return (await this.load()).filter((entry) => entry.persona === persona).map((entry) => entry.token);
+  async tokensForPersona(persona: string, exclude?: Set<number>): Promise<string[]> {
+    return (await this.load())
+      .filter((entry) => entry.persona === persona && !exclude?.has(entry.contactId))
+      .map((entry) => entry.token);
   }
 
   async summary(): Promise<{ total: number; accounts: number; byPlatform: Record<string, number> }> {
@@ -140,9 +142,9 @@ export class PushService {
     return this.deliver(tokens, message, { broadcast: true });
   }
 
-  /** M29: one message to every device of one persona's members. */
-  async broadcastPersona(persona: string, message: PushMessage): Promise<PushOutcome> {
-    return this.deliver(await this.tokensForPersona(persona), message, { persona });
+  /** M29: one message to every device of one persona's members; `exclude` skips muted members (M87b). */
+  async broadcastPersona(persona: string, message: PushMessage, exclude?: Set<number>): Promise<PushOutcome> {
+    return this.deliver(await this.tokensForPersona(persona, exclude), message, { persona });
   }
 
   private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {

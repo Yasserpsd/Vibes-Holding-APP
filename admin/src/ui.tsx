@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { AccountFilter } from './types';
 
-export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news';
+export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {
@@ -94,6 +94,7 @@ const ICONS = {
   partners: 'M20.5 12.5 13 20l-8.5-8.5V4h7.5l8.5 8.5ZM8.25 7.75h.01M8.25 7.75a.5.5 0 1 0 .01 0Z',
   workshops: 'M3 4.5h18M5 4.5h14v9.5H5V4.5ZM12 14v2M8.5 20l3.5-3.5 3.5 3.5M8.5 8l2.5 2.5L15.5 6',
   forms: 'M9 4.5h6v3H9zM9 4.5H6v16h12v-16h-3M9 12h6M9 15.5h4M9.5 8.5l1 1 2-2',
+  companion: 'M12 3l1.2 3.6L17 8l-3.8 1.4L12 13l-1.2-3.6L7 8l3.8-1.4L12 3ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14ZM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
   close: 'M6 6l12 12M18 6 6 18',
