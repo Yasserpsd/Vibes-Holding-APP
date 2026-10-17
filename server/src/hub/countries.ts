@@ -14,7 +14,7 @@ export type CountryRow = {
 };
 
 export const COUNTRY_ROWS: readonly CountryRow[] = [
-  { code: 'sa', name: 'السعودية', nameEn: 'Saudi Arabia', dial: '966', flag: '🇸🇦', example: '0558318777', local: /^0?5\d{8}$/ },
+  { code: 'sa', name: 'السعودية', nameEn: 'Saudi Arabia', dial: '966', flag: '🇸🇦', example: '0512345678', local: /^0?5\d{8}$/ },
   { code: 'ae', name: 'الإمارات', nameEn: 'United Arab Emirates', dial: '971', flag: '🇦🇪', example: '0501234567', local: /^0?5\d{8}$/ },
   { code: 'kw', name: 'الكويت', nameEn: 'Kuwait', dial: '965', flag: '🇰🇼', example: '51234567', local: /^[569]\d{7}$/ },
   { code: 'qa', name: 'قطر', nameEn: 'Qatar', dial: '974', flag: '🇶🇦', example: '55123456', local: /^[3567]\d{7}$/ },

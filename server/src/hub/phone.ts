@@ -13,7 +13,7 @@ const GENERIC_LOCAL = /^\d{5,12}$/;
 /** Loose client-side pattern sent to the app for countries without a strict rule. */
 export const GENERIC_PATTERN = '^0*\\d{5,12}$';
 
-export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة — في السعودية مثلًا بهذا الشكل: 0558318777.';
+export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة — في السعودية مثلًا بهذا الشكل: 0512345678.';
 export const EMAIL_POLICY_TEXT = 'نقبل التسجيل بأي بريد إلكتروني صحيح، شخصي أو بريد عمل — يصلك عليه رمز التفعيل';
 
 export function countryByCode(code: string | undefined): Country | undefined {

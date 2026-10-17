@@ -228,7 +228,7 @@
   "auth.login.subtitle": "بنفس حساب نادي المستثمرين الذي تستخدمه على مواقع المنظومة.",
   "auth.login.adminOnly": "النسخة التجريبية: الدخول متاح لحسابات إدارة النادي فقط.",
   "auth.login.field": "البريد الإلكتروني أو رقم الجوال",
-  "auth.login.placeholder": "name@gmail.com أو 0558318777",
+  "auth.login.placeholder": "name@gmail.com أو 0512345678",
   "auth.login.required": "اكتب البريد الإلكتروني أو رقم الجوال وكلمة المرور",
   "auth.login.submit": "دخول",
   "auth.login.busy": "جارٍ الدخول…",

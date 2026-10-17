@@ -66,10 +66,10 @@ export class MockChat {
     if (!text) throw new HubError('empty', 'الرسالة فارغة', 400);
     const room = this.room(contactId);
     if (contact.member_expired) {
-      return { ok: true, gated: true, gate: { type: 'membership', text: `انتهت عضويتك — جدّدها من ${MOCK_MEMBERSHIP_URL}`, card: membershipCard(), mgmt: '966558318777' }, contact };
+      return { ok: true, gated: true, gate: { type: 'membership', text: `انتهت عضويتك — جدّدها من ${MOCK_MEMBERSHIP_URL}`, card: membershipCard(), mgmt: '966551623111' }, contact };
     }
     if (!contact.is_member && room.replies >= FREE_REPLIES) {
-      return { ok: true, gated: true, gate: { type: 'membership', text: `للمتابعة فعّل عضويتك السنوية: ${MOCK_MEMBERSHIP_URL}`, card: membershipCard(), mgmt: '966558318777', needs_account: 0 }, contact };
+      return { ok: true, gated: true, gate: { type: 'membership', text: `للمتابعة فعّل عضويتك السنوية: ${MOCK_MEMBERSHIP_URL}`, card: membershipCard(), mgmt: '966551623111', needs_account: 0 }, contact };
     }
     const now = Date.now();
     const pageTitle = str(body, 'page_title', 200);
