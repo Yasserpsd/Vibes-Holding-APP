@@ -18,7 +18,12 @@ export const env = {
   appEnv: extra.appEnv ?? 'test',
   isProduction: extra.appEnv === 'production',
   apiBaseUrl,
-  // M46: the Google OAuth web client id (public). Empty = the Google button stays hidden.
-  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? extra.googleWebClientId ?? '',
+  // M46/M92: the Google OAuth web client id (a public value, committed in eas.json too). The
+  // hardcoded default keeps the button alive in OTA bundles: `eas update` never reads eas.json
+  // env, so an export without the variable used to ship '' and silently hide Google sign-in.
+  googleWebClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    extra.googleWebClientId ||
+    '980470249678-g51bg4r3u4op57tse8t2nt4vut1fp0cm.apps.googleusercontent.com',
   appVersion: Constants.expoConfig?.version ?? '0.0.0',
 } as const;
