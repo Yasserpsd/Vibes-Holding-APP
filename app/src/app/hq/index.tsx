@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
@@ -61,8 +61,23 @@ export default function HqScreen() {
     }
   };
 
+  const photos = data.photos ?? [];
+
   return (
     <Screen title={content.title} subtitle={content.intro} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
+      {/* M81: the owner's real HQ photos, employed where they belong — the first photo leads wide. */}
+      {photos.length ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Image source={{ uri: photos[0] }} style={styles.heroPhoto} resizeMode="cover" accessibilityLabel={content.title} />
+          {photos.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
+              {photos.slice(1).map((photo) => (
+                <Image key={photo} source={{ uri: photo }} style={styles.photo} resizeMode="cover" accessibilityLabel={content.title} />
+              ))}
+            </ScrollView>
+          ) : null}
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(1)}>
         <GlassCard golden style={styles.card}>
           <View style={styles.row}>
@@ -164,6 +179,10 @@ function VisitRow({ visit, onPass, onCancel }: { visit: Visit; onPass: () => voi
 }
 
 const styles = StyleSheet.create({
+  // M81: the HQ gallery.
+  heroPhoto: { width: '100%', height: 180, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
+  photoStrip: { gap: spacing.sm, paddingTop: spacing.sm },
+  photo: { width: 132, height: 88, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   card: {
     gap: spacing.md,
     padding: spacing.md,

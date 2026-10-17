@@ -430,6 +430,9 @@ export const api = {
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
+  // M81 «صور التطبيق»: code-defined image slots the owner fills with uploads.
+  contentImages: () => call<{ slots: ImageSlot[] }>('GET', '/api/admin/content/images'),
+  saveContentImage: (key: string, url: string | null) => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url }),
   partners: () => call<{ settings: PartnersSettings; partners: Partner[] }>('GET', '/api/admin/partners'),
   createPartner: (input: PartnerInput) => call<{ partner: Partner }>('POST', '/api/admin/partners', input),
   updatePartner: (id: string, input: Partial<PartnerInput>) => call<{ partner: Partner }>('PUT', `/api/admin/partners/${id}`, input),
@@ -437,6 +440,9 @@ export const api = {
   savePartnersSettings: (input: Partial<PartnersSettings>) => call<{ settings: PartnersSettings }>('PUT', '/api/admin/partners/settings', input),
   promoLookup: (code: string) => call<{ promo: PromoRecord | null }>('GET', `/api/admin/partners/promo/${encodeURIComponent(code)}`),
 };
+
+/** M81 «صور التطبيق» — mirrors server/src/content/images.ts. */
+export type ImageSlot = { key: string; label: string; group: string; url: string | null };
 
 /** M68 «شركاؤنا» — mirrors server/src/partners/service.ts. */
 export type Partner = {

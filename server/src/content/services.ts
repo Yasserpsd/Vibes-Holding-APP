@@ -53,6 +53,8 @@ export type Service = {
   order: number;
   /** M74: the imperative call to action on the service card («سجّل», «احجز»…); an older stored row has none. */
   cta?: string;
+  /** M81: the owner's photo for this service (filled from the image slots at read time, never stored here). */
+  imageUrl?: string | null;
 };
 
 export type ServicesContent = {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import type { ContentList, WordingList } from '../types';
 import { Chips } from '../ui';
+import { Images } from './Images';
 import { Values } from './Values';
 import { WordingEditor, type WordingSave } from './Wording';
 
@@ -21,10 +22,11 @@ const save: WordingSave = ({ lang, key, value }) => {
   return api.saveContent({ lang, block: block ?? '', path: path.join('|'), value });
 };
 
-type Tab = 'texts' | 'values';
+type Tab = 'texts' | 'values' | 'images';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'texts', label: 'النصوص' },
   { value: 'values', label: 'القيم والأسعار' },
+  { value: 'images', label: 'الصور' },
 ];
 
 /**
@@ -40,8 +42,10 @@ export function Content() {
       <Chips label="ماذا تعدّل" options={TABS} value={tab} onChange={setTab} />
       {tab === 'texts' ? (
         <WordingEditor title="محتوى التطبيق" hint="نصوص الشاشات التي يرسلها الخادم للتطبيق (الرئيسية، العضوية، الخدمات، المشاريع الذهبية، المقر، عن النادي، الفيديو) بالعربية وبالإنجليزية. الأسعار والروابط والأرقام في تبويب «القيم والأسعار»." groupLabel="القسم" allLabel="كل الأقسام" maxLength={2000} load={load} save={save} />
-      ) : (
+      ) : tab === 'values' ? (
         <Values />
+      ) : (
+        <Images />
       )}
     </div>
   );

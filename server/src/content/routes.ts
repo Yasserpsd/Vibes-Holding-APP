@@ -16,6 +16,7 @@ import { getGoldenContent } from './golden.js';
 import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
 import { getMembershipContent } from './membership.js';
+import { imageSlots, saveImage, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
 export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService };
@@ -43,6 +44,12 @@ const valueSchema = z.object({
   path: z.string().trim().min(1).max(200),
   /** `null` = back to the seed's value (M33 «القيم والأسعار»). */
   value: z.union([z.number(), z.string().max(500), z.boolean()]).nullable(),
+});
+
+const imageSchema = z.object({
+  key: z.string().trim().min(1).max(80),
+  /** `null` (or absent) = clear the slot (M81 «صور التطبيق»). */
+  url: z.string().trim().max(500).nullish(),
 });
 
 /**
@@ -111,7 +118,10 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
     '/api/services',
     guard(async (request) => {
       const who = await whoIs(request);
-      return publicServices(await getServicesContent(kv, langOf(request)), who?.me ?? null);
+      const list = publicServices(await getServicesContent(kv, langOf(request)), who?.me ?? null);
+      // M81: the owner's uploaded service photos ride on the services the app already reads.
+      const images = await serviceImages(kv);
+      return { ...list, services: list.services.map((service) => ({ ...service, imageUrl: images[service.key] ?? null })) };
     }),
   );
 
@@ -124,7 +134,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       const list = publicServices(content, who?.me ?? null);
       const service = list.services.find((entry) => entry.key === key);
       if (!service) return reply.code(404).send({ error: { code: 'not_found', message: 'الخدمة غير موجودة' } });
-      return { service, lockedText: list.lockedText, isMember: list.isMember };
+      const images = await serviceImages(kv);
+      return { service: { ...service, imageUrl: images[service.key] ?? null }, lockedText: list.lockedText, isMember: list.isMember };
     }),
   );
 
@@ -198,6 +209,30 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       await offers.refresh();
       await sync.bump('content').catch(() => undefined);
       return { ok: true, ...offers.status() };
+    }),
+  );
+
+  // M81 «صور التطبيق»: the owner fills code-defined image slots with uploads; the app reads them inside hq/services.
+  app.get(
+    '/api/admin/content/images',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return { slots: await imageSlots(kv) };
+    }),
+  );
+
+  app.put(
+    '/api/admin/content/image',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(imageSchema, request.body, reply);
+      if (!body) return;
+      const slot = await saveImage(kv, body.key, body.url ?? null);
+      if (!slot) return reply.code(404).send({ error: { code: 'not_found', message: 'خانة الصورة غير موجودة' } });
+      await sync.bump('content').catch(() => undefined);
+      return { ok: true, slot };
     }),
   );
 

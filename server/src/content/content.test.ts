@@ -120,3 +120,32 @@ test('only a dashboard admin edits a text; each language keeps its own edits; th
   assert.equal((await get('/api/hq')).json().content.title, 'مقر النادي');
   assert.equal((await get('/api/hq', 'en')).json().content.title, 'Club HQ');
 });
+
+// M81 «صور التطبيق»: code-defined slots, filled by uploads from the dashboard, read inside hq/services.
+test('the image slots fill from the dashboard and ride into the hq gallery and the service pages', async () => {
+  const slots = await app.inject({ method: 'GET', url: '/api/admin/content/images', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(slots.statusCode, 200, slots.body);
+  const listed = slots.json().slots as { key: string; url: string | null }[];
+  assert.ok(listed.some((slot) => slot.key === 'hq.1'));
+  const serviceSlot = listed.find((slot) => slot.key.startsWith('service.'));
+  assert.ok(serviceSlot, 'every service gets a slot');
+
+  const putImage = (payload: Record<string, unknown>) =>
+    app.inject({ method: 'PUT', url: '/api/admin/content/image', payload, headers: { authorization: `Bearer ${token}` } });
+  assert.equal((await app.inject({ method: 'PUT', url: '/api/admin/content/image', payload: { key: 'hq.1', url: 'https://cdn.example.test/media/a.webp' } })).statusCode, 401);
+  assert.equal((await putImage({ key: 'nowhere', url: 'https://cdn.example.test/media/a.webp' })).statusCode, 404);
+
+  assert.equal((await putImage({ key: 'hq.2', url: 'https://cdn.example.test/media/hall.webp' })).statusCode, 200);
+  assert.deepEqual((await get('/api/hq')).json().photos, ['https://cdn.example.test/media/hall.webp']);
+
+  const serviceKey = (serviceSlot as { key: string }).key.slice('service.'.length);
+  assert.equal((await putImage({ key: `service.${serviceKey}`, url: 'https://cdn.example.test/media/studio.webp' })).statusCode, 200);
+  const services = (await get('/api/services')).json().services as { key: string; imageUrl: string | null }[];
+  assert.equal(services.find((service) => service.key === serviceKey)?.imageUrl, 'https://cdn.example.test/media/studio.webp');
+  const one = await get(`/api/services/${serviceKey}`);
+  assert.equal(one.json().service.imageUrl, 'https://cdn.example.test/media/studio.webp');
+
+  // Clearing empties the slot again.
+  assert.equal((await putImage({ key: 'hq.2', url: null })).statusCode, 200);
+  assert.deepEqual((await get('/api/hq')).json().photos, []);
+});

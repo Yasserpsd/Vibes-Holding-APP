@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { getHqContent, type HqContent } from '../content/hq.js';
+import { hqPhotos } from '../content/images.js';
 import type { AppLang } from '../lang.js';
 import type { Notifier, VisitLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
@@ -74,6 +75,8 @@ export type HqOverview = {
   lockedText: string | null;
   days: { date: string; weekday: number }[];
   times: string[];
+  /** M81: the owner's HQ photos (uploaded from the dashboard image slots), in slot order. */
+  photos: string[];
 };
 
 export type BookInput = { date: string; time: string; purpose: string; note: string };
@@ -227,6 +230,7 @@ export class HqService {
       lockedText: access === 'member' ? null : access === 'guest' ? content.guestText : content.memberOnlyText,
       days: bookableDays(content, now),
       times: slotTimes(content),
+      photos: await hqPhotos(this.deps.kv),
     };
   }
 

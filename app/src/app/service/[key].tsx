@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
@@ -87,6 +87,12 @@ export default function ServiceScreen() {
 
   return (
     <Screen>
+      {/* M81: the owner's photo of this service (the studio, the theatre…) leads the page. */}
+      {service.imageUrl ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Image source={{ uri: service.imageUrl }} style={styles.heroImage} resizeMode="cover" accessibilityLabel={service.title} />
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(0)}>
         <View style={styles.header}>
           <PopIn>
@@ -260,6 +266,8 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
 }
 
 const styles = StyleSheet.create({
+  // M81: the service's real photo, big on top.
+  heroImage: { width: '100%', height: 170, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconBox: {
     width: 60,

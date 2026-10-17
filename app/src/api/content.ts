@@ -92,6 +92,8 @@ export type Service = {
   order: number;
   /** M74: the imperative call to action on the service card; an older server sends none. */
   cta?: string;
+  /** M81: the owner's photo for this service, shown atop its page; an older server sends none. */
+  imageUrl?: string | null;
 };
 
 export type ServicesList = {

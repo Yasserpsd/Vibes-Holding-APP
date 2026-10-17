@@ -30,6 +30,8 @@ export type HqOverview = {
   lockedText: string | null;
   days: { date: string; weekday: number }[];
   times: string[];
+  /** M81: the owner's HQ photos (dashboard uploads); an older server sends none. */
+  photos?: string[];
 };
 
 export type VisitStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled';
