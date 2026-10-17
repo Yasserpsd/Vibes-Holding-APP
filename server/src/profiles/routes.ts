@@ -1,15 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type ProfilesService } from './service.js';
 
 export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService };
 
 const linkSchema = z.object({
-  label: z.string().trim().max(40).default(''),
-  url: z.string().trim().url('اكتب رابطًا صحيحًا يبدأ بـ https').max(200),
+  label: z.string().trim().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا').default(''),
+  url: z.string().trim().url('اكتب رابطًا صحيحًا يبدأ بـ https').max(200, 'الرابط بحد أقصى 200 حرف'),
 });
 
 const applySchema = z.object({
@@ -28,12 +28,21 @@ const applySchema = z.object({
   links: z.array(linkSchema).max(5).default([]),
 });
 
+const longLine = (max: number) => z.string().trim().min(1).max(max, `كل سطر بحد أقصى ${max} حرفًا — قسّم السطر الطويل إلى سطرين`);
+
 const fieldsSchema = applySchema.extend({
-  name: z.string().trim().min(2).max(80),
+  name: z.string().trim().min(2, 'اكتب الاسم').max(80),
   photo: z.string().trim().max(500).nullable().default(null),
   // The member must state them; the admin's manual entry may leave them for later.
   specialty: z.string().trim().max(160).default(''),
   city: z.string().trim().max(80).default(''),
+  // M73 fix (owner, 2026-10-17): the admin pastes REAL spotlight content — paragraph-length story
+  // lines and rich bios must not bounce off the member-form limits («البيانات غير مكتملة» with no clue).
+  bio: z.string().trim().max(4000, 'النبذة بحد أقصى 4000 حرف').default(''),
+  milestones: z.array(longLine(600)).max(30, 'بحد أقصى 30 محطة').default([]),
+  achievements: z.array(longLine(600)).max(30, 'بحد أقصى 30 إنجازًا').default([]),
+  benefit: z.array(longLine(600)).max(30, 'بحد أقصى 30 سطرًا').default([]),
+  seeking: z.string().trim().max(1200, 'بحد أقصى 1200 حرف').default(''),
 });
 
 const updateSchema = fieldsSchema.partial().extend({ order: z.number().int().min(0).max(9999).optional() });
@@ -132,9 +141,10 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       if (!admin) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      const input = parse(updateSchema, request.body, reply);
-      if (!input) return;
-      const updated = await service.update(params.id, input);
+      const parsed = parse(updateSchema, request.body, reply);
+      if (!parsed) return;
+      // Zod 4 fills the defaults even under .partial(): only what the dashboard sent may change.
+      const updated = await service.update(params.id, sentOnly(parsed, request.body));
       if (!updated) return reply.code(404).send({ error: { code: 'not_found', message: 'الملف غير موجود' } });
       return { profile: updated };
     }),

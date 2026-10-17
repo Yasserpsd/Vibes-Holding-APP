@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
 import { useAuth } from '@/auth/AuthProvider';
@@ -66,6 +66,12 @@ export default function AgendaEventScreen() {
         <StateView loading={query.isLoading} error={query.error} onRetry={() => void query.refetch()} />
       ) : (
         <>
+          {/* M77 (owner): the BIG image leads the page — all details below it. */}
+          {event.imageUrl ? (
+            <FadeInView offset={8}>
+              <Image source={{ uri: event.imageUrl }} style={styles.heroImage} resizeMode="cover" accessibilityLabel={event.title} />
+            </FadeInView>
+          ) : null}
           <FadeInView style={styles.head} offset={10}>
             <EventDateBadge date={event.date} highlight />
             <View style={styles.headText}>
@@ -144,6 +150,8 @@ export default function AgendaEventScreen() {
 }
 
 const styles = StyleSheet.create({
+  // M77: the owner's event image, big on top of everything.
+  heroImage: { width: '100%', height: 200, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   headText: { flex: 1, gap: 4 },
   title: { ...typography.title, color: colors.textPrimary, textAlign: textStart },

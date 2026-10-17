@@ -7,14 +7,20 @@ import { loadSetting, saveSetting } from '@/lib/deviceStore';
  * queries already hold against these marks to draw their badges; opening the section clears it.
  * Device-local on purpose (no server round trip, works for guests too).
  */
-export type SeenSection = 'inbox' | 'projects' | 'posts';
+export type SeenSection = 'inbox' | 'projects' | 'posts' | 'home' | 'account';
 
 const KEY = 'investorsclub.seen';
 
 type SeenMap = Record<SeenSection, number>;
 
 // Until the stored marks load, everything counts as seen (0 badges beat wrong badges at launch).
-let marks: SeenMap = { inbox: Number.MAX_SAFE_INTEGER, projects: Number.MAX_SAFE_INTEGER, posts: Number.MAX_SAFE_INTEGER };
+let marks: SeenMap = {
+  inbox: Number.MAX_SAFE_INTEGER,
+  projects: Number.MAX_SAFE_INTEGER,
+  posts: Number.MAX_SAFE_INTEGER,
+  home: Number.MAX_SAFE_INTEGER,
+  account: Number.MAX_SAFE_INTEGER,
+};
 let loaded = false;
 const listeners = new Set<() => void>();
 
@@ -29,7 +35,7 @@ function ensureLoaded(): void {
       // A section never opened counts from the FIRST launch, not from 1970: nobody opens the
       // app to 260 «new» projects.
       const now = Date.now();
-      marks = { inbox: stored.inbox ?? now, projects: stored.projects ?? now, posts: stored.posts ?? now };
+      marks = { inbox: stored.inbox ?? now, projects: stored.projects ?? now, posts: stored.posts ?? now, home: stored.home ?? now, account: stored.account ?? now };
       if (!raw) void saveSetting(KEY, JSON.stringify(marks));
       notify();
     } catch {

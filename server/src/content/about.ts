@@ -33,7 +33,9 @@ export const ABOUT_CONTENT_KEY = 'content:about';
 // docs/PROJECT_BRIEF.md section 1. No membership prices, no promised returns. The dashboard edits it later.
 export const ABOUT_SEED: AboutContent = {
   title: 'عنّا',
-  intro: 'نادي المستثمرين مجتمعٌ راقٍ يؤمن بأن الفكر ثروة: يجمع المستثمرين ورواد الأعمال لبناء علاقات وشراكات عبر ملتقيات دورية في الرياض وعبر الإنترنت.',
+  // M82: the owner's CANONICAL club definition (2026-10-17) — the official copy, used as written.
+  intro:
+    'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض. من السعودية إلى العالم… عضويتك معك أينما كنت؛ فلديك عام كامل تستفيد فيه من جميع مزايا النادي، حضوريًا في مقر النادي بمدينة الرياض بالمملكة العربية السعودية، وعبر الإنترنت، وتستكشف المشاريع وفرص الشراكة، لتبني علاقات قد تفتح لك أبوابًا لا يفتحها المال وحده.',
   logoUrl: 'https://vcmem.com/wp-content/uploads/2025/11/لوجو-نادي-المستثمرين-جوولد-شفاف.png',
   sections: [
     {
@@ -126,7 +128,7 @@ export const ABOUT_SEED: AboutContent = {
     address: 'الرياض، حي العليا',
     trademark: 'نادي المستثمرين® علامة تجارية مسجلة لشركة Vibes Ventures Company Holding.',
   },
-  version: 4,
+  version: 5,
   updatedAt: '2026-10-16T00:00:00.000Z',
 };
 

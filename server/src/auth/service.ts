@@ -83,6 +83,8 @@ export type RegisterInput = {
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
+  /** M74: the in-app category switch (the hub stores the persona; one identity source). */
+  persona?: Persona;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
@@ -374,8 +376,14 @@ export class AuthService {
     if (patch.bio !== undefined) body.bio = patch.bio;
     if (patch.social !== undefined) body.social = patch.social;
     if (patch.password) body.password = patch.password;
+    if (patch.persona !== undefined) body.persona = patch.persona;
     const result = await this.deps.hub.call('profile', body);
-    return this.remember(session.uuid, requireContact(result));
+    const contact = requireContact(result);
+    // A hub plugin older than the persona-aware op_profile silently drops the field: say so instead of pretending.
+    if (patch.persona !== undefined && contact.persona !== patch.persona) {
+      throw new AuthError('persona_unsupported', 'تغيير الفئة غير متاح حاليًا، حاول لاحقًا', 503);
+    }
+    return this.remember(session.uuid, contact);
   }
 
   async logout(token: string, session: SessionRecord): Promise<void> {

@@ -6,6 +6,7 @@ import { EventDateBadge } from '@/app/agenda/index';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
+import { FlipCountdown } from '@/components/wow';
 import { t } from '@/i18n';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -19,9 +20,14 @@ export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
   const events = (agenda.data?.events ?? []).filter((event) => !event.past);
   if (events.length === 0) return null;
 
+  // M85f: the flip countdown ticks toward the nearest event (Riyadh clock; no time = midnight).
+  const nearest = events[0];
+  const targetMs = nearest ? Date.parse(`${nearest.date}T${nearest.time || '00:00'}:00+03:00`) : NaN;
+
   return (
     <FadeInView delay={160}>
       <SectionHeader title={t('agenda.title')} subtitle={t('agenda.subtitle')} cta={ctaLabel ?? t('agenda.all')} onPress={() => router.push('/agenda' as Href)} />
+      {nearest && Number.isFinite(targetMs) ? <FlipCountdown targetMs={targetMs} title={nearest.title} /> : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

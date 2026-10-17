@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { dashboardGuard, guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
 import type { Translator } from '../translate.js';
@@ -21,6 +21,8 @@ const eventSchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u, 'اكتب الوقت بصيغة 21:00').or(z.literal('')).default(''),
   place: z.string().trim().max(200).default(''),
   onlineUrl: z.string().trim().url('اكتب رابطًا صحيحًا').max(300).or(z.literal('')).default(''),
+  /** M77: the big hero image above the event details, uploaded from the dashboard. */
+  imageUrl: z.string().trim().max(500).nullish(),
   mode: z.enum(['hq', 'online', 'both']),
   feeSar: z.number().int().min(0).max(100_000).default(0),
   open: z.boolean().default(true),
@@ -125,8 +127,10 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       if (!admin) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      const input = parse(eventSchema.partial(), request.body, reply);
-      if (!input) return;
+      const parsed = parse(eventSchema.partial(), request.body, reply);
+      if (!parsed) return;
+      // Zod 4 fills the defaults even under .partial(): only what the dashboard sent may change.
+      const input = sentOnly(parsed, request.body);
       const previous = await service.event(params.id);
       const { english, ...fields } = input;
       const updated = await service.update(params.id, fields);

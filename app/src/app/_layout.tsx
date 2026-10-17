@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 
 import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
+import { GuestNudge } from '@/components/GuestNudge';
+import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { ScreenTracker } from '@/components/ScreenTracker';
@@ -126,6 +128,8 @@ export default function RootLayout() {
                 <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: t('nav.hqAdmin') }} />
                 <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
                 <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
+                <Stack.Screen name="security" options={{ ...detailHeader, title: t('security.title') }} />
+                <Stack.Screen name="delete-account" options={{ ...detailHeader, title: t('deleteAccount.title') }} />
                 <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
                 <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
@@ -135,8 +139,12 @@ export default function RootLayout() {
             {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
             <AskAdvisorButton />
           </AskAdvisorProvider>
-          {/* The app opens for members: a visitor is sent to the gate, and again when his guest minute is over. */}
+          {/* The app opens for members: a visitor is sent to the gate, and again when his guest week is over. */}
           <GuestGate />
+          {/* M74: the soft register invitation after the guest has browsed a while. */}
+          <GuestNudge />
+          {/* M85f: gold confetti the moment the membership turns active, wherever it is noticed. */}
+          <MembershipCelebration />
         </GuestGateProvider>
       </AuthProvider>
     </QueryClientProvider>

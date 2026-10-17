@@ -52,7 +52,8 @@ function TabIcon({ name, color, size, focused }: { name: IoniconName; color: Col
 export default function TabsLayout() {
   // M75: «+N» on the tabs — fresh things since this device last looked.
   const badges = useTabBadges();
-  const badgeOf = (name: string): number => (name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : 0);
+  const badgeOf = (name: string): number =>
+    name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : name === 'index' ? badges.home : name === 'account' ? badges.account : 0;
   return (
     <Tabs
       screenOptions={{

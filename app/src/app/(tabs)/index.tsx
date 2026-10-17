@@ -1,24 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter, type Href } from 'expo-router';
-import { useState, type ReactElement } from 'react';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useMembershipContent } from '@/api/auth';
-import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
+import { useAgenda } from '@/api/agenda';
+import { useHomeContent, useServices, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { usePartners, type Partner } from '@/api/partners';
-import { useGolden } from '@/api/queries';
+import { usePeople } from '@/api/people';
+import { useGolden, useProjectsList } from '@/api/queries';
 import type { GoldenCompany, GoldenContent } from '@/api/types';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AgendaBlock } from '@/components/AgendaBlock';
-import { AppButton } from '@/components/AppButton';
 import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline, NeonPulse } from '@/components/lux';
-import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
+import { PersonaSwitchCard } from '@/components/PersonaSwitchCard';
 import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
@@ -30,6 +30,9 @@ import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { playVideo } from '@/lib/player';
+import { markSeen } from '@/lib/seen';
+import { formatNumber } from '@/lib/format';
+import { GoldDust, GoldTicker } from '@/components/wow';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
@@ -41,7 +44,8 @@ const MINI_LOGO = 72;
 const VIDEO_WIDTH = 240;
 
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
-const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'portals', 'golden', 'membership', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
+// The membership block left the home page for good (owner, 2026-10-17); a server order naming it is skipped.
+const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'portals', 'golden', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -51,12 +55,21 @@ export default function HomeScreen() {
   const services = useServices();
   const videos = useVideos();
   const partners = usePartners();
+  // M85f ticker sources (the badges hook and the carousel share these cache entries).
+  const projectsList = useProjectsList({ q: '', sort: 'latest' });
+  const agenda = useAgenda();
+  const people = usePeople();
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
-  const membershipContent = useMembershipContent();
   const [refreshing, setRefreshing] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
+  // M75: opening the home clears its +N badge.
+  useFocusEffect(
+    useCallback(() => {
+      markSeen('home');
+    }, []),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -96,6 +109,18 @@ export default function HomeScreen() {
 
   const greeting = status === 'signedIn' && me ? t('home.greeting', { name: me.name.split(' ')[0] }) : '';
   const featured = videos.data?.pages[0]?.featured ?? [];
+
+  // M85f: the live gold ticker — honest numbers from the queries this screen holds anyway.
+  const projectsTotal = projectsList.data?.pages[0]?.total ?? 0;
+  const goldenCount = golden.data ? golden.data.companies.length + 1 : 0;
+  const peopleCount = people.data?.people.length ?? 0;
+  const nextEvent = (agenda.data?.events ?? []).find((event) => !event.past);
+  const tickerItems = [
+    projectsTotal > 0 ? t('wow.tickerProjects', { count: formatNumber(projectsTotal) }) : null,
+    nextEvent ? t('wow.tickerEvent', { title: nextEvent.title }) : null,
+    goldenCount > 0 ? t('wow.tickerGolden', { count: formatNumber(goldenCount) }) : null,
+    peopleCount > 0 ? t('wow.tickerPeople', { count: formatNumber(peopleCount) }) : null,
+  ].filter((item): item is string => item !== null);
 
   // M74: the home follows the account's persona — a signed-in account without one reads the neutral variant.
   const signedIn = status === 'signedIn';
@@ -159,17 +184,6 @@ export default function HomeScreen() {
           onPress={() => pushRoute(ctaOf('golden')?.route ?? '/golden')}
         />
         {golden.data ? <GoldenStrip content={golden.data} onPress={() => router.push('/golden')} /> : null}
-      </FadeInView>
-    ),
-    membership: () => (
-      <FadeInView key="membership" delay={280}>
-        <MembershipBlock
-          block={content.membership}
-          signedIn={signedIn}
-          membership={me?.membership ?? null}
-          statusTexts={membershipContent.data?.statusTexts}
-          onPress={() => router.push('/membership')}
-        />
       </FadeInView>
     ),
     services: () => (
@@ -242,6 +256,8 @@ export default function HomeScreen() {
       <IntroVideoPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
       <View style={styles.hero}>
+        {/* M85f: golden dust drifting up behind the emblem. */}
+        <GoldDust height={130} />
         <FadeInView offset={12}>
           <Floating>
             <View style={styles.emblemRing}>
@@ -264,7 +280,21 @@ export default function HomeScreen() {
         </FadeInView>
       </View>
 
+      {/* M85f: the live gold ticker — stock-exchange energy under the hero. */}
+      {tickerItems.length > 0 ? (
+        <FadeInView delay={360} offset={6}>
+          <GoldTicker items={tickerItems} />
+        </FadeInView>
+      ) : null}
+
       {order.map((key) => sections[key]?.() ?? null)}
+
+      {/* M74: the neutral's gentle «هل حددت وجهتك؟» card — switch the category from inside the app. */}
+      {signedIn && me?.persona === 'neutral' ? (
+        <FadeInView delay={380}>
+          <PersonaSwitchCard />
+        </FadeInView>
+      ) : null}
 
       <FadeInView delay={400}>
         <View style={styles.footerLinks}>
@@ -295,14 +325,16 @@ function PortalChip({ portal, onPress }: { portal: HomePortal; onPress: () => vo
   );
 }
 
-/** M84 (owner): the shortcuts that lived deep in «حسابي», now icon tiles on the first page. */
+/** M84 (owner): the shortcuts that lived deep in «حسابي», now icon tiles on the first page — icons gently alive. */
 function QuickAction({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.lg} wrapStyle={styles.quickItem} accessibilityRole="button" accessibilityLabel={label}>
       <GlassCard radius={radii.lg} style={styles.quickCard}>
-        <View style={styles.quickIcon}>
-          <Ionicons name={icon} size={22} color={colors.gold} />
-        </View>
+        <Floating amplitude={2} duration={2200}>
+          <View style={styles.quickIcon}>
+            <Ionicons name={icon} size={22} color={colors.gold} />
+          </View>
+        </Floating>
         <Text style={styles.quickLabel} numberOfLines={2}>
           {label}
         </Text>
@@ -389,29 +421,6 @@ function PartnerMini({ partner, onPress }: { partner: Partner; onPress: () => vo
   );
 }
 
-type MembershipBlockProps = {
-  block: HomeContent['membership'];
-  signedIn: boolean;
-  membership: NonNullable<ReturnType<typeof useAuth>['me']>['membership'] | null;
-  statusTexts: Parameters<typeof MembershipStatusCard>[0]['texts'];
-  onPress: () => void;
-};
-
-function MembershipBlock({ block, signedIn, membership, statusTexts, onPress }: MembershipBlockProps) {
-  const active = membership?.status === 'active';
-  return (
-    <GlassCard golden radius={radii.xl} style={styles.membership}>
-      <View style={styles.membershipHeader}>
-        <Ionicons name="ribbon" size={26} color={colors.gold} />
-        <Text style={styles.membershipTitle}>{block.title}</Text>
-      </View>
-      {signedIn ? <MembershipStatusCard membership={membership} texts={statusTexts} title={block.title} /> : null}
-      <Text style={styles.membershipText}>{active ? block.activeText : block.subtitle}</Text>
-      <AppButton label={block.cta} variant={active ? 'outline' : 'primary'} icon={chevronForward()} onPress={onPress} />
-    </GlassCard>
-  );
-}
-
 function FooterLink({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.md} wrapStyle={styles.footerLinkWrap} style={styles.footerLink}>
@@ -422,20 +431,21 @@ function FooterLink({ icon, label, onPress }: { icon: IoniconName; label: string
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', gap: spacing.xs, paddingTop: spacing.sm },
+  // M85c: the hero got compact — the screen belongs to the content, not the emblem.
+  hero: { alignItems: 'center', gap: 2, paddingTop: spacing.xs },
   emblemRing: {
-    width: 116,
-    height: 116,
+    width: 88,
+    height: 88,
     borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.goldFaint,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
-  emblem: { width: 84, height: 84 },
-  heroDivider: { width: 72, marginTop: spacing.sm, alignSelf: 'center' },
-  eyebrow: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold, letterSpacing: 1 },
-  heroTitle: { fontFamily: fonts.bold, fontSize: 26, lineHeight: 40, color: colors.textPrimary, textAlign: 'center' },
+  emblem: { width: 62, height: 62 },
+  heroDivider: { width: 72, marginTop: spacing.xs, alignSelf: 'center' },
+  eyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold, letterSpacing: 1 },
+  heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   // M74: the guest's three gateway chips, side by side and compact.
   portalsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
@@ -507,14 +517,6 @@ const styles = StyleSheet.create({
   miniLogoFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   miniName: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center', minHeight: 40 },
   miniCode: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.gold },
-  membership: {
-    gap: spacing.md,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  membershipHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  membershipTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 30, color: colors.gold, textAlign: textStart },
-  membershipText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   footerLinks: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   footerLinkWrap: { flex: 1 },
   footerLink: {

@@ -326,6 +326,12 @@ export class MockHubClient implements HubClient {
     for (const [field, key, max] of fields) {
       if (key in body) (contact as unknown as Record<string, string>)[field] = str(body, key, max);
     }
+    // M74: the in-app category switch (mirrors the planned hub op_profile persona support).
+    if ('persona' in body) {
+      const persona = str(body, 'persona', 20).toLowerCase();
+      if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر فئتك: محايد، رائد أعمال، أو مستثمر', 400);
+      contact.persona = persona;
+    }
     const password = typeof body.password === 'string' ? body.password : '';
     if (password) {
       if (password.length < 6) throw new HubError('invalid', 'كلمة المرور 6 أحرف على الأقل', 400);

@@ -9,6 +9,7 @@ import { AgendaService } from './agenda/service.js';
 import { analyticsRoutes } from './analytics/routes.js';
 import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
+import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
@@ -373,7 +374,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
   await app.register(appStringsRoutes, { kv, auth, sync });
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier });
   await app.register(advisorRoutes, { service: advisor, auth });
   await app.register(newsRoutes, { service: news, auth, kv });
   await app.register(videosRoutes, { service: videos });
@@ -384,6 +385,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
+  await app.register(badgesRoutes, { auth, agenda, profiles, payments });
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });

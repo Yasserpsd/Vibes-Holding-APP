@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
+import type { Notifier } from '../mail/notify.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { guard, parse, sessionGuard } from './guard.js';
@@ -9,7 +10,7 @@ import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
-export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode; social: SocialVerifier };
+export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode; social: SocialVerifier; notifier?: Notifier };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
 const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
@@ -53,6 +54,8 @@ const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, passwor
 const profileSchema = z
   .object({
     name: z.string().trim().min(2).max(120),
+    // M74: the neutral's «هل حددت وجهتك؟» card switches the category from inside the app.
+    persona: personaSchema,
     jobTitle: z.string().trim().max(150),
     company: z.string().trim().max(190),
     city: z.string().trim().max(120),
@@ -62,10 +65,11 @@ const profileSchema = z
     password: passwordSchema,
   })
   .partial();
-const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
+// M79: the deliberate delete flow sends WHY (a picked reason or the member's own words) so the owner learns from it.
+const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -242,7 +246,12 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const body = parse(deleteSchema, request.body, reply);
       if (!body) return;
+      // Who is leaving is read first (the row is emptied by the deletion); the mail goes only after it succeeded.
+      const leaving = notifier ? await service.me(auth.session).catch(() => null) : null;
       await service.deleteAccount(auth.token, auth.session, body.password);
+      if (notifier && leaving) {
+        notifier.accountDeletionRequested({ email: leaving.email, name: leaving.name, phone: leaving.phone, note: body.reason ?? '', ip: request.ip });
+      }
       return { ok: true };
     }),
   );

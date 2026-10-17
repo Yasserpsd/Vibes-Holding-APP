@@ -208,6 +208,8 @@ export type AgendaEventInput = {
   endTime: string;
   place: string;
   onlineUrl: string;
+  /** M77: the big hero image above the event details (uploaded here, shown in the app). */
+  imageUrl?: string | null;
   mode: AgendaMode;
   feeSar: number;
   open: boolean;

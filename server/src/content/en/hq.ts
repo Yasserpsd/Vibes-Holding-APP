@@ -4,7 +4,8 @@ import type { Translation } from '../i18n.js';
 /** The HQ page in English; hours, capacity, the map and the tour video are the Arabic block's. */
 export const HQ_EN: Translation<HqContent> = {
   title: 'Club HQ',
-  intro: 'The Investors Club headquarters in Riyadh: 400 m² of offices, meeting rooms, the club theatre and a coffee shop, for subscribed members by prior booking.',
+  intro:
+    'When you arrive in Riyadh, the club is your second home in the business world — no need to worry about your essential business needs: a meeting room to receive your guests, a fully equipped venue seating 80 with an integrated stage for hosting your own meetups and workshops, 15 offices for temporary use, a podcast studio to carry your message, and a business incubator to embrace your project. All yours as a member, with discounts that lighten your business costs.',
   address: 'Riyadh, Al Olaya district, Prince Mohammed bin Abdulaziz Street (formerly Tahlia), Al Jawhara Tower',
   facilities: ['15 equipped offices', 'The club theatre and presentation stage', 'A meeting room for eight people with Zoom', 'Coffee shop'],
   rules: [

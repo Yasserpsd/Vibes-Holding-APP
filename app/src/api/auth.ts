@@ -75,6 +75,8 @@ export type LoginResult = PendingResult | SignedInResult;
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
+  /** M74: the neutral's in-app category switch; the hub stores it (one identity source). */
+  persona?: Persona;
 };
 
 export type MembershipBenefit = { icon: string; title: string; detail: string | null };
@@ -110,7 +112,8 @@ export const authApi = {
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),
   updateMe: (patch: ProfilePatch) => apiRequest<{ me: Me }>('PATCH', '/api/me', { body: patch }),
   logout: () => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {} }),
-  deleteMe: (password: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password } }),
+  // M79: the reason (picked or written) travels with the deletion so the club learns why members leave.
+  deleteMe: (password: string, reason?: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password, ...(reason ? { reason } : {}) } }),
 };
 
 export function useAuthConfig() {

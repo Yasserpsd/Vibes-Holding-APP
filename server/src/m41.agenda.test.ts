@@ -82,6 +82,21 @@ test('the dashboard creates events and the public agenda lists the upcoming ones
   const events = pub.json().events as { id: string; mine: unknown; mustPay: boolean; onlineUrl: string | null }[];
   assert.equal(events.length, 2);
   assert.ok(events.every((event) => event.mine === null && event.mustPay === false && event.onlineUrl === null));
+
+  // M77: the owner-uploaded hero image travels to the public event, and clears with null.
+  const pictured = await send('PUT', `/api/admin/agenda/${feeEventId}`, { imageUrl: 'https://cdn.example.test/media/event.webp' }, adminToken);
+  assert.equal(pictured.statusCode, 200, pictured.body);
+  const withImage = await get(`/api/agenda/${feeEventId}`);
+  assert.equal(withImage.json().event.imageUrl, 'https://cdn.example.test/media/event.webp');
+  await send('PUT', `/api/admin/agenda/${feeEventId}`, { imageUrl: null }, adminToken);
+  assert.equal((await get(`/api/agenda/${feeEventId}`)).json().event.imageUrl, null);
+
+  // M75: the badges signal carries the fresh events' times for the home badge; a visitor gets no account list.
+  const badges = await get('/api/badges');
+  assert.equal(badges.statusCode, 200, badges.body);
+  assert.equal(badges.headers['cache-control'], 'no-store');
+  assert.ok((badges.json().home as string[]).length >= 2);
+  assert.deepEqual(badges.json().account, []);
 });
 
 test('a member registers with one tap: confirmed at once, mailed, and duplicates are refused', async () => {

@@ -39,6 +39,8 @@ export type AgendaEvent = {
   place: string;
   /** Shown in the app only to a CONFIRMED online attendee. */
   onlineUrl: string;
+  /** M77: the owner-uploaded hero image — the event page shows it BIG on top, all details below. */
+  imageUrl?: string | null;
   mode: AgendaMode;
   /** The attendance fee for accounts WITHOUT an active membership; 0 = بدون رسوم للجميع. Members never pay. */
   feeSar: number;
@@ -86,6 +88,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   mustPay: boolean;
   /** Only for a confirmed online attendee. */
   onlineUrl: string | null;
+  /** M77: the big hero image on top of the event page (null = none uploaded). */
+  imageUrl: string | null;
   /** M77: the event's last day has passed — the app keeps it listed, faded. */
   past: boolean;
 };
@@ -159,6 +163,7 @@ export class AgendaService {
       mine: mine ? { attendance: mine.attendance, paid: mine.paid } : null,
       mustPay: Boolean(me && me.membership.status !== 'active' && feeSar > 0),
       onlineUrl: confirmedOnline && event.onlineUrl ? event.onlineUrl : null,
+      imageUrl: event.imageUrl || null,
       past,
     };
   }
@@ -182,6 +187,12 @@ export class AgendaService {
       .sort((a, b) => lastDay(b).localeCompare(lastDay(a)))
       .map((event) => publish(event, true));
     return [...upcoming, ...past];
+  }
+
+  /** M75: when each currently-listed upcoming event was created — the home badge counts the fresh ones. */
+  async createdTimes(now = Date.now()): Promise<string[]> {
+    const today = riyadhDay(now);
+    return (await this.loadEvents()).filter((event) => lastDay(event) >= today).map((event) => event.createdAt);
   }
 
   async viewerEvent(id: string, me: Me | null, lang: 'ar' | 'en' = 'ar'): Promise<PublicAgendaEvent | null> {

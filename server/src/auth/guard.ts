@@ -44,6 +44,16 @@ export function parse<T>(schema: z.ZodType<T>, input: unknown, reply: FastifyRep
   return null;
 }
 
+/**
+ * Zod 4 fills `.default()` fields even under `.partial()`, so a PATCH-style body parsed with a
+ * partial schema comes back carrying every defaulted field — and would wipe the stored values.
+ * This keeps only the keys the client actually sent.
+ */
+export function sentOnly<T extends Record<string, unknown>>(parsed: T, body: unknown): Partial<T> {
+  const sent = new Set(Object.keys(body && typeof body === 'object' ? (body as Record<string, unknown>) : {}));
+  return Object.fromEntries(Object.entries(parsed).filter(([key]) => sent.has(key))) as Partial<T>;
+}
+
 export type SessionAuth = { token: string; session: SessionRecord };
 
 function bearerToken(request: FastifyRequest): string {

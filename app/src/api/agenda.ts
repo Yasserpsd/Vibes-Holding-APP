@@ -26,6 +26,8 @@ export type AgendaEvent = {
   mustPay: boolean;
   /** Only for a confirmed online attendee. */
   onlineUrl: string | null;
+  /** M77: the big hero image above the details; an older server sends none. */
+  imageUrl?: string | null;
   /** M77: the event's last day has passed — listed faded; an older server sends none. */
   past?: boolean;
 };

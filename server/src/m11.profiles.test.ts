@@ -184,6 +184,17 @@ test('the dashboard enters and orders profiles by hand and edits the owner\'s in
   const manualId = created.json().profile.id as string;
   assert.equal(created.json().profile.status, 'approved');
 
+  // M73 fix (owner, 2026-10-17): the admin pastes paragraph-length story lines — they must not bounce.
+  const longLine = 'سطر طويل جدًا من مسيرة حقيقية يشرح المحطة بالتفصيل الكامل مع الأرقام والنتائج والمراحل. '.repeat(4).trim();
+  const rich = await send(
+    'POST',
+    '/api/admin/profiles',
+    { fields: { name: 'الخليل مدخلي', title: 'الرئيس التنفيذي', company: '', bio: 'نبذة. '.repeat(300).trim(), milestones: [longLine], achievements: [longLine], benefit: [longLine], links: [{ label: '', url: 'https://www.linkedin.com/in/example' }], photo: null } },
+    adminToken,
+  );
+  assert.equal(rich.statusCode, 201, rich.body);
+  await send('DELETE', `/api/admin/profiles/${rich.json().profile.id}`, undefined, adminToken);
+
   // The manual profile is ordered before the member's (smaller order first).
   const ordered = await send('PUT', `/api/admin/profiles/${manualId}`, { order: 1 }, adminToken);
   assert.equal(ordered.statusCode, 200);

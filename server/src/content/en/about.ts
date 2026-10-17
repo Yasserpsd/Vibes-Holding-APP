@@ -4,7 +4,8 @@ import type { Translation } from '../i18n.js';
 /** «عنّا» in English. Company names as the companies write them; registration numbers, links and logos are the Arabic block's. */
 export const ABOUT_EN: Translation<AboutContent> = {
   title: 'About us',
-  intro: 'The Investors Club is a refined community that believes ideas are wealth: it brings investors and entrepreneurs together to build relationships and partnerships through regular meetups in Riyadh and online.',
+  intro:
+    'The Investors Club® is an exclusive business community for neutrals, entrepreneurs and investors, serving its members through one app and a permanent headquarters in the heart of the Saudi capital, Riyadh. From Saudi Arabia to the world — your membership travels with you: a full year to enjoy every club benefit, in person at the club HQ in Riyadh and online, exploring projects and partnership opportunities and building relationships that open doors money alone cannot.',
   sections: [
     {
       key: 'club',

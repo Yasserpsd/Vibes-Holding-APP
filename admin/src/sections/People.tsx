@@ -238,7 +238,7 @@ export function People() {
               </label>
               <label>
                 النبذة
-                <textarea rows={5} maxLength={1200} value={editor.fields.bio} onChange={(event) => edit({ bio: event.target.value })} required />
+                <textarea rows={5} maxLength={4000} value={editor.fields.bio} onChange={(event) => edit({ bio: event.target.value })} required />
               </label>
               <label>
                 محطات المسيرة (سطر لكل محطة)
@@ -254,7 +254,7 @@ export function People() {
               </label>
               <label>
                 ما الذي يبحث عنه؟
-                <textarea rows={2} maxLength={600} value={editor.fields.seeking ?? ''} onChange={(event) => edit({ seeking: event.target.value })} />
+                <textarea rows={2} maxLength={1200} value={editor.fields.seeking ?? ''} onChange={(event) => edit({ seeking: event.target.value })} />
               </label>
               <label>
                 الجوال والواتساب (يظهر للأعضاء)

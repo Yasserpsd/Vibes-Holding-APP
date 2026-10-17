@@ -97,6 +97,24 @@ test('register → verify → me → logout', async () => {
   assert.equal(patched.statusCode, 200, patched.body);
   assert.equal(patched.json().me.jobTitle, 'مدير استثمار');
 
+  // M74: the in-app category switch — the hub stores the persona and the card number letter follows.
+  const switched = await app.inject({
+    method: 'PATCH',
+    url: '/api/me',
+    headers: { authorization: `Bearer ${token}` },
+    payload: { persona: 'entrepreneur' },
+  });
+  assert.equal(switched.statusCode, 200, switched.body);
+  assert.equal(switched.json().me.persona, 'entrepreneur');
+  assert.match(switched.json().me.cardNumber, /^E-/);
+  const badPersona = await app.inject({
+    method: 'PATCH',
+    url: '/api/me',
+    headers: { authorization: `Bearer ${token}` },
+    payload: { persona: 'astronaut' },
+  });
+  assert.equal(badPersona.statusCode, 400);
+
   const loggedOut = await post('/api/auth/logout', {}, token);
   assert.equal(loggedOut.statusCode, 200);
   const afterLogout = await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${token}` } });
