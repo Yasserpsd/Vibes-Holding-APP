@@ -201,6 +201,16 @@ test('unlock: the balance runs out at the allowance (402 no_credit) and the stat
   assert.deepEqual([access.state, access.balance.left, access.contact], ['exhausted', 0, null]);
 });
 
+test('M99c wallet: session required; the member reads his balance and opened count, a non-member gets nulls', async () => {
+  assert.equal((await get('/api/projects/wallet')).statusCode, 401);
+  const wallet = await get('/api/projects/wallet', memberToken);
+  assert.equal(wallet.statusCode, 200, wallet.body);
+  assert.equal(wallet.headers['cache-control'], 'no-store');
+  assert.deepEqual(wallet.json(), { isMember: true, balance: { credits: 5, granted: 0, used: 5, left: 0 }, unlockedCount: 5 });
+  const guest = (await get('/api/projects/wallet', guestToken)).json();
+  assert.deepEqual(guest, { isMember: false, balance: null, unlockedCount: 0 });
+});
+
 test('rule 4: whatever Projects Bank answers, only the four contract fields leave the server, each one checked', async () => {
   const otherKv = new MemoryKV();
   await otherKv.set(SNAPSHOT_KEY, { fetchedAt: '2026-09-20T00:00:00.000Z', projects } satisfies FeedSnapshot);
