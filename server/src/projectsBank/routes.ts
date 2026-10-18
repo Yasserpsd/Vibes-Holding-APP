@@ -64,6 +64,16 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
     }),
   );
 
+  // M99c: the investor's wallet card — balance + how many projects he opened (counts only, rule 4 untouched).
+  app.get(
+    '/api/projects/wallet',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      return access.wallet(current.session);
+    }),
+  );
+
   // The member's «رصيد» for this project; founder contact data only when PB says he unlocked it (rule 4).
   app.get(
     '/api/projects/:id/access',

@@ -105,6 +105,8 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(4, 90)}>
         <MenuGroup title={t('account.group.club')}>
           <MenuRow icon="grid-outline" label={t('account.menu.services')} onPress={() => router.push('/services')} />
+          {/* M99b: the Projects Bank stays reachable from here for the persona whose tabs hide it. */}
+          <MenuRow icon="briefcase-outline" label={t('tabs.projects')} onPress={() => router.push('/projects')} />
           <MenuRow icon="calendar-outline" label={t('agenda.title')} onPress={() => router.push('/agenda' as Href)} />
           <MenuRow icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
           <MenuRow icon="chatbubbles-outline" label={t('account.menu.contact')} onPress={() => router.push('/contact' as Href)} />

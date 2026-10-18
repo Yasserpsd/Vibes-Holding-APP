@@ -103,7 +103,7 @@ test('services are listed for everyone but member-only ones are locked without a
   const guest = await get('/api/services');
   assert.equal(guest.statusCode, 200);
   const list = guest.json();
-  assert.equal(list.services.length, 15);
+  assert.equal(list.services.length, 16);
   assert.equal(list.groups.length, 3);
   assert.equal(list.isMember, false);
   const studio = list.services.find((service: { key: string }) => service.key === 'studio');

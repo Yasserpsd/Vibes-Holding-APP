@@ -117,6 +117,36 @@ export const SERVICES_SEED: ServicesContent = {
       order: 1,
       cta: 'اطلب ملتقاك',
     },
+    // M100 (owner, 2026-10-18): the club's operating-rights offering, copy from vibesholding.com/operating-rights/.
+    {
+      key: 'operating-rights',
+      title: 'حقوق تشغيل نادي المستثمرين',
+      summary: 'شغّل علامة «نادي المستثمرين» حصريًا في مدينتك أو بلدك، بذات منهجية العمل المعتمدة في مقر النادي بالرياض.',
+      detail:
+        'إذا كنت تدير حاضنة أعمال أو مسرّعة مشاريع، أو تمتلك مساحة مكتبية فاخرة، فحقوق التشغيل تتيح لك تشغيل كافة عناصر منظومة Vibes Ventures ضمن نطاق جغرافي حصري محدد، وبذات الآلية ومنهجية العمل المعتمدة في مقر نادي المستثمرين بمدينة الرياض.\nكمشغّل حصري تحصل على: آلية موحدة لنسخ التجربة وتطبيقها محليًا في منطقتك، وعرض المشاريع التابعة لك على بنك المشاريع، واقتسام نسبة 50% من قيم العضوية والنسب التي يحصل عليها النادي عند اعتماد أي مشروع مقدم من جهتك، و50% من رسوم عضوية الانتساب، وأحقية استخدام العلامة التجارية «نادي المستثمرين» داخل المدينة المستهدفة، والعديد من المميزات الأخرى الموضحة في حقوق التشغيل.\nالنموذج مصمم للحاضنات والمسرعات ومالكي المساحات المكتبية الفاخرة والصناديق الاستثمارية والجهات الاستشارية ومكاتب تطوير الأعمال، وللشركات والأفراد ذوي الخبرة الراغبين في تمثيل النادي داخل مدنهم أو دولهم.\nيتطلب الحصول على حقوق التشغيل تقديم ضمان بنكي، وتتواصل معك الإدارة لاستكمال المعايير والتفاصيل.',
+      icon: 'key',
+      group: 'entrepreneur',
+      priceLabel: null,
+      memberLabel: null,
+      access: 'everyone',
+      action: management('أرغب في الحصول على حقوق تشغيل علامة «نادي المستثمرين».', [
+        { key: 'city', label: 'الدولة والمدينة المستهدفة' },
+        {
+          key: 'population',
+          label: 'عدد سكان المدينة',
+          options: ['من 100 ألف إلى 250 ألف', 'من 250 ألف إلى 500 ألف', 'من 500 ألف إلى مليون', 'من مليون إلى 2 مليون', '2 مليون فما فوق'],
+        },
+        {
+          key: 'entity',
+          label: 'جهتك',
+          options: ['حاضنة أعمال', 'مسرعة أعمال', 'مساحات مكتبية', 'صندوق استثماري', 'جهة استشارية', 'مكتب تطوير أعمال', 'شركة', 'فرد خبير'],
+        },
+        { key: 'about', label: 'نبذة عنك وعن عملك', placeholder: 'خبراتك ولماذا تسعى لحقوق التشغيل' },
+      ]),
+      infoUrl: 'https://vibesholding.com/operating-rights/',
+      order: 2,
+      cta: 'اطلب حقوق التشغيل',
+    },
     {
       key: 'success-partners',
       title: 'شركاء النجاح',
@@ -130,7 +160,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'everyone',
       action: { type: 'form', formKey: 'success-partners', label: 'سجّل مشروعك' },
       infoUrl: null,
-      order: 2,
+      order: 3,
       cta: 'سجّل مشروعك',
     },
     {
@@ -148,7 +178,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'stage', label: 'مرحلة المشروع', options: ['فكرة', 'نموذج أولي', 'مشروع قائم', 'توسّع'] },
       ]),
       infoUrl: null,
-      order: 3,
+      order: 4,
       cta: 'اطلب تصميمك',
     },
     // M83 (owner, 2026-10-17): «لرائد الأعمال يقدر ينشر تطبيقه علي جوجل وiOS بدون رسوم اهم حاجه يكون معاه عضوية».
@@ -164,7 +194,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'form', formKey: 'app-publish', label: 'املأ بيانات تطبيقك' },
       infoUrl: null,
-      order: 4,
+      order: 5,
       cta: 'انشر تطبيقك',
     },
     {
@@ -179,7 +209,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'everyone',
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
-      order: 5,
+      order: 6,
       cta: 'سجّل في الورشة',
     },
     {
@@ -197,7 +227,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'time', label: 'الوقت المفضل', placeholder: 'مثال: الثلاثاء 4 عصرًا' },
       ]),
       infoUrl: 'https://almoltaqapodcast.com/studio/',
-      order: 6,
+      order: 7,
       cta: 'احجز الاستديو',
     },
     {
@@ -212,7 +242,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'hq' },
       infoUrl: null,
-      order: 7,
+      order: 8,
       cta: 'احجز زيارتك',
     },
     {
@@ -230,7 +260,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'time', label: 'الموعد المفضل' },
       ]),
       infoUrl: null,
-      order: 8,
+      order: 9,
       cta: 'احجز القاعة',
     },
     {
@@ -245,7 +275,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'advisor', prompt: 'أرغب في استشارة أونلاين: لديّ فكرة وأحتاج من يساعدني على فهمها وتحديد خطواتي التالية.' },
       infoUrl: null,
-      order: 9,
+      order: 10,
       cta: 'ابدأ استشارتك',
     },
     {
@@ -261,7 +291,7 @@ export const SERVICES_SEED: ServicesContent = {
       // M73: «قدّم من هنا» opens the M11 application (apply → committee review → published).
       action: { type: 'route', path: '/people/apply', label: 'قدّم من هنا' },
       infoUrl: null,
-      order: 10,
+      order: 11,
       cta: 'قدّم من هنا',
     },
     {
@@ -276,7 +306,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: management('أرغب في نشر مشروعي على منصات النادي.', [{ key: 'project', label: 'اسم المشروع أو رابطه في بنك المشاريع' }]),
       infoUrl: null,
-      order: 11,
+      order: 12,
       cta: 'اطلب الإبراز',
     },
     {
@@ -291,7 +321,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'projects' },
       infoUrl: null,
-      order: 12,
+      order: 13,
       cta: 'استخدم رصيدك',
     },
     {
@@ -308,7 +338,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'service', label: 'الخدمة', options: ['موقع إلكتروني', 'تطبيق', 'تسويق إلكتروني', 'إعلانات مؤثرين'] },
       ]),
       infoUrl: 'https://momentummix.com/',
-      order: 13,
+      order: 14,
       cta: 'اطلب الخدمة',
     },
     {
@@ -323,7 +353,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: management('أرغب في الاستفادة من خصم الأعضاء على حقيبة الامتياز.', [{ key: 'brand', label: 'العلامة التجارية' }]),
       infoUrl: 'https://franchment.com/',
-      order: 14,
+      order: 15,
       cta: 'اطلب الحقيبة',
     },
     {
@@ -338,12 +368,12 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: management('أرغب في الحصول على كود خصم منتجات «منفذ».'),
       infoUrl: null,
-      order: 15,
+      order: 16,
       cta: 'اطلب الكود',
     },
   ],
-  version: 9,
-  updatedAt: '2026-10-17T00:00:00.000Z',
+  version: 10,
+  updatedAt: '2026-10-18T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

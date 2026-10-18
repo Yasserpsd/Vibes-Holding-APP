@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
+import { useHiddenTabs } from '@/lib/personaTabs';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -57,13 +58,15 @@ export function GlobalTabBar() {
   // The advisor dock opens the conversation knowing which detail page the member is on.
   const ask = useAskAdvisor();
   const advisorContext = useCurrentAdvisorContext();
+  // M99: mirror the (tabs) bar — a tab the persona hides leaves this twin too.
+  const hiddenTabs = useHiddenTabs();
   if (TAB_PATHS.has(pathname) || HIDDEN.some((prefix) => pathname.startsWith(prefix))) return null;
   const active = sectionOf(pathname);
   const badgeOf = (key: string): number =>
     key === 'news' ? badges.inbox : key === 'projects' ? badges.projects : key === 'home' ? badges.home : key === 'account' ? badges.account : 0;
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
-      {TABS.map((tab) => {
+      {TABS.filter((tab) => !hiddenTabs.has(tab.key)).map((tab) => {
         if (tab.key === 'advisor') {
           // Owner (2026-10-18): the raised golden circle in the middle — same dock as the (tabs) bar.
           return (

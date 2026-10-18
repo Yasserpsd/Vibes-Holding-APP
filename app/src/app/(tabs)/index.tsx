@@ -21,7 +21,9 @@ import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SlotBanner } from '@/components/SlotBanner';
+import { GoldenOpportunity } from '@/components/GoldenOpportunity';
 import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
+import { WalletCard } from '@/components/WalletCard';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
@@ -108,14 +110,25 @@ export default function HomeScreen() {
   const personaKey: PortalKey | 'guest' = signedIn ? (me?.persona || 'neutral') : 'guest';
   const variant = content.personas?.[personaKey];
   const heroSubtitle = variant?.heroSubtitle || content.hero.subtitle;
-  // The server's order first, then any block it left out, so nothing silently disappears.
-  const order: HomeSectionKey[] = [...(variant?.order ?? []), ...DEFAULT_ORDER.filter((key) => !(variant?.order ?? []).includes(key))];
+  // The server's order first, then any block it left out, so nothing silently disappears —
+  // M99: except the blocks the persona explicitly hides (the Projects Bank leaves the entrepreneur's home).
+  const hidden = new Set(variant?.hide ?? []);
+  const order: HomeSectionKey[] = [...(variant?.order ?? []), ...DEFAULT_ORDER.filter((key) => !(variant?.order ?? []).includes(key))].filter(
+    (key) => !hidden.has(key),
+  );
   const ctaOf = (key: HomeSectionKey): HomeCta | null => variant?.ctas?.[key] ?? null;
   const pushRoute = (route: string) => router.push(route as Href);
 
-  // M74 (owner): رائد الأعمال sees ALL the services up front, with the distinctive «+» to شركاء النجاح.
+  // M74/M99: the persona's lead services open his grid, the rest follow; the entrepreneur keeps his «+»
+  // and his full grid, and the guest browses EVERYTHING (M99a).
   const allServices = services.data?.services ?? [];
-  const teaser = personaKey === 'entrepreneur' ? allServices : allServices.slice(0, 4);
+  const leadKeys = variant?.serviceKeys ?? [];
+  const leadRank = (key: string): number => {
+    const at = leadKeys.indexOf(key);
+    return at === -1 ? leadKeys.length : at;
+  };
+  const orderedServices = leadKeys.length ? [...allServices].sort((a, b) => leadRank(a.key) - leadRank(b.key)) : allServices;
+  const teaser = personaKey === 'entrepreneur' || personaKey === 'guest' ? orderedServices : orderedServices.slice(0, 4);
 
   const sections: Partial<Record<HomeSectionKey, () => ReactElement | null>> = {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
@@ -154,6 +167,27 @@ export default function HomeScreen() {
             onPress={() => pushRoute(ctaOf('projectsBank')?.route ?? '/projects')}
           />
           <ProjectsBankCarousel />
+        </FadeInView>
+      ) : null,
+    // M99a: the guest's first CONTENT block — مميزات العضوية, straight after the persona picker.
+    membership: () =>
+      !signedIn && content.membership ? (
+        <FadeInView key="membership" delay={190}>
+          <MembershipTeaserCard block={content.membership} onPress={() => pushRoute(ctaOf('membership')?.route ?? '/membership')} />
+        </FadeInView>
+      ) : null,
+    // M99c: the investor's opening act — one golden opportunity, renewed on every app open.
+    opportunity: () =>
+      content.opportunity ? (
+        <FadeInView key="opportunity" delay={170}>
+          <GoldenOpportunity block={content.opportunity} />
+        </FadeInView>
+      ) : null,
+    // M99c: the investor's wallet — his balance and unlocked projects at a glance.
+    wallet: () =>
+      signedIn && content.wallet ? (
+        <FadeInView key="wallet" delay={220}>
+          <WalletCard block={content.wallet} />
         </FadeInView>
       ) : null,
     // M74-8 (owner): the advisor as the neutral's companion — next-step suggestion chips, one tap to the conversation.
@@ -412,6 +446,29 @@ function SavingsCard({ block, onPress }: { block: NonNullable<HomeContent['savin
   );
 }
 
+/** M99a: the guest's «مميزات العضوية» card — his first content block, one tap to the full copy. */
+function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membership']; onPress: () => void }) {
+  return (
+    <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={block.cta}>
+      <GlassCard golden radius={radii.xl} style={styles.membershipCard}>
+        <Floating amplitude={2} duration={2600}>
+          <GoldGradient style={styles.membershipIcon}>
+            <Ionicons name="star" size={24} color={colors.goldInk} />
+          </GoldGradient>
+        </Floating>
+        <View style={styles.membershipTexts}>
+          <Text style={styles.membershipTitle}>{block.title}</Text>
+          <Text style={styles.membershipSubtitle}>{block.subtitle}</Text>
+          <View style={styles.membershipCtaRow}>
+            <Text style={styles.membershipCta}>{block.cta}</Text>
+            <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+          </View>
+        </View>
+      </GlassCard>
+    </PressScale>
+  );
+}
+
 /** M74 (owner): the VERY distinctive «+» of رائد الأعمال — it opens the شركاء النجاح gate. */
 function PartnersPlusCard({ onPress }: { onPress: () => void }) {
   return (
@@ -577,6 +634,21 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   savingsCtaText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.gold },
+  // M99a: the guest's membership card.
+  membershipCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm },
+  membershipIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.glowGold,
+  },
+  membershipTexts: { flex: 1, gap: 2 },
+  membershipTitle: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
+  membershipSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  membershipCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  membershipCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.gold },
   // M74: the entrepreneur's «+» to شركاء النجاح — deliberately unlike every other card.
   plusCard: {
     flexDirection: 'row',

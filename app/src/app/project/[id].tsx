@@ -8,7 +8,7 @@ import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/compo
 import { AppButton } from '@/components/AppButton';
 import { Highlight } from '@/components/Highlight';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
-import { ProjectBrief } from '@/components/project/ProjectBrief';
+import { EMPTY_VALUE, ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -228,6 +228,9 @@ function parseRich(text: string): RichLine[] {
   for (const line of lines) {
     const bullet = /^([-•*◦▪–]|[0-9٠-٩]{1,2}[).\-–])\s*/u.exec(line);
     const clean = bullet ? line.slice(bullet[0].length) : line;
+    // M98 (owner): «لابل: غير محدد» lines and bare placeholders leave the page entirely.
+    const parts = clean.split(/[:：]/);
+    if (EMPTY_VALUE.test(clean.trim()) || (parts.length === 2 && EMPTY_VALUE.test(parts[1]?.trim() ?? ''))) continue;
     const heading = !bullet && clean.length <= 48 && (/[:：]$/u.test(clean) || !/[.؟!،;]/u.test(clean));
     if (heading) {
       out.push({ kind: 'heading', text: clean.replace(/[:：]$/u, ''), accent: headings });
@@ -249,7 +252,8 @@ function parseRich(text: string): RichLine[] {
       out.push({ kind: 'para', text: line });
     }
   }
-  return out;
+  // M98 (owner): a heading with nothing under it («نموذج الإيرادات» and friends) never renders.
+  return out.filter((entry, index) => entry.kind !== 'heading' || (out[index + 1] !== undefined && out[index + 1]?.kind !== 'heading'));
 }
 
 /**

@@ -34,13 +34,21 @@ export type HomeSectionKey =
   | 'advisor'
   | 'podcast'
   | 'savings'
-  | 'tour';
+  | 'tour'
+  | 'opportunity'
+  | 'wallet';
 
-/** M74: how the home reads for one persona (or a guest). */
+/** M74: how the home reads for one persona (or a guest). M99: visibility, tabs and the services grid too. */
 export type HomePersonaVariant = {
   heroSubtitle?: string;
   order?: HomeSectionKey[];
   ctas?: Partial<Record<HomeSectionKey, HomeCta>>;
+  /** M99: blocks this persona never sees, even when the default order carries them. */
+  hide?: HomeSectionKey[];
+  /** M99: tab routes this persona never sees; the screens stay reachable by path. */
+  hideTabs?: string[];
+  /** M99: the service keys that LEAD this persona's services grid; the rest follow. */
+  serviceKeys?: string[];
 };
 
 export type HomeContent = {
@@ -62,6 +70,10 @@ export type HomeContent = {
   podcast?: { title: string; subtitle: string; cta: string; route: string };
   /** M74-5: what the membership saves while exploring. */
   savings?: { title: string; subtitle: string; items: string[]; cta: string };
+  /** M99c «الفرصة الذهبية»: one featured project that changes on every app open. */
+  opportunity?: { title: string; subtitle: string; cta: string };
+  /** M99c: the investor's wallet card — words from the server, numbers from the wallet API. */
+  wallet?: { title: string; subtitle: string; cta: string };
   /** M74: per-persona home variants; an older server sends none and one home serves everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };

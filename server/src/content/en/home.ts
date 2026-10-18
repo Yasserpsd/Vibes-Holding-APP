@@ -67,6 +67,16 @@ export const HOME_EN: Translation<HomeContent> = {
     items: ['Workshops and meetups with no fees for members', 'An annual credit that opens the club services for you', "Our partners' discounts with your personal member code"],
     cta: 'See the membership',
   },
+  opportunity: {
+    title: 'The golden opportunity',
+    subtitle: 'A venture picked from the Projects Bank, renewed on every app open',
+    cta: 'Discover the opportunity',
+  },
+  wallet: {
+    title: 'Your Projects Bank wallet',
+    subtitle: 'Your SAR 2,500 balance opens the complete details of 5 ventures you pick yourself, meeting their founders directly',
+    cta: 'Use your balance',
+  },
   personas: {
     guest: {
       heroSubtitle:
@@ -82,8 +92,7 @@ export const HOME_EN: Translation<HomeContent> = {
     entrepreneur: {
       heroSubtitle: "Your venture deserves the club's stage: services that take it further and a chance to present it to investors.",
       ctas: {
-        golden: { label: 'Join the Vibes Ventures Golden Projects' },
-        projectsBank: { label: 'Submit your venture to the bank' },
+        agenda: { label: 'The “5 minutes” meetup awaits you' },
         services: { label: 'All your services' },
       },
     },
@@ -91,7 +100,6 @@ export const HOME_EN: Translation<HomeContent> = {
       heroSubtitle: 'Real partnership opportunities await you: the Projects Bank, the meetups and the business community in one place.',
       ctas: {
         projectsBank: { label: 'Explore partnership opportunities' },
-        golden: { label: 'Discover the golden opportunities' },
       },
     },
   },

@@ -88,6 +88,55 @@ export const MEMBERSHIP_EN: Translation<MembershipContent> = {
   ].join('\n\n'),
   groups: GROUPS_EN,
   benefits: BENEFITS_EN,
+  neutralReasons: {
+    title: 'Why subscribe to the Investors Club membership before you set your direction?',
+    intro:
+      'You need not be an investor nor a venture owner to join; whether you are an employee, a student or hold savings and seek your path, one subscription places you for a full year inside a closed, governed business community of thousands of neutrals, entrepreneurs and investors, and opens the doors of the Vibes Ventures group companies with member-only discounts. In short, these are the reasons:',
+    items: [
+      {
+        title: 'Your place is here before you choose your path',
+        text: 'Neutral members are the largest group in the club: you attend the workshops and meetups, browse the ventures with your balance, consult your AI-powered expert advisor and build your relationships — a full year before deciding whether to start a venture or join someone else’s.',
+      },
+      {
+        title: 'You learn the world of investment from the inside',
+        text: 'You see how ventures are evaluated, how an investor thinks and how partnerships are built in practice… from people with real experience, not from theories, before you put a single riyal into any venture.',
+      },
+      {
+        title: 'Every workshop and meetup is open to you',
+        text: 'You attend all the regular workshops and meetups at the club HQ in Riyadh, or follow the meetups remotely from outside it; you listen, ask and learn — and when your venture is born, you present it to investors at the “5 minutes” meetup.',
+      },
+      {
+        title: 'A ready network from day one',
+        text: 'You join the club community of thousands of neutrals, entrepreneurs and investors, with one account for all the group’s platforms… and one relationship may be the start of your path.',
+      },
+      {
+        title: 'You discover your direction through real ventures',
+        text: 'Pre-evaluated ventures are presented inside the club all year, and a SAR 2,500 balance in the Projects Bank opens 5 complete ventures you pick to match your field and means — then you meet their founders directly… and your direction may turn out to be a partnership in one of them.',
+      },
+      {
+        title: 'An AI-powered expert advisor in your pocket',
+        text: 'Ask it in an online consultation at no charge: where do I start? An AI-powered expert advisor built on Vibes Ventures’ own patent-protected technology, running on Vibes Ventures’ own servers; it reads your situation and your numbers and lays your next step out clearly. You also have a renewable daily balance with the AI assistant around the clock, and every feature of the Investors Club app.',
+        badges: ['Patent-protected', 'On Vibes Ventures’ own servers'],
+      },
+      {
+        title: 'Your appearance in the “Profile & Journey” initiative',
+        text: 'Because every person has a story and every journey has value, your profile and career are published on the club’s platforms and before its audience at no charge — even before your first venture — among the figures regularly chosen from the members.',
+      },
+      {
+        title: 'Your first venture and all that follows, before investors',
+        text: 'When you begin, you add any number of your ventures to the “Success Partners” programme as long as you founded them and your membership is active, with priority evaluation within 10 working days; each then moves to the Projects Bank, available to present to all the club’s members, with your venture published 3 times a month on the club’s platforms.',
+      },
+      {
+        title: 'The club theatre is your stage to the world',
+        text: 'When you want to share your idea or expertise, you hold your own meetup on a stage seating up to 80 people, with full media coverage and a live broadcast to the whole world — all at a 50% discount.',
+        badges: ['Live'],
+      },
+      {
+        title: 'Your services with priority and at half the value',
+        text: 'And when your idea becomes a venture: the design of any website or mobile app of yours on Android or iOS, the pitch deck, marketing by Momentum, Al-Moltaqa podcast production, the franchise kit and the meeting room — at a 50% discount, alongside up to 50% off outdoor filming and conference coverage, and a code of up to 20% on “Manfaz” products.',
+      },
+    ],
+  },
   comingSoonTitle: 'Upcoming benefits and discounts added to your membership automatically',
   comingSoon: ['Many partners are being connected to offer varied discounts made for the club’s members'],
   statusTexts: {

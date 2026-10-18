@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { useMembershipContent, type MembershipGroup, type MembershipItem } from '@/api/auth';
+import { useMembershipContent, type MembershipGroup, type MembershipItem, type NeutralReason } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
@@ -72,12 +72,55 @@ export default function MembershipScreen() {
         </FadeInView>
       ) : null}
 
-      {data.groups.map((group, index) => (
-        <FadeInView key={group.key} delay={entranceDelay(index + 3)}>
-          <GroupCard group={group} onOpen={open} />
-        </FadeInView>
-      ))}
+      {/* M99d (owner): the neutral reads HIS page — the 10 reasons; every other persona keeps the groups. */}
+      {status === 'signedIn' && me?.persona === 'neutral' && data.neutralReasons ? (
+        <>
+          <FadeInView delay={entranceDelay(3)}>
+            <View style={styles.reasonsHead}>
+              <Text style={styles.reasonsTitle}>{data.neutralReasons.title}</Text>
+              <Text style={styles.reasonsIntro}>{data.neutralReasons.intro}</Text>
+            </View>
+          </FadeInView>
+          {data.neutralReasons.items.map((reason, index) => (
+            <FadeInView key={reason.title} delay={entranceDelay(index + 4)}>
+              <ReasonCard index={index + 1} reason={reason} />
+            </FadeInView>
+          ))}
+        </>
+      ) : (
+        data.groups.map((group, index) => (
+          <FadeInView key={group.key} delay={entranceDelay(index + 3)}>
+            <GroupCard group={group} onOpen={open} />
+          </FadeInView>
+        ))
+      )}
     </Screen>
+  );
+}
+
+/** M99d: one of the neutral's ten reasons — a numbered golden badge, the title, its gold pills, the text. */
+function ReasonCard({ index, reason }: { index: number; reason: NeutralReason }) {
+  return (
+    <GlassCard style={styles.reason}>
+      <View style={styles.reasonHeader}>
+        <View style={styles.reasonNumber}>
+          <Text style={styles.reasonNumberText}>{index}</Text>
+        </View>
+        <Text style={styles.reasonTitle}>{reason.title}</Text>
+      </View>
+      {reason.badges?.length ? (
+        <View style={styles.reasonBadges}>
+          {reason.badges.map((badge) => (
+            <View key={badge} style={styles.reasonBadge}>
+              <Text style={styles.reasonBadgeText} numberOfLines={1}>
+                {badge}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <Text style={styles.reasonText}>{reason.text}</Text>
+    </GlassCard>
   );
 }
 
@@ -132,6 +175,34 @@ const styles = StyleSheet.create({
   groupTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   soon: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.goldFaint },
   soonText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  // M99d: the neutral's 10-reason page.
+  reasonsHead: { gap: spacing.xs },
+  reasonsTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
+  reasonsIntro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
+  reason: { gap: spacing.sm, padding: spacing.md },
+  reasonHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  reasonNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  reasonNumberText: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 22, color: colors.goldInk },
+  reasonTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart, flex: 1 },
+  reasonBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  reasonBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldFaint,
+  },
+  reasonBadgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  reasonText: { ...typography.body, fontSize: 14, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   item: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm + 2 },
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   itemText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },

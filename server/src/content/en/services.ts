@@ -31,6 +31,23 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       },
     },
     {
+      key: 'operating-rights',
+      cta: 'Request operating rights',
+      title: 'Investors Club operating rights',
+      summary: 'Operate the “Investors Club” brand exclusively in your city or country, with the same methodology as the club HQ in Riyadh.',
+      detail:
+        'If you run a business incubator or accelerator, or own premium office space, the operating rights let you run every element of the Vibes Ventures ecosystem within a defined exclusive geographic area, with the same mechanism and methodology used at the Investors Club HQ in Riyadh.\nAs an exclusive operator you get: a unified mechanism to replicate the experience locally in your area, listing your own ventures in the Projects Bank, a 50% share of the membership values and percentages the club receives when a venture submitted by you is approved, 50% of membership subscription fees, the right to use the “Investors Club” trademark in the target city, and many more benefits set out in the operating-rights terms.\nThe model is designed for incubators, accelerators, owners of premium office space, investment funds, advisory firms and business development offices, and for companies and experienced individuals who wish to represent the club in their cities or countries.\nObtaining the operating rights requires a bank guarantee, and the management contacts you to complete the criteria and details.',
+      action: {
+        message: 'I would like to obtain the “Investors Club” operating rights.',
+        fields: [
+          { key: 'city', label: 'Target country and city' },
+          { key: 'population', label: 'City population', options: ['100k to 250k', '250k to 500k', '500k to 1M', '1M to 2M', '2M and above'] },
+          { key: 'entity', label: 'Your entity', options: ['Business incubator', 'Business accelerator', 'Office space', 'Investment fund', 'Advisory firm', 'Business development office', 'Company', 'Experienced individual'] },
+          { key: 'about', label: 'About you and your business', placeholder: 'Your experience and why you seek the operating rights' },
+        ],
+      },
+    },
+    {
       key: 'success-partners',
       cta: 'Register your venture',
       title: 'Success Partners',

@@ -17,6 +17,8 @@ export type AccessState = 'golden' | 'not_member' | 'can_unlock' | 'exhausted' |
 export type UnlockedContact = { whatsapp: string; email: string; website: string; pitchUrl: string };
 export type ProjectAccess = { state: AccessState; isMember: boolean; balance: PbBalanceLite | null; contact: UnlockedContact | null; message: string | null };
 export type UnlockResult = { ok: true; already: boolean; left: number; contact: UnlockedContact };
+/** M99c: the member's wallet at a glance — the balance and HOW MANY projects he opened, never which ones here. */
+export type WalletResult = { isMember: boolean; balance: PbBalanceLite | null; unlockedCount: number };
 
 const UNLOCKS_PER_HOUR = 30;
 const NOT_MEMBER = 'فتح بيانات التواصل متاح لأعضاء النادي المشتركين. فعّل عضويتك من شاشة العضوية.';
@@ -66,6 +68,21 @@ export class ProjectAccessService {
       // The bridge is down or not set up: the project page still opens, without the unlock button.
       this.deps.log.warn({ code: error.code }, 'Projects Bank access unavailable');
       return { state: 'unavailable', isMember, balance: null, contact: null, message: error.message };
+    }
+  }
+
+  /** M99c: the wallet card's numbers; a non-member (or a bridge outage) gets nulls and the card keeps its words. */
+  async wallet(session: SessionRecord): Promise<WalletResult> {
+    const contact = await this.deps.auth.contact(session);
+    const isMember = contact.is_member === 1;
+    if (!isMember) return { isMember, balance: null, unlockedCount: 0 };
+    try {
+      const { credits, granted, used, left, unlocked } = await this.deps.pb.balance(pbMemberOf(contact));
+      return { isMember, balance: { credits, granted, used, left }, unlockedCount: unlocked.length };
+    } catch (error) {
+      if (!(error instanceof RequestError) || error.status < 500) throw error;
+      this.deps.log.warn({ code: error.code }, 'Projects Bank wallet unavailable');
+      return { isMember, balance: null, unlockedCount: 0 };
     }
   }
 

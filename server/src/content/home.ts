@@ -40,7 +40,10 @@ export type HomeSectionKey =
   | 'videos'
   | 'advisor'
   | 'podcast'
-  | 'savings';
+  | 'savings'
+  | 'tour'
+  | 'opportunity'
+  | 'wallet';
 
 /** M74: how the home reads for one persona (or a guest): its own copy, block order and block CTAs. */
 export type HomePersonaVariant = {
@@ -50,6 +53,12 @@ export type HomePersonaVariant = {
   order?: HomeSectionKey[];
   /** Per-block CTA overrides (label + app route). */
   ctas?: Partial<Record<HomeSectionKey, HomeCta>>;
+  /** M99: blocks this persona never sees, even when the default order carries them. */
+  hide?: HomeSectionKey[];
+  /** M99: tab routes this persona never sees (e.g. 'projects'); the screens stay reachable by path. */
+  hideTabs?: string[];
+  /** M99: the service keys that LEAD this persona's services grid; the rest follow in catalog order. */
+  serviceKeys?: string[];
 };
 
 export type HomeContent = {
@@ -71,6 +80,10 @@ export type HomeContent = {
   podcast?: { title: string; subtitle: string; cta: string; route: string };
   /** M74-5: what the membership saves while he explores; the CTA leads to the membership screen. */
   savings?: { title: string; subtitle: string; items: string[]; cta: string };
+  /** M99c «الفرصة الذهبية»: ONE featured project that changes on every app open — the investor's opening act. */
+  opportunity?: { title: string; subtitle: string; cta: string };
+  /** M99c: the investor's wallet card — his Projects Bank balance and unlocked projects at a glance. */
+  wallet?: { title: string; subtitle: string; cta: string };
   /** M74: per-persona home variants (guest included). Absent on an older stored block = one home for everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   /** The entrepreneurs portal page: intro plus the keys of the services it lists. */
@@ -187,40 +200,58 @@ export const HOME_SEED: HomeContent = {
     items: ['ورش العمل والملتقيات بدون رسوم للأعضاء', 'رصيد سنوي يفتح لك خدمات النادي', 'خصومات شركائنا برمز العضو الخاص بك'],
     cta: 'تعرّف على العضوية',
   },
-  // M74: the home speaks to the persona — copy, order and CTAs per gateway (the owner edits the texts from the dashboard).
+  // M99c: the investor's opening act and wallet (the numbers come live from the PB bridge, the words from here).
+  opportunity: {
+    title: 'الفرصة الذهبية',
+    subtitle: 'مشروع مختار من بنك المشاريع، يتجدد مع كل فتح للتطبيق',
+    cta: 'اكتشف الفرصة',
+  },
+  wallet: {
+    title: 'محفظتك في بنك المشاريع',
+    subtitle: 'رصيدك 2,500 ريال يفتح لك التفاصيل الكاملة لـ5 مشاريع تنتقيها بنفسك، وتلتقي بمؤسسيها مباشرة',
+    cta: 'استخدم رصيدك',
+  },
+  // M74 + M99: four separate experiences — copy, order, visibility, tabs and the services grid per persona
+  // (the owner edits everything from the dashboard).
   personas: {
     guest: {
-      // The guest reads the official definition too; the portals row below is his «اختر بوابتك».
+      // M99a: the picker first, then مميزات العضوية as the guest's first CONTENT block; he browses ALL services.
       heroSubtitle:
         'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
-      order: ['portals', 'posts', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
+      order: ['portals', 'membership', 'posts', 'agenda', 'projectsBank', 'services', 'partners', 'videos', 'famous'],
     },
     neutral: {
       // M74-6..8 (owner-approved, 2026-10-17): the neutral's home is a discovery journey — events and the
       // companion advisor first, then the inspiration content (شخصية ومسيرة / تعرف علينا / the podcast stage),
       // the Projects Bank as a window, and what the membership saves him while he explores.
       heroSubtitle: 'استكشف الملتقيات وقصص الأعضاء، ودع مستشارك يرافقك حتى تحدّد وجهتك بثقة.',
-      order: ['posts', 'agenda', 'advisor', 'quickActions', 'famous', 'videos', 'podcast', 'projectsBank', 'services', 'savings', 'golden', 'partners'],
+      order: ['posts', 'agenda', 'advisor', 'quickActions', 'famous', 'videos', 'podcast', 'projectsBank', 'services', 'savings', 'partners'],
       ctas: {
         projectsBank: { label: 'استكشف المشاريع للإلهام', route: '/projects' },
         agenda: { label: 'احضر الملتقى القادم', route: '/agenda' },
       },
     },
     entrepreneur: {
+      // M99b: the «+» leads, الملتقيات prominent, and the Projects Bank leaves his home AND his tabs
+      // (it stays reachable from inside حسابي); his services grid leads with the founder's tools.
       heroSubtitle: 'مشروعك يستحق منصة النادي: خدمات تأخذه خطوة أبعد وفرصة تعرضه على المستثمرين.',
-      order: ['posts', 'quickActions', 'agenda', 'services', 'projectsBank', 'golden', 'membership', 'partners', 'videos', 'famous'],
+      order: ['posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      hide: ['projectsBank', 'golden', 'opportunity', 'wallet'],
+      hideTabs: ['projects'],
+      serviceKeys: ['pitch-deck', 'meetup', 'studio', 'momentum', 'theater', 'famous'],
       ctas: {
-        golden: { label: 'انضم إلى مشاريع Vibes Ventures الذهبية', route: '/service/success-partners' },
-        projectsBank: { label: 'قدّم مشروعك للبنك', route: '/service/success-partners' },
+        agenda: { label: 'ملتقى «5 دقائق» بانتظارك', route: '/agenda' },
         services: { label: 'كل خدماتك', route: '/services' },
       },
     },
     investor: {
+      // M99c: the Projects Bank is the heart — the golden opportunity opens, his wallet beside it,
+      // and the services that serve investing lead his grid.
       heroSubtitle: 'فرص شراكة حقيقية بانتظارك: بنك المشاريع والملتقيات ومجتمع الأعمال في مكان واحد.',
-      order: ['posts', 'quickActions', 'agenda', 'projectsBank', 'golden', 'membership', 'services', 'partners', 'videos', 'famous'],
+      order: ['opportunity', 'posts', 'projectsBank', 'wallet', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      serviceKeys: ['credit', 'theater', 'consultation', 'meetup'],
       ctas: {
         projectsBank: { label: 'استكشف فرص الشراكة', route: '/projects' },
-        golden: { label: 'اكتشف الفرص الذهبية', route: '/golden' },
       },
     },
   },
@@ -234,8 +265,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 10,
-  updatedAt: '2026-10-17T16:00:00.000Z',
+  version: 11,
+  updatedAt: '2026-10-18T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

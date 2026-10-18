@@ -7,6 +7,7 @@ import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/co
 import { PopIn } from '@/components/motion';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
+import { useHiddenTabs } from '@/lib/personaTabs';
 import { colors, fonts, gradients, radii, shadows, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -56,6 +57,8 @@ export default function TabsLayout() {
   // The advisor dock opens the conversation knowing what the member was looking at (the old FAB's brain).
   const ask = useAskAdvisor();
   const advisorContext = useCurrentAdvisorContext();
+  // M99: the persona decides the bar — a hidden tab leaves it (its screen stays reachable by path).
+  const hiddenTabs = useHiddenTabs();
   const badgeOf = (name: string): number =>
     name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : name === 'index' ? badges.home : name === 'account' ? badges.account : 0;
   return (
@@ -108,6 +111,7 @@ export default function TabsLayout() {
             name={tab.name}
             options={{
               title: t(tab.title),
+              href: hiddenTabs.has(tab.name) ? null : undefined,
               tabBarIcon: ({ color, focused, size }) => (
                 <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
               ),

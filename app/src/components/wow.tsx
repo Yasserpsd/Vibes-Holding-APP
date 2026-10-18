@@ -135,7 +135,7 @@ function remainingTo(target: number, now: number): Remaining {
 }
 
 /** One flip cell: the value snaps closed and springs open again whenever it changes. */
-function FlipCell({ value, label }: { value: number; label: string }) {
+function FlipCell({ value, label, small = false }: { value: number; label: string; small?: boolean }) {
   const [scaleY] = useState(() => new Animated.Value(1));
   const shown = useRef(value);
   const [display, setDisplay] = useState(value);
@@ -153,16 +153,16 @@ function FlipCell({ value, label }: { value: number; label: string }) {
 
   return (
     <View style={styles.flipCell}>
-      <Animated.View style={[styles.flipCard, { transform: [{ scaleY }] }]}>
-        <Text style={styles.flipDigits}>{String(display).padStart(2, '0')}</Text>
+      <Animated.View style={[styles.flipCard, small && styles.flipCardSm, { transform: [{ scaleY }] }]}>
+        <Text style={[styles.flipDigits, small && styles.flipDigitsSm]}>{String(display).padStart(2, '0')}</Text>
       </Animated.View>
       <Text style={styles.flipLabel}>{label}</Text>
     </View>
   );
 }
 
-/** M85f: the flip-digit countdown to the next event — mounted by the agenda block on the home. */
-export function FlipCountdown({ targetMs, title }: { targetMs: number; title: string }) {
+/** M85f flip-digit countdown. M96: `compact` mounts it ON the event's own card so the numbers visibly belong to it. */
+export function FlipCountdown({ targetMs, title = '', compact = false }: { targetMs: number; title?: string; compact?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 30_000);
@@ -171,6 +171,20 @@ export function FlipCountdown({ targetMs, title }: { targetMs: number; title: st
 
   const left = remainingTo(targetMs, now);
   if (!left) return null;
+  if (compact) {
+    return (
+      <View style={styles.countdownCompact}>
+        <Text style={styles.countdownCompactLabel}>{t('wow.startsIn')}</Text>
+        <View style={styles.flipRow}>
+          <FlipCell small value={left.days} label={t('wow.days')} />
+          <Text style={[styles.flipColon, styles.flipColonSm]}>:</Text>
+          <FlipCell small value={left.hours} label={t('wow.hours')} />
+          <Text style={[styles.flipColon, styles.flipColonSm]}>:</Text>
+          <FlipCell small value={left.minutes} label={t('wow.minutes')} />
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={styles.countdown}>
       <Text style={styles.countdownTitle} numberOfLines={1}>
@@ -348,6 +362,12 @@ const styles = StyleSheet.create({
   // The countdown.
   countdown: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
   countdownTitle: { ...typography.caption, color: colors.textSecondary },
+  // M96: the on-card version — tight enough to sit inside the event photo's scrim.
+  countdownCompact: { alignItems: 'center', gap: 2 },
+  countdownCompactLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  flipCardSm: { minWidth: 34, paddingVertical: 2, paddingHorizontal: spacing.xs + 2 },
+  flipDigitsSm: { fontSize: 15, lineHeight: 22 },
+  flipColonSm: { fontSize: 14, lineHeight: 30 },
   flipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   flipCell: { alignItems: 'center', gap: 2 },
   flipCard: {

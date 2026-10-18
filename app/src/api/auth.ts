@@ -85,12 +85,17 @@ export type MembershipItemLink = { type: 'whatsapp'; phone: string; message: str
 export type MembershipItem = { text: string; link: MembershipItemLink | null };
 export type MembershipGroup = { key: string; title: string; icon: string; comingSoon: boolean; items: MembershipItem[] };
 
+/** M99d: one of the neutral's ten reasons; `badges` render as gold pills beside the title. */
+export type NeutralReason = { title: string; text: string; badges?: string[] };
+
 export type MembershipContent = {
   title: string;
   subtitle: string;
   intro: string;
   groups: MembershipGroup[];
   benefits: MembershipBenefit[];
+  /** M99d: the neutral persona's own benefits copy (the owner's 10-reason page). */
+  neutralReasons?: { title: string; intro: string; items: NeutralReason[] };
   comingSoonTitle: string;
   comingSoon: string[];
   statusTexts: { guest: string; unactivated: string; active: string; expired: string };

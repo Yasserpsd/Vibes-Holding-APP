@@ -75,6 +75,8 @@ export const gradients = {
   goldWash: 'linear-gradient(160deg, rgba(242, 206, 116, 0.16) 0%, rgba(242, 206, 116, 0.03) 55%, rgba(0, 0, 0, 0) 100%)',
   /** Screen backdrop: deep black with a faint golden dawn at the top. */
   screen: 'linear-gradient(180deg, #121014 0%, #070708 34%)',
+  /** M96: bottom-up dark scrim that makes text readable on top of a photo. */
+  scrim: 'linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0) 78%)',
 } as const;
 
 export const spacing = {

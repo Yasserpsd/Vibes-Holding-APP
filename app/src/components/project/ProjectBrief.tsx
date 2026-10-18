@@ -32,7 +32,7 @@ export function ProjectBrief({ projectId }: { projectId: string }) {
 }
 
 /** M95 (owner): «مش عايز اي خانات فاضية» — a row whose value is empty or a placeholder never renders. */
-const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|متوفر|معروف|مذكور)|لا\s+(?:يوجد|توجد)|لم\s+يحدد|بدون|n\/?a|none|null)$/iu;
+export const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|متوفر|معروف|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون|n\/?a|none|null)$/iu;
 
 function BriefBody({ brief }: { brief: Brief }) {
   const router = useRouter();
@@ -127,6 +127,8 @@ function BriefBody({ brief }: { brief: Brief }) {
 /** Where the project stands on the five steps; the feed's own wording sits beside the title. */
 function StageStepper({ stage }: { stage: Brief['stage'] }) {
   const known = stage.index >= 0 && stage.index < stage.steps.length;
+  // M98 (owner): an unknown stage shows NOTHING — no flag, no «غير محدد» pill, no stepper.
+  if (!known) return null;
   return (
     <View style={styles.stage}>
       <View style={styles.stageHeader}>
@@ -175,8 +177,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
           );
         })}
       </View>
-      {known ? null : <Text style={styles.stageNote}>{t('brief.stageUnknown')}</Text>}
-      {known && stage.estimated ? <Text style={styles.stageNote}>{t('brief.stageEstimated')}</Text> : null}
+      {stage.estimated ? <Text style={styles.stageNote}>{t('brief.stageEstimated')}</Text> : null}
     </View>
   );
 }

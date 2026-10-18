@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiRequest } from './client';
-import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectUnlockResult, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
+import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectUnlockResult, ProjectsBalance, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
 
 export const PAGE_SIZE = 20;
 
@@ -55,6 +55,19 @@ export function useProjectAccess(id: string | undefined, account: string | null)
     enabled: Boolean(id) && Boolean(account),
     staleTime: 0,
     gcTime: 0,
+    retry: false,
+  });
+}
+
+/** M99c: the member's Projects Bank wallet — his balance and how many projects he opened. */
+export type ProjectsWallet = { isMember: boolean; balance: ProjectsBalance | null; unlockedCount: number };
+
+export function useProjectsWallet(account: string | null) {
+  return useQuery({
+    queryKey: ['projects-wallet', account ?? ''],
+    queryFn: () => apiGet<ProjectsWallet>('/api/projects/wallet'),
+    enabled: Boolean(account),
+    staleTime: 60_000,
     retry: false,
   });
 }
