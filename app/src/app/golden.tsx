@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
+import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -42,6 +43,8 @@ export default function GoldenScreen() {
       <SlotBanner slot="golden.banner" />
       <FadeInView offset={12}>
         <GlassCard golden radius={radii.xl} style={styles.heroCard}>
+          {/* M85f (owner pick): the gradient sweeping the portfolio hero's rim. */}
+          <GoldSweep radius={radii.xl} duration={6200} />
           <View
             style={styles.hero}
             onLayout={({ nativeEvent: { layout } }) => {

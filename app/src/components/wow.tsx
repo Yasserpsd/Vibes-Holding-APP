@@ -4,7 +4,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/AuthProvider';
 import { t } from '@/i18n';
 import { isRTL } from '@/i18n/direction';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M85f (owner): «حاجة تحب تفضل فاتح التطبيق بس تتفرج عليه من جماله» — the wow layer.
@@ -60,6 +60,65 @@ export function GoldTicker({ items }: { items: string[] }) {
         {copy('a')}
         {copy('b')}
       </Animated.View>
+    </View>
+  );
+}
+
+// ── الإطار الذهبي الجاري ─────────────────────────────────────────────────────
+
+/**
+ * M85f: a gradient sweeping along a golden card's rim. A large light band spins behind
+ * an inner mask that re-paints the card surface, so only the hairline rim catches it.
+ * Rotation is transform-only on the native driver; the gradient itself never animates.
+ * Render it as the FIRST child inside a GlassCard (it fills the card absolutely).
+ */
+export function GoldSweep({ radius = radii.lg, thickness = 1.5, duration = 5200 }: { radius?: number; thickness?: number; duration?: number }) {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [turn] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [turn, duration]);
+
+  const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  // The spinning square must cover the card's diagonal at every angle.
+  const span = Math.ceil(Math.hypot(size.w, size.h)) + 8;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}
+      onLayout={(event) => setSize({ w: Math.ceil(event.nativeEvent.layout.width), h: Math.ceil(event.nativeEvent.layout.height) })}
+    >
+      {size.w > 0 ? (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: size.w / 2 - span / 2,
+            top: size.h / 2 - span / 2,
+            width: span,
+            height: span,
+            transform: [{ rotate }],
+            experimental_backgroundImage:
+              'linear-gradient(90deg, rgba(242,206,116,0) 0%, rgba(242,206,116,0) 38%, rgba(242,206,116,0.95) 50%, rgba(242,206,116,0) 62%, rgba(242,206,116,0) 100%)',
+          }}
+        />
+      ) : null}
+      {/* The mask re-paints the card surface, leaving only the rim lit. */}
+      <View
+        style={{
+          position: 'absolute',
+          top: thickness,
+          bottom: thickness,
+          start: thickness,
+          end: thickness,
+          borderRadius: Math.max(radius - thickness, 0),
+          backgroundColor: colors.surface,
+          experimental_backgroundImage: gradients.surface,
+        }}
+      />
     </View>
   );
 }

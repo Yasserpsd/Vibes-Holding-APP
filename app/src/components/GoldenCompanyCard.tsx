@@ -5,6 +5,7 @@ import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { Sheen } from '@/components/motion';
+import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -20,6 +21,8 @@ export function GoldenCompanyCard({ company }: Props) {
   return (
     // V2: the golden companies wear the premium glass surface with the gold hairline.
     <GlassCard golden style={styles.card}>
+      {/* M85f (owner pick): the gradient sweeping the golden card's rim. */}
+      <GoldSweep radius={radii.lg} />
       <View style={styles.header}>
         <View style={styles.logoBox}>
           <Image source={{ uri: company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={company.name} />
