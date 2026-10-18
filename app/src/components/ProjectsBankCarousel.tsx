@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 import { useProjectsList } from '@/api/queries';
@@ -14,6 +14,20 @@ const FADE_OUT_MS = 220;
 const FADE_IN_MS = 320;
 const MAX_SLIDES = 8;
 
+/** Seeded Fisher–Yates: the same seed always deals the same hand, so renders stay stable. */
+function shuffled<T>(items: T[], seed: number): T[] {
+  const out = [...items];
+  let state = seed >>> 0 || 1;
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const j = state % (i + 1);
+    const swap = out[i];
+    out[i] = out[j];
+    out[j] = swap;
+  }
+  return out;
+}
+
 /**
  * M84 (owner): the Projects Bank home block «بيقلب كده في الصور زي الموقع بالظبط» — an
  * auto-rotating fade carousel of the bank's project images; a tap opens that project.
@@ -23,8 +37,25 @@ export function ProjectsBankCarousel() {
   const list = useProjectsList({ q: '', sort: 'discover' });
   const [index, setIndex] = useState(0);
   const [opacity] = useState(() => new Animated.Value(1));
+  // M95 (owner): «كل مرة تقفل وتفتح تتغير وكل مرة تروح صفحة وترجع تتغير» — a fresh seed on every
+  // focus (and every cold start) deals a different hand of projects into the carousel.
+  const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
+  useFocusEffect(
+    useCallback(() => {
+      setShuffleSeed(Date.now());
+      setIndex(0);
+    }, []),
+  );
 
-  const slides = (list.data?.pages[0]?.items ?? []).filter((project): project is PublicProject & { image: string } => Boolean(project.image)).slice(0, MAX_SLIDES);
+  const page = list.data?.pages[0];
+  const slides = useMemo(
+    () =>
+      shuffled(
+        (page?.items ?? []).filter((project): project is PublicProject & { image: string } => Boolean(project.image)),
+        shuffleSeed,
+      ).slice(0, MAX_SLIDES),
+    [page, shuffleSeed],
+  );
 
   useEffect(() => {
     if (slides.length < 2) return;

@@ -6,6 +6,7 @@ import { Animated, Platform, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
+import { Highlight } from '@/components/Highlight';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
@@ -13,7 +14,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { isRTL, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
-import { topicIcon } from '@/lib/icons';
+import { topicIcon, type IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -180,47 +181,120 @@ function ReadMore({ text }: { text: string }) {
   );
 }
 
-/**
- * M80 (owner): «عن المشروع» with visual signposting instead of a wall of text — heading-like lines
- * get a topic icon, list lines get golden diamonds, and plain paragraphs stay paragraphs.
- */
-function RichText({ text }: { text: string }) {
+// M95 (owner): long content rotates through soft accents so pages never read single-toned.
+const GOLD_ACCENT = { ink: colors.goldLight, bg: colors.goldSoft, border: colors.borderGoldSoft };
+const RICH_ACCENTS = [
+  GOLD_ACCENT,
+  { ink: '#5ECFA0', bg: 'rgba(52,178,123,0.14)', border: 'rgba(52,178,123,0.4)' },
+  { ink: '#B9A6F7', bg: 'rgba(109,79,194,0.18)', border: 'rgba(167,139,250,0.4)' },
+  { ink: '#7CC4EA', bg: 'rgba(95,184,232,0.14)', border: 'rgba(95,184,232,0.4)' },
+];
+
+/** A paragraph longer than this becomes icon-led rows instead of one gray block. */
+const LONG_PARAGRAPH = 160;
+
+/** Sentence split without lookbehind (Hermes-safe); a dot only closes before whitespace or the end. */
+function sentencesOf(text: string): string[] {
+  const out: string[] = [];
+  let current = '';
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text.charAt(index);
+    current += char;
+    const next = text.charAt(index + 1);
+    const closes = '؟!؛'.includes(char) || (char === '.' && (next === '' || /\s/u.test(next)));
+    if (closes && current.trim().length > 1) {
+      out.push(current.trim());
+      current = '';
+    }
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+type RichLine =
+  | { kind: 'heading'; text: string; accent: number }
+  | { kind: 'bullet'; text: string }
+  | { kind: 'piece'; text: string; icon: IoniconName }
+  | { kind: 'para'; text: string };
+
+/** Pure classifier: headings, list lines, and long paragraphs broken into sentence rows. */
+function parseRich(text: string): RichLine[] {
   const lines = text
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+  const out: RichLine[] = [];
+  let headings = 0;
+  for (const line of lines) {
+    const bullet = /^([-•*◦▪–]|[0-9٠-٩]{1,2}[).\-–])\s*/u.exec(line);
+    const clean = bullet ? line.slice(bullet[0].length) : line;
+    const heading = !bullet && clean.length <= 48 && (/[:：]$/u.test(clean) || !/[.؟!،;]/u.test(clean));
+    if (heading) {
+      out.push({ kind: 'heading', text: clean.replace(/[:：]$/u, ''), accent: headings });
+      headings += 1;
+    } else if (bullet) {
+      out.push({ kind: 'bullet', text: clean });
+    } else if (clean.length > LONG_PARAGRAPH) {
+      // M95 (owner): «اي كلام كتير ورا بعض تفصله أيقونات» — the wall becomes scannable rows.
+      let chunk = '';
+      for (const sentence of sentencesOf(clean)) {
+        chunk = chunk ? `${chunk} ${sentence}` : sentence;
+        if (chunk.length >= 110) {
+          out.push({ kind: 'piece', text: chunk, icon: topicIcon(chunk) });
+          chunk = '';
+        }
+      }
+      if (chunk) out.push({ kind: 'piece', text: chunk, icon: topicIcon(chunk) });
+    } else {
+      out.push({ kind: 'para', text: line });
+    }
+  }
+  return out;
+}
+
+/**
+ * M80 (owner): «عن المشروع» with visual signposting instead of a wall of text — heading-like lines
+ * get a topic icon, list lines get golden diamonds. M95: long paragraphs break into icon-led rows,
+ * figures light up in gold, and heading badges rotate through soft accent colors.
+ */
+function RichText({ text }: { text: string }) {
+  const lines = parseRich(text);
   return (
     <View style={styles.rich}>
       {lines.map((line, index) => {
-        const bullet = /^([-•*◦▪–]|[0-9٠-٩]{1,2}[).\-–])\s*/u.exec(line);
-        const clean = bullet ? line.slice(bullet[0].length) : line;
-        const heading = !bullet && clean.length <= 48 && (/[:：]$/u.test(clean) || !/[.؟!،;]/u.test(clean));
-        if (heading) {
+        if (line.kind === 'heading') {
+          const accent = RICH_ACCENTS[line.accent % RICH_ACCENTS.length] ?? GOLD_ACCENT;
           return (
             <View key={index} style={styles.richHeading}>
-              {/* M84e: each heading's gold badge pops into place as the reader reaches it. */}
+              {/* M84e: each heading's badge pops into place as the reader reaches it. */}
               <PopIn delay={100}>
-                <View style={styles.richIconBadge}>
-                  <Ionicons name={topicIcon(clean)} size={15} color={colors.gold} />
+                <View style={[styles.richIconBadge, { backgroundColor: accent.bg, borderColor: accent.border }]}>
+                  <Ionicons name={topicIcon(line.text)} size={15} color={accent.ink} />
                 </View>
               </PopIn>
-              <Text style={styles.richHeadingText}>{clean.replace(/[:：]$/u, '')}</Text>
+              <Text style={[styles.richHeadingText, { color: accent.ink }]}>{line.text}</Text>
             </View>
           );
         }
-        if (bullet) {
+        if (line.kind === 'bullet') {
           return (
             <View key={index} style={styles.richBullet}>
               <Text style={styles.richDiamond}>◆</Text>
-              <Text style={styles.richBulletText}>{clean}</Text>
+              <Highlight text={line.text} style={styles.richBulletText} />
             </View>
           );
         }
-        return (
-          <Text key={index} style={styles.body}>
-            {line}
-          </Text>
-        );
+        if (line.kind === 'piece') {
+          return (
+            <View key={index} style={styles.richPiece}>
+              <View style={styles.richPieceIcon}>
+                <Ionicons name={line.icon} size={13} color={colors.goldDark} />
+              </View>
+              <Highlight text={line.text} style={styles.richPieceText} />
+            </View>
+          );
+        }
+        return <Highlight key={index} text={line.text} style={styles.body} />;
       })}
     </View>
   );
@@ -318,4 +392,18 @@ const styles = StyleSheet.create({
   richBullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingStart: spacing.xs },
   richDiamond: { fontSize: 9, lineHeight: 24, color: colors.gold },
   richBulletText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
+  // M95: a long paragraph's sentence rows, each led by its matched icon.
+  richPiece: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  richPieceIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 2,
+  },
+  richPieceText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
 });

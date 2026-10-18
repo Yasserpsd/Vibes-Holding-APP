@@ -4,6 +4,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { useProjectBrief } from '@/api/queries';
 import type { ProjectBrief as Brief } from '@/api/types';
+import { Highlight } from '@/components/Highlight';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, GrowBar, PopIn, PressScale, usePulse, Wiggle } from '@/components/motion';
 import { t } from '@/i18n';
@@ -30,8 +31,15 @@ export function ProjectBrief({ projectId }: { projectId: string }) {
   return <BriefBody brief={query.data} />;
 }
 
+/** M95 (owner): «مش عايز اي خانات فاضية» — a row whose value is empty or a placeholder never renders. */
+const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|متوفر|معروف|مذكور)|لا\s+(?:يوجد|توجد)|لم\s+يحدد|بدون|n\/?a|none|null)$/iu;
+
 function BriefBody({ brief }: { brief: Brief }) {
   const router = useRouter();
+  const rows = brief.table.filter((row) => {
+    const value = row.value.trim();
+    return value.length > 0 && !EMPTY_VALUE.test(value);
+  });
   return (
     <View style={styles.wrap}>
       <FadeInView delay={entranceDelay(0)}>
@@ -42,14 +50,14 @@ function BriefBody({ brief }: { brief: Brief }) {
             </View>
             <Text style={styles.headerTitle}>{t('brief.title')}</Text>
           </View>
-          {brief.summary ? <Text style={styles.summary}>{brief.summary}</Text> : null}
+          {brief.summary ? <Highlight text={brief.summary} style={styles.summary} /> : null}
 
           {/* M80 (owner): the stage stepper FIRST — «اول حاجة مرحلة المشروع الشكل المميز ده» — then the table. */}
           <StageStepper stage={brief.stage} />
 
-          {brief.table.length ? (
+          {rows.length ? (
             <View style={styles.table}>
-              {brief.table.map((row, index) => (
+              {rows.map((row, index) => (
                 <View key={`${row.label}:${index}`} style={[styles.tableRow, index > 0 && styles.tableRowBorder, index % 2 === 1 && styles.tableRowAlt]}>
                   <View style={styles.labelCell}>
                     {/* M80: every fact row carries its own signpost icon — M84e: it pops in, row after row. */}
@@ -59,7 +67,8 @@ function BriefBody({ brief }: { brief: Brief }) {
                     <Text style={styles.labelText}>{row.label}</Text>
                   </View>
                   <View style={styles.valueCell}>
-                    <Text style={styles.valueText}>{row.value}</Text>
+                    {/* M95: the figures light up in gold inside the value. */}
+                    <Highlight text={row.value} style={styles.valueText} />
                   </View>
                 </View>
               ))}
@@ -185,7 +194,8 @@ function Points({ title, icon, tone, items }: { title: string; icon: IoniconName
       {items.map((item) => (
         <View key={item} style={styles.point}>
           <View style={[styles.bullet, { backgroundColor: tone }]} />
-          <Text style={styles.pointText}>{item}</Text>
+          {/* M95: figures inside a point take the section's own tone — greens for strengths, amber for risks. */}
+          <Highlight text={item} style={styles.pointText} tone={tone} />
         </View>
       ))}
     </View>
