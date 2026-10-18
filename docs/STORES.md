@@ -29,8 +29,15 @@ The API server serves its own store-facing pages (`server/src/legal/`, Arabic + 
   (ownership verified by e-mail before any deletion; honeypot + 5/hour per IP).
 
 `GET /api/membership/store` falls back to `<PUBLIC_URL>/legal/terms|privacy` when
-`STORE_TERMS_URL` / `STORE_PRIVACY_URL` are unset. **Store forms should use the PRODUCTION
-server's URLs** once that service exists (section 3), e.g. `https://<prod-domain>/legal/privacy`.
+`STORE_TERMS_URL` / `STORE_PRIVACY_URL` are unset. **Store forms use the PRODUCTION
+server's URLs — verified LIVE (HTTP 200, 2026-10-18) on both services:**
+
+- Privacy policy URL (both stores): `https://club-api-prod-production.up.railway.app/legal/privacy`
+- Terms / EULA URL: `https://club-api-prod-production.up.railway.app/legal/terms`
+- Account deletion URL (Google Play form): `https://club-api-prod-production.up.railway.app/legal/account-deletion`
+
+(The test server serves the same pages. If the owner later attaches a custom domain to the
+production service, update these URLs in both consoles — they are editable any time.)
 
 ## 3. Production environment (prepared, NOT live)
 
@@ -124,30 +131,138 @@ the vcmem.com widget. Note: the hub refuses a duplicate phone across accounts.
 - [ ] Webhook → `https://<prod-domain>/api/webhooks/revenuecat`, Authorization header = production `REVENUECAT_WEBHOOK_AUTH`.
 - [ ] Railway production: `REVENUECAT_PUBLIC_KEY_ANDROID` (`goog_…`), `REVENUECAT_PUBLIC_KEY_IOS` (`appl_…`), optional `REVENUECAT_SECRET_KEY`.
 
-## 6. Data safety / App Privacy — draft answers (must match `/legal/privacy`)
+## 6. Data safety / App Privacy — FINAL answers (match `/legal/privacy`; completed 2026-10-18)
 
 Common facts: data encrypted in transit (HTTPS); account deletion in-app + web page; **no
 ads, no tracking across apps, no third-party analytics SDK**; the M33 analytics id is a
-random app-generated identifier not linked to the account.
+random app-generated identifier not linked to the account; push (FCM) tokens are collected
+to deliver notifications.
 
-### Google Play «Data safety»
-| Category | Collected? | Shared? | Linked? | Purpose |
-|---|---|---|---|---|
-| Personal info → Name, Email, Phone | Yes (required for account) | No | Yes | Account management, App functionality |
-| Financial info → Purchase history | Yes | No | Yes | App functionality (membership + service payments; card details stay with Google Play / Paymob) |
-| Messages → Other in-app messages (advisor chat) | Yes | No | Yes | App functionality |
-| App activity → App interactions (screen views) | Yes | No | **No** (random id) | Analytics |
-| Device or other IDs (the random analytics id) | Yes | No | No | Analytics |
-| Photos/videos (only if the profile/journey upload ships media) | per feature | No | Yes | App functionality |
-- Security practices: data encrypted in transit — Yes; users can request deletion — Yes (in-app + URL).
-- «Data shared»: none (processors acting on our behalf — Paymob, RevenueCat, Expo, the LLM provider — are service providers, not "sharing" in Play's sense).
+### Google Play «Data safety» — question by question
 
-### Apple «App Privacy»
-- Data used to track you: **none**.
-- Data linked to you: Contact Info (name, e-mail, phone), Purchases (purchase history), User Content (advisor messages, form answers), Identifiers (User ID = hub account id).
-- Data not linked to you: Usage Data (product interaction — screen views), Identifiers (the random device id used only for first-party analytics).
+**Overview questions**
+- Does your app collect or share any of the required user data types? → **Yes**
+- Is all of the user data collected by your app encrypted in transit? → **Yes**
+- Do you provide a way for users to request that their data is deleted? → **Yes** →
+  deletion URL = `https://club-api-prod-production.up.railway.app/legal/account-deletion`
 
-## 7. Order of operations
+**Data types** (everything below: Shared = **No**; Collected = Yes; Ephemeral = No;
+«processors acting on our behalf» — Google Play Billing, Paymob, RevenueCat, Expo push, the
+LLM provider — are service providers, not "sharing" in Play's sense):
+
+| Data type | Required/Optional | Purposes |
+|---|---|---|
+| Personal info → **Name** | Required | Account management, App functionality |
+| Personal info → **Email address** | Required | Account management, App functionality |
+| Personal info → **Phone number** | Required | Account management, App functionality |
+| Financial info → **Purchase history** | Optional (only members/buyers) | App functionality (membership + service payments; card details stay with Google Play / Paymob) |
+| Messages → **Other in-app messages** (advisor chat, form answers) | Optional | App functionality |
+| App activity → **App interactions** (opened screen names) | Required | Analytics (first-party only, daily aggregates) |
+| Device or other IDs → **Device or other IDs** (random analytics id + push token) | Required | Analytics (random id, NOT linked to account), App functionality (push token) |
+
+- Account creation: «Username and password» (+ optional Google / Apple sign-in).
+- NOT collected (answer No everywhere else): location, contacts, calendar, photos/videos*,
+  audio, files, health, browsing history, installed apps, SMS/call logs.
+  (*If a future feature uploads member photos, add Photos/videos → App functionality then.)
+
+### Apple «App Privacy» (App Store Connect → App Privacy)
+
+- Data used to **track** you: **none** (no tracking, no ATT prompt needed).
+- Data **linked to you**:
+  - Contact Info → Name, Email Address, Phone Number — App Functionality
+  - Purchases → Purchase History — App Functionality
+  - User Content → Other User Content (advisor messages, form answers) — App Functionality
+  - Identifiers → User ID (hub account id, push token) — App Functionality
+- Data **not linked to you**:
+  - Usage Data → Product Interaction (opened screen names) — Analytics
+  - Identifiers → Device ID (random app-generated id, first-party analytics only) — Analytics
+
+## 7. Store listing copy — FINAL (2026-10-18; sources: M82 canonical definition + HQ copy + docs/membership-copy-2026-10-17.md)
+
+Wording rules applied: «بدون رسوم» never «مجاني», «رصيد», «الشراكات», no prices (the store
+shows the IAP price itself — rule 3), no promised returns, valuation/returns disclaimer included.
+
+### Names (both stores)
+- App name: **Investors Club** (14 chars — fits both 30-char limits)
+- Apple subtitle (≤30 chars): **مجتمع أعمال حصري في الرياض**
+- Google short description (≤80 chars):
+  **مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين — تطبيق واحد ومقر في الرياض**
+
+### Full description — Arabic (primary listing, both stores)
+
+```
+نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض. من السعودية إلى العالم… عضويتك معك أينما كنت؛ فلديك عام كامل تستفيد فيه من جميع مزايا النادي، حضورياً في مقر النادي بمدينة الرياض بالمملكة العربية السعودية، وعبر الإنترنت، وتستكشف المشاريع وفرص الشراكة، لتبني علاقات قد تفتح لك أبوابًا لا يفتحها المال وحده.
+
+ماذا تجد داخل التطبيق؟
+
+• بنك مشاريع يضم أكثر من 260 مشروعًا اجتازت الفحص والتقييم، مع رصيد يفتح لك التفاصيل الكاملة والتواصل المباشر مع المؤسسين لمناقشة فرص الشراكة.
+• المشاريع الذهبية: فرص مختارة يتواصل معها الأعضاء مباشرة دون خصم من الرصيد.
+• مستشار ذكي متاح على مدار الساعة برصيد استخدام يومي متجدد، للاستفسارات والصياغة والتحليل.
+• أحدث الفعاليات: ملتقيات وورش عمل وأمسيات على مدار السنة، تُقام في المقر وتُبث عبر الإنترنت للأعضاء في كل مكان.
+• أخبار مختارة من مصادرها الأصلية، تقرأها من المصدر مباشرة.
+• خدمات المنظومة بخصومات للأعضاء: استوديو بودكاست، تصميم المواقع والتطبيقات، قاعة اجتماعات، خدمات تسويقية، ومنصة «اصنع ملتقاك».
+• مبادرة «شخصية ومسيرة» لتقديم نفسك وخبراتك لأعضاء النادي بدون رسوم.
+
+وحين تصل إلى الرياض، فالنادي بيتك الثاني في عالم الأعمال، ولا داعي لأن تحمل همّ متطلبات عملك الأساسية؛ فقد وفّرنا لك قاعة اجتماعات لاستقبال ضيوفك، ومقرًّا مجهّزًا يتسع لـ80 شخصًا مع منصة متكاملة لاستضافة ملتقياتك وورش عملك الخاصة، و15 مكتبًا للاستخدام المؤقت، واستوديو بودكاست لتصل رسالتك، وحاضنة أعمال تحتضن مشروعك. كلها متاحة لك بصفتك عضوًا، مع خصومات تخفّف تكاليف أعمالك.
+
+العضوية السنوية تُشترى داخل التطبيق كاشتراك سنوي متجدد تلقائيًا، ويمكن إلغاء التجديد في أي وقت من إعدادات المتجر.
+
+المحتوى داخل التطبيق لأغراض التعريف بفرص الشراكة والخدمات، ولا يُعد عرضًا تعاقديًا أو ضمانًا لعوائد.
+```
+
+### Full description — English (secondary locale, optional at first submission)
+
+```
+Investors Club® is an exclusive business community for explorers, entrepreneurs and investors, serving its members through one app and a permanent headquarters in the heart of Riyadh, Saudi Arabia. From Saudi Arabia to the world — your membership travels with you: a full year to enjoy every club benefit, in person at the Riyadh HQ and online, exploring projects and partnership opportunities and building relationships that open doors money alone cannot.
+
+Inside the app:
+
+• A projects bank of 260+ vetted projects, with credit that unlocks full details and direct contact with founders to discuss partnership opportunities.
+• Golden projects: selected opportunities members can contact directly at no credit cost.
+• A smart advisor available around the clock with a daily renewing usage credit.
+• Club events: meetups, workshops and evening sessions all year, held at the HQ and streamed online to members everywhere.
+• Curated news, read straight from the original source.
+• Member discounts on ecosystem services: podcast studio, web and app design, meeting room, marketing services, and the «Host your meetup» stage.
+
+When you arrive in Riyadh, the club is your second home for business: a meeting room for your guests, an 80-seat equipped venue with a full stage for your own meetups and workshops, 15 flexible desks, a podcast studio, and a business incubator — all available to you as a member, with discounts that lower your costs.
+
+The annual membership is purchased in-app as an auto-renewing yearly subscription; renewal can be cancelled any time from your store settings.
+
+In-app content presents partnership opportunities and services; it is not a contractual offer or a guarantee of returns.
+```
+
+### Apple keywords (≤100 chars)
+`نادي المستثمرين,استثمار,ريادة أعمال,شراكات,مشاريع,الرياض,السعودية,business,investors,club`
+
+### Graphics
+- Icon: the club MARK alone (golden «i» roundel, no text) — M82b. 1024×1024 PNG for Apple,
+  512×512 for Play (source: the start-screen mark in `app/assets/`, regenerated ®-free 2026-10-04).
+- Feature graphic (Play, 1024×500) + screenshots: take from the preview build on the owner's
+  phone or the emulator — Arabic UI, at least 4 phone screenshots per store (home, projects
+  bank, project page, membership). Prepare at submission time.
+
+## 8. Reviewer notes (paste as written)
+
+### App Store Connect → App Review Information → Notes
+```
+Investors Club is an Arabic-first (RTL) business-club app for a private members club in Riyadh, Saudi Arabia. Content language is Arabic (an English UI is included).
+
+Sign in with the provided demo account (email + password; no SMS/2FA). The account already holds an ACTIVE annual membership, so all member features are unlocked: projects bank with full project details, smart advisor chat, events, services and the membership card.
+
+The annual membership is an auto-renewing subscription sold via in-app purchase (product: club_membership_annual). Other in-app payments (club services) are real-world services for club members fulfilled at the Riyadh HQ, paid via the Paymob payment gateway, per guideline 3.1.3(e) — they are not digital content.
+
+Account deletion: in-app under Account (حسابي) → delete account, and via the web page listed in the privacy policy.
+```
+
+### Google Play → App access → instructions
+```
+All member functionality requires signing in. Use the provided demo credentials (email + password, no 2FA). The demo account holds an active annual membership, so every member screen is reachable: projects bank (full details), advisor chat, events, services, membership card. The app is Arabic-first (RTL); an English UI is included.
+```
+
+(Credentials themselves: `ceo@vibesholding.com` + the password the owner holds — he types it
+into both consoles; never in git or chat.)
+
+## 9. Order of operations
 
 1. ~~Legal pages in code~~ ✅ this session (deploys with the next push).
 2. Production Railway service + Postgres + hub production site key (owner in browser with Claude).
