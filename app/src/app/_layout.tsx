@@ -18,7 +18,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { MembershipCelebration } from '@/components/wow';
-import { AskAdvisorButton, AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
+import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { ScreenTracker } from '@/components/ScreenTracker';
 import { SyncPoller } from '@/components/SyncPoller';
@@ -146,8 +146,6 @@ export default function RootLayout() {
                 <GlobalTabBar />
               </View>
             </LocaleProvider>
-            {/* One floating «اسأل المستشار» for every screen that registered its context (useAdvisorScreen). */}
-            <AskAdvisorButton />
           </AskAdvisorProvider>
           {/* The app opens for members: a visitor is sent to the gate, and again when his guest week is over. */}
           <GuestGate />

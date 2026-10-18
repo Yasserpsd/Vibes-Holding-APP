@@ -5,6 +5,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { eventOf, useLatestPosts, type Post } from '@/api/posts';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { PaperCard } from '@/components/paper';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
@@ -49,19 +50,18 @@ export function audienceBadge(post: Pick<Post, 'audience'>): string | null {
   return null;
 }
 
-/** One post as a tappable card (home block and the posts list); a pinned post wears a soft golden wash. */
+/**
+ * One post as a tappable card (home block and the posts list). A PINNED management message reads as a
+ * paper sheet pinned to the desk (M85f, owner pick 2026-10-18); the rest keep the dark glass card.
+ */
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
   const thumbnail = thumbnailOf(post);
   const event = eventOf(post);
   const targeted = audienceBadge(post);
-  return (
-    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={radii.lg}>
-      {/* M76 (owner): a post WITH media leads with a big banner image — visual cards, not a wall of text. */}
-      <GlassCard radius={radii.lg} style={[styles.card, thumbnail ? styles.cardMedia : null, post.pinned && styles.cardPinned]}>
-        {post.pinned ? <View pointerEvents="none" style={styles.pinnedWash} /> : null}
-        {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.banner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
-        <View style={[styles.texts, thumbnail ? styles.textsPadded : null]}>
+  const paper = post.pinned;
+  const body = (
+    <View style={[styles.texts, thumbnail && !paper ? styles.textsPadded : null]}>
           {targeted ? (
             <View style={styles.audience}>
               <View style={styles.audienceBadge}>
@@ -71,8 +71,7 @@ export function PostCard({ post }: { post: Post }) {
             </View>
           ) : null}
           <View style={styles.titleRow}>
-            {post.pinned ? <Ionicons name="pin" size={14} color={colors.gold} /> : null}
-            <Text style={styles.title} numberOfLines={2}>
+            <Text style={[styles.title, paper && styles.titlePaper]} numberOfLines={2}>
               {post.title}
             </Text>
           </View>
@@ -82,7 +81,7 @@ export function PostCard({ post }: { post: Post }) {
                 <Ionicons name="calendar" size={12} color={colors.black} />
                 <Text style={styles.eventBadgeText}>{t('posts.eventBadge')}</Text>
               </View>
-              <Text style={styles.eventWhen} numberOfLines={1}>
+              <Text style={[styles.eventWhen, paper && styles.eventWhenPaper]} numberOfLines={1}>
                 {formatEventDate(event.date)}
               </Text>
             </View>
@@ -93,30 +92,45 @@ export function PostCard({ post }: { post: Post }) {
                 <Ionicons name="stats-chart" size={12} color={colors.black} />
                 <Text style={styles.eventBadgeText}>{t('poll.badge')}</Text>
               </View>
-              <Text style={styles.eventWhen} numberOfLines={1}>
+              <Text style={[styles.eventWhen, paper && styles.eventWhenPaper]} numberOfLines={1}>
                 {post.poll?.closed ? t('poll.closedShort') : post.poll?.myVote ? t('poll.votedShort') : t('poll.openShort')}
               </Text>
             </View>
           ) : null}
           {event && (event.place || event.onlineUrl) ? (
             <View style={styles.eventPlace}>
-              <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={colors.goldLight} />
-              <Text style={styles.eventPlaceText} numberOfLines={1}>
+              <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={paper ? colors.paperGold : colors.goldLight} />
+              <Text style={[styles.eventPlaceText, paper && styles.inkSoftPaper]} numberOfLines={1}>
                 {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
               </Text>
             </View>
           ) : null}
           {post.body ? (
-            <Text style={styles.body} numberOfLines={2}>
+            <Text style={[styles.body, paper && styles.inkSoftPaper]} numberOfLines={2}>
               {post.body}
             </Text>
           ) : null}
           <View style={styles.metaRow}>
-            {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
-            {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={colors.goldLight} /> : null}
+            {post.publishedAt ? <Text style={[styles.time, paper && styles.timePaper]}>{formatRelativeTime(post.publishedAt)}</Text> : null}
+            {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={paper ? colors.paperGold : colors.goldLight} /> : null}
           </View>
         </View>
-      </GlassCard>
+  );
+  return (
+    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={paper ? radii.xl : radii.lg}>
+      {paper ? (
+        // The golden pin head and the hair of tilt come from PaperCard itself.
+        <PaperCard pinned style={styles.paperCard}>
+          {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.paperBanner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
+          {body}
+        </PaperCard>
+      ) : (
+        // M76 (owner): a post WITH media leads with a big banner image — visual cards, not a wall of text.
+        <GlassCard radius={radii.lg} style={[styles.card, thumbnail ? styles.cardMedia : null]}>
+          {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.banner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
+          {body}
+        </GlassCard>
+      )}
     </PressScale>
   );
 }
@@ -134,8 +148,13 @@ const styles = StyleSheet.create({
   cardMedia: { flexDirection: 'column', alignItems: 'stretch', padding: 0, gap: 0, overflow: 'hidden' },
   banner: { width: '100%', height: 160, backgroundColor: colors.surfaceElevated },
   textsPadded: { padding: spacing.md },
-  cardPinned: { borderColor: colors.borderGoldSoft },
-  pinnedWash: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, backgroundColor: colors.goldFaint },
+  // M85f: the pinned management message as a paper sheet — ivory card, ink text, photo inside the sheet.
+  paperCard: { padding: spacing.md, gap: spacing.sm },
+  paperBanner: { width: '100%', height: 150, borderRadius: radii.md, backgroundColor: colors.paperBorder },
+  titlePaper: { color: colors.paperInk },
+  inkSoftPaper: { color: colors.paperInkSoft },
+  timePaper: { color: colors.paperMuted },
+  eventWhenPaper: { color: colors.paperGold },
   texts: { flex: 1, gap: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   title: { ...typography.body, flex: 1, color: colors.textPrimary },

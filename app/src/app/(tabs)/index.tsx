@@ -21,6 +21,7 @@ import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
+import { SlotBanner } from '@/components/SlotBanner';
 import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
@@ -281,6 +282,9 @@ export default function HomeScreen() {
           <GoldHairline style={styles.heroDivider} />
         </FadeInView>
       </View>
+
+      {/* M81 extension: the owner's home banner, straight under the hero — shows only when he fills the slot. */}
+      <SlotBanner slot="home.banner" />
 
       {order.map((key) => sections[key]?.() ?? null)}
 
@@ -548,7 +552,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldSoft,
     boxShadow: shadows.glowGoldFaint,
   },
-  quickLabel: { ...typography.caption, fontSize: 10, lineHeight: 15, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center' },
+  // Reserved two-line height: a one-line label keeps its tile as tall as the rest of the row.
+  quickLabel: { ...typography.caption, fontSize: 10, lineHeight: 15, minHeight: 30, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center' },
   // M74-8: the advisor companion card.
   advisorCard: { gap: spacing.sm, padding: spacing.md, marginTop: spacing.sm },
   advisorHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

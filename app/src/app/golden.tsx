@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
+import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { formatMillionsSar } from '@/lib/format';
@@ -37,6 +38,8 @@ export default function GoldenScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
+      {/* M81 extension: the owner's golden banner, above the portfolio hero — shows only when filled. */}
+      <SlotBanner slot="golden.banner" />
       <FadeInView offset={12}>
         <GlassCard golden radius={radii.xl} style={styles.heroCard}>
           <View

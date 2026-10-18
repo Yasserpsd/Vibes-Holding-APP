@@ -21,6 +21,14 @@ const stored = async (kv: KV): Promise<StoredImages> => (await kv.get<StoredImag
 
 const hqKeys = (): string[] => Array.from({ length: HQ_SLOTS }, (_, index) => `hq.${index + 1}`);
 
+/** Screen banners (M81 extension, owner 2026-10-18): a wide image slot per key screen — shown only when filled. */
+const BANNER_SLOTS: { key: string; label: string }[] = [
+  { key: 'home.banner', label: 'بانر الرئيسية (تحت المقدمة)' },
+  { key: 'golden.banner', label: 'بانر الشركات الذهبية' },
+  { key: 'membership.banner', label: 'بانر العضوية' },
+  { key: 'about.banner', label: 'بانر عن النادي' },
+];
+
 /** The catalog the dashboard shows: every slot, labeled in the owner's words, filled or empty. */
 export async function imageSlots(kv: KV): Promise<ImageSlot[]> {
   const [saved, services] = await Promise.all([stored(kv), getServicesContent(kv)]);
@@ -34,7 +42,21 @@ export async function imageSlots(kv: KV): Promise<ImageSlot[]> {
     const key = `service.${service.key}`;
     slots.push({ key, label: service.title, group: 'الخدمات (صورة أعلى صفحة الخدمة)', url: saved[key] ?? null });
   }
+  for (const banner of BANNER_SLOTS) {
+    slots.push({ ...banner, group: 'بانرات الشاشات (تظهر فقط عند رفع صورة)', url: saved[banner.key] ?? null });
+  }
   return slots;
+}
+
+/** The filled screen banners, key → url, served publicly at `GET /api/images`. */
+export async function bannerImages(kv: KV): Promise<Record<string, string>> {
+  const saved = await stored(kv);
+  const banners: Record<string, string> = {};
+  for (const banner of BANNER_SLOTS) {
+    const url = saved[banner.key];
+    if (url) banners[banner.key] = url;
+  }
+  return banners;
 }
 
 /** Saves one slot (`url: null` clears it). Refuses a key outside the catalog. */

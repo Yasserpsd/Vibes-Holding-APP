@@ -16,7 +16,7 @@ import { getGoldenContent } from './golden.js';
 import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
 import { getMembershipContent } from './membership.js';
-import { imageSlots, saveImage, serviceImages } from './images.js';
+import { bannerImages, imageSlots, saveImage, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
 export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService };
@@ -109,6 +109,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       return { ok: true };
     }),
   );
+  // M81 extension: the owner-filled screen banners (home/golden/membership/about), empty keys left out.
+  app.get('/api/images', async () => ({ images: await bannerImages(kv) }));
   app.get('/api/membership', async (request) => getMembershipContent(kv, langOf(request)));
   app.get('/api/home', async (request) => getHomeContent(kv, langOf(request)));
   app.get('/api/about', async (request) => getAboutContent(kv, langOf(request)));

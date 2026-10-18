@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -53,6 +54,9 @@ export function GlobalTabBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const badges = useTabBadges();
+  // The advisor dock opens the conversation knowing which detail page the member is on.
+  const ask = useAskAdvisor();
+  const advisorContext = useCurrentAdvisorContext();
   if (TAB_PATHS.has(pathname) || HIDDEN.some((prefix) => pathname.startsWith(prefix))) return null;
   const active = sectionOf(pathname);
   const badgeOf = (key: string): number =>
@@ -60,6 +64,20 @@ export function GlobalTabBar() {
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
       {TABS.map((tab) => {
+        if (tab.key === 'advisor') {
+          // Owner (2026-10-18): the raised golden circle in the middle — same dock as the (tabs) bar.
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => (advisorContext ? ask(advisorContext) : router.navigate(tab.path))}
+              accessibilityRole="button"
+              accessibilityLabel={t(tab.title)}
+              style={styles.item}
+            >
+              <AdvisorDockButton />
+            </Pressable>
+          );
+        }
         const current = tab.key === active;
         const count = badgeOf(tab.key);
         return (

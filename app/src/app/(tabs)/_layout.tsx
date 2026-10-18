@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Animated, StyleSheet, View, type ColorValue } from 'react-native';
 
+import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
 import { PopIn } from '@/components/motion';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
@@ -52,6 +53,9 @@ function TabIcon({ name, color, size, focused }: { name: IoniconName; color: Col
 export default function TabsLayout() {
   // M75: «+N» on the tabs — fresh things since this device last looked.
   const badges = useTabBadges();
+  // The advisor dock opens the conversation knowing what the member was looking at (the old FAB's brain).
+  const ask = useAskAdvisor();
+  const advisorContext = useCurrentAdvisorContext();
   const badgeOf = (name: string): number =>
     name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : name === 'index' ? badges.home : name === 'account' ? badges.account : 0;
   return (
@@ -71,26 +75,48 @@ export default function TabsLayout() {
           borderTopColor: colors.borderGoldSoft,
           borderTopStartRadius: radii.xxl,
           borderTopEndRadius: radii.xxl,
+          // No overflow:'hidden': the advisor dock's crown rises above the bar's top edge
+          // (the twin GlobalTabBar already renders these corners fine without it).
           boxShadow: shadows.lift,
-          overflow: 'hidden',
         },
         tabBarLabelStyle: typography.tabLabel,
       }}
     >
-      {TABS.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            title: t(tab.title),
-            tabBarIcon: ({ color, focused, size }) => (
-              <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
-            ),
-            tabBarBadge: badgeOf(tab.name) > 0 ? (badgeOf(tab.name) > 9 ? '+9' : `+${badgeOf(tab.name)}`) : undefined,
-            tabBarBadgeStyle: styles.badge,
-          }}
-        />
-      ))}
+      {TABS.map((tab) =>
+        tab.name === 'advisor' ? (
+          // Owner (2026-10-18): the advisor is THE raised golden circle in the middle of the bar — no label.
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              title: t(tab.title),
+              tabBarIcon: ({ focused }) => <AdvisorDockButton focused={focused} />,
+              tabBarLabel: () => null,
+            }}
+            listeners={{
+              tabPress: (event) => {
+                // With a registered screen context, the dock opens the advisor already briefed on it.
+                if (!advisorContext) return;
+                event.preventDefault();
+                ask(advisorContext);
+              },
+            }}
+          />
+        ) : (
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              title: t(tab.title),
+              tabBarIcon: ({ color, focused, size }) => (
+                <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
+              ),
+              tabBarBadge: badgeOf(tab.name) > 0 ? (badgeOf(tab.name) > 9 ? '+9' : `+${badgeOf(tab.name)}`) : undefined,
+              tabBarBadgeStyle: styles.badge,
+            }}
+          />
+        ),
+      )}
     </Tabs>
   );
 }

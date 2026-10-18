@@ -56,7 +56,8 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.black },
   flex: { flex: 1 },
-  content: { padding: spacing.lg, gap: spacing.md },
+  // M85c density: tighter side gutters give the content the width the owner asked for.
+  content: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md },
   heading: { gap: spacing.xs, marginBottom: spacing.sm },
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: textStart },

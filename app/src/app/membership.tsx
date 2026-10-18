@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
+import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { StorePurchaseCard } from '@/components/StorePurchaseCard';
 import { t } from '@/i18n';
@@ -45,6 +46,8 @@ export default function MembershipScreen() {
 
   return (
     <Screen title={data.title} subtitle={data.subtitle} watermark>
+      {/* M81 extension: the owner's membership banner — shows only when he fills the slot. */}
+      <SlotBanner slot="membership.banner" />
       <FadeInView delay={entranceDelay(0)}>
         <Text style={styles.intro}>{data.intro}</Text>
       </FadeInView>

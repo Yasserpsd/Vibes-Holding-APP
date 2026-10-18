@@ -8,6 +8,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, Floating, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
+import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
@@ -47,6 +48,9 @@ export default function AboutScreen() {
         <Text style={styles.title}>{data.title}</Text>
         <Text style={styles.intro}>{data.intro}</Text>
       </FadeInView>
+
+      {/* M81 extension: the owner's about banner — shows only when he fills the slot. */}
+      <SlotBanner slot="about.banner" />
 
       {data.sections.map((section, index) => (
         <FadeInView key={section.key} delay={entranceDelay(index + 1, 80)}>

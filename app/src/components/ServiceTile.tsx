@@ -49,11 +49,10 @@ export function ServiceTile({ service, onPress }: Props) {
         <Text style={[styles.summary, locked && styles.lockedText]} numberOfLines={2}>
           {service.summary}
         </Text>
-        {service.memberLabel || service.priceLabel ? (
-          <Text style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
-            {service.memberLabel ?? service.priceLabel}
-          </Text>
-        ) : null}
+        {/* Always rendered: the reserved line keeps every tile in the grid the same height. */}
+        <Text style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
+          {service.memberLabel ?? service.priceLabel ?? ''}
+        </Text>
       </View>
     </PressScale>
   );
@@ -62,8 +61,11 @@ export function ServiceTile({ service, onPress }: Props) {
 /** The grid container: two tiles per row with an even gutter. */
 export const serviceGridStyle = { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm } as const;
 
-/** The grid CHILD (the FadeInView around a tile): basis + grow halve the row whatever the width. */
-export const serviceTileWrapStyle = { flexBasis: '47%' as const, flexGrow: 1 };
+/**
+ * The grid CHILD (the FadeInView around a tile): basis + grow halve the row whatever the width.
+ * The cap keeps a lone last tile at half width instead of stretching across the whole row.
+ */
+export const serviceTileWrapStyle = { flexBasis: '47%' as const, flexGrow: 1, maxWidth: '50%' as const };
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
@@ -97,8 +99,9 @@ const styles = StyleSheet.create({
   },
   lockPill: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.paperBorder },
   pillText: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 15 },
-  title: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: colors.paperInk, textAlign: textStart },
-  summary: { ...typography.caption, fontSize: 11, lineHeight: 17, color: colors.paperInkSoft, textAlign: textStart },
-  meta: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.paperGold, textAlign: textStart },
+  // Reserved two-line heights: a short title or summary keeps the tile as tall as its neighbors.
+  title: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, minHeight: 42, color: colors.paperInk, textAlign: textStart },
+  summary: { ...typography.caption, fontSize: 11, lineHeight: 17, minHeight: 34, color: colors.paperInkSoft, textAlign: textStart },
+  meta: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.paperGold, textAlign: textStart },
   lockedText: { opacity: 0.75 },
 });
