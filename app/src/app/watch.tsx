@@ -2,11 +2,9 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '@/components/AppButton';
 import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { openLink } from '@/lib/openLink';
 import { loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -15,8 +13,8 @@ type VideoModule = typeof import('expo-video');
 /**
  * M19 («أي فيديو يتم فتحه داخل التطبيق… مش محتاج تطلع برا الأبلكيشن أبدًا»): one player screen.
  * YouTube plays in YouTube's own embedded player (its terms) inside a WebView; an uploaded post
- * video plays in expo-video. On a binary without the native modules the screen offers the in-app
- * browser instead — lib/player.ts normally keeps old binaries away from here altogether.
+ * video plays in expo-video. On a binary without the native modules the screen shows the
+ * update message — nothing here ever opens outside the app (M93, owner).
  */
 export default function WatchScreen() {
   const params = useLocalSearchParams<{ url?: string; yt?: string; title?: string; poster?: string }>();
@@ -27,16 +25,21 @@ export default function WatchScreen() {
   const webview = useMemo(() => loadWebView(), []);
   const video = useMemo(() => loadVideo(), []);
 
-  const embedUrl = youtubeId
-    ? `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0&modestbranding=1`
+  // Error 153: YouTube rejects an embed URL loaded directly (no Referer). The embed must sit in an
+  // iframe inside a page with a real origin — baseUrl supplies it (M93).
+  const embedHtml = youtubeId
+    ? `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">` +
+      `<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head>` +
+      `<body><iframe src="https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0&modestbranding=1" ` +
+      `allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe></body></html>`
     : null;
 
   let player = null;
-  if (embedUrl && webview) {
+  if (embedHtml && webview) {
     const WebView = webview.WebView;
     player = (
       <WebView
-        source={{ uri: embedUrl }}
+        source={{ html: embedHtml, baseUrl: 'https://www.vcmem.com' }}
         style={styles.web}
         containerStyle={styles.webContainer}
         allowsFullscreenVideo
@@ -45,6 +48,13 @@ export default function WatchScreen() {
         setSupportMultipleWindows={false}
         startInLoadingState
         renderLoading={() => <LoadingGhost />}
+        // «مش عايز أي حد يخرج من الأبلكيشن نهائي»: intent/vnd.youtube links would open the
+        // YouTube app and YouTube site pages (watch, channel) would replace the player; both
+        // are blocked — the embed and anything it needs (consent, static) load freely.
+        onShouldStartLoadWithRequest={(request) =>
+          /^(https?:|about:blank)/.test(request.url) &&
+          !/youtube\.com\/(watch|channel\/|results|@)|youtu\.be\//.test(request.url)
+        }
       />
     );
   } else if (!youtubeId && url && video) {
@@ -65,15 +75,6 @@ export default function WatchScreen() {
         {title ? (
           <FadeInView delay={40}>
             <Text style={styles.title}>{title}</Text>
-          </FadeInView>
-        ) : null}
-        {youtubeId ? (
-          <FadeInView delay={110}>
-            <AppButton label={t('watch.openYoutube')} variant="outline" icon="logo-youtube" onPress={() => void openLink(url || `https://www.youtube.com/watch?v=${youtubeId}`)} />
-          </FadeInView>
-        ) : url && !player ? (
-          <FadeInView delay={110}>
-            <AppButton label={t('watch.openBrowser')} variant="outline" icon="open-outline" onPress={() => void openLink(url)} />
           </FadeInView>
         ) : null}
       </ScrollView>

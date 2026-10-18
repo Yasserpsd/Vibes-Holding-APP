@@ -2,13 +2,12 @@ import { requireOptionalNativeModule } from 'expo';
 import type { useRouter } from 'expo-router';
 import { NativeModules, TurboModuleRegistry } from 'react-native';
 
-import { openLink } from '@/lib/openLink';
-
 /**
  * M19 («أي فيديو يتم فتحه داخل التطبيق»): YouTube plays in YouTube's own embedded player inside a
  * WebView (its terms), uploaded files play in expo-video. Both are native modules, so binaries built
  * before M19 do not contain them: the native registry is checked before any require — exactly like
- * auth/social.ts — and an OTA update on an old binary simply keeps the in-app browser behaviour.
+ * auth/social.ts. M93 (owner): «مش عايز أي حد يخرج من الأبلكيشن نهائي» — a video never opens outside
+ * the app, so a binary without the modules shows the update message on the watch screen instead.
  */
 
 type WebViewModule = typeof import('react-native-webview');
@@ -60,23 +59,18 @@ export function youtubeIdOf(url: string): string | null {
 }
 
 export type PlayRequest = {
-  /** The page or file to open when in-app playback is not possible (and the analytics name of the video). */
+  /** The video page or file URL (and the analytics name of the video). */
   url: string;
   title?: string | null;
   poster?: string | null;
 };
 
 /**
- * Opens the video inside the app (the «مشاهدة» screen) whenever this binary can play it;
- * an old binary falls back to the in-app browser, exactly as before M19.
+ * Opens the video inside the app (the «مشاهدة» screen), always. A binary without the player
+ * modules shows the update message there — never the browser (M93, owner).
  */
 export function playVideo(router: Router, request: PlayRequest): void {
   const youtubeId = youtubeIdOf(request.url);
-  const canPlay = youtubeId ? loadWebView() !== null : loadVideo() !== null;
-  if (!canPlay) {
-    void openLink(request.url);
-    return;
-  }
   router.push({
     pathname: '/watch',
     params: {
