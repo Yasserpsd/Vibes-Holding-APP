@@ -1,5 +1,5 @@
 import { useRouter, type Href } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAgenda, type AgendaEvent } from '@/api/agenda';
 import { EventDateBadge } from '@/app/agenda/index';
@@ -8,6 +8,7 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FlipCountdown } from '@/components/wow';
 import { t } from '@/i18n';
+import { formatDayCount } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 168;
@@ -47,10 +48,22 @@ export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
 
 /** The nearest event wears the golden card; a paid seat shows as a small lit pill. */
 function MiniEvent({ event, nearest, onPress }: { event: AgendaEvent; nearest: boolean; onPress: () => void }) {
+  // Owner (2026-10-18): the card leads with the workshop's photo, and a multi-day workshop says so.
+  const days = event.dates?.length ?? 1;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={event.title}>
       <GlassCard golden={nearest} radius={radii.lg} style={styles.card}>
-        <EventDateBadge date={event.date} size="sm" />
+        {event.imageUrl ? <Image source={{ uri: event.imageUrl }} style={styles.photo} resizeMode="cover" accessibilityLabel={event.title} /> : null}
+        <View style={styles.dateRow}>
+          <EventDateBadge date={event.date} size="sm" />
+          {days > 1 ? (
+            <View style={styles.daysPill}>
+              <Text style={styles.daysPillText} numberOfLines={1}>
+                {formatDayCount(days)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
         </Text>
@@ -76,8 +89,20 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     alignItems: 'center',
     gap: spacing.sm,
-    padding: spacing.md,
+    padding: spacing.sm + 4,
   },
+  // The workshop's photo leads the card; the width matches the card's inner width.
+  photo: { width: CARD_WIDTH - 2 * (spacing.sm + 4), height: 80, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  daysPill: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+  },
+  daysPillText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldLight },
   title: { ...typography.body, color: colors.textPrimary, textAlign: 'center' },
   meta: { ...typography.caption, color: colors.gold, textAlign: 'center' },
   pill: {

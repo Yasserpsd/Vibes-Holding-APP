@@ -48,6 +48,12 @@ export function formatEventDays(dates: string[] | undefined, date: string): stri
   return days.map(formatArabicDate).join(en ? ', ' : '، ');
 }
 
+/** The multi-day pill on event cards: «يومان»، «3 أيام» (EN: "2 days"). */
+export function formatDayCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 day' : `${count} days`;
+  return arabicCount(count, 'يوم', 'يومان', 'أيام');
+}
+
 /** Arabic counted noun: singular and dual without a numeral (ساعة، ساعتين), 3 to 10 with the plural (5 ساعات), 11 and up with the singular (15 ساعة). */
 function arabicCount(count: number, singular: string, dual: string, plural: string): string {
   if (count === 1) return singular;

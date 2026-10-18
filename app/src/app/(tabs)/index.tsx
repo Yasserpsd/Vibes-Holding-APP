@@ -5,13 +5,12 @@ import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react
 
 import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { usePartners, type Partner } from '@/api/partners';
-import { useGolden } from '@/api/queries';
-import type { GoldenCompany, GoldenContent } from '@/api/types';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AgendaBlock } from '@/components/AgendaBlock';
+import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
@@ -42,14 +41,14 @@ const MINI_LOGO = 72;
 const VIDEO_WIDTH = 240;
 
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
-// The membership block left the home page for good (owner, 2026-10-17); a server order naming it is skipped.
-const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'portals', 'golden', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
+// The membership block left the home page for good (owner, 2026-10-17), and the golden strip followed it
+// (owner, 2026-10-18) — «جولة في النادي» stands in its place; a server order naming either is skipped.
+const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'portals', 'tour', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
 
 export default function HomeScreen() {
   const router = useRouter();
   const { status, me } = useAuth();
   const home = useHomeContent();
-  const golden = useGolden();
   const services = useServices();
   const videos = useVideos();
   const partners = usePartners();
@@ -67,7 +66,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([home.refetch(), golden.refetch(), services.refetch(), videos.refetch(), partners.refetch(), latestPosts.refetch()]);
+    await Promise.all([home.refetch(), services.refetch(), videos.refetch(), partners.refetch(), latestPosts.refetch()]);
     setRefreshing(false);
   };
 
@@ -178,17 +177,9 @@ export default function HomeScreen() {
           <SavingsCard block={content.savings} onPress={() => pushRoute(ctaOf('savings')?.route ?? '/membership')} />
         </FadeInView>
       ) : null,
-    golden: () => (
-      <FadeInView key="golden" delay={220}>
-        <SectionHeader
-          title={content.golden.title}
-          subtitle={content.golden.subtitle}
-          cta={ctaOf('golden')?.label ?? content.golden.cta}
-          onPress={() => pushRoute(ctaOf('golden')?.route ?? '/golden')}
-        />
-        {golden.data ? <GoldenStrip content={golden.data} onPress={() => router.push('/golden')} /> : null}
-      </FadeInView>
-    ),
+    // Owner (2026-10-18): the golden strip left the home («ملهاش اي داعي» — it lives inside بنك المشاريع);
+    // the REAL HQ photos stand in its spot.
+    tour: () => <ClubTourStrip key="tour" />,
     services: () => (
       <FadeInView key="services" delay={320}>
         <SectionHeader
@@ -441,42 +432,6 @@ function PartnersPlusCard({ onPress }: { onPress: () => void }) {
   );
 }
 
-function GoldenStrip({ content, onPress }: { content: GoldenContent; onPress: () => void }) {
-  const companies = [content.umbrella, ...content.companies];
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.strip}
-      snapToInterval={MINI_WIDTH + spacing.sm}
-      decelerationRate="fast"
-    >
-      {companies.map((company, index) => (
-        <FadeInView key={company.code} delay={entranceDelay(index)}>
-          <GoldenMini company={company} onPress={onPress} />
-        </FadeInView>
-      ))}
-    </ScrollView>
-  );
-}
-
-function GoldenMini({ company, onPress }: { company: GoldenCompany; onPress: () => void }) {
-  return (
-    <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityLabel={company.name}>
-      <GlassCard golden radius={radii.lg} style={styles.mini}>
-        {/* No Sheen here: a dozen minis would run a dozen loops; the golden GlassCard carries the premium read. */}
-        <View style={styles.miniLogoBox}>
-          <Image source={{ uri: company.logoUrl }} style={styles.miniLogo} resizeMode="contain" accessibilityLabel={company.name} />
-        </View>
-        <Text style={styles.miniName} numberOfLines={2}>
-          {company.name}
-        </Text>
-        <Text style={styles.miniCode}>{company.code}</Text>
-      </GlassCard>
-    </PressScale>
-  );
-}
-
 /** A partner on the home strip: the logo and the name; the card opens the partners page. */
 function PartnerMini({ partner, onPress }: { partner: Partner; onPress: () => void }) {
   return (
@@ -663,7 +618,6 @@ const styles = StyleSheet.create({
   miniLogo: { width: '100%', height: '100%' },
   miniLogoFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   miniName: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: 'center', minHeight: 40 },
-  miniCode: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.gold },
   footerLinks: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   footerLinkWrap: { flex: 1 },
   footerLink: {

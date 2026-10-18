@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { useAgenda, type AgendaEvent } from '@/api/agenda';
 import { GlassCard } from '@/components/lux';
@@ -59,6 +59,8 @@ function EventCard({ event, highlight, onPress }: { event: AgendaEvent; highligh
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
       <GlassCard golden={highlight} style={[styles.card, past && styles.pastCard]}>
         <EventDateBadge date={event.date} highlight={highlight} />
+        {/* Owner (2026-10-18): the workshop's photo on the list card too, not only inside the page. */}
+        {event.imageUrl ? <Image source={{ uri: event.imageUrl }} style={styles.thumb} resizeMode="cover" accessibilityLabel={event.title} /> : null}
         <View style={styles.cardBody}>
           <Text style={styles.title} numberOfLines={2}>
             {event.title}
@@ -94,6 +96,7 @@ const styles = StyleSheet.create({
   },
   // M77: the faded look of a finished event.
   pastCard: { opacity: 0.45 },
+  thumb: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
   cardBody: { flex: 1, gap: 4 },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

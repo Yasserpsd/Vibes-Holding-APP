@@ -33,7 +33,8 @@ export type HomeSectionKey =
   | 'videos'
   | 'advisor'
   | 'podcast'
-  | 'savings';
+  | 'savings'
+  | 'tour';
 
 /** M74: how the home reads for one persona (or a guest). */
 export type HomePersonaVariant = {
