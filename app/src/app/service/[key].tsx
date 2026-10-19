@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
@@ -16,6 +16,7 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -87,10 +88,10 @@ export default function ServiceScreen() {
 
   return (
     <Screen>
-      {/* M81: the owner's photo of this service (the studio, the theatre…) leads the page. */}
-      {service.imageUrl ? (
+      {/* M81 + M105: the owner's photos of this service lead the page — several rotate on their own. */}
+      {service.imageUrls?.length || service.imageUrl ? (
         <FadeInView delay={entranceDelay(0)}>
-          <Image source={{ uri: service.imageUrl }} style={styles.heroImage} resizeMode="cover" accessibilityLabel={service.title} />
+          <RotatingBanner urls={service.imageUrls?.length ? service.imageUrls : [service.imageUrl as string]} accessibilityLabel={service.title} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(0)}>
@@ -267,7 +268,6 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
 
 const styles = StyleSheet.create({
   // M81: the service's real photo, big on top.
-  heroImage: { width: '100%', height: 170, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconBox: {
     width: 60,

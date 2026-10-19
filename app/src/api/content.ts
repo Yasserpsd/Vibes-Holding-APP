@@ -117,6 +117,8 @@ export type Service = {
   cta?: string;
   /** M81: the owner's photo for this service, shown atop its page; an older server sends none. */
   imageUrl?: string | null;
+  /** M105: the service page's rotating banner photos, slot order; an older server sends none. */
+  imageUrls?: string[];
 };
 
 export type ServicesList = {

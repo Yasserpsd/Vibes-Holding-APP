@@ -16,7 +16,7 @@ import { getGoldenContent } from './golden.js';
 import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
 import { getMembershipContent } from './membership.js';
-import { bannerImages, imageSlots, saveImage, serviceImages } from './images.js';
+import { bannerImages, imageSlots, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
 export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService };
@@ -121,9 +121,11 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
     guard(async (request) => {
       const who = await whoIs(request);
       const list = publicServices(await getServicesContent(kv, langOf(request)), who?.me ?? null);
-      // M81: the owner's uploaded service photos ride on the services the app already reads.
+      // M81 + M105: the owner's uploaded service photos ride on the services the app already reads —
+      // `imageUrl` stays the first photo (older apps), `imageUrls` carries the whole rotating banner.
       const images = await serviceImages(kv);
-      return { ...list, services: list.services.map((service) => ({ ...service, imageUrl: images[service.key] ?? null })) };
+      const galleries = await serviceGalleries(kv);
+      return { ...list, services: list.services.map((service) => ({ ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] })) };
     }),
   );
 
@@ -137,7 +139,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       const service = list.services.find((entry) => entry.key === key);
       if (!service) return reply.code(404).send({ error: { code: 'not_found', message: 'الخدمة غير موجودة' } });
       const images = await serviceImages(kv);
-      return { service: { ...service, imageUrl: images[service.key] ?? null }, lockedText: list.lockedText, isMember: list.isMember };
+      const galleries = await serviceGalleries(kv);
+      return { service: { ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] }, lockedText: list.lockedText, isMember: list.isMember };
     }),
   );
 

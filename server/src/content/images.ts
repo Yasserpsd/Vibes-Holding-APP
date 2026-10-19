@@ -15,6 +15,9 @@ export const IMAGES_KEY = 'content:images';
 /** The HQ gallery: up to this many photos, shown in slot order on the HQ screen. */
 const HQ_SLOTS = 6;
 
+/** M105 (owner, 2026-10-19): every service page carries an auto-rotating banner — up to this many photos. */
+const SERVICE_SLOTS = 6;
+
 type StoredImages = Record<string, string>;
 
 const stored = async (kv: KV): Promise<StoredImages> => (await kv.get<StoredImages>(IMAGES_KEY)) ?? {};
@@ -39,8 +42,16 @@ export async function imageSlots(kv: KV): Promise<ImageSlot[]> {
     url: saved[key] ?? null,
   }));
   for (const service of [...services.services].sort((a, b) => a.order - b.order)) {
-    const key = `service.${service.key}`;
-    slots.push({ key, label: service.title, group: 'الخدمات (صورة أعلى صفحة الخدمة)', url: saved[key] ?? null });
+    // M105: slot 1 keeps its historic key (older uploads stay); slots 2..N extend the rotating banner.
+    for (let index = 1; index <= SERVICE_SLOTS; index += 1) {
+      const key = index === 1 ? `service.${service.key}` : `service.${service.key}.${index}`;
+      slots.push({
+        key,
+        label: index === 1 ? service.title : `${service.title} — صورة ${index}`,
+        group: 'الخدمات (بانر متحرك أعلى صفحة الخدمة)',
+        url: saved[key] ?? null,
+      });
+    }
   }
   for (const banner of BANNER_SLOTS) {
     slots.push({ ...banner, group: 'بانرات الشاشات (تظهر فقط عند رفع صورة)', url: saved[banner.key] ?? null });
@@ -79,12 +90,32 @@ export async function hqPhotos(kv: KV): Promise<string[]> {
     .filter((url): url is string => Boolean(url));
 }
 
-/** service key → uploaded image url, for overlaying onto the public services. */
+/** service key → uploaded image url (the banner's FIRST photo), for overlaying onto the public services. */
 export async function serviceImages(kv: KV): Promise<Record<string, string>> {
-  const saved = await stored(kv);
+  const galleries = await serviceGalleries(kv);
   const byService: Record<string, string> = {};
-  for (const [key, url] of Object.entries(saved)) {
-    if (key.startsWith('service.')) byService[key.slice('service.'.length)] = url;
+  for (const [key, urls] of Object.entries(galleries)) {
+    const first = urls[0];
+    if (first) byService[key] = first;
   }
   return byService;
+}
+
+/** M105: service key → every uploaded banner photo in slot order (filled slots only). */
+export async function serviceGalleries(kv: KV): Promise<Record<string, string[]>> {
+  const saved = await stored(kv);
+  const byService: Record<string, string[]> = {};
+  for (const [key, url] of Object.entries(saved)) {
+    if (!key.startsWith('service.')) continue;
+    const rest = key.slice('service.'.length);
+    const match = /^(.+?)\.(\d+)$/.exec(rest);
+    const service = match ? (match[1] as string) : rest;
+    const order = match ? Number(match[2]) : 1;
+    (byService[service] ??= []).push(`${String(order).padStart(2, '0')}:${url}`);
+  }
+  const out: Record<string, string[]> = {};
+  for (const [service, tagged] of Object.entries(byService)) {
+    out[service] = tagged.sort().map((entry) => entry.slice(entry.indexOf(':') + 1));
+  }
+  return out;
 }
