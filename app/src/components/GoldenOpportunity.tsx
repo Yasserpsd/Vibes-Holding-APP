@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { HomeContent } from '@/api/content';
@@ -31,7 +31,11 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
   const list = useProjectsList({ q: '', sort: 'discover' });
   const page = list.data?.pages[0];
   const project = useMemo(() => pick(page?.items ?? [], OPEN_SEED), [page]);
+  // M102 (owner): «الصورة بتفضل فاضية» — a broken image URL must never leave a dark hole: the club
+  // emblem steps in on a golden wash.
+  const [imageBroken, setImageBroken] = useState(false);
   if (!project) return null;
+  const showImage = Boolean(project.image) && !imageBroken;
 
   return (
     <View>
@@ -44,9 +48,13 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
         accessibilityLabel={`${block.title} — ${project.title}`}
       >
         <View style={styles.card}>
-          {project.image ? (
-            <Image source={{ uri: project.image }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={project.title} />
-          ) : null}
+          {showImage ? (
+            <Image source={{ uri: project.image ?? undefined }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={project.title} onError={() => setImageBroken(true)} />
+          ) : (
+            <View style={styles.fallback} pointerEvents="none">
+              <Image source={require('../../assets/images/club-emblem.png')} style={styles.fallbackEmblem} resizeMode="contain" />
+            </View>
+          )}
           <View style={styles.scrim} pointerEvents="none" />
           <GoldSweep radius={radii.xl} />
           <View style={styles.body}>
@@ -91,6 +99,17 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
+  fallback: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    experimental_backgroundImage: gradients.goldWash,
+  },
+  fallbackEmblem: { width: 110, height: 110, opacity: 0.5 },
   body: { padding: spacing.md, gap: spacing.xs },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   pill: {

@@ -892,8 +892,6 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "inbox.kind.person": "شخصية ومسيرة",
     "gate.subscribe": "اشترك في العضوية الآن",
     "membership.registerAndPay": "سجّل وادفع الآن",
-    "home.storyMore": "اقرأ المزيد عن النادي",
-    "home.storyLess": "إخفاء",
     "home.moreServices": "اضغط للمزيد — باقي الخدمات",
     "home.lessServices": "إخفاء باقي الخدمات",
     "persona.title": "تغيير التوجه",
@@ -928,7 +926,9 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.voiceStop": "إيقاف التسجيل",
     "advisor.voiceNoPermission": "اسمح للتطبيق باستخدام الميكروفون من إعدادات الجهاز أولًا.",
     "advisor.voiceEmpty": "لم نلتقط كلامًا واضحًا، حاول مرة أخرى.",
-    "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى."
+    "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى.",
+    "home.appPublish": "انشر تطبيقك بدون رسوم",
+    "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store"
   },
   "en": {
     "tabs.home": "Home",
@@ -1822,8 +1822,6 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "inbox.kind.person": "Profile & Journey",
     "gate.subscribe": "Subscribe now",
     "membership.registerAndPay": "Register and pay now",
-    "home.storyMore": "Read more about the club",
-    "home.storyLess": "Hide",
     "home.moreServices": "Tap for more — the rest of the services",
     "home.lessServices": "Hide the extra services",
     "persona.title": "Change my direction",
@@ -1858,7 +1856,9 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.voiceStop": "Stop recording",
     "advisor.voiceNoPermission": "Allow the app to use the microphone in the device settings first.",
     "advisor.voiceEmpty": "We could not catch clear speech; try again.",
-    "advisor.voiceFailed": "The recording could not be read; try again."
+    "advisor.voiceFailed": "The recording could not be read; try again.",
+    "home.appPublish": "Publish your app, no fees",
+    "home.appPublishHint": "The club publishes your app on Google Play and the App Store"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
+import { useHq } from '@/api/hq';
 import { usePartners, type Partner } from '@/api/partners';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
@@ -12,7 +13,7 @@ import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AgendaBlock } from '@/components/AgendaBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { IntroVideoPopup } from '@/components/IntroVideo';
-import { GlassCard, GoldGradient, GoldHairline, NeonPulse } from '@/components/lux';
+import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
 import { PersonaSwitchCard } from '@/components/PersonaSwitchCard';
@@ -28,12 +29,10 @@ import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
-import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
-import { GoldDust } from '@/components/wow';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
 const clubEmblem = require('../../../assets/images/club-emblem.png');
@@ -42,8 +41,6 @@ const clubEmblem = require('../../../assets/images/club-emblem.png');
 const MINI_WIDTH = 124;
 const MINI_LOGO = 72;
 const VIDEO_WIDTH = 240;
-// M102: remembers that the member collapsed the opening story.
-const STORY_KEY = 'investorsclub.storyCollapsed';
 
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
 // The membership block left the home page for good (owner, 2026-10-17), and the golden strip followed it
@@ -60,30 +57,8 @@ export default function HomeScreen() {
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const [refreshing, setRefreshing] = useState(false);
-  // M102: the owner's opening text shows OPEN by default; a member who collapses it stays collapsed.
-  const [storyOpen, setStoryOpen] = useState(true);
+  // M102: the entrepreneur's collapsed services grid.
   const [gridOpen, setGridOpen] = useState(false);
-  // The decorative layers mount a beat after first paint, so the opening feels light.
-  const [dressed, setDressed] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setDressed(true), 900);
-    return () => clearTimeout(timer);
-  }, []);
-  useEffect(() => {
-    let alive = true;
-    void loadSetting(STORY_KEY).then((collapsed) => {
-      if (alive && collapsed === '1') setStoryOpen(false);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-  const toggleStory = () => {
-    setStoryOpen((open) => {
-      void saveSetting(STORY_KEY, open ? '1' : '');
-      return !open;
-    });
-  };
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -155,18 +130,17 @@ export default function HomeScreen() {
     return at === -1 ? leadKeys.length : at;
   };
   const orderedServices = leadKeys.length ? [...allServices].sort((a, b) => leadRank(a.key) - leadRank(b.key)) : allServices;
-  // M102 (owner): the entrepreneur's home shows only HIS two doors — شركاء النجاح (the «+» card)
-  // and نشر تطبيقه بدون رسوم — and the rest of the grid waits behind «اضغط للمزيد».
-  const entrepreneurLead = orderedServices.filter((service) => service.key === 'app-publish');
+  // M102 (owner): the entrepreneur's home shows only HIS two doors — شركاء النجاح and نشر تطبيقه،
+  // TWIN gold cards — and the rest of the grid waits behind a loud «اضغط للمزيد».
   const teaser =
     personaKey === 'entrepreneur'
-      ? gridOpen || entrepreneurLead.length === 0
-        ? orderedServices
-        : entrepreneurLead
+      ? gridOpen
+        ? orderedServices.filter((service) => service.key !== 'app-publish')
+        : []
       : personaKey === 'guest'
         ? orderedServices
         : orderedServices.slice(0, 4);
-  const gridCollapsible = personaKey === 'entrepreneur' && entrepreneurLead.length > 0 && orderedServices.length > entrepreneurLead.length;
+  const gridCollapsible = personaKey === 'entrepreneur' && orderedServices.length > 1;
 
   const sections: Partial<Record<HomeSectionKey, () => ReactElement | null>> = {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
@@ -262,7 +236,9 @@ export default function HomeScreen() {
         />
         {personaKey === 'entrepreneur' ? (
           <View style={styles.list}>
-            <PartnersPlusCard onPress={() => pushRoute('/service/success-partners')} />
+            <GoldDoorCard icon="add" title={t('home.partnersPlus')} hint={t('home.partnersPlusHint')} onPress={() => pushRoute('/service/success-partners')} />
+            {/* M102 (owner): the second door, gold exactly like the first — publish his app, no fees. */}
+            <GoldDoorCard icon="phone-portrait-outline" title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={() => pushRoute('/service/app-publish')} />
           </View>
         ) : null}
         {/* M85: the light 2-column tiles, on the home too. */}
@@ -278,7 +254,7 @@ export default function HomeScreen() {
           <PressScale onPress={() => setGridOpen((open) => !open)} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={t(gridOpen ? 'home.lessServices' : 'home.moreServices')}>
             <View style={styles.moreServices}>
               <Text style={styles.moreServicesText}>{t(gridOpen ? 'home.lessServices' : 'home.moreServices')}</Text>
-              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.gold} />
+              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.goldInk} />
             </View>
           </PressScale>
         ) : null}
@@ -331,12 +307,11 @@ export default function HomeScreen() {
       <IntroVideoPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
       <View style={styles.hero}>
-        {/* M85f: golden dust behind the emblem — mounted a beat late so the first paint stays light. */}
-        {dressed ? <GoldDust height={130} /> : null}
+        {/* Perf (owner, 2026-10-19): the dust and neon-pulse loops left the home — they ran forever
+            alongside every other animation and dragged weaker phones. The floating emblem stays. */}
         <FadeInView offset={12}>
           <Floating>
             <View style={styles.emblemRing}>
-              {dressed ? <NeonPulse radius={radii.pill} /> : null}
               <Image source={clubEmblem} style={styles.emblem} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
             </View>
           </Floating>
@@ -350,32 +325,14 @@ export default function HomeScreen() {
         <FadeInView delay={250} offset={8}>
           <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${heroSubtitle}` : heroSubtitle}</Text>
         </FadeInView>
-        {/* M102 (owner's verbatim text): the club's opening story, OPEN by default. A persona hero
-            line replaces the canonical first paragraph, so the story then carries it too. */}
-        {content.hero.story?.length ? (
-          <FadeInView delay={290} offset={6}>
-            {storyOpen
-              ? [...(heroSubtitle === content.hero.subtitle ? [] : [content.hero.subtitle]), ...content.hero.story].map((paragraph) => (
-                  <Text key={paragraph.slice(0, 24)} style={styles.heroStory}>
-                    {paragraph}
-                  </Text>
-                ))
-              : null}
-            <PressScale onPress={toggleStory} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(storyOpen ? 'home.storyLess' : 'home.storyMore')}>
-              <View style={styles.storyToggle}>
-                <Text style={styles.storyToggleText}>{t(storyOpen ? 'home.storyLess' : 'home.storyMore')}</Text>
-                <Ionicons name={storyOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.gold} />
-              </View>
-            </PressScale>
-          </FadeInView>
-        ) : null}
         <FadeInView delay={330} offset={0}>
           <GoldHairline style={styles.heroDivider} />
         </FadeInView>
       </View>
 
-      {/* M81 extension: the owner's home banner, straight under the hero — shows only when he fills the slot. */}
-      <SlotBanner slot="home.banner" />
+      {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
+          banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
+      <HqBanner />
 
       {order.map((key) => sections[key]?.() ?? null)}
 
@@ -393,6 +350,20 @@ export default function HomeScreen() {
         </View>
       </FadeInView>
     </Screen>
+  );
+}
+
+/** M102: the home's top image — the real HQ, opening the HQ screen; the banner slot is the fallback. */
+function HqBanner() {
+  const router = useRouter();
+  const photo = useHq().data?.photos?.[0] ?? null;
+  if (!photo) return <SlotBanner slot="home.banner" />;
+  return (
+    <FadeInView delay={140}>
+      <PressScale onPress={() => router.push('/hq')} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('nav.hq')}>
+        <Image source={{ uri: photo }} style={styles.hqBanner} resizeMode="cover" accessibilityLabel={t('nav.hq')} />
+      </PressScale>
+    </FadeInView>
   );
 }
 
@@ -535,18 +506,18 @@ function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membersh
   );
 }
 
-/** M74 (owner): the VERY distinctive «+» of رائد الأعمال — it opens the شركاء النجاح gate. */
-function PartnersPlusCard({ onPress }: { onPress: () => void }) {
+/** M74 + M102 (owner): the entrepreneur's gold doors — شركاء النجاح and نشر تطبيقه, twins by design. */
+function GoldDoorCard({ icon, title, hint, onPress }: { icon: IoniconName; title: string; hint: string; onPress: () => void }) {
   return (
-    <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={t('home.partnersPlus')}>
+    <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={title}>
       <GoldGradient style={styles.plusCard}>
         <View style={styles.plusBadge}>
-          <Ionicons name="add" size={30} color={colors.gold} />
+          <Ionicons name={icon} size={icon === 'add' ? 30 : 24} color={colors.gold} />
         </View>
         <View style={styles.plusTexts}>
-          <Text style={styles.plusTitle}>{t('home.partnersPlus')}</Text>
+          <Text style={styles.plusTitle}>{title}</Text>
           <Text style={styles.plusHint} numberOfLines={1}>
-            {t('home.partnersPlusHint')}
+            {hint}
           </Text>
         </View>
         <Ionicons name={chevronForward()} size={20} color={colors.goldInk} />
@@ -603,23 +574,31 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold, letterSpacing: 1 },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-  // M102: the opening story paragraphs and their quiet gold toggle.
-  heroStory: { ...typography.body, fontSize: 14, lineHeight: 24, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
-  storyToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing.xs, marginTop: 2 },
-  storyToggleText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  // M102: the HQ photo crowning the home.
+  hqBanner: {
+    width: '100%',
+    height: 150,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.surfaceElevated,
+    marginTop: spacing.sm,
+    boxShadow: shadows.lift,
+  },
+  // M102 (owner): «اضغط للمزيد» must CATCH the eye — a full gold bar, not a quiet outline.
   moreServices: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm + 4,
     borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderGoldSoft,
-    backgroundColor: colors.goldFaint,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
     marginTop: spacing.sm,
   },
-  moreServicesText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.gold },
+  moreServicesText: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.goldInk },
   // M74: the guest's three gateway chips, side by side and compact.
   portalsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   portalItem: { flex: 1 },

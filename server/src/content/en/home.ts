@@ -8,10 +8,6 @@ export const HOME_EN: Translation<HomeContent> = {
     title: 'A refined community that believes ideas are wealth',
     subtitle:
       'The Investors Club® is an exclusive business community for neutrals, entrepreneurs and investors, serving its members through one app and a permanent HQ in the heart of the Saudi capital, Riyadh.',
-    story: [
-      'From Saudi Arabia to the world… your membership travels with you: a full year of every club benefit, in person at the club HQ in Riyadh and online, exploring ventures and partnership opportunities and building relationships that open doors money alone cannot.',
-      'And when you arrive in Riyadh, the club is your second home in the world of business. Your essential work needs are taken care of: a meeting room to receive your guests, a fully equipped venue for 80 people with an integrated stage for your own meetups and workshops, 15 day-use offices, a podcast studio to carry your message, and a business incubator to embrace your venture — all available to you as a member, with discounts that lighten your business costs.',
-    ],
   },
   portals: [
     { key: 'neutral', title: 'Neutral', subtitle: 'Exploring my direction' },

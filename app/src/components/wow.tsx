@@ -77,9 +77,11 @@ export function GoldSweep({ radius = radii.lg, thickness = 1.5, duration = 5200 
   const [turn] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }));
-    loop.start();
-    return () => loop.stop();
+    // Perf (owner, 2026-10-19: «الموبايل بيهنج»): the rim light sweeps TWICE on mount, then rests.
+    // An endless rotation of a big gradient layer on every such card kept weaker GPUs busy forever.
+    const sweep = Animated.loop(Animated.timing(turn, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }), { iterations: 2 });
+    sweep.start();
+    return () => sweep.stop();
   }, [turn, duration]);
 
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });

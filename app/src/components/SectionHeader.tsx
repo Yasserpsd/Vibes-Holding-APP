@@ -57,9 +57,21 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  // M102 (owner): «كل / عرض الكل» reads as a BUTTON now — a small gold pill, not a floating word.
   ctaWrap: { flexShrink: 0 },
-  cta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ctaText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  ctaText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 19, color: colors.goldLight },
   // M75: the unread «+N» pill.
   badge: {
     minWidth: 22,

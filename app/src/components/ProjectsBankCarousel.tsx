@@ -9,7 +9,8 @@ import { PressScale } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-const ROTATE_MS = 3500;
+// Perf (owner, 2026-10-19): a calmer tempo — each flip decodes a fresh image, so fewer flips, less heat.
+const ROTATE_MS = 6000;
 const FADE_OUT_MS = 220;
 const FADE_IN_MS = 320;
 const MAX_SLIDES = 8;

@@ -890,8 +890,6 @@
   "inbox.kind.person": "Profile & Journey",
   "gate.subscribe": "Subscribe now",
   "membership.registerAndPay": "Register and pay now",
-  "home.storyMore": "Read more about the club",
-  "home.storyLess": "Hide",
   "home.moreServices": "Tap for more — the rest of the services",
   "home.lessServices": "Hide the extra services",
   "persona.title": "Change my direction",
@@ -926,5 +924,7 @@
   "advisor.voiceStop": "Stop recording",
   "advisor.voiceNoPermission": "Allow the app to use the microphone in the device settings first.",
   "advisor.voiceEmpty": "We could not catch clear speech; try again.",
-  "advisor.voiceFailed": "The recording could not be read; try again."
+  "advisor.voiceFailed": "The recording could not be read; try again.",
+  "home.appPublish": "Publish your app, no fees",
+  "home.appPublishHint": "The club publishes your app on Google Play and the App Store"
 }

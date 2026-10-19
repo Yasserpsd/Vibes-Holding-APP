@@ -890,8 +890,6 @@
   "inbox.kind.person": "شخصية ومسيرة",
   "gate.subscribe": "اشترك في العضوية الآن",
   "membership.registerAndPay": "سجّل وادفع الآن",
-  "home.storyMore": "اقرأ المزيد عن النادي",
-  "home.storyLess": "إخفاء",
   "home.moreServices": "اضغط للمزيد — باقي الخدمات",
   "home.lessServices": "إخفاء باقي الخدمات",
   "persona.title": "تغيير التوجه",
@@ -926,5 +924,7 @@
   "advisor.voiceStop": "إيقاف التسجيل",
   "advisor.voiceNoPermission": "اسمح للتطبيق باستخدام الميكروفون من إعدادات الجهاز أولًا.",
   "advisor.voiceEmpty": "لم نلتقط كلامًا واضحًا، حاول مرة أخرى.",
-  "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى."
+  "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى.",
+  "home.appPublish": "انشر تطبيقك بدون رسوم",
+  "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store"
 }
