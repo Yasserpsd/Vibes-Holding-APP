@@ -90,23 +90,13 @@ export function PressScale({ children, onPress, onLongPress, disabled, style, wr
 }
 
 /** A slow, weightless float for hero marks (the emblem breathing over the welcome screen). */
-export function Floating({ children, amplitude = 7, duration = 2600, style }: { children: ReactNode; amplitude?: number; duration?: number; style?: StyleProp<ViewStyle> }) {
-  const [drift] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(drift, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(drift, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [drift, duration]);
-  return (
-    <Animated.View style={[style, { transform: [{ translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [0, -amplitude] }) }] }]}>
-      {children}
-    </Animated.View>
-  );
+/**
+ * Perf (owner, 2026-10-19 round 2: «لسه تقيل جدا في الحركة بالذات في اول صفحة»): the endless float
+ * loops are RETIRED — every Floating is now a still wrapper, so no screen keeps animating forever.
+ * The entrance animations (FadeInView / PopIn) run once and stop, and they carry the life now.
+ */
+export function Floating({ children, style }: { children: ReactNode; amplitude?: number; duration?: number; style?: StyleProp<ViewStyle> }) {
+  return <View style={style}>{children}</View>;
 }
 
 /** Badges and icons pop into place with a spring — sharper than a fade for small elements. */

@@ -91,7 +91,8 @@ const styles = StyleSheet.create({
   },
   // M106: the faint photo layer and the ivory wash that keeps the ink readable.
   photo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  wash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(250, 247, 240, 0.88)' },
+  // Round 2 (owner): «خفف الشفافية... خليها أخف» — the photo whispers, the ink stays crisp.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(250, 247, 240, 0.94)' },
   lockedCard: { backgroundColor: colors.paper, opacity: 0.82 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.xs },
   badge: {

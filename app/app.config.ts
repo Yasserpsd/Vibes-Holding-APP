@@ -62,8 +62,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/images/club-logo.png',
-        imageWidth: 180,
+        // M106b (owner: «اللوجو مقصوص»): Android 12+ clips the splash into a centered inset, so the
+        // SQUARE emblem goes there (never cropped); the full logo greets on the welcome screen instead.
+        image: './assets/images/club-emblem.png',
+        imageWidth: 160,
         resizeMode: 'contain',
         backgroundColor: BRAND_BLACK,
       },

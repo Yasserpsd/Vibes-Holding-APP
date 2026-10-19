@@ -48,13 +48,14 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
         accessibilityLabel={`${block.title} — ${project.title}`}
       >
         <View style={styles.card}>
+          {/* M106b (owner: «الصورة سودا مش بتظهر»): the emblem layer ALWAYS renders underneath —
+              a slow or hotlink-blocked PB image can stall without erroring, and black is never ok. */}
+          <View style={styles.fallback} pointerEvents="none">
+            <Image source={require('../../assets/images/club-emblem.png')} style={styles.fallbackEmblem} resizeMode="contain" />
+          </View>
           {showImage ? (
             <Image source={{ uri: project.image ?? undefined }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={project.title} onError={() => setImageBroken(true)} />
-          ) : (
-            <View style={styles.fallback} pointerEvents="none">
-              <Image source={require('../../assets/images/club-emblem.png')} style={styles.fallbackEmblem} resizeMode="contain" />
-            </View>
-          )}
+          ) : null}
           <View style={styles.scrim} pointerEvents="none" />
           <GoldSweep radius={radii.xl} />
           <View style={styles.body}>
