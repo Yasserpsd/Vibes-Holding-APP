@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
@@ -28,6 +28,7 @@ import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
+import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
@@ -41,6 +42,8 @@ const clubEmblem = require('../../../assets/images/club-emblem.png');
 const MINI_WIDTH = 124;
 const MINI_LOGO = 72;
 const VIDEO_WIDTH = 240;
+// M102: remembers that the member collapsed the opening story.
+const STORY_KEY = 'investorsclub.storyCollapsed';
 
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
 // The membership block left the home page for good (owner, 2026-10-17), and the golden strip followed it
@@ -57,9 +60,30 @@ export default function HomeScreen() {
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const [refreshing, setRefreshing] = useState(false);
-  // M102: the hero's «اقرأ المزيد» story, and the entrepreneur's collapsed services grid.
-  const [storyOpen, setStoryOpen] = useState(false);
+  // M102: the owner's opening text shows OPEN by default; a member who collapses it stays collapsed.
+  const [storyOpen, setStoryOpen] = useState(true);
   const [gridOpen, setGridOpen] = useState(false);
+  // The decorative layers mount a beat after first paint, so the opening feels light.
+  const [dressed, setDressed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setDressed(true), 900);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    void loadSetting(STORY_KEY).then((collapsed) => {
+      if (alive && collapsed === '1') setStoryOpen(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const toggleStory = () => {
+    setStoryOpen((open) => {
+      void saveSetting(STORY_KEY, open ? '1' : '');
+      return !open;
+    });
+  };
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -307,12 +331,12 @@ export default function HomeScreen() {
       <IntroVideoPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
       <View style={styles.hero}>
-        {/* M85f: golden dust drifting up behind the emblem. */}
-        <GoldDust height={130} />
+        {/* M85f: golden dust behind the emblem — mounted a beat late so the first paint stays light. */}
+        {dressed ? <GoldDust height={130} /> : null}
         <FadeInView offset={12}>
           <Floating>
             <View style={styles.emblemRing}>
-              <NeonPulse radius={radii.pill} />
+              {dressed ? <NeonPulse radius={radii.pill} /> : null}
               <Image source={clubEmblem} style={styles.emblem} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
             </View>
           </Floating>
@@ -326,17 +350,18 @@ export default function HomeScreen() {
         <FadeInView delay={250} offset={8}>
           <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${heroSubtitle}` : heroSubtitle}</Text>
         </FadeInView>
-        {/* M102 (owner's verbatim text): the rest of the club's opening story, behind «اقرأ المزيد». */}
+        {/* M102 (owner's verbatim text): the club's opening story, OPEN by default. A persona hero
+            line replaces the canonical first paragraph, so the story then carries it too. */}
         {content.hero.story?.length ? (
           <FadeInView delay={290} offset={6}>
             {storyOpen
-              ? content.hero.story.map((paragraph) => (
+              ? [...(heroSubtitle === content.hero.subtitle ? [] : [content.hero.subtitle]), ...content.hero.story].map((paragraph) => (
                   <Text key={paragraph.slice(0, 24)} style={styles.heroStory}>
                     {paragraph}
                   </Text>
                 ))
               : null}
-            <PressScale onPress={() => setStoryOpen((open) => !open)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(storyOpen ? 'home.storyLess' : 'home.storyMore')}>
+            <PressScale onPress={toggleStory} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(storyOpen ? 'home.storyLess' : 'home.storyMore')}>
               <View style={styles.storyToggle}>
                 <Text style={styles.storyToggleText}>{t(storyOpen ? 'home.storyLess' : 'home.storyMore')}</Text>
                 <Ionicons name={storyOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.gold} />

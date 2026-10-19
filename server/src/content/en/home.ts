@@ -76,11 +76,6 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: 'A venture picked from the Projects Bank, renewed on every app open',
     cta: 'Discover the opportunity',
   },
-  wallet: {
-    title: 'Your Projects Bank wallet',
-    subtitle: 'Your SAR 2,500 balance opens the complete details of 5 ventures you pick yourself, meeting their founders directly',
-    cta: 'Use your balance',
-  },
   personas: {
     guest: {
       heroSubtitle:

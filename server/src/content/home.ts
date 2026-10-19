@@ -206,16 +206,11 @@ export const HOME_SEED: HomeContent = {
     items: ['ورش العمل والملتقيات بدون رسوم للأعضاء', 'رصيد سنوي يفتح لك خدمات النادي', 'خصومات شركائنا برمز العضو الخاص بك'],
     cta: 'تعرّف على العضوية',
   },
-  // M99c: the investor's opening act and wallet (the numbers come live from the PB bridge, the words from here).
+  // M99c: the investor's opening act (the wallet card left the home for good — owner, 2026-10-19: «ملهاش اي داعي»).
   opportunity: {
     title: 'الفرصة الذهبية',
     subtitle: 'مشروع مختار من بنك المشاريع، يتجدد مع كل فتح للتطبيق',
     cta: 'اكتشف الفرصة',
-  },
-  wallet: {
-    title: 'محفظتك في بنك المشاريع',
-    subtitle: 'رصيدك 2,500 ريال يفتح لك التفاصيل الكاملة لـ5 مشاريع تنتقيها بنفسك، وتلتقي بمؤسسيها مباشرة',
-    cta: 'استخدم رصيدك',
   },
   // M74 + M99: four separate experiences — copy, order, visibility, tabs and the services grid per persona
   // (the owner edits everything from the dashboard).
@@ -258,8 +253,8 @@ export const HOME_SEED: HomeContent = {
       // الكاروسيل، المحفظة) — the carousel block leaves; the opportunity opens and the wallet follows,
       // and the full bank lives in his بنك المشاريع tab.
       heroSubtitle: 'فرص شراكة حقيقية بانتظارك: بنك المشاريع والملتقيات ومجتمع الأعمال في مكان واحد.',
-      order: ['opportunity', 'wallet', 'posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
-      hide: ['projectsBank'],
+      order: ['opportunity', 'posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      hide: ['projectsBank', 'wallet'],
       serviceKeys: ['credit', 'theater', 'consultation', 'meetup'],
       ctas: {
         opportunity: { label: 'استكشف فرص الشراكة', route: '/projects' },
@@ -276,7 +271,7 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 12,
+  version: 13,
   updatedAt: '2026-10-19T00:00:00.000Z',
 };
 

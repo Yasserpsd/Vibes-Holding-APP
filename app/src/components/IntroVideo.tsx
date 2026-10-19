@@ -21,7 +21,8 @@ const INTRO = {
   ar: { url: 'https://www.youtube.com/watch?v=8MuTvxvtnXY', thumb: 'https://img.youtube.com/vi/8MuTvxvtnXY/hqdefault.jpg' },
   en: { url: 'https://www.youtube.com/watch?v=QJpUWGz47q0', thumb: 'https://img.youtube.com/vi/QJpUWGz47q0/hqdefault.jpg' },
 } as const;
-const SEEN_KEY = 'investorsclub.introSeen';
+// The key was bumped (M102): everyone sees the NEW popup — language-matched film, HQ-photo poster — one more time.
+const SEEN_KEY = 'investorsclub.introSeen.v2';
 
 export function IntroVideoPopup() {
   const router = useRouter();
