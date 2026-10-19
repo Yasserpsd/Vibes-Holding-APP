@@ -6,11 +6,21 @@ import type { Notifier } from '../mail/notify.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { guard, parse, sessionGuard } from './guard.js';
+import type { Mailer } from '../mail/mailer.js';
+import { PERSONA_CHANGE_DAYS, type PersonaChangeStore } from './personaChange.js';
 import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
-export type AuthRoutesOptions = { service: AuthService; hubMode: HubMode; social: SocialVerifier; notifier?: Notifier };
+export type AuthRoutesOptions = {
+  service: AuthService;
+  hubMode: HubMode;
+  social: SocialVerifier;
+  notifier?: Notifier;
+  /** M101: the e-mailed-code persona change (absent only in old tests; the routes then 404). */
+  personaChange?: PersonaChangeStore;
+  mailer?: Mailer;
+};
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
 const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(200);
@@ -69,7 +79,7 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -234,8 +244,89 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const body = parse(profileSchema, request.body, reply);
       if (!body) return;
+      // M101: members change the persona through the e-mailed-code flow below; the direct patch
+      // stays for the club's admins only (they demo the three apps without the 30-day window).
+      if (body.persona !== undefined) {
+        const current = await service.me(auth.session);
+        if (!current.isAdmin && current.persona && current.persona !== body.persona) {
+          return reply.code(403).send({ error: { code: 'persona_code_required', message: 'تغيير التوجه يتم بالرمز المُرسل إلى بريدك الإلكتروني' } });
+        }
+      }
       const me = await service.updateProfile(auth.session, body);
       return { me };
+    }),
+  );
+
+  // M101 «تغيير التوجه»: the member asks, a code lands in his mailbox, and the confirmed code
+  // applies the change at the hub — once every 30 days (admins switch directly, see PATCH above).
+  app.post(
+    '/api/me/persona/request',
+    guard(async (request, reply) => {
+      if (!personaChange) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      if (limited('persona', 10, request, reply)) return;
+      const body = parse(z.object({ persona: personaSchema }), request.body, reply);
+      if (!body) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      if (me.persona === body.persona) {
+        return reply.code(400).send({ error: { code: 'persona_same', message: 'هذا هو توجهك الحالي بالفعل' } });
+      }
+      const label = PERSONAS.find((item) => item.key === body.persona)?.label ?? body.persona;
+      const result = await personaChange.request(me.id, body.persona, async (code) => {
+        try {
+          await mailer?.send({
+            to: [me.email],
+            subject: 'رمز تغيير التوجه — نادي المستثمرين',
+            text: [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة كل 30 يومًا.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
+          });
+        } catch (error) {
+          request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'persona change code was not mailed');
+          throw new Error('mail_failed');
+        }
+      }).catch((cause: unknown) => {
+        if (cause instanceof Error && cause.message === 'mail_failed') return null;
+        throw cause;
+      });
+      if (!result) return reply.code(503).send({ error: { code: 'mail_failed', message: 'تعذر إرسال الرمز الآن، حاول بعد قليل' } });
+      if (!result.ok) {
+        if (result.reason === 'cooldown') {
+          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير توجهك مرة واحدة كل ${PERSONA_CHANGE_DAYS} يومًا — متبقٍ ${result.daysLeft} يومًا`, daysLeft: result.daysLeft } });
+        }
+        if (result.reason === 'too_soon') {
+          return reply.code(429).send({ error: { code: 'persona_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });
+        }
+        return reply.code(429).send({ error: { code: 'persona_too_many', message: 'طلبات كثيرة، حاول لاحقًا' } });
+      }
+      return { ok: true, email: me.email, seconds: result.seconds, days: PERSONA_CHANGE_DAYS };
+    }),
+  );
+
+  app.post(
+    '/api/me/persona/confirm',
+    guard(async (request, reply) => {
+      if (!personaChange) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      if (limited('persona-confirm', 20, request, reply)) return;
+      const body = parse(z.object({ code: codeSchema }), request.body, reply);
+      if (!body) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      const result = await personaChange.confirm(me.id, body.code);
+      if (!result.ok) {
+        const message =
+          result.reason === 'bad_code'
+            ? `الرمز غير صحيح — متبقٍ ${result.attemptsLeft} محاولات`
+            : result.reason === 'code_expired'
+              ? 'انتهت صلاحية الرمز، اطلب رمزًا جديدًا'
+              : result.reason === 'locked'
+                ? 'محاولات خاطئة كثيرة، اطلب رمزًا جديدًا لاحقًا'
+                : 'لا يوجد طلب تغيير قائم، ابدأ من جديد';
+        return reply.code(400).send({ error: { code: `persona_${result.reason}`, message } });
+      }
+      const updated = await service.updateProfile(auth.session, { persona: result.persona });
+      if (!updated.isAdmin) await personaChange.stamp(me.id);
+      return { me: updated };
     }),
   );
 

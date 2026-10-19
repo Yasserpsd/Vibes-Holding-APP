@@ -57,6 +57,9 @@ export default function HomeScreen() {
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
   const [refreshing, setRefreshing] = useState(false);
+  // M102: the hero's «اقرأ المزيد» story, and the entrepreneur's collapsed services grid.
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [gridOpen, setGridOpen] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -128,7 +131,18 @@ export default function HomeScreen() {
     return at === -1 ? leadKeys.length : at;
   };
   const orderedServices = leadKeys.length ? [...allServices].sort((a, b) => leadRank(a.key) - leadRank(b.key)) : allServices;
-  const teaser = personaKey === 'entrepreneur' || personaKey === 'guest' ? orderedServices : orderedServices.slice(0, 4);
+  // M102 (owner): the entrepreneur's home shows only HIS two doors — شركاء النجاح (the «+» card)
+  // and نشر تطبيقه بدون رسوم — and the rest of the grid waits behind «اضغط للمزيد».
+  const entrepreneurLead = orderedServices.filter((service) => service.key === 'app-publish');
+  const teaser =
+    personaKey === 'entrepreneur'
+      ? gridOpen || entrepreneurLead.length === 0
+        ? orderedServices
+        : entrepreneurLead
+      : personaKey === 'guest'
+        ? orderedServices
+        : orderedServices.slice(0, 4);
+  const gridCollapsible = personaKey === 'entrepreneur' && entrepreneurLead.length > 0 && orderedServices.length > entrepreneurLead.length;
 
   const sections: Partial<Record<HomeSectionKey, () => ReactElement | null>> = {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
@@ -235,6 +249,15 @@ export default function HomeScreen() {
             </FadeInView>
           ))}
         </View>
+        {/* M102: the rest of the entrepreneur's grid, behind one tap. */}
+        {gridCollapsible ? (
+          <PressScale onPress={() => setGridOpen((open) => !open)} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={t(gridOpen ? 'home.lessServices' : 'home.moreServices')}>
+            <View style={styles.moreServices}>
+              <Text style={styles.moreServicesText}>{t(gridOpen ? 'home.lessServices' : 'home.moreServices')}</Text>
+              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.gold} />
+            </View>
+          </PressScale>
+        ) : null}
       </FadeInView>
     ),
     // M68 «شركاؤنا»: renders only when the server already carries the block and at least one partner is visible.
@@ -303,6 +326,24 @@ export default function HomeScreen() {
         <FadeInView delay={250} offset={8}>
           <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${heroSubtitle}` : heroSubtitle}</Text>
         </FadeInView>
+        {/* M102 (owner's verbatim text): the rest of the club's opening story, behind «اقرأ المزيد». */}
+        {content.hero.story?.length ? (
+          <FadeInView delay={290} offset={6}>
+            {storyOpen
+              ? content.hero.story.map((paragraph) => (
+                  <Text key={paragraph.slice(0, 24)} style={styles.heroStory}>
+                    {paragraph}
+                  </Text>
+                ))
+              : null}
+            <PressScale onPress={() => setStoryOpen((open) => !open)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(storyOpen ? 'home.storyLess' : 'home.storyMore')}>
+              <View style={styles.storyToggle}>
+                <Text style={styles.storyToggleText}>{t(storyOpen ? 'home.storyLess' : 'home.storyMore')}</Text>
+                <Ionicons name={storyOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.gold} />
+              </View>
+            </PressScale>
+          </FadeInView>
+        ) : null}
         <FadeInView delay={330} offset={0}>
           <GoldHairline style={styles.heroDivider} />
         </FadeInView>
@@ -537,6 +578,23 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold, letterSpacing: 1 },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  // M102: the opening story paragraphs and their quiet gold toggle.
+  heroStory: { ...typography.body, fontSize: 14, lineHeight: 24, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  storyToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing.xs, marginTop: 2 },
+  storyToggleText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  moreServices: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+    marginTop: spacing.sm,
+  },
+  moreServicesText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.gold },
   // M74: the guest's three gateway chips, side by side and compact.
   portalsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   portalItem: { flex: 1 },

@@ -3,22 +3,31 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Modal, StyleSheet, Text, View } from 'react-native';
 
+import { useHq } from '@/api/hq';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { playVideo } from '@/lib/player';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-/** M84 (owner): the one-time «تعرف علينا أكتر» popup — this exact film, first open only. */
-const INTRO_URL = 'https://www.youtube.com/watch?v=8MuTvxvtnXY';
-const INTRO_THUMB = 'https://img.youtube.com/vi/8MuTvxvtnXY/hqdefault.jpg';
+/**
+ * M84 (owner): the one-time «تعرف علينا أكتر» popup — first open only.
+ * M102: each language gets its own film, and the poster is the club HQ photo (owner: the
+ * YouTube auto-thumbnail showed the podcast studio), falling back to the film's thumbnail.
+ */
+const INTRO = {
+  ar: { url: 'https://www.youtube.com/watch?v=8MuTvxvtnXY', thumb: 'https://img.youtube.com/vi/8MuTvxvtnXY/hqdefault.jpg' },
+  en: { url: 'https://www.youtube.com/watch?v=QJpUWGz47q0', thumb: 'https://img.youtube.com/vi/QJpUWGz47q0/hqdefault.jpg' },
+} as const;
 const SEEN_KEY = 'investorsclub.introSeen';
 
 export function IntroVideoPopup() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
+  const intro = INTRO[getLang()];
+  const hqPhoto = useHq().data?.photos?.[0] ?? null;
 
   useEffect(() => {
     let alive = true;
@@ -38,7 +47,7 @@ export function IntroVideoPopup() {
 
   const play = () => {
     dismiss();
-    playVideo(router, { url: INTRO_URL, title: t('home.intro.title') });
+    playVideo(router, { url: intro.url, title: t('home.intro.title') });
   };
 
   if (!visible) return null;
@@ -49,7 +58,7 @@ export function IntroVideoPopup() {
           <GlassCard golden radius={radii.xxl} style={styles.card}>
             <PressScale onPress={play} accessibilityRole="button" accessibilityLabel={t('home.intro.play')}>
               <View style={styles.thumbBox}>
-                <Image source={{ uri: INTRO_THUMB }} style={styles.thumb} resizeMode="cover" accessibilityLabel={t('home.intro.title')} />
+                <Image source={{ uri: hqPhoto ?? intro.thumb }} style={styles.thumb} resizeMode="cover" accessibilityLabel={t('home.intro.title')} />
                 <View style={styles.playRing}>
                   <Ionicons name="play" size={26} color={colors.goldInk} />
                 </View>

@@ -15,6 +15,7 @@ import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
+import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
 import { Screen } from '@/components/Screen';
 import { env } from '@/config/env';
 import { languageChoiceOffered, t, tOptional } from '@/i18n';
@@ -75,6 +76,8 @@ export default function AccountScreen() {
     <Screen aboveTabBar watermark refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
       {me ? (
         <FadeInView offset={12}>
+          {/* M103: the gentle «كمّل بياناتك» popup — at most once a week while the profile is incomplete. */}
+          <CompleteProfilePopup me={me} />
           <ProfileHeader me={me} />
         </FadeInView>
       ) : (
@@ -89,6 +92,8 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(2, 90)}>
         <MenuGroup title={t('account.group.data')}>
           <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
+          {/* M101: the member changes his direction with an e-mailed code, once every 30 days. */}
+          <MenuRow icon="compass-outline" label={t('persona.title')} onPress={() => router.push('/persona' as Href)} />
           <MenuRow icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} />
           <MenuRow icon="sparkles-outline" label={t('people.title')} onPress={() => router.push('/people/apply' as Href)} />
         </MenuGroup>
@@ -138,17 +143,21 @@ export default function AccountScreen() {
 
 function ProfileHeader({ me }: { me: Me }) {
   const initial = me.name.trim().charAt(0) || '؟';
+  // M103: the completion meter around the avatar — golden dots fill as the profile does.
+  const percent = profileCompletion(me);
   return (
     <View style={styles.header}>
-      <GoldGradient style={styles.avatarRing}>
-        {me.avatarUrl ? (
-          <Image source={{ uri: me.avatarUrl }} style={styles.avatar} accessibilityLabel={me.name} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
-        )}
-      </GoldGradient>
+      <CompletionMeter percent={percent} size={78}>
+        <GoldGradient style={styles.avatarRing}>
+          {me.avatarUrl ? (
+            <Image source={{ uri: me.avatarUrl }} style={styles.avatar} accessibilityLabel={me.name} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarInitial}>{initial}</Text>
+            </View>
+          )}
+        </GoldGradient>
+      </CompletionMeter>
       <View style={styles.headerText}>
         <View style={styles.nameRow}>
           <Text style={styles.name}>{me.name}</Text>

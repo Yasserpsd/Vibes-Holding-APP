@@ -79,6 +79,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // M19: videos play inside the app — expo-video for uploaded files, react-native-webview for the
     // YouTube embedded player (native modules: need a new build; old binaries keep the in-app browser).
     'expo-video',
+    // M104: the advisor listens — microphone recording (native module: needs a new build; old
+    // binaries hide the mic button via requireOptionalNativeModule).
+    ['expo-audio', { microphonePermission: 'يستخدم التطبيق الميكروفون لتسجيل سؤالك الصوتي للمستشار.' }],
   ],
   experiments: { typedRoutes: true },
   extra: {

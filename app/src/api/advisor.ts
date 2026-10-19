@@ -64,4 +64,6 @@ export const advisorApi = {
     }
   },
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),
+  // M104: the recorded question (base64) comes back as text; the app then sends it as a message.
+  transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime } }),
 };

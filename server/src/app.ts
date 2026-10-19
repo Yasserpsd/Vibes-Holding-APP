@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { advisorRoutes } from './advisor/routes.js';
+import { VoiceTranscriber } from './advisor/voice.js';
 import { AdvisorService } from './advisor/service.js';
 import { agendaRoutes } from './agenda/routes.js';
 import { AgendaService } from './agenda/service.js';
@@ -11,6 +12,7 @@ import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
 import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
+import { PersonaChangeStore } from './auth/personaChange.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
@@ -375,8 +377,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(projectsRoutes, { service: projects, auth, access, brief });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
   await app.register(appStringsRoutes, { kv, auth, sync });
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier });
-  await app.register(advisorRoutes, { service: advisor, auth });
+  // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
+  const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail });
+  // M104: voice input for the advisor — available whenever the OpenAI key is set.
+  const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
+  await app.register(advisorRoutes, { service: advisor, auth, voice });
   await app.register(newsRoutes, { service: news, auth, kv });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });

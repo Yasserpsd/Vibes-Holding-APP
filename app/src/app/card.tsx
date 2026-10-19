@@ -17,7 +17,7 @@ import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const PERSONA_KEY: Record<string, StringKey> = { neutral: 'persona.neutral', entrepreneur: 'persona.entrepreneur', investor: 'persona.investor' };
 
@@ -29,6 +29,16 @@ function categoryOf(persona: string): string {
 
 // Left-to-right mark: keeps a Latin or numeric value readable inside the Arabic line (Android RTL).
 const LRM = '‎';
+
+// M103 (owner): the ACTIVE member's card is a VIP gold piece; the unactivated (or expired) card
+// turns to a faded silver with «عضو غير مفعل» on it — same layout, two metals.
+const SILVER = {
+  bright: '#E9EAEF',
+  body: '#B6BAC4',
+  dark: '#787D88',
+  soft: 'rgba(182, 186, 196, 0.16)',
+  glow: '0 0 24px rgba(182, 186, 196, 0.18)',
+} as const;
 
 /**
  * M30: «كارت العضوية» — a gold business card on black: club name, the member's name with an
@@ -61,45 +71,66 @@ export default function CardScreen() {
   const endDate = me.membership.endDate ? formatArabicDate(me.membership.endDate) : null;
   const roleLine = [me.jobTitle, me.company].filter(Boolean).join(' · ');
   const contacts = [me.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
+  // M103: one layout, two metals — VIP gold for the active member, faded silver for the rest.
+  const metal = {
+    frame: active ? colors.gold : SILVER.dark,
+    inner: active ? colors.goldDark : SILVER.dark,
+    bright: active ? colors.goldLight : SILVER.bright,
+    body: active ? colors.gold : SILVER.body,
+    glow: active ? shadows.glowGoldStrong : SILVER.glow,
+  };
 
   return (
     <Screen title={t('nav.card')} subtitle={t('card.subtitle')}>
       <Stack.Screen options={{ title: t('nav.card') }} />
 
       <FadeInView offset={18}>
-      <View style={styles.card}>
-        {/* V2: the card frame breathes a golden neon halo — the one neon element of this screen. */}
-        <NeonPulse radius={radii.lg} intensity="strong" />
-        <View style={styles.cardInner} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
-          {/* The metal of the card: soft gold rings and a diagonal sheen, behind everything. */}
-          <View pointerEvents="none" style={[styles.ring, styles.ringLarge]} />
-          <View pointerEvents="none" style={[styles.ring, styles.ringSmall]} />
-          <View pointerEvents="none" style={styles.sheen} />
-          <View pointerEvents="none" style={[styles.corner, styles.cornerTopStart]} />
-          <View pointerEvents="none" style={[styles.corner, styles.cornerBottomEnd]} />
+      <View style={[styles.card, { borderColor: metal.frame, boxShadow: metal.glow }, !active && styles.cardFaded]}>
+        {/* V2: the card frame breathes a neon halo — golden only while the membership is. */}
+        {active ? <NeonPulse radius={radii.lg} intensity="strong" /> : null}
+        <View style={[styles.cardInner, { borderColor: metal.inner }]} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+          {/* The metal of the card: soft rings and a diagonal sheen, behind everything. */}
+          <View pointerEvents="none" style={[styles.ring, styles.ringLarge, { borderColor: metal.body }]} />
+          <View pointerEvents="none" style={[styles.ring, styles.ringSmall, { borderColor: metal.body }]} />
+          <View pointerEvents="none" style={[styles.sheen, { backgroundColor: metal.bright }]} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerTopStart, { borderColor: metal.frame }]} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerBottomEnd, { borderColor: metal.frame }]} />
 
           <View style={styles.head}>
-            <View style={styles.logoBadge}>
+            <View style={[styles.logoBadge, { borderColor: metal.frame }]}>
               <Image source={require('../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
             </View>
             <View style={styles.headText}>
-              <Text style={styles.club} numberOfLines={1}>{t('common.clubName')}</Text>
-              <Text style={styles.clubEn} numberOfLines={1}>{t('card.clubEn')}</Text>
+              <Text style={[styles.club, { color: metal.body }]} numberOfLines={1}>{t('common.clubName')}</Text>
+              <Text style={[styles.clubEn, { color: metal.bright }]} numberOfLines={1}>{t('card.clubEn')}</Text>
             </View>
-            {category ? (
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryText}>{category}</Text>
+            {/* M103: the member's standing, loud and unmistakable — VIP in gold, or the quiet silver tag. */}
+            {active ? (
+              <View style={styles.vipBadge}>
+                <Ionicons name="diamond" size={11} color={colors.goldInk} />
+                <Text style={styles.vipText}>VIP</Text>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.inactiveBadge}>
+                <Text style={styles.inactiveBadgeText}>{t('card.notActiveBadge')}</Text>
+              </View>
+            )}
           </View>
 
-          <GoldRule />
+          <GoldRule active={active} />
 
           <View style={styles.holder}>
-            <Text style={styles.holderName} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.holderName, { color: metal.bright }]} numberOfLines={1} adjustsFontSizeToFit>
               {me.name}
             </Text>
-            {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
+            <View style={styles.holderMetaRow}>
+              {category ? (
+                <View style={[styles.categoryPill, { backgroundColor: active ? colors.gold : SILVER.body }]}>
+                  <Text style={styles.categoryText}>{category}</Text>
+                </View>
+              ) : null}
+              {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
+            </View>
           </View>
 
           {me.cardNumber || (active && promoCode) ? (
@@ -107,23 +138,23 @@ export default function CardScreen() {
               {me.cardNumber ? (
                 <View style={[styles.numberBlock, styles.numberCell]}>
                   <Text style={styles.numberLabel}>{t('card.numberLabel')}</Text>
-                  <Text style={styles.number}>{me.cardNumber}</Text>
+                  <Text style={[styles.number, { color: metal.body }]}>{me.cardNumber}</Text>
                 </View>
               ) : null}
               {active && promoCode ? (
                 <View style={styles.numberBlock}>
                   <Text style={styles.numberLabel}>{t('card.promoLabel')}</Text>
-                  <Text style={styles.number} selectable>{promoCode}</Text>
+                  <Text style={[styles.number, { color: metal.body }]} selectable>{promoCode}</Text>
                 </View>
               ) : null}
             </View>
           ) : null}
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: metal.inner }]}>
             {active && endDate ? (
               <View style={styles.cell}>
                 <Text style={styles.cellLabel}>{t('card.validThru')}</Text>
-                <Text style={styles.cellValue}>{endDate}</Text>
+                <Text style={[styles.cellValue, { color: metal.bright }]}>{endDate}</Text>
               </View>
             ) : null}
             {active && me.membership.daysLeft !== null ? (
@@ -131,7 +162,7 @@ export default function CardScreen() {
                 <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
                 <View style={styles.daysRow}>
                   <Ionicons name="hourglass-outline" size={13} color={colors.gold} />
-                  <Text style={styles.cellValue}>{t('card.daysValue', { days: daysShown })}</Text>
+                  <Text style={[styles.cellValue, { color: metal.bright }]}>{t('card.daysValue', { days: daysShown })}</Text>
                 </View>
               </View>
             ) : null}
@@ -170,15 +201,14 @@ export default function CardScreen() {
   );
 }
 
-/** A thin metallic divider: dark gold melting into bright gold and back. */
-function GoldRule() {
+/** A thin metallic divider: dark metal melting into bright and back — gold or silver with the membership. */
+function GoldRule({ active }: { active: boolean }) {
+  const steps = active ? [colors.goldDark, colors.gold, colors.goldLight, colors.gold, colors.goldDark] : [SILVER.dark, SILVER.body, SILVER.bright, SILVER.body, SILVER.dark];
   return (
     <View style={styles.rule}>
-      <View style={[styles.ruleStep, { backgroundColor: colors.goldDark, flex: 2 }]} />
-      <View style={[styles.ruleStep, { backgroundColor: colors.gold, flex: 3 }]} />
-      <View style={[styles.ruleStep, { backgroundColor: colors.goldLight, flex: 2 }]} />
-      <View style={[styles.ruleStep, { backgroundColor: colors.gold, flex: 3 }]} />
-      <View style={[styles.ruleStep, { backgroundColor: colors.goldDark, flex: 2 }]} />
+      {steps.map((tone, index) => (
+        <View key={index} style={[styles.ruleStep, { backgroundColor: tone, flex: index % 2 ? 3 : 2 }]} />
+      ))}
     </View>
   );
 }
@@ -225,6 +255,11 @@ function PrintBlock({ active }: { active: boolean }) {
     <GlassCard style={styles.print}>
       <Text style={styles.printTitle}>{t('card.printTitle')}</Text>
       <Text style={styles.printText}>{t('card.printText')}</Text>
+      {/* M103 (owner): say it loud — the printed card reaches the member's home address with no fees. */}
+      <View style={styles.printFreeRow}>
+        <Ionicons name="gift-outline" size={16} color={colors.gold} />
+        <Text style={styles.printFree}>{t('card.printFree')}</Text>
+      </View>
       {!active ? (
         <Text style={styles.hint}>{t('card.printMembersOnly')}</Text>
       ) : sent ? (
@@ -290,6 +325,31 @@ const styles = StyleSheet.create({
   clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: colors.goldLight, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
   categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: colors.gold },
   categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.black },
+  // M103: the silvered, faded shell of the unactivated card.
+  cardFaded: { opacity: 0.88 },
+  // M103: the VIP mark — gold on gold-ink, impossible to miss.
+  vipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
+  },
+  vipText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, color: colors.goldInk, letterSpacing: 2, writingDirection: 'ltr' },
+  inactiveBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: SILVER.dark,
+    backgroundColor: SILVER.soft,
+  },
+  inactiveBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: SILVER.bright },
+  holderMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
 
   rule: { flexDirection: 'row', alignItems: 'center', height: 2, borderRadius: 1, overflow: 'hidden' },
   ruleStep: { height: 2 },
@@ -331,7 +391,8 @@ const styles = StyleSheet.create({
   cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: textStart },
   cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, color: colors.goldLight, textAlign: textStart },
   daysRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  inactive: { ...typography.caption, color: colors.warning, textAlign: textStart },
+  // M103: the unactivated line reads clearly on the silver card.
+  inactive: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: SILVER.bright, textAlign: textStart },
 
   contacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 },
   contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.textSecondary, textAlign: textStart, flexShrink: 1 },
@@ -340,5 +401,7 @@ const styles = StyleSheet.create({
   print: { gap: spacing.sm, padding: spacing.md },
   printTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   printText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  printFreeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  printFree: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart, flex: 1 },
   form: { gap: spacing.sm },
 });

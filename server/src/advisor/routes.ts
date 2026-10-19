@@ -6,8 +6,9 @@ import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
 import type { AdvisorService } from './service.js';
+import type { VoiceTranscriber } from './voice.js';
 
-export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService };
+export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber };
 
 // The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
 const selection = z.string().trim().max(1000).nullish();
@@ -28,7 +29,13 @@ const messageSchema = z.object({
 const pollSchema = z.object({ after: z.coerce.number().int().nonnegative().default(0) });
 
 /** Chat with the hub advisor. Every route needs a session; the hub adds its own per-account limits. */
-export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth }) => {
+// A one-minute m4a clip is ~1 MB; base64 adds a third. The cap keeps the route harmless.
+const voiceSchema = z.object({
+  audio: z.string().min(100).max(8_000_000),
+  mime: z.enum(['audio/m4a', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/wav']).default('audio/m4a'),
+});
+
+export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice }) => {
   const requireSession = sessionGuard(auth);
   const limiter = new RateLimiter();
 
@@ -52,6 +59,35 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       const body = parse(messageSchema, request.body, reply);
       if (!body) return;
       return service.send(current.session, body.text, body.context ?? null, request.ip, langOf(request));
+    }),
+  );
+
+  // M104: the member's recorded question becomes text; the app sends it as an ordinary message.
+  app.post(
+    '/api/advisor/transcribe',
+    { bodyLimit: 10_000_000 },
+    guard(async (request, reply) => {
+      if (!voice) return reply.code(404).send({ error: { code: 'voice_off', message: 'الإدخال الصوتي غير متاح حاليًا' } });
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (!limiter.hit(`voice:${request.ip}`, 20, 15 * 60_000)) {
+        return reply.code(429).send({ error: { code: 'rate', message: 'تسجيلات كثيرة في وقت قصير، حاول بعد قليل' } });
+      }
+      const body = parse(voiceSchema, request.body, reply);
+      if (!body) return;
+      let audio: Buffer;
+      try {
+        audio = Buffer.from(body.audio, 'base64');
+      } catch {
+        return reply.code(400).send({ error: { code: 'bad_audio', message: 'تعذر قراءة التسجيل' } });
+      }
+      if (audio.length < 100) return reply.code(400).send({ error: { code: 'bad_audio', message: 'التسجيل قصير جدًا' } });
+      try {
+        const text = await voice.transcribe(audio, body.mime, langOf(request));
+        return { text };
+      } catch {
+        return reply.code(502).send({ error: { code: 'voice_failed', message: 'تعذر تحويل الصوت إلى نص، حاول مرة أخرى' } });
+      }
     }),
   );
 

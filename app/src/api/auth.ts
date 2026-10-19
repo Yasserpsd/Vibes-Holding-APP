@@ -117,6 +117,9 @@ export const authApi = {
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),
   updateMe: (patch: ProfilePatch) => apiRequest<{ me: Me }>('PATCH', '/api/me', { body: patch }),
   logout: () => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {} }),
+  // M101 «تغيير التوجه»: the e-mailed code applies the change at the hub, once every 30 days (admins patch directly).
+  personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
+  personaConfirm: (code: string) => apiRequest<{ me: Me }>('POST', '/api/me/persona/confirm', { body: { code } }),
   // M79: the reason (picked or written) travels with the deletion so the club learns why members leave.
   deleteMe: (password: string, reason?: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password, ...(reason ? { reason } : {}) } }),
 };

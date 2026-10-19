@@ -97,16 +97,44 @@ test('register → verify → me → logout', async () => {
   assert.equal(patched.statusCode, 200, patched.body);
   assert.equal(patched.json().me.jobTitle, 'مدير استثمار');
 
-  // M74: the in-app category switch — the hub stores the persona and the card number letter follows.
-  const switched = await app.inject({
+  // M101: the mock's sign-up accounts are hub admins, so the DIRECT patch stays open for them —
+  // exactly the owner's demo path (members get 403 persona_code_required and use the code flow).
+  const directSwitch = await app.inject({
     method: 'PATCH',
     url: '/api/me',
     headers: { authorization: `Bearer ${token}` },
     payload: { persona: 'entrepreneur' },
   });
-  assert.equal(switched.statusCode, 200, switched.body);
-  assert.equal(switched.json().me.persona, 'entrepreneur');
-  assert.match(switched.json().me.cardNumber, /^E-/);
+  assert.equal(directSwitch.statusCode, 200, directSwitch.body);
+  assert.equal(directSwitch.json().me.persona, 'entrepreneur');
+  assert.match(directSwitch.json().me.cardNumber, /^E-/);
+
+  // The e-mailed-code flow (mock: the public test code stands in for the mail).
+  const samePersona = await post('/api/me/persona/request', { persona: 'entrepreneur' }, token);
+  assert.equal(samePersona.statusCode, 400);
+  assert.equal(samePersona.json().error.code, 'persona_same');
+
+  const requested = await post('/api/me/persona/request', { persona: 'investor' }, token);
+  assert.equal(requested.statusCode, 200, requested.body);
+  assert.equal(requested.json().days, 30);
+
+  const wrongCode = await post('/api/me/persona/confirm', { code: '000000' }, token);
+  assert.equal(wrongCode.statusCode, 400);
+  assert.equal(wrongCode.json().error.code, 'persona_bad_code');
+
+  const confirmed = await post('/api/me/persona/confirm', { code: MOCK_CODE }, token);
+  assert.equal(confirmed.statusCode, 200, confirmed.body);
+  assert.equal(confirmed.json().me.persona, 'investor');
+  assert.match(confirmed.json().me.cardNumber, /^I-/);
+
+  // Admin exemption: no 30-day stamp — a new request right away still passes (members are
+  // refused with persona_cooldown; see personaChange.test.ts for the window itself).
+  const again = await post('/api/me/persona/request', { persona: 'entrepreneur' }, token);
+  assert.equal(again.statusCode, 200, again.body);
+  const confirmedAgain = await post('/api/me/persona/confirm', { code: MOCK_CODE }, token);
+  assert.equal(confirmedAgain.statusCode, 200, confirmedAgain.body);
+  assert.equal(confirmedAgain.json().me.persona, 'entrepreneur');
+
   const badPersona = await app.inject({
     method: 'PATCH',
     url: '/api/me',

@@ -176,7 +176,7 @@ function Field({ field, value, onChange }: { field: FormFieldDef; value: string;
         <Text style={[styles.selectLabel, paper && styles.paperSelectLabel]}>{field.label}</Text>
         <View style={styles.chips}>
           {(field.options ?? []).map((option) => (
-            <Chip key={option} label={option} selected={value === option} onPress={() => onChange(value === option ? '' : option)} />
+            <Chip key={option} label={option} selected={value === option} dimmed={Boolean(value)} onPress={() => onChange(value === option ? '' : option)} />
           ))}
         </View>
       </View>

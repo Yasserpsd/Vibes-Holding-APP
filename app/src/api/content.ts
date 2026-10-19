@@ -52,7 +52,8 @@ export type HomePersonaVariant = {
 };
 
 export type HomeContent = {
-  hero: { eyebrow: string; title: string; subtitle: string };
+  /** `story` (M102): the paragraphs behind «اقرأ المزيد» under the hero; an older server sends none. */
+  hero: { eyebrow: string; title: string; subtitle: string; story?: string[] };
   portals: HomePortal[];
   golden: { title: string; subtitle: string; cta: string };
   membership: { title: string; subtitle: string; cta: string; activeText: string };

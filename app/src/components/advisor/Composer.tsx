@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, TextInput, View } from 'react-native';
 
+import { VoiceButton, voiceInputAvailable } from '@/components/advisor/VoiceButton';
 import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { inputStart } from '@/i18n/direction';
@@ -16,7 +17,9 @@ type Props = {
 };
 
 export function Composer({ value, onChange, onSend, busy }: Props) {
-  const canSend = !busy && value.trim().length > 0;
+  // M104: voice input (binaries without expo-audio hide the mic; see VoiceButton).
+  const [listening, setListening] = useState(false);
+  const canSend = !busy && !listening && value.trim().length > 0;
   const showSpinner = busy && value.trim().length > 0;
   const [focused, setFocused] = useState(false);
   // Crossfade between the send mark and the spinner instead of swapping them cold.
@@ -40,6 +43,9 @@ export function Composer({ value, onChange, onSend, busy }: Props) {
         onBlur={() => setFocused(false)}
         accessibilityLabel={t('advisor.messageLabel')}
       />
+      {voiceInputAvailable() ? (
+        <VoiceButton disabled={busy} onBusy={setListening} onText={(text) => onChange(value.trim() ? `${value.trim()} ${text}` : text)} />
+      ) : null}
       <PressScale
         onPress={onSend}
         disabled={!canSend}

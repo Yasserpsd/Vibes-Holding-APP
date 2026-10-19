@@ -62,7 +62,8 @@ export type HomePersonaVariant = {
 };
 
 export type HomeContent = {
-  hero: { eyebrow: string; title: string; subtitle: string };
+  /** `story` (M102, owner's verbatim text 2026-10-19): the paragraphs behind «اقرأ المزيد» under the hero. */
+  hero: { eyebrow: string; title: string; subtitle: string; story?: string[] };
   portals: HomePortal[];
   golden: { title: string; subtitle: string; cta: string };
   membership: { title: string; subtitle: string; cta: string; activeText: string };
@@ -104,6 +105,11 @@ export const HOME_SEED: HomeContent = {
     // M82 (owner, 2026-10-17): the CANONICAL definition leads the home — verbatim first paragraph.
     subtitle:
       'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
+    // M102 (owner, 2026-10-19, verbatim): the rest of the opening text, behind «اقرأ المزيد».
+    story: [
+      'من السعودية إلى العالم… عضويتك معك أينما كنت؛ فلديك عام كامل تستفيد فيه من جميع مزايا النادي، حضورياً في مقر النادي بمدينة الرياض بالمملكة العربية السعودية، وعبر الإنترنت، وتستكشف المشاريع وفرص الشراكة، لتبني علاقات قد تفتح لك أبوابًا لا يفتحها المال وحده.',
+      'وحين تصل إلى الرياض، فالنادي بيتك الثاني في عالم الأعمال، ولا داعي لأن تحمل همّ متطلبات عملك الأساسية؛ فقد وفّرنا لك قاعة اجتماعات لاستقبال ضيوفك، ومقرًّا مجهّزًا يتسع لـ80 شخصًا مع منصة متكاملة لاستضافة ملتقياتك وورش عملك الخاصة، و15 مكتبًا للاستخدام المؤقت، واستوديو بودكاست لتصل رسالتك، وحاضنة أعمال تحتضن مشروعك. كلها متاحة لك بصفتك عضوًا، مع خصومات تخفّف تكاليف أعمالك.',
+    ],
   },
   // The owner's wording and order (2026-09-21): the neutral member first.
   portals: [
@@ -232,26 +238,31 @@ export const HOME_SEED: HomeContent = {
       },
     },
     entrepreneur: {
-      // M99b: the «+» leads, الملتقيات prominent, and the Projects Bank leaves his home AND his tabs
-      // (it stays reachable from inside حسابي); his services grid leads with the founder's tools.
-      heroSubtitle: 'مشروعك يستحق منصة النادي: خدمات تأخذه خطوة أبعد وفرصة تعرضه على المستثمرين.',
-      order: ['posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      // M99b + M102 (owner, 2026-10-19): the founder sees HIS two doors first — عرض مشروعه في
+      // شركاء النجاح ونشر تطبيقه بدون رسوم — and the rest of the grid waits behind «اضغط للمزيد»
+      // (the app collapses the grid for this persona). His journey: present yourself (podcast,
+      // شخصية ومسيرة), meet investors (الملتقيات), grow the venture (الخدمات).
+      heroSubtitle: 'مشروعك يستحق منصة النادي: اعرضه على المستثمرين في شركاء النجاح، وانشر تطبيقك بدون رسوم.',
+      order: ['services', 'posts', 'agenda', 'podcast', 'quickActions', 'famous', 'partners', 'videos'],
       hide: ['projectsBank', 'golden', 'opportunity', 'wallet'],
       hideTabs: ['projects'],
-      serviceKeys: ['pitch-deck', 'meetup', 'studio', 'momentum', 'theater', 'famous'],
+      serviceKeys: ['app-publish', 'pitch-deck', 'meetup', 'studio', 'momentum', 'theater', 'famous'],
       ctas: {
         agenda: { label: 'ملتقى «5 دقائق» بانتظارك', route: '/agenda' },
         services: { label: 'كل خدماتك', route: '/services' },
+        podcast: { label: 'عرّف المستثمرين بمشروعك', route: '/service/studio' },
       },
     },
     investor: {
-      // M99c: the Projects Bank is the heart — the golden opportunity opens, his wallet beside it,
-      // and the services that serve investing lead his grid.
+      // M99c + M102 (owner): the Projects Bank appeared three times on his home (الفرصة الذهبية،
+      // الكاروسيل، المحفظة) — the carousel block leaves; the opportunity opens and the wallet follows,
+      // and the full bank lives in his بنك المشاريع tab.
       heroSubtitle: 'فرص شراكة حقيقية بانتظارك: بنك المشاريع والملتقيات ومجتمع الأعمال في مكان واحد.',
-      order: ['opportunity', 'posts', 'projectsBank', 'wallet', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      order: ['opportunity', 'wallet', 'posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      hide: ['projectsBank'],
       serviceKeys: ['credit', 'theater', 'consultation', 'meetup'],
       ctas: {
-        projectsBank: { label: 'استكشف فرص الشراكة', route: '/projects' },
+        opportunity: { label: 'استكشف فرص الشراكة', route: '/projects' },
       },
     },
   },
@@ -265,8 +276,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 11,
-  updatedAt: '2026-10-18T00:00:00.000Z',
+  version: 12,
+  updatedAt: '2026-10-19T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */
