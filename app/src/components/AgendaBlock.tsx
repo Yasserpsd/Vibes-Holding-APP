@@ -29,7 +29,7 @@ export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
 
   return (
     <FadeInView delay={160}>
-      <SectionHeader title={t('agenda.title')} subtitle={t('agenda.subtitle')} cta={ctaLabel ?? t('agenda.all')} onPress={() => router.push('/agenda' as Href)} />
+      <SectionHeader icon="calendar-outline" title={t('agenda.title')} subtitle={t('agenda.subtitle')} cta={ctaLabel ?? t('agenda.all')} onPress={() => router.push('/agenda' as Href)} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

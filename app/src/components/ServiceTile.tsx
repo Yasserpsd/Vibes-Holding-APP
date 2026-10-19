@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
 import { PopIn, PressScale } from '@/components/motion';
@@ -14,13 +14,22 @@ type Props = { service: Service; onPress: () => void };
  * M85 (owner, from the reference app): a compact light tile for the 2-column services grid —
  * white card, ink text, a soft-tinted icon badge in the group's accent, and the imperative
  * CTA as a small corner pill. Locked services dim and wear the lock pill instead.
+ * M106 (owner): the service's own photo sits FAINT behind the tile — «الصورة في الخلفية خفيفة
+ * والكلام فوقها» — the ivory wash keeps the ink text readable.
  */
 export function ServiceTile({ service, onPress }: Props) {
   const { locked } = service;
   const accent = serviceAccents[service.group] ?? serviceAccents.entrepreneur;
+  const photo = service.imageUrls?.[0] ?? service.imageUrl ?? null;
   return (
     <PressScale onPress={onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
       <View style={[styles.card, locked && styles.lockedCard]}>
+        {photo && !locked ? (
+          <>
+            <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+            <View style={styles.wash} pointerEvents="none" />
+          </>
+        ) : null}
         <View style={styles.topRow}>
           {/* M84e: the icon badge pops into place — the tile's icon leads, alive. */}
           <PopIn delay={120}>
@@ -78,7 +87,11 @@ const styles = StyleSheet.create({
     padding: spacing.sm + 4,
     gap: spacing.xs,
     boxShadow: shadows.lift,
+    overflow: 'hidden',
   },
+  // M106: the faint photo layer and the ivory wash that keeps the ink readable.
+  photo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(250, 247, 240, 0.88)' },
   lockedCard: { backgroundColor: colors.paper, opacity: 0.82 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.xs },
   badge: {

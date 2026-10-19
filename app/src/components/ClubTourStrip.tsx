@@ -22,7 +22,7 @@ export function ClubTourStrip() {
   const open = () => router.push('/hq' as Href);
   return (
     <FadeInView delay={220}>
-      <SectionHeader title={t('home.tourTitle')} subtitle={t('home.tourSubtitle')} cta={t('home.tourCta')} onPress={open} />
+      <SectionHeader icon="business-outline" title={t('home.tourTitle')} subtitle={t('home.tourSubtitle')} cta={t('home.tourCta')} onPress={open} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

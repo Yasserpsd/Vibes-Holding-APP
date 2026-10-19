@@ -134,13 +134,14 @@ export default function ProjectScreen() {
             </FadeInView>
           ) : null}
 
+          {/* M35 + M106 (owner, third ask): the adviser's table TRULY first — the brief opens the page,
+              the unlock/contact block follows it. */}
           <FadeInView delay={80}>
-            <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} autoStart={contact === '1'} />
+            <ProjectBrief projectId={String(project.id)} />
           </FadeInView>
 
-          {/* M35: the adviser's table before everything else about the project. */}
           <FadeInView delay={140}>
-            <ProjectBrief projectId={String(project.id)} />
+            <ProjectUnlock projectId={String(project.id)} projectTitle={project.title} hasPitchDeck={project.hasPitchDeck} autoStart={contact === '1'} />
           </FadeInView>
 
           {/* M80 (owner): the original text hides behind «اقرأ المزيد», collapsed by default. */}

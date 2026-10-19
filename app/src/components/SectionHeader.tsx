@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { PressScale } from '@/components/motion';
+import { PopIn, PressScale } from '@/components/motion';
 import { chevronForward, textStart } from '@/i18n/direction';
-import { colors, fonts, gradients, shadows, spacing, typography } from '@/theme/tokens';
+import type { IoniconName } from '@/lib/icons';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   title: string;
@@ -12,16 +13,25 @@ type Props = {
   onPress?: () => void;
   /** M75: an unread count pinned beside the title («+3»); 0 hides it. */
   badge?: number;
+  /** M106 (owner: «زود أيقونز»): a small golden icon badge leading the title. */
+  icon?: IoniconName;
 };
 
 /** Section title behind a small gold accent bar, with an optional «عرض الكل» link on the far side. */
-export function SectionHeader({ title, subtitle, cta, onPress, badge = 0 }: Props) {
+export function SectionHeader({ title, subtitle, cta, onPress, badge = 0, icon }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.accent} />
       <View style={styles.texts}>
         {/* M77 (owner): the CTA sits on the TITLE line, parallel to it, never bouncing to the subtitle's bottom. */}
         <View style={styles.titleRow}>
+          {icon ? (
+            <PopIn delay={120}>
+              <View style={styles.iconBadge}>
+                <Ionicons name={icon} size={14} color={colors.gold} />
+              </View>
+            </PopIn>
+          ) : null}
           <Text style={styles.title}>{title}</Text>
           {badge > 0 ? (
             <View style={styles.badge}>
@@ -55,6 +65,17 @@ const styles = StyleSheet.create({
   },
   texts: { flex: 1, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // M106: the title's golden icon badge.
+  iconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.goldSoft,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+  },
   title: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   // M102 (owner): «كل / عرض الكل» reads as a BUTTON now — a small gold pill, not a floating word.

@@ -173,6 +173,7 @@ export default function HomeScreen() {
       content.projectsBank ? (
         <FadeInView key="projectsBank" delay={200}>
           <SectionHeader
+            icon="briefcase-outline"
             title={content.projectsBank.title}
             subtitle={content.projectsBank.subtitle}
             cta={ctaOf('projectsBank')?.label ?? content.projectsBank.cta}
@@ -229,6 +230,7 @@ export default function HomeScreen() {
     services: () => (
       <FadeInView key="services" delay={320}>
         <SectionHeader
+          icon="grid-outline"
           title={content.services.title}
           subtitle={content.services.subtitle}
           cta={ctaOf('services')?.label ?? content.services.cta}
@@ -264,7 +266,7 @@ export default function HomeScreen() {
     partners: () =>
       content.partners && (partners.data?.partners.length ?? 0) > 0 ? (
         <FadeInView key="partners" delay={340}>
-          <SectionHeader title={content.partners.title} subtitle={content.partners.subtitle} cta={content.partners.cta} onPress={() => router.push('/partners' as Href)} />
+          <SectionHeader icon="pricetags-outline" title={content.partners.title} subtitle={content.partners.subtitle} cta={content.partners.cta} onPress={() => router.push('/partners' as Href)} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -283,7 +285,7 @@ export default function HomeScreen() {
     videos: () =>
       featured.length ? (
         <FadeInView key="videos" delay={360}>
-          <SectionHeader title={content.videos.title} subtitle={content.videos.subtitle} cta={content.videos.cta} onPress={() => router.push('/videos')} />
+          <SectionHeader icon="play-circle-outline" title={content.videos.title} subtitle={content.videos.subtitle} cta={content.videos.cta} onPress={() => router.push('/videos')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

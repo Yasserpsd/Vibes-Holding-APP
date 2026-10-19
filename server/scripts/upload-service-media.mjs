@@ -89,12 +89,12 @@ const PLAN = [
   { file: 'franchise-5.webp', slot: 'service.franchise.5' },
   { file: 'franchise-6.webp', slot: 'service.franchise.6' },
   // كود خصم منتجات «منفذ» — the products-and-Riyadh display leads, the invoice closes.
-  { file: 'manfath-1.webp', slot: 'service.manfath' },
-  { file: 'manfath-2.webp', slot: 'service.manfath.2' },
-  { file: 'manfath-3.webp', slot: 'service.manfath.3' },
-  { file: 'manfath-4.webp', slot: 'service.manfath.4' },
-  { file: 'manfath-5.webp', slot: 'service.manfath.5' },
-  { file: 'manfath-6.webp', slot: 'service.manfath.6' },
+  { file: 'manfath-1.webp', slot: 'service.manfaz' },
+  { file: 'manfath-2.webp', slot: 'service.manfaz.2' },
+  { file: 'manfath-3.webp', slot: 'service.manfaz.3' },
+  { file: 'manfath-4.webp', slot: 'service.manfaz.4' },
+  { file: 'manfath-5.webp', slot: 'service.manfaz.5' },
+  { file: 'manfath-6.webp', slot: 'service.manfaz.6' },
 ];
 
 async function env() {

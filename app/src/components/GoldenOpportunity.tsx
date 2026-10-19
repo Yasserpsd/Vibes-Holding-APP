@@ -39,7 +39,7 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
 
   return (
     <View>
-      <SectionHeader title={block.title} subtitle={block.subtitle} />
+      <SectionHeader icon="star-outline" title={block.title} subtitle={block.subtitle} />
       <PressScale
         onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(project.id) } })}
         glow

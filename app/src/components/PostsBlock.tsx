@@ -32,7 +32,7 @@ export function PostsBlock() {
   return (
     <FadeInView delay={140}>
       <View style={styles.block}>
-        <SectionHeader title={t('nav.posts')} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
+        <SectionHeader icon="newspaper-outline" title={t('nav.posts')} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
         {posts.map((post, index) => (
           <FadeInView key={post.id} delay={entranceDelay(index, 70)}>
             <PostCard post={post} />

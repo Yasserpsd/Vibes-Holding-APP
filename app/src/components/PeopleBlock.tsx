@@ -24,6 +24,7 @@ export function PeopleBlock({ block }: { block?: { title: string; subtitle: stri
   return (
     <FadeInView delay={180}>
       <SectionHeader
+        icon="sparkles-outline"
         title={block?.title ?? t('people.title')}
         subtitle={block?.subtitle ?? people.data?.intro ?? ''}
         cta={items.length > 0 ? t('people.all') : null}
