@@ -50,22 +50,26 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
       : project;
   const proxiedPage = (page: ProjectsPage): ProjectsPage => ({ ...page, items: page.items.map(proxied) });
 
+  // M109h: a cold-started server answers image requests BEFORE the feed's first refresh — that is
+  // «try again shortly» (503, never cached), not a 404 a CDN could hold onto; a failed upstream
+  // fetch of a known image is the same. Only a truly unknown project/slot earns the 404.
+  const serveProxied = async (reply: FastifyReply, url: string | null | undefined) => {
+    if (!url) return reply.code(service.status().count === 0 ? 503 : 404).header('cache-control', 'no-store').send();
+    const image = await proxy.get(url);
+    if (!image) return reply.code(503).header('cache-control', 'no-store').send();
+    return reply.header('cache-control', 'public, max-age=43200').type(image.type).send(image.buffer);
+  };
+
   app.get('/img/pb/:id', async (request, reply) => {
     const params = idParamSchema.safeParse(request.params);
     if (!params.success) return reply.code(404).send();
-    const url = service.get(params.data.id)?.image;
-    const image = url ? await proxy.get(url) : null;
-    if (!image) return reply.code(404).send();
-    return reply.header('cache-control', 'public, max-age=43200').type(image.type).send(image.buffer);
+    return serveProxied(reply, service.get(params.data.id)?.image);
   });
 
   app.get('/img/pb/:id/g/:index', async (request, reply) => {
     const params = galleryParamSchema.safeParse(request.params);
     if (!params.success) return reply.code(404).send();
-    const url = service.get(params.data.id)?.gallery[params.data.index];
-    const image = url ? await proxy.get(url) : null;
-    if (!image) return reply.code(404).send();
-    return reply.header('cache-control', 'public, max-age=43200').type(image.type).send(image.buffer);
+    return serveProxied(reply, service.get(params.data.id)?.gallery[params.data.index]);
   });
 
   // The English app (M27) reads the founders' English fields and the terms' English names (projectsBank/lang.ts).

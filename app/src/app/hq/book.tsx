@@ -18,7 +18,7 @@ import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatHours, formatNumber, weekdayName } from '@/lib/format';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, spacing, typography } from '@/theme/tokens';
 
 /** M109a: the booking kinds — a plain visit, or an hours-wallet space (مكتب خاص / قاعة اجتماعات). */
 const KINDS: { key: 'visit' | HqSpace; label: StringKey }[] = [
