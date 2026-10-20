@@ -12,6 +12,7 @@ import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
 import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
+import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
@@ -413,7 +414,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail });
+  // M109e: the English app's view of the member's own data — its own transliteration prompt, cached per profile.
+  const meLocalizer = new MeLocalizer(
+    kv,
+    config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
+  );
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice });

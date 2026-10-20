@@ -2,7 +2,9 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
+import { langOf } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { guard, parse, sessionGuard } from './guard.js';
@@ -20,6 +22,8 @@ export type AuthRoutesOptions = {
   /** M101: the e-mailed-code persona change (absent only in old tests; the routes then 404). */
   personaChange?: PersonaChangeStore;
   mailer?: Mailer;
+  /** M109e: the member's data in English for the English app (absent in old tests: no `en` block). */
+  meLocalizer?: MeLocalizer;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -79,9 +83,17 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
+
+  // M109e: the English app gets the member's own data in English too; a failed translation
+  // never breaks the account answer — the registered data stands in.
+  const withEnglish = async (request: FastifyRequest, me: Awaited<ReturnType<AuthService['me']>>) => {
+    if (!meLocalizer) return me;
+    const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
+    return en ? { ...me, en } : me;
+  };
 
   const limited = (name: string, limit: number, request: FastifyRequest, reply: FastifyReply): boolean => {
     if (limiter.hit(`${name}:${request.ip}`, limit, WINDOW)) return false;
@@ -137,7 +149,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('verify', 12, request, reply)) return;
       const body = parse(verifySchema, request.body, reply);
       if (!body) return;
-      return service.verify(body.pendingToken, body.code, request.ip);
+      const result = await service.verify(body.pendingToken, body.code, request.ip);
+      return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -147,7 +160,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('login', 12, request, reply)) return;
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
-      return service.login(body.login, body.password, request.ip);
+      const result = await service.login(body.login, body.password, request.ip);
+      return result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -159,7 +173,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(socialSchema, request.body, reply);
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
-      return service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
+      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
+      return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -233,7 +248,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const query = meQuerySchema.safeParse(request.query);
       const me = await service.me(auth.session, query.success && query.data.fresh === '1');
-      return { me };
+      return { me: await withEnglish(request, me) };
     }),
   );
 
@@ -253,7 +268,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         }
       }
       const me = await service.updateProfile(auth.session, body);
-      return { me };
+      return { me: await withEnglish(request, me) };
     }),
   );
 
@@ -326,7 +341,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       }
       const updated = await service.updateProfile(auth.session, { persona: result.persona });
       if (!updated.isAdmin) await personaChange.stamp(me.id);
-      return { me: updated };
+      return { me: await withEnglish(request, updated) };
     }),
   );
 

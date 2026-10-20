@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { getLang } from '@/i18n';
+
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/auth/service.ts and server/src/auth/routes.ts.
@@ -35,7 +37,19 @@ export type Me = {
   membership: Membership;
   /** M30: the number on the membership card; an older server sends none and the card hides it. */
   cardNumber?: string;
+  /** M109e: the same data in English (name transliterated) when the app asks in English; an older server sends none. */
+  en?: { name: string; jobTitle: string; company: string; city: string; bio: string } | null;
 };
+
+/**
+ * M109e: the member's data as THIS language displays it — the English app shows the translated
+ * block (nothing stays Arabic on the card), the Arabic app the registered data. Display only:
+ * the profile editor keeps editing the registered originals.
+ */
+export function displayProfile(me: Me): { name: string; jobTitle: string; company: string; city: string; bio: string } {
+  const { name, jobTitle, company, city, bio } = me;
+  return getLang() === 'en' && me.en ? me.en : { name, jobTitle, company, city, bio };
+}
 
 /** M64: `nameEn` arrives with the world country list; an older server sends none. */
 export type Country = { code: string; name: string; nameEn?: string; dial: string; flag: string; example: string; pattern: string };

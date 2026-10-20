@@ -40,6 +40,9 @@ export type Membership = {
   aiDailyLeft: number | null;
 };
 
+/** M109e: the member's data as the ENGLISH app displays it (name transliterated); never stored at the hub. */
+export type MeEnglish = { name: string; jobTitle: string; company: string; city: string; bio: string };
+
 /** The account as the app sees it. Built from the hub contact; never stored on the server. */
 export type Me = {
   id: number;
@@ -63,6 +66,8 @@ export type Me = {
   membership: Membership;
   /** M30: the number on the membership card, derived from the category and the contact id. */
   cardNumber: string;
+  /** M109e: filled per-request when the app asks in English; absent otherwise (display only). */
+  en?: MeEnglish | null;
 };
 
 export type RegisterInput = {

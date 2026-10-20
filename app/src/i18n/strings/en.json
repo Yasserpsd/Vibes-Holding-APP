@@ -210,6 +210,7 @@
   "account.group.club": "Club services",
   "account.group.security": "Security",
   "account.group.preferences": "Preferences & app",
+  "account.group.more": "More",
   "security.title": "Security settings",
   "security.subtitle": "Your password and account management.",
   "security.changePassword": "Change password",
