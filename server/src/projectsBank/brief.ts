@@ -44,7 +44,8 @@ export const BRIEF_DISCLAIMER_EN = "An automatic summary from the project's publ
 /** The Arabic brief keeps its key of M13; the English one sits beside it. */
 export const briefKey = (id: number, lang: AppLang = 'ar'): string => (lang === 'en' ? `projects:brief:${id}:en` : `projects:brief:${id}`);
 
-const VERSION = 6;
+// 7: M116b (owner) — shorter summary, table rows inferred instead of «unknown», unknown-ish values dropped.
+const VERSION = 7;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
@@ -140,6 +141,8 @@ const RETURNS = /عائد|عوائد|أرباح|ارباح|ربح|roi|return|pro
 /** Forward-looking yield talk: never in the prose, whatever the founder wrote. */
 const YIELD = /عائد|عوائد|roi|return on/i;
 const CONTACT_LABEL = /واتس|جوال|هاتف|تواصل|بريد|ايميل|إيميل|موقع|رابط|email|phone|whats|website|انستقرام|تويتر|سناب/i;
+/** M116b (owner: «مش عايز اي حاجه unknown نهائي»): a placeholder value drops the whole row. */
+const UNKNOWNISH = /^(?:[-—ـ_.?؟]+|unknown|unspecified|not\s+specified|n\/?a|none|null|غير\s+(?:محدد|محددة|متوفر|معروف|معروفة|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون)$/iu;
 /** Rows about what the project asks for or who founded it: the app shows what the project is (owner's rule). */
 const ASK_LABEL = /المطلوب|الاحتياج|التمويل|الاستثمار|رأس\s*المال|راس\s*المال|الحص[ةه]|التقييم|المؤسس|المالك|funding|investment|valuation|equity|founder|the ask/i;
 
@@ -239,7 +242,7 @@ function writtenRows(details: string, taken: Set<string>, lang: AppLang): BriefR
     if (!match) continue;
     const label = fixWording(match[1] ?? '', lang);
     const value = fixWording(match[2] ?? '', lang);
-    if (!label || !value || taken.has(label) || RETURNS.test(label + value) || PROMISE.test(value) || CONTACT_LABEL.test(label) || ASK_LABEL.test(label) || mentionsFunding(value)) continue;
+    if (!label || !value || taken.has(label) || UNKNOWNISH.test(value) || RETURNS.test(label + value) || PROMISE.test(value) || CONTACT_LABEL.test(label) || ASK_LABEL.test(label) || mentionsFunding(value)) continue;
     taken.add(label);
     rows.push({ label, value });
     if (rows.length >= 6) break;
@@ -289,7 +292,7 @@ const systemPrompt = (lang: AppLang): string =>
     'Never promise or estimate returns or profits, never call anything guaranteed or safe, never advise to invest. No contact data of any kind (phones, e-mails, links, handles).',
     'Describe what the project IS. Never say what it asks for: no funding sought, no investment amount, no capital, no valuation, no equity or share on offer, no founder name.',
     ...TEXT[lang].language,
-    'Return: summary (2 to 4 sentences: what it is, for whom, how it earns, where it stands); table (up to 8 rows «label, value» with the facts a partner asks about first, taken from the text: product, customers, revenue model, location, team… skip a row when the text does not say); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; «unknown» whenever the text does not say it plainly.',
+    'Return: summary (2 to 3 SHORT sentences, about 45 words in all: what it is, for whom, how it earns — a member reads it in one glance, never a wall of text); table (up to 8 rows «label, value» with the facts a partner asks about first: product, customers, revenue model, location, team… each value stated in the text, or carefully INFERRED from the description when the inference is obvious — e.g. a legal AI assistant for individuals and firms clearly earns by subscriptions/paid plans if the text implies a service; a value is NEVER «unknown», «غير معروف», «غير محدد» or any placeholder: when you cannot state or soundly infer it, OMIT the whole row); strengths (up to 4); risks (up to 4, honest and specific to what the text says or leaves out); competitors: for EVERY competitor id you were given, one sentence «why» it is comparable, from the two descriptions only; stageKey: where the project stands TODAY by what the description says already exists (idea = an idea or a study; prototype = founding, building or a first version; launch = launched and operating; revenue = sales or income already coming in; growth = already expanding to new markets or branches). Plans, goals and ambitions never count; for stageKey only, «unknown» whenever the text does not say it plainly.',
   ].join('\n');
 
 const RESPONSE_FORMAT = {
@@ -316,7 +319,7 @@ const RESPONSE_FORMAT = {
 const line = z.string().trim().min(5).max(260);
 const answerSchema = z
   .object({
-    summary: z.string().trim().min(40).max(900),
+    summary: z.string().trim().min(40).max(420),
     table: z.array(z.object({ label: z.string().trim().min(2).max(40), value: z.string().trim().min(1).max(220) }).strict()).max(12),
     strengths: z.array(line).max(6),
     risks: z.array(line).max(6),
@@ -408,7 +411,7 @@ export class BriefService {
     const taken = new Set(facts.map((row) => row.label));
     const extra = answer.table
       .map((row) => ({ label: fixWording(row.label, lang), value: fixWording(row.value, lang) }))
-      .filter((row) => sound(row.value) && sound(row.label) && !RETURNS.test(row.label + row.value) && !CONTACT_LABEL.test(row.label) && !ASK_LABEL.test(row.label) && !taken.has(row.label))
+      .filter((row) => sound(row.value) && sound(row.label) && !UNKNOWNISH.test(row.value) && !RETURNS.test(row.label + row.value) && !CONTACT_LABEL.test(row.label) && !ASK_LABEL.test(row.label) && !taken.has(row.label))
       .slice(0, 8);
     const lines = (items: string[], fallback: string[]): string[] => {
       const kept = items.map((item) => fixWording(item, lang)).filter((item) => sound(item) && !YIELD.test(item)).slice(0, 4);

@@ -90,8 +90,8 @@ export default function ProjectScreen() {
 
           <FadeInView delay={30}>
             <Text style={styles.title}>{project.title}</Text>
-            {/* M116: the stars right under the name. */}
-            {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} size={16} /> : null}
+            {/* M116: the stars right under the name — empty outlines until the first rating. */}
+            {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} size={16} /> : null}
           </FadeInView>
           {project.titleEn ? (
             <FadeInView delay={50}>

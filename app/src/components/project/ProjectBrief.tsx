@@ -31,8 +31,17 @@ export function ProjectBrief({ projectId }: { projectId: string }) {
   return <BriefBody brief={query.data} />;
 }
 
-/** M95 (owner): «مش عايز اي خانات فاضية» — a row whose value is empty or a placeholder never renders. */
-export const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|متوفر|معروف|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون|n\/?a|none|null)$/iu;
+/** M95 (owner): «مش عايز اي خانات فاضية» — a row whose value is empty or a placeholder never renders.
+ *  M116b (owner: «مش عايز اي حاجه unknown نهائي»): the literal unknowns joined the list. */
+export const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|محددة|متوفر|معروف|معروفة|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون|unknown|unspecified|not\s+specified|n\/?a|none|null)$/iu;
+
+/** M116b (owner: «الكلام ورا بعض يتظبط ويتفنط»): the summary wall becomes tidy sentence lines. */
+function summaryLines(summary: string): string[] {
+  return summary
+    .split(/(?<=[.!؟?])\s+/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 1);
+}
 
 function BriefBody({ brief }: { brief: Brief }) {
   const router = useRouter();
@@ -50,11 +59,8 @@ function BriefBody({ brief }: { brief: Brief }) {
             </View>
             <Text style={styles.headerTitle}>{t('brief.title')}</Text>
           </View>
-          {brief.summary ? <Highlight text={brief.summary} style={styles.summary} /> : null}
 
-          {/* M80 (owner): the stage stepper FIRST — «اول حاجة مرحلة المشروع الشكل المميز ده» — then the table. */}
-          <StageStepper stage={brief.stage} />
-
+          {/* M116b (owner): the TABLE leads; no paragraph wall above it. */}
           {rows.length ? (
             <View style={styles.table}>
               {rows.map((row, index) => (
@@ -74,6 +80,12 @@ function BriefBody({ brief }: { brief: Brief }) {
               ))}
             </View>
           ) : null}
+
+          {/* The stage stepper rides right under the facts. */}
+          <StageStepper stage={brief.stage} />
+
+          {/* M116b: the summary follows the table as tidy sentence lines, never a text wall. */}
+          {brief.summary ? <Points title={t('brief.about')} icon="reader-outline" tone={colors.gold} items={summaryLines(brief.summary)} /> : null}
 
           <Points title={t('brief.strengths')} icon="trending-up-outline" tone={colors.success} items={brief.strengths} />
           <Points title={t('brief.risks')} icon="alert-circle-outline" tone={colors.warning} items={brief.risks} />

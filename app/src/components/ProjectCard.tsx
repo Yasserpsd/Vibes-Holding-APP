@@ -80,8 +80,8 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
           <Text style={styles.title} numberOfLines={2}>
             {project.title}
           </Text>
-          {/* M116: the stars the owner asked for on every project. */}
-          {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
+          {/* M116: the stars on EVERY project — empty outlines until the first rating (owner). */}
+          {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
           {project.companyName ? (
             <Text style={styles.company} numberOfLines={1}>
               {project.companyName}

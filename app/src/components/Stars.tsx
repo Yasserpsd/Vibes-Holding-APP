@@ -15,16 +15,16 @@ function starNames(value: number): ('star' | 'star-half' | 'star-outline')[] {
 }
 
 export function StarsRow({ value, count, size = 14 }: { value: number | null; count?: number; size?: number }) {
-  if (value === null) return null;
+  // M116b (owner): EVERY project wears the stars — no rating yet shows the five empty outlines.
   return (
-    <View style={styles.row} accessibilityLabel={t('ratings.a11y', { stars: String(value) })}>
+    <View style={styles.row} accessibilityLabel={t('ratings.a11y', { stars: String(value ?? 0) })}>
       <View style={styles.stars}>
-        {starNames(value).map((name, index) => (
-          <Ionicons key={index} name={name} size={size} color={colors.gold} />
+        {starNames(value ?? 0).map((name, index) => (
+          <Ionicons key={index} name={name} size={size} color={value === null ? colors.goldDark : colors.gold} />
         ))}
       </View>
-      <Text style={[styles.value, { fontSize: size - 1, lineHeight: size + 4 }]}>{value}</Text>
-      {count !== undefined && count > 0 ? (
+      {value !== null ? <Text style={[styles.value, { fontSize: size - 1, lineHeight: size + 4 }]}>{value}</Text> : null}
+      {value !== null && count !== undefined && count > 0 ? (
         <Text style={[styles.count, { fontSize: size - 2, lineHeight: size + 4 }]}>({count})</Text>
       ) : null}
     </View>

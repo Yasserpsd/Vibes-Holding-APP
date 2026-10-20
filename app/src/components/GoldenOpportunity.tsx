@@ -83,7 +83,7 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
             <Text style={styles.title} numberOfLines={2}>
               {project.title}
             </Text>
-            {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
+            {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
             <View style={styles.ctaRow}>
               <Text style={styles.cta}>{block.cta}</Text>
               <Ionicons name={chevronForward()} size={14} color={colors.gold} />
