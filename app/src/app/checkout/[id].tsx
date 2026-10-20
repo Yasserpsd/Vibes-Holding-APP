@@ -68,6 +68,9 @@ export default function CheckoutScreen() {
           source={{ uri: payment.checkoutUrl }}
           style={styles.web}
           containerStyle={styles.webContainer}
+          // Owner (2026-10-20, the black 3-D Secure page): payment pages stay WHITE, always — the
+          // bank's verification page has no background of its own and Android force-dark inverted it.
+          forceDarkOn={false}
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loading}>
@@ -115,8 +118,12 @@ export default function CheckoutScreen() {
   );
 }
 
+// The whole checkout lives on WHITE (owner: «لما الموضوع يكون في دفع الخلفية بيضاء تمامًا») —
+// the gateway and bank pages assume a light background, and gold on white stays the brand accent.
+const PAPER = '#FFFFFF';
+const INK = '#1C1C1C';
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colors.black },
+  page: { flex: 1, backgroundColor: PAPER },
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -125,13 +132,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E8E2D2',
+    backgroundColor: PAPER,
   },
-  service: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  service: { ...typography.body, color: INK, flex: 1 },
   amount: { ...typography.subtitle, color: colors.gold },
-  web: { flex: 1, backgroundColor: colors.black },
-  webContainer: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.black },
-  fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
-  fallbackText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  web: { flex: 1, backgroundColor: PAPER },
+  webContainer: { flex: 1, backgroundColor: PAPER },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PAPER },
+  fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: PAPER },
+  fallbackText: { ...typography.body, color: INK, textAlign: 'center' },
 });

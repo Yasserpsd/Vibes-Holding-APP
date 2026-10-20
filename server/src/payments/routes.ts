@@ -96,6 +96,28 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
     return reply.type('text/html; charset=utf-8').send(returnPage(result, appScheme));
   });
 
+  // M110: resend the invoice mails (customer + admin copies) and report each send's exact error.
+  app.post(
+    '/api/admin/payments/:id/invoice/resend',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      return service.resendInvoice(params.id);
+    }),
+  );
+
+  // Why do no mails arrive? Sends one probe mail to the admin list and returns the SMTP error text.
+  app.post(
+    '/api/admin/mail/probe',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return service.mailProbe();
+    }),
+  );
+
   // M110: the customer's printable invoice (paid payments only; the uuid is the access key).
   app.get(
     '/pay/invoice/:id',
