@@ -700,7 +700,7 @@
   "service.discountApplied": "after {percent}% off",
   "service.discountFree": "The code covers the whole price — your request confirms with no payment",
   "service.confirmByCode": "Confirm with the code",
-  "service.save": "Save SAR {amount} with the membership",
+  "service.save": "Save SAR {amount} with your membership",
   "service.signInToPay": "Paying inside the app requires signing in to your account.",
   "service.signInButton": "Sign in to pay",
   "service.payNow": "Pay now",

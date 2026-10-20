@@ -22,6 +22,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
+import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { composeRequest, openWhatsApp } from '@/lib/whatsapp';
@@ -131,6 +132,15 @@ export default function ServiceScreen() {
               <View style={styles.labels}>
                 {service.priceLabel ? <Text style={styles.price}>{service.priceLabel}</Text> : null}
                 {service.memberLabel ? <Text style={styles.member}>{service.memberLabel}</Text> : null}
+              </View>
+            ) : null}
+            {/* M109b «وفّر … ريال بعضويتك»: the membership saving, loud under the price. */}
+            {service.savingsSar ? (
+              <View style={styles.savingsPill}>
+                <Ionicons name="sparkles" size={13} color={colors.goldInk} />
+                <Text style={styles.savingsText} numberOfLines={1}>
+                  {t('service.save', { amount: formatNumber(service.savingsSar) })}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -247,10 +257,7 @@ function ActionPanel({ action, price, signedIn, paying, answers, discount, onAns
               {price.memberPrice && !discount.applied ? <Text style={styles.paperPriceNote}>{t('service.memberPrice')}</Text> : null}
             </View>
           ) : null}
-          {/* M107 «وفّر بالعضوية»: the membership saving, spelled out for a non-member payer. */}
-          {price && !price.memberPrice && action.memberAmount !== null && action.amount > action.memberAmount ? (
-            <Text style={styles.paperPriceNote}>{t('service.save', { amount: String(action.amount - action.memberAmount) })}</Text>
-          ) : null}
+          {/* M109b: the saving moved up beside the price in the header; the panel stays uncrowded. */}
           {signedIn && price ? (
             <View style={styles.codeRow}>
               <View style={styles.codeField}>
@@ -339,6 +346,19 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 4 },
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  // M109b: the gold savings pill under the price labels.
+  savingsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  savingsText: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
   price: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textPrimary },
   member: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLight },
   summary: { ...typography.body, color: colors.textPrimary, textAlign: textStart },

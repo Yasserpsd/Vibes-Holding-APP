@@ -700,7 +700,7 @@
   "service.discountApplied": "بعد خصم {percent}%",
   "service.discountFree": "الكود يغطي السعر كاملًا — يتأكد طلبك بدون دفع",
   "service.confirmByCode": "تأكيد الطلب بالكود",
-  "service.save": "وفّر {amount} ريال بالعضوية",
+  "service.save": "وفّر {amount} ريال بعضويتك",
   "service.signInToPay": "الدفع من داخل التطبيق يحتاج تسجيل الدخول بحسابك.",
   "service.signInButton": "سجّل الدخول للدفع",
   "service.payNow": "ادفع الآن",

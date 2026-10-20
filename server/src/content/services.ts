@@ -73,7 +73,13 @@ export type ServicesContent = {
 export type ServicePrice = { amount: number; currency: string; memberPrice: boolean };
 
 /** A service as the app receives it: locked services carry no action. */
-export type PublicService = Omit<Service, 'action'> & { locked: boolean; action: ServiceAction | null; price: ServicePrice | null };
+export type PublicService = Omit<Service, 'action'> & {
+  locked: boolean;
+  action: ServiceAction | null;
+  price: ServicePrice | null;
+  /** M109b «وفّر … ريال بعضويتك»: list price minus member price, for every priced service with a member cut. */
+  savingsSar: number | null;
+};
 
 export const SERVICES_CONTENT_KEY = 'content:services';
 
@@ -385,10 +391,17 @@ export function priceFor(service: Service, me: Me | null): ServicePrice | null {
   return { amount: memberPrice ? (service.action.memberAmount as number) : service.action.amount, currency: service.action.currency, memberPrice };
 }
 
+/** M109b: what the annual membership saves on this service (the agenda's savingsSar, for services). */
+export function savingsOf(service: Service): number | null {
+  if (service.action.type !== 'paymob' || service.action.memberAmount === null) return null;
+  const saved = service.action.amount - service.action.memberAmount;
+  return saved > 0 ? saved : null;
+}
+
 export function toPublicService(service: Service, me: Me | null): PublicService {
   const locked = service.access === 'member' && !isActiveMember(me);
   const { action, ...rest } = service;
-  return { ...rest, locked, action: locked ? null : action, price: locked ? null : priceFor(service, me) };
+  return { ...rest, locked, action: locked ? null : action, price: locked ? null : priceFor(service, me), savingsSar: savingsOf(service) };
 }
 
 export function lockedTextFor(content: ServicesContent, me: Me | null): string {
