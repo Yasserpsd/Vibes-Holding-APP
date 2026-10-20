@@ -17,6 +17,7 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
+import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
 import { PushRegistrar } from '@/components/PushRegistrar';
@@ -136,6 +137,8 @@ export default function RootLayout() {
                 <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
                 <Stack.Screen name="security" options={{ ...detailHeader, title: t('security.title') }} />
                 <Stack.Screen name="delete-account" options={{ ...detailHeader, title: t('deleteAccount.title') }} />
+                {/* M116d: club pages inside the app (terms, privacy…) — the screen sets its own title. */}
+                <Stack.Screen name="webpage" options={{ ...detailHeader, title: '' }} />
                 <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
                 <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
@@ -153,6 +156,8 @@ export default function RootLayout() {
           <GuestNudge />
           {/* M85f: gold confetti the moment the membership turns active, wherever it is noticed. */}
           <MembershipCelebration />
+          {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
+          <SplashFlash />
         </GuestGateProvider>
       </AuthProvider>
     </QueryClientProvider>
