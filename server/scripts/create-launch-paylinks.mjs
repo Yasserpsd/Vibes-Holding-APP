@@ -6,15 +6,17 @@ const API = 'https://vibes-holding-app-production.up.railway.app';
 const ENV_FILE = 'C:/Projects/vibes-club-app/server/.env.admin.local';
 
 // M108b: permanent links — a stable /pay/link/:id URL that mints a fresh invoice per visitor, forever.
+// Pricing model (owner, 2026-10-20): members pay 50% of every service — the low price IS the member
+// price, the high price is the non-member price (not package tiers). Workshops vary per workshop.
 const LINKS = [
-  { kind: 'membership', amountSar: 3900, permanent: true, label: 'العضوية السنوية لنادي المستثمرين — السعر الكامل' },
-  { kind: 'membership', amountSar: 1900, permanent: true, label: 'العضوية السنوية لنادي المستثمرين — سعر العرض' },
-  { kind: 'other', amountSar: 15000, permanent: true, label: 'خدمة اصنع ملتقاك — الباقة الأساسية' },
-  { kind: 'other', amountSar: 30000, permanent: true, label: 'خدمة اصنع ملتقاك — الباقة الكاملة' },
-  { kind: 'other', amountSar: 2500, permanent: true, label: 'خدمة Pitch Deck — الباقة الأساسية' },
-  { kind: 'other', amountSar: 5000, permanent: true, label: 'خدمة Pitch Deck — الباقة الكاملة' },
-  { kind: 'workshop', amountSar: 290, permanent: true, label: 'ورش العمل الدورية — ورشة أونلاين' },
-  { kind: 'workshop', amountSar: 3000, permanent: true, label: 'ورش العمل الدورية — الورشة المتقدمة' },
+  { kind: 'membership', amountSar: 3900, permanent: true, label: 'العضوية السنوية لنادي المستثمرين' },
+  { kind: 'membership', amountSar: 1900, permanent: true, label: 'العضوية السنوية لنادي المستثمرين — سعر العرض (حسب الخصومات)' },
+  { kind: 'other', amountSar: 30000, permanent: true, label: 'خدمة اصنع ملتقاك — سعر غير الأعضاء' },
+  { kind: 'other', amountSar: 15000, permanent: true, label: 'خدمة اصنع ملتقاك — سعر الأعضاء (خصم 50% بالعضوية)' },
+  { kind: 'other', amountSar: 5000, permanent: true, label: 'خدمة Pitch Deck — سعر غير الأعضاء' },
+  { kind: 'other', amountSar: 2500, permanent: true, label: 'خدمة Pitch Deck — سعر الأعضاء (خصم 50% بالعضوية)' },
+  { kind: 'workshop', amountSar: 290, permanent: true, label: 'ورشة عمل دورية — رسوم الحضور' },
+  { kind: 'workshop', amountSar: 3000, permanent: true, label: 'ورشة عمل دورية — رسوم الحضور' },
 ];
 
 const text = await readFile(ENV_FILE, 'utf8');
