@@ -17,7 +17,7 @@ export type Payment = {
   memberPrice: boolean;
   status: PaymentStatus;
   /** M107: `code` = confirmed by a 100% discount code, no gateway and no checkout. */
-  provider: 'paymob' | 'mock' | 'code';
+  provider: 'paymob' | 'moyasar' | 'mock' | 'code';
   /** M107: the discount applied, when any. */
   discountCode?: string | null;
   discountPercent?: number | null;

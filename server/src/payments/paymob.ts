@@ -23,6 +23,8 @@ export type Intention = { intentionId: string; orderId: string; clientSecret: st
 
 export interface PaymobGateway {
   readonly mode: 'live' | 'mock';
+  /** Which real gateway stands behind the intention (the payment records it and the callback route checks it). */
+  readonly provider: 'paymob' | 'moyasar' | 'mock';
   createIntention(input: IntentionInput): Promise<Intention>;
 }
 
@@ -39,6 +41,7 @@ export type LivePaymobOptions = {
 
 export class LivePaymob implements PaymobGateway {
   readonly mode = 'live' as const;
+  readonly provider = 'paymob' as const;
 
   constructor(private readonly options: LivePaymobOptions) {}
 
@@ -104,6 +107,7 @@ export const MOCK_HMAC_SECRET = 'mock-paymob-hmac-secret';
 /** No gateway: the checkout URL is a local page that fires the same signed callback as Paymob would. */
 export class MockPaymob implements PaymobGateway {
   readonly mode = 'mock' as const;
+  readonly provider = 'mock' as const;
   private counter = Date.now() % 1_000_000;
 
   constructor(private readonly publicUrl: string) {}

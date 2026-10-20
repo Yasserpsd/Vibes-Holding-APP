@@ -59,6 +59,12 @@ const envSchema = z.object({
   PAYMOB_HMAC_SECRET: z.string().min(10).optional(),
   // Integration id(s) of the payment methods shown at checkout (comma separated).
   PAYMOB_INTEGRATION_ID: z.string().min(1).optional(),
+  // Moyasar (Saudi gateway, 2026-10-20): the live gateway for in-app service payments. Setting the
+  // secret key switches the gateway to Moyasar invoices; secrets live in the environment only (rule 1).
+  MOYASAR_BASE_URL: z.string().url().default('https://api.moyasar.com'),
+  MOYASAR_SECRET_KEY: z.string().min(20).optional(),
+  // The publishable key ships in the app later (native SDK milestone); unused by the invoice flow.
+  MOYASAR_PUBLISHABLE_KEY: z.string().min(10).optional(),
   // M46 social sign-in: comma-separated token audiences the server accepts (public ids, not secrets).
   // Google: the OAuth WEB client id (native sign-in issues the ID token for it). Apple: the app bundle ids
   // (with the .preview twin) and later the web Services ID. Empty = that provider's button stays hidden.
@@ -107,7 +113,8 @@ const envSchema = z.object({
 type Env = z.infer<typeof envSchema>;
 export type HubMode = 'live' | 'mock';
 export type PaymobMode = 'live' | 'mock';
-export type Config = Omit<Env, 'HUB_MODE' | 'PAYMOB_MODE'> & { HUB_MODE: HubMode; PAYMOB_MODE: PaymobMode; PUBLIC_URL: string };
+export type GatewayKind = 'moyasar' | 'paymob' | 'mock';
+export type Config = Omit<Env, 'HUB_MODE' | 'PAYMOB_MODE'> & { HUB_MODE: HubMode; PAYMOB_MODE: PaymobMode; GATEWAY: GatewayKind; PUBLIC_URL: string };
 
 /** Loads server/.env when present. Real environments (Railway) use variables only. */
 export function loadDotEnv(): void {
@@ -142,9 +149,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   if (paymobMode === 'live' && !paymobConfigured) {
     throw new Error('Invalid environment: PAYMOB_MODE=live requires PAYMOB_SECRET_KEY, PAYMOB_PUBLIC_KEY, PAYMOB_HMAC_SECRET and PAYMOB_INTEGRATION_ID');
   }
-  if (paymobMode === 'mock' && env.APP_ENV === 'production') {
+  // The Moyasar secret key, once set, is THE gateway (2026-10-20, the signed contract landed).
+  const gateway: GatewayKind = env.MOYASAR_SECRET_KEY ? 'moyasar' : paymobMode === 'live' ? 'paymob' : 'mock';
+  if (gateway === 'mock' && env.APP_ENV === 'production') {
     throw new Error('Invalid environment: mock payments are not allowed in production');
   }
   const publicUrl = env.PUBLIC_URL ?? (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${env.PORT}`);
-  return { ...env, HUB_MODE: hubMode, PAYMOB_MODE: paymobMode, PUBLIC_URL: publicUrl.replace(/\/+$/, '') };
+  return { ...env, HUB_MODE: hubMode, PAYMOB_MODE: paymobMode, GATEWAY: gateway, PUBLIC_URL: publicUrl.replace(/\/+$/, '') };
 }

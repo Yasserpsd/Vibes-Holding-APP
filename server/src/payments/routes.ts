@@ -78,6 +78,19 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
     }),
   );
 
+  // Moyasar's paid-invoice callback (per-payment URL). The body is only a hint: the server re-reads
+  // the invoice from Moyasar's API before anything settles (CLAUDE.md rule 5).
+  app.post(
+    '/api/payments/moyasar/callback',
+    guard(async (request) => {
+      const { payment } = flatQuery(request.query);
+      const body = (request.body ?? {}) as { id?: unknown };
+      const invoiceId = typeof body.id === 'string' ? body.id : undefined;
+      const result = await service.confirmMoyasar({ ...(payment ? { paymentId: payment } : {}), ...(invoiceId ? { invoiceId } : {}) });
+      return { ok: true, ...result };
+    }),
+  );
+
   app.get('/pay/return', async (request, reply) => {
     const result = await service.redirectResult(flatQuery(request.query));
     return reply.type('text/html; charset=utf-8').send(returnPage(result, appScheme));

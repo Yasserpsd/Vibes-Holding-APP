@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import Fastify, { type FastifyInstance } from 'fastify';
 
@@ -49,6 +49,7 @@ import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
+import { LiveMoyasar, moyasarKeyMode, type MoyasarConfirmer } from './payments/moyasar.js';
 import { LivePaymob, MOCK_HMAC_SECRET, MockPaymob, parseIntegrationIds, paymobKeyMode, paymobKeyShape, type PaymobGateway } from './payments/paymob.js';
 import { paymentsRoutes } from './payments/routes.js';
 import { PaymentsService } from './payments/service.js';
@@ -269,29 +270,44 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     sweepEnabled: config.UPLOADS_SWEEP === '1' && Boolean(config.DATABASE_URL),
     log: app.log,
   });
-  // Payments: Paymob intentions for real-world services; the mock gateway stands in until the test keys exist.
-  const paymob: PaymobGateway =
+  // Payments: Moyasar invoices (live since the 2026-10-20 contract) or Paymob intentions for
+  // real-world services; the mock gateway stands in until any live keys exist.
+  const paymentGateway: PaymobGateway & Partial<MoyasarConfirmer> =
     gateway ??
-    (config.PAYMOB_MODE === 'live' && config.PAYMOB_SECRET_KEY && config.PAYMOB_PUBLIC_KEY
-      ? new LivePaymob({
-          baseUrl: config.PAYMOB_BASE_URL,
-          secretKey: config.PAYMOB_SECRET_KEY,
-          publicKey: config.PAYMOB_PUBLIC_KEY,
-          integrationIds: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID),
+    (config.GATEWAY === 'moyasar' && config.MOYASAR_SECRET_KEY
+      ? new LiveMoyasar({
+          baseUrl: config.MOYASAR_BASE_URL,
+          secretKey: config.MOYASAR_SECRET_KEY,
           log: app.log,
           exposeGatewayErrors: config.APP_ENV !== 'production',
           fetchImpl,
         })
-      : new MockPaymob(config.PUBLIC_URL));
+      : config.GATEWAY === 'paymob' && config.PAYMOB_SECRET_KEY && config.PAYMOB_PUBLIC_KEY
+        ? new LivePaymob({
+            baseUrl: config.PAYMOB_BASE_URL,
+            secretKey: config.PAYMOB_SECRET_KEY,
+            publicKey: config.PAYMOB_PUBLIC_KEY,
+            integrationIds: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID),
+            log: app.log,
+            exposeGatewayErrors: config.APP_ENV !== 'production',
+            fetchImpl,
+          })
+        : new MockPaymob(config.PUBLIC_URL));
   // M107 «أكواد الخصم»: dashboard-made codes; a 100% code is how anyone attends بدون دفع.
   const discounts = new DiscountsService({ kv });
   const payments = new PaymentsService({
     kv,
     log: app.log,
-    gateway: paymob,
+    gateway: paymentGateway,
     notifier,
     push,
-    hmacSecret: paymob.mode === 'live' && config.PAYMOB_HMAC_SECRET ? config.PAYMOB_HMAC_SECRET : MOCK_HMAC_SECRET,
+    // With Moyasar live the Paymob webhook route stays mounted but unforgeable (random secret).
+    hmacSecret:
+      paymentGateway.mode === 'live'
+        ? paymentGateway.provider === 'paymob' && config.PAYMOB_HMAC_SECRET
+          ? config.PAYMOB_HMAC_SECRET
+          : randomUUID()
+        : MOCK_HMAC_SECRET,
     publicUrl: config.PUBLIC_URL,
     discounts,
   });
@@ -376,7 +392,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     mail: notifier.status(),
     payments: {
       ...payments.status(),
-      ...(config.APP_ENV === 'test' ? { keys: paymobKeyMode(config.PAYMOB_SECRET_KEY), secret: paymobKeyShape(config.PAYMOB_SECRET_KEY), public: paymobKeyShape(config.PAYMOB_PUBLIC_KEY), hmacLength: config.PAYMOB_HMAC_SECRET?.length ?? 0, baseUrl: config.PAYMOB_BASE_URL, integrations: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID) } : {}),
+      gateway: config.GATEWAY,
+      ...(config.APP_ENV === 'test'
+        ? config.GATEWAY === 'moyasar'
+          ? { keys: moyasarKeyMode(config.MOYASAR_SECRET_KEY), secretLength: config.MOYASAR_SECRET_KEY?.length ?? 0, baseUrl: config.MOYASAR_BASE_URL }
+          : { keys: paymobKeyMode(config.PAYMOB_SECRET_KEY), secret: paymobKeyShape(config.PAYMOB_SECRET_KEY), public: paymobKeyShape(config.PAYMOB_PUBLIC_KEY), hmacLength: config.PAYMOB_HMAC_SECRET?.length ?? 0, baseUrl: config.PAYMOB_BASE_URL, integrations: parseIntegrationIds(config.PAYMOB_INTEGRATION_ID) }
+        : {}),
     },
     membership: membership.status(),
     push: push.status(),

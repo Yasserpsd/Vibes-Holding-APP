@@ -11,6 +11,7 @@ import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
+import type { MoyasarConfirmer } from './moyasar.js';
 import type { PaymobGateway } from './paymob.js';
 
 /**
@@ -39,7 +40,7 @@ export type Payment = {
   memberPrice: boolean;
   status: PaymentStatus;
   /** M107: `code` = confirmed by a 100% discount code, no gateway involved. */
-  provider: 'paymob' | 'mock' | 'code';
+  provider: 'paymob' | 'moyasar' | 'mock' | 'code';
   /** M107: the discount code applied to this payment, if any (the use is recorded once it settles paid). */
   discountCode?: string | null;
   discountPercent?: number | null;
@@ -87,7 +88,7 @@ export type PaymentStats = { series: ({ day: string } & PaymentTotals)[]; today:
 
 export type RedirectResult = { payment: PublicPayment | null; verified: boolean; gatewaySuccess: boolean | null };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string; discounts?: DiscountsService };
+type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway & Partial<MoyasarConfirmer>; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string; discounts?: DiscountsService };
 
 function isoDaysAgo(now: number, days: number): string {
   return new Date(now - days * 86_400_000).toISOString();
@@ -274,6 +275,7 @@ export class PaymentsService {
   private async createPayment(customer: { contactId: number; name: string; email: string; phone: string }, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount }, now: number): Promise<Payment> {
     const id = randomUUID();
     const [firstName = '', ...rest] = customer.name.trim().split(/\s+/);
+    const provider = this.deps.gateway.provider;
     const intention = await this.deps.gateway.createIntention({
       paymentId: id,
       amountCents: input.amount * 100,
@@ -281,7 +283,8 @@ export class PaymentsService {
       itemName: input.title,
       description: `${input.title} — تطبيق نادي المستثمرين`,
       customer: { firstName, lastName: rest.join(' '), email: customer.email || 'no-reply@vcmem.com', phone: customer.phone || '0500000000' },
-      notificationUrl: `${this.deps.publicUrl}/api/payments/paymob/webhook`,
+      notificationUrl:
+        provider === 'moyasar' ? `${this.deps.publicUrl}/api/payments/moyasar/callback?payment=${id}` : `${this.deps.publicUrl}/api/payments/paymob/webhook`,
       redirectionUrl: `${this.deps.publicUrl}/pay/return?payment=${id}`,
       extras: { app: 'investorsclub', payment: id, service: input.key, contact: String(customer.contactId) },
     });
@@ -300,7 +303,7 @@ export class PaymentsService {
       currency: input.currency,
       memberPrice: input.memberPrice,
       status: 'created',
-      provider: this.mode === 'mock' ? 'mock' : 'paymob',
+      provider: this.deps.gateway.provider,
       discountCode: input.discount?.code ?? null,
       discountPercent: input.discount?.percent ?? null,
       preDiscountSar: input.discount?.amountBefore ?? null,
@@ -425,34 +428,80 @@ export class PaymentsService {
       this.deps.log.warn({ orderId, reference }, 'paymob callback for an unknown order');
       return { ok: true, id: null, status: null };
     }
-    if (result.changed) {
-      this.deps.log.info({ payment: result.payment.id, status: result.payment.status }, 'payment updated from the gateway callback');
-      // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
-      const linkSale = result.payment.serviceKey.startsWith('link:');
-      // M107: a code on a paid order counts as used only now, when the gateway confirmed the money.
-      if (result.payment.status === 'paid') await this.recordDiscountUse(result.payment, now);
-      if (result.payment.status === 'paid' && !linkSale) this.deps.notifier.paymentPaid(this.toMail(result.payment));
-      else if (result.payment.status !== 'paid' && !linkSale) this.deps.notifier.paymentFailed(this.toMail(result.payment));
-      if (result.payment.status === 'paid' || result.payment.status === 'failed') {
-        const { id, contactId, serviceTitle, amount, currency, status } = result.payment;
-        this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });
-        for (const listener of this.settledListeners) {
-          try {
-            listener(result.payment);
-          } catch (error) {
-            this.deps.log.error({ err: error, payment: id }, 'payment settled listener failed');
-          }
+    if (result.changed) await this.announceSettled(result.payment, now);
+    return { ok: true, id: result.payment.id, status: result.payment.status };
+  }
+
+  /** Everything that happens once a gateway settled a payment: code use, mails, push, module listeners. */
+  private async announceSettled(payment: Payment, now: number): Promise<void> {
+    this.deps.log.info({ payment: payment.id, status: payment.status }, 'payment updated from the gateway callback');
+    // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
+    const linkSale = payment.serviceKey.startsWith('link:');
+    // M107: a code on a paid order counts as used only now, when the gateway confirmed the money.
+    if (payment.status === 'paid') await this.recordDiscountUse(payment, now);
+    if (payment.status === 'paid' && !linkSale) this.deps.notifier.paymentPaid(this.toMail(payment));
+    else if (payment.status !== 'paid' && !linkSale) this.deps.notifier.paymentFailed(this.toMail(payment));
+    if (payment.status === 'paid' || payment.status === 'failed') {
+      const { id, contactId, serviceTitle, amount, currency, status } = payment;
+      this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });
+      for (const listener of this.settledListeners) {
+        try {
+          listener(payment);
+        } catch (error) {
+          this.deps.log.error({ err: error, payment: id }, 'payment settled listener failed');
         }
       }
     }
-    return { ok: true, id: result.payment.id, status: result.payment.status };
+  }
+
+  /**
+   * Moyasar settles here: the invoice callback or the return page names a payment, and the server
+   * re-reads the invoice from Moyasar's API with the secret key (rule 5 — the posted body and the
+   * browser redirect are never trusted). Safe to call twice: a settled payment is left alone.
+   */
+  async confirmMoyasar(reference: { paymentId?: string; invoiceId?: string }, now = Date.now()): Promise<{ id: string | null; status: PaymentStatus | null }> {
+    if (!this.deps.gateway.confirmInvoice) return { id: null, status: null };
+    const payment = (await this.load()).find(
+      (entry) =>
+        entry.provider === 'moyasar' &&
+        ((reference.paymentId !== undefined && entry.id === reference.paymentId) || (reference.invoiceId !== undefined && entry.intentionId === reference.invoiceId)),
+    );
+    if (!payment) {
+      this.deps.log.warn(reference, 'moyasar callback for an unknown payment');
+      return { id: null, status: null };
+    }
+    if (payment.status !== 'created') return { id: payment.id, status: payment.status };
+    const invoice = await this.deps.gateway.confirmInvoice(payment.intentionId);
+    if (invoice.status === 'pending') return { id: payment.id, status: payment.status };
+    const settled = await this.mutate((entries) => {
+      const entry = entries.find((candidate) => candidate.id === payment.id);
+      if (!entry || entry.status !== 'created') return null;
+      const stamp = new Date(now).toISOString();
+      entry.transactionId = invoice.transactionId;
+      entry.updatedAt = stamp;
+      if (invoice.status === 'paid' && invoice.amount === entry.amountCents) {
+        entry.status = 'paid';
+        entry.paidAt = stamp;
+        entry.failureReason = null;
+      } else {
+        entry.status = 'failed';
+        entry.failedAt = stamp;
+        entry.failureReason = invoice.status === 'paid' ? `amount mismatch (${invoice.amount})` : (invoice.failureReason ?? 'declined');
+      }
+      return entry;
+    }, now);
+    if (!settled) return { id: payment.id, status: payment.status };
+    await this.announceSettled(settled, now);
+    return { id: settled.id, status: settled.status };
   }
 
   /** The browser redirect after checkout. The stored status is what counts; the redirect only shapes the page. */
   async redirectResult(query: Record<string, string>): Promise<RedirectResult> {
     const verified = verifyRedirect(query, this.deps.hmacSecret);
-    const payments = await this.load();
     const reference = query.payment ?? query.merchant_order_id ?? '';
+    // Moyasar sends no signed redirect: a still-pending payment is confirmed against the API right now.
+    if (reference) await this.confirmMoyasar({ paymentId: reference }).catch(() => undefined);
+    const payments = await this.load();
     const payment = payments.find((entry) => entry.id === reference) ?? (query.order ? payments.find((entry) => entry.orderId === query.order) : undefined) ?? null;
     return { payment: payment ? this.toPublic(payment) : null, verified, gatewaySuccess: verified ? query.success === 'true' : null };
   }

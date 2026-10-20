@@ -703,7 +703,7 @@
   "service.signInToPay": "Paying inside the app requires signing in to your account.",
   "service.signInButton": "Sign in to pay",
   "service.payNow": "Pay now",
-  "service.payHint": "Payment through the Paymob gateway inside the app. After the payment, the club team contacts you.",
+  "service.payHint": "Secure payment through the Moyasar gateway inside the app. After the payment, the club team contacts you.",
   "service.bookHq": "Book your HQ visit",
   "service.openProjects": "Open the Projects Bank",
   "about.title": "About the Investors Club",
