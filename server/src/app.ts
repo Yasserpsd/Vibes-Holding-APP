@@ -432,7 +432,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });
   await app.register(legalRoutes, { notifier });
-  await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme });
+  await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme, smtpHost: config.SMTP_HOST ?? null, smtpPort: config.SMTP_PORT });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
