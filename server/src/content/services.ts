@@ -278,7 +278,8 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: null,
       memberLabel: 'خصم 50% للأعضاء',
       access: 'member',
-      action: management('أرغب في حجز مسرح النادي.', [{ key: 'time', label: 'الموعد المفضل' }]),
+      // Owner (2026-10-21): theatre bookings go straight to the podcast/stage number, like the studio.
+      action: studio('أرغب في حجز مسرح النادي.', [{ key: 'time', label: 'الموعد المفضل' }]),
       infoUrl: null,
       order: 10,
       cta: 'احجز المسرح',
@@ -354,7 +355,8 @@ export const SERVICES_SEED: ServicesContent = {
       priceLabel: null,
       memberLabel: 'خصم 50% للأعضاء',
       access: 'member',
-      action: management('أرغب في الاستفادة من خصم الأعضاء على خدمات مومنتوم.', [
+      // Owner (2026-10-21): momentum requests go to the same stage/podcast number.
+      action: studio('أرغب في الاستفادة من خصم الأعضاء على خدمات مومنتوم.', [
         { key: 'service', label: 'الخدمة', options: ['موقع إلكتروني', 'تطبيق', 'تسويق إلكتروني', 'إعلانات مؤثرين'] },
       ]),
       infoUrl: 'https://momentummix.com/',
@@ -364,7 +366,7 @@ export const SERVICES_SEED: ServicesContent = {
     // M107 (owner, 2026-10-20): «حقيبة الامتياز» and «كود خصم منتجات منفذ» removed for good.
   ],
   // v12 (M109f): the lock texts carry the owner's membership upsell sentence.
-  version: 12,
+  version: 13,
   updatedAt: '2026-10-20T00:00:00.000Z',
 };
 
