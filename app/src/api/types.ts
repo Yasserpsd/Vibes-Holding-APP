@@ -114,7 +114,7 @@ export type ProjectBrief = {
   stage: { key: BriefStageKey; label: string; index: number; total: number; steps: string[]; estimated?: boolean };
   strengths: string[];
   risks: string[];
-  competitors: { id: number; title: string; sector: string | null; stage: string | null; why: string }[];
+  competitors: { id: number; title: string; sector: string | null; stage: string | null; why: string; image?: string | null; rating?: { stars: number | null; count: number } }[];
   disclaimer: string;
   generatedAt: string;
   source: 'ai' | 'rules';

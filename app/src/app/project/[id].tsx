@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Animated, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Image, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
@@ -77,7 +77,21 @@ export default function ProjectScreen() {
                 </View>
               ) : null}
             </FadeInView>
-          ) : null}
+          ) : (
+            /* M116c (owner: «لازم يظهر صورة من فوق»): no gallery → the cover photo leads the page,
+               and a project with no photo at all still opens on the golden emblem, never on text. */
+            <FadeInView>
+              <View style={styles.gallery}>
+                {project.image ? (
+                  <GalleryImage uri={project.image} width={imageWidth} />
+                ) : (
+                  <View style={[styles.galleryImage, styles.heroFallback, { width: imageWidth }]}>
+                    <Image source={require('../../../assets/images/club-emblem.png')} style={styles.heroEmblem} resizeMode="contain" />
+                  </View>
+                )}
+              </View>
+            </FadeInView>
+          )}
 
           {project.isGolden ? (
             <PopIn delay={60} style={styles.goldenWrap}>
@@ -314,16 +328,26 @@ function RichText({ text }: { text: string }) {
   );
 }
 
-/** A gallery page that fades in once its image arrives, instead of popping over the placeholder. */
+/** A gallery page that fades in once its image arrives; a failed photo shows the emblem, never a dark hole. */
 function GalleryImage({ uri, width }: { uri: string; width: number }) {
   const [reveal] = useState(() => new Animated.Value(0));
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    return (
+      <View style={[styles.galleryImage, styles.heroFallback, { width }]}>
+        <Image source={require('../../../assets/images/club-emblem.png')} style={styles.heroEmblem} resizeMode="contain" />
+      </View>
+    );
+  }
   return (
     <View style={[styles.galleryImage, { width }]}>
       <Animated.Image
         source={{ uri }}
         style={[StyleSheet.absoluteFill, { opacity: reveal }]}
         resizeMode="cover"
+        resizeMethod="resize"
         onLoad={() => Animated.timing(reveal, { toValue: 1, duration: 320, useNativeDriver: true }).start()}
+        onError={() => setBroken(true)}
       />
     </View>
   );
@@ -334,6 +358,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md },
   gallery: { borderRadius: radii.lg, overflow: 'hidden' },
   galleryImage: { height: 220, backgroundColor: colors.surfaceElevated },
+  heroFallback: { alignItems: 'center', justifyContent: 'center', experimental_backgroundImage: gradients.goldWash },
+  heroEmblem: { width: 110, height: 110, opacity: 0.5 },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',

@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 import { useProjectBrief } from '@/api/queries';
 import type { ProjectBrief as Brief } from '@/api/types';
 import { Highlight } from '@/components/Highlight';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, GrowBar, PopIn, PressScale, usePulse, Wiggle } from '@/components/motion';
+import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { topicIcon, type IoniconName } from '@/lib/icons';
@@ -111,10 +113,13 @@ function BriefBody({ brief }: { brief: Brief }) {
                 onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(competitor.id) } })}
               >
                 <GlassCard radius={radii.lg} style={styles.competitor}>
+                  {/* M116c (owner): every comparable project shows its photo and its stars. */}
+                  <CompetitorThumb uri={competitor.image ?? null} title={competitor.title} />
                   <View style={styles.competitorTexts}>
                     <Text style={styles.competitorTitle} numberOfLines={2}>
                       {competitor.title}
                     </Text>
+                    <StarsRow value={competitor.rating?.stars ?? null} count={competitor.rating?.count} size={13} />
                     {competitor.sector || competitor.stage ? (
                       <View style={styles.tags}>
                         {competitor.sector ? <Tag label={competitor.sector} /> : null}
@@ -217,6 +222,20 @@ function Points({ title, icon, tone, items }: { title: string; icon: IoniconName
   );
 }
 
+/** The comparable project's square photo; a missing or failed one shows the briefcase on gold wash. */
+function CompetitorThumb({ uri, title }: { uri: string | null; title: string }) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <View style={styles.thumb}>
+      {uri && !broken ? (
+        <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" resizeMethod="resize" accessibilityLabel={title} onError={() => setBroken(true)} />
+      ) : (
+        <Ionicons name="briefcase-outline" size={24} color={colors.goldDark} />
+      )}
+    </View>
+  );
+}
+
 // Padding sits on a View: Android measures a padded Text too narrow and truncates it.
 function Tag({ label }: { label: string }) {
   return (
@@ -302,6 +321,8 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   competitor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
+  thumb: { width: 64, height: 64, borderRadius: radii.md, backgroundColor: colors.goldFaint, borderWidth: 1, borderColor: colors.borderGoldSoft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  thumbImage: { width: '100%', height: '100%' },
   competitorTexts: { flex: 1, gap: spacing.xs },
   competitorTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   competitorWhy: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

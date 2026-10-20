@@ -112,7 +112,17 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
       if (!limiter.hit(`brief:${request.ip}`, 120, 15 * 60_000)) {
         return reply.code(429).send({ error: { code: 'rate', message: 'طلبات كثيرة في وقت قصير، حاول بعد قليل' } });
       }
-      return brief.brief(project, service.all(), Date.now(), langOf(request));
+      const answer = await brief.brief(project, service.all(), Date.now(), langOf(request));
+      // M116c (owner): the comparable projects carry their photo and LIVE stars — added at serve
+      // time (new objects, the cached brief untouched) so a fresh rating never waits on the cache.
+      return {
+        ...answer,
+        competitors: answer.competitors.map((competitor) => ({
+          ...competitor,
+          image: publicUrl && service.get(competitor.id)?.image ? `${publicUrl}/img/pb/${competitor.id}` : null,
+          rating: ratings ? ratings.summary(competitor.id) : { stars: null, count: 0 },
+        })),
+      };
     }),
   );
 
