@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -213,8 +214,10 @@ function Progress({ text }: { text: string }) {
 }
 
 function LinkText({ label, url }: { label: string; url: string }) {
+  const router = useRouter();
+  // M116d (owner): club pages open INSIDE the app — the hosting domain never shows.
   return (
-    <PressScale onPress={() => void openLink(url)} accessibilityRole="link">
+    <PressScale onPress={() => router.push({ pathname: '/webpage', params: { url, title: label } } as Href)} accessibilityRole="link">
       <Text style={styles.link}>{label}</Text>
     </PressScale>
   );

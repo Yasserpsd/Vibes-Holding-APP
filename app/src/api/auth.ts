@@ -150,6 +150,13 @@ export const authApi = {
     apiRequest<{ request: PersonaChangeRequest }>('POST', '/api/me/persona/change-request', { body: { persona, ...(note ? { note } : {}) } }),
   // M79: the reason (picked or written) travels with the deletion so the club learns why members leave.
   deleteMe: (password: string, reason?: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password, ...(reason ? { reason } : {}) } }),
+  // M117: the three-step deletion — password starts it, the mailed code + the shown word confirm it,
+  // and the request only SCHEDULES the deletion 30 days ahead (cancellable the whole time).
+  deleteStart: (password: string, reason?: string) =>
+    apiRequest<{ ok: true; email: string; seconds: number; word: string; days: number }>('POST', '/api/me/delete/start', { body: { password, ...(reason ? { reason } : {}) } }),
+  deleteConfirm: (code: string, word: string) => apiRequest<{ ok: true; dueAt: string; daysLeft: number }>('POST', '/api/me/delete/confirm', { body: { code, word } }),
+  deleteState: () => apiGet<{ scheduled: { dueAt: string; daysLeft: number } | null }>('/api/me/delete/state'),
+  deleteCancel: () => apiRequest<{ ok: true; cancelled: boolean }>('POST', '/api/me/delete/cancel', { body: {} }),
 };
 
 export function useAuthConfig() {

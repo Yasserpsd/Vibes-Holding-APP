@@ -242,11 +242,12 @@ test('member type: company requires a name, individual is the default', async ()
   }
 });
 
-test('delete account needs the password and ends the session', async () => {
+test('delete account needs the password and schedules 30 days ahead (M117: never instant)', async () => {
   const login = await post('/api/auth/login', { login: registration.email, password: registration.password });
   const { token } = login.json();
   const wrong = await app.inject({ method: 'DELETE', url: '/api/me', headers: { authorization: `Bearer ${token}` }, payload: { password: 'nope' } });
-  assert.equal(wrong.statusCode, 401);
+  assert.equal(wrong.statusCode, 403);
+  assert.equal(wrong.json().error.code, 'bad_password');
   const deleted = await app.inject({
     method: 'DELETE',
     url: '/api/me',
@@ -254,8 +255,10 @@ test('delete account needs the password and ends the session', async () => {
     payload: { password: registration.password },
   });
   assert.equal(deleted.statusCode, 200, deleted.body);
-  const gone = await post('/api/auth/login', { login: registration.email, password: registration.password });
-  assert.equal(gone.statusCode, 401);
+  assert.equal(deleted.json().daysLeft, 30);
+  // The account lives through the grace window: signing in still works.
+  const still = await post('/api/auth/login', { login: registration.email, password: registration.password });
+  assert.equal(still.statusCode, 200, still.body);
 });
 
 test('the owner can still close test registration and restore the admins-only preview', async () => {

@@ -423,6 +423,17 @@ export class AuthService {
     await this.deps.hub.call('reset_confirm', { login, code, password, ip });
   }
 
+  /** M117: true when the password matches this account — a hub login check, no session is created. */
+  async passwordMatches(session: SessionRecord, password: string): Promise<boolean> {
+    const me = await this.me(session);
+    try {
+      const result = await this.deps.hub.call('login', { uuid: newUuid(), ip: 'delete-check', login: me.email, password, page_url: 'app://delete-account' });
+      return Boolean(result.contact);
+    } catch {
+      return false;
+    }
+  }
+
   async deleteAccount(token: string, session: SessionRecord, password: string): Promise<void> {
     await this.deps.hub.call('delete_account', { uuid: session.uuid, password });
     this.meCache.delete(session.uuid);

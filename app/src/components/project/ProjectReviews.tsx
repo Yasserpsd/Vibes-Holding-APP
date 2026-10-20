@@ -1,19 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { ApiError } from '@/api/client';
-import { projectsApi, useProjectReviews } from '@/api/queries';
+import { useProjectReviews } from '@/api/queries';
 import type { ProjectReview } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
-import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
-import { Notice } from '@/components/Notice';
-import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
-import { StarsPicker, StarsRow } from '@/components/Stars';
+import { RateProjectModal } from '@/components/project/RateProjectModal';
+import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
@@ -26,47 +21,13 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
  */
 export function ProjectReviews({ projectId }: { projectId: string }) {
   const { status, me } = useAuth();
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const signedIn = status === 'signedIn';
   const query = useProjectReviews(projectId, signedIn && me ? String(me.id) : null);
   const summary = query.data?.summary ?? null;
   const reviews = query.data?.reviews ?? [];
   const myReview = reviews.find((review) => review.mine) ?? null;
-
-  const [composing, setComposing] = useState(false);
-  const [stars, setStars] = useState(0);
-  const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-
-  const open = () => {
-    setStars(myReview?.stars ?? 0);
-    setComment(myReview?.comment ?? '');
-    setDone(false);
-    setError(null);
-    setComposing(true);
-  };
-
-  async function submit() {
-    if (busy || stars < 1) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await projectsApi.review(projectId, stars, comment.trim());
-      setDone(true);
-      setComposing(false);
-      await query.refetch();
-      // The stars on the cards and the «الأعلى تقييمًا» order move with the new average.
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-      await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-    } catch (failure) {
-      setError(failure);
-    } finally {
-      setBusy(false);
-    }
-  }
+  // M116d: ONE rating sheet for the whole app — this block and the title stars open the same modal.
+  const [rateOpen, setRateOpen] = useState(false);
 
   return (
     <GlassCard radius={radii.xl} style={styles.card}>
@@ -81,41 +42,8 @@ export function ProjectReviews({ projectId }: { projectId: string }) {
         <ReviewRow key={review.id} review={review} />
       ))}
 
-      {done ? <Notice tone="success" text={t('ratings.thanks')} /> : null}
-
-      {!signedIn ? (
-        <View style={styles.gate}>
-          <Notice text={t('ratings.signIn')} />
-          <AppButton label={t('auth.login.title')} icon="log-in-outline" variant="outline" onPress={() => router.push('/auth/login')} />
-        </View>
-      ) : composing ? (
-        <View style={styles.composer}>
-          <Text style={styles.pickLabel}>{t('ratings.yourStars')}</Text>
-          <StarsPicker value={stars} onChange={setStars} />
-          <FormField
-            label={t('ratings.commentLabel')}
-            placeholder={t('ratings.commentPlaceholder')}
-            value={comment}
-            onChangeText={setComment}
-            multiline
-            maxLength={500}
-          />
-          {isProfileGate(error) ? (
-            <ProfileGateNotice text={error instanceof ApiError ? error.message : ''} />
-          ) : error ? (
-            <Notice tone="warning" text={error instanceof ApiError ? error.message : t('errors.generic')} />
-          ) : null}
-          <AppButton
-            label={myReview ? t('ratings.update') : t('ratings.submit')}
-            icon="star"
-            disabled={stars < 1}
-            loading={busy}
-            onPress={() => void submit()}
-          />
-        </View>
-      ) : (
-        <AppButton label={myReview ? t('ratings.edit') : t('ratings.add')} icon="star-outline" variant="outline" onPress={open} />
-      )}
+      <AppButton label={signedIn && myReview ? t('ratings.edit') : t('ratings.add')} icon="star-outline" variant="outline" onPress={() => setRateOpen(true)} />
+      <RateProjectModal projectId={projectId} visible={rateOpen} onClose={() => setRateOpen(false)} />
     </GlassCard>
   );
 }

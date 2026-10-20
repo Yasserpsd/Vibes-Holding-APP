@@ -10,6 +10,7 @@ import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from
 import { dashboardGuard, guard, parse, sessionGuard } from './guard.js';
 import type { Mailer } from '../mail/mailer.js';
 import type { PushService } from '../push/service.js';
+import { DELETION_GRACE_DAYS, type AccountDeletionStore } from './deletion.js';
 import { PERSONA_CHANGE_DAYS, type PersonaChangeStore } from './personaChange.js';
 import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService } from './personaRequests.js';
 import { RateLimiter } from './rateLimit.js';
@@ -29,6 +30,8 @@ export type AuthRoutesOptions = {
   /** M109d «طلب تغيير الصفة»: the dashboard-reviewed request once the yearly change is used up. */
   personaRequests?: PersonaRequestsService;
   push?: PushService;
+  /** M117: the three-step, 30-day account deletion (absent only in old tests; the routes then 404). */
+  deletion?: AccountDeletionStore;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -88,7 +91,7 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -432,6 +435,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     }),
   );
 
+  // M117: deleting is never instant any more — the old route now SCHEDULES the 30-day deletion
+  // (pre-M117 app bundles still call it; they get the same grace window, just without the code step).
   app.delete(
     '/api/me',
     guard(async (request, reply) => {
@@ -439,13 +444,118 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const body = parse(deleteSchema, request.body, reply);
       if (!body) return;
-      // Who is leaving is read first (the row is emptied by the deletion); the mail goes only after it succeeded.
-      const leaving = notifier ? await service.me(auth.session).catch(() => null) : null;
-      await service.deleteAccount(auth.token, auth.session, body.password);
-      if (notifier && leaving) {
-        notifier.accountDeletionRequested({ email: leaving.email, name: leaving.name, phone: leaving.phone, note: body.reason ?? '', ip: request.ip });
+      const me = await service.me(auth.session);
+      if (!(await service.passwordMatches(auth.session, body.password))) {
+        return reply.code(403).send({ error: { code: 'bad_password', message: 'كلمة المرور غير صحيحة' } });
       }
-      return { ok: true };
+      if (!deletion) {
+        // Old tests without the store keep the original instant behaviour.
+        await service.deleteAccount(auth.token, auth.session, body.password);
+        notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: body.reason ?? '', ip: request.ip });
+        return { ok: true };
+      }
+      const row = await deletion.schedule({ contactId: me.id, uuid: auth.session.uuid, email: me.email, name: me.name, phone: me.phone }, body.reason ?? '');
+      notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: `${body.reason ?? ''} — حذف مجدول بعد ${DELETION_GRACE_DAYS} يومًا (${row.dueAt.slice(0, 10)})`, ip: request.ip });
+      return { ok: true, dueAt: row.dueAt, daysLeft: DELETION_GRACE_DAYS };
+    }),
+  );
+
+  // M117 «حذف الحساب على ثلاث خطوات»: password → an e-mailed code → the confirm word the app
+  // shows. Nothing is deleted on the spot: the request is scheduled 30 days ahead, the member
+  // keeps using the app with a countdown and may cancel any time; on the due day the management
+  // is mailed to execute the hub deletion.
+  app.post(
+    '/api/me/delete/start',
+    guard(async (request, reply) => {
+      if (!deletion) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      if (limited('delete-start', 10, request, reply)) return;
+      const body = parse(deleteSchema, request.body, reply);
+      if (!body) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      if (await deletion.statusOf(me.id)) {
+        return reply.code(409).send({ error: { code: 'already_scheduled', message: 'حذف حسابك مجدول بالفعل' } });
+      }
+      if (!(await service.passwordMatches(auth.session, body.password))) {
+        return reply.code(403).send({ error: { code: 'bad_password', message: 'كلمة المرور غير صحيحة' } });
+      }
+      const result = await deletion.request(me.id, body.reason ?? '', async (code) => {
+        try {
+          await mailer?.send({
+            to: [me.email],
+            subject: 'رمز تأكيد حذف الحساب — نادي المستثمرين',
+            text: [`رمز تأكيد حذف حسابك: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', `بعد التأكيد يبقى حسابك فعالًا ${DELETION_GRACE_DAYS} يومًا ويمكنك التراجع خلالها في أي وقت.`, 'إذا لم تطلب حذف حسابك فتجاهل هذه الرسالة وغيّر كلمة مرورك.'].join('\n'),
+          });
+        } catch (error) {
+          request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'deletion code was not mailed');
+          throw new Error('mail_failed');
+        }
+      }).catch((cause: unknown) => {
+        if (cause instanceof Error && cause.message === 'mail_failed') return null;
+        throw cause;
+      });
+      if (!result) return reply.code(503).send({ error: { code: 'mail_failed', message: 'تعذر إرسال الرمز الآن، حاول بعد قليل' } });
+      if (!result.ok) {
+        if (result.reason === 'too_soon') return reply.code(429).send({ error: { code: 'delete_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });
+        return reply.code(429).send({ error: { code: 'delete_too_many', message: 'طلبات كثيرة، حاول لاحقًا' } });
+      }
+      return { ok: true, email: me.email, seconds: result.seconds, word: result.word, days: DELETION_GRACE_DAYS };
+    }),
+  );
+
+  app.post(
+    '/api/me/delete/confirm',
+    guard(async (request, reply) => {
+      if (!deletion) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      if (limited('delete-confirm', 20, request, reply)) return;
+      const body = parse(z.object({ code: codeSchema, word: z.string().trim().min(1, 'اكتب كلمة التأكيد').max(40) }), request.body, reply);
+      if (!body) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      const result = await deletion.confirm(me.id, body.code, body.word);
+      if (!result.ok) {
+        const message =
+          result.reason === 'bad_code'
+            ? `الرمز غير صحيح — متبقٍ ${result.attemptsLeft} محاولات`
+            : result.reason === 'bad_word'
+              ? 'كلمة التأكيد غير مطابقة — اكتبها كما تظهر لك'
+              : result.reason === 'code_expired'
+                ? 'انتهت صلاحية الرمز، اطلب رمزًا جديدًا'
+                : result.reason === 'locked'
+                  ? 'محاولات خاطئة كثيرة، ابدأ من جديد'
+                  : 'لا يوجد طلب حذف قائم، ابدأ من جديد';
+        return reply.code(400).send({ error: { code: `delete_${result.reason}`, message } });
+      }
+      const row = await deletion.schedule({ contactId: me.id, uuid: auth.session.uuid, email: me.email, name: me.name, phone: me.phone }, result.reason);
+      notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: `${result.reason} — حذف مجدول بعد ${DELETION_GRACE_DAYS} يومًا (${row.dueAt.slice(0, 10)})`, ip: request.ip });
+      return { ok: true, dueAt: row.dueAt, daysLeft: DELETION_GRACE_DAYS };
+    }),
+  );
+
+  // The countdown the app shows in حسابي, and the member's way back.
+  app.get(
+    '/api/me/delete/state',
+    guard(async (request, reply) => {
+      if (!deletion) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      return { scheduled: await deletion.statusOf(me.id) };
+    }),
+  );
+
+  app.post(
+    '/api/me/delete/cancel',
+    guard(async (request, reply) => {
+      if (!deletion) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      const removed = await deletion.cancel(me.id);
+      if (removed) notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: 'تراجع العضو عن حذف حسابه — أُلغي الطلب المجدول.', ip: request.ip });
+      return { ok: true, cancelled: removed };
     }),
   );
 };

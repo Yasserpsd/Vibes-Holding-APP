@@ -79,6 +79,7 @@ import { companionRoutes } from './companion/routes.js';
 import { CompanionService } from './companion/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
+import { AccountDeletionStore } from './auth/deletion.js';
 import { ratingsRoutes } from './ratings/routes.js';
 import { RatingsService } from './ratings/service.js';
 import type { KV } from './store.js';
@@ -427,6 +428,25 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  // M117: the three-step, 30-day account deletion; the due-day sweep mails the management to execute.
+  const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  const deletionSweep = async (): Promise<void> => {
+    for (const row of await deletion.due()) {
+      notifier.accountDeletionRequested({
+        email: row.email,
+        name: row.name,
+        phone: row.phone,
+        note: `انتهت مهلة الثلاثين يومًا (طلب ${row.requestedAt.slice(0, 10)}) — نفّذوا حذف الحساب من لوحة vcmem الآن.`,
+        ip: 'scheduler',
+      });
+      await deletion.markReminded(row.contactId);
+    }
+  };
+  const deletionTimer = setInterval(() => void deletionSweep().catch((error: unknown) => app.log.error({ err: error }, 'deletion sweep failed')), 6 * 3_600_000);
+  deletionTimer.unref();
+  app.addHook('onClose', async () => clearInterval(deletionTimer));
+  // One pass shortly after boot, so a due request never waits for the first interval.
+  setTimeout(() => void deletionSweep().catch(() => undefined), 90_000).unref();
   // M109e: the English app's view of the member's own data — its own transliteration prompt, cached per profile.
   const meLocalizer = new MeLocalizer(
     kv,
@@ -434,7 +454,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   );
   // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
   const personaRequests = new PersonaRequestsService(kv);
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice });

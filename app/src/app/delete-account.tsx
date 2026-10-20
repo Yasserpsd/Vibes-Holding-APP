@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -14,19 +15,35 @@ import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-/** M79 (owner): the deliberate flow — a reason or a message FIRST, then the final password confirm. */
+/**
+ * M79 (owner): the deliberate flow — a reason or a message FIRST.
+ * M117 (owner, 2026-10-21): three steps so nobody deletes by accident — the password, a code
+ * mailed to the account's e-mail, then a random confirm word the screen shows and the member
+ * types. Even then nothing is deleted on the spot: the account stays fully usable for 30 days
+ * with a countdown in حسابي and a «تراجع» door the whole time.
+ */
 const REASON_KEYS = ['notUsing', 'notFound', 'otherAccount', 'support', 'other'] as const;
 type ReasonKey = (typeof REASON_KEYS)[number];
 
+type Step = 'reason' | 'code' | 'done';
+
 export default function DeleteAccountScreen() {
-  const { me, signOut } = useAuth();
+  const { me } = useAuth();
+  const router = useRouter();
+  const [step, setStep] = useState<Step>('reason');
   const [reason, setReason] = useState<ReasonKey | null>(null);
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Step 2 + 3: where the code went, and the word the member must type back.
+  const [sentTo, setSentTo] = useState('');
+  const [word, setWord] = useState('');
+  const [code, setCode] = useState('');
+  const [typedWord, setTypedWord] = useState('');
+  const [daysLeft, setDaysLeft] = useState(30);
 
   if (!me) {
     return (
@@ -44,7 +61,7 @@ export default function DeleteAccountScreen() {
     return [picked, written].filter(Boolean).join(' — ');
   };
 
-  const confirmDelete = async (password: string) => {
+  const start = async (password: string) => {
     if (!password) {
       setError(t('account.delete.passwordRequired'));
       return;
@@ -52,15 +69,77 @@ export default function DeleteAccountScreen() {
     setBusy(true);
     setError(null);
     try {
-      await authApi.deleteMe(password, reasonText());
+      const answer = await authApi.deleteStart(password, reasonText());
+      setSentTo(answer.email);
+      setWord(answer.word);
       setConfirming(false);
-      await signOut();
+      setStep('code');
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
   };
+
+  const confirm = async () => {
+    if (busy || code.trim().length < 4 || !typedWord.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const answer = await authApi.deleteConfirm(code.trim(), typedWord);
+      setDaysLeft(answer.daysLeft);
+      setStep('done');
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (step === 'done') {
+    return (
+      <Screen title={t('deleteAccount.title')}>
+        <FadeInView>
+          <GlassCard radius={radii.lg} style={styles.card}>
+            <Ionicons name="hourglass-outline" size={34} color={colors.warning} style={styles.doneIcon} />
+            <Text style={styles.doneTitle}>{t('deleteAccount.scheduledTitle')}</Text>
+            <Text style={styles.doneText}>{t('deleteAccount.scheduledText', { days: String(daysLeft) })}</Text>
+            <AppButton label={t('deleteAccount.backHome')} icon="home-outline" onPress={() => router.back()} />
+          </GlassCard>
+        </FadeInView>
+      </Screen>
+    );
+  }
+
+  if (step === 'code') {
+    return (
+      <Screen title={t('deleteAccount.title')} subtitle={t('deleteAccount.codeSubtitle')}>
+        <FadeInView>
+          <GlassCard radius={radii.lg} style={styles.card}>
+            <Notice text={t('deleteAccount.codeSent', { email: sentTo })} />
+            <FormField
+              label={t('deleteAccount.codeLabel')}
+              value={code}
+              onChangeText={setCode}
+              latin
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="000000"
+            />
+            {/* Step 3: the random word, shown big — typing it is the last deliberate act. */}
+            <Text style={styles.wordLabel}>{t('deleteAccount.wordLabel')}</Text>
+            <View style={styles.wordBox}>
+              <Text style={styles.word}>{word}</Text>
+            </View>
+            <FormField label={t('deleteAccount.wordField')} value={typedWord} onChangeText={setTypedWord} maxLength={40} placeholder={word} />
+            {error ? <Notice tone="warning" text={error} /> : null}
+            <AppButton label={t('deleteAccount.confirmFinal')} icon="trash-outline" disabled={code.trim().length < 4 || !typedWord.trim()} loading={busy} onPress={() => void confirm()} />
+            <Text style={styles.hint}>{t('deleteAccount.graceHint')}</Text>
+          </GlassCard>
+        </FadeInView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen title={t('deleteAccount.title')} subtitle={t('deleteAccount.subtitle')}>
@@ -103,7 +182,7 @@ export default function DeleteAccountScreen() {
         confirmLabel={t('account.delete.confirm')}
         busy={busy}
         error={error}
-        onConfirm={(password) => void confirmDelete(password)}
+        onConfirm={(password) => void start(password)}
         onCancel={() => {
           setConfirming(false);
           setError(null);
@@ -121,4 +200,18 @@ const styles = StyleSheet.create({
   reasonChosen: { color: colors.textPrimary },
   actions: { gap: spacing.xs },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  wordLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  wordBox: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldFaint,
+  },
+  word: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.gold, textAlign: 'center' },
+  doneIcon: { alignSelf: 'center' },
+  doneTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: 'center' },
+  doneText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
 });

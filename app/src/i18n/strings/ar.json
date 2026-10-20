@@ -988,5 +988,19 @@
   "ratings.submit": "إرسال التقييم",
   "ratings.update": "تحديث التقييم",
   "ratings.thanks": "وصل تقييمك — شكرًا لك.",
-  "ratings.signIn": "سجّل دخولك لتقييم المشروع والتعليق عليه — يظهر اسمك وصورتك وتقييمك فقط، ولا يمكن لأحد الوصول إلى حسابك."
+  "ratings.signIn": "سجّل دخولك لتقييم المشروع والتعليق عليه — يظهر اسمك وصورتك وتقييمك فقط، ولا يمكن لأحد الوصول إلى حسابك.",
+  "ratings.close": "إغلاق",
+  "ratings.tapHint": "اضغط على النجوم لتقييم المشروع",
+  "deleteAccount.codeSubtitle": "خطوة أخيرة للتأكد أنك صاحب الحساب",
+  "deleteAccount.codeSent": "أرسلنا رمز التأكيد إلى {email} — صالح لمدة 10 دقائق.",
+  "deleteAccount.codeLabel": "رمز التأكيد من بريدك",
+  "deleteAccount.wordLabel": "اكتب كلمة التأكيد التالية كما تظهر:",
+  "deleteAccount.wordField": "كلمة التأكيد",
+  "deleteAccount.confirmFinal": "تأكيد حذف الحساب",
+  "deleteAccount.graceHint": "بعد التأكيد يبقى حسابك فعالًا 30 يومًا ويمكنك التراجع خلالها في أي وقت من «حسابي».",
+  "deleteAccount.scheduledTitle": "تم جدولة حذف حسابك",
+  "deleteAccount.scheduledText": "أمامك {days} يومًا يمكنك خلالها استخدام التطبيق كالمعتاد، وبعدها يُحذف حسابك نهائيًا. غيّرت رأيك؟ من «حسابي» اضغط «تراجع عن الحذف» في أي وقت.",
+  "deleteAccount.backHome": "رجوع",
+  "deleteAccount.countdown": "حذف حسابك مجدول: أمامك {days} يومًا ثم يُحذف الحساب نهائيًا.",
+  "deleteAccount.cancel": "تراجع عن الحذف"
 }

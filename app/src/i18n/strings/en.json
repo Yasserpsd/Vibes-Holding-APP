@@ -988,5 +988,19 @@
   "ratings.submit": "Send review",
   "ratings.update": "Update review",
   "ratings.thanks": "Your review is in — thank you.",
-  "ratings.signIn": "Sign in to rate and comment on this project — only your name, photo and rating show, and no one can reach your account."
+  "ratings.signIn": "Sign in to rate and comment on this project — only your name, photo and rating show, and no one can reach your account.",
+  "ratings.close": "Close",
+  "ratings.tapHint": "Tap the stars to rate this project",
+  "deleteAccount.codeSubtitle": "One last step to make sure it is really you",
+  "deleteAccount.codeSent": "We sent the confirmation code to {email} — valid for 10 minutes.",
+  "deleteAccount.codeLabel": "Code from your e-mail",
+  "deleteAccount.wordLabel": "Type the following confirmation word exactly as shown:",
+  "deleteAccount.wordField": "Confirmation word",
+  "deleteAccount.confirmFinal": "Confirm account deletion",
+  "deleteAccount.graceHint": "After confirming, your account stays active for 30 days and you can undo at any time from My Account.",
+  "deleteAccount.scheduledTitle": "Your account deletion is scheduled",
+  "deleteAccount.scheduledText": "You have {days} days to keep using the app as usual; after that your account is permanently deleted. Changed your mind? Tap “Undo deletion” in My Account at any time.",
+  "deleteAccount.backHome": "Back",
+  "deleteAccount.countdown": "Account deletion scheduled: {days} days left, then the account is permanently deleted.",
+  "deleteAccount.cancel": "Undo deletion"
 }

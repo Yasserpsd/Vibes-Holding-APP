@@ -17,13 +17,14 @@ import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/c
 import { Notice } from '@/components/Notice';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
+import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
 import { env } from '@/config/env';
 import { languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
-import { openLink } from '@/lib/openLink';
+
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -87,6 +88,8 @@ export default function AccountScreen() {
       ) : (
         <Notice tone="warning" text={t('account.loadFailed')} />
       )}
+      {/* M117: the 30-day deletion countdown with its «تراجع» door — only while a deletion is scheduled. */}
+      {me ? <DeletionBanner account={String(me.id)} /> : null}
       <FadeInView delay={entranceDelay(1, 90)}>
         <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} />
       </FadeInView>
@@ -144,8 +147,9 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(7, 90)}>
         <MenuGroup title={t('account.group.more')}>
           <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
-          {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => void openLink(store.termsUrl ?? '')} /> : null}
-          {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => void openLink(store.privacyUrl ?? '')} /> : null}
+          {/* M116d (owner): legal pages render INSIDE the app — no browser bar, no hosting domain on show. */}
+          {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.termsUrl ?? '', title: t('store.terms') } })} /> : null}
+          {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.privacyUrl ?? '', title: t('store.privacy') } })} /> : null}
           <MenuRow icon="trash-outline" label={t('account.menu.delete')} danger onPress={() => router.push('/delete-account' as Href)} />
         </MenuGroup>
       </FadeInView>

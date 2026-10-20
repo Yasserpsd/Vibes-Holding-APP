@@ -11,6 +11,7 @@ import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { EMPTY_VALUE, ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectReviews } from '@/components/project/ProjectReviews';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
+import { RateProjectModal } from '@/components/project/RateProjectModal';
 import { StarsRow } from '@/components/Stars';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -38,6 +39,8 @@ export default function ProjectScreen() {
   const imageWidth = width - spacing.md * 2;
   // V2: the gallery's page indicator follows the swipes.
   const [page, setPage] = useState(0);
+  // M116d: the rating sheet, opened from the stars under the title.
+  const [rateOpen, setRateOpen] = useState(false);
 
   return (
     <View style={styles.screen}>
@@ -104,8 +107,12 @@ export default function ProjectScreen() {
 
           <FadeInView delay={30}>
             <Text style={styles.title}>{project.title}</Text>
-            {/* M116: the stars right under the name — empty outlines until the first rating. */}
-            {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} size={16} /> : null}
+            {/* M116d (owner): a tap on the stars under the name opens the rating sheet right away. */}
+            {project.rating ? (
+              <PressScale onPress={() => setRateOpen(true)} accessibilityRole="button" accessibilityLabel={t('ratings.add')} wrapStyle={styles.titleStars}>
+                <StarsRow value={project.rating.stars} count={project.rating.count} size={18} />
+              </PressScale>
+            ) : null}
           </FadeInView>
           {project.titleEn ? (
             <FadeInView delay={50}>
@@ -177,6 +184,8 @@ export default function ProjectScreen() {
           <FadeInView delay={280}>
             <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
           </FadeInView>
+
+          <RateProjectModal projectId={String(project.id)} visible={rateOpen} onClose={() => setRateOpen(false)} />
         </ScrollView>
       )}
     </View>
@@ -360,6 +369,7 @@ const styles = StyleSheet.create({
   galleryImage: { height: 220, backgroundColor: colors.surfaceElevated },
   heroFallback: { alignItems: 'center', justifyContent: 'center', experimental_backgroundImage: gradients.goldWash },
   heroEmblem: { width: 110, height: 110, opacity: 0.5 },
+  titleStars: { alignSelf: 'flex-start', marginTop: spacing.xs },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',

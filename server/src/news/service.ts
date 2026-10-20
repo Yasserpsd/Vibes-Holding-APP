@@ -38,7 +38,9 @@ export function decisionsTitle(lang: NewsLang): string {
 const MAX_ITEMS = 1500;
 const MAX_NEW_PER_SOURCE = 30;
 const PAGE_CONCURRENCY = 4;
-const RECENCY_HALF_LIFE_H = 36;
+// M116d (owner: «الأخبار قديمة اوي، عايزها أحدث»): freshness rules the feed — a story loses half
+// its recency score every 14 hours (was 36), and recency outweighs the tier ladder.
+const RECENCY_HALF_LIFE_H = 14;
 
 /** Interests assumed from the persona until the member picks their own. */
 const PERSONA_TOPICS: Record<string, TopicKey[]> = {
@@ -412,7 +414,7 @@ function feedTierRank(item: NewsItem): number {
 
 function scoreOf(item: NewsItem, wanted: Set<TopicKey>, now: number): number {
   const ageHours = Math.max(0, now - Date.parse(item.publishedAt)) / 3_600_000;
-  const recency = 40 * Math.pow(0.5, ageHours / RECENCY_HALF_LIFE_H);
+  const recency = 55 * Math.pow(0.5, ageHours / RECENCY_HALF_LIFE_H);
   const interest = item.topics.some((topic) => wanted.has(topic)) ? 25 : 0;
   return feedTierRank(item) * 8 + recency + item.relevance * 0.3 + interest;
 }
