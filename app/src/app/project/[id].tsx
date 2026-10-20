@@ -9,7 +9,9 @@ import { AppButton } from '@/components/AppButton';
 import { Highlight } from '@/components/Highlight';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { EMPTY_VALUE, ProjectBrief } from '@/components/project/ProjectBrief';
+import { ProjectReviews } from '@/components/project/ProjectReviews';
 import { ProjectUnlock } from '@/components/project/ProjectUnlock';
+import { StarsRow } from '@/components/Stars';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { isRTL, textStart } from '@/i18n/direction';
@@ -88,6 +90,8 @@ export default function ProjectScreen() {
 
           <FadeInView delay={30}>
             <Text style={styles.title}>{project.title}</Text>
+            {/* M116: the stars right under the name. */}
+            {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} size={16} /> : null}
           </FadeInView>
           {project.titleEn ? (
             <FadeInView delay={50}>
@@ -150,6 +154,11 @@ export default function ProjectScreen() {
               <ReadMore text={project.details ?? project.detailsEn ?? ''} />
             </FadeInView>
           ) : null}
+
+          {/* M116: the meetup-credibility block — stars and words from real people. */}
+          <FadeInView delay={260}>
+            <ProjectReviews projectId={String(project.id)} />
+          </FadeInView>
 
           <FadeInView delay={280}>
             <AppButton label={t('project.discuss')} icon="sparkles-outline" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />

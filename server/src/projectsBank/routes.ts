@@ -10,10 +10,11 @@ import type { ProjectAccessService } from './access.js';
 import type { BriefService } from './brief.js';
 import { PbImageProxy } from './images.js';
 import { localizeFilters, localizePage, localizeProject } from './lang.js';
+import type { RatingsService } from '../ratings/service.js';
 import type { ProjectsService } from './service.js';
 import { PROJECT_SORTS, type ProjectsPage, type PublicProject } from './types.js';
 
-export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; publicUrl?: string; fetchImpl?: typeof fetch };
+export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; ratings?: RatingsService; publicUrl?: string; fetchImpl?: typeof fetch };
 
 const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -33,21 +34,24 @@ function badRequest(reply: FastifyReply, message: string): FastifyReply {
   return reply.code(400).send({ error: { code: 'bad_request', message } });
 }
 
-export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief, interests, publicUrl, fetchImpl }) => {
+export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief, interests, ratings, publicUrl, fetchImpl }) => {
   const requireSession = sessionGuard(auth);
   const whoIs = optionalSession(auth);
   const limiter = new RateLimiter();
   const proxy = new PbImageProxy(fetchImpl);
 
   // M107b: the app loads every project photo through the server (images.ts says why).
-  const proxied = (project: PublicProject): PublicProject =>
-    publicUrl
+  // M116: every answered project also carries its stars summary for the cards and the page header.
+  const proxied = (project: PublicProject): PublicProject => {
+    const withRating = ratings ? { ...project, rating: ratings.summary(project.id) } : project;
+    return publicUrl
       ? {
-          ...project,
+          ...withRating,
           image: project.image ? `${publicUrl}/img/pb/${project.id}` : null,
           gallery: project.gallery.map((_entry, index) => `${publicUrl}/img/pb/${project.id}/g/${index}`),
         }
-      : project;
+      : withRating;
+  };
   const proxiedPage = (page: ProjectsPage): ProjectsPage => ({ ...page, items: page.items.map(proxied) });
 
   // M109h: a cold-started server answers image requests BEFORE the feed's first refresh — that is

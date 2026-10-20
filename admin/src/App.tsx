@@ -17,6 +17,7 @@ import { Partners } from './sections/Partners';
 import { Paylinks } from './sections/Paylinks';
 import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
+import { Ratings } from './sections/Ratings';
 import { Threads } from './sections/Threads';
 import { Companion } from './sections/Companion';
 import { Content } from './sections/Content';
@@ -34,6 +35,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'paylinks', label: 'روابط الدفع', icon: 'paylinks' },
   { key: 'discounts', label: 'أكواد الخصم', icon: 'discounts' },
   { key: 'interests', label: 'الاهتمامات', icon: 'interests' },
+  { key: 'ratings', label: 'تقييمات المشاريع', icon: 'ratings' },
   { key: 'partners', label: 'شركاؤنا', icon: 'partners' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
@@ -268,6 +270,7 @@ export function App() {
             {section === 'paylinks' ? <Paylinks /> : null}
             {section === 'discounts' ? <Discounts /> : null}
             {section === 'interests' ? <Interests /> : null}
+            {section === 'ratings' ? <Ratings /> : null}
             {section === 'partners' ? <Partners /> : null}
             {section === 'cards' ? <CardRequests /> : null}
             {section === 'invites' ? <Invites /> : null}

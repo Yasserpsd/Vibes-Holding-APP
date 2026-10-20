@@ -336,6 +336,7 @@
   "notFound.message": "هذه الصفحة غير موجودة",
   "notFound.home": "العودة إلى الرئيسية",
   "home.greeting": "أهلًا {name}.",
+  "projects.sort.top": "الأعلى تقييمًا",
   "projects.sort.latest": "الأحدث",
   "projects.sort.views": "الأكثر مشاهدة",
   "projects.sort.discover": "اكتشف",
@@ -974,5 +975,17 @@
   "hqBook.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
   "hqBook.walletHint": "يُخصم الحجز من رصيدك بعد تأكيد الإدارة فقط، ولا دخول قبل التأكيد.",
   "hqBook.walletEmpty": "رصيد ساعاتك لهذه السنة انتهى، ويتجدد مع سنة العضوية الجديدة.",
-  "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة"
+  "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
+  "ratings.title": "التقييمات",
+  "ratings.a11y": "{stars} من 5 نجوم",
+  "ratings.empty": "لا توجد تقييمات بعد — كن أول من يقيّم هذا المشروع.",
+  "ratings.add": "أضف تقييمك",
+  "ratings.edit": "عدّل تقييمك",
+  "ratings.yourStars": "تقييمك للمشروع",
+  "ratings.commentLabel": "تعليقك (اختياري)",
+  "ratings.commentPlaceholder": "ما رأيك في المشروع؟",
+  "ratings.submit": "إرسال التقييم",
+  "ratings.update": "تحديث التقييم",
+  "ratings.thanks": "وصل تقييمك — شكرًا لك.",
+  "ratings.signIn": "سجّل دخولك لتقييم المشروع والتعليق عليه — يظهر اسمك وصورتك وتقييمك فقط، ولا يمكن لأحد الوصول إلى حسابك."
 }

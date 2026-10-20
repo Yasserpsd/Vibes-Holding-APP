@@ -55,21 +55,36 @@ export function dailyLeft(account: Pick<Account, 'daily_left' | 'daily_limit'>):
   return account.daily_left === null ? '—' : `${formatNumber(account.daily_left)} من ${formatNumber(account.daily_limit)}`;
 }
 
+/** M116 (owner): the member's category, readable at a glance on the row and the sheet. */
+export function personaLabel(persona: string | null | undefined): string | null {
+  return PERSONA_FILTERS.find((entry) => entry.value === persona && entry.value !== 'all')?.label ?? null;
+}
+
 function Row({ account }: { account: AccountRow }) {
   const { openMember } = useShell();
   const member = account.state === 'member';
+  const persona = personaLabel(account.persona);
   return (
     <li>
       <button type="button" className="member-row" onClick={() => openMember(account.id)}>
         <span className="member-top">
           <strong>{account.name || account.email || `حساب رقم ${account.id}`}</strong>
-          <span className="pills"><StatePill account={account} /></span>
+          <span className="pills">
+            {persona ? <Pill tone="muted">{persona}</Pill> : null}
+            <StatePill account={account} />
+          </span>
         </span>
         <span className="muted member-contact">
           {account.email ? <bdi dir="ltr">{account.email}</bdi> : null}
           {account.phone ? <bdi dir="ltr">{account.phone}</bdi> : null}
           <span>آخر نشاط {formatRelative(account.last_at ?? account.created_at)}</span>
         </span>
+        {/* M116 (owner's «الحتة التنظيمية»): what this account cares about, right on the row. */}
+        {account.interests?.length ? (
+          <span className="pills" style={{ marginTop: 4 }}>
+            {account.interests.map((label) => <Pill key={label} tone="gold">{label}</Pill>)}
+          </span>
+        ) : null}
         {member ? (
           <span className="member-facts">
             <span className={!account.never_expires && account.member_left !== null && account.member_left <= 7 ? 'fact alert' : 'fact'}>

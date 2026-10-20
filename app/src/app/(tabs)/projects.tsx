@@ -21,6 +21,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 
 // The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
 const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
+  { key: 'top', label: '' },
   { key: 'latest', label: '' },
   { key: 'views', label: '' },
   { key: 'discover', label: '' },
@@ -33,7 +34,8 @@ export default function ProjectsScreen() {
   const signedIn = status === 'signedIn';
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [sort, setSort] = useState<ProjectsSort>('latest');
+  // M116 (owner): the bank's default face is «الأعلى تقييمًا».
+  const [sort, setSort] = useState<ProjectsSort>('top');
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
   // M107 «حسب اهتماماتي»: keeps only the projects matching my saved interests.

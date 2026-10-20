@@ -4,7 +4,7 @@ import { api, newRequestId } from '../api';
 import { formatCents, formatDateTime, formatDay, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { Account, GrantAction, MemberDetail, MemberEvent } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
-import { dailyLeft, memberLeft, StatePill } from './Members';
+import { dailyLeft, memberLeft, personaLabel, StatePill } from './Members';
 
 type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
@@ -256,7 +256,15 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
   return (
     <div className="stack">
       <section className="sheet-block">
-        <div className="pills"><StatePill account={account} /><Intent score={account.intent} label={account.intent_label} /></div>
+        <div className="pills">
+          {personaLabel(account.persona) ? <Pill tone="muted">{personaLabel(account.persona)}</Pill> : null}
+          <StatePill account={account} />
+          <Intent score={account.intent} label={account.intent_label} />
+        </div>
+        {/* M116 (owner): the member's interests, right where he reads who this is. */}
+        {detail.interests?.length ? (
+          <div className="pills">{detail.interests.map((label) => <Pill key={label} tone="gold">{label}</Pill>)}</div>
+        ) : null}
         <dl className="fields">
           <Field label="البريد الإلكتروني" ltr>{account.email || '—'}</Field>
           <Field label="الجوال" ltr>{account.phone || '—'}</Field>

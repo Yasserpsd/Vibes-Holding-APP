@@ -8,6 +8,7 @@ import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
 import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
+import { StarsRow } from '@/components/Stars';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -82,6 +83,7 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
             <Text style={styles.title} numberOfLines={2}>
               {project.title}
             </Text>
+            {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
             <View style={styles.ctaRow}>
               <Text style={styles.cta}>{block.cta}</Text>
               <Ionicons name={chevronForward()} size={14} color={colors.gold} />

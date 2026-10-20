@@ -40,7 +40,7 @@ export const STAGE_EN: Record<StageKey, string> = {
 
 export const ESTIMATED_MARK_EN = "adviser's estimate";
 
-const SORT_EN: Record<ProjectsSort, string> = { latest: 'Latest', views: 'Most viewed', discover: 'Discover', golden: 'Golden Projects' };
+const SORT_EN: Record<ProjectsSort, string> = { top: 'Top rated', latest: 'Latest', views: 'Most viewed', discover: 'Discover', golden: 'Golden Projects' };
 
 const isStageKey = (slug: string): slug is StageKey => slug in STAGE_EN;
 

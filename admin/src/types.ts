@@ -185,7 +185,8 @@ export type Home = {
   errors: { hub?: SectionError; pb?: SectionError };
 };
 
-export type AccountRow = Account & { pb: PbBeside | null };
+/** M116: `interests` = the member's saved interests as ready Arabic labels (the «أخرى» text inlined). */
+export type AccountRow = Account & { pb: PbBeside | null; interests?: string[] };
 export type AccountsResult = Listed<AccountRow> & { counts: Record<string, number>; pbError: SectionError | null };
 export type MemberDetail = {
   ok: true;
@@ -199,6 +200,8 @@ export type MemberDetail = {
   events: MemberEvent[];
   pb: PbBalance | null;
   pbError: SectionError | null;
+  /** M116: the member's interests as ready Arabic labels. */
+  interests?: string[];
 };
 export type ThreadDetail = { ok: true; account: Account; messages: ThreadMessage[]; has_more: boolean };
 

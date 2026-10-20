@@ -108,7 +108,8 @@ test('returns a project and the filters', async () => {
 
   const filters = await app.inject({ method: 'GET', url: '/api/projects/filters' });
   assert.deepEqual(filters.json().sectors.map((option: { slug: string }) => option.slug).sort(), ['food', 'tech']);
-  assert.equal(filters.json().sorts.length, 4);
+  // M116 added «الأعلى تقييمًا» to the four original sorts.
+  assert.equal(filters.json().sorts.length, 5);
 });
 
 test('serves the seeded golden portal', async () => {

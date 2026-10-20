@@ -338,6 +338,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "notFound.message": "هذه الصفحة غير موجودة",
     "notFound.home": "العودة إلى الرئيسية",
     "home.greeting": "أهلًا {name}.",
+    "projects.sort.top": "الأعلى تقييمًا",
     "projects.sort.latest": "الأحدث",
     "projects.sort.views": "الأكثر مشاهدة",
     "projects.sort.discover": "اكتشف",
@@ -976,7 +977,19 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "hqBook.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
     "hqBook.walletHint": "يُخصم الحجز من رصيدك بعد تأكيد الإدارة فقط، ولا دخول قبل التأكيد.",
     "hqBook.walletEmpty": "رصيد ساعاتك لهذه السنة انتهى، ويتجدد مع سنة العضوية الجديدة.",
-    "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة"
+    "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
+    "ratings.title": "التقييمات",
+    "ratings.a11y": "{stars} من 5 نجوم",
+    "ratings.empty": "لا توجد تقييمات بعد — كن أول من يقيّم هذا المشروع.",
+    "ratings.add": "أضف تقييمك",
+    "ratings.edit": "عدّل تقييمك",
+    "ratings.yourStars": "تقييمك للمشروع",
+    "ratings.commentLabel": "تعليقك (اختياري)",
+    "ratings.commentPlaceholder": "ما رأيك في المشروع؟",
+    "ratings.submit": "إرسال التقييم",
+    "ratings.update": "تحديث التقييم",
+    "ratings.thanks": "وصل تقييمك — شكرًا لك.",
+    "ratings.signIn": "سجّل دخولك لتقييم المشروع والتعليق عليه — يظهر اسمك وصورتك وتقييمك فقط، ولا يمكن لأحد الوصول إلى حسابك."
   },
   "en": {
     "tabs.home": "Home",
@@ -1316,6 +1329,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "notFound.message": "This page does not exist",
     "notFound.home": "Back to home",
     "home.greeting": "Welcome, {name}.",
+    "projects.sort.top": "Top rated",
     "projects.sort.latest": "Latest",
     "projects.sort.views": "Most viewed",
     "projects.sort.discover": "Discover",
@@ -1954,7 +1968,19 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "hqBook.walletLine": "Your annual hours balance: {left} of {total} hours left",
     "hqBook.walletHint": "Hours are deducted only after the management confirms, and there is no entry before confirmation.",
     "hqBook.walletEmpty": "Your hours for this membership year are used up; the balance renews with the new membership year.",
-    "hq.walletLine": "Your annual hours balance: {left} of {total} hours left"
+    "hq.walletLine": "Your annual hours balance: {left} of {total} hours left",
+    "ratings.title": "Reviews",
+    "ratings.a11y": "{stars} out of 5 stars",
+    "ratings.empty": "No reviews yet — be the first to rate this project.",
+    "ratings.add": "Add your review",
+    "ratings.edit": "Edit your review",
+    "ratings.yourStars": "Your rating",
+    "ratings.commentLabel": "Your comment (optional)",
+    "ratings.commentPlaceholder": "What do you think of the project?",
+    "ratings.submit": "Send review",
+    "ratings.update": "Update review",
+    "ratings.thanks": "Your review is in — thank you.",
+    "ratings.signIn": "Sign in to rate and comment on this project — only your name, photo and rating show, and no one can reach your account."
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2017,6 +2043,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "interests": "الاهتمامات",
     "partners": "شركاؤنا",
     "profileNudge": "تنبيه إكمال البيانات",
-    "profileGate": "بوابة إكمال البيانات"
+    "profileGate": "بوابة إكمال البيانات",
+    "ratings": "تقييمات المشاريع"
   }
 };

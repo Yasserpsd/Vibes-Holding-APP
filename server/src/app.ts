@@ -79,6 +79,8 @@ import { companionRoutes } from './companion/routes.js';
 import { CompanionService } from './companion/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
+import { ratingsRoutes } from './ratings/routes.js';
+import { RatingsService } from './ratings/service.js';
 import type { KV } from './store.js';
 import { OffTranslator, OpenAITranslator, type Translator } from './translate.js';
 import { FeedService } from './sync/feed.js';
@@ -174,7 +176,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
   // Fire and forget: a version that kv could not save is logged, never an unhandled rejection.
   const moved = (...keys: SyncKey[]): void => void sync.bump(...keys).catch((error: unknown) => app.log.error({ err: error, keys }, 'sync version not saved'));
-  const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects') });
+  // M116 «تقييمات المشاريع»: stars + comments; one kv read at boot fills the sync summary cache.
+  const ratings = new RatingsService({ kv });
+  await ratings.start();
+  const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects'), ratingOf: (id) => ratings.summary(id) });
   // Native golden offer pages, pulled from each company's web /offer/ page (PROJECT_BRIEF §5.1).
   const golden = new GoldenOffersService({ kv, config, log: app.log, fetchImpl, onChange: () => moved('content') });
   // The server's own mock hub comes with a demo club, so the dashboard can be checked locally.
@@ -414,7 +419,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
   registerProfileGate(app, auth);
 
-  await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, publicUrl: config.PUBLIC_URL, fetchImpl });
+  await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl });
+  await app.register(ratingsRoutes, { service: ratings, auth, projects });
   await app.register(interestsRoutes, { service: interests, auth });
   await app.register(discountsRoutes, { service: discounts, auth });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
@@ -452,7 +458,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
-  await app.register(dashboardRoutes, { service: dashboard, auth });
+  await app.register(dashboardRoutes, { service: dashboard, auth, interests });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });
   await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });

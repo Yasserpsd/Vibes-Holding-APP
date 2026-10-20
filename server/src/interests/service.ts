@@ -85,6 +85,18 @@ export class InterestsService {
     return { picked, savedAny };
   }
 
+  /** M116 (owner's «الحتة التنظيمية»): the members screen shows every account's interests as labels. */
+  async labelsFor(contactIds: number[]): Promise<Record<number, string[]>> {
+    const doc = await this.load();
+    const out: Record<number, string[]> = {};
+    for (const id of contactIds) {
+      const prefs = doc.byContact[String(id)];
+      if (!prefs) continue;
+      out[id] = prefs.keys.map((key) => (key === 'other' && prefs.other ? `أخرى: ${prefs.other}` : interestLabel(key)));
+    }
+    return out;
+  }
+
   /** Dashboard report: how many members picked each interest, and every «أخرى» text for the monthly review. */
   async report(): Promise<{
     total: number;

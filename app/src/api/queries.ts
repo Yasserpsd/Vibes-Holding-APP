@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiRequest } from './client';
-import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectUnlockResult, ProjectsBalance, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
+import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectReview, ProjectReviews, ProjectUnlockResult, ProjectsBalance, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
 
 export const PAGE_SIZE = 20;
 
@@ -76,7 +76,21 @@ export function useProjectsWallet(account: string | null) {
 
 export const projectsApi = {
   unlock: (id: string) => apiRequest<ProjectUnlockResult>('POST', `/api/projects/${encodeURIComponent(id)}/unlock`, { body: {} }),
+  // M116: rate a project (any signed-in account; resubmitting updates the same review).
+  review: (id: string, stars: number, comment: string) =>
+    apiRequest<{ ok: true; review: ProjectReview; summary: ProjectReviews['summary'] }>('POST', `/api/projects/${encodeURIComponent(id)}/reviews`, { body: { stars, comment } }),
 };
+
+/** M116 «تقييمات المشاريع»: public like the project; `mine` marks the signed-in account's own review. */
+export function useProjectReviews(id: string | undefined, account: string | null) {
+  return useQuery({
+    // The account in the key: `mine` flips when another account signs in.
+    queryKey: ['project-reviews', id, account ?? ''],
+    queryFn: () => apiGet<ProjectReviews>(`/api/projects/${encodeURIComponent(id ?? '')}/reviews`),
+    enabled: Boolean(id),
+    staleTime: 60_000,
+  });
+}
 
 export function useProjectFilters() {
   return useQuery({

@@ -3,9 +3,10 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { InterestsService } from '../interests/service.js';
 import type { DashboardService } from './service.js';
 
-export type DashboardRoutesOptions = { service: DashboardService; auth: AuthService };
+export type DashboardRoutesOptions = { service: DashboardService; auth: AuthService; interests?: InterestsService };
 
 const q = z.string().trim().max(120).default('');
 const paging = { page: z.coerce.number().int().min(1).max(100_000).default(1), per_page: z.coerce.number().int().min(1).max(100).default(25) };
@@ -38,7 +39,7 @@ const pbGrantSchema = z.object({ amount: z.number().int().min(-50).max(50).refin
 const replySchema = z.object({ text: z.string().trim().min(1, 'اكتب الرد أولًا').max(4000, 'الرد طويل، الحد 4000 حرف'), confirm, requestId });
 
 /** The dashboard's bridge v2 endpoints: all behind `dashboardGuard`, all `no-store` like every /api/ answer. */
-export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async (app, { service, auth }) => {
+export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async (app, { service, auth, interests }) => {
   const requireAdmin = dashboardGuard(auth);
 
   app.get(
@@ -59,7 +60,11 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const query = parse(accountsSchema, request.query, reply);
       if (!query) return;
-      return service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona });
+      const answer = await service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona });
+      // M116 (owner): the members list shows each account's interests beside the persona filter.
+      if (!interests) return answer;
+      const labels = await interests.labelsFor(answer.items.map((item) => item.id));
+      return { ...answer, items: answer.items.map((item) => ({ ...item, interests: labels[item.id] ?? [] })) };
     }),
   );
 
@@ -82,7 +87,11 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      return service.account(admin, params.id);
+      const detail = await service.account(admin, params.id);
+      // M116: the member sheet names the member's interests too.
+      if (!interests) return detail;
+      const labels = await interests.labelsFor([params.id]);
+      return { ...detail, interests: labels[params.id] ?? [] };
     }),
   );
 

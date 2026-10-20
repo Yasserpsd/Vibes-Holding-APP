@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { AccountFilter } from './types';
 
-export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion';
+export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'ratings' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {
@@ -91,6 +91,8 @@ const ICONS = {
   people: 'M12 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM5 20v-.75A5.75 5.75 0 0 1 10.75 13.5h2.5A5.75 5.75 0 0 1 19 19.25V20M18.5 2.8v3.4M16.8 4.5h3.4',
   agenda: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-12ZM4 9.5h16M8.5 3.5v3M15.5 3.5v3M8 13.5h3M8 16.5h5.5M14.5 13l1.5 1.5 3-3',
   paylinks: 'M9.5 14.5l5-5M8 10.5 5.75 12.75a3.18 3.18 0 0 0 4.5 4.5L12.5 15M11.5 9l2.25-2.25a3.18 3.18 0 0 1 4.5 4.5L16 13.5M17 17.5c2-.4 3-1.4 3-3M4 6.5c0 1.6 1 2.6 3 3',
+  // M116: a star (project ratings).
+  ratings: 'M12 3.5l2.47 5.01 5.53.8-4 3.9.94 5.51L12 16.12l-4.94 2.6.94-5.51-4-3.9 5.53-.8L12 3.5Z',
   // M107: a price tag (discount codes) and a heart (interests).
   discounts: 'M11.5 3.5H5a1.5 1.5 0 0 0-1.5 1.5v6.5L12 20l8.5-8.5-9-8ZM8 8h.01M8 8a.5.5 0 1 0 .01 0ZM10.5 15.5l5-5',
   interests: 'M12 20s-7.5-4.6-9.3-9A5 5 0 0 1 12 6.6 5 5 0 0 1 21.3 11c-1.8 4.4-9.3 9-9.3 9Z',

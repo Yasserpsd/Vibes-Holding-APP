@@ -309,6 +309,35 @@ export type DiscountUse = {
   at: string;
 };
 
+// M116 «تقييمات المشاريع»: stars + comments on the Projects Bank, fed by the app and by hand.
+export type RatingRow = {
+  projectId: number;
+  title: string;
+  number: string | null;
+  /** What the app shows: the pinned value when set, else the average. */
+  stars: number | null;
+  average: number | null;
+  count: number;
+  hiddenCount: number;
+  override: number | null;
+  latestAt: string | null;
+};
+export type RatingCatalogEntry = { id: number; title: string; number: string | null };
+export type RatingReview = {
+  id: string;
+  projectId: number;
+  stars: number;
+  comment: string;
+  source: 'member' | 'manual';
+  contactId: number | null;
+  name: string;
+  photoUrl: string;
+  hidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type ManualReviewInput = { name: string; stars: number; comment: string; photoUrl: string };
+
 /** M107 «الاهتمامات» — mirrors server/src/interests. */
 export type InterestsReport = {
   total: number;
@@ -521,6 +550,13 @@ export const api = {
   updateDiscount: (code: string, patch: Partial<DiscountCodeInput>) => call<{ code: DiscountCode }>('PUT', `/api/admin/discounts/${encodeURIComponent(code)}`, patch),
   deleteDiscount: (code: string) => call<{ ok: true }>('DELETE', `/api/admin/discounts/${encodeURIComponent(code)}`),
   discountUses: (code: string) => call<{ uses: DiscountUse[] }>('GET', `/api/admin/discounts/${encodeURIComponent(code)}/uses`),
+  // M116 «تقييمات المشاريع»
+  ratings: () => call<{ rows: RatingRow[]; catalog: RatingCatalogEntry[] }>('GET', '/api/admin/ratings'),
+  ratingReviews: (projectId: number) => call<{ reviews: RatingReview[]; summary: { stars: number | null; count: number } }>('GET', `/api/admin/ratings/${projectId}`),
+  addRatingReview: (projectId: number, input: ManualReviewInput) => call<{ review: RatingReview }>('POST', `/api/admin/ratings/${projectId}/reviews`, input),
+  updateRatingReview: (id: string, patch: Partial<ManualReviewInput> & { hidden?: boolean }) => call<{ review: RatingReview }>('PUT', `/api/admin/ratings/reviews/${encodeURIComponent(id)}`, patch),
+  deleteRatingReview: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/ratings/reviews/${encodeURIComponent(id)}`),
+  setRatingOverride: (projectId: number, stars: number | null) => call<{ ok: true; summary: { stars: number | null; count: number } }>('PUT', `/api/admin/ratings/${projectId}/override`, { stars }),
   interestsReport: () => call<InterestsReport>('GET', '/api/admin/interests'),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),

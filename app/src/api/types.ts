@@ -28,9 +28,27 @@ export type PublicProject = {
   contactRule: string | null;
   viewsCount: number;
   modifiedAt: string | null;
+  /** M116: stars + count (the dashboard's pinned value already applied server-side). */
+  rating?: { stars: number | null; count: number };
 };
 
-export type ProjectsSort = 'latest' | 'views' | 'discover' | 'golden';
+export type ProjectsSort = 'top' | 'latest' | 'views' | 'discover' | 'golden';
+
+// M116 «تقييمات المشاريع»: name, photo, stars and comment only — nothing reaches the rater's account.
+export type ProjectReview = {
+  id: string;
+  name: string;
+  photoUrl: string;
+  stars: number;
+  comment: string;
+  at: string;
+  mine: boolean;
+};
+
+export type ProjectReviews = {
+  summary: { stars: number | null; count: number };
+  reviews: ProjectReview[];
+};
 
 export type ProjectsPage = {
   items: PublicProject[];

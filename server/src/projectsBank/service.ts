@@ -22,6 +22,8 @@ import type {
 export const SNAPSHOT_KEY = 'projectsBank:snapshot';
 
 export const SORT_LABELS: Record<ProjectsSort, string> = {
+  // M116 (owner): «الأعلى تقييمًا» leads — the default face of the bank follows the ratings.
+  top: 'الأعلى تقييمًا',
   latest: 'الأحدث',
   views: 'الأكثر مشاهدة',
   discover: 'اكتشف',
@@ -30,7 +32,15 @@ export const SORT_LABELS: Record<ProjectsSort, string> = {
 
 type IndexedProject = { project: PublicProject; search: string };
 
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; /** Called when a refresh brought different content (/api/sync). */ onChange?: () => void };
+type RatingLookup = (id: number) => { stars: number | null; count: number };
+
+type Deps = {
+  kv: KV;
+  config: Config;
+  log: FastifyBaseLogger;
+  /** Called when a refresh brought different content (/api/sync). */ onChange?: () => void;
+  /** M116: the ratings summary, for the «الأعلى تقييمًا» sort. */ ratingOf?: RatingLookup;
+};
 
 /** Keeps the public projects in memory, refreshed from the feed on a schedule. */
 export class ProjectsService {
@@ -138,7 +148,7 @@ export class ProjectsService {
       const terms = normalizeForSearch(query.q).split(' ').filter(Boolean);
       rows = rows.filter((row) => terms.every((term) => row.search.includes(term)));
     }
-    const sorted = sortProjects(rows.map((row) => row.project), query.sort);
+    const sorted = sortProjects(rows.map((row) => row.project), query.sort, this.deps.ratingOf);
     const start = (query.page - 1) * query.limit;
     const items = sorted.slice(start, start + query.limit);
     return {
@@ -209,9 +219,18 @@ function byLatest(a: PublicProject, b: PublicProject): number {
   return (b.modifiedAt ?? '').localeCompare(a.modifiedAt ?? '') || b.id - a.id;
 }
 
-function sortProjects(projects: PublicProject[], sort: ProjectsSort): PublicProject[] {
+function sortProjects(projects: PublicProject[], sort: ProjectsSort, ratingOf?: (id: number) => { stars: number | null; count: number }): PublicProject[] {
   const copy = [...projects];
   switch (sort) {
+    // M116: the rated projects first (stars, then how many rated), the rest in their latest order.
+    case 'top': {
+      if (!ratingOf) return copy.sort(byLatest);
+      return copy.sort((a, b) => {
+        const ra = ratingOf(a.id);
+        const rb = ratingOf(b.id);
+        return (rb.stars ?? 0) - (ra.stars ?? 0) || rb.count - ra.count || byLatest(a, b);
+      });
+    }
     case 'views':
       return copy.sort((a, b) => b.viewsCount - a.viewsCount || byLatest(a, b));
     case 'golden':

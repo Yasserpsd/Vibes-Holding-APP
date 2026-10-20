@@ -23,6 +23,8 @@ const GATED_ROUTES = new Set([
   'POST /api/agenda/:id/register',
   'POST /api/hq/visits',
   'POST /api/projects/:id/unlock',
+  // M116 (owner: «نربط تكملة البروفايل بأنه يعمل أي حاجة»): rating a project needs a complete profile too.
+  'POST /api/projects/:id/reviews',
 ]);
 
 export function registerProfileGate(app: FastifyInstance, auth: AuthService): void {

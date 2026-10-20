@@ -336,6 +336,7 @@
   "notFound.message": "This page does not exist",
   "notFound.home": "Back to home",
   "home.greeting": "Welcome, {name}.",
+  "projects.sort.top": "Top rated",
   "projects.sort.latest": "Latest",
   "projects.sort.views": "Most viewed",
   "projects.sort.discover": "Discover",
@@ -974,5 +975,17 @@
   "hqBook.walletLine": "Your annual hours balance: {left} of {total} hours left",
   "hqBook.walletHint": "Hours are deducted only after the management confirms, and there is no entry before confirmation.",
   "hqBook.walletEmpty": "Your hours for this membership year are used up; the balance renews with the new membership year.",
-  "hq.walletLine": "Your annual hours balance: {left} of {total} hours left"
+  "hq.walletLine": "Your annual hours balance: {left} of {total} hours left",
+  "ratings.title": "Reviews",
+  "ratings.a11y": "{stars} out of 5 stars",
+  "ratings.empty": "No reviews yet — be the first to rate this project.",
+  "ratings.add": "Add your review",
+  "ratings.edit": "Edit your review",
+  "ratings.yourStars": "Your rating",
+  "ratings.commentLabel": "Your comment (optional)",
+  "ratings.commentPlaceholder": "What do you think of the project?",
+  "ratings.submit": "Send review",
+  "ratings.update": "Update review",
+  "ratings.thanks": "Your review is in — thank you.",
+  "ratings.signIn": "Sign in to rate and comment on this project — only your name, photo and rating show, and no one can reach your account."
 }

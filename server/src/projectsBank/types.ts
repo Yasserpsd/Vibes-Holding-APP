@@ -31,9 +31,11 @@ export type PublicProject = {
   contactRule: string | null;
   viewsCount: number;
   modifiedAt: string | null;
+  /** M116: stars + count from the ratings module; set by the routes, never by the feed mapper. */
+  rating?: { stars: number | null; count: number };
 };
 
-export const PROJECT_SORTS = ['latest', 'views', 'discover', 'golden'] as const;
+export const PROJECT_SORTS = ['top', 'latest', 'views', 'discover', 'golden'] as const;
 export type ProjectsSort = (typeof PROJECT_SORTS)[number];
 
 export type ProjectsQuery = {
