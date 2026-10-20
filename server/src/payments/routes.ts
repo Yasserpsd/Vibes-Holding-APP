@@ -96,6 +96,18 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
     return reply.type('text/html; charset=utf-8').send(returnPage(result, appScheme));
   });
 
+  // M110: the customer's printable invoice (paid payments only; the uuid is the access key).
+  app.get(
+    '/pay/invoice/:id',
+    guard(async (request, reply) => {
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const html = await service.invoicePage(params.id);
+      if (!html) return reply.code(404).type('text/html; charset=utf-8').send(returnPage({ payment: null, verified: false, gatewaySuccess: null }, appScheme));
+      return reply.type('text/html; charset=utf-8').send(html);
+    }),
+  );
+
   app.get(
     '/api/admin/payments',
     guard(async (request, reply) => {

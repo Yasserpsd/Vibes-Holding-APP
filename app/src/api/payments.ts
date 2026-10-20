@@ -25,6 +25,8 @@ export type Payment = {
   checkoutUrl: string;
   transactionId: string | null;
   failureReason: string | null;
+  /** M110: set once the payment is paid; the invoice lives at /pay/invoice/<id> on the server. */
+  invoiceNo?: number | null;
   createdAt: string;
   paidAt: string | null;
   failedAt: string | null;

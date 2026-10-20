@@ -165,6 +165,18 @@ test('a payment through Moyasar records the invoice and the per-payment callback
   await settle();
   const paid = await built.payments.byId(paymentId);
   assert.deepEqual([paid?.status, paid?.transactionId], ['paid', 'tr_ok']);
+
+  // M110: the sale carries an invoice number, the customer got the HTML invoice mail,
+  // and the printable invoice page answers.
+  assert.ok(paid?.invoiceNo, 'invoice number assigned');
+  const invoiceMail = mailer.sent.find((mail) => mail.subject.includes('فاتورتك') && mail.to.includes('moyasar.admin@gmail.com'));
+  assert.ok(invoiceMail?.html?.includes('مدفوعة بالكامل'), 'customer invoice mail with HTML');
+  const page = await get(`/pay/invoice/${paymentId}`);
+  assert.equal(page.statusCode, 200);
+  assert.ok(page.body.includes(String(paid?.invoiceNo)) && page.body.includes('بيانات البائع'), page.body.slice(0, 300));
+  // An unpaid payment has no invoice page.
+  const { paymentId: unpaid } = await startLinkPayment(5);
+  assert.equal((await get(`/pay/invoice/${unpaid}`)).statusCode, 404);
 });
 
 test('an amount mismatch from the API fails the payment instead of paying it', async () => {

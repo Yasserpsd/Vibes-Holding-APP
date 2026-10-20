@@ -100,8 +100,10 @@ test('a workshop link needs no activation and its mail names the sale', async ()
   const mail = mailer.sent.slice(before).map((entry) => entry.subject + '\n' + entry.text).join('\n');
   assert.match(mail, /✅ دفعة ورشة \/ فعالية: ورشة مشروعك الريادي — ضيف الورشة \(290 ريال\)/);
   assert.match(mail, /لا يلزم/);
-  // The generic payment mail stays quiet for link sales: one clear mail per sale.
-  assert.equal(mailer.sent.slice(before).length, 1);
+  // The generic payment mail stays quiet for link sales: one clear sale mail — plus, since M110,
+  // the admin copy of the customer invoice (owner: «ابعت للأدمن زيها بالظبط»).
+  assert.equal(mailer.sent.slice(before).length, 2);
+  assert.match(mail, /نسخة الإدارة/);
 });
 
 test('a membership sale with no matched account is flagged for manual activation after payment', async () => {

@@ -93,6 +93,7 @@ function answerLines(answers: Answer[]): string[] {
 
 function gatewayName(provider: string): string {
   if (provider === 'code') return 'بدون بوابة — كود خصم 100%';
+  if (provider === 'moyasar') return 'ميسر (Moyasar)';
   return provider === 'mock' ? 'تجريبية (بدون بوابة حقيقية)' : 'Paymob';
 }
 
@@ -386,6 +387,22 @@ export class Notifier {
       '',
       'يرجى التواصل مع العميل لبدء تنفيذ الخدمة.',
     ]);
+  }
+
+  /**
+   * M110: the invoice mail (HTML) the moment a payment settles paid — to the customer, and the
+   * exact same invoice to every registered admin address (owner, 2026-10-20: «ابعت للأدمن زيها
+   * بالظبط لكل الأدمن المسجل»). Separate sends, so the customer never sees the admin list.
+   */
+  invoiceIssued(input: { email: string; subject: string; text: string; html: string }): void {
+    const subject = `${this.deps.appEnv === 'test' ? '[تجريبي] ' : ''}${input.subject}`;
+    const sendTo = (to: string[], mailSubject: string) =>
+      this.deps.mailer
+        .send({ to, subject: mailSubject, text: input.text, html: input.html })
+        .then((sent) => this.deps.log.info({ subject: mailSubject, sent }, 'invoice mail'))
+        .catch((error: unknown) => this.deps.log.error({ err: error, subject: mailSubject }, 'invoice mail failed'));
+    if (input.email.trim()) void sendTo([input.email.trim()], subject);
+    if (this.recipients.length) void sendTo(this.recipients, `${SUBJECT_PREFIX} نسخة الإدارة — ${input.subject}`);
   }
 
   paymentFailed(payment: PaymentLike): void {

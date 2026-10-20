@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import nodemailer, { type Transporter } from 'nodemailer';
 
-export type Mail = { to: string[]; subject: string; text: string };
+export type Mail = { to: string[]; subject: string; text: string; html?: string };
 
 export interface Mailer {
   /** False when mails are only logged. */
@@ -44,7 +44,7 @@ export class SmtpMailer implements Mailer {
   }
 
   async send(mail: Mail): Promise<boolean> {
-    await this.transport.sendMail({ from: this.options.from, to: mail.to.join(', '), subject: mail.subject, text: mail.text });
+    await this.transport.sendMail({ from: this.options.from, to: mail.to.join(', '), subject: mail.subject, text: mail.text, ...(mail.html ? { html: mail.html } : {}) });
     return true;
   }
 }

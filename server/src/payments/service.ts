@@ -11,6 +11,7 @@ import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
+import { invoiceHtml, invoiceText, invoiceTitle } from './invoice.js';
 import type { MoyasarConfirmer } from './moyasar.js';
 import type { PaymobGateway } from './paymob.js';
 
@@ -20,6 +21,9 @@ import type { PaymobGateway } from './paymob.js';
  * Payments live in one kv document (single-instance server, writes serialized in process).
  */
 export const PAYMENTS_KEY = 'payments:orders';
+/** M110: the growing invoice number the customer sees (never the payment uuid). */
+const INVOICE_SEQ_KEY = 'payments:invoiceSeq';
+const FIRST_INVOICE_NO = 10001;
 const KEEP_DAYS = 400;
 
 export type PaymentStatus = 'created' | 'paid' | 'failed';
@@ -52,6 +56,8 @@ export type Payment = {
   checkoutUrl: string;
   transactionId: string | null;
   failureReason: string | null;
+  /** M110: assigned the moment the payment settles paid; names the customer's invoice. */
+  invoiceNo?: number | null;
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
@@ -75,6 +81,7 @@ export type PublicPayment = Pick<
   | 'checkoutUrl'
   | 'transactionId'
   | 'failureReason'
+  | 'invoiceNo'
   | 'createdAt'
   | 'paidAt'
   | 'failedAt'
@@ -150,6 +157,7 @@ export class PaymentsService {
       checkoutUrl: payment.checkoutUrl,
       transactionId: payment.transactionId,
       failureReason: payment.failureReason,
+      invoiceNo: payment.invoiceNo ?? null,
       createdAt: payment.createdAt,
       paidAt: payment.paidAt,
       failedAt: payment.failedAt,
@@ -236,16 +244,8 @@ export class PaymentsService {
       payments.push(payment);
     }, now);
     this.deps.log.info({ payment: id, service: input.key, code: input.discount.code }, 'order confirmed by a 100% discount code');
-    await this.recordDiscountUse(payment, now);
-    this.deps.notifier.paymentPaid(this.toMail(payment));
-    this.deps.push.paymentResult({ id, contactId: customer.contactId, serviceTitle: input.title, amount: 0, currency: input.currency, status: 'paid' });
-    for (const listener of this.settledListeners) {
-      try {
-        listener(payment);
-      } catch (error) {
-        this.deps.log.error({ err: error, payment: id }, 'payment settled listener failed');
-      }
-    }
+    // M110: the shared settle tail — discount use, mails (invoice included), push and listeners.
+    await this.announceSettled(payment, now);
     return payment;
   }
 
@@ -450,9 +450,43 @@ export class PaymentsService {
     return { ok: true, id: result.payment.id, status: result.payment.status };
   }
 
+  /** M110: one growing number per paid payment, assigned exactly once under the write lock. */
+  private async assignInvoiceNo(paymentId: string, now: number): Promise<number | null> {
+    return this.mutate(async (payments) => {
+      const payment = payments.find((entry) => entry.id === paymentId);
+      if (!payment) return null;
+      if (payment.invoiceNo) return payment.invoiceNo;
+      const stored = await this.deps.kv.get<{ next: number }>(INVOICE_SEQ_KEY);
+      const next = stored?.next ?? FIRST_INVOICE_NO;
+      await this.deps.kv.set(INVOICE_SEQ_KEY, { next: next + 1 });
+      payment.invoiceNo = next;
+      return next;
+    }, now);
+  }
+
+  /** M110: the printable invoice page (/pay/invoice/:id) — paid payments only. */
+  async invoicePage(id: string): Promise<string | null> {
+    const payment = (await this.load()).find((entry) => entry.id === id);
+    if (!payment || payment.status !== 'paid' || !payment.invoiceNo) return null;
+    return invoiceHtml(payment, payment.invoiceNo);
+  }
+
   /** Everything that happens once a gateway settled a payment: code use, mails, push, module listeners. */
   private async announceSettled(payment: Payment, now: number): Promise<void> {
     this.deps.log.info({ payment: payment.id, status: payment.status }, 'payment updated from the gateway callback');
+    // M110: the customer's instant invoice — numbered once, mailed as HTML, kept at /pay/invoice/:id.
+    if (payment.status === 'paid') {
+      const invoiceNo = await this.assignInvoiceNo(payment.id, now);
+      if (invoiceNo) {
+        payment.invoiceNo = invoiceNo;
+        this.deps.notifier.invoiceIssued({
+          email: payment.email,
+          subject: `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo)}`,
+          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`),
+          html: invoiceHtml(payment, invoiceNo),
+        });
+      }
+    }
     // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
     const linkSale = payment.serviceKey.startsWith('link:');
     // M107: a code on a paid order counts as used only now, when the gateway confirmed the money.
