@@ -16,7 +16,6 @@ import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
-import { PersonaSwitchCard } from '@/components/PersonaSwitchCard';
 import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
@@ -338,12 +337,8 @@ export default function HomeScreen() {
 
       {order.map((key) => sections[key]?.() ?? null)}
 
-      {/* M74: the neutral's gentle «هل حددت وجهتك؟» card — switch the category from inside the app. */}
-      {signedIn && me?.persona === 'neutral' ? (
-        <FadeInView delay={380}>
-          <PersonaSwitchCard />
-        </FadeInView>
-      ) : null}
+      {/* M74's «هل حددت وجهتك؟» card left the neutral's home (owner, 2026-10-21); persona change
+          stays reachable from the «تغيير التوجه» row in حسابي. */}
 
       <FadeInView delay={400}>
         <View style={styles.footerLinks}>

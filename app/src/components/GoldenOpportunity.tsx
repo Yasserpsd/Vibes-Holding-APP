@@ -8,7 +8,6 @@ import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
 import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
-import { GoldSweep } from '@/components/wow';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -73,8 +72,8 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
             />
           ) : null}
           {/* M107b: the dark scrim belongs on a photo only — over the golden fallback it read as a dead black card. */}
+          {/* No GoldSweep here: its rim mask repaints the card interior opaque and swallowed the photo. */}
           {showImage ? <View style={styles.scrim} pointerEvents="none" /> : null}
-          <GoldSweep radius={radii.xl} />
           <View style={styles.body}>
             <View style={styles.pillRow}>
               {project.sector ? <Pill text={project.sector.name} /> : null}
