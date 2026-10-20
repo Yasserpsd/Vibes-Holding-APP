@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { AccountFilter } from './types';
 
-export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion';
+export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'partners' | 'cards' | 'invites' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {

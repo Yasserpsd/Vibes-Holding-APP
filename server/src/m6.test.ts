@@ -117,11 +117,11 @@ test('services are listed for everyone but member-only ones are locked without a
 
   const guestStudio = await get('/api/services/studio');
   assert.equal(guestStudio.json().service.locked, true);
-  assert.match(guestStudio.json().lockedText, /سجّل الدخول/);
+  assert.match(guestStudio.json().lockedText, /حصرية لأعضاء/); // M109f: the owner's upsell sentence
 
   const unactivated = await get('/api/services/studio', unactivatedToken);
   assert.equal(unactivated.json().service.locked, true);
-  assert.doesNotMatch(unactivated.json().lockedText, /سجّل الدخول/);
+  assert.match(unactivated.json().lockedText, /حصرية لأعضاء/);
 
   const member = await get('/api/services/studio', memberToken);
   assert.equal(member.json().service.locked, false);
@@ -147,7 +147,7 @@ test('HQ: member books → admin confirms → QR pass → verify; others are ref
   assert.equal(guest.json().access, 'guest');
   assert.ok(guest.json().days.length > 10);
   assert.equal(guest.json().content.slotCapacity, undefined);
-  assert.match(guest.json().lockedText, /سجّل الدخول/);
+  assert.match(guest.json().lockedText, /حصرية لأعضاء/);
 
   const member = await get('/api/hq', memberToken);
   assert.equal(member.json().access, 'member');

@@ -5,6 +5,7 @@ import type { Service } from '@/api/content';
 import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { colors, fonts, radii, serviceAccents, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -62,6 +63,10 @@ export function ServiceTile({ service, onPress }: Props) {
         <Text style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
           {service.memberLabel ?? service.priceLabel ?? ''}
         </Text>
+        {/* M109b: the membership saving, loud on every priced tile (reserved so rows stay even). */}
+        <Text style={[styles.savings, locked && styles.lockedText]} numberOfLines={1}>
+          {service.savingsSar ? t('service.save', { amount: formatNumber(service.savingsSar) }) : ''}
+        </Text>
       </View>
     </PressScale>
   );
@@ -117,5 +122,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, minHeight: 42, color: colors.paperInk, textAlign: textStart },
   summary: { ...typography.caption, fontSize: 11, lineHeight: 17, minHeight: 34, color: colors.paperInkSoft, textAlign: textStart },
   meta: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.paperGold, textAlign: textStart },
+  savings: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.paperGold, textAlign: textStart },
   lockedText: { opacity: 0.75 },
 });

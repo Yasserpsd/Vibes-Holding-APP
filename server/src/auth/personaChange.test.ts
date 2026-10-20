@@ -6,7 +6,7 @@ import { PersonaChangeStore } from './personaChange.js';
 
 const CODE = '123456';
 
-test('persona change: code confirms, stamp opens the 30-day window', async () => {
+test('persona change: code confirms, stamp opens the membership-year window', async () => {
   const kv = new MemoryKV();
   const store = new PersonaChangeStore(kv, CODE);
   const mails: string[] = [];
@@ -28,11 +28,11 @@ test('persona change: code confirms, stamp opens the 30-day window', async () =>
   assert.deepEqual(confirmed, { ok: true, persona: 'investor' });
   assert.deepEqual(await store.confirm(7, CODE), { ok: false, reason: 'gone' });
 
-  // The caller stamps after the hub applied the change: the member now waits ~30 days.
+  // The caller stamps after the hub applied the change: the member now waits a membership year (M109d).
   await store.stamp(7);
-  assert.equal(await store.daysLeft(7), 30);
+  assert.equal(await store.daysLeft(7), 365);
   const refused = await store.request(7, 'entrepreneur', deliver);
-  assert.deepEqual(refused, { ok: false, reason: 'cooldown', daysLeft: 30 });
+  assert.deepEqual(refused, { ok: false, reason: 'cooldown', daysLeft: 365 });
   // Another member is untouched by that stamp.
   assert.equal(await store.daysLeft(8), 0);
 });

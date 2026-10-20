@@ -4,9 +4,10 @@ import type { KV } from '../store.js';
 import type { Persona } from './service.js';
 
 /**
- * M101 «تغيير التوجه»: a member changes his persona from inside the app with an e-mailed code,
- * once every 30 days. Club admins are exempt (they switch directly through PATCH /api/me, no code,
- * no cooldown) so the owner can demo the neutral / entrepreneur / investor apps freely.
+ * M101 «تغيير التوجه»: a member changes his persona from inside the app with an e-mailed code.
+ * M109d (owner, 2026-10-20): once per MEMBERSHIP YEAR (365 days) instead of every 30; a member whose
+ * year is used up sends a dashboard request instead (personaRequests.ts). Club admins are exempt
+ * (they switch directly through PATCH /api/me, no code, no window) so the owner can demo the three apps.
  */
 export type PersonaRequest = {
   persona: Persona;
@@ -18,7 +19,7 @@ export type PersonaRequest = {
   lastSentAt: string;
 };
 
-export const PERSONA_CHANGE_DAYS = 30;
+export const PERSONA_CHANGE_DAYS = 365;
 const CODE_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
 const MAX_SENDS = 4;
@@ -112,7 +113,7 @@ export class PersonaChangeStore {
     return { ok: false, reason: 'bad_code', attemptsLeft: MAX_ATTEMPTS - attempts };
   }
 
-  /** The change landed at the hub: the 30-day window starts now. */
+  /** The change landed at the hub: the membership-year window starts now. */
   async stamp(contactId: number): Promise<void> {
     await this.kv.set(stampKey(contactId), { at: new Date().toISOString() });
   }

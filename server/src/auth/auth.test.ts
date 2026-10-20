@@ -116,7 +116,7 @@ test('register → verify → me → logout', async () => {
 
   const requested = await post('/api/me/persona/request', { persona: 'investor' }, token);
   assert.equal(requested.statusCode, 200, requested.body);
-  assert.equal(requested.json().days, 30);
+  assert.equal(requested.json().days, 365);
 
   const wrongCode = await post('/api/me/persona/confirm', { code: '000000' }, token);
   assert.equal(wrongCode.statusCode, 400);

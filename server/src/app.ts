@@ -12,7 +12,9 @@ import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
 import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
+import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
+import { PersonaRequestsService } from './auth/personaRequests.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
@@ -67,6 +69,7 @@ import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { PollsService } from './polls/service.js';
+import { registerProfileGate } from './profiles/gate.js';
 import { profilesRoutes } from './profiles/routes.js';
 import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
@@ -406,6 +409,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
   }));
 
+  // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
+  registerProfileGate(app, auth);
+
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, publicUrl: config.PUBLIC_URL, fetchImpl });
   await app.register(interestsRoutes, { service: interests, auth });
   await app.register(discountsRoutes, { service: discounts, auth });
@@ -413,7 +419,14 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail });
+  // M109e: the English app's view of the member's own data — its own transliteration prompt, cached per profile.
+  const meLocalizer = new MeLocalizer(
+    kv,
+    config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
+  );
+  // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
+  const personaRequests = new PersonaRequestsService(kv);
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice });

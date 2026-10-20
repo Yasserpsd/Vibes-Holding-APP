@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { dashboardGuard, guard, parse, sentOnly, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, MEMBER_ONLY_UPSELL, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type ProfilesService } from './service.js';
 
@@ -58,6 +58,7 @@ const idSchema = z.object({ id: z.string().uuid() });
 export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (app, { service, auth }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
+  const whoIs = optionalSession(auth);
 
   app.get(
     '/api/people',
@@ -72,6 +73,12 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
     guard(async (request, reply) => {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
+      // M109g: the full spotlight (bio, journey, phone, e-mail, links) is a membership feature —
+      // guests and non-members browse only the list's public teaser (name, title, photo).
+      const who = await whoIs(request);
+      if (who?.me?.membership.status !== 'active' && !who?.me?.isAdmin) {
+        return reply.code(403).send({ error: { code: 'members_only', message: MEMBER_ONLY_UPSELL } });
+      }
       const person = await service.person(params.id);
       if (!person) return reply.code(404).send({ error: { code: 'not_found', message: 'الملف غير موجود' } });
       return { person: publicPersonFull(person) };

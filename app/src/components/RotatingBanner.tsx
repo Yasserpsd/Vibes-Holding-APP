@@ -14,30 +14,49 @@ const FADE_IN_MS = 340;
 export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }: { urls: string[]; height?: number; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   const [index, setIndex] = useState(0);
   const [opacity] = useState(() => new Animated.Value(1));
+  // M109h: a photo that fails to load (a stale upload, a network hiccup) leaves the rotation
+  // instead of cycling an empty gray frame; with none left the banner steps aside entirely.
+  const [failed, setFailed] = useState<string[]>([]);
+  // A new photo set gets a clean slate (reset during render, the React way for derived state).
+  const key = urls.join('|');
+  const [failedFor, setFailedFor] = useState(key);
+  if (failedFor !== key) {
+    setFailedFor(key);
+    setFailed([]);
+    setIndex(0);
+  }
+  const usable = urls.filter((entry) => !failed.includes(entry));
 
   useEffect(() => {
-    if (urls.length < 2) return;
+    if (usable.length < 2) return;
     const timer = setInterval(() => {
       Animated.timing(opacity, { toValue: 0, duration: FADE_OUT_MS, useNativeDriver: true }).start(() => {
-        setIndex((current) => (current + 1) % urls.length);
+        setIndex((current) => current + 1);
         Animated.timing(opacity, { toValue: 1, duration: FADE_IN_MS, useNativeDriver: true }).start();
       });
     }, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [opacity, urls]);
+  }, [opacity, usable.length]);
 
-  const url = urls[Math.min(index, urls.length - 1)];
+  const url = usable[usable.length ? index % usable.length : 0];
   if (!url) return null;
 
   return (
     <View style={[styles.box, { height }, style]}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
-        <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" resizeMethod="resize" accessibilityLabel={accessibilityLabel} />
+        <Image
+          source={{ uri: url }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          resizeMethod="resize"
+          accessibilityLabel={accessibilityLabel}
+          onError={() => setFailed((current) => (current.includes(url) ? current : [...current, url]))}
+        />
       </Animated.View>
-      {urls.length > 1 ? (
+      {usable.length > 1 ? (
         <View style={styles.dots}>
-          {urls.map((entry, dot) => (
-            <View key={`${dot}-${entry.slice(-12)}`} style={[styles.dot, dot === index && styles.dotOn]} />
+          {usable.map((entry, dot) => (
+            <View key={`${dot}-${entry.slice(-12)}`} style={[styles.dot, dot === index % usable.length && styles.dotOn]} />
           ))}
         </View>
       ) : null}

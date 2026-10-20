@@ -60,6 +60,43 @@ export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; 
 export type PostInput = { title: string; body: string; english?: { title: string; body: string } | null; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; audience: PostAudience };
 
 /** M30: a member's request for his printed membership card, delivered to his door at no charge. */
+/** M7/M109a: an HQ visit or office/meeting-room booking as the dashboard reviews it. */
+export type HqVisit = {
+  id: string;
+  contactId: number;
+  name: string;
+  phone: string;
+  email: string;
+  date: string;
+  time: string;
+  endTime: string;
+  purpose: string;
+  note: string;
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled';
+  createdAt: string;
+  decidedAt: string | null;
+  adminNote: string | null;
+  /** M109a: the hours-wallet booking parts; a plain visit carries none. */
+  space?: 'office' | 'meeting' | null;
+  hours?: number | null;
+};
+
+/** M109d: a member's «طلب تغيير الصفة» as the dashboard reviews it. */
+export type PersonaChangeRequest = {
+  id: string;
+  contactId: number;
+  name: string;
+  email: string;
+  from: string;
+  to: string;
+  note: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  adminNote: string | null;
+};
+
 export type CardRequest = {
   id: string;
   contactId: number;
@@ -457,6 +494,13 @@ export const api = {
   createProfile: (input: { contactId: number | null; fields: ProfileFields }) => call<{ profile: Profile }>('POST', '/api/admin/profiles', input),
   updateProfile: (id: string, input: Partial<ProfileFields> & { order?: number }) => call<{ profile: Profile }>('PUT', `/api/admin/profiles/${id}`, input),
   decideProfile: (id: string, action: 'approve' | 'reject', note = '') => call<{ profile: Profile }>('POST', `/api/admin/profiles/${id}/decision`, { action, note }),
+  // M7/M109a «حجوزات المقر»: approve confirms the slot (pass + push + hours deducted); reject frees it.
+  hqVisits: (status?: 'pending' | 'confirmed' | 'rejected' | 'cancelled') => call<{ visits: HqVisit[] }>('GET', `/api/admin/hq/visits${status ? `?status=${status}` : ''}`),
+  decideHqVisit: (id: string, status: 'confirmed' | 'rejected', note = '') => call<{ visit: HqVisit }>('POST', `/api/admin/hq/visits/${id}/decision`, { status, note }),
+  // M109d «طلبات تغيير الصفة»: approve applies the persona at the hub and pushes to the member.
+  personaRequests: () => call<{ requests: PersonaChangeRequest[] }>('GET', '/api/admin/persona-requests'),
+  decidePersonaRequest: (id: string, action: 'approve' | 'reject', note = '') =>
+    call<{ request: PersonaChangeRequest }>('POST', `/api/admin/persona-requests/${id}/decision`, { action, note }),
   deleteProfile: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/profiles/${id}`),
   profilesConfig: (input: ProfilesConfig) => call<{ config: ProfilesConfig }>('PUT', '/api/admin/profiles/config', input),
   workshopRegistrations: () => call<{ registrations: WorkshopRegistration[] }>('GET', '/api/admin/workshops'),

@@ -4,6 +4,7 @@ import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
+import { displayProfile } from '@/api/auth';
 import { cardApi, usePrintRequest } from '@/api/card';
 import { errorMessage } from '@/api/client';
 import { usePartners } from '@/api/partners';
@@ -69,8 +70,10 @@ export default function CardScreen() {
   const active = me.membership.status === 'active';
   const category = categoryOf(me.persona);
   const endDate = me.membership.endDate ? formatArabicDate(me.membership.endDate) : null;
-  const roleLine = [me.jobTitle, me.company].filter(Boolean).join(' · ');
-  const contacts = [me.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
+  // M109e: the English card shows the member's own data in English too (name transliterated).
+  const holder = displayProfile(me);
+  const roleLine = [holder.jobTitle, holder.company].filter(Boolean).join(' · ');
+  const contacts = [holder.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
   // M103: one layout, two metals — VIP gold for the active member, faded silver for the rest.
   const metal = {
     frame: active ? colors.gold : SILVER.dark,
@@ -121,7 +124,7 @@ export default function CardScreen() {
 
           <View style={styles.holder}>
             <Text style={[styles.holderName, { color: metal.bright }]} numberOfLines={1} adjustsFontSizeToFit>
-              {me.name}
+              {holder.name}
             </Text>
             <View style={styles.holderMetaRow}>
               {category ? (

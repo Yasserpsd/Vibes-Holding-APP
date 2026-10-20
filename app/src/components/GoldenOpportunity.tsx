@@ -34,6 +34,14 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
   // M102 (owner): «الصورة بتفضل فاضية» — a broken image URL must never leave a dark hole: the club
   // emblem steps in on a golden wash.
   const [imageBroken, setImageBroken] = useState(false);
+  // M109h: the featured project changes on every app open — a new photo url resets the latched
+  // failure (reset during render, the React way for derived state).
+  const imageUri = project?.image ?? null;
+  const [brokenFor, setBrokenFor] = useState(imageUri);
+  if (brokenFor !== imageUri) {
+    setBrokenFor(imageUri);
+    setImageBroken(false);
+  }
   if (!project) return null;
   const showImage = Boolean(project.image) && !imageBroken;
 

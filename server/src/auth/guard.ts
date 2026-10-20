@@ -7,6 +7,9 @@ import type { SessionRecord } from './sessions.js';
 
 type Handler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
+/** M109f (owner's wording): what every member-only feature answers guests and non-members with. */
+export const MEMBER_ONLY_UPSELL = 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.';
+
 /** A request the server refuses with an Arabic message (validation, access, state). */
 export class RequestError extends Error {
   constructor(

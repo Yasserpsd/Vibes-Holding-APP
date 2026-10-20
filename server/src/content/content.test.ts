@@ -74,14 +74,14 @@ test('the app reads every block in its language; the logic keeps the Arabic stru
   const services = (await get('/api/services', 'en')).json();
   const meetup = services.services.find((service: { key: string }) => service.key === 'meetup');
   assert.deepEqual([meetup.title, meetup.priceLabel, meetup.action.fields[0].label, meetup.action.phone ?? meetup.action.amount], ['Make your meetup', 'SAR 30,000', 'Meetup topic', 30000]);
-  assert.equal(services.lockedText, 'This service is for subscribed members. Sign in and activate your annual membership to use it.');
+  assert.equal(services.lockedText, 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.');
   assert.equal((await get('/api/services/credit', 'en')).json().service.title, 'Projects Bank balance');
 
   assert.equal((await get('/api/membership', 'en')).json().groups[0].title, 'Why it is worth it even before you set your direction');
   assert.equal((await get('/api/golden', 'en')).json().companies[0].name, 'Wdeny');
   assert.equal((await get('/api/about', 'en')).json().sections[1].bullets[0], 'Success Partners: a venture starts by registering, and a specialised committee reviews it before it is approved.');
   const hq = (await get('/api/hq', 'en')).json();
-  assert.deepEqual([hq.content.title, hq.content.hours.open, hq.lockedText], ['Club HQ', HQ_SEED.hours.open, 'Sign in to your account and activate your annual membership to book an HQ visit.']);
+  assert.deepEqual([hq.content.title, hq.content.hours.open, hq.lockedText], ['Club HQ', HQ_SEED.hours.open, 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.']);
   assert.equal((await get('/api/videos', 'en')).json().title, 'Get to know us');
   assert.equal((await get('/api/videos')).json().title, 'تعرف علينا');
 });

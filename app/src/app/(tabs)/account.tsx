@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
+import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
+import { useStoreConfig } from '@/api/membership';
 import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
@@ -22,6 +23,7 @@ import { languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
+import { openLink } from '@/lib/openLink';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -31,6 +33,8 @@ export default function AccountScreen() {
   const { status, me, signOut, refresh } = useAuth();
   const { data: config } = useAuthConfig();
   const { data: content } = useMembershipContent();
+  // M109c: the legal rows of «المزيد» open the server's own pages (or the owner's override URLs).
+  const { data: store } = useStoreConfig();
   const [refreshing, setRefreshing] = useState(false);
   // M75: opening حسابي clears its +N badge.
   useFocusEffect(
@@ -131,9 +135,18 @@ export default function AccountScreen() {
           {/* M87b: the daily advisor message, on or off — server-side, follows the account. */}
           <CompanionToggleRow />
           {languageChoiceOffered(me?.isAdmin === true) ? <MenuRow icon="language-outline" label={t('account.menu.language')} onPress={chooseLanguage} /> : null}
-          <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
           {me?.isAdmin ? <MenuRow icon="key-outline" label={t('account.menu.hqAdmin')} onPress={() => router.push('/hq/admin')} /> : null}
           <MenuRow icon="log-out-outline" label={t('account.menu.signOut')} onPress={() => void signOut()} />
+        </MenuGroup>
+      </FadeInView>
+
+      {/* M109c «المزيد»: the low-traffic legal and account rows, gathered in one quiet group. */}
+      <FadeInView delay={entranceDelay(7, 90)}>
+        <MenuGroup title={t('account.group.more')}>
+          <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
+          {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => void openLink(store.termsUrl ?? '')} /> : null}
+          {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => void openLink(store.privacyUrl ?? '')} /> : null}
+          <MenuRow icon="trash-outline" label={t('account.menu.delete')} danger onPress={() => router.push('/delete-account' as Href)} />
         </MenuGroup>
       </FadeInView>
 
@@ -143,7 +156,9 @@ export default function AccountScreen() {
 }
 
 function ProfileHeader({ me }: { me: Me }) {
-  const initial = me.name.trim().charAt(0) || '؟';
+  // M109e: the English app shows the member's own data in English (display only).
+  const shown = displayProfile(me);
+  const initial = shown.name.trim().charAt(0) || '؟';
   // M103: the completion meter around the avatar — golden dots fill as the profile does.
   const percent = profileCompletion(me);
   return (
@@ -161,7 +176,7 @@ function ProfileHeader({ me }: { me: Me }) {
       </CompletionMeter>
       <View style={styles.headerText}>
         <View style={styles.nameRow}>
-          <Text style={styles.name}>{me.name}</Text>
+          <Text style={styles.name}>{shown.name}</Text>
           {me.isAdmin ? (
             <PopIn delay={260}>
               <View style={styles.adminBadge}>
@@ -171,7 +186,7 @@ function ProfileHeader({ me }: { me: Me }) {
           ) : null}
         </View>
         {me.personaLabel ? <Text style={styles.meta}>{tOptional(`persona.${me.persona}`) ?? me.personaLabel}</Text> : null}
-        {me.jobTitle ? <Text style={styles.meta}>{me.jobTitle}</Text> : null}
+        {shown.jobTitle ? <Text style={styles.meta}>{shown.jobTitle}</Text> : null}
         <Text style={styles.contact}>{me.email}</Text>
         <Text style={styles.contact}>{me.phone}</Text>
       </View>

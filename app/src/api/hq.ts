@@ -19,8 +19,16 @@ export type HqContent = {
   leadDays: number;
   maxDaysAhead: number;
   purposes: string[];
+  /** M109a: the annual office/meeting-room hours wallet size; an older server sends none. */
+  walletHours?: number;
   updatedAt: string;
 };
+
+/** M109a: the two hours-wallet space types. */
+export type HqSpace = 'office' | 'meeting';
+
+/** M109a: the member's annual hours wallet (live counter). */
+export type HqWallet = { total: number; used: number; pending: number; remaining: number };
 
 export type HqAccess = 'guest' | 'locked' | 'expired' | 'member';
 
@@ -51,6 +59,9 @@ export type Visit = {
   slotStart: string;
   slotEnd: string;
   cancellable: boolean;
+  /** M109a: the hours-wallet booking parts; an older server (or a plain visit) sends none/1. */
+  space?: HqSpace | null;
+  hours?: number;
 };
 
 export type AdminVisit = Visit & { contactId: number; name: string; phone: string; email: string };
@@ -65,9 +76,12 @@ export type VerifyResult = { valid: boolean; state: PassState | 'unknown'; visit
 
 export const hqApi = {
   overview: () => apiGet<HqOverview>('/api/hq'),
-  slots: (date: string) => apiGet<{ date: string; slots: Slot[] }>('/api/hq/slots', { date }),
+  slots: (date: string, space?: HqSpace, hours?: number) => apiGet<{ date: string; slots: Slot[] }>('/api/hq/slots', { date, space, hours }),
   myVisits: () => apiGet<{ visits: Visit[] }>('/api/hq/visits'),
-  book: (input: { date: string; time: string; purpose: string; note: string }) => apiRequest<{ visit: Visit }>('POST', '/api/hq/visits', { body: input }),
+  // M109a: the live annual hours counter.
+  wallet: () => apiGet<{ wallet: HqWallet }>('/api/hq/wallet'),
+  book: (input: { date: string; time: string; purpose: string; note: string; space?: HqSpace; hours?: number }) =>
+    apiRequest<{ visit: Visit }>('POST', '/api/hq/visits', { body: input }),
   cancel: (id: string) => apiRequest<{ visit: Visit }>('POST', `/api/hq/visits/${encodeURIComponent(id)}/cancel`, { body: {} }),
   pass: (id: string) => apiGet<{ pass: Pass }>(`/api/hq/visits/${encodeURIComponent(id)}/pass`),
   adminVisits: (status?: VisitStatus) => apiGet<{ visits: AdminVisit[] }>('/api/admin/hq/visits', { status }),
@@ -91,8 +105,19 @@ export function useMyVisits(enabled: boolean) {
   return useQuery({ queryKey: ['hq', 'visits', account], queryFn: hqApi.myVisits, enabled, staleTime: 30_000 });
 }
 
-export function useHqSlots(date: string | null) {
-  return useQuery({ queryKey: ['hq', 'slots', date], queryFn: () => hqApi.slots(date ?? ''), enabled: Boolean(date), staleTime: 15_000 });
+export function useHqSlots(date: string | null, space?: HqSpace | null, hours?: number) {
+  return useQuery({
+    queryKey: ['hq', 'slots', date, space ?? 'visit', hours ?? 1],
+    queryFn: () => hqApi.slots(date ?? '', space ?? undefined, space ? hours : undefined),
+    enabled: Boolean(date),
+    staleTime: 15_000,
+  });
+}
+
+/** M109a: the member's live remaining-hours counter. */
+export function useHqWallet(enabled: boolean) {
+  const account = useAccountKey();
+  return useQuery({ queryKey: ['hq', 'wallet', account], queryFn: hqApi.wallet, enabled, staleTime: 30_000 });
 }
 
 export function usePass(id: string | undefined) {

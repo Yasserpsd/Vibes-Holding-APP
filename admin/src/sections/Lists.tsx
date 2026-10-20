@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type CardRequest, type InviteRecord, type InvitesConfig, type WorkshopRegistration } from '../api';
+import { api, type CardRequest, type InviteRecord, type InvitesConfig, type PersonaChangeRequest, type WorkshopRegistration } from '../api';
 import { formatDateTime, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { AuditEntry, Lead, MailItem, Ticket } from '../types';
 import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, messageOf, Pill, SearchBox, SectionHead, sessionOver, useDebounced, useLoad, useShell, type Tone } from '../ui';
@@ -88,6 +88,77 @@ export function CardRequests() {
                     <Pill tone="ok">سُلّم {row.doneAt ? formatDateTime(row.doneAt) : ''}</Pill>
                   ) : (
                     <button type="button" disabled={busyId === row.id} onClick={() => void markDone(row)}>تم التسليم</button>
+                  ),
+              },
+            ]}
+          />
+        )}
+      </Async>
+    </>
+  );
+}
+
+const PERSONA_WORD: Record<string, string> = { neutral: 'محايد', entrepreneur: 'رائد أعمال', investor: 'مستثمر' };
+
+/** M109d «طلبات تغيير الصفة»: the yearly self-serve change is used up, so the member asks and the club decides. */
+export function PersonaRequests() {
+  const { signOut, notify } = useShell();
+  const state = useLoad(() => api.personaRequests(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const rows = state.data?.requests ?? [];
+  const pending = rows.filter((row) => row.status === 'pending').length;
+
+  async function decide(row: PersonaChangeRequest, action: 'approve' | 'reject') {
+    const to = PERSONA_WORD[row.to] ?? row.to;
+    const confirmText =
+      action === 'approve' ? `اعتماد تغيير صفة «${row.name}» إلى «${to}»؟ يُطبّق التغيير فورًا ويصل للعضو إشعار.` : `رفض طلب «${row.name}»؟ يصل للعضو إشعار بالرفض.`;
+    if (!window.confirm(confirmText)) return;
+    const note = action === 'reject' ? (window.prompt('ملاحظة للعضو (اختياري):') ?? '') : '';
+    setBusyId(row.id);
+    try {
+      await api.decidePersonaRequest(row.id, action, note.trim());
+      notify('ok', action === 'approve' ? 'اعتُمد التغيير ووصل العضو إشعار.' : 'رُفض الطلب ووصل العضو إشعار.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      <SectionHead title="طلبات تغيير الصفة" hint={state.data ? `قيد المراجعة: ${formatNumber(pending)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <p className="muted">
+        العضو يغيّر صفته بنفسه مرة واحدة خلال سنة العضوية. ما زاد عن ذلك يصل هنا كطلب: الاعتماد يطبّق الصفة الجديدة فورًا ويُشعر العضو، والرفض يُشعره
+        بدون تغيير. إن فشل الاعتماد لانتهاء جلسة العضو يبقى الطلب قائمًا — اطلب منه فتح التطبيق ثم أعد المحاولة.
+      </p>
+      <Async state={state} rows={5} empty={() => rows.length === 0} emptyText="لا توجد طلبات تغيير بعد.">
+        {() => (
+          <DataTable<PersonaChangeRequest>
+            caption="طلبات تغيير الصفة"
+            rows={rows}
+            rowKey={(row) => row.id}
+            columns={[
+              { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
+              { key: 'from', label: 'الصفة الحالية', cell: (row) => PERSONA_WORD[row.from] ?? row.from ?? '—' },
+              { key: 'to', label: 'الصفة المطلوبة', cell: (row) => PERSONA_WORD[row.to] ?? row.to },
+              { key: 'note', label: 'ملاحظة العضو', cell: (row) => row.note || '—' },
+              { key: 'at', label: 'طُلب', cell: (row) => formatDateTime(row.createdAt) },
+              {
+                key: 'status',
+                label: 'الحالة',
+                cell: (row) =>
+                  row.status === 'pending' ? (
+                    <span className="actions">
+                      <button type="button" disabled={busyId === row.id} onClick={() => void decide(row, 'approve')}>اعتماد</button>
+                      <button type="button" className="danger" disabled={busyId === row.id} onClick={() => void decide(row, 'reject')}>رفض</button>
+                    </span>
+                  ) : (
+                    <Pill tone={row.status === 'approved' ? 'ok' : 'danger'}>
+                      {row.status === 'approved' ? 'اعتُمد' : 'رُفض'} {row.decidedAt ? formatDateTime(row.decidedAt) : ''}
+                    </Pill>
                   ),
               },
             ]}

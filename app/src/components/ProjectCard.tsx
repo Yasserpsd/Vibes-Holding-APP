@@ -25,6 +25,14 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
   const [imageWidth, setImageWidth] = useState(0);
   // M107b: a cover that errors out hands the box to the fallback instead of staying a dark hole.
   const [imageBroken, setImageBroken] = useState(false);
+  // M109h: a recycled card keeps its state — a NEW cover url gets a fresh try instead of the
+  // previous project's latched failure (reset during render, the React way for derived state).
+  const [brokenFor, setBrokenFor] = useState(project.image);
+  if (brokenFor !== project.image) {
+    setBrokenFor(project.image);
+    setImageBroken(false);
+    imageOpacity.setValue(0);
+  }
   const golden = project.isGolden;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>

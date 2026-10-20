@@ -111,6 +111,8 @@ export type Service = {
   action: ServiceAction | null;
   /** What this account pays for a Paymob service (member price with an active membership); null otherwise. */
   price: { amount: number; currency: string; memberPrice: boolean } | null;
+  /** M109b «وفّر … ريال بعضويتك»: list price minus member price; an older server sends none. */
+  savingsSar?: number | null;
   infoUrl: string | null;
   order: number;
   /** M74: the imperative call to action on the service card; an older server sends none. */

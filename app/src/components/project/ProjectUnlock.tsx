@@ -13,6 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { hubText, t } from '@/i18n';
 import { arrowForward, chevronForward, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
@@ -39,6 +40,7 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
   const [confirming, setConfirming] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gated, setGated] = useState(false);
   const autoStarted = useRef(false);
   const accessState = query.data?.state;
   useEffect(() => {
@@ -91,8 +93,9 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
     } catch (cause) {
       setConfirming(false);
       setError(errorMessage(cause));
+      setGated(isProfileGate(cause));
       // The balance ran out, the membership lapsed or the project became golden meanwhile: read the state again.
-      if (cause instanceof ApiError && [402, 403, 409].includes(cause.status)) void query.refetch();
+      if (cause instanceof ApiError && !isProfileGate(cause) && [402, 403, 409].includes(cause.status)) void query.refetch();
     } finally {
       setUnlocking(false);
     }
@@ -128,7 +131,8 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
           <AppButton label={t('unlock.open')} icon="lock-open-outline" onPress={() => setConfirming(true)} />
           {error ? (
             <FadeInView offset={8}>
-              <Notice tone="warning" text={error} />
+              {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
+              {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} />}
             </FadeInView>
           ) : null}
           <ConfirmSheet

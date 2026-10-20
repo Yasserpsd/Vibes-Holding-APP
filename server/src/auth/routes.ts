@@ -2,12 +2,16 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
+import { langOf } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
-import { guard, parse, sessionGuard } from './guard.js';
+import { dashboardGuard, guard, parse, sessionGuard } from './guard.js';
 import type { Mailer } from '../mail/mailer.js';
+import type { PushService } from '../push/service.js';
 import { PERSONA_CHANGE_DAYS, type PersonaChangeStore } from './personaChange.js';
+import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService } from './personaRequests.js';
 import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
@@ -20,6 +24,11 @@ export type AuthRoutesOptions = {
   /** M101: the e-mailed-code persona change (absent only in old tests; the routes then 404). */
   personaChange?: PersonaChangeStore;
   mailer?: Mailer;
+  /** M109e: the member's data in English for the English app (absent in old tests: no `en` block). */
+  meLocalizer?: MeLocalizer;
+  /** M109d «طلب تغيير الصفة»: the dashboard-reviewed request once the yearly change is used up. */
+  personaRequests?: PersonaRequestsService;
+  push?: PushService;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -79,9 +88,17 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
+
+  // M109e: the English app gets the member's own data in English too; a failed translation
+  // never breaks the account answer — the registered data stands in.
+  const withEnglish = async (request: FastifyRequest, me: Awaited<ReturnType<AuthService['me']>>) => {
+    if (!meLocalizer) return me;
+    const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
+    return en ? { ...me, en } : me;
+  };
 
   const limited = (name: string, limit: number, request: FastifyRequest, reply: FastifyReply): boolean => {
     if (limiter.hit(`${name}:${request.ip}`, limit, WINDOW)) return false;
@@ -137,7 +154,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('verify', 12, request, reply)) return;
       const body = parse(verifySchema, request.body, reply);
       if (!body) return;
-      return service.verify(body.pendingToken, body.code, request.ip);
+      const result = await service.verify(body.pendingToken, body.code, request.ip);
+      return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -147,7 +165,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('login', 12, request, reply)) return;
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
-      return service.login(body.login, body.password, request.ip);
+      const result = await service.login(body.login, body.password, request.ip);
+      return result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -159,7 +178,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(socialSchema, request.body, reply);
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
-      return service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
+      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
+      return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -233,7 +253,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const query = meQuerySchema.safeParse(request.query);
       const me = await service.me(auth.session, query.success && query.data.fresh === '1');
-      return { me };
+      return { me: await withEnglish(request, me) };
     }),
   );
 
@@ -253,7 +273,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         }
       }
       const me = await service.updateProfile(auth.session, body);
-      return { me };
+      return { me: await withEnglish(request, me) };
     }),
   );
 
@@ -278,7 +298,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
           await mailer?.send({
             to: [me.email],
             subject: 'رمز تغيير التوجه — نادي المستثمرين',
-            text: [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة كل 30 يومًا.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
+            text: [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة خلال سنة العضوية.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
           });
         } catch (error) {
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'persona change code was not mailed');
@@ -291,7 +311,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!result) return reply.code(503).send({ error: { code: 'mail_failed', message: 'تعذر إرسال الرمز الآن، حاول بعد قليل' } });
       if (!result.ok) {
         if (result.reason === 'cooldown') {
-          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير توجهك مرة واحدة كل ${PERSONA_CHANGE_DAYS} يومًا — متبقٍ ${result.daysLeft} يومًا`, daysLeft: result.daysLeft } });
+          // M109d: the owner's wording — the yearly change is used up; the dashboard request is the way.
+          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير صفتك مرة واحدة فقط خلال السنة — متبقٍ ${result.daysLeft} يومًا. يمكنك إرسال «طلب تغيير الصفة» إلى الإدارة.`, daysLeft: result.daysLeft } });
         }
         if (result.reason === 'too_soon') {
           return reply.code(429).send({ error: { code: 'persona_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });
@@ -326,7 +347,88 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       }
       const updated = await service.updateProfile(auth.session, { persona: result.persona });
       if (!updated.isAdmin) await personaChange.stamp(me.id);
-      return { me: updated };
+      return { me: await withEnglish(request, updated) };
+    }),
+  );
+
+  // M109d: where the member's persona stands — days left in the yearly window and his latest request.
+  app.get(
+    '/api/me/persona/state',
+    guard(async (request, reply) => {
+      if (!personaChange || !personaRequests) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      const [daysLeft, mine] = await Promise.all([me.isAdmin ? 0 : personaChange.daysLeft(me.id), personaRequests.mine(me.id)]);
+      return { daysLeft, request: mine ? toMyPersonaRequest(mine) : null };
+    }),
+  );
+
+  // M109d «طلب تغيير الصفة»: once the yearly change is used up, the member asks and the dashboard decides.
+  app.post(
+    '/api/me/persona/change-request',
+    guard(async (request, reply) => {
+      if (!personaChange || !personaRequests) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      if (limited('persona-request', 10, request, reply)) return;
+      const body = parse(z.object({ persona: personaSchema, note: z.string().trim().max(300).default('') }), request.body, reply);
+      if (!body) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const me = await service.me(auth.session);
+      if (me.persona === body.persona) {
+        return reply.code(400).send({ error: { code: 'persona_same', message: 'هذا هو توجهك الحالي بالفعل' } });
+      }
+      const daysLeft = me.isAdmin ? 0 : await personaChange.daysLeft(me.id);
+      if (daysLeft === 0) {
+        return reply.code(400).send({ error: { code: 'window_open', message: 'تغييرك السنوي ما زال متاحًا — غيّر توجهك مباشرة بالرمز المرسل إلى بريدك' } });
+      }
+      const created = await personaRequests.create(me, auth.session.uuid, body.persona, body.note);
+      return reply.code(201).send({ request: toMyPersonaRequest(created) });
+    }),
+  );
+
+  // The dashboard's review: approve applies the persona at the hub first, so a failed hub call
+  // leaves the request pending for a retry after the member signs in again.
+  const requireDashboard = dashboardGuard(service);
+
+  app.get(
+    '/api/admin/persona-requests',
+    guard(async (request, reply) => {
+      if (!personaRequests) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const admin = await requireDashboard(request, reply);
+      if (!admin) return;
+      const query = parse(z.object({ status: z.enum(['pending', 'approved', 'rejected']).optional() }), request.query, reply);
+      if (!query) return;
+      return { requests: (await personaRequests.list(query.status ?? null)).map(toAdminPersonaRequest) };
+    }),
+  );
+
+  app.post(
+    '/api/admin/persona-requests/:id/decision',
+    guard(async (request, reply) => {
+      if (!personaRequests) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const admin = await requireDashboard(request, reply);
+      if (!admin) return;
+      const params = parse(z.object({ id: z.string().uuid() }), request.params, reply);
+      if (!params) return;
+      const body = parse(z.object({ action: z.enum(['approve', 'reject']), note: z.string().trim().max(300).default('') }), request.body, reply);
+      if (!body) return;
+      if (body.action === 'approve') {
+        const pending = await personaRequests.pending(params.id);
+        if (!pending) return reply.code(404).send({ error: { code: 'not_found', message: 'لا يوجد طلب قائم بهذا الرقم' } });
+        try {
+          await service.applyPersonaFor(pending.uuid, pending.to);
+        } catch {
+          return reply.code(409).send({
+            error: { code: 'member_session_gone', message: 'تعذر تطبيق التغيير: جلسة العضو انتهت — اطلب منه فتح التطبيق وتسجيل الدخول ثم أعد المحاولة' },
+          });
+        }
+        service.forget(pending.contactId);
+      }
+      const decided = await personaRequests.decide(params.id, body.action === 'approve' ? 'approved' : 'rejected', admin.me.name || admin.me.email, body.note);
+      const label = PERSONAS.find((item) => item.key === decided.to)?.label ?? decided.to;
+      push?.personaChangeDecided(decided.contactId, decided.status === 'approved', label, decided.adminNote);
+      return { request: toAdminPersonaRequest(decided) };
     }),
   );
 

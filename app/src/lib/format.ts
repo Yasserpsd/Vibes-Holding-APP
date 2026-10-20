@@ -48,6 +48,12 @@ export function formatEventDays(dates: string[] | undefined, date: string): stri
   return days.map(formatArabicDate).join(en ? ', ' : '، ');
 }
 
+/** M109a: a booking duration in words — «ساعة»، «ساعتان»، «5 ساعات» (EN: "2 hours"). */
+export function formatHours(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 hour' : `${count} hours`;
+  return arabicCount(count, 'ساعة', 'ساعتان', 'ساعات');
+}
+
 /** The multi-day pill on event cards: «يومان»، «3 أيام» (EN: "2 days"). */
 export function formatDayCount(count: number): string {
   if (getLang() === 'en') return count === 1 ? '1 day' : `${count} days`;

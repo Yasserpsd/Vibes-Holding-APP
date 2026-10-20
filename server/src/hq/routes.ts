@@ -8,13 +8,22 @@ import type { HqService } from './service.js';
 
 export type HqRoutesOptions = { service: HqService; auth: AuthService };
 
-const dateSchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'التاريخ غير صالح') });
+// M109a: the hours-wallet space and duration ride the same date/slots/book routes.
+const spaceSchema = z.enum(['office', 'meeting']);
+const dateSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'التاريخ غير صالح'),
+  space: spaceSchema.optional(),
+  hours: z.coerce.number().int().min(1).max(12).optional(),
+});
 const idSchema = z.object({ id: z.string().uuid('رقم الحجز غير صالح') });
 const bookSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'التاريخ غير صالح'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'الوقت غير صالح'),
-  purpose: z.string().trim().min(1, 'اختر الغرض من الزيارة').max(80),
+  // An hours-wallet booking needs no purpose (the space label stands in); a plain visit does.
+  purpose: z.string().trim().max(80).default(''),
   note: z.string().trim().max(300, 'الملاحظة طويلة، الحد 300 حرف').default(''),
+  space: spaceSchema.optional(),
+  hours: z.number().int().min(1, 'اختر مدة الحجز').max(12).optional(),
 });
 const statusSchema = z.object({ status: z.enum(['pending', 'confirmed', 'rejected', 'cancelled']).optional() });
 const decisionSchema = z.object({ status: z.enum(['confirmed', 'rejected']), note: z.string().trim().max(300).default('') });
@@ -41,7 +50,18 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       if (!current) return;
       const query = parse(dateSchema, request.query, reply);
       if (!query) return;
-      return service.slots(query.date);
+      return service.slots(query.date, Date.now(), { space: query.space ?? null, hours: query.hours });
+    }),
+  );
+
+  // M109a: the member's live annual hours counter.
+  app.get(
+    '/api/hq/wallet',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const me = await auth.me(current.session);
+      return { wallet: await service.wallet(me) };
     }),
   );
 

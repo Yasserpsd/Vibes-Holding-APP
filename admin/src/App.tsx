@@ -6,7 +6,8 @@ import { Agenda } from './sections/Agenda';
 import { Discounts } from './sections/Discounts';
 import { Home } from './sections/Home';
 import { Interests } from './sections/Interests';
-import { Audit, CardRequests, Invites, Leads, Mail, Tickets, Workshops } from './sections/Lists';
+import { Audit, CardRequests, Invites, Leads, Mail, PersonaRequests, Tickets, Workshops } from './sections/Lists';
+import { HqBookings } from './sections/Hq';
 import { Forms } from './sections/Forms';
 import { MemberMail } from './sections/MemberMail';
 import { Members } from './sections/Members';
@@ -38,7 +39,9 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
   { key: 'inbox', label: 'رسائل الأعضاء', icon: 'inbox' },
   { key: 'agenda', label: 'أجندة النادي', icon: 'agenda' },
+  { key: 'hq', label: 'حجوزات المقر', icon: 'home' },
   { key: 'people', label: 'شخصية ومسيرة', icon: 'people' },
+  { key: 'personas', label: 'طلبات تغيير الصفة', icon: 'members' },
   { key: 'workshops', label: 'تسجيلات الورش', icon: 'workshops' },
   { key: 'forms', label: 'نماذج التسجيل', icon: 'forms' },
   { key: 'tickets', label: 'التذاكر', icon: 'tickets' },
@@ -270,7 +273,9 @@ export function App() {
             {section === 'invites' ? <Invites /> : null}
             {section === 'inbox' ? <MemberMail /> : null}
             {section === 'agenda' ? <Agenda /> : null}
+            {section === 'hq' ? <HqBookings /> : null}
             {section === 'people' ? <People /> : null}
+            {section === 'personas' ? <PersonaRequests /> : null}
             {section === 'workshops' ? <Workshops /> : null}
             {section === 'forms' ? <Forms /> : null}
             {section === 'tickets' ? <Tickets /> : null}

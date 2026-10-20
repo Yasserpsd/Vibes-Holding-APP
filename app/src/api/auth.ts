@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { getLang } from '@/i18n';
+
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/auth/service.ts and server/src/auth/routes.ts.
@@ -35,6 +37,28 @@ export type Me = {
   membership: Membership;
   /** M30: the number on the membership card; an older server sends none and the card hides it. */
   cardNumber?: string;
+  /** M109e: the same data in English (name transliterated) when the app asks in English; an older server sends none. */
+  en?: { name: string; jobTitle: string; company: string; city: string; bio: string } | null;
+};
+
+/**
+ * M109e: the member's data as THIS language displays it — the English app shows the translated
+ * block (nothing stays Arabic on the card), the Arabic app the registered data. Display only:
+ * the profile editor keeps editing the registered originals.
+ */
+export function displayProfile(me: Me): { name: string; jobTitle: string; company: string; city: string; bio: string } {
+  const { name, jobTitle, company, city, bio } = me;
+  return getLang() === 'en' && me.en ? me.en : { name, jobTitle, company, city, bio };
+}
+
+/** M109d: the member's own «طلب تغيير الصفة» as the server reports it. */
+export type PersonaChangeRequest = {
+  id: string;
+  to: Persona;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  decidedAt: string | null;
+  adminNote: string | null;
 };
 
 /** M64: `nameEn` arrives with the world country list; an older server sends none. */
@@ -120,6 +144,10 @@ export const authApi = {
   // M101 «تغيير التوجه»: the e-mailed code applies the change at the hub, once every 30 days (admins patch directly).
   personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
   personaConfirm: (code: string) => apiRequest<{ me: Me }>('POST', '/api/me/persona/confirm', { body: { code } }),
+  // M109d: the yearly window's state plus the member's latest «طلب تغيير الصفة».
+  personaState: () => apiRequest<{ daysLeft: number; request: PersonaChangeRequest | null }>('GET', '/api/me/persona/state'),
+  personaChangeRequest: (persona: Persona, note?: string) =>
+    apiRequest<{ request: PersonaChangeRequest }>('POST', '/api/me/persona/change-request', { body: { persona, ...(note ? { note } : {}) } }),
   // M79: the reason (picked or written) travels with the deletion so the club learns why members leave.
   deleteMe: (password: string, reason?: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password, ...(reason ? { reason } : {}) } }),
 };

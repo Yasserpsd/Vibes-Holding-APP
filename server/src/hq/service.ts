@@ -26,6 +26,11 @@ const QR_PREFIX = 'VCHQ';
 
 export type VisitStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled';
 
+/** M109a: the two hours-wallet space types (one of each; a booking locks its span). */
+export type HqSpace = 'office' | 'meeting';
+
+export const HQ_SPACE_LABELS: Record<HqSpace, string> = { office: 'مكتب خاص', meeting: 'حجز قاعة الاجتماعات' };
+
 export type Visit = {
   id: string;
   contactId: number;
@@ -42,6 +47,11 @@ export type Visit = {
   decidedBy: number | null;
   adminNote: string | null;
   passCode: string | null;
+  /** M109a: set on hours-wallet bookings; a plain visit carries null/1. */
+  space: HqSpace | null;
+  hours: number;
+  /** The member's membership-year key at booking time, so the approval charges the right year. */
+  walletYear: string | null;
 };
 
 export type PublicVisit = {
@@ -59,6 +69,9 @@ export type PublicVisit = {
   slotStart: string;
   slotEnd: string;
   cancellable: boolean;
+  /** M109a: the hours-wallet booking parts; a plain visit sends null/1. */
+  space: HqSpace | null;
+  hours: number;
 };
 
 export type AdminVisit = PublicVisit & { contactId: number; name: string; phone: string; email: string };
@@ -79,7 +92,10 @@ export type HqOverview = {
   photos: string[];
 };
 
-export type BookInput = { date: string; time: string; purpose: string; note: string };
+export type BookInput = { date: string; time: string; purpose: string; note: string; space?: HqSpace | null; hours?: number };
+
+/** M109a: the member's annual hours wallet as the app shows it (live counter). */
+export type HqWallet = { total: number; used: number; pending: number; remaining: number };
 
 type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier; push: PushService };
 
@@ -144,6 +160,19 @@ function isOpen(visit: Visit): boolean {
   return visit.status === 'pending' || visit.status === 'confirmed';
 }
 
+/** Minutes of one booking: hours-wallet bookings span several slots. */
+function durationMinutes(visit: Pick<Visit, 'hours'>, slotMinutes: number): number {
+  return slotMinutes * Math.max(1, visit.hours ?? 1);
+}
+
+function spansOverlap(aStart: number, aMinutes: number, bStart: number, bMinutes: number): boolean {
+  return aStart < bStart + bMinutes && bStart < aStart + aMinutes;
+}
+
+const walletKey = (contactId: number): string => `hq:hours:${contactId}`;
+
+type WalletDoc = { year: string; used: number };
+
 export class HqService {
   private chain: Promise<unknown> = Promise.resolve();
 
@@ -156,7 +185,8 @@ export class HqService {
 
   private async load(): Promise<Visit[]> {
     const stored = await this.deps.kv.get<{ visits: Visit[] }>(HQ_VISITS_KEY);
-    return stored?.visits ?? [];
+    // Visits stored before M109a carry no space/hours: they are plain one-slot visits.
+    return (stored?.visits ?? []).map((visit) => ({ ...visit, space: visit.space ?? null, hours: visit.hours ?? 1, walletYear: visit.walletYear ?? null }));
   }
 
   /** Read-modify-write under an in-process lock; old visits are pruned on every write. */
@@ -174,12 +204,13 @@ export class HqService {
   }
 
   private toPublic(visit: Visit, content: HqContent, now = Date.now()): PublicVisit {
-    const { start, end } = slotWindow(visit.date, visit.time, content.hours.slotMinutes);
+    const minutes = durationMinutes(visit, content.hours.slotMinutes);
+    const { start, end } = slotWindow(visit.date, visit.time, minutes);
     return {
       id: visit.id,
       date: visit.date,
       time: visit.time,
-      endTime: timeOf(minutesOf(visit.time) + content.hours.slotMinutes),
+      endTime: timeOf(minutesOf(visit.time) + minutes),
       purpose: visit.purpose,
       note: visit.note,
       status: visit.status,
@@ -190,6 +221,8 @@ export class HqService {
       slotStart: start.toISOString(),
       slotEnd: end.toISOString(),
       cancellable: isOpen(visit) && start.getTime() > now,
+      space: visit.space,
+      hours: Math.max(1, visit.hours ?? 1),
     };
   }
 
@@ -206,7 +239,7 @@ export class HqService {
       email: visit.email,
       date: visit.date,
       time: visit.time,
-      endTime: timeOf(minutesOf(visit.time) + content.hours.slotMinutes),
+      endTime: timeOf(minutesOf(visit.time) + durationMinutes(visit, content.hours.slotMinutes)),
       purpose: visit.purpose,
       note: visit.note,
       createdAt: visit.createdAt,
@@ -234,17 +267,70 @@ export class HqService {
     };
   }
 
-  async slots(date: string, now = Date.now()): Promise<{ date: string; slots: { time: string; endTime: string; available: boolean }[] }> {
+  /** True when [start, start+minutes) of one space is already held by an open booking that day. */
+  private static spanTaken(visits: Visit[], date: string, space: HqSpace, startMinutes: number, minutes: number, slotMinutes: number): boolean {
+    return visits.some(
+      (visit) => isOpen(visit) && visit.date === date && visit.space === space && spansOverlap(startMinutes, minutes, minutesOf(visit.time), durationMinutes(visit, slotMinutes)),
+    );
+  }
+
+  /**
+   * The day's grid. Plain visits count heads against slotCapacity; an hours-wallet space
+   * (`space` + wanted `hours`) marks a start time available only when its whole span is free
+   * and still inside the working day — taken spans show as unselectable in the calendar.
+   */
+  async slots(
+    date: string,
+    now = Date.now(),
+    options: { space?: HqSpace | null; hours?: number } = {},
+  ): Promise<{ date: string; slots: { time: string; endTime: string; available: boolean }[] }> {
     const content = await this.content();
     if (!DATE.test(date) || !bookableDays(content, now).some((day) => day.date === date)) {
       throw new RequestError('bad_date', 'الموعد خارج فترة الحجز المتاحة');
     }
     const visits = await this.load();
+    const { slotMinutes, close } = content.hours;
+    const space = options.space ?? null;
+    const minutes = slotMinutes * Math.max(1, options.hours ?? 1);
     const slots = slotTimes(content).map((time) => {
-      const taken = visits.filter((visit) => isOpen(visit) && visit.date === date && visit.time === time).length;
-      return { time, endTime: timeOf(minutesOf(time) + content.hours.slotMinutes), available: taken < content.slotCapacity };
+      if (space) {
+        const fits = minutesOf(time) + minutes <= minutesOf(close);
+        const available = fits && !HqService.spanTaken(visits, date, space, minutesOf(time), minutes, slotMinutes);
+        return { time, endTime: timeOf(minutesOf(time) + minutes), available };
+      }
+      const taken = visits.filter((visit) => isOpen(visit) && !visit.space && visit.date === date && visit.time === time).length;
+      return { time, endTime: timeOf(minutesOf(time) + slotMinutes), available: taken < content.slotCapacity };
     });
     return { date, slots };
+  }
+
+  /** The member's membership-year key: the wallet resets with every new membership year. */
+  private static yearKeyOf(me: Me): string {
+    return me.membership.endDate ?? `cal:${new Date().getUTCFullYear()}`;
+  }
+
+  private async usedHours(contactId: number, year: string): Promise<number> {
+    const doc = await this.deps.kv.get<WalletDoc>(walletKey(contactId));
+    return doc && doc.year === year ? doc.used : 0;
+  }
+
+  /** Confirmed hours move the ledger; pending requests only reserve against the shown balance. */
+  private async charge(visit: Visit, deltaHours: number): Promise<void> {
+    if (!visit.space || !visit.walletYear) return;
+    const used = await this.usedHours(visit.contactId, visit.walletYear);
+    await this.deps.kv.set(walletKey(visit.contactId), { year: visit.walletYear, used: Math.max(0, used + deltaHours) } satisfies WalletDoc);
+  }
+
+  /** M109a: the live counter — total, deducted (confirmed), reserved (pending) and what remains. */
+  async wallet(me: Me): Promise<HqWallet> {
+    const content = await this.content();
+    const total = content.walletHours ?? 24;
+    const year = HqService.yearKeyOf(me);
+    const used = await this.usedHours(me.id, year);
+    const pending = (await this.load())
+      .filter((visit) => visit.contactId === me.id && visit.status === 'pending' && visit.space)
+      .reduce((sum, visit) => sum + Math.max(1, visit.hours ?? 1), 0);
+    return { total, used, pending, remaining: Math.max(0, total - used - pending) };
   }
 
   async myVisits(contactId: number, now = Date.now()): Promise<PublicVisit[]> {
@@ -260,16 +346,40 @@ export class HqService {
       throw new RequestError('bad_date', 'الموعد خارج فترة الحجز المتاحة');
     }
     if (!TIME.test(input.time) || !slotTimes(content).includes(input.time)) throw new RequestError('bad_time', 'الوقت خارج ساعات العمل');
-    const purpose = input.purpose.trim();
-    if (!content.purposes.includes(purpose)) throw new RequestError('bad_purpose', 'اختر الغرض من الزيارة');
+    // M109a: an hours-wallet booking (office / meeting room) carries its space and duration;
+    // the purpose is the space's own label. A plain visit keeps the picked purpose.
+    const space = input.space ?? null;
+    const hours = space ? Math.max(1, Math.min(Math.trunc(input.hours ?? 1), 12)) : 1;
+    const { slotMinutes, close } = content.hours;
+    if (space && minutesOf(input.time) + hours * slotMinutes > minutesOf(close)) {
+      throw new RequestError('bad_span', 'المدة المطلوبة تتجاوز ساعات العمل، اختر وقتًا أبكر أو مدة أقصر');
+    }
+    const purpose = space ? HQ_SPACE_LABELS[space] : input.purpose.trim();
+    if (!space && !content.purposes.includes(purpose)) throw new RequestError('bad_purpose', 'اختر الغرض من الزيارة');
     const note = input.note.trim().slice(0, 300);
+    const walletYear = space ? HqService.yearKeyOf(me) : null;
+    const total = content.walletHours ?? 24;
+    const used = space && walletYear ? await this.usedHours(me.id, walletYear) : 0;
 
     const visit = await this.mutate((visits) => {
       if (visits.some((visit) => visit.contactId === me.id && isOpen(visit) && visit.date === input.date)) {
         throw new RequestError('duplicate', 'لديك حجز في هذا اليوم بالفعل');
       }
-      const taken = visits.filter((visit) => isOpen(visit) && visit.date === input.date && visit.time === input.time).length;
-      if (taken >= content.slotCapacity) throw new RequestError('full', 'هذا الوقت مكتمل، اختر وقتًا آخر');
+      if (space) {
+        // The wallet check counts the ledger plus every pending reservation, inside the write lock.
+        const reserved = visits
+          .filter((visit) => visit.contactId === me.id && visit.status === 'pending' && visit.space)
+          .reduce((sum, visit) => sum + Math.max(1, visit.hours ?? 1), 0);
+        if (used + reserved + hours > total) {
+          throw new RequestError('wallet_exhausted', `رصيد ساعاتك السنوي لا يكفي: المتبقي ${Math.max(0, total - used - reserved)} من ${total} ساعة`);
+        }
+        if (HqService.spanTaken(visits, input.date, space, minutesOf(input.time), hours * slotMinutes, slotMinutes)) {
+          throw new RequestError('full', 'هذا الوقت محجوز، اختر وقتًا آخر');
+        }
+      } else {
+        const taken = visits.filter((visit) => isOpen(visit) && !visit.space && visit.date === input.date && visit.time === input.time).length;
+        if (taken >= content.slotCapacity) throw new RequestError('full', 'هذا الوقت مكتمل، اختر وقتًا آخر');
+      }
       const visit: Visit = {
         id: randomUUID(),
         contactId: me.id,
@@ -286,9 +396,12 @@ export class HqService {
         decidedBy: null,
         adminNote: null,
         passCode: null,
+        space,
+        hours,
+        walletYear,
       };
       visits.push(visit);
-      this.deps.log.info({ visit: visit.id, date: visit.date, time: visit.time }, 'hq visit requested');
+      this.deps.log.info({ visit: visit.id, date: visit.date, time: visit.time, space, hours }, 'hq visit requested');
       return visit;
     });
     this.deps.notifier.hqVisitRequested(this.toMail(visit, content));
@@ -301,7 +414,12 @@ export class HqService {
       const visit = visits.find((entry) => entry.id === id && entry.contactId === contactId);
       if (!visit) throw new RequestError('not_found', 'الحجز غير موجود', 404);
       if (!this.toPublic(visit, content, now).cancellable) throw new RequestError('not_cancellable', 'لا يمكن إلغاء هذا الحجز');
+      const wasConfirmed = visit.status === 'confirmed';
       visit.status = 'cancelled';
+      return { visit, wasConfirmed };
+    }).then(async ({ visit, wasConfirmed }) => {
+      // M109a: cancelling a CONFIRMED hours booking before it starts gives the hours back.
+      if (wasConfirmed) await this.charge(visit, -Math.max(1, visit.hours ?? 1));
       return visit;
     });
     this.deps.notifier.hqVisitCancelled(this.toMail(visit, content));
@@ -314,7 +432,7 @@ export class HqService {
     const visit = (await this.load()).find((entry) => entry.id === id && entry.contactId === contactId);
     if (!visit) throw new RequestError('not_found', 'الحجز غير موجود', 404);
     if (visit.status !== 'confirmed' || !visit.passCode) throw new RequestError('not_confirmed', 'لم تؤكد الإدارة هذا الحجز بعد');
-    const { state, validFrom, validTo } = passState(visit, content.hours.slotMinutes, now);
+    const { state, validFrom, validTo } = passState(visit, durationMinutes(visit, content.hours.slotMinutes), now);
     const code = `${QR_PREFIX}:${visit.id}:${visit.passCode}`;
     const qr = await QRCode.toDataURL(code, { errorCorrectionLevel: 'M', margin: 1, width: 480 });
     return { visit: this.toPublic(visit, content, now), name: visit.name, code, qr, validFrom: validFrom.toISOString(), validTo: validTo.toISOString(), state };
@@ -340,9 +458,14 @@ export class HqService {
       this.deps.log.info({ visit: visit.id, status, adminId: admin.id }, 'hq visit decided');
       return visit;
     });
+    // M109a: only the admin's confirmation moves the hours ledger; a rejection deducts nothing.
+    if (status === 'confirmed') await this.charge(visit, Math.max(1, visit.hours ?? 1));
     const mail = this.toMail(visit, content);
     this.deps.notifier.hqVisitDecided(mail, status, admin.name);
-    this.deps.push.hqVisitDecided({ id: visit.id, contactId: visit.contactId, date: visit.date, time: visit.time, endTime: mail.endTime, adminNote: visit.adminNote }, status);
+    this.deps.push.hqVisitDecided(
+      { id: visit.id, contactId: visit.contactId, date: visit.date, time: visit.time, endTime: mail.endTime, adminNote: visit.adminNote, space: visit.space },
+      status,
+    );
     return this.toAdmin(visit, content, now);
   }
 
@@ -353,7 +476,7 @@ export class HqService {
     const secret = parts.length === 3 && parts[0] === QR_PREFIX ? parts[2] : parts[0];
     const visit = (await this.load()).find((entry) => entry.passCode && entry.passCode === secret && entry.status === 'confirmed');
     if (!visit) return { valid: false, state: 'unknown', visit: null, text: 'باركود غير معروف أو حجز غير مؤكد' };
-    const { state } = passState(visit, content.hours.slotMinutes, now);
+    const { state } = passState(visit, durationMinutes(visit, content.hours.slotMinutes), now);
     const text = state === 'active' ? 'الدخول مسموح' : state === 'upcoming' ? 'الموعد لم يبدأ بعد' : 'انتهى وقت هذا الموعد';
     return { valid: state === 'active', state, visit: this.toAdmin(visit, content), text };
   }
