@@ -1,13 +1,19 @@
+import type { AppLang } from '../lang.js';
 import type { Payment } from './service.js';
 
 /**
- * M110 «الفاتورة الفورية»: the moment a payment settles paid, the customer gets a branded Arabic
- * invoice — mailed as HTML and served at /pay/invoice/:id (printable). Styled after the owner's
- * sample invoices (navy header, seller/customer cards, items table, gold accents).
+ * M110 «الفاتورة الفورية»: the moment a payment settles paid, the customer gets a branded invoice —
+ * mailed as HTML and served at /pay/invoice/:id (printable). Styled after the owner's samples
+ * (navy header, seller/customer cards, items table, gold accents).
+ * M113 (owner, 2026-10-21): EMAIL-SAFE layout — nested tables with inline styles only (mail clients
+ * strip flex/grid) and explicit directions on every mixed value; and the invoice follows the
+ * CUSTOMER'S app language («لو العميل فاتح من إنجليزي الفاتورة بالكامل إنجليزي») — the app sends
+ * x-app-lang with the payment and the stored `lang` picks the whole rendering.
  */
 
 export const SELLER = {
   name: 'شركة فيبس فينتشرز القابضة',
+  nameEn: 'VIBES VENTURES COMPANY HOLDING',
   brand: 'Vibes Ventures',
   cr: '2050161213',
   unified: '7030567908',
@@ -18,18 +24,87 @@ export const SELLER = {
   phones: ['+966558318777', '+966503844438'],
 } as const;
 
-const GATEWAY_LABEL: Record<string, string> = { moyasar: 'ميسر (Moyasar)', paymob: 'Paymob', code: 'كود خصم 100%', mock: 'بوابة تجريبية' };
+const GATEWAY_LABEL: Record<AppLang, Record<string, string>> = {
+  ar: { moyasar: 'ميسر (Moyasar)', paymob: 'Paymob', code: 'كود خصم 100%', mock: 'بوابة تجريبية' },
+  en: { moyasar: 'Moyasar', paymob: 'Paymob', code: '100% discount code', mock: 'Test gateway' },
+};
+
+/** Every fixed phrase on the invoice, per language. */
+const L = {
+  ar: {
+    cr: 'سجل تجاري',
+    invoice: 'فاتورة',
+    paid: 'مدفوعة بالكامل ✓',
+    invoiceNo: 'رقم الفاتورة',
+    payDate: 'تاريخ الدفع',
+    issueDate: 'تاريخ الإصدار',
+    gateway: 'بوابة الدفع',
+    seller: 'بيانات البائع',
+    customer: 'بيانات العميل',
+    name: 'الاسم',
+    sellerCr: 'السجل التجاري',
+    unified: 'الرقم الوطني الموحد',
+    address: 'العنوان',
+    email: 'البريد الإلكتروني',
+    phone: 'رقم الجوال',
+    item: 'البند',
+    amount: 'القيمة (ريال سعودي)',
+    memberPrice: 'سعر الأعضاء — خصم العضوية مطبق',
+    discountBy: 'خصم بكود',
+    total: 'إجمالي المبلغ المدفوع',
+    reference: 'مرجع العملية:',
+    appName: 'تطبيق نادي المستثمرين',
+  },
+  en: {
+    cr: 'CR No.',
+    invoice: 'Invoice',
+    paid: 'PAID IN FULL ✓',
+    invoiceNo: 'Invoice No.',
+    payDate: 'Payment date',
+    issueDate: 'Issue date',
+    gateway: 'Payment gateway',
+    seller: 'Seller',
+    customer: 'Customer',
+    name: 'Name',
+    sellerCr: 'CR No.',
+    unified: 'Unified National No.',
+    address: 'Address',
+    email: 'Email',
+    phone: 'Phone',
+    item: 'Item',
+    amount: 'Amount (SAR)',
+    memberPrice: 'Member price — membership discount applied',
+    discountBy: 'Discount code',
+    total: 'Total paid',
+    reference: 'Transaction reference:',
+    appName: 'The Investors Club app',
+  },
+} as const satisfies Record<AppLang, Record<string, string>>;
+
+const NAVY = '#1F3A6E';
+const INK = '#1C2B4A';
+const MUTED = '#5A6B8C';
+const LINE = '#E1E6F0';
+const WASH = '#F4F6FB';
+const GOLD = '#F6C445';
+const FONT = `font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif`;
 
 function escape(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
 }
 
-const dateFormat = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' });
+const dateFormats: Record<AppLang, Intl.DateTimeFormat> = {
+  ar: new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' }),
+  en: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', year: 'numeric', month: 'long', day: 'numeric' }),
+};
 
-function day(value: string | null): string {
+/** «20 أكتوبر 2026» locked right-to-left so mail clients cannot reorder the pieces; plain in English. */
+function day(value: string | null, lang: AppLang): string {
   if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : dateFormat.format(date);
+  if (Number.isNaN(date.getTime())) return '—';
+  const text = dateFormats[lang].format(date);
+  return lang === 'ar' ? `<span dir="rtl">&rlm;${text}&rlm;</span>` : escape(text);
 }
 
 function money(amount: number): string {
@@ -37,97 +112,164 @@ function money(amount: number): string {
 }
 
 /** The invoice number the customer sees: a plain growing number, never the payment uuid. */
-export function invoiceTitle(invoiceNo: number): string {
-  return `فاتورة رقم ${invoiceNo}`;
+export function invoiceTitle(invoiceNo: number, lang: AppLang = 'ar'): string {
+  return lang === 'en' ? `Invoice No. ${invoiceNo}` : `فاتورة رقم ${invoiceNo}`;
 }
 
+/** The customer mail subject, in the customer's language. */
+export function invoiceSubject(invoiceNo: number, lang: AppLang = 'ar'): string {
+  return lang === 'en'
+    ? `Your invoice from The Investors Club — ${invoiceTitle(invoiceNo, 'en')}`
+    : `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo, 'ar')}`;
+}
+
+/** One labeled meta cell («رقم الفاتورة» …) — a quarter of the meta row. */
+function metaCell(label: string, value: string): string {
+  return `<td width="25%" style="padding:4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${WASH};border-radius:10px"><tr><td style="${FONT};padding:10px 12px;text-align:center"><div style="font-size:12px;color:${MUTED};line-height:1.6">${label}</div><div style="font-size:15px;font-weight:700;color:${INK};line-height:1.8;white-space:nowrap">${value}</div></td></tr></table></td>`;
+}
+
+const ltr = (value: string): string => `<span dir="ltr">${escape(value)}</span>`;
+
 /** Full printable HTML document; also the body of the customer mail. */
-export function invoiceHtml(payment: Payment, invoiceNo: number): string {
-  const gateway = GATEWAY_LABEL[payment.provider] ?? payment.provider;
-  const discountRow =
-    payment.discountCode && payment.preDiscountSar && payment.preDiscountSar > payment.amount
-      ? `<tr><td class="item"><strong>خصم بكود ${escape(payment.discountCode)}${payment.discountPercent ? ` (${payment.discountPercent}%)` : ''}</strong></td>
-         <td class="num">−${money(payment.preDiscountSar - payment.amount)}</td></tr>`
-      : '';
+export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang = 'ar'): string {
+  const t = L[lang];
+  const dir = lang === 'en' ? 'ltr' : 'rtl';
+  const start = lang === 'en' ? 'left' : 'right';
+  const end = lang === 'en' ? 'right' : 'left';
+  const gateway = GATEWAY_LABEL[lang][payment.provider] ?? payment.provider;
+  const sellerName = lang === 'en' ? SELLER.nameEn : SELLER.name;
+  const sellerAddress = lang === 'en' ? SELLER.addressEn : SELLER.address;
   const baseAmount = payment.preDiscountSar && payment.preDiscountSar > payment.amount ? payment.preDiscountSar : payment.amount;
   const answers = payment.answers
     .filter((answer) => answer.key !== 'discount')
     .map((answer) => `${escape(answer.label)}: ${escape(answer.value)}`)
     .join(' · ');
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${invoiceTitle(invoiceNo)} — ${escape(SELLER.brand)}</title>
-<style>
-  body{margin:0;background:#EEF1F6;font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;color:#1C2B4A}
-  .page{max-width:820px;margin:0 auto;background:#fff}
-  .bar{background:#1F3A6E;color:#fff;padding:14px 28px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
-  .bar .en{direction:ltr;font-size:13px}
-  .head{padding:26px 28px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-  h1{margin:0;font-size:24px;color:#1F3A6E}
-  .badge{background:#F6C445;color:#1C2B4A;border-radius:20px;padding:6px 16px;font-weight:700;font-size:14px}
-  .meta{display:flex;flex-wrap:wrap;gap:10px;padding:6px 28px 0}
-  .meta div{flex:1;min-width:140px;background:#F4F6FB;border-radius:10px;padding:10px 14px}
-  .meta .k{font-size:12px;color:#5A6B8C}.meta .v{font-weight:700;margin-top:2px}
-  .cards{display:flex;gap:10px;padding:14px 28px 0;flex-wrap:wrap}
-  .card{flex:1;min-width:250px;border:1px solid #E1E6F0;border-radius:12px;padding:14px 16px}
-  .card h3{margin:0 0 10px;color:#1F3A6E;font-size:15px;border-bottom:1px solid #E1E6F0;padding-bottom:8px}
-  .row{display:flex;justify-content:space-between;gap:10px;margin:4px 0;font-size:13px}
-  .row .k{color:#5A6B8C}.row .v{font-weight:600;text-align:left}
-  table{width:calc(100% - 56px);margin:18px 28px 0;border-collapse:collapse}
-  thead th{background:#1F3A6E;color:#fff;padding:10px 12px;font-size:13px;text-align:right}
-  thead th.num,td.num{text-align:left;direction:ltr}
-  td{padding:12px;border-bottom:1px solid #E9EDF5;font-size:14px;vertical-align:top}
-  td .sub{color:#5A6B8C;font-size:12px;margin-top:4px}
-  .total{background:#1F3A6E;color:#fff;margin:18px 28px 0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
-  .total .amount{direction:ltr;font-size:20px;font-weight:800}
-  .note{margin:14px 28px;background:#FFF8E6;border:1px solid #F6C445;border-radius:10px;padding:12px 16px;font-size:13px;color:#5A4A12}
-  .foot{background:#1F3A6E;color:#fff;margin-top:22px;padding:16px 28px;font-size:13px;text-align:center;line-height:2}
-  .foot bdi{direction:ltr}
-  @media print{body{background:#fff}.page{max-width:none}}
-</style></head><body><div class="page">
-<div class="bar"><span>سجل تجاري: <bdi dir="ltr">${SELLER.cr}</bdi></span><span class="en">${escape(SELLER.brand)}</span></div>
-<div class="head"><h1>فاتورة ${escape(payment.serviceTitle)}</h1><span class="badge">مدفوعة بالكامل ✓</span></div>
-<div class="meta">
-  <div><div class="k">رقم الفاتورة</div><div class="v"><bdi dir="ltr">${invoiceNo}</bdi></div></div>
-  <div><div class="k">تاريخ الدفع</div><div class="v">${day(payment.paidAt)}</div></div>
-  <div><div class="k">تاريخ الإصدار</div><div class="v">${day(payment.paidAt ?? payment.createdAt)}</div></div>
-  <div><div class="k">بوابة الدفع</div><div class="v">${escape(gateway)}</div></div>
-</div>
-<div class="cards">
-  <div class="card"><h3>بيانات البائع</h3>
-    <div class="row"><span class="k">الاسم</span><span class="v">${SELLER.name}</span></div>
-    <div class="row"><span class="k">السجل التجاري</span><span class="v"><bdi dir="ltr">${SELLER.cr}</bdi></span></div>
-    <div class="row"><span class="k">الرقم الوطني الموحد</span><span class="v"><bdi dir="ltr">${SELLER.unified}</bdi></span></div>
-    <div class="row"><span class="k">العنوان</span><span class="v">${SELLER.address}</span></div>
-    <div class="row"><span class="k">البريد الإلكتروني</span><span class="v"><bdi dir="ltr">${SELLER.email}</bdi></span></div>
-  </div>
-  <div class="card"><h3>بيانات العميل</h3>
-    <div class="row"><span class="k">الاسم</span><span class="v">${escape(payment.name || '—')}</span></div>
-    ${payment.phone ? `<div class="row"><span class="k">رقم الجوال</span><span class="v"><bdi dir="ltr">${escape(payment.phone)}</bdi></span></div>` : ''}
-    ${payment.email ? `<div class="row"><span class="k">البريد الإلكتروني</span><span class="v"><bdi dir="ltr">${escape(payment.email)}</bdi></span></div>` : ''}
-  </div>
-</div>
-<table>
-  <thead><tr><th>البند</th><th class="num">القيمة (ريال سعودي)</th></tr></thead>
-  <tbody>
-    <tr><td class="item"><strong>${escape(payment.serviceTitle)}</strong>${answers ? `<div class="sub">${answers}</div>` : ''}${payment.memberPrice ? '<div class="sub">سعر الأعضاء — خصم العضوية مطبق</div>' : ''}</td>
-    <td class="num">${money(baseAmount)}</td></tr>
+  const cardRow = (label: string, value: string): string =>
+    `<tr><td style="${FONT};font-size:12px;color:${MUTED};padding:5px 0;white-space:nowrap;vertical-align:top">${label}</td><td style="${FONT};font-size:13px;font-weight:600;color:${INK};padding:5px 10px;text-align:${end}">${value}</td></tr>`;
+  const itemCell = `padding:12px 14px;border-bottom:1px solid ${LINE};${FONT};font-size:14px;color:${INK};vertical-align:top`;
+  const numCell = `padding:12px 14px;border-bottom:1px solid ${LINE};${FONT};font-size:14px;color:${INK};text-align:${end};white-space:nowrap`;
+  const discountRow =
+    payment.discountCode && payment.preDiscountSar && payment.preDiscountSar > payment.amount
+      ? `<tr><td style="${itemCell}"><strong>${t.discountBy} <span dir="ltr">${escape(payment.discountCode)}</span>${payment.discountPercent ? ` (${payment.discountPercent}%)` : ''}</strong></td><td dir="ltr" style="${numCell}">&minus;${money(payment.preDiscountSar - payment.amount)}</td></tr>`
+      : '';
+  const note =
+    lang === 'en'
+      ? `This invoice was issued electronically by ${t.appName} — <span dir="ltr">Vibes Ventures</span> and confirms full payment of the amount above through <bdi>${escape(gateway)}</bdi>.`
+      : `صدرت هذه الفاتورة إلكترونيًا من ${t.appName} — <span dir="ltr">Vibes Ventures</span> وتثبت سداد المبلغ المذكور أعلاه بالكامل عبر بوابة <bdi>${escape(gateway)}</bdi>.`;
+  return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+<title>${invoiceTitle(invoiceNo, lang)} — ${escape(SELLER.brand)}</title>
+<style>:root{color-scheme:light}@media print{body{background:#fff !important}}</style></head>
+<body style="margin:0;padding:0;background:#EEF1F6;${FONT}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF1F6"><tr><td align="center" style="padding:18px 8px">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden">
+
+<tr><td style="background:${NAVY};padding:12px 24px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="${FONT};color:#FFFFFF;font-size:14px;font-weight:700;white-space:nowrap">${t.cr}: ${ltr(SELLER.cr)}</td>
+    <td dir="ltr" style="${FONT};color:#FFFFFF;font-size:13px;text-align:${end};white-space:nowrap">${escape(SELLER.brand)}</td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="padding:22px 24px 6px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="${FONT};font-size:21px;font-weight:700;color:${NAVY};line-height:1.6"><bdi>${t.invoice} — ${escape(payment.serviceTitle)}</bdi></td>
+    <td align="${end}" style="vertical-align:top;padding-${start}:10px;white-space:nowrap"><span style="${FONT};display:inline-block;background:${GOLD};color:${INK};border-radius:20px;padding:6px 16px;font-weight:700;font-size:13px;white-space:nowrap">${t.paid}</span></td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="padding:8px 20px 0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    ${metaCell(t.invoiceNo, ltr(String(invoiceNo)))}
+    ${metaCell(t.payDate, day(payment.paidAt, lang))}
+    ${metaCell(t.issueDate, day(payment.paidAt ?? payment.createdAt, lang))}
+    ${metaCell(t.gateway, `<bdi>${escape(gateway)}</bdi>`)}
+  </tr></table>
+</td></tr>
+
+<tr><td style="padding:12px 20px 0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="50%" style="padding:4px;vertical-align:top">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${LINE};border-radius:12px"><tr><td style="padding:14px 16px">
+        <div style="${FONT};font-size:15px;font-weight:700;color:${NAVY};border-bottom:1px solid ${LINE};padding-bottom:8px;margin-bottom:6px">${t.seller}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${cardRow(t.name, `<bdi>${escape(sellerName)}</bdi>`)}
+          ${cardRow(t.sellerCr, ltr(SELLER.cr))}
+          ${cardRow(t.unified, ltr(SELLER.unified))}
+          ${cardRow(t.address, `<bdi>${escape(sellerAddress)}</bdi>`)}
+          ${cardRow(t.email, ltr(SELLER.email))}
+        </table>
+      </td></tr></table>
+    </td>
+    <td width="50%" style="padding:4px;vertical-align:top">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${LINE};border-radius:12px"><tr><td style="padding:14px 16px">
+        <div style="${FONT};font-size:15px;font-weight:700;color:${NAVY};border-bottom:1px solid ${LINE};padding-bottom:8px;margin-bottom:6px">${t.customer}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${cardRow(t.name, `<bdi>${escape(payment.name || '—')}</bdi>`)}
+          ${payment.phone ? cardRow(t.phone, ltr(payment.phone)) : ''}
+          ${payment.email ? cardRow(t.email, ltr(payment.email)) : ''}
+        </table>
+      </td></tr></table>
+    </td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="padding:16px 24px 0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+    <tr>
+      <th style="background:${NAVY};color:#FFFFFF;${FONT};font-size:13px;padding:10px 14px;text-align:${start}">${t.item}</th>
+      <th style="background:${NAVY};color:#FFFFFF;${FONT};font-size:13px;padding:10px 14px;text-align:${end};white-space:nowrap">${t.amount}</th>
+    </tr>
+    <tr>
+      <td style="${itemCell}"><strong><bdi>${escape(payment.serviceTitle)}</bdi></strong>${answers ? `<div style="color:${MUTED};font-size:12px;margin-top:4px;line-height:1.8"><bdi>${answers}</bdi></div>` : ''}${payment.memberPrice ? `<div style="color:${MUTED};font-size:12px;margin-top:2px">${t.memberPrice}</div>` : ''}</td>
+      <td dir="ltr" style="${numCell}">${money(baseAmount)}</td>
+    </tr>
     ${discountRow}
-  </tbody>
+  </table>
+</td></tr>
+
+<tr><td style="padding:16px 24px 0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${NAVY};border-radius:10px"><tr>
+    <td style="${FONT};color:#FFFFFF;font-size:15px;font-weight:700;padding:14px 18px">${t.total}</td>
+    <td dir="ltr" style="${FONT};color:#FFFFFF;font-size:19px;font-weight:800;padding:14px 18px;text-align:${end};white-space:nowrap">SAR ${money(payment.amount)}</td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="padding:14px 24px 0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8E6;border:1px solid ${GOLD};border-radius:10px"><tr>
+    <td style="${FONT};font-size:12.5px;color:#5A4A12;padding:12px 16px;line-height:1.9">${note}${payment.transactionId ? ` ${t.reference} ${ltr(payment.transactionId)}` : ''}</td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="background:${NAVY};padding:14px 24px;margin-top:20px">
+  <div dir="ltr" style="${FONT};color:#FFFFFF;font-size:12.5px;text-align:center;line-height:2">
+    <span style="color:#FFFFFF">${escape(SELLER.addressEn)}</span><br>
+    ${SELLER.phones.map((phone) => `<a href="tel:${escape(phone)}" style="color:#FFFFFF;text-decoration:none">${escape(phone)}</a>`).join(' · ')}
+    · <a href="https://${escape(SELLER.site)}" style="color:#FFFFFF;text-decoration:none">${escape(SELLER.site)}</a>
+    · <a href="mailto:${escape(SELLER.email)}" style="color:#FFFFFF;text-decoration:none">${escape(SELLER.email)}</a>
+  </div>
+</td></tr>
+
 </table>
-<div class="total"><span>إجمالي المبلغ المدفوع</span><span class="amount">SAR ${money(payment.amount)}</span></div>
-<div class="note">صدرت هذه الفاتورة إلكترونيًا من ${APP_LINE} وتثبت سداد المبلغ المذكور أعلاه بالكامل عبر بوابة ${escape(gateway)}.${payment.transactionId ? ` مرجع العملية: <bdi dir="ltr">${escape(payment.transactionId)}</bdi>` : ''}</div>
-<div class="foot">${SELLER.addressEn}<br><bdi>${SELLER.phones.join('</bdi> · <bdi>')}</bdi> · <bdi>${SELLER.site}</bdi> · <bdi>${SELLER.email}</bdi></div>
-</div></body></html>`;
+<div style="${FONT};font-size:11px;color:${MUTED};padding:10px 0">${t.appName} — ${invoiceTitle(invoiceNo, lang)}</div>
+</td></tr></table>
+</body></html>`;
 }
 
-const APP_LINE = 'تطبيق نادي المستثمرين — Vibes Ventures';
-
 /** The plain-text twin of the invoice mail (clients without HTML). */
-export function invoiceText(payment: Payment, invoiceNo: number, url: string): string {
+export function invoiceText(payment: Payment, invoiceNo: number, url: string, lang: AppLang = 'ar'): string {
+  if (lang === 'en') {
+    return [
+      `${invoiceTitle(invoiceNo, 'en')} — ${payment.serviceTitle}`,
+      `Total paid: SAR ${money(payment.amount)}`,
+      `Seller: ${SELLER.nameEn} — CR ${SELLER.cr}`,
+      `Your full invoice: ${url}`,
+      'Thank you for choosing The Investors Club.',
+    ].join('\n');
+  }
   return [
-    `${invoiceTitle(invoiceNo)} — ${payment.serviceTitle}`,
+    `${invoiceTitle(invoiceNo, 'ar')} — ${payment.serviceTitle}`,
     `المبلغ المدفوع: ${money(payment.amount)} ريال سعودي`,
-    `تاريخ الدفع: ${day(payment.paidAt)}`,
     `البائع: ${SELLER.name} — سجل تجاري ${SELLER.cr}`,
     `فاتورتك الكاملة: ${url}`,
     'شكرًا لتعاملك مع نادي المستثمرين.',

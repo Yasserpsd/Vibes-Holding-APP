@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
 import type { AppliedDiscount, DiscountsService } from '../discounts/service.js';
 import type { InterestsService } from '../interests/service.js';
 import { isInterestKey, type InterestKey } from '../interests/types.js';
@@ -286,7 +287,7 @@ export class AgendaService {
    * once; a 100% code confirms with no checkout; otherwise the registration waits on the payment this
    * call starts. A registration whose payment never finished starts a fresh payment.
    */
-  async register(me: Me, eventId: string, attendance: AgendaAttendance, discountCode?: string, now = Date.now()): Promise<{ registration: AgendaRegistration; payment: PublicPayment | null }> {
+  async register(me: Me, eventId: string, attendance: AgendaAttendance, discountCode?: string, lang: AppLang = 'ar', now = Date.now()): Promise<{ registration: AgendaRegistration; payment: PublicPayment | null }> {
     const event = await this.event(eventId);
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
     if (!event.open) throw new RequestError('closed', 'التسجيل في هذه الفعالية مغلق حاليًا', 409);
@@ -355,6 +356,7 @@ export class AgendaService {
       amountSar: due,
       memberPrice: member,
       discount,
+      lang,
     });
     if (payment.status === 'paid') {
       // A 100% code settled at zero on the spot (the payments push already told the member).

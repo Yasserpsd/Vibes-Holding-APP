@@ -93,7 +93,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       const input = parse(registerSchema, request.body, reply);
       if (!input) return;
       const me = await auth.me(current.session);
-      const result = await service.register(me, params.id, input.attendance, input.discountCode);
+      const result = await service.register(me, params.id, input.attendance, input.discountCode, langOf(request));
       return reply.code(201).send({
         registration: { id: result.registration.id, attendance: result.registration.attendance, paid: result.registration.paid },
         payment: result.payment,

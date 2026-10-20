@@ -11,7 +11,8 @@ import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
-import { invoiceHtml, invoiceText, invoiceTitle } from './invoice.js';
+import type { AppLang } from '../lang.js';
+import { invoiceHtml, invoiceSubject, invoiceText } from './invoice.js';
 import type { MoyasarConfirmer } from './moyasar.js';
 import type { PaymobGateway } from './paymob.js';
 
@@ -58,6 +59,8 @@ export type Payment = {
   failureReason: string | null;
   /** M110: assigned the moment the payment settles paid; names the customer's invoice. */
   invoiceNo?: number | null;
+  /** M113: the customer's app language at purchase — the invoice renders entirely in it. */
+  lang?: AppLang | null;
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
@@ -206,7 +209,7 @@ export class PaymentsService {
    */
   private async createFreePayment(
     customer: { contactId: number; name: string; email: string; phone: string },
-    input: { key: string; title: string; answers: Answer[]; currency: string; memberPrice: boolean; discount: AppliedDiscount },
+    input: { key: string; title: string; answers: Answer[]; currency: string; memberPrice: boolean; discount: AppliedDiscount; lang?: AppLang },
     now: number,
   ): Promise<Payment> {
     const id = randomUUID();
@@ -235,6 +238,7 @@ export class PaymentsService {
       checkoutUrl: '',
       transactionId: null,
       failureReason: null,
+      lang: input.lang ?? 'ar',
       createdAt: stamp,
       updatedAt: stamp,
       paidAt: stamp,
@@ -274,7 +278,7 @@ export class PaymentsService {
   /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
   private async createPayment(
     customer: { contactId: number; name: string; email: string; phone: string },
-    input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount; validHours?: number },
+    input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount; validHours?: number; lang?: AppLang },
     now: number,
   ): Promise<Payment> {
     const id = randomUUID();
@@ -318,6 +322,7 @@ export class PaymentsService {
       checkoutUrl: intention.checkoutUrl,
       transactionId: null,
       failureReason: null,
+      lang: input.lang ?? 'ar',
       createdAt: stamp,
       updatedAt: stamp,
       paidAt: null,
@@ -332,7 +337,7 @@ export class PaymentsService {
   }
 
   /** Creates the gateway intention for a paid service and records the payment as created. */
-  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, discountCode?: string, now = Date.now()): Promise<PublicPayment> {
+  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, discountCode?: string, lang: AppLang = 'ar', now = Date.now()): Promise<PublicPayment> {
     const service = content.services.find((entry) => entry.key === serviceKey);
     if (!service) throw new RequestError('not_found', 'الخدمة غير موجودة', 404);
     if (toPublicService(service, me).locked || service.action.type !== 'paymob') {
@@ -347,7 +352,7 @@ export class PaymentsService {
     const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
     // M107: a discount code shrinks the amount; a 100% code confirms with no gateway.
     const discount = discountCode && this.deps.discounts ? await this.deps.discounts.apply(discountCode, price.amount, now) : undefined;
-    const base = { key: service.key, title: service.title, answers, currency: price.currency, memberPrice: price.memberPrice };
+    const base = { key: service.key, title: service.title, answers, currency: price.currency, memberPrice: price.memberPrice, lang };
     const payment =
       discount && discount.amountAfter === 0
         ? await this.createFreePayment(customer, { ...base, discount }, now)
@@ -358,7 +363,7 @@ export class PaymentsService {
   /** M41 «أجندة النادي»: the attendance fee (M107: members pay their member price too; a 100% code confirms without the gateway). */
   async startAgenda(
     me: Me,
-    input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number; memberPrice?: boolean; discount?: AppliedDiscount },
+    input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number; memberPrice?: boolean; discount?: AppliedDiscount; lang?: AppLang },
     now = Date.now(),
   ): Promise<PublicPayment> {
     const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
@@ -368,6 +373,7 @@ export class PaymentsService {
       answers: [{ key: 'attendance', label: 'طريقة الحضور', value: input.attendanceLabel }],
       currency: 'SAR',
       memberPrice: input.memberPrice ?? false,
+      lang: input.lang,
     };
     const payment =
       input.discount && input.discount.amountAfter === 0
@@ -471,11 +477,12 @@ export class PaymentsService {
     const invoiceNo = payment.invoiceNo ?? (await this.assignInvoiceNo(payment.id, now));
     if (!invoiceNo) throw new RequestError('not_found', 'العملية غير موجودة', 404);
     payment.invoiceNo = invoiceNo;
+    const lang = payment.lang ?? 'ar';
     const result = await this.deps.notifier.invoiceSend({
       email: payment.email,
-      subject: `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo)}`,
-      text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`),
-      html: invoiceHtml(payment, invoiceNo),
+      subject: invoiceSubject(invoiceNo, lang),
+      text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+      html: invoiceHtml(payment, invoiceNo, lang),
     });
     return { ok: result.customer === null && result.admins === null, invoiceNo, customer: result.customer, admins: result.admins };
   }
@@ -485,11 +492,11 @@ export class PaymentsService {
     return this.deps.notifier.probe();
   }
 
-  /** M110: the printable invoice page (/pay/invoice/:id) — paid payments only. */
+  /** M110: the printable invoice page (/pay/invoice/:id) — paid payments only, in the buyer's language. */
   async invoicePage(id: string): Promise<string | null> {
     const payment = (await this.load()).find((entry) => entry.id === id);
     if (!payment || payment.status !== 'paid' || !payment.invoiceNo) return null;
-    return invoiceHtml(payment, payment.invoiceNo);
+    return invoiceHtml(payment, payment.invoiceNo, payment.lang ?? 'ar');
   }
 
   /** Everything that happens once a gateway settled a payment: code use, mails, push, module listeners. */
@@ -500,11 +507,12 @@ export class PaymentsService {
       const invoiceNo = await this.assignInvoiceNo(payment.id, now);
       if (invoiceNo) {
         payment.invoiceNo = invoiceNo;
+        const lang = payment.lang ?? 'ar';
         await this.deps.notifier.invoiceSend({
           email: payment.email,
-          subject: `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo)}`,
-          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`),
-          html: invoiceHtml(payment, invoiceNo),
+          subject: invoiceSubject(invoiceNo, lang),
+          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+          html: invoiceHtml(payment, invoiceNo, lang),
         });
       }
     }

@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
+import { langOf } from '../lang.js';
 import type { AuthService } from '../auth/service.js';
 import { getServicesContent } from '../content/services.js';
 import type { KV } from '../store.js';
@@ -69,7 +70,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       const body = parse(startSchema, request.body, reply);
       if (!body) return;
       const me = await auth.me(current.session);
-      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv), body.discountCode) };
+      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv), body.discountCode, langOf(request)) };
     }),
   );
 
