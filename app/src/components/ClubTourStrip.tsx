@@ -33,7 +33,7 @@ export function ClubTourStrip() {
         {photos.map((url, index) => (
           <FadeInView key={url} delay={entranceDelay(index)}>
             <PressScale onPress={open} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('home.tourTitle')}>
-              <Image source={{ uri: url }} style={styles.photo} resizeMode="cover" />
+              <Image source={{ uri: url }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
             </PressScale>
           </FadeInView>
         ))}

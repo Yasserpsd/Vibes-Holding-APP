@@ -54,9 +54,18 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
             <Image source={require('../../assets/images/club-emblem.png')} style={styles.fallbackEmblem} resizeMode="contain" />
           </View>
           {showImage ? (
-            <Image source={{ uri: project.image ?? undefined }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={project.title} onError={() => setImageBroken(true)} />
+            <Image
+              source={{ uri: project.image ?? undefined }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              // Android decodes at the card's size instead of the photo's — the home stops paying for full-resolution bitmaps.
+              resizeMethod="resize"
+              accessibilityLabel={project.title}
+              onError={() => setImageBroken(true)}
+            />
           ) : null}
-          <View style={styles.scrim} pointerEvents="none" />
+          {/* M107b: the dark scrim belongs on a photo only — over the golden fallback it read as a dead black card. */}
+          {showImage ? <View style={styles.scrim} pointerEvents="none" /> : null}
           <GoldSweep radius={radii.xl} />
           <View style={styles.body}>
             <View style={styles.pillRow}>

@@ -16,7 +16,12 @@ export type Payment = {
   currency: string;
   memberPrice: boolean;
   status: PaymentStatus;
-  provider: 'paymob' | 'mock';
+  /** M107: `code` = confirmed by a 100% discount code, no gateway and no checkout. */
+  provider: 'paymob' | 'mock' | 'code';
+  /** M107: the discount applied, when any. */
+  discountCode?: string | null;
+  discountPercent?: number | null;
+  preDiscountSar?: number | null;
   checkoutUrl: string;
   transactionId: string | null;
   failureReason: string | null;
@@ -26,9 +31,13 @@ export type Payment = {
 };
 
 export const paymentsApi = {
-  start: (serviceKey: string, answers: Record<string, string>) => apiRequest<{ payment: Payment }>('POST', '/api/payments', { body: { serviceKey, answers } }),
+  start: (serviceKey: string, answers: Record<string, string>, discountCode?: string) =>
+    apiRequest<{ payment: Payment }>('POST', '/api/payments', { body: { serviceKey, answers, ...(discountCode ? { discountCode } : {}) } }),
   get: (id: string) => apiGet<{ payment: Payment }>(`/api/payments/${encodeURIComponent(id)}`),
   list: () => apiGet<{ payments: Payment[] }>('/api/payments'),
+  /** M107: previews a discount code against an amount before paying. */
+  checkDiscount: (code: string, amount: number) =>
+    apiRequest<{ code: string; percent: number; amountBefore: number; amountAfter: number }>('POST', '/api/discounts/check', { body: { code, amount } }),
 };
 
 /** One payment; polls every few seconds while the gateway's callback is still awaited. */

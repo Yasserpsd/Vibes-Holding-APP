@@ -26,7 +26,7 @@ export function ServiceTile({ service, onPress }: Props) {
       <View style={[styles.card, locked && styles.lockedCard]}>
         {photo && !locked ? (
           <>
-            <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+            <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
             <View style={styles.wash} pointerEvents="none" />
           </>
         ) : null}

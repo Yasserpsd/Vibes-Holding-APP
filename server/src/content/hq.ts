@@ -49,8 +49,9 @@ export const HQ_SEED: HqContent = {
   leadDays: 1,
   maxDaysAhead: 30,
   slotCapacity: 5,
-  purposes: ['اجتماع عمل', 'زيارة تعريفية للمقر', 'تصوير أو بودكاست', 'حضور فعالية', 'أخرى'],
-  version: 3,
+  // M107 (owner, 2026-10-20): the meeting room books through this same flow, بدون رسوم for members.
+  purposes: ['حجز قاعة الاجتماعات', 'اجتماع عمل', 'زيارة تعريفية للمقر', 'تصوير أو بودكاست', 'حضور فعالية', 'أخرى'],
+  version: 4,
   updatedAt: '2026-09-12T00:00:00.000Z',
 };
 

@@ -32,7 +32,7 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
   return (
     <View style={[styles.box, { height }, style]}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
-        <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={accessibilityLabel} />
+        <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" resizeMethod="resize" accessibilityLabel={accessibilityLabel} />
       </Animated.View>
       {urls.length > 1 ? (
         <View style={styles.dots}>

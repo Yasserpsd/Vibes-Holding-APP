@@ -92,6 +92,7 @@ function answerLines(answers: Answer[]): string[] {
 }
 
 function gatewayName(provider: string): string {
+  if (provider === 'code') return 'بدون بوابة — كود خصم 100%';
   return provider === 'mock' ? 'تجريبية (بدون بوابة حقيقية)' : 'Paymob';
 }
 

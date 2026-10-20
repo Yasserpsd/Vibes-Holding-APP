@@ -13,6 +13,8 @@ export type PaymentsRoutesOptions = { service: PaymentsService; auth: AuthServic
 const startSchema = z.object({
   serviceKey: z.string().trim().min(1).max(60),
   answers: z.record(z.string().max(40), z.string().trim().max(300)).default({}),
+  /** M107: an optional discount code; a 100% code confirms the order with no checkout. */
+  discountCode: z.string().trim().max(30).optional(),
 });
 const idSchema = z.object({ id: z.string().uuid('رقم العملية غير صالح') });
 const statusSchema = z.object({ status: z.enum(['created', 'paid', 'failed']).optional() });
@@ -43,7 +45,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       const body = parse(startSchema, request.body, reply);
       if (!body) return;
       const me = await auth.me(current.session);
-      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv)) };
+      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv), body.discountCode) };
     }),
   );
 

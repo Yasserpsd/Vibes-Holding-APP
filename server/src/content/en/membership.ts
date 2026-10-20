@@ -133,7 +133,7 @@ export const MEMBERSHIP_EN: Translation<MembershipContent> = {
       },
       {
         title: 'Your services with priority and at half the value',
-        text: 'And when your idea becomes a venture: the design of any website or mobile app of yours on Android or iOS, the pitch deck, marketing by Momentum, Al-Moltaqa podcast production, the franchise kit and the meeting room — at a 50% discount, alongside up to 50% off outdoor filming and conference coverage, and a code of up to 20% on “Manfaz” products.',
+        text: 'And when your idea becomes a venture: the design of any website or mobile app of yours on Android or iOS, the pitch deck, marketing by Momentum, Al-Moltaqa podcast production and the meeting room — at a 50% discount, alongside up to 50% off outdoor filming and conference coverage.',
       },
     ],
   },

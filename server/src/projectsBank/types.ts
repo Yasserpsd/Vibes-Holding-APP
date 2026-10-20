@@ -40,6 +40,8 @@ export type ProjectsQuery = {
   q?: string;
   sector?: string;
   stage?: string;
+  /** M107: keep only the projects whose sector (or title) matches these member interests. */
+  forInterests?: string[];
   sort: ProjectsSort;
   page: number;
   limit: number;

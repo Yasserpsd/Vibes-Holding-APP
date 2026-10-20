@@ -39,6 +39,11 @@ export default function ServiceScreen() {
   const [handedOver, setHandedOver] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // M107: the discount code and what the server said it is worth against this price.
+  const [code, setCode] = useState('');
+  const [applied, setApplied] = useState<{ code: string; percent: number; amountAfter: number } | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const openAdvisor = useAskAdvisor();
   const advisorContext = data ? ({ type: 'service', id: data.service.key, title: data.service.title } as const) : null;
   useAdvisorScreen(advisorContext);
@@ -62,6 +67,22 @@ export default function ServiceScreen() {
     setHandedOver(await openWhatsApp(action.phone, text));
   };
 
+  // M107: «تحقق من الكود» — the server prices the code against this service's amount for me.
+  const tryCode = async () => {
+    if (!service.price || !code.trim() || checking) return;
+    setChecking(true);
+    setCodeError(null);
+    try {
+      const answer = await paymentsApi.checkDiscount(code.trim(), service.price.amount);
+      setApplied({ code: answer.code, percent: answer.percent, amountAfter: answer.amountAfter });
+    } catch (cause) {
+      setApplied(null);
+      setCodeError(errorMessage(cause));
+    } finally {
+      setChecking(false);
+    }
+  };
+
   // The server creates the gateway intention; the checkout opens in the in-app browser; the status is polled from the server.
   const pay = async () => {
     const action = service.action;
@@ -75,9 +96,12 @@ export default function ServiceScreen() {
     setPaying(true);
     setPayError(null);
     try {
-      const { payment } = await paymentsApi.start(service.key, answers);
+      const { payment } = await paymentsApi.start(service.key, answers, applied ? applied.code : code.trim() || undefined);
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
-      await openCheckout(payment.checkoutUrl, paymentReturnUrl(payment.id));
+      // M107: a 100% code settles on the spot — straight to the confirmation, no checkout.
+      if (payment.status === 'created' && payment.checkoutUrl) {
+        await openCheckout(payment.checkoutUrl, paymentReturnUrl(payment.id));
+      }
       router.navigate({ pathname: '/payment/[id]', params: { id: payment.id } });
     } catch (cause) {
       setPayError(errorMessage(cause));
@@ -134,6 +158,7 @@ export default function ServiceScreen() {
             signedIn={status === 'signedIn'}
             paying={paying}
             answers={answers}
+            discount={{ code, applied, error: codeError, checking, onCode: (value) => { setCode(value.toUpperCase()); setApplied(null); setCodeError(null); }, onCheck: () => void tryCode() }}
             onAnswer={(field, value) => setAnswers((current) => ({ ...current, [field]: value }))}
             onWhatsApp={(action) => void handOver(action)}
             onPay={() => void pay()}
@@ -166,12 +191,23 @@ export default function ServiceScreen() {
   );
 }
 
+type Discount = {
+  code: string;
+  applied: { code: string; percent: number; amountAfter: number } | null;
+  error: string | null;
+  checking: boolean;
+  onCode: (value: string) => void;
+  onCheck: () => void;
+};
+
 type ActionPanelProps = {
   action: ServiceAction;
   price: Service['price'];
   signedIn: boolean;
   paying: boolean;
   answers: Record<string, string>;
+  /** M107: the discount-code box on paid services. */
+  discount: Discount;
   onAnswer: (field: string, value: string) => void;
   onWhatsApp: (action: Extract<ServiceAction, { type: 'whatsapp' }>) => void;
   onPay: () => void;
@@ -183,7 +219,7 @@ type ActionPanelProps = {
   onRoute: (path: string) => void;
 };
 
-function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm, onRoute }: ActionPanelProps) {
+function ActionPanel({ action, price, signedIn, paying, answers, discount, onAnswer, onWhatsApp, onPay, onLogin, onAdvisor, onHq, onProjects, onForm, onRoute }: ActionPanelProps) {
   switch (action.type) {
     // M85 (owner): the request forms sit on PAPER — ivory sheet, ink text, the eye rests.
     case 'whatsapp':
@@ -206,17 +242,37 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
           {price ? (
             <View style={styles.priceRow}>
               <Text style={styles.paperPriceLabel}>{t('service.amount')}</Text>
-              <Text style={styles.paperPriceValue}>{amountLabel(price)}</Text>
-              {price.memberPrice ? <Text style={styles.paperPriceNote}>{t('service.memberPrice')}</Text> : null}
+              <Text style={styles.paperPriceValue}>{discount.applied ? amountLabel({ amount: discount.applied.amountAfter, currency: price.currency }) : amountLabel(price)}</Text>
+              {discount.applied ? <Text style={styles.paperPriceNote}>{t('service.discountApplied', { percent: String(discount.applied.percent) })}</Text> : null}
+              {price.memberPrice && !discount.applied ? <Text style={styles.paperPriceNote}>{t('service.memberPrice')}</Text> : null}
             </View>
           ) : null}
+          {/* M107 «وفّر بالعضوية»: the membership saving, spelled out for a non-member payer. */}
+          {price && !price.memberPrice && action.memberAmount !== null && action.amount > action.memberAmount ? (
+            <Text style={styles.paperPriceNote}>{t('service.save', { amount: String(action.amount - action.memberAmount) })}</Text>
+          ) : null}
+          {signedIn && price ? (
+            <View style={styles.codeRow}>
+              <View style={styles.codeField}>
+                <FormField label={t('service.discountLabel')} latin autoCapitalize="characters" autoCorrect={false} value={discount.code} onChangeText={discount.onCode} placeholder="CODE" />
+              </View>
+              <AppButton label={t('service.discountCheck')} variant="outline" icon="checkmark-outline" loading={discount.checking} onPress={discount.onCheck} />
+            </View>
+          ) : null}
+          {discount.applied && discount.applied.amountAfter === 0 ? <Text style={styles.paperPriceNote}>{t('service.discountFree')}</Text> : null}
+          {discount.error ? <Text style={styles.codeError}>{discount.error}</Text> : null}
           {!signedIn ? (
             <>
               <Text style={styles.paperPayHint}>{t('service.signInToPay')}</Text>
               <AppButton label={t('service.signInButton')} icon="log-in-outline" onPress={onLogin} />
             </>
           ) : (
-            <AppButton label={t('service.payNow')} icon="card-outline" loading={paying} onPress={onPay} />
+            <AppButton
+              label={discount.applied && discount.applied.amountAfter === 0 ? t('service.confirmByCode') : t('service.payNow')}
+              icon="card-outline"
+              loading={paying}
+              onPress={onPay}
+            />
           )}
           <Text style={styles.paperPayHint}>{t('service.payHint')}</Text>
         </PaperCard>
@@ -296,6 +352,10 @@ const styles = StyleSheet.create({
   fieldLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, flexWrap: 'wrap' },
+  // M107: the discount-code box inside the paper payment card.
+  codeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  codeField: { flex: 1 },
+  codeError: { ...typography.caption, color: colors.danger, textAlign: textStart },
   priceLabel: { ...typography.caption, color: colors.textSecondary },
   priceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
   priceNote: { ...typography.caption, color: colors.goldLight },

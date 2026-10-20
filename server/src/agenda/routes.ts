@@ -1,15 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { dashboardGuard, guard, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
+import { adminGuard, dashboardGuard, guard, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { INTEREST_KEYS } from '../interests/types.js';
 import { langOf } from '../lang.js';
 import type { Translator } from '../translate.js';
 import type { AgendaEvent, AgendaService } from './service.js';
 
 export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator };
 
-const registerSchema = z.object({ attendance: z.enum(['hq', 'online']) });
+const registerSchema = z.object({ attendance: z.enum(['hq', 'online']), discountCode: z.string().trim().max(30).optional() });
+const discountSchema = z.object({ code: z.string().trim().min(1).max(30) });
+const verifySchema = z.object({ code: z.string().trim().min(6).max(120) });
 
 const eventSchema = z.object({
   title: z.string().trim().min(3, 'اكتب اسم الفعالية').max(140),
@@ -25,6 +28,10 @@ const eventSchema = z.object({
   imageUrl: z.string().trim().max(500).nullish(),
   mode: z.enum(['hq', 'online', 'both']),
   feeSar: z.number().int().min(0).max(100_000).default(0),
+  /** M107: the ACTIVE member's price (0 = ضمن العضوية بدون رسوم إضافية). */
+  memberFeeSar: z.number().int().min(0).max(100_000).default(0),
+  /** M107: the unified interest keys this event suits (targets the push, badges the agenda). */
+  interests: z.array(z.enum(INTEREST_KEYS as [string, ...string[]])).max(10).default([]),
   open: z.boolean().default(true),
   /** M43: the dashboard's own English wording; absent or empty = the automatic translation stands. */
   english: z.object({ title: z.string().trim().max(140).default(''), blurb: z.string().trim().max(1000).default(''), place: z.string().trim().max(200).default('') }).nullish(),
@@ -36,6 +43,7 @@ const idSchema = z.object({ id: z.string().uuid() });
 export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
+  const requireAppAdmin = adminGuard(auth);
   const whoIs = optionalSession(auth);
 
   /** M43: his own wording from the editor wins for good; otherwise AI writes the English once and
@@ -85,11 +93,50 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       const input = parse(registerSchema, request.body, reply);
       if (!input) return;
       const me = await auth.me(current.session);
-      const result = await service.register(me, params.id, input.attendance);
+      const result = await service.register(me, params.id, input.attendance, input.discountCode);
       return reply.code(201).send({
         registration: { id: result.registration.id, attendance: result.registration.attendance, paid: result.registration.paid },
         payment: result.payment,
       });
+    }),
+  );
+
+  // M107: «تحقق من الكود» — what a discount code does to THIS viewer's fee, before registering.
+  app.post(
+    '/api/agenda/:id/discount',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const input = parse(discountSchema, request.body, reply);
+      if (!input) return;
+      const me = await auth.me(current.session);
+      return service.previewDiscount(me, params.id, input.code);
+    }),
+  );
+
+  // M107: the confirmed attendee's ticket (QR), shown in the app like the HQ pass.
+  app.get(
+    '/api/agenda/:id/ticket',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      return { ticket: await service.ticket(current.session.contactId, params.id) };
+    }),
+  );
+
+  // M107: the door scan (app admin accounts, like the HQ pass scanner).
+  app.post(
+    '/api/admin/agenda/verify',
+    guard(async (request, reply) => {
+      const admin = await requireAppAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(verifySchema, request.body, reply);
+      if (!body) return;
+      return service.verifyTicket(body.code);
     }),
   );
 

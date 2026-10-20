@@ -113,18 +113,24 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       summary: 'Book your visit to the club HQ in Riyadh; once the administration confirms, you receive the entry barcode for your appointment.',
       memberLabel: 'For subscribed members',
     },
+    // M107: the meeting room books in-app through the HQ flow, no fees for the membership's whole term.
+    {
+      key: 'meeting-room',
+      cta: 'Book the room',
+      title: 'Meeting room booking',
+      summary: 'A meeting room for 8 people with a Zoom subscription at the club HQ in Riyadh — no fees for the whole membership term.',
+      detail: 'Book your slot from the app and pick the purpose “Meeting room booking”; once the administration confirms, you receive the entry barcode for your appointment.',
+      memberLabel: 'No fees for the whole membership term',
+    },
     {
       key: 'theater',
-      cta: 'Book the space',
-      title: 'Club theatre and meeting room',
-      summary: 'A theatre seating up to 80 people and a meeting room for 8 people with a Zoom subscription, at the club HQ at a 50% discount for members.',
+      cta: 'Book the theatre',
+      title: 'Club theatre',
+      summary: 'A theatre seating up to 80 people at the club HQ for your events and shows, at a 50% discount for members.',
       memberLabel: '50% discount for members',
       action: {
-        message: 'I would like to book the club theatre or the meeting room.',
-        fields: [
-          { key: 'space', label: 'Space', options: ['Club theatre', 'Meeting room'] },
-          { key: 'time', label: 'Preferred date' },
-        ],
+        message: 'I would like to book the club theatre.',
+        fields: [{ key: 'time', label: 'Preferred date' }],
       },
     },
     {
@@ -173,24 +179,6 @@ export const SERVICES_EN: Translation<ServicesContent> = {
         fields: [{ key: 'service', label: 'Service', options: ['Website', 'App', 'Digital marketing', 'Influencer advertising'] }],
       },
     },
-    {
-      key: 'franchise',
-      cta: 'Request the kit',
-      title: 'Franchise package',
-      summary: 'The franchise package from Franchment to expand your brand, at a 50% discount for members.',
-      memberLabel: '50% discount for members',
-      action: {
-        message: 'I would like to use the member discount on the franchise package.',
-        fields: [{ key: 'brand', label: 'Brand' }],
-      },
-    },
-    {
-      key: 'manfaz',
-      cta: 'Get the code',
-      title: '“Manfaz” products discount code',
-      summary: 'A discount code of up to 20% on “Manfaz” products from Quick Deals Trading.',
-      memberLabel: 'Up to 20% for members',
-      action: { message: 'I would like to get the “Manfaz” products discount code.' },
-    },
+    // M107: «franchise» and «manfaz» removed with their Arabic entries.
   ],
 };

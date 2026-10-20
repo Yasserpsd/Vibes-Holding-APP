@@ -28,6 +28,7 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
       <GlassCard>
         <View style={styles.thumbBox}>
           <Animated.Image
+            resizeMethod="resize"
             source={{ uri: video.thumbnail }}
             style={[styles.thumb, { opacity: thumbOpacity }]}
             resizeMode="cover"

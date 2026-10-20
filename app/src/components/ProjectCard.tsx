@@ -23,17 +23,22 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
   // The cover fades in once it arrives instead of popping over the dark surface.
   const [imageOpacity] = useState(() => new Animated.Value(0));
   const [imageWidth, setImageWidth] = useState(0);
+  // M107b: a cover that errors out hands the box to the fallback instead of staying a dark hole.
+  const [imageBroken, setImageBroken] = useState(false);
   const golden = project.isGolden;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>
       <GlassCard golden={golden} radius={radii.xl} style={golden ? styles.cardGolden : null}>
         <View style={styles.imageBox} onLayout={(event) => setImageWidth(event.nativeEvent.layout.width)}>
-          {project.image ? (
+          {project.image && !imageBroken ? (
             <Animated.Image
               source={{ uri: project.image }}
               style={[styles.image, { opacity: imageOpacity }]}
               resizeMode="cover"
+              // Android decodes at the card's size instead of the photo's (perf, owner 2026-10-20).
+              resizeMethod="resize"
               onLoad={() => Animated.timing(imageOpacity, { toValue: 1, duration: 320, useNativeDriver: true }).start()}
+              onError={() => setImageBroken(true)}
             />
           ) : (
             <View style={[styles.image, styles.imageFallback]}>

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
+import { isInterestKey, matchesInterests } from '../interests/types.js';
 import type { KV } from '../store.js';
 import { fetchFeedItems } from './feed.js';
 import { pageUrlOf, toPublicProject } from './mapper.js';
@@ -128,6 +129,11 @@ export class ProjectsService {
     let rows = this.items;
     if (query.sector) rows = rows.filter((row) => row.project.sector?.slug === query.sector);
     if (query.stage) rows = rows.filter((row) => row.project.stage?.slug === query.stage);
+    // M107 «حسب اهتماماتي»: the member's interests matched against the sector name and the title.
+    if (query.forInterests?.length) {
+      const keys = query.forInterests.filter(isInterestKey);
+      rows = rows.filter((row) => matchesInterests(keys, `${row.project.sector?.name ?? ''} ${row.project.title}`));
+    }
     if (query.q) {
       const terms = normalizeForSearch(query.q).split(' ').filter(Boolean);
       rows = rows.filter((row) => terms.every((term) => row.search.includes(term)));

@@ -7,7 +7,20 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 /** M41 «أجندة النادي»: events across the whole year, their registrations, and the members' push reminder. */
 
 const MODE_LABEL: Record<AgendaMode, string> = { hq: 'حضوري', online: 'أونلاين', both: 'حضوري وأونلاين' };
-const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, mode: 'both', feeSar: 0, open: true };
+const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, mode: 'both', feeSar: 0, memberFeeSar: 0, interests: [], open: true };
+
+/** M107: the unified interests (mirrors server/src/interests/types.ts). */
+const INTEREST_OPTIONS: { key: string; label: string }[] = [
+  { key: 'startups', label: 'ريادة الأعمال والشركات الناشئة' },
+  { key: 'tech', label: 'التقنية والذكاء الاصطناعي' },
+  { key: 'invest', label: 'الاستثمار والتمويل والأسواق المالية' },
+  { key: 'realestate', label: 'العقار والإنشاءات' },
+  { key: 'trade', label: 'التجارة والتجزئة والتجارة الإلكترونية' },
+  { key: 'industry', label: 'الصناعة واللوجستيات' },
+  { key: 'tourism', label: 'السياحة والترفيه والرياضة' },
+  { key: 'health_edu', label: 'الصحة والتعليم' },
+  { key: 'energy', label: 'الطاقة والتعدين' },
+];
 
 export function Agenda() {
   const { signOut, notify } = useShell();
@@ -110,8 +123,9 @@ export function Agenda() {
     <>
       <SectionHead title="أجندة النادي" hint={state.data ? `فعاليات قادمة: ${formatNumber(upcoming)}` : undefined} onReload={state.reload} busy={state.loading} />
       <p className="muted">
-        أضف فعاليات السنة كلها من هنا: العضو يسجّل حضوره من التطبيق بدوسة واحدة (حضوري أو أونلاين) بدون رسوم، وغير العضو يدفع رسوم الفعالية داخل
-        التطبيق إن وُجدت ولا يتأكد تسجيله إلا بعد نجاح الدفع. رابط الأونلاين لا يظهر إلا للمسجّلين المؤكدين. زر «إشعار» يذكّر كل الأجهزة بالفعالية.
+        أضف فعاليات السنة كلها من هنا: لكل فعالية سعر لغير الأعضاء وسعر للأعضاء (0 = ضمن العضوية)، والدفع داخل التطبيق ولا يتأكد
+        التسجيل إلا بعد نجاح الدفع — ومن تريده أن يحضر بدون دفع أعطه كود خصم 100% من قسم «أكواد الخصم». بعد التأكيد يحصل العضو على
+        تذكرة بباركود، ويصله تذكير قبل الفعالية بيوم. رابط الأونلاين لا يظهر إلا للمؤكدين، واختيار الاهتمامات يوجّه الإشعار لأصحابها.
       </p>
       <div className="row-actions" style={{ marginBottom: 12 }}>
         <button type="button" onClick={() => setEditor({ row: null, input: { ...EMPTY }, english: { title: '', blurb: '', place: '' } })}>+ فعالية جديدة</button>
@@ -135,7 +149,12 @@ export function Agenda() {
               },
               { key: 'title', label: 'الفعالية', cell: (row) => row.title },
               { key: 'mode', label: 'الحضور', cell: (row) => MODE_LABEL[row.mode] },
-              { key: 'fee', label: 'رسوم غير الأعضاء', cell: (row) => (row.feeSar > 0 ? `${formatNumber(row.feeSar)} ر.س` : 'بدون رسوم') },
+              {
+                key: 'fee',
+                label: 'الرسوم (غير العضو / العضو)',
+                cell: (row) =>
+                  `${row.feeSar > 0 ? `${formatNumber(row.feeSar)} ر.س` : 'بدون رسوم'} / ${(row.memberFeeSar ?? 0) > 0 ? `${formatNumber(row.memberFeeSar ?? 0)} ر.س` : 'ضمن العضوية'}`,
+              },
               {
                 key: 'counts',
                 label: 'المسجّلون',
@@ -155,7 +174,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, mode: row.mode, feeSar: row.feeSar, open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, mode: row.mode, feeSar: row.feeSar, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -228,9 +247,32 @@ export function Agenda() {
               {uploading ? <p className="muted">جارٍ رفع الصورة…</p> : null}
             </fieldset>
             <label>
-              رسوم غير الأعضاء بالريال (0 = بدون رسوم للجميع؛ الأعضاء دائمًا بدون رسوم)
+              سعر غير الأعضاء بالريال (0 = بدون رسوم للجميع)
               <input type="number" min={0} max={100000} value={editor.input.feeSar} onChange={(event) => edit({ feeSar: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
             </label>
+            <label>
+              سعر الأعضاء بالريال (0 = ضمن العضوية بدون رسوم إضافية)
+              <input type="number" min={0} max={100000} value={editor.input.memberFeeSar ?? 0} onChange={(event) => edit({ memberFeeSar: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
+            </label>
+            <fieldset>
+              <legend>الاهتمامات المناسبة — الإشعار يصل لمن اختاروها (ولمن لم يحدد اهتماماته)</legend>
+              {INTEREST_OPTIONS.map((option) => (
+                <label key={option.key} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={(editor.input.interests ?? []).includes(option.key)}
+                    onChange={(event) =>
+                      edit({
+                        interests: event.target.checked
+                          ? [...(editor.input.interests ?? []), option.key]
+                          : (editor.input.interests ?? []).filter((key) => key !== option.key),
+                      })
+                    }
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </fieldset>
             <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, display: 'flex' }}>
               <input type="checkbox" checked={editor.input.open} onChange={(event) => edit({ open: event.target.checked })} /> التسجيل مفتوح
             </label>
@@ -273,8 +315,13 @@ export function Agenda() {
                   key: 'paid',
                   label: 'الحالة',
                   cell: (row) =>
-                    row.paid ? <Pill tone="ok">{row.member ? 'عضو — بدون رسوم' : 'مؤكد — دفع'}</Pill> : <Pill tone="muted">لم يكتمل الدفع</Pill>,
+                    row.paid ? (
+                      <Pill tone="ok">{(row.amountSar ?? 0) > 0 ? `مؤكد — دفع ${formatNumber(row.amountSar ?? 0)} ر.س` : row.discountCode ? 'مؤكد — كود خصم' : row.member ? 'عضو — ضمن العضوية' : 'مؤكد'}</Pill>
+                    ) : (
+                      <Pill tone="muted">لم يكتمل الدفع</Pill>
+                    ),
                 },
+                { key: 'code', label: 'الكود', cell: (row) => (row.discountCode ? <bdi dir="ltr" className="num">{row.discountCode}</bdi> : '—') },
                 { key: 'phone', label: 'الجوال', cell: (row) => (row.phone ? <bdi dir="ltr" className="num">{row.phone}</bdi> : '—') },
                 { key: 'at', label: 'سجّل', cell: (row) => formatDateTime(row.createdAt) },
               ]}

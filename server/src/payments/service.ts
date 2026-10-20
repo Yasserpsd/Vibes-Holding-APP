@@ -5,6 +5,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { priceFor, toPublicService, type ServicesContent } from '../content/services.js';
+import type { AppliedDiscount, DiscountsService } from '../discounts/service.js';
 import type { Notifier, PaymentLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
@@ -37,7 +38,13 @@ export type Payment = {
   currency: string;
   memberPrice: boolean;
   status: PaymentStatus;
-  provider: 'paymob' | 'mock';
+  /** M107: `code` = confirmed by a 100% discount code, no gateway involved. */
+  provider: 'paymob' | 'mock' | 'code';
+  /** M107: the discount code applied to this payment, if any (the use is recorded once it settles paid). */
+  discountCode?: string | null;
+  discountPercent?: number | null;
+  /** The amount before the discount (the list or member price). */
+  preDiscountSar?: number | null;
   intentionId: string;
   orderId: string;
   clientSecret: string;
@@ -61,6 +68,9 @@ export type PublicPayment = Pick<
   | 'memberPrice'
   | 'status'
   | 'provider'
+  | 'discountCode'
+  | 'discountPercent'
+  | 'preDiscountSar'
   | 'checkoutUrl'
   | 'transactionId'
   | 'failureReason'
@@ -77,7 +87,7 @@ export type PaymentStats = { series: ({ day: string } & PaymentTotals)[]; today:
 
 export type RedirectResult = { payment: PublicPayment | null; verified: boolean; gatewaySuccess: boolean | null };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string };
+type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string; discounts?: DiscountsService };
 
 function isoDaysAgo(now: number, days: number): string {
   return new Date(now - days * 86_400_000).toISOString();
@@ -133,6 +143,9 @@ export class PaymentsService {
       memberPrice: payment.memberPrice,
       status: payment.status,
       provider: payment.provider,
+      discountCode: payment.discountCode ?? null,
+      discountPercent: payment.discountPercent ?? null,
+      preDiscountSar: payment.preDiscountSar ?? null,
       checkoutUrl: payment.checkoutUrl,
       transactionId: payment.transactionId,
       failureReason: payment.failureReason,
@@ -172,8 +185,93 @@ export class PaymentsService {
     };
   }
 
+  /** M107: the «كود الخصم» answer row, so the retry screen and the management mail name the code. */
+  private static discountAnswer(discount: AppliedDiscount): Answer {
+    return { key: 'discount', label: 'كود الخصم', value: `${discount.code} (خصم ${discount.percent}%)` };
+  }
+
+  /**
+   * M107: a 100% code confirms the order with no gateway at all (rule 5 untouched: no gateway said
+   * anything, there is simply nothing to pay). The use is recorded at once and the settled listeners
+   * fire, so an agenda registration confirms through the same path as a paid one.
+   */
+  private async createFreePayment(
+    customer: { contactId: number; name: string; email: string; phone: string },
+    input: { key: string; title: string; answers: Answer[]; currency: string; memberPrice: boolean; discount: AppliedDiscount },
+    now: number,
+  ): Promise<Payment> {
+    const id = randomUUID();
+    const stamp = new Date(now).toISOString();
+    const payment: Payment = {
+      id,
+      contactId: customer.contactId,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      serviceKey: input.key,
+      serviceTitle: input.title,
+      answers: [...input.answers, PaymentsService.discountAnswer(input.discount)],
+      amount: 0,
+      amountCents: 0,
+      currency: input.currency,
+      memberPrice: input.memberPrice,
+      status: 'paid',
+      provider: 'code',
+      discountCode: input.discount.code,
+      discountPercent: input.discount.percent,
+      preDiscountSar: input.discount.amountBefore,
+      intentionId: '',
+      orderId: '',
+      clientSecret: '',
+      checkoutUrl: '',
+      transactionId: null,
+      failureReason: null,
+      createdAt: stamp,
+      updatedAt: stamp,
+      paidAt: stamp,
+      failedAt: null,
+    };
+    await this.mutate((payments) => {
+      payments.push(payment);
+    }, now);
+    this.deps.log.info({ payment: id, service: input.key, code: input.discount.code }, 'order confirmed by a 100% discount code');
+    await this.recordDiscountUse(payment, now);
+    this.deps.notifier.paymentPaid(this.toMail(payment));
+    this.deps.push.paymentResult({ id, contactId: customer.contactId, serviceTitle: input.title, amount: 0, currency: input.currency, status: 'paid' });
+    for (const listener of this.settledListeners) {
+      try {
+        listener(payment);
+      } catch (error) {
+        this.deps.log.error({ err: error, payment: id }, 'payment settled listener failed');
+      }
+    }
+    return payment;
+  }
+
+  /** One confirmed use per settled payment (the service dedupes by payment id). */
+  private async recordDiscountUse(payment: Payment, now: number): Promise<void> {
+    if (!this.deps.discounts || !payment.discountCode) return;
+    try {
+      await this.deps.discounts.recordUse(
+        {
+          code: payment.discountCode,
+          contactId: payment.contactId,
+          name: payment.name,
+          context: payment.serviceKey,
+          label: payment.serviceTitle,
+          amountBefore: payment.preDiscountSar ?? payment.amount,
+          amountAfter: payment.amount,
+          paymentId: payment.id,
+        },
+        now,
+      );
+    } catch (error) {
+      this.deps.log.error({ err: error, payment: payment.id }, 'discount use not recorded');
+    }
+  }
+
   /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
-  private async createPayment(customer: { contactId: number; name: string; email: string; phone: string }, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean }, now: number): Promise<Payment> {
+  private async createPayment(customer: { contactId: number; name: string; email: string; phone: string }, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount }, now: number): Promise<Payment> {
     const id = randomUUID();
     const [firstName = '', ...rest] = customer.name.trim().split(/\s+/);
     const intention = await this.deps.gateway.createIntention({
@@ -196,13 +294,16 @@ export class PaymentsService {
       phone: customer.phone,
       serviceKey: input.key,
       serviceTitle: input.title,
-      answers: input.answers,
+      answers: input.discount ? [...input.answers, PaymentsService.discountAnswer(input.discount)] : input.answers,
       amount: input.amount,
       amountCents: input.amount * 100,
       currency: input.currency,
       memberPrice: input.memberPrice,
       status: 'created',
       provider: this.mode === 'mock' ? 'mock' : 'paymob',
+      discountCode: input.discount?.code ?? null,
+      discountPercent: input.discount?.percent ?? null,
+      preDiscountSar: input.discount?.amountBefore ?? null,
       intentionId: intention.intentionId,
       orderId: intention.orderId,
       clientSecret: intention.clientSecret,
@@ -223,7 +324,7 @@ export class PaymentsService {
   }
 
   /** Creates the gateway intention for a paid service and records the payment as created. */
-  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, now = Date.now()): Promise<PublicPayment> {
+  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, discountCode?: string, now = Date.now()): Promise<PublicPayment> {
     const service = content.services.find((entry) => entry.key === serviceKey);
     if (!service) throw new RequestError('not_found', 'الخدمة غير موجودة', 404);
     if (toPublicService(service, me).locked || service.action.type !== 'paymob') {
@@ -235,28 +336,35 @@ export class PaymentsService {
     const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
     if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
     const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
-    const payment = await this.createPayment(
-      { contactId: me.id, name: me.name, email: me.email, phone: me.phone },
-      { key: service.key, title: service.title, answers, amount: price.amount, currency: price.currency, memberPrice: price.memberPrice },
-      now,
-    );
+    const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
+    // M107: a discount code shrinks the amount; a 100% code confirms with no gateway.
+    const discount = discountCode && this.deps.discounts ? await this.deps.discounts.apply(discountCode, price.amount, now) : undefined;
+    const base = { key: service.key, title: service.title, answers, currency: price.currency, memberPrice: price.memberPrice };
+    const payment =
+      discount && discount.amountAfter === 0
+        ? await this.createFreePayment(customer, { ...base, discount }, now)
+        : await this.createPayment(customer, { ...base, amount: discount ? discount.amountAfter : price.amount, discount }, now);
     return this.toPublic(payment);
   }
 
-  /** M41 «أجندة النادي»: the attendance fee of a visitor without an active membership (a real-world service, rule 3 intact). */
-  async startAgenda(me: Me, input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number }, now = Date.now()): Promise<PublicPayment> {
-    const payment = await this.createPayment(
-      { contactId: me.id, name: me.name, email: me.email, phone: me.phone },
-      {
-        key: `agenda:${input.eventId}`,
-        title: `حضور فعالية: ${input.eventTitle}`,
-        answers: [{ key: 'attendance', label: 'طريقة الحضور', value: input.attendanceLabel }],
-        amount: input.amountSar,
-        currency: 'SAR',
-        memberPrice: false,
-      },
-      now,
-    );
+  /** M41 «أجندة النادي»: the attendance fee (M107: members pay their member price too; a 100% code confirms without the gateway). */
+  async startAgenda(
+    me: Me,
+    input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number; memberPrice?: boolean; discount?: AppliedDiscount },
+    now = Date.now(),
+  ): Promise<PublicPayment> {
+    const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
+    const base = {
+      key: `agenda:${input.eventId}`,
+      title: `حضور فعالية: ${input.eventTitle}`,
+      answers: [{ key: 'attendance', label: 'طريقة الحضور', value: input.attendanceLabel }],
+      currency: 'SAR',
+      memberPrice: input.memberPrice ?? false,
+    };
+    const payment =
+      input.discount && input.discount.amountAfter === 0
+        ? await this.createFreePayment(customer, { ...base, discount: input.discount }, now)
+        : await this.createPayment(customer, { ...base, amount: input.discount ? input.discount.amountAfter : input.amountSar, discount: input.discount }, now);
     return this.toPublic(payment);
   }
 
@@ -321,6 +429,8 @@ export class PaymentsService {
       this.deps.log.info({ payment: result.payment.id, status: result.payment.status }, 'payment updated from the gateway callback');
       // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
       const linkSale = result.payment.serviceKey.startsWith('link:');
+      // M107: a code on a paid order counts as used only now, when the gateway confirmed the money.
+      if (result.payment.status === 'paid') await this.recordDiscountUse(result.payment, now);
       if (result.payment.status === 'paid' && !linkSale) this.deps.notifier.paymentPaid(this.toMail(result.payment));
       else if (result.payment.status !== 'paid' && !linkSale) this.deps.notifier.paymentFailed(this.toMail(result.payment));
       if (result.payment.status === 'paid' || result.payment.status === 'failed') {

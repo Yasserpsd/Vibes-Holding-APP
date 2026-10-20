@@ -15,5 +15,5 @@ export const HQ_EN: Translation<HqContent> = {
   ],
   memberOnlyText: 'Booking an HQ visit is for subscribed members. Activate your annual membership to book your appointment.',
   guestText: 'Sign in to your account and activate your annual membership to book an HQ visit.',
-  purposes: ['Business meeting', 'Introductory visit to the HQ', 'Filming or podcast', 'Attending an event', 'Other'],
+  purposes: ['Meeting room booking', 'Business meeting', 'Introductory visit to the HQ', 'Filming or podcast', 'Attending an event', 'Other'],
 };

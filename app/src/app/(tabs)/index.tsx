@@ -363,7 +363,7 @@ function HqBanner() {
   return (
     <FadeInView delay={140}>
       <PressScale onPress={() => router.push('/hq')} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('nav.hq')}>
-        <Image source={{ uri: photo }} style={styles.hqBanner} resizeMode="cover" accessibilityLabel={t('nav.hq')} />
+        <Image source={{ uri: photo }} style={styles.hqBanner} resizeMode="cover" resizeMethod="resize" accessibilityLabel={t('nav.hq')} />
       </PressScale>
     </FadeInView>
   );

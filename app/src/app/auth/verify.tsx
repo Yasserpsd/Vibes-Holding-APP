@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
-import { newsApi } from '@/api/news';
+import { interestsApi } from '@/api/interests';
 import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -15,10 +15,10 @@ import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
 import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
-type Params = { pendingToken?: string; email?: string; text?: string; interests?: string };
+type Params = { pendingToken?: string; email?: string; text?: string; interests?: string; interestsOther?: string };
 
 export default function VerifyScreen() {
-  const { pendingToken, email, text, interests } = useLocalSearchParams<Params>();
+  const { pendingToken, email, text, interests, interestsOther } = useLocalSearchParams<Params>();
   const router = useRouter();
   const { signIn } = useAuth();
   const queryClient = useQueryClient();
@@ -57,9 +57,10 @@ export default function VerifyScreen() {
       // Interests chosen at signup are saved before the session is announced, so mounted screens
       // (the news tab) load them on their first request; a failure here must not block the account.
       const chosen = (interests ?? '').split(',').filter(Boolean);
-      if (chosen.length > 0) await newsApi.savePrefs(chosen, result.token).catch(() => undefined);
+      if (chosen.length > 0) await interestsApi.save({ keys: chosen, other: interestsOther || undefined }, result.token).catch(() => undefined);
       await signIn(result.token, result.me);
       void queryClient.invalidateQueries({ queryKey: ['news'] });
+      void queryClient.invalidateQueries({ queryKey: ['interests'] });
       finish();
     } catch (cause) {
       setError(errorMessage(cause));

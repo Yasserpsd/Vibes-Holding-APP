@@ -142,6 +142,12 @@ export class PushService {
     return this.deliver(tokens, message, { broadcast: true });
   }
 
+  /** M107: a broadcast narrowed per account (interest targeting); devices whose account fails the test stay quiet. */
+  async broadcastWhere(message: PushMessage, keep: (contactId: number) => boolean): Promise<PushOutcome> {
+    const tokens = (await this.load()).filter((entry) => keep(entry.contactId)).map((entry) => entry.token);
+    return this.deliver(tokens, message, { targeted: true });
+  }
+
   /** M29: one message to every device of one persona's members; `exclude` skips muted members (M87b). */
   async broadcastPersona(persona: string, message: PushMessage, exclude?: Set<number>): Promise<PushOutcome> {
     return this.deliver(await this.tokensForPersona(persona, exclude), message, { persona });
@@ -227,11 +233,14 @@ export class PushService {
 
   paymentResult(payment: { id: string; contactId: number; serviceTitle: string; amount: number; currency: string; status: 'paid' | 'failed' }): void {
     const paid = payment.status === 'paid';
+    // M107: a 100% discount code settles at zero — the push confirms the order, not a transfer.
+    const paidBody =
+      payment.amount === 0
+        ? `تم تأكيد طلبك لخدمة «${payment.serviceTitle}» بكود الخصم. سنتواصل معك لبدء التنفيذ.`
+        : `اكتمل دفع ${formatAmount(payment.amount, payment.currency)} لخدمة «${payment.serviceTitle}». سنتواصل معك لبدء التنفيذ.`;
     this.background(payment.contactId, {
-      title: paid ? 'تم الدفع بنجاح' : 'لم يكتمل الدفع',
-      body: paid
-        ? `اكتمل دفع ${formatAmount(payment.amount, payment.currency)} لخدمة «${payment.serviceTitle}». سنتواصل معك لبدء التنفيذ.`
-        : `لم يكتمل دفع خدمة «${payment.serviceTitle}». يمكنك المحاولة مرة أخرى من التطبيق.`,
+      title: paid ? (payment.amount === 0 ? 'تم تأكيد طلبك' : 'تم الدفع بنجاح') : 'لم يكتمل الدفع',
+      body: paid ? paidBody : `لم يكتمل دفع خدمة «${payment.serviceTitle}». يمكنك المحاولة مرة أخرى من التطبيق.`,
       data: { type: 'payment', id: payment.id, status: payment.status, screen: `/payment/${payment.id}` },
     });
   }
@@ -258,8 +267,18 @@ export class PushService {
   agendaConfirmed(contactId: number, eventTitle: string, eventId: string): void {
     this.background(contactId, {
       title: 'تم تأكيد حضورك ✅',
-      body: `حضورك في «${eventTitle}» مؤكد. تفاصيل الفعالية في أجندة النادي.`,
+      body: `حضورك في «${eventTitle}» مؤكد. تذكرتك جاهزة في التطبيق.`,
       data: { type: 'agenda', screen: `/agenda/${eventId}` },
+    });
+  }
+
+  /** M107: the day-before reminder for a confirmed attendee. */
+  agendaReminder(contactId: number, event: { id: string; title: string; date: string; time: string }): void {
+    const when = `${arabicDay(event.date)}${event.time ? ` الساعة ${event.time}` : ''}`;
+    this.background(contactId, {
+      title: 'تذكير بفعاليتك غدًا 📅',
+      body: `«${event.title}» — ${when}. تذكرتك في التطبيق.`,
+      data: { type: 'agenda', screen: `/agenda/${event.id}` },
     });
   }
 

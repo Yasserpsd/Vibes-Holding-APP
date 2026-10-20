@@ -3,13 +3,14 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService, Me } from '../auth/service.js';
+import type { InterestsService } from '../interests/service.js';
 import { langOf } from '../lang.js';
 import type { KV } from '../store.js';
 import { decisionsTitle, type NewsService } from './service.js';
 import { getNewsSources, setSourceEnabled } from './sources.js';
 import { NEWS_TOPICS, isTopicKey, tierLabel, topicsFor, type TopicKey } from './types.js';
 
-export type NewsRoutesOptions = { service: NewsService; auth: AuthService; kv: KV };
+export type NewsRoutesOptions = { service: NewsService; auth: AuthService; kv: KV; interests?: InterestsService };
 
 const listSchema = z.object({
   topic: z.string().trim().max(30).optional(),
@@ -25,9 +26,17 @@ const toggleSchema = z.object({ enabled: z.boolean() });
  * Public feeds for everyone; interests need a session. A signed-in member gets a personalized ranking.
  * The feeds follow the app's language (`langOf`): English sources for the English version, Arabic otherwise.
  */
-export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { service, auth, kv }) => {
+export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { service, auth, kv, interests }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
+
+  /** M107: the unified interests win over the legacy per-topic prefs once the member saved them. */
+  const topicsOf = async (contactId: number): Promise<{ topics: TopicKey[]; saved: boolean } | null> => {
+    const mapped = interests ? await interests.newsTopicsFor(contactId) : null;
+    if (mapped) return { topics: mapped, saved: true };
+    const legacy = await service.prefs(contactId);
+    return legacy ? { topics: legacy.topics, saved: true } : null;
+  };
 
   /** Reads the bearer token when present; a missing or stale token means a guest, never a 401. */
   const whoIs = async (request: FastifyRequest): Promise<{ contactId: number; me: Me | null } | null> => {
@@ -57,7 +66,8 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
       const topic: TopicKey | undefined = query.topic ? (isTopicKey(query.topic) ? query.topic : undefined) : undefined;
       if (query.topic && !topic) return reply.code(400).send({ error: { code: 'invalid', message: 'الاهتمام غير معروف' } });
       const who = await whoIs(request);
-      const prefs = who ? await service.prefs(who.contactId) : null;
+      const chosen = who ? await topicsOf(who.contactId) : null;
+      const prefs = chosen ? { topics: chosen.topics, updatedAt: '' } : null;
       return service.feed({ topic, page: query.page, limit: query.limit, lang: langOf(request) }, { prefs, persona: who?.me?.persona ?? '' });
     }),
   );
@@ -76,14 +86,14 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
     guard(async (request, reply) => {
       const current = await requireSession(request, reply);
       if (!current) return;
-      const prefs = await service.prefs(current.session.contactId);
+      const chosen = await topicsOf(current.session.contactId);
       let persona = '';
       try {
         persona = (await auth.me(current.session)).persona;
       } catch {
         persona = '';
       }
-      return { topics: prefs?.topics ?? [], suggested: service.suggestedTopics(persona), saved: prefs !== null };
+      return { topics: chosen?.topics ?? [], suggested: service.suggestedTopics(persona), saved: chosen !== null };
     }),
   );
 

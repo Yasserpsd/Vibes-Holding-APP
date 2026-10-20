@@ -10,6 +10,8 @@ export type ProjectsListParams = {
   sort: ProjectsSort;
   sector?: string;
   stage?: string;
+  /** M107 «حسب اهتماماتي»: '1' keeps only the projects matching my saved interests. */
+  mine?: '1';
 };
 
 export function useProjectsList(params: ProjectsListParams) {

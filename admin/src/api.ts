@@ -212,6 +212,10 @@ export type AgendaEventInput = {
   imageUrl?: string | null;
   mode: AgendaMode;
   feeSar: number;
+  /** M107: the ACTIVE member's price (0 = ضمن العضوية). */
+  memberFeeSar?: number;
+  /** M107: the unified interest keys this event suits. */
+  interests?: string[];
   open: boolean;
 };
 export type AgendaEvent = AgendaEventInput & {
@@ -237,6 +241,42 @@ export type AgendaRegistration = {
   paymentId: string | null;
   createdAt: string;
   confirmedAt: string | null;
+  /** M107: the discount code used and what was actually paid. */
+  discountCode?: string | null;
+  amountSar?: number;
+};
+
+/** M107 «أكواد الخصم» — mirrors server/src/discounts/service.ts. */
+export type DiscountCode = {
+  code: string;
+  percent: number;
+  maxUses: number;
+  startsAt: string;
+  endsAt: string;
+  enabled: boolean;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+  used: number;
+};
+export type DiscountCodeInput = Pick<DiscountCode, 'code' | 'percent' | 'maxUses' | 'startsAt' | 'endsAt' | 'enabled' | 'note'>;
+export type DiscountUse = {
+  code: string;
+  contactId: number;
+  name: string;
+  context: string;
+  label: string;
+  amountBefore: number;
+  amountAfter: number;
+  paymentId: string | null;
+  at: string;
+};
+
+/** M107 «الاهتمامات» — mirrors server/src/interests. */
+export type InterestsReport = {
+  total: number;
+  counts: { key: string; label: string; count: number }[];
+  others: { contactId: number; text: string; updatedAt: string }[];
 };
 
 /** M44 «روابط الدفع» — mirrors server/src/paylinks/service.ts. */
@@ -428,6 +468,13 @@ export const api = {
   deleteAgendaEvent: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/agenda/${id}`),
   agendaRegistrations: (id: string) => call<{ registrations: AgendaRegistration[] }>('GET', `/api/admin/agenda/${id}/registrations`),
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
+  // M107 «أكواد الخصم» والاهتمامات.
+  discounts: () => call<{ codes: DiscountCode[] }>('GET', '/api/admin/discounts'),
+  createDiscount: (input: DiscountCodeInput) => call<{ code: DiscountCode }>('POST', '/api/admin/discounts', input),
+  updateDiscount: (code: string, patch: Partial<DiscountCodeInput>) => call<{ code: DiscountCode }>('PUT', `/api/admin/discounts/${encodeURIComponent(code)}`, patch),
+  deleteDiscount: (code: string) => call<{ ok: true }>('DELETE', `/api/admin/discounts/${encodeURIComponent(code)}`),
+  discountUses: (code: string) => call<{ uses: DiscountUse[] }>('GET', `/api/admin/discounts/${encodeURIComponent(code)}/uses`),
+  interestsReport: () => call<InterestsReport>('GET', '/api/admin/interests'),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
   // M87b «المستشار اليومي»: the daily-push template pools, their preview, and the mute count.

@@ -92,6 +92,7 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(2, 90)}>
         <MenuGroup title={t('account.group.data')}>
           <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
+          <MenuRow icon="heart-outline" label={t('nav.interests')} onPress={() => router.push('/news/interests' as Href)} />
           {/* M101: the member changes his direction with an e-mailed code, once every 30 days. */}
           <MenuRow icon="compass-outline" label={t('persona.title')} onPress={() => router.push('/persona' as Href)} />
           <MenuRow icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} />

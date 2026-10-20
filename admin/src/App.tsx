@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, session, type Me } from './api';
 import { Login } from './Login';
 import { Agenda } from './sections/Agenda';
+import { Discounts } from './sections/Discounts';
 import { Home } from './sections/Home';
+import { Interests } from './sections/Interests';
 import { Audit, CardRequests, Invites, Leads, Mail, Tickets, Workshops } from './sections/Lists';
 import { Forms } from './sections/Forms';
 import { MemberMail } from './sections/MemberMail';
@@ -29,6 +31,8 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'members', label: 'الأعضاء', icon: 'members' },
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'paylinks', label: 'روابط الدفع', icon: 'paylinks' },
+  { key: 'discounts', label: 'أكواد الخصم', icon: 'discounts' },
+  { key: 'interests', label: 'الاهتمامات', icon: 'interests' },
   { key: 'partners', label: 'شركاؤنا', icon: 'partners' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
@@ -259,6 +263,8 @@ export function App() {
             {section === 'members' ? <Members key={memberFilter.turn} initial={memberFilter.state} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
             {section === 'paylinks' ? <Paylinks /> : null}
+            {section === 'discounts' ? <Discounts /> : null}
+            {section === 'interests' ? <Interests /> : null}
             {section === 'partners' ? <Partners /> : null}
             {section === 'cards' ? <CardRequests /> : null}
             {section === 'invites' ? <Invites /> : null}

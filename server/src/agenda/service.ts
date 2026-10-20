@@ -1,7 +1,12 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
+
+import QRCode from 'qrcode';
 
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
+import type { AppliedDiscount, DiscountsService } from '../discounts/service.js';
+import type { InterestsService } from '../interests/service.js';
+import { isInterestKey, type InterestKey } from '../interests/types.js';
 import type { Notifier } from '../mail/notify.js';
 import type { Payment, PaymentsService, PublicPayment } from '../payments/service.js';
 import type { PushService } from '../push/service.js';
@@ -42,8 +47,15 @@ export type AgendaEvent = {
   /** M77: the owner-uploaded hero image — the event page shows it BIG on top, all details below. */
   imageUrl?: string | null;
   mode: AgendaMode;
-  /** The attendance fee for accounts WITHOUT an active membership; 0 = بدون رسوم للجميع. Members never pay. */
+  /** The attendance fee for accounts WITHOUT an active membership; 0 = بدون رسوم للجميع. */
   feeSar: number;
+  /**
+   * M107: the attendance fee for ACTIVE members. 0 or absent = included in the membership.
+   * Whoever should attend without paying gets a 100% discount code — never a free price tag.
+   */
+  memberFeeSar?: number;
+  /** M107: the unified interest keys this event suits — targets the push and badges the agenda. */
+  interests?: string[];
   open: boolean;
   createdAt: string;
   updatedAt: string;
@@ -73,6 +85,14 @@ export type AgendaRegistration = {
   paymentId: string | null;
   createdAt: string;
   confirmedAt: string | null;
+  /** M107: the ticket secret of a confirmed registration (the QR encodes it); older rows get one lazily. */
+  passCode?: string | null;
+  /** M107: the day-before reminder went out. */
+  remindedAt?: string | null;
+  /** M107: the discount code applied at registration, for the dashboard list. */
+  discountCode?: string | null;
+  /** M107: what this attendee actually paid (after any code), SAR. */
+  amountSar?: number;
 };
 
 /** The days an event runs: the `dates` list of a multi-day workshop, or the single `date`. */
@@ -92,13 +112,39 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   imageUrl: string | null;
   /** M77: the event's last day has passed — the app keeps it listed, faded. */
   past: boolean;
+  /** M107: the member price (0 = ضمن العضوية), what THIS viewer pays, and what the membership saves. */
+  memberFeeSar: number;
+  myFeeSar: number;
+  savingsSar: number;
+  /** M107: the unified interest keys this event suits (the app badges the matching ones). */
+  interests: string[];
 };
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
 
-type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; onChange?: () => void };
+type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; discounts?: DiscountsService; interests?: InterestsService; onChange?: () => void };
 
 const ATTENDANCE_LABEL: Record<AgendaAttendance, string> = { hq: 'حضوري في المقر', online: 'أونلاين' };
+const TICKET_PREFIX = 'VCEV';
+const REMINDER_SWEEP_MS = 30 * 60_000;
+
+export type TicketState = 'upcoming' | 'active' | 'expired';
+
+/** The confirmed attendee's ticket, laid out like the HQ pass: the event, the holder and the QR. */
+export type AgendaTicket = {
+  event: Pick<AgendaEvent, 'id' | 'title' | 'date' | 'time' | 'endTime' | 'place'> & { dates: string[] };
+  name: string;
+  attendance: AgendaAttendance;
+  attendanceLabel: string;
+  code: string;
+  qr: string;
+  state: TicketState;
+};
+
+/** What this viewer pays for an event: the member price with an active membership, else the list fee. */
+export function feeFor(event: Pick<AgendaEvent, 'feeSar' | 'memberFeeSar'>, member: boolean): number {
+  return member ? (event.memberFeeSar ?? 0) : event.feeSar;
+}
 
 export class AgendaService {
   private eventsChain: Promise<unknown> = Promise.resolve();
@@ -147,6 +193,9 @@ export class AgendaService {
     // M43: the English app reads the stored English (AI once, owner-editable); anything untranslated stays Arabic.
     const en = lang === 'en' ? (event.en ?? null) : null;
     const confirmedOnline = Boolean(mine && mine.paid && mine.attendance === 'online');
+    const member = me?.membership.status === 'active';
+    const memberFeeSar = event.memberFeeSar ?? 0;
+    const myFeeSar = feeFor(event, member === true);
     return {
       id,
       title: en?.title || event.title,
@@ -158,10 +207,15 @@ export class AgendaService {
       place: en?.place || event.place,
       mode,
       feeSar,
+      memberFeeSar,
+      myFeeSar,
+      // M107 «وفّر بالعضوية»: what the membership shaves off this event for a non-member viewer.
+      savingsSar: !member && feeSar > memberFeeSar ? feeSar - memberFeeSar : 0,
+      interests: (event.interests ?? []).filter(isInterestKey),
       // A finished event never registers, whatever the stored flag says.
       open: open && !past,
       mine: mine ? { attendance: mine.attendance, paid: mine.paid } : null,
-      mustPay: Boolean(me && me.membership.status !== 'active' && feeSar > 0),
+      mustPay: Boolean(me && myFeeSar > 0),
       onlineUrl: confirmedOnline && event.onlineUrl ? event.onlineUrl : null,
       imageUrl: event.imageUrl || null,
       past,
@@ -213,11 +267,26 @@ export class AgendaService {
     });
   }
 
+  private static ticketCode(): string {
+    return randomBytes(9).toString('base64url');
+  }
+
+  /** M107: what a code does to this viewer's fee, checked before registering («تحقق من الكود»). */
+  async previewDiscount(me: Me, eventId: string, code: string, now = Date.now()): Promise<AppliedDiscount> {
+    if (!this.deps.discounts) throw new RequestError('not_found', 'كود الخصم غير صحيح', 404);
+    const event = await this.event(eventId);
+    if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
+    const fee = feeFor(event, me.membership.status === 'active');
+    if (fee <= 0) throw new RequestError('no_fee', 'لا توجد رسوم على حضورك لهذه الفعالية');
+    return this.deps.discounts.apply(code, fee, now);
+  }
+
   /**
-   * ONE tap: a member (or a no-fee event) is confirmed at once; otherwise the registration waits on a
-   * Paymob payment this call starts. A registration whose payment never finished starts a fresh payment.
+   * ONE tap: a viewer with no fee (member of an event ضمن العضوية, or a no-fee event) is confirmed at
+   * once; a 100% code confirms with no checkout; otherwise the registration waits on the payment this
+   * call starts. A registration whose payment never finished starts a fresh payment.
    */
-  async register(me: Me, eventId: string, attendance: AgendaAttendance, now = Date.now()): Promise<{ registration: AgendaRegistration; payment: PublicPayment | null }> {
+  async register(me: Me, eventId: string, attendance: AgendaAttendance, discountCode?: string, now = Date.now()): Promise<{ registration: AgendaRegistration; payment: PublicPayment | null }> {
     const event = await this.event(eventId);
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
     if (!event.open) throw new RequestError('closed', 'التسجيل في هذه الفعالية مغلق حاليًا', 409);
@@ -226,7 +295,10 @@ export class AgendaService {
       throw new RequestError('invalid', event.mode === 'hq' ? 'هذه الفعالية حضورية فقط' : 'هذه الفعالية أونلاين فقط', 400);
     }
     const member = me.membership.status === 'active';
-    const free = member || event.feeSar <= 0;
+    const fee = feeFor(event, member);
+    // M107: the code is validated BEFORE the registration is touched, so a bad code changes nothing.
+    const discount = discountCode && fee > 0 && this.deps.discounts ? await this.deps.discounts.apply(discountCode, fee, now) : undefined;
+    const due = discount ? discount.amountAfter : fee;
     const stamp = new Date(now).toISOString();
 
     const existing = await this.mutateRegs((registrations) => {
@@ -257,15 +329,21 @@ export class AgendaService {
       return created;
     });
 
-    if (free) {
-      const confirmed = await this.mutateRegs((registrations) => {
+    const confirm = (paymentId: string | null) =>
+      this.mutateRegs((registrations) => {
         const mine = registrations.find((entry) => entry.id === existing.id);
         if (!mine) throw new RequestError('not_found', 'التسجيل غير موجود', 404);
         mine.paid = true;
-        mine.paymentId = null;
+        mine.paymentId = paymentId;
         mine.confirmedAt = stamp;
+        mine.passCode = mine.passCode ?? AgendaService.ticketCode();
+        mine.discountCode = discount?.code ?? null;
+        mine.amountSar = due;
         return mine;
       });
+
+    if (fee <= 0) {
+      const confirmed = await confirm(null);
       this.deps.notifier.agendaRegistered(confirmed, event);
       return { registration: confirmed, payment: null };
     }
@@ -274,12 +352,22 @@ export class AgendaService {
       eventId,
       eventTitle: event.title,
       attendanceLabel: ATTENDANCE_LABEL[attendance],
-      amountSar: event.feeSar,
+      amountSar: due,
+      memberPrice: member,
+      discount,
     });
+    if (payment.status === 'paid') {
+      // A 100% code settled at zero on the spot (the payments push already told the member).
+      const confirmed = await confirm(payment.id);
+      this.deps.notifier.agendaRegistered(confirmed, event);
+      return { registration: confirmed, payment };
+    }
     const pending = await this.mutateRegs((registrations) => {
       const mine = registrations.find((entry) => entry.id === existing.id);
       if (!mine) throw new RequestError('not_found', 'التسجيل غير موجود', 404);
       mine.paymentId = payment.id;
+      mine.discountCode = discount?.code ?? null;
+      mine.amountSar = due;
       return mine;
     });
     return { registration: pending, payment };
@@ -294,6 +382,7 @@ export class AgendaService {
         if (!mine || mine.paid) return null;
         mine.paid = true;
         mine.confirmedAt = new Date().toISOString();
+        mine.passCode = mine.passCode ?? AgendaService.ticketCode();
         return mine;
       });
       if (!confirmed) return;
@@ -303,6 +392,95 @@ export class AgendaService {
         this.deps.push.agendaConfirmed(confirmed.contactId, event.title, event.id);
       }
     })();
+  }
+
+  // ── M107: tickets ───────────────────────────────────────────────────────────
+
+  private ticketStateOf(event: AgendaEvent, now = Date.now()): TicketState {
+    const today = riyadhDay(now);
+    const days = eventDays(event);
+    if (today < (days[0] ?? event.date)) return 'upcoming';
+    return today > (days.at(-1) ?? event.date) ? 'expired' : 'active';
+  }
+
+  /** The confirmed attendee's ticket: event details plus the QR (a pre-M107 confirmation gets its code here). */
+  async ticket(contactId: number, eventId: string, now = Date.now()): Promise<AgendaTicket> {
+    const event = await this.event(eventId);
+    if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
+    let mine = (await this.loadRegs()).find((entry) => entry.eventId === eventId && entry.contactId === contactId);
+    if (!mine || !mine.paid) throw new RequestError('not_confirmed', 'لم يتأكد حضورك في هذه الفعالية بعد', 404);
+    if (!mine.passCode) {
+      mine = await this.mutateRegs((registrations) => {
+        const row = registrations.find((entry) => entry.id === (mine as AgendaRegistration).id);
+        if (!row) throw new RequestError('not_found', 'التسجيل غير موجود', 404);
+        row.passCode = row.passCode ?? AgendaService.ticketCode();
+        return row;
+      });
+    }
+    const code = `${TICKET_PREFIX}:${mine.id}:${mine.passCode}`;
+    const qr = await QRCode.toDataURL(code, { errorCorrectionLevel: 'M', margin: 1, width: 480 });
+    return {
+      event: { id: event.id, title: event.title, date: event.date, dates: eventDays(event), time: event.time, endTime: event.endTime, place: event.place },
+      name: mine.name,
+      attendance: mine.attendance,
+      attendanceLabel: ATTENDANCE_LABEL[mine.attendance],
+      code,
+      qr,
+      state: this.ticketStateOf(event, now),
+    };
+  }
+
+  /** Checks a scanned ticket at the door: known code, confirmed registration, and an event day. */
+  async verifyTicket(scanned: string, now = Date.now()): Promise<{ valid: boolean; text: string; attendee: { name: string; phone: string; attendance: AgendaAttendance; eventTitle: string } | null }> {
+    const parts = scanned.trim().split(':');
+    const secret = parts.length === 3 && parts[0] === TICKET_PREFIX ? parts[2] : parts[0];
+    const mine = (await this.loadRegs()).find((entry) => entry.passCode && entry.passCode === secret && entry.paid);
+    if (!mine) return { valid: false, text: 'تذكرة غير معروفة أو حضور غير مؤكد', attendee: null };
+    const event = await this.event(mine.eventId);
+    if (!event) return { valid: false, text: 'الفعالية غير موجودة', attendee: null };
+    const attendee = { name: mine.name, phone: mine.phone, attendance: mine.attendance, eventTitle: event.title };
+    const today = riyadhDay(now);
+    const days = eventDays(event);
+    if (today < (days[0] ?? event.date)) return { valid: false, text: 'الفعالية لم تبدأ بعد', attendee };
+    if (today > (days.at(-1) ?? event.date)) return { valid: false, text: 'انتهت هذه الفعالية', attendee };
+    return { valid: true, text: 'الدخول مسموح', attendee };
+  }
+
+  // ── M107: the day-before reminder ───────────────────────────────────────────
+
+  private reminderTimer: NodeJS.Timeout | null = null;
+
+  startReminders(): void {
+    if (this.reminderTimer) return;
+    this.reminderTimer = setInterval(() => void this.sweepReminders().catch(() => undefined), REMINDER_SWEEP_MS);
+    this.reminderTimer.unref();
+  }
+
+  stopReminders(): void {
+    if (this.reminderTimer) clearInterval(this.reminderTimer);
+    this.reminderTimer = null;
+  }
+
+  /** Every confirmed attendee whose event starts tomorrow (Riyadh) hears once. */
+  async sweepReminders(now = Date.now()): Promise<number> {
+    const tomorrow = riyadhDay(now + 24 * 60 * 60 * 1000);
+    const events = (await this.loadEvents()).filter((event) => (eventDays(event)[0] ?? event.date) === tomorrow);
+    if (events.length === 0) return 0;
+    const byId = new Map(events.map((event) => [event.id, event]));
+    const due = await this.mutateRegs((registrations) => {
+      const rows: AgendaRegistration[] = [];
+      for (const entry of registrations) {
+        if (!entry.paid || entry.remindedAt || !byId.has(entry.eventId)) continue;
+        entry.remindedAt = new Date(now).toISOString();
+        rows.push({ ...entry });
+      }
+      return rows;
+    });
+    for (const entry of due) {
+      const event = byId.get(entry.eventId);
+      if (event) this.deps.push.agendaReminder(entry.contactId, { id: event.id, title: event.title, date: event.date, time: event.time });
+    }
+    return due.length;
   }
 
   // ── dashboard ──────────────────────────────────────────────────────────────
@@ -381,11 +559,26 @@ export class AgendaService {
     // M70: a multi-day workshop announces its span in words (never a hyphen between two numbers).
     const days = eventDays(event);
     const when = days.length > 1 ? `من ${days[0]} إلى ${days.at(-1)}` : event.date;
-    const outcome = await this.deps.push.broadcast({
+    const message = {
       title: 'أجندة النادي 📅',
       body: `${event.title}${when ? ` — ${when}` : ''}${event.time ? ` ${event.time}` : ''}. سجّل حضورك من التطبيق.`,
       data: { type: 'agenda', screen: `/agenda/${event.id}` },
-    });
+    };
+    // M107: a tagged event reaches the members who picked a matching interest — and everyone who never picked any.
+    const tags = (event.interests ?? []).filter(isInterestKey);
+    let outcome;
+    if (tags.length > 0 && this.deps.interests) {
+      const wanted = new Set<number>();
+      let savedAny = new Set<number>();
+      for (const tag of tags) {
+        const sets = await this.deps.interests.contactsFor(tag as InterestKey);
+        for (const id of sets.picked) wanted.add(id);
+        savedAny = sets.savedAny;
+      }
+      outcome = await this.deps.push.broadcastWhere(message, (contactId) => wanted.has(contactId) || !savedAny.has(contactId));
+    } else {
+      outcome = await this.deps.push.broadcast(message);
+    }
     if (outcome.sent === 0) throw new RequestError('no_devices', 'لا توجد أجهزة مسجلة للإشعارات بعد', 409);
     return outcome;
   }

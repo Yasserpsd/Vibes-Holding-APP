@@ -26,7 +26,11 @@ import { invitesRoutes } from './invites/routes.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { contentRoutes } from './content/routes.js';
+import { discountsRoutes } from './discounts/routes.js';
+import { DiscountsService } from './discounts/service.js';
 import { GoldenOffersService } from './golden/service.js';
+import { interestsRoutes } from './interests/routes.js';
+import { InterestsService } from './interests/service.js';
 import { dashboardRoutes } from './dashboard/routes.js';
 import { DashboardService } from './dashboard/service.js';
 import { formsRoutes } from './forms/routes.js';
@@ -279,6 +283,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
           fetchImpl,
         })
       : new MockPaymob(config.PUBLIC_URL));
+  // M107 «أكواد الخصم»: dashboard-made codes; a 100% code is how anyone attends بدون دفع.
+  const discounts = new DiscountsService({ kv });
   const payments = new PaymentsService({
     kv,
     log: app.log,
@@ -287,6 +293,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     push,
     hmacSecret: paymob.mode === 'live' && config.PAYMOB_HMAC_SECRET ? config.PAYMOB_HMAC_SECRET : MOCK_HMAC_SECRET,
     publicUrl: config.PUBLIC_URL,
+    discounts,
   });
   const membership = new MembershipService({
     kv,
@@ -313,8 +320,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const translator: Translator = config.OPENAI_API_KEY
     ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl })
     : new OffTranslator();
+  // M107: the unified interests — one list for the news ranking, the Projects Bank filter, the agenda and the push.
+  const interests = new InterestsService({ kv, news });
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
-  const agenda = new AgendaService({ kv, notifier, push, payments, onChange: () => moved('content') });
+  const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content') });
+  // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).
+  if (autoPush) agenda.startReminders();
   // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
   const partners = new PartnersService({ kv, onChange: () => moved('content') });
   // M87: the advisor's daily persona push — templates over live data, zero AI cost at send time.
@@ -374,7 +385,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
   }));
 
-  await app.register(projectsRoutes, { service: projects, auth, access, brief });
+  await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, publicUrl: config.PUBLIC_URL, fetchImpl });
+  await app.register(interestsRoutes, { service: interests, auth });
+  await app.register(discountsRoutes, { service: discounts, auth });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
@@ -383,7 +396,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice });
-  await app.register(newsRoutes, { service: news, auth, kv });
+  await app.register(newsRoutes, { service: news, auth, kv, interests });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });

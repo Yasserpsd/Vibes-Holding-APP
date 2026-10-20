@@ -41,10 +41,14 @@ export function ProjectsBankCarousel() {
   // M95 (owner): «كل مرة تقفل وتفتح تتغير وكل مرة تروح صفحة وترجع تتغير» — a fresh seed on every
   // focus (and every cold start) deals a different hand of projects into the carousel.
   const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
+  // M107b perf: the carousel flips only while the home is on screen — on another tab it rests.
+  const [focused, setFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
       setShuffleSeed(Date.now());
       setIndex(0);
+      setFocused(true);
+      return () => setFocused(false);
     }, []),
   );
 
@@ -59,7 +63,7 @@ export function ProjectsBankCarousel() {
   );
 
   useEffect(() => {
-    if (slides.length < 2) return;
+    if (slides.length < 2 || !focused) return;
     const timer = setInterval(() => {
       Animated.timing(opacity, { toValue: 0, duration: FADE_OUT_MS, useNativeDriver: true }).start(() => {
         setIndex((current) => (current + 1) % slides.length);
@@ -67,7 +71,7 @@ export function ProjectsBankCarousel() {
       });
     }, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [opacity, slides.length]);
+  }, [opacity, slides.length, focused]);
 
   if (slides.length === 0) return null;
   const project = slides[Math.min(index, slides.length - 1)];
@@ -76,7 +80,7 @@ export function ProjectsBankCarousel() {
     <PressScale onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(project.id) } })} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={project.title}>
       <GlassCard golden radius={radii.xl} style={styles.card}>
         <Animated.View style={{ opacity }}>
-          <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" accessibilityLabel={project.title} />
+          <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" resizeMethod="resize" accessibilityLabel={project.title} />
           <View style={styles.overlay}>
             <Text style={styles.title} numberOfLines={1}>
               {project.title}

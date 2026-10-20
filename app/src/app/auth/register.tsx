@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
-import { useNewsTopics } from '@/api/news';
+import { useInterests } from '@/api/interests';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -34,11 +34,13 @@ type Form = {
   jobTitle: string;
   /** M32: another member's membership number; checked and stored by the server side. */
   inviteCode: string;
-  /** News interests (optional): saved with the account right after the code is verified. */
+  /** M107: the unified interests (1 to 3), saved with the account right after the code is verified. */
   interests: string[];
+  /** The «أخرى» short text. */
+  interestsOther: string;
 };
 
-const EMPTY: Form = { name: '', memberType: 'individual', companyName: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [] };
+const EMPTY: Form = { name: '', memberType: 'individual', companyName: '', country: 'sa', phone: '', email: '', password: '', persona: '', bio: '', jobTitle: '', inviteCode: '', interests: [], interestsOther: '' };
 
 const MEMBER_TYPES = ['individual', 'company'] as const;
 
@@ -68,7 +70,7 @@ function PersonaRow({ selected, onPress, children }: { selected: boolean; onPres
 export default function RegisterScreen() {
   const router = useRouter();
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
-  const topics = useNewsTopics();
+  const interestsList = useInterests();
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -76,8 +78,16 @@ export default function RegisterScreen() {
 
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
   const set = (key: Exclude<keyof Form, 'interests'>) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const maxInterests = interestsList.data?.max ?? 3;
   const toggleInterest = (key: string) =>
-    setForm((current) => ({ ...current, interests: current.interests.includes(key) ? current.interests.filter((item) => item !== key) : [...current.interests, key] }));
+    setForm((current) => ({
+      ...current,
+      interests: current.interests.includes(key)
+        ? current.interests.filter((item) => item !== key)
+        : current.interests.length >= maxInterests
+          ? current.interests
+          : [...current.interests, key],
+    }));
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
@@ -113,7 +123,7 @@ export default function RegisterScreen() {
       });
       router.push({
         pathname: '/auth/verify',
-        params: { pendingToken: result.pendingToken, email: result.email, text: result.text, interests: form.interests.join(',') },
+        params: { pendingToken: result.pendingToken, email: result.email, text: result.text, interests: form.interests.join(','), interestsOther: form.interestsOther.trim() },
       });
     } catch (cause) {
       setSubmitError(errorMessage(cause));
@@ -272,14 +282,19 @@ export default function RegisterScreen() {
           placeholder="I-0000000000"
         />
       </FadeInView>
-      {topics.data && topics.data.topics.length > 0 ? (
+      {interestsList.data && interestsList.data.interests.length > 0 ? (
         <FadeInView delay={entranceDelay(11)} style={styles.group}>
           <Text style={styles.label}>{t('auth.register.interests')}</Text>
           <View style={styles.chips}>
-            {topics.data.topics.map((topic) => (
-              <Chip key={topic.key} label={topic.label} selected={form.interests.includes(topic.key)} onPress={() => toggleInterest(topic.key)} />
+            {interestsList.data.interests.map((interest) => (
+              <Chip key={interest.key} label={interest.label} selected={form.interests.includes(interest.key)} onPress={() => toggleInterest(interest.key)} />
             ))}
           </View>
+          {form.interests.includes('other') ? (
+            <FadeInView offset={8}>
+              <FormField label={t('interests.otherLabel')} value={form.interestsOther} onChangeText={set('interestsOther')} placeholder={t('interests.otherPlaceholder')} maxLength={120} />
+            </FadeInView>
+          ) : null}
         </FadeInView>
       ) : null}
       {submitError ? (

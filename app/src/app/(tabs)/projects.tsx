@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProjectFilters, useProjectsList } from '@/api/queries';
 import type { ProjectsSort } from '@/api/types';
+import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
@@ -28,11 +29,15 @@ const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
 
 export default function ProjectsScreen() {
   const router = useRouter();
+  const { status } = useAuth();
+  const signedIn = status === 'signedIn';
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [sort, setSort] = useState<ProjectsSort>('latest');
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
+  // M107 «حسب اهتماماتي»: keeps only the projects matching my saved interests.
+  const [mine, setMine] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const q = useDebounced(search.trim());
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
@@ -45,7 +50,7 @@ export default function ProjectsScreen() {
   );
 
   const filters = useProjectFilters();
-  const list = useProjectsList({ q, sort, sector, stage });
+  const list = useProjectsList({ q, sort, sector, stage, mine: mine ? '1' : undefined });
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   const sorts = filters.data?.sorts ?? DEFAULT_SORTS;
@@ -88,6 +93,7 @@ export default function ProjectsScreen() {
       <FadeInView delay={entranceDelay(2)}>
         {/* One row: the sorts, then «فلترة» opening the sheet (the sector/stage chip rows used to crowd the header). */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          {signedIn ? <Chip label={t('projects.mine')} selected={mine} onPress={() => setMine((value) => !value)} /> : null}
           {sorts.map((option) => (
             <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
           ))}

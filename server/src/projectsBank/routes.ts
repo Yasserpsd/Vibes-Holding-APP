@@ -1,42 +1,86 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-import { guard, parse, sessionGuard } from '../auth/guard.js';
+import { guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import type { InterestsService } from '../interests/service.js';
 import { langOf } from '../lang.js';
 import type { ProjectAccessService } from './access.js';
 import type { BriefService } from './brief.js';
+import { PbImageProxy } from './images.js';
 import { localizeFilters, localizePage, localizeProject } from './lang.js';
 import type { ProjectsService } from './service.js';
-import { PROJECT_SORTS } from './types.js';
+import { PROJECT_SORTS, type ProjectsPage, type PublicProject } from './types.js';
 
-export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService };
+export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; publicUrl?: string; fetchImpl?: typeof fetch };
 
 const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   sector: z.string().trim().max(100).optional(),
   stage: z.string().trim().max(100).optional(),
+  /** M107: `mine=1` keeps only the projects matching the member's saved interests. */
+  mine: z.enum(['1', '0']).optional(),
   sort: z.enum(PROJECT_SORTS).default('latest'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
+const galleryParamSchema = z.object({ id: z.coerce.number().int().positive(), index: z.coerce.number().int().min(0).max(30) });
 
 function badRequest(reply: FastifyReply, message: string): FastifyReply {
   return reply.code(400).send({ error: { code: 'bad_request', message } });
 }
 
-export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief }) => {
+export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief, interests, publicUrl, fetchImpl }) => {
   const requireSession = sessionGuard(auth);
+  const whoIs = optionalSession(auth);
   const limiter = new RateLimiter();
+  const proxy = new PbImageProxy(fetchImpl);
+
+  // M107b: the app loads every project photo through the server (images.ts says why).
+  const proxied = (project: PublicProject): PublicProject =>
+    publicUrl
+      ? {
+          ...project,
+          image: project.image ? `${publicUrl}/img/pb/${project.id}` : null,
+          gallery: project.gallery.map((_entry, index) => `${publicUrl}/img/pb/${project.id}/g/${index}`),
+        }
+      : project;
+  const proxiedPage = (page: ProjectsPage): ProjectsPage => ({ ...page, items: page.items.map(proxied) });
+
+  app.get('/img/pb/:id', async (request, reply) => {
+    const params = idParamSchema.safeParse(request.params);
+    if (!params.success) return reply.code(404).send();
+    const url = service.get(params.data.id)?.image;
+    const image = url ? await proxy.get(url) : null;
+    if (!image) return reply.code(404).send();
+    return reply.header('cache-control', 'public, max-age=43200').type(image.type).send(image.buffer);
+  });
+
+  app.get('/img/pb/:id/g/:index', async (request, reply) => {
+    const params = galleryParamSchema.safeParse(request.params);
+    if (!params.success) return reply.code(404).send();
+    const url = service.get(params.data.id)?.gallery[params.data.index];
+    const image = url ? await proxy.get(url) : null;
+    if (!image) return reply.code(404).send();
+    return reply.header('cache-control', 'public, max-age=43200').type(image.type).send(image.buffer);
+  });
 
   // The English app (M27) reads the founders' English fields and the terms' English names (projectsBank/lang.ts).
   app.get('/api/projects', async (request, reply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) return badRequest(reply, 'معاملات البحث غير صالحة');
-    return localizePage(service.list(query.data), langOf(request));
+    const { mine, ...rest } = query.data;
+    // M107: «حسب اهتماماتي» filters by the signed-in member's saved interests; without any it changes nothing.
+    let forInterests: string[] | undefined;
+    if (mine === '1' && interests) {
+      const who = await whoIs(request);
+      const prefs = who ? await interests.mine(who.session.contactId) : null;
+      forInterests = prefs?.keys;
+    }
+    return proxiedPage(localizePage(service.list({ ...rest, forInterests }), langOf(request)));
   });
 
   app.get('/api/projects/filters', async (request) => localizeFilters(service.filters(), langOf(request)));
@@ -46,7 +90,7 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
     if (!params.success) return badRequest(reply, 'رقم المشروع غير صالح');
     const project = service.get(params.data.id);
     if (!project) return reply.code(404).send({ error: { code: 'not_found', message: 'المشروع غير موجود' } });
-    return { project: localizeProject(project, langOf(request)) };
+    return { project: proxied(localizeProject(project, langOf(request))) };
   });
 
   // «ملخص المستشار»: public like the project itself (built from the same public fields), cached per content.

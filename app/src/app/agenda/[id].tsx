@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
+import { useAgendaDiscount, useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaDiscount, type AgendaEvent } from '@/api/agenda';
+import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -30,17 +32,40 @@ export default function AgendaEventScreen() {
   const signedIn = status === 'signedIn';
   const query = useAgendaEvent(typeof id === 'string' ? id : undefined);
   const register = useRegisterAgenda();
+  const checkDiscount = useAgendaDiscount();
   const [error, setError] = useState<string | null>(null);
+  // M107: the discount code the member typed, and what the server said it is worth here.
+  const [code, setCode] = useState('');
+  const [applied, setApplied] = useState<AgendaDiscount | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const event = query.data?.event;
+  const myFee = event ? (event.myFeeSar ?? event.feeSar) : 0;
+  const dueNow = applied ? applied.amountAfter : myFee;
+
+  const tryCode = () => {
+    if (!event || !code.trim() || checkDiscount.isPending) return;
+    setCodeError(null);
+    checkDiscount.mutate(
+      { eventId: event.id, code: code.trim() },
+      {
+        onSuccess: (answer) => setApplied(answer),
+        onError: (cause) => {
+          setApplied(null);
+          setCodeError(errorMessage(cause));
+        },
+      },
+    );
+  };
 
   const tap = (attendance: AgendaAttendance) => {
     if (!event || register.isPending) return;
     setError(null);
     register.mutate(
-      { eventId: event.id, attendance },
+      { eventId: event.id, attendance, discountCode: applied ? applied.code : code.trim() || undefined },
       {
         onSuccess: async (answer) => {
-          if (answer.payment) {
+          // A 100% code settles on the spot: there is no checkout to open.
+          if (answer.payment && answer.payment.status === 'created' && answer.payment.checkoutUrl) {
             await openCheckout(answer.payment.checkoutUrl, paymentReturnUrl(answer.payment.id));
             router.navigate({ pathname: '/payment/[id]', params: { id: answer.payment.id } });
             return;
@@ -57,7 +82,7 @@ export default function AgendaEventScreen() {
     return item.time ? `${LRM}${item.time}` : '';
   };
 
-  const registerLabel = (base: string): string => (event && event.mustPay ? t('agenda.withFee', { label: base, fee: String(event.feeSar) }) : base);
+  const registerLabel = (base: string): string => (event && event.mustPay && dueNow > 0 ? t('agenda.withFee', { label: base, fee: String(dueNow) }) : base);
 
   return (
     <Screen>
@@ -95,14 +120,25 @@ export default function AgendaEventScreen() {
                   <Text style={styles.infoText}>{`${t('agenda.place')}: ${event.place}`}</Text>
                 </View>
               ) : null}
+              {/* M107: both prices side by side, with the membership saving for a non-member viewer. */}
               <View style={styles.infoRow}>
                 <Ionicons name="pricetag-outline" size={18} color={colors.gold} />
-                <View style={styles.feePill}>
-                  <Text style={styles.feeText} numberOfLines={1}>
-                    {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
-                  </Text>
+                <View style={styles.prices}>
+                  <View style={styles.feePill}>
+                    <Text style={styles.feeText} numberOfLines={1}>
+                      {event.feeSar > 0 ? t('agenda.nonMemberPrice', { fee: String(event.feeSar) }) : t('agenda.free')}
+                    </Text>
+                  </View>
+                  <View style={[styles.feePill, styles.memberPill]}>
+                    <Text style={styles.feeText} numberOfLines={1}>
+                      {(event.memberFeeSar ?? 0) > 0 ? t('agenda.memberPrice', { fee: String(event.memberFeeSar) }) : t('agenda.included')}
+                    </Text>
+                  </View>
                 </View>
               </View>
+              {(event.savingsSar ?? 0) > 0 ? (
+                <Text style={styles.savings}>{t('agenda.save', { amount: String(event.savingsSar) })}</Text>
+              ) : null}
             </GlassCard>
           </FadeInView>
 
@@ -111,7 +147,9 @@ export default function AgendaEventScreen() {
               <PopIn style={styles.confirmGlow}>
                 <Notice tone="success" text={`${t('agenda.confirmed')} — ${event.mine.attendance === 'hq' ? t('agenda.attHq') : t('agenda.attOnline')}`} />
               </PopIn>
-              {event.onlineUrl ? <AppButton label={t('agenda.onlineLink')} icon="videocam-outline" onPress={() => void openLink(event.onlineUrl as string)} /> : null}
+              {/* M107: the confirmed attendee's QR ticket. */}
+              <AppButton label={t('agenda.ticket')} icon="qr-code-outline" onPress={() => router.push(`/agenda/ticket/${event.id}` as Href)} />
+              {event.onlineUrl ? <AppButton label={t('agenda.onlineLink')} icon="videocam-outline" variant="outline" onPress={() => void openLink(event.onlineUrl as string)} /> : null}
             </>
           ) : !signedIn ? (
             <>
@@ -124,6 +162,36 @@ export default function AgendaEventScreen() {
             <>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}
               {event.mustPay ? <Notice tone="info" text={t('agenda.payNote')} /> : null}
+              {/* M107: the discount-code box — a 100% code confirms the attendance with no checkout. */}
+              {event.mustPay ? (
+                <View style={styles.codeBox}>
+                  <View style={styles.codeRow}>
+                    <View style={styles.codeField}>
+                      <FormField
+                        label={t('agenda.discountLabel')}
+                        latin
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        value={code}
+                        onChangeText={(value) => {
+                          setCode(value.toUpperCase());
+                          setApplied(null);
+                          setCodeError(null);
+                        }}
+                        placeholder="CODE"
+                      />
+                    </View>
+                    <AppButton label={t('agenda.discountCheck')} variant="outline" icon="checkmark-outline" loading={checkDiscount.isPending} onPress={tryCode} />
+                  </View>
+                  {applied ? (
+                    <Notice
+                      tone="success"
+                      text={applied.amountAfter === 0 ? t('agenda.discountFree') : t('agenda.discountApplied', { percent: String(applied.percent), amount: String(applied.amountAfter) })}
+                    />
+                  ) : null}
+                  {codeError ? <Notice tone="warning" text={codeError} /> : null}
+                </View>
+              ) : null}
               {error ? (
                 <FadeInView offset={8}>
                   <Notice tone="warning" text={error} />
@@ -163,6 +231,13 @@ const styles = StyleSheet.create({
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   infoText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  // M107: both prices side by side, then the saving line under them.
+  prices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, flex: 1 },
+  memberPill: { backgroundColor: colors.surfaceElevated },
+  savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  codeBox: { gap: spacing.sm },
+  codeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  codeField: { flex: 1 },
   // The fee reads as a golden pill, not a plain line.
   feePill: {
     paddingVertical: spacing.xs,
