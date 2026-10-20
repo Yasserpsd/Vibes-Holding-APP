@@ -86,7 +86,7 @@ export class LiveMoyasar implements PaymobGateway, MoyasarConfirmer {
       success_url: input.redirectionUrl,
       back_url: input.redirectionUrl,
       // The payer gets a generous window; after it Moyasar blocks the page and the order stays unpaid.
-      expired_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+      expired_at: new Date(Date.now() + (input.validHours ?? 24) * 3_600_000).toISOString(),
       metadata: input.extras,
     });
     if (!invoice.id || !invoice.url) throw new RequestError('gateway', 'رد غير متوقع من بوابة الدفع', 502);

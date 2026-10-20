@@ -348,7 +348,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
-  const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log });
+  const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL });
   payments.onSettled((payment) => paylinks.settled(payment));
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
   // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,

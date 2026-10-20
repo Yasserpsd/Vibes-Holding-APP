@@ -17,6 +17,8 @@ export type IntentionInput = {
   notificationUrl: string;
   redirectionUrl: string;
   extras: Record<string, string>;
+  /** How long the checkout stays payable (Moyasar invoices; default 24h). Paymob keeps its own 1h window. */
+  validHours?: number;
 };
 
 export type Intention = { intentionId: string; orderId: string; clientSecret: string; checkoutUrl: string };

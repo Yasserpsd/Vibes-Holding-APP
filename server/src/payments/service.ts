@@ -272,7 +272,11 @@ export class PaymentsService {
   }
 
   /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
-  private async createPayment(customer: { contactId: number; name: string; email: string; phone: string }, input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount }, now: number): Promise<Payment> {
+  private async createPayment(
+    customer: { contactId: number; name: string; email: string; phone: string },
+    input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount; validHours?: number },
+    now: number,
+  ): Promise<Payment> {
     const id = randomUUID();
     const [firstName = '', ...rest] = customer.name.trim().split(/\s+/);
     const provider = this.deps.gateway.provider;
@@ -287,6 +291,7 @@ export class PaymentsService {
         provider === 'moyasar' ? `${this.deps.publicUrl}/api/payments/moyasar/callback?payment=${id}` : `${this.deps.publicUrl}/api/payments/paymob/webhook`,
       redirectionUrl: `${this.deps.publicUrl}/pay/return?payment=${id}`,
       extras: { app: 'investorsclub', payment: id, service: input.key, contact: String(customer.contactId) },
+      ...(input.validHours ? { validHours: input.validHours } : {}),
     });
     const stamp = new Date(now).toISOString();
     const payment: Payment = {
@@ -375,10 +380,23 @@ export class PaymentsService {
    * M44 «روابط الدفع»: the owner sells by a link he creates in the dashboard (a real-world sale outside
    * the app — never shown inside it, rule 3 intact). The customer may hold no app account at all.
    */
-  async startLink(input: { kind: string; label: string; amountSar: number; customer: { contactId: number; name: string; email: string; phone: string } }, now = Date.now()): Promise<Payment> {
+  async startLink(
+    input: { kind: string; label: string; amountSar: number; customer: { contactId: number; name: string; email: string; phone: string }; ref?: string; validHours?: number },
+    now = Date.now(),
+  ): Promise<Payment> {
     return this.createPayment(
       input.customer,
-      { key: `link:${input.kind}`, title: input.label, answers: [], amount: input.amountSar, currency: 'SAR', memberPrice: false },
+      // A link is sent and paid at the customer's pace: the checkout stays payable for 30 days.
+      // `ref` ties a payment spawned by a PERMANENT link back to its link row (M108b).
+      {
+        key: input.ref ? `link:${input.kind}:${input.ref}` : `link:${input.kind}`,
+        title: input.label,
+        answers: [],
+        amount: input.amountSar,
+        currency: 'SAR',
+        memberPrice: false,
+        validHours: input.validHours ?? 30 * 24,
+      },
       now,
     );
   }

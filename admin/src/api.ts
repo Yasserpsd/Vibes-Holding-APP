@@ -286,6 +286,8 @@ export type PayLink = {
   kind: PayLinkKind;
   label: string;
   amountSar: number;
+  /** M108b: a permanent link mints a fresh invoice per visitor and never expires. */
+  permanent?: boolean;
   days: number | null;
   contactId: number | null;
   contactName: string;
@@ -304,6 +306,7 @@ export type PayLinkInput = {
   label: string;
   amountSar: number;
   days: number;
+  permanent?: boolean;
   customer: { name: string; phone: string; email: string };
 };
 

@@ -184,6 +184,31 @@ test('the return page confirms a pending Moyasar payment against the API before 
   assert.equal((await built.payments.byId(paymentId))?.status, 'paid');
 });
 
+test('a permanent link mints a fresh invoice per visitor and every sale settles on its own', async () => {
+  const created = await post('/api/admin/paylinks', { kind: 'other', label: 'رابط دائم للاختبار', amountSar: 100, permanent: true }, adminToken);
+  assert.equal(created.statusCode, 201, created.body);
+  const link = created.json().link as { id: string; permanent: boolean; checkoutUrl: string };
+  assert.equal(link.permanent, true);
+  assert.ok(link.checkoutUrl.endsWith(`/pay/link/${link.id}`), link.checkoutUrl);
+
+  const first = await get(`/pay/link/${link.id}`);
+  const second = await get(`/pay/link/${link.id}`);
+  assert.deepEqual([first.statusCode, second.statusCode], [302, 302]);
+  assert.notEqual(first.headers.location, second.headers.location);
+
+  // The second visitor pays: that sale settles by itself and stamps the link.
+  const invoiceId = String(second.headers.location).split('/').at(-1) ?? '';
+  fake.invoices.set(invoiceId, { status: 'paid', amount: 10_000, transactionId: 'tr_perm', failureReason: null });
+  await post('/api/payments/moyasar/callback', { id: invoiceId });
+  await settle();
+  const listed = await get('/api/admin/paylinks', adminToken);
+  const row = (listed.json().links as { id: string; paidAt: string | null }[]).find((entry) => entry.id === link.id);
+  assert.ok(row?.paidAt);
+
+  const missing = await get('/pay/link/00000000-0000-4000-8000-000000000000');
+  assert.equal(missing.statusCode, 404);
+});
+
 test('a callback that names nothing known answers ok and settles nothing', async () => {
   const unknown = await post('/api/payments/moyasar/callback', { id: 'inv_unknown' });
   assert.equal(unknown.statusCode, 200);

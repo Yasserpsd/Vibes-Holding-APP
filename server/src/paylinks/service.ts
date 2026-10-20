@@ -30,6 +30,12 @@ export type PayLink = {
   kind: PayLinkKind;
   label: string;
   amountSar: number;
+  /**
+   * M108b (owner, 2026-10-20: «مش كل يوم هعمل لينك دفع»): a PERMANENT link is a stable server URL
+   * (/pay/link/:id) that mints a fresh Moyasar invoice for every visitor — it never expires and is
+   * never consumed by one sale. A normal link stays one invoice for one customer.
+   */
+  permanent?: boolean;
   /** Membership sales only: how many days the activation grants. */
   days: number | null;
   /** The matched hub account (by the customer's phone/e-mail) that a membership sale activates. */
@@ -51,10 +57,11 @@ export type PayLinkInput = {
   label: string;
   amountSar: number;
   days: number;
+  permanent?: boolean;
   customer: { name: string; phone: string; email: string };
 };
 
-type Deps = { kv: KV; hub: HubClient; payments: PaymentsService; notifier: Notifier; push: PushService; auth: AuthService; invites?: InvitesService; log: FastifyBaseLogger };
+type Deps = { kv: KV; hub: HubClient; payments: PaymentsService; notifier: Notifier; push: PushService; auth: AuthService; invites?: InvitesService; log: FastifyBaseLogger; publicUrl: string };
 
 export class PayLinksService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -105,28 +112,39 @@ export class PayLinksService {
       }
     }
     const label = input.label.trim() || (input.kind === 'membership' ? `عضوية سنوية${customer.name ? ` — ${customer.name}` : ''}` : KIND_LABEL[input.kind]);
-    const payment = await this.deps.payments.startLink({
-      kind: input.kind,
-      label,
-      amountSar: input.amountSar,
-      customer: { contactId: contactId ?? 0, name: customer.name || contactName || 'عميل رابط دفع', email: customer.email, phone: customer.phone },
-    });
+    const id = randomUUID();
+    const permanent = input.permanent === true;
+    // A permanent link holds no invoice of its own: every visit to /pay/link/:id mints one.
+    const payment = permanent
+      ? null
+      : await this.deps.payments.startLink({
+          kind: input.kind,
+          label,
+          amountSar: input.amountSar,
+          customer: { contactId: contactId ?? 0, name: customer.name || contactName || 'عميل رابط دفع', email: customer.email, phone: customer.phone },
+        });
     const link: PayLink = {
-      id: randomUUID(),
+      id,
       kind: input.kind,
       label,
       amountSar: input.amountSar,
+      permanent,
       days: input.kind === 'membership' ? input.days : null,
       contactId,
       contactName,
       customer,
-      paymentId: payment.id,
-      checkoutUrl: payment.checkoutUrl,
+      paymentId: payment?.id ?? '',
+      checkoutUrl: payment?.checkoutUrl ?? `${this.deps.publicUrl}/pay/link/${id}`,
       createdBy: adminName,
       createdAt: new Date(now).toISOString(),
       paidAt: null,
       activation: input.kind === 'membership' ? 'auto' : 'none',
-      activationNote: input.kind === 'membership' && !contactId ? 'لا يوجد حساب مطابق بالجوال أو البريد — التفعيل يدوي بعد الدفع' : null,
+      activationNote:
+        input.kind === 'membership' && !contactId
+          ? permanent
+            ? 'رابط دائم — التفعيل يدوي بعد كل دفعة (لا يُعرف الحساب من البطاقة)'
+            : 'لا يوجد حساب مطابق بالجوال أو البريد — التفعيل يدوي بعد الدفع'
+          : null,
     };
     await this.mutate((links) => {
       links.push(link);
@@ -134,18 +152,41 @@ export class PayLinksService {
     return link;
   }
 
+  /**
+   * M108b: a visit to /pay/link/:id. A normal link answers its one stored invoice; a permanent link
+   * mints a fresh invoice for this visitor (3 days to pay it — the next visitor gets their own).
+   */
+  async freshCheckout(id: string): Promise<string | null> {
+    const link = (await this.load()).find((entry) => entry.id === id);
+    if (!link) return null;
+    if (!link.permanent) return link.checkoutUrl;
+    const payment = await this.deps.payments.startLink({
+      kind: link.kind,
+      label: link.label,
+      amountSar: link.amountSar,
+      customer: { contactId: link.contactId ?? 0, name: link.customer.name || link.contactName || 'عميل رابط دائم', email: link.customer.email, phone: link.customer.phone },
+      ref: link.id,
+      validHours: 3 * 24,
+    });
+    return payment.checkoutUrl;
+  }
+
   /** Hears every settled payment; a paid link mails its exact story and activates a matched membership sale. */
   settled(payment: Payment): void {
     if (!payment.serviceKey.startsWith('link:')) return;
     void (async () => {
       try {
-        const link = (await this.load()).find((entry) => entry.paymentId === payment.id);
+        // `link:<kind>:<linkId>` = a sale minted by a permanent link; otherwise the link owns the payment id.
+        const refId = payment.serviceKey.split(':')[2] ?? '';
+        const link = (await this.load()).find((entry) => entry.paymentId === payment.id || (refId !== '' && entry.id === refId));
         if (!link) return;
         if (payment.status !== 'paid') {
           this.deps.notifier.payLinkFailed(link, payment);
           return;
         }
-        if (link.paidAt) return; // a webhook retry: told once, activated once (the hub is idempotent anyway)
+        // A webhook retry tells once and activates once (the hub is idempotent anyway). A permanent
+        // link is different: every sale is its own payment, so every sale is told.
+        if (link.paidAt && !link.permanent) return;
         await this.mutate((links) => {
           const row = links.find((entry) => entry.id === link.id);
           if (row) row.paidAt = new Date().toISOString();
@@ -158,7 +199,7 @@ export class PayLinksService {
             const result = await hubCall(this.deps.hub, 'activate_member', {
               contact_id: link.contactId,
               days: link.days ?? 365,
-              reference: `paylink:${link.paymentId}`,
+              reference: `paylink:${payment.id}`,
               product: 'paymob_link',
               store: 'PAYMOB_LINK',
             });

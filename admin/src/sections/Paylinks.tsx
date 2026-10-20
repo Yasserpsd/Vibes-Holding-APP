@@ -10,9 +10,10 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
  */
 
 const KIND_LABEL: Record<PayLinkKind, string> = { membership: 'عضوية سنوية', workshop: 'ورشة / فعالية', other: 'أخرى' };
-const EMPTY: PayLinkInput = { kind: 'membership', label: '', amountSar: 1900, days: 365, customer: { name: '', phone: '', email: '' } };
+const EMPTY: PayLinkInput = { kind: 'membership', label: '', amountSar: 1900, days: 365, permanent: false, customer: { name: '', phone: '', email: '' } };
 
 function statusOf(row: PayLink): { label: string; tone: Tone } {
+  if (row.permanent) return { label: row.paidAt ? 'رابط دائم — في مبيعات ✅' : 'رابط دائم ♾️', tone: 'gold' };
   if (row.status === 'paid') return { label: 'مدفوع ✅', tone: 'ok' };
   if (row.status === 'failed') return { label: 'محاولة فاشلة — الرابط صالح', tone: 'muted' };
   return { label: 'بانتظار الدفع', tone: 'gold' };
@@ -96,6 +97,10 @@ export function Paylinks() {
             <input type="number" min={1} max={3650} value={input.days} onChange={(event) => edit({ days: Math.max(1, Math.trunc(Number(event.target.value) || 365)) })} />
           </label>
         ) : null}
+        <label className="check">
+          <input type="checkbox" checked={input.permanent === true} onChange={(event) => edit({ permanent: event.target.checked })} />
+          رابط دائم ♾️ — ما بينتهيش بالدفع ولا بالوقت: كل عميل يفتحه تتعمله فاتورة جديدة (مناسب للنشر العام)
+        </label>
         <label>
           اسم العميل
           <input value={input.customer.name} maxLength={120} onChange={(event) => editCustomer({ name: event.target.value })} />
