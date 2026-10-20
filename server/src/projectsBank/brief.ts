@@ -45,7 +45,8 @@ export const BRIEF_DISCLAIMER_EN = "An automatic summary from the project's publ
 export const briefKey = (id: number, lang: AppLang = 'ar'): string => (lang === 'en' ? `projects:brief:${id}:en` : `projects:brief:${id}`);
 
 // 7: M116b (owner) — shorter summary, table rows inferred instead of «unknown», unknown-ish values dropped.
-const VERSION = 7;
+// 8: the unknown filter matches by prefix («غير مذكور صراحة» fell through the exact match).
+const VERSION = 8;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 25_000;
 const RETRY_MS = 6 * 3_600_000;
@@ -141,8 +142,10 @@ const RETURNS = /عائد|عوائد|أرباح|ارباح|ربح|roi|return|pro
 /** Forward-looking yield talk: never in the prose, whatever the founder wrote. */
 const YIELD = /عائد|عوائد|roi|return on/i;
 const CONTACT_LABEL = /واتس|جوال|هاتف|تواصل|بريد|ايميل|إيميل|موقع|رابط|email|phone|whats|website|انستقرام|تويتر|سناب/i;
-/** M116b (owner: «مش عايز اي حاجه unknown نهائي»): a placeholder value drops the whole row. */
-const UNKNOWNISH = /^(?:[-—ـ_.?؟]+|unknown|unspecified|not\s+specified|n\/?a|none|null|غير\s+(?:محدد|محددة|متوفر|معروف|معروفة|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون)$/iu;
+/** M116b (owner: «مش عايز اي حاجه unknown نهائي»): a placeholder value drops the whole row.
+ *  Prefix match on the negative phrases: «غير مذكور صراحة» and friends fall too, however they end. */
+const UNKNOWNISH =
+  /^(?:[-—ـ_.?؟]+|n\/?a|none|null|بدون|(?:unknown|unspecified|not\s+(?:specified|stated|mentioned|available)|غير\s+(?:محدد|محددة|معروف|معروفة|متوفر|متوفرة|مذكور|مذكورة|متاح|متاحة|واضح|واضحة)|لا\s+(?:يوجد|توجد)|لم\s+(?:يُ?حدد|تُ?حدد|يُ?ذكر|تُ?ذكر))(?:\s.*)?)$/iu;
 /** Rows about what the project asks for or who founded it: the app shows what the project is (owner's rule). */
 const ASK_LABEL = /المطلوب|الاحتياج|التمويل|الاستثمار|رأس\s*المال|راس\s*المال|الحص[ةه]|التقييم|المؤسس|المالك|funding|investment|valuation|equity|founder|the ask/i;
 

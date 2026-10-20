@@ -32,8 +32,10 @@ export function ProjectBrief({ projectId }: { projectId: string }) {
 }
 
 /** M95 (owner): «مش عايز اي خانات فاضية» — a row whose value is empty or a placeholder never renders.
- *  M116b (owner: «مش عايز اي حاجه unknown نهائي»): the literal unknowns joined the list. */
-export const EMPTY_VALUE = /^(?:[-—ـ_.?؟]+|غير\s+(?:محدد|محددة|متوفر|معروف|معروفة|مذكور|متاح|واضح)|لا\s+(?:يوجد|توجد)|لم\s+(?:يحدد|تحدد|يذكر|تذكر)|بدون|unknown|unspecified|not\s+specified|n\/?a|none|null)$/iu;
+ *  M116b (owner: «مش عايز اي حاجه unknown نهائي»): the unknowns joined the list, matched by PREFIX,
+ *  so «غير مذكور صراحة» and every long-winded cousin fall too. */
+export const EMPTY_VALUE =
+  /^(?:[-—ـ_.?؟]+|n\/?a|none|null|بدون|(?:unknown|unspecified|not\s+(?:specified|stated|mentioned|available)|غير\s+(?:محدد|محددة|معروف|معروفة|متوفر|متوفرة|مذكور|مذكورة|متاح|متاحة|واضح|واضحة)|لا\s+(?:يوجد|توجد)|لم\s+(?:يُ?حدد|تُ?حدد|يُ?ذكر|تُ?ذكر))(?:\s.*)?)$/iu;
 
 /** M116b (owner: «الكلام ورا بعض يتظبط ويتفنط»): the summary wall becomes tidy sentence lines. */
 function summaryLines(summary: string): string[] {
