@@ -676,6 +676,8 @@
   "payment.gatewayId": "Gateway transaction number",
   "payment.id": "Transaction number",
   "payment.openCheckout": "Open the payment page",
+  "checkout.title": "Complete the payment",
+  "checkout.fallback": "Update the app to pay inside this screen, or pay on the secure payment page.",
   "payment.refreshStatus": "Refresh the status",
   "payment.retry": "Try again",
   "payment.all": "All my payments",

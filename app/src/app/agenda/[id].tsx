@@ -16,7 +16,6 @@ import { StateView } from '@/components/StateView';
 import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { formatEventDays } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -64,10 +63,9 @@ export default function AgendaEventScreen() {
       { eventId: event.id, attendance, discountCode: applied ? applied.code : code.trim() || undefined },
       {
         onSuccess: async (answer) => {
-          // A 100% code settles on the spot: there is no checkout to open.
+          // M111: the checkout renders embedded inside the app. A 100% code settles on the spot.
           if (answer.payment && answer.payment.status === 'created' && answer.payment.checkoutUrl) {
-            await openCheckout(answer.payment.checkoutUrl, paymentReturnUrl(answer.payment.id));
-            router.navigate({ pathname: '/payment/[id]', params: { id: answer.payment.id } });
+            router.navigate({ pathname: '/checkout/[id]', params: { id: answer.payment.id } });
             return;
           }
           void query.refetch();
