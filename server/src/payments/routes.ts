@@ -1,3 +1,5 @@
+import { connect } from 'node:net';
+
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
@@ -8,7 +10,7 @@ import type { KV } from '../store.js';
 import { mockCheckoutPage, returnPage } from './pages.js';
 import type { PaymentsService } from './service.js';
 
-export type PaymentsRoutesOptions = { service: PaymentsService; auth: AuthService; kv: KV; appScheme: string };
+export type PaymentsRoutesOptions = { service: PaymentsService; auth: AuthService; kv: KV; appScheme: string; smtpHost?: string | null; smtpPort?: number };
 
 const startSchema = z.object({
   serviceKey: z.string().trim().min(1).max(60),
@@ -18,6 +20,28 @@ const startSchema = z.object({
 });
 const idSchema = z.object({ id: z.string().uuid('رقم العملية غير صالح') });
 const statusSchema = z.object({ status: z.enum(['created', 'paid', 'failed']).optional() });
+
+/** Plain TCP dial per port — tells a firewall block (timeout) apart from an SMTP-level failure. */
+async function dialSmtpPorts(host: string | null, configured: number | null): Promise<Record<string, string>> {
+  if (!host) return {};
+  const ports = [...new Set([configured ?? 465, 465, 587, 25, 2525])];
+  const results = await Promise.all(
+    ports.map(
+      (port) =>
+        new Promise<[string, string]>((resolve) => {
+          const socket = connect({ host, port, timeout: 5000 });
+          const done = (state: string) => {
+            socket.destroy();
+            resolve([String(port), state]);
+          };
+          socket.once('connect', () => done('open'));
+          socket.once('timeout', () => done('timeout (blocked?)'));
+          socket.once('error', (error) => done(String((error as NodeJS.ErrnoException).code ?? error).slice(0, 60)));
+        }),
+    ),
+  );
+  return Object.fromEntries(results);
+}
 
 function flatQuery(query: unknown): Record<string, string> {
   const out: Record<string, string> = {};
@@ -29,7 +53,7 @@ function flatQuery(query: unknown): Record<string, string> {
 }
 
 /** Payments need a session; the Paymob callback and the browser pages are public (HMAC-checked). */
-export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme }) => {
+export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme, smtpHost, smtpPort }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   // The mock gateway page posts a plain HTML form.
@@ -95,6 +119,30 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
     const result = await service.redirectResult(flatQuery(request.query));
     return reply.type('text/html; charset=utf-8').send(returnPage(result, appScheme));
   });
+
+  // M110: resend the invoice mails (customer + admin copies) and report each send's exact error.
+  app.post(
+    '/api/admin/payments/:id/invoice/resend',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      return service.resendInvoice(params.id);
+    }),
+  );
+
+  // Why do no mails arrive? Sends one probe mail, and dials the SMTP host on every usual port so a
+  // provider-level block (Railway closes SMTP ports on some plans) shows itself as closed ports.
+  app.post(
+    '/api/admin/mail/probe',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const [mail, ports] = await Promise.all([service.mailProbe(), dialSmtpPorts(smtpHost ?? null, smtpPort ?? null)]);
+      return { ...mail, host: smtpHost ?? null, configuredPort: smtpPort ?? null, ports };
+    }),
+  );
 
   // M110: the customer's printable invoice (paid payments only; the uuid is the access key).
   app.get(

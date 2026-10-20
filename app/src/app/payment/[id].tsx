@@ -11,7 +11,6 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { formatArabicDateTime } from '@/lib/format';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -55,10 +54,8 @@ export default function PaymentScreen() {
 
   const { payment } = data;
   const state = STATE[payment.status];
-  const reopen = async () => {
-    await openCheckout(payment.checkoutUrl, paymentReturnUrl(payment.id));
-    void refetch();
-  };
+  // M111: the checkout renders embedded inside the app («الدفع جوا نفس الصفحة», owner).
+  const reopen = () => router.push({ pathname: '/checkout/[id]', params: { id: payment.id } });
 
   return (
     <Screen>

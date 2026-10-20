@@ -674,6 +674,8 @@
   "payment.gatewayId": "رقم عملية البوابة",
   "payment.id": "رقم العملية",
   "payment.openCheckout": "فتح صفحة الدفع",
+  "checkout.title": "إتمام الدفع",
+  "checkout.fallback": "حدّث التطبيق لإتمام الدفع داخل نفس الشاشة، أو ادفع من صفحة الدفع الآمنة.",
   "payment.refreshStatus": "تحديث الحالة",
   "payment.retry": "المحاولة مرة أخرى",
   "payment.all": "كل مدفوعاتي",

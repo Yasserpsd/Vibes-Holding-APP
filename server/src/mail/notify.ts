@@ -393,16 +393,39 @@ export class Notifier {
    * M110: the invoice mail (HTML) the moment a payment settles paid — to the customer, and the
    * exact same invoice to every registered admin address (owner, 2026-10-20: «ابعت للأدمن زيها
    * بالظبط لكل الأدمن المسجل»). Separate sends, so the customer never sees the admin list.
+   * The awaited form reports each send's error text, for the dashboard resend and the mail probe.
    */
-  invoiceIssued(input: { email: string; subject: string; text: string; html: string }): void {
+  async invoiceSend(input: { email: string; subject: string; text: string; html: string }): Promise<{ customer: string | null; admins: string | null }> {
     const subject = `${this.deps.appEnv === 'test' ? '[تجريبي] ' : ''}${input.subject}`;
-    const sendTo = (to: string[], mailSubject: string) =>
-      this.deps.mailer
-        .send({ to, subject: mailSubject, text: input.text, html: input.html })
-        .then((sent) => this.deps.log.info({ subject: mailSubject, sent }, 'invoice mail'))
-        .catch((error: unknown) => this.deps.log.error({ err: error, subject: mailSubject }, 'invoice mail failed'));
-    if (input.email.trim()) void sendTo([input.email.trim()], subject);
-    if (this.recipients.length) void sendTo(this.recipients, `${SUBJECT_PREFIX} نسخة الإدارة — ${input.subject}`);
+    const sendTo = async (to: string[], mailSubject: string): Promise<string | null> => {
+      try {
+        const sent = await this.deps.mailer.send({ to, subject: mailSubject, text: input.text, html: input.html });
+        this.deps.log.info({ subject: mailSubject, sent }, 'invoice mail');
+        return sent ? null : 'smtp_not_configured';
+      } catch (error) {
+        this.deps.log.error({ err: error, subject: mailSubject }, 'invoice mail failed');
+        return String(error).slice(0, 300);
+      }
+    };
+    return {
+      customer: input.email.trim() ? await sendTo([input.email.trim()], subject) : 'no_customer_email',
+      admins: this.recipients.length ? await sendTo(this.recipients, `${SUBJECT_PREFIX} نسخة الإدارة — ${input.subject}`) : 'no_recipients',
+    };
+  }
+
+  /** A minimal awaited send that surfaces the SMTP error text (the dashboard's mail probe). */
+  async probe(): Promise<{ sent: boolean; error: string | null; recipients: number }> {
+    if (!this.recipients.length) return { sent: false, error: 'no_recipients', recipients: 0 };
+    try {
+      const sent = await this.deps.mailer.send({
+        to: this.recipients,
+        subject: `${SUBJECT_PREFIX} فحص البريد — ${riyadhDateTime(Date.now())}`,
+        text: `رسالة فحص من ${APP_NAME}: لو وصلتك، فإرسال البريد من السيرفر يعمل.`,
+      });
+      return { sent, error: sent ? null : 'smtp_not_configured', recipients: this.recipients.length };
+    } catch (error) {
+      return { sent: false, error: String(error).slice(0, 300), recipients: this.recipients.length };
+    }
   }
 
   paymentFailed(payment: PaymentLike): void {

@@ -22,7 +22,6 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -102,11 +101,13 @@ export default function ServiceScreen() {
     try {
       const { payment } = await paymentsApi.start(service.key, answers, applied ? applied.code : code.trim() || undefined);
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      // M111: the checkout renders EMBEDDED inside the app («الدفع جوا نفس الصفحة», owner).
       // M107: a 100% code settles on the spot — straight to the confirmation, no checkout.
       if (payment.status === 'created' && payment.checkoutUrl) {
-        await openCheckout(payment.checkoutUrl, paymentReturnUrl(payment.id));
+        router.navigate({ pathname: '/checkout/[id]', params: { id: payment.id } });
+      } else {
+        router.navigate({ pathname: '/payment/[id]', params: { id: payment.id } });
       }
-      router.navigate({ pathname: '/payment/[id]', params: { id: payment.id } });
     } catch (cause) {
       setPayError(errorMessage(cause));
       setPayGated(isProfileGate(cause));
@@ -154,11 +155,17 @@ export default function ServiceScreen() {
         <Text style={styles.summary}>{service.summary}</Text>
       </FadeInView>
       {service.detail
-        ? service.detail.split('\n').map((paragraph, index) => (
-            <FadeInView key={index} delay={entranceDelay(index + 2)}>
-              <Text style={styles.paragraph}>{paragraph}</Text>
-            </FadeInView>
-          ))
+        ? service.detail
+            .split('\n')
+            .map((paragraph) => paragraph.trim())
+            // Blank lines in the server text used to render as empty paragraphs — a tall dead gap
+            // above the payment panel (owner, 2026-10-20: «مساحة كبيرة جدًا فاضية»).
+            .filter((paragraph) => paragraph.length > 0)
+            .map((paragraph, index) => (
+              <FadeInView key={index} delay={entranceDelay(index + 2)}>
+                <Text style={styles.paragraph}>{paragraph}</Text>
+              </FadeInView>
+            ))
         : null}
 
       {service.locked || !service.action ? (

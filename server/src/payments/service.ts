@@ -464,6 +464,27 @@ export class PaymentsService {
     }, now);
   }
 
+  /** M110: the dashboard resend — re-mails the invoice and reports each send's exact error. */
+  async resendInvoice(id: string, now = Date.now()): Promise<{ ok: boolean; invoiceNo: number; customer: string | null; admins: string | null }> {
+    const payment = (await this.load()).find((entry) => entry.id === id);
+    if (!payment || payment.status !== 'paid') throw new RequestError('not_found', 'لا توجد عملية مدفوعة بهذا الرقم', 404);
+    const invoiceNo = payment.invoiceNo ?? (await this.assignInvoiceNo(payment.id, now));
+    if (!invoiceNo) throw new RequestError('not_found', 'العملية غير موجودة', 404);
+    payment.invoiceNo = invoiceNo;
+    const result = await this.deps.notifier.invoiceSend({
+      email: payment.email,
+      subject: `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo)}`,
+      text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`),
+      html: invoiceHtml(payment, invoiceNo),
+    });
+    return { ok: result.customer === null && result.admins === null, invoiceNo, customer: result.customer, admins: result.admins };
+  }
+
+  /** Sends a minimal admin mail and surfaces the SMTP error text (why nothing arrives). */
+  mailProbe(): Promise<{ sent: boolean; error: string | null; recipients: number }> {
+    return this.deps.notifier.probe();
+  }
+
   /** M110: the printable invoice page (/pay/invoice/:id) — paid payments only. */
   async invoicePage(id: string): Promise<string | null> {
     const payment = (await this.load()).find((entry) => entry.id === id);
@@ -479,7 +500,7 @@ export class PaymentsService {
       const invoiceNo = await this.assignInvoiceNo(payment.id, now);
       if (invoiceNo) {
         payment.invoiceNo = invoiceNo;
-        this.deps.notifier.invoiceIssued({
+        await this.deps.notifier.invoiceSend({
           email: payment.email,
           subject: `فاتورتك من نادي المستثمرين — ${invoiceTitle(invoiceNo)}`,
           text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`),
