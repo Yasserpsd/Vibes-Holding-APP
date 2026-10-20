@@ -130,8 +130,9 @@ function metaCell(label: string, value: string): string {
 
 const ltr = (value: string): string => `<span dir="ltr">${escape(value)}</span>`;
 
-/** Full printable HTML document; also the body of the customer mail. */
-export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang = 'ar'): string {
+/** Full printable HTML document; also the body of the customer mail.
+ * `publicUrl` lets the company stamp render (served at /pay/invoice-stamp.png). */
+export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang = 'ar', publicUrl?: string): string {
   const t = L[lang];
   const dir = lang === 'en' ? 'ltr' : 'rtl';
   const start = lang === 'en' ? 'left' : 'right';
@@ -240,6 +241,8 @@ export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang =
     <td style="${FONT};font-size:12.5px;color:#5A4A12;padding:12px 16px;line-height:1.9">${note}${payment.transactionId ? ` ${t.reference} ${ltr(payment.transactionId)}` : ''}</td>
   </tr></table>
 </td></tr>
+
+${publicUrl ? `<tr><td align="center" style="padding:18px 24px 6px"><img src="${publicUrl}/pay/invoice-stamp.png" width="128" height="128" alt="${escape(SELLER.brand)}" style="display:block;width:128px;height:128px;opacity:0.92"></td></tr>` : ''}
 
 <tr><td style="background:${NAVY};padding:14px 24px;margin-top:20px">
   <div dir="ltr" style="${FONT};color:#FFFFFF;font-size:12.5px;text-align:center;line-height:2">

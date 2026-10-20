@@ -482,7 +482,7 @@ export class PaymentsService {
       email: payment.email,
       subject: invoiceSubject(invoiceNo, lang),
       text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
-      html: invoiceHtml(payment, invoiceNo, lang),
+      html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
     });
     return { ok: result.customer === null && result.admins === null, invoiceNo, customer: result.customer, admins: result.admins };
   }
@@ -496,7 +496,7 @@ export class PaymentsService {
   async invoicePage(id: string): Promise<string | null> {
     const payment = (await this.load()).find((entry) => entry.id === id);
     if (!payment || payment.status !== 'paid' || !payment.invoiceNo) return null;
-    return invoiceHtml(payment, payment.invoiceNo, payment.lang ?? 'ar');
+    return invoiceHtml(payment, payment.invoiceNo, payment.lang ?? 'ar', this.deps.publicUrl);
   }
 
   /** Everything that happens once a gateway settled a payment: code use, mails, push, module listeners. */
@@ -512,7 +512,7 @@ export class PaymentsService {
           email: payment.email,
           subject: invoiceSubject(invoiceNo, lang),
           text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
-          html: invoiceHtml(payment, invoiceNo, lang),
+          html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
         });
       }
     }

@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { connect } from 'node:net';
+import { join } from 'node:path';
 
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -144,6 +146,18 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       return { ...mail, host: smtpHost ?? null, configuredPort: smtpPort ?? null, ports };
     }),
   );
+
+  // M113b: the company stamp on the invoice (served from the repo; mail clients load it by URL).
+  let stamp: Buffer | null = null;
+  try {
+    stamp = readFileSync(join(process.cwd(), 'assets', 'invoice-stamp.png'));
+  } catch {
+    stamp = null;
+  }
+  app.get('/pay/invoice-stamp.png', async (_request, reply) => {
+    if (!stamp) return reply.code(404).send();
+    return reply.type('image/png').header('cache-control', 'public, max-age=86400').send(stamp);
+  });
 
   // M110: the customer's printable invoice (paid payments only; the uuid is the access key).
   app.get(
