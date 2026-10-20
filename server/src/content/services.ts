@@ -100,8 +100,9 @@ export const SERVICES_SEED: ServicesContent = {
     { key: 'member', title: 'مزايا الأعضاء المشتركين' },
     { key: 'discount', title: 'خصومات المنظومة' },
   ],
-  lockedText: 'هذه الخدمة للأعضاء المشتركين. فعّل عضويتك السنوية لاستخدامها.',
-  lockedGuestText: 'هذه الخدمة للأعضاء المشتركين. سجّل الدخول وفعّل عضويتك السنوية لاستخدامها.',
+  // M109f: the owner's upsell sentence on every member-only feature.
+  lockedText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
+  lockedGuestText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
   lockedExpiredText: 'انتهت عضويتك. جدّد عضويتك السنوية لاستخدام هذه الخدمة.',
   services: [
     {
@@ -362,7 +363,8 @@ export const SERVICES_SEED: ServicesContent = {
     },
     // M107 (owner, 2026-10-20): «حقيبة الامتياز» and «كود خصم منتجات منفذ» removed for good.
   ],
-  version: 11,
+  // v12 (M109f): the lock texts carry the owner's membership upsell sentence.
+  version: 12,
   updatedAt: '2026-10-20T00:00:00.000Z',
 };
 

@@ -2,7 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { ApiError } from '@/api/client';
 import { usePerson } from '@/api/people';
+import { useAuth } from '@/auth/AuthProvider';
+import { LockedNotice } from '@/components/LockedNotice';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { PersonAvatar } from '@/components/PeopleBlock';
@@ -16,14 +19,21 @@ import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 /** M11: one club figure's public page — photo, bio, journey milestones and links. */
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { status } = useAuth();
   const person = usePerson(typeof id === 'string' ? id : undefined);
   const data = person.data?.person;
+  // M109g: the full spotlight is a membership feature — the refusal shows the velvet rope, not an error.
+  const memberGate = person.error instanceof ApiError && person.error.code === 'members_only' ? person.error.message : null;
 
   return (
     <Screen>
       <Stack.Screen options={{ title: t('nav.person') }} />
       {!data ? (
-        <StateView loading={person.isLoading} error={person.error} onRetry={() => void person.refetch()} />
+        memberGate ? (
+          <LockedNotice text={memberGate} guest={status !== 'signedIn'} />
+        ) : (
+          <StateView loading={person.isLoading} error={person.error} onRetry={() => void person.refetch()} />
+        )
       ) : (
         <>
           <FadeInView style={styles.head} offset={12}>

@@ -13,7 +13,7 @@ export const HQ_EN: Translation<HqContent> = {
     'Once the administration confirms, you receive an entry barcode valid for your appointment only.',
     'Bring your digital membership card from the app when you arrive.',
   ],
-  memberOnlyText: 'Booking an HQ visit is for subscribed members. Activate your annual membership to book your appointment.',
-  guestText: 'Sign in to your account and activate your annual membership to book an HQ visit.',
+  memberOnlyText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
+  guestText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
   purposes: ['Meeting room booking', 'Business meeting', 'Introductory visit to the HQ', 'Filming or podcast', 'Attending an event', 'Other'],
 };

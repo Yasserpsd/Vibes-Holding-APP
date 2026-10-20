@@ -8,7 +8,6 @@ import { useGuestGate } from '@/auth/GuestGate';
 import { AppButton } from '@/components/AppButton';
 import { GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
-import { Notice } from '@/components/Notice';
 import { languageChoiceOffered, t } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -17,22 +16,18 @@ import { colors, spacing, typography } from '@/theme/tokens';
 const clubLogo = require('../../assets/images/club-logo.png');
 
 /**
- * The gate every visitor meets first: sign in, create an account, or look around as a guest for one
- * minute. When the minute is over the same screen comes back without the guest choice. Preview builds
- * sign in the club's admins only (CLAUDE.md rule 9), so the testers keep the guest choice there.
+ * The gate every visitor meets first: sign in, create an account, or browse as a guest — M109f:
+ * guest mode is permanent, so the guest choice is always offered and never runs out.
  * M106b: the club theatre breathes FAINT behind the whole gate («اعمل من ورا شكل المسرح بشياكة
  * ويكون خفيف في الخلفية») — the first HQ photo at low opacity under a dark wash.
  */
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { locked, guestOver, startGuest } = useGuestGate();
+  const { locked, startGuest } = useGuestGate();
   const { data: config } = useAuthConfig();
   const theatre = useHq().data?.photos?.[0] ?? null;
 
   if (!locked) return <Redirect href="/" />;
-
-  const testBuild = config?.adminOnly === true;
-  const guestOffered = !guestOver || testBuild;
 
   return (
     <GoldGradient variant="screen" style={styles.backdrop}>
@@ -43,14 +38,8 @@ export default function WelcomeScreen() {
           <FadeInView delay={entranceDelay(0)} style={styles.hero}>
             <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
           </FadeInView>
-          {/* The full logo already carries the club's name: the title line returns only for the guest-over notice. */}
-          {guestOver ? (
-            <FadeInView delay={entranceDelay(1)}>
-              <Text style={styles.title}>{t('welcome.returnTitle')}</Text>
-            </FadeInView>
-          ) : null}
           <FadeInView delay={entranceDelay(2)}>
-            <Text style={styles.subtitle}>{guestOver ? t('welcome.returnText') : t('welcome.subtitle')}</Text>
+            <Text style={styles.subtitle}>{t('welcome.subtitle')}</Text>
           </FadeInView>
           <View style={styles.actions}>
             <FadeInView delay={entranceDelay(3)}>
@@ -61,22 +50,13 @@ export default function WelcomeScreen() {
                 <AppButton label={t('welcome.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
               </FadeInView>
             )}
-            {guestOffered ? (
-              <>
-                <FadeInView delay={entranceDelay(5)}>
-                  <AppButton label={t('welcome.guest')} variant="outline" icon="eye-outline" onPress={startGuest} />
-                </FadeInView>
-                <FadeInView delay={entranceDelay(6)}>
-                  <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
-                </FadeInView>
-              </>
-            ) : null}
-          </View>
-          {testBuild && guestOver ? (
-            <FadeInView delay={entranceDelay(7)}>
-              <Notice tone="warning" text={t('welcome.testNote')} />
+            <FadeInView delay={entranceDelay(5)}>
+              <AppButton label={t('welcome.guest')} variant="outline" icon="eye-outline" onPress={startGuest} />
             </FadeInView>
-          ) : null}
+            <FadeInView delay={entranceDelay(6)}>
+              <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
+            </FadeInView>
+          </View>
           {languageChoiceOffered(false) ? (
             <FadeInView delay={entranceDelay(8)}>
               <PressScale onPress={chooseLanguage} hitSlop={8}>

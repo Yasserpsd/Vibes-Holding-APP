@@ -1,89 +1,54 @@
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppState, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { colors } from '@/theme/tokens';
 
-/** How long a visitor may look around before an account is required (M74: a full week). */
-export const GUEST_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** The guest week survives launches: the first «المتابعة كضيف» tap is recorded on the device. */
+/** The «المتابعة كضيف» tap is recorded on the device: a returning visitor walks straight in. */
 const GUEST_START_KEY = 'investorsclub.guestStart';
 
 type GuestGateValue = {
   /** The app is closed to this visitor: only the gate and the account screens open. */
   locked: boolean;
-  /** The guest week has been used up. */
-  guestOver: boolean;
   /** The saved guest start has been read: lock decisions are final. */
   ready: boolean;
-  /** «المتابعة كضيف»: opens the app for a guest week. */
+  /** «المتابعة كضيف»: opens the app's open content for good. */
   startGuest: () => void;
 };
 
 const GuestGateContext = createContext<GuestGateValue | null>(null);
 
 /**
- * The app opens for members only. A visitor passes the gate (`/welcome`) by signing in, creating an
- * account, or taking a guest week; when the week is over the gate comes back. The week's start is
- * saved on the device, so a returning visitor walks straight in until his week runs out (M74).
+ * M109f (owner, 2026-10-20): guest mode is PERMANENT — the M74 guest week and its expiry are gone.
+ * A visitor passes the gate (`/welcome`) once, by signing in, creating an account or choosing
+ * «المتابعة كضيف», and from then on always browses the open content; member-only features answer
+ * with the membership upsell instead of a closed door.
  */
 export function GuestGateProvider({ children }: { children: ReactNode }) {
   const { status } = useAuth();
-  // undefined = the saved start is still being read; null = no guest window.
-  const [guestUntil, setGuestUntil] = useState<number | null | undefined>(undefined);
-  const [guestOver, setGuestOver] = useState(false);
+  // undefined = the saved choice is still being read; false = the visitor never passed the gate.
+  const [guest, setGuest] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     let alive = true;
     void loadSetting(GUEST_START_KEY).then((saved) => {
-      if (!alive) return;
-      const start = Number(saved);
-      if (!saved || !Number.isFinite(start)) {
-        setGuestUntil(null);
-        return;
-      }
-      const until = start + GUEST_SESSION_MS;
-      if (until > Date.now()) {
-        setGuestUntil(until);
-      } else {
-        setGuestUntil(null);
-        setGuestOver(true);
-      }
+      if (alive) setGuest(Boolean(saved));
     });
     return () => {
       alive = false;
     };
   }, []);
 
-  useEffect(() => {
-    if (guestUntil == null) return;
-    const timer = setTimeout(() => setGuestOver(true), Math.max(0, guestUntil - Date.now()));
-    // Timers sleep while the app is in the background: the clock is read again on the way back.
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && Date.now() >= guestUntil) setGuestOver(true);
-    });
-    return () => {
-      clearTimeout(timer);
-      subscription.remove();
-    };
-  }, [guestUntil]);
-
   const startGuest = useCallback(() => {
-    const start = Date.now();
-    void saveSetting(GUEST_START_KEY, String(start));
-    setGuestOver(false);
-    setGuestUntil(start + GUEST_SESSION_MS);
+    void saveSetting(GUEST_START_KEY, String(Date.now()));
+    setGuest(true);
   }, []);
 
-  const ready = guestUntil !== undefined;
-  const locked = status === 'guest' && ready && (guestUntil === null || guestOver);
-  const value = useMemo<GuestGateValue>(
-    () => ({ locked, guestOver, ready, startGuest }),
-    [locked, guestOver, ready, startGuest],
-  );
+  const ready = guest !== undefined;
+  const locked = status === 'guest' && ready && !guest;
+  const value = useMemo<GuestGateValue>(() => ({ locked, ready, startGuest }), [locked, ready, startGuest]);
 
   return <GuestGateContext.Provider value={value}>{children}</GuestGateContext.Provider>;
 }

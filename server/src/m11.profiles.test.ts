@@ -126,7 +126,7 @@ test('the admin approves: the profile is public with its words, and the detail p
   assert.equal(people[0]?.id, profileId);
   assert.equal(people[0]?.title, application.title);
 
-  const person = await get(`/api/people/${profileId}`);
+  const person = await get(`/api/people/${profileId}`, memberToken);
   assert.equal(person.statusCode, 200);
   assert.match(person.json().person.bio as string, /قيادة فرق الاستثمار/);
   assert.equal((person.json().person.milestones as string[]).length, 2);
@@ -146,12 +146,12 @@ test('an edit of an approved profile waits as a draft while the public keeps the
   assert.equal(edited.json().profile.status, 'approved');
   assert.ok(edited.json().profile.draft);
 
-  const person = await get(`/api/people/${profileId}`);
+  const person = await get(`/api/people/${profileId}`, memberToken);
   assert.match(person.json().person.bio as string, /قيادة فرق الاستثمار/);
 
   const approved = await send('POST', `/api/admin/profiles/${profileId}/decision`, { action: 'approve' }, adminToken);
   assert.equal(approved.json().profile.draft, null);
-  const after = await get(`/api/people/${profileId}`);
+  const after = await get(`/api/people/${profileId}`, memberToken);
   assert.match(after.json().person.bio as string, /نسخة معدلة/);
 });
 

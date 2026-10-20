@@ -21,7 +21,8 @@ export type UnlockResult = { ok: true; already: boolean; left: number; contact: 
 export type WalletResult = { isMember: boolean; balance: PbBalanceLite | null; unlockedCount: number };
 
 const UNLOCKS_PER_HOUR = 30;
-const NOT_MEMBER = 'فتح بيانات التواصل متاح لأعضاء النادي المشتركين. فعّل عضويتك من شاشة العضوية.';
+// M109f: the owner's upsell sentence on every member-only feature.
+const NOT_MEMBER = 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.';
 
 const clip = (value: string, max: number): string => value.trim().slice(0, max);
 const link = (value: string): string => (/^https?:\/\//i.test(value.trim()) && URL.canParse(value.trim()) ? clip(value, 600) : '');

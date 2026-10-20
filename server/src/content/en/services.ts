@@ -10,8 +10,8 @@ export const SERVICES_EN: Translation<ServicesContent> = {
     { key: 'member', title: 'Benefits for subscribed members' },
     { key: 'discount', title: 'Group discounts' },
   ],
-  lockedText: 'This service is for subscribed members. Activate your annual membership to use it.',
-  lockedGuestText: 'This service is for subscribed members. Sign in and activate your annual membership to use it.',
+  lockedText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
+  lockedGuestText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
   lockedExpiredText: 'Your membership has ended. Renew your annual membership to use this service.',
   services: [
     {
