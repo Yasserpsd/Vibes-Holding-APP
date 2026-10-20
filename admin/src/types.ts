@@ -144,7 +144,22 @@ export type HubStats = {
   generated_at: string;
   tz: string;
   days: number;
-  totals: { contacts: number; leads: number; accounts: number; pending_email: number; unpaid: number; members_active: number; members_expired: number; members_no_expiry: number; admins: number; publishers: number };
+  totals: {
+    contacts: number;
+    leads: number;
+    accounts: number;
+    pending_email: number;
+    unpaid: number;
+    members_active: number;
+    members_expired: number;
+    members_no_expiry: number;
+    admins: number;
+    publishers: number;
+    /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */
+    persona_investor?: number;
+    persona_entrepreneur?: number;
+    persona_neutral?: number;
+  };
   today: Omit<StatsDay, 'day'>;
   expiring: { d7: number; d30: number; items: { id: number; name: string; phone: string; email: string; member_end: string; days_left: number }[] };
   series: StatsDay[];

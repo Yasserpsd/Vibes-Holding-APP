@@ -47,6 +47,14 @@ function Tiles({ hub }: { hub: HubStats }) {
       <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
       <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />
       <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} />
+      {/* M112 (owner): how the accounts split across the three personas — needs hub 2.19.0+. */}
+      {totals.persona_investor !== undefined ? (
+        <>
+          <Tile label="المستثمرون" value={totals.persona_investor ?? 0} tone="gold" onOpen={open('all')} />
+          <Tile label="رواد الأعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open('all')} />
+          <Tile label="المحايدون" value={totals.persona_neutral ?? 0} onOpen={open('all')} />
+        </>
+      ) : null}
     </div>
   );
 }

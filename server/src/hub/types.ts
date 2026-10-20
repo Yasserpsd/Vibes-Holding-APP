@@ -95,6 +95,7 @@ export type HubOp =
   | 'admin_set_role'
   | 'changes'
   | 'publish'
+  | 'send_mail'
   | 'feed';
 
 export type HubBody = Record<string, unknown>;
@@ -267,7 +268,22 @@ export type HubStats = {
   generated_at: string;
   tz: 'Asia/Riyadh';
   days: number;
-  totals: { contacts: number; leads: number; accounts: number; pending_email: number; unpaid: number; members_active: number; members_expired: number; members_no_expiry: number; admins: number; publishers: number };
+  totals: {
+    contacts: number;
+    leads: number;
+    accounts: number;
+    pending_email: number;
+    unpaid: number;
+    members_active: number;
+    members_expired: number;
+    members_no_expiry: number;
+    admins: number;
+    publishers: number;
+    /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */
+    persona_investor?: number;
+    persona_entrepreneur?: number;
+    persona_neutral?: number;
+  };
   today: Omit<HubStatsDay, 'day'>;
   expiring: { d7: number; d30: number; items: { id: number; name: string; phone: string; email: string; member_end: string; days_left: number }[] };
   series: HubStatsDay[];
@@ -295,6 +311,8 @@ export type HubResults = {
   admin_thread: { ok: true; account: HubAccount; messages: HubThreadMessage[]; has_more: boolean };
   admin_reply: { ok: true; message_id: number };
   admin_mail: { ok: true; stats: HubMailStats; items: HubMailItem[] };
+  /** M112: the hub sends a mail on the app's behalf (wp_mail there — HTTPS, no SMTP ports). */
+  send_mail: { ok: true; sent: boolean; to: number };
   admin_grant: { ok: true; contact: HubContact; event: HubEvent };
   admin_set_role: { ok: true; contact: HubContact };
   activate_member: { ok: true; contact: HubContact; already: boolean };

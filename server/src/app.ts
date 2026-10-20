@@ -42,7 +42,7 @@ import { HqService } from './hq/service.js';
 import { LiveHubClient } from './hub/client.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubClient } from './hub/types.js';
-import { LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
+import { FallbackMailer, HubMailer, LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
 import { NotifyRecipients } from './mail/recipients.js';
 import { membershipRoutes } from './membership/routes.js';
@@ -211,19 +211,21 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const posts = new PostsService(kv);
   const polls = new PollsService(kv);
   const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos });
-  // Management notifications: the website's hosting mailbox (SMTP) or log-only when it is not configured.
-  const mail: Mailer =
-    mailer ??
-    (config.SMTP_HOST
-      ? new SmtpMailer({
-          host: config.SMTP_HOST,
-          port: config.SMTP_PORT,
-          secure: config.SMTP_SECURE ? config.SMTP_SECURE === '1' : config.SMTP_PORT === 465,
-          user: config.SMTP_USER,
-          pass: config.SMTP_PASS,
-          from: config.MAIL_FROM ?? config.SMTP_USER ?? 'no-reply@vcmem.com',
-        })
-      : new LogMailer(app.log));
+  // Management notifications: the hosting mailbox (SMTP) with the hub's HTTPS wp_mail channel as
+  // the automatic fallback (M112) — a blocked port or a TLS hiccup never loses a mail.
+  const smtpMail: Mailer | null = config.SMTP_HOST
+    ? new SmtpMailer({
+        host: config.SMTP_HOST,
+        port: config.SMTP_PORT,
+        secure: config.SMTP_SECURE ? config.SMTP_SECURE === '1' : config.SMTP_PORT === 465,
+        user: config.SMTP_USER,
+        pass: config.SMTP_PASS,
+        from: config.MAIL_FROM ?? config.SMTP_USER ?? 'no-reply@vcmem.com',
+        tlsRelaxed: config.SMTP_TLS_RELAXED === '1',
+      })
+    : null;
+  const hubMail: Mailer | null = hubClient.mode === 'live' ? new HubMailer(hubClient) : null;
+  const mail: Mailer = mailer ?? (smtpMail && hubMail ? new FallbackMailer(smtpMail, hubMail, app.log) : (smtpMail ?? hubMail ?? new LogMailer(app.log)));
   // Dashboard sign-in code (M18). On the mock hub without SMTP the code is the mock's public test code.
   const otp = new AdminOtpStore(kv, config.ADMIN_OTP_SECONDS, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });

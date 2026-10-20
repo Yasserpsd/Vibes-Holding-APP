@@ -76,6 +76,8 @@ const envSchema = z.object({
   SMTP_SECURE: z.enum(['0', '1']).optional(),
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
+  // M112: the hosting's mail server shows a self-signed «cloud-panel» certificate; '1' accepts it on that hop.
+  SMTP_TLS_RELAXED: z.enum(['0', '1']).optional(),
   MAIL_FROM: z.string().min(3).optional(),
   NOTIFY_EMAIL: z.string().min(3).optional(),
   // Web dashboard origins allowed to call the API from a browser, comma separated (e.g. https://dashboard.example.com).

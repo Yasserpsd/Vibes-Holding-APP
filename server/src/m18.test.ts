@@ -224,17 +224,19 @@ test('a mail that cannot leave gives no challenge', async () => {
   }
 });
 
-test('the live hub without SMTP refuses the dashboard instead of skipping the code', async () => {
+test('the live hub without SMTP mails the code THROUGH the hub (M112); a hub that cannot send still refuses', async () => {
   const liveHub = new RoleHub();
   liveHub.mode = 'live';
   const built = await buildApp({ config: loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', ADMIN_OTP: '1' }), kv: new MemoryKV(), hub: liveHub });
   try {
     await liveHub.call('register', { uuid: 'app-setup', ip: '127.0.0.1', ...account, job_title: '', page_url: 'app://register' });
     await liveHub.call('verify', { uuid: 'app-setup', code: MOCK_CODE, ip: '127.0.0.1' });
-    assert.equal((await built.app.inject({ method: 'GET', url: '/health' })).json().hub.adminOtp, 'no_mail');
+    // M112: a live hub IS a mail channel (HubMailer), so the OTP no longer reports no_mail…
+    assert.equal((await built.app.inject({ method: 'GET', url: '/health' })).json().hub.adminOtp, 'on');
+    // …but this test hub has no send_mail op, so the send fails and the dashboard still refuses.
     const res = await post(built.app, '/api/admin/auth/login', { login: account.email, password: account.password });
     assert.equal(res.statusCode, 503, res.body);
-    assert.equal(res.json().error.code, 'otp_mail_off');
+    assert.equal(res.json().error.code, 'otp_mail_failed');
   } finally {
     await built.app.close();
   }
