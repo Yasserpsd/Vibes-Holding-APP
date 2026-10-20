@@ -391,6 +391,20 @@ export class AuthService {
     return this.remember(session.uuid, contact);
   }
 
+  /**
+   * M109d: applies an approved «طلب تغيير الصفة» through the member's own hub visitor uuid
+   * (captured at request time). Throws when that hub session is gone — the caller keeps the
+   * request pending and asks the admin to retry after the member signs in.
+   */
+  async applyPersonaFor(uuid: string, persona: Persona): Promise<void> {
+    const result = await this.deps.hub.call('profile', { uuid, persona });
+    const contact = requireContact(result);
+    if (contact.persona !== persona) {
+      throw new AuthError('persona_unsupported', 'تغيير الفئة غير متاح حاليًا، حاول لاحقًا', 503);
+    }
+    this.remember(uuid, contact);
+  }
+
   async logout(token: string, session: SessionRecord): Promise<void> {
     this.meCache.delete(session.uuid);
     await this.deps.sessions.deleteSession(token);

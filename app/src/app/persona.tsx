@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -26,11 +27,13 @@ const CHOICES: Choice[] = [
 
 /**
  * M101 «تغيير التوجه»: the member picks his new direction, a code lands in his mailbox, and the
- * confirmed code reshapes the whole app — once every 30 days. Club admins switch instantly with
- * no code and no window, so the owner can present the three experiences to the members.
+ * confirmed code reshapes the whole app — M109d: once per MEMBERSHIP YEAR. Once the year's change
+ * is used, the button becomes «طلب تغيير الصفة» and the dashboard decides. Club admins switch
+ * instantly with no code and no window, so the owner can present the three experiences.
  */
 export default function PersonaScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { me, setMe } = useAuth();
   const params = useLocalSearchParams<{ pick?: string }>();
   const preset = CHOICES.find((choice) => choice.key === params.pick)?.key ?? null;
@@ -40,6 +43,12 @@ export default function PersonaScreen() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestSent, setRequestSent] = useState(false);
+  // M109d: the yearly window's state and the member's latest dashboard request.
+  const state = useQuery({ queryKey: ['persona', 'state'], queryFn: authApi.personaState, enabled: Boolean(me) && !me?.isAdmin });
+  const daysLeft = state.data?.daysLeft ?? 0;
+  const yearUsed = daysLeft > 0;
+  const pendingRequest = state.data?.request?.status === 'pending';
 
   if (!me) {
     return (
@@ -88,6 +97,21 @@ export default function PersonaScreen() {
       .finally(() => setBusy(false));
   };
 
+  // M109d: the year's change is used — the pick goes to the dashboard as a request instead.
+  const sendChangeRequest = () => {
+    if (!picked) return;
+    setBusy(true);
+    setError(null);
+    authApi
+      .personaChangeRequest(picked)
+      .then(() => {
+        setRequestSent(true);
+        void queryClient.invalidateQueries({ queryKey: ['persona', 'state'] });
+      })
+      .catch((cause: unknown) => setError(errorMessage(cause)))
+      .finally(() => setBusy(false));
+  };
+
   const confirm = () => {
     if (code.trim().length < 4) {
       setError(t('persona.needCode'));
@@ -109,10 +133,19 @@ export default function PersonaScreen() {
     <Screen title={t('persona.title')} subtitle={t('persona.subtitle')}>
       <Stack.Screen options={{ title: t('persona.title') }} />
 
-      {/* The rule, said up front: once every 30 days, confirmed by a code to the member's mailbox. */}
+      {/* The rule, said up front: once per membership year, confirmed by a code to the member's mailbox. */}
       <FadeInView>
-        <Notice tone={isAdmin ? 'success' : 'info'} text={isAdmin ? t('persona.adminNote') : t('persona.monthlyNote')} />
+        <Notice
+          tone={isAdmin ? 'success' : 'info'}
+          text={isAdmin ? t('persona.adminNote') : yearUsed ? t('persona.yearUsed', { days: daysLeft }) : t('persona.monthlyNote')}
+        />
       </FadeInView>
+      {/* M109d: a request already on the administration's desk. */}
+      {!isAdmin && (pendingRequest || requestSent) ? (
+        <FadeInView>
+          <Notice tone="success" text={requestSent ? t('persona.requestSent') : t('persona.requestPending')} />
+        </FadeInView>
+      ) : null}
 
       {stage === 'pick' ? (
         <>
@@ -158,12 +191,15 @@ export default function PersonaScreen() {
             })}
           </View>
           {error ? <Notice tone="warning" text={error} /> : null}
-          <AppButton
-            label={busy ? t('persona.sending') : isAdmin ? t('persona.applyNow') : t('persona.sendCode')}
-            icon={isAdmin ? 'swap-horizontal-outline' : 'mail-outline'}
-            loading={busy}
-            onPress={() => (busy || !picked ? null : requestCode())}
-          />
+          {/* M109d: once the yearly change is used, the pick becomes a dashboard request. */}
+          {pendingRequest || requestSent ? null : (
+            <AppButton
+              label={busy ? t('persona.sending') : isAdmin ? t('persona.applyNow') : yearUsed ? t('persona.requestButton') : t('persona.sendCode')}
+              icon={isAdmin ? 'swap-horizontal-outline' : yearUsed ? 'paper-plane-outline' : 'mail-outline'}
+              loading={busy}
+              onPress={() => (busy || !picked ? null : yearUsed && !isAdmin ? sendChangeRequest() : requestCode())}
+            />
+          )}
         </>
       ) : (
         <FadeInView offset={10} style={styles.codeBlock}>

@@ -293,6 +293,19 @@ export class PushService {
     });
   }
 
+  /** M109d: the dashboard decided on the member's «طلب تغيير الصفة». */
+  personaChangeDecided(contactId: number, approved: boolean, label: string, adminNote: string | null): void {
+    this.background(contactId, {
+      title: approved ? 'تم اعتماد تغيير صفتك' : 'تحديث بشأن طلب تغيير الصفة',
+      body: approved
+        ? `أصبحت صفتك الآن: ${label}. سيتشكل التطبيق حول وجهتك الجديدة.`
+        : adminNote
+          ? `لم تعتمد الإدارة طلبك هذه المرة. ملاحظة الإدارة: ${adminNote}`
+          : 'لم تعتمد الإدارة طلب تغيير صفتك هذه المرة.',
+      data: { type: 'persona', screen: '/persona' },
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     this.background(contactId, {
       title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',

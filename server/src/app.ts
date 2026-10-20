@@ -14,6 +14,7 @@ import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
+import { PersonaRequestsService } from './auth/personaRequests.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
@@ -419,7 +420,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer });
+  // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
+  const personaRequests = new PersonaRequestsService(kv);
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice });
