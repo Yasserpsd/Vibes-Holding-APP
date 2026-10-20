@@ -21,6 +21,8 @@ export type HqContent = {
   maxDaysAhead: number;
   slotCapacity: number;
   purposes: string[];
+  /** M109a: every member's ANNUAL wallet of bookable office/meeting-room hours. */
+  walletHours: number;
   version: number;
   updatedAt: string;
 };
@@ -46,14 +48,18 @@ export const HQ_SEED: HqContent = {
   // M109f: the owner's upsell sentence on every member-only feature.
   memberOnlyText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
   guestText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
-  hours: { days: [0, 1, 2, 3, 4], open: '10:00', close: '19:00', slotMinutes: 60 },
+  // M109a (owner, 2026-10-20): the bookable day spans 12 hours — first slot 09:00, last slot 20:00.
+  hours: { days: [0, 1, 2, 3, 4], open: '09:00', close: '21:00', slotMinutes: 60 },
   leadDays: 1,
   maxDaysAhead: 30,
   slotCapacity: 5,
   // M107 (owner, 2026-10-20): the meeting room books through this same flow, بدون رسوم for members.
   purposes: ['حجز قاعة الاجتماعات', 'اجتماع عمل', 'زيارة تعريفية للمقر', 'تصوير أو بودكاست', 'حضور فعالية', 'أخرى'],
-  version: 4,
-  updatedAt: '2026-09-12T00:00:00.000Z',
+  // M109a: 24 bookable office/meeting-room hours per member per membership year.
+  walletHours: 24,
+  // v5 (M109a+f): the 09:00–21:00 day, the hours wallet, and the upsell lock texts.
+  version: 5,
+  updatedAt: '2026-10-20T00:00:00.000Z',
 };
 
 export async function ensureHqSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {

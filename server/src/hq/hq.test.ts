@@ -19,10 +19,11 @@ test('riyadh clock and bookable days follow the Riyadh calendar and the working 
 });
 
 test('slot times cover the working hours in slot steps', () => {
+  // M109a: the 12-hour day — first slot 09:00, last slot 20:00.
   const times = slotTimes(HQ_SEED);
-  assert.equal(times[0], '10:00');
-  assert.equal(times[times.length - 1], '18:00');
-  assert.equal(times.length, 9);
+  assert.equal(times[0], '09:00');
+  assert.equal(times[times.length - 1], '20:00');
+  assert.equal(times.length, 12);
 });
 
 test('pass windows: 15 minutes of grace before the slot, expired after it', () => {

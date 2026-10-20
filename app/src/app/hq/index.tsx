@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
-import { hqApi, useHq, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
+import { hqApi, useHq, useHqWallet, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
@@ -18,7 +18,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { formatArabicDate, weekdayName, weekdayOf } from '@/lib/format';
+import { formatArabicDate, formatNumber, weekdayName, weekdayOf } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -31,6 +31,8 @@ export default function HqScreen() {
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useHq();
   const visits = useMyVisits(status === 'signedIn');
+  // M109a: the member's live annual hours counter (offices + meeting room).
+  const wallet = useHqWallet(status === 'signedIn' && data?.access === 'member');
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   useAdvisorScreen({ type: 'screen', id: 'hq', title: data?.content.title ?? t('nav.hq') });
@@ -114,6 +116,11 @@ export default function HqScreen() {
       </FadeInView>
       {data.access === 'member' ? (
         <FadeInView delay={entranceDelay(4)}>
+          {wallet.data ? (
+            <Text style={styles.walletLine}>
+              {t('hq.walletLine', { left: formatNumber(wallet.data.wallet.remaining), total: formatNumber(wallet.data.wallet.total) })}
+            </Text>
+          ) : null}
           <AppButton label={t('hq.book')} icon="calendar-outline" onPress={() => router.push('/hq/book')} />
         </FadeInView>
       ) : (
@@ -197,6 +204,8 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bulletText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, flex: 1 },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
+  // M109a: the live hours counter above the booking button.
+  walletLine: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldLight, textAlign: textStart, marginBottom: spacing.sm },
   visit: { gap: spacing.xs, padding: spacing.md },
   visitHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   visitDate: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, flex: 1 },

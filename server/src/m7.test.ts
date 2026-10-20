@@ -68,7 +68,7 @@ after(async () => {
   await app.close();
 });
 
-test('content: one annual membership name, HQ open 10:00 to 19:00, two services priced for Paymob', async () => {
+test('content: one annual membership name, HQ open 09:00 to 21:00 (M109a), two services priced for Paymob', async () => {
   const membership = await get('/api/membership');
   assert.equal(membership.json().title, 'العضوية السنوية لنادي المستثمرين');
   const home = await get('/api/home');
@@ -76,8 +76,9 @@ test('content: one annual membership name, HQ open 10:00 to 19:00, two services 
   assert.ok(!`${membership.body}${home.body}`.includes('العضوية الذهبية'));
 
   const hq = await get('/api/hq');
-  assert.equal(hq.json().content.hours.close, '19:00');
-  assert.deepEqual([hq.json().times[0], hq.json().times.at(-1), hq.json().times.length], ['10:00', '18:00', 9]);
+  // M109a: the 12-hour booking day.
+  assert.equal(hq.json().content.hours.close, '21:00');
+  assert.deepEqual([hq.json().times[0], hq.json().times.at(-1), hq.json().times.length], ['09:00', '20:00', 12]);
 
   const guest = await get('/api/services');
   const services = guest.json().services as { key: string; action: { type: string } | null; price: { amount: number; memberPrice: boolean } | null }[];

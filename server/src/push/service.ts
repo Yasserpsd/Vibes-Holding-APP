@@ -214,19 +214,24 @@ export class PushService {
     this.inflight = this.inflight.then(() => run);
   }
 
-  hqVisitDecided(visit: { id: string; contactId: number; date: string; time: string; endTime: string; adminNote: string | null }, status: 'confirmed' | 'rejected'): void {
+  hqVisitDecided(
+    visit: { id: string; contactId: number; date: string; time: string; endTime: string; adminNote: string | null; space?: 'office' | 'meeting' | null },
+    status: 'confirmed' | 'rejected',
+  ): void {
     const when = `${arabicDay(visit.date)} من ${visit.time} إلى ${visit.endTime}`;
+    // M109a: office/meeting-room bookings speak of a booking, not a visit, and name the hours deduction.
+    const booking = Boolean(visit.space);
     if (status === 'confirmed') {
       this.background(visit.contactId, {
-        title: 'تم تأكيد زيارتك للمقر',
-        body: `${when}. باركود الدخول جاهز في التطبيق.`,
+        title: booking ? 'تم تأكيد حجزك في المقر' : 'تم تأكيد زيارتك للمقر',
+        body: `${when}. باركود الدخول جاهز في التطبيق${booking ? '، وخُصمت مدة الحجز من رصيد ساعاتك السنوي' : ''}.`,
         data: { type: 'hq_visit', id: visit.id, status, screen: `/hq/pass/${visit.id}` },
       });
       return;
     }
     this.background(visit.contactId, {
-      title: 'تعذّر تأكيد زيارتك للمقر',
-      body: `${when}. ${visit.adminNote ? `ملاحظة الإدارة: ${visit.adminNote}` : 'يمكنك اختيار موعد آخر من التطبيق.'}`,
+      title: booking ? 'تعذّر تأكيد حجزك في المقر' : 'تعذّر تأكيد زيارتك للمقر',
+      body: `${when}. ${visit.adminNote ? `ملاحظة الإدارة: ${visit.adminNote}` : 'يمكنك اختيار موعد آخر من التطبيق.'}${booking ? ' لم يُخصم شيء من رصيد ساعاتك.' : ''}`,
       data: { type: 'hq_visit', id: visit.id, status, screen: '/hq' },
     });
   }

@@ -964,7 +964,17 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.voiceEmpty": "لم نلتقط كلامًا واضحًا، حاول مرة أخرى.",
     "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى.",
     "home.appPublish": "انشر تطبيقك بدون رسوم",
-    "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store"
+    "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store",
+    "hqBook.kind": "نوع الحجز",
+    "hqBook.kindVisit": "زيارة المقر",
+    "hqBook.kindOffice": "مكتب خاص",
+    "hqBook.kindMeeting": "قاعة الاجتماعات",
+    "hqBook.duration": "مدة الحجز",
+    "hqBook.incompleteSpace": "اختر اليوم والوقت والمدة",
+    "hqBook.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
+    "hqBook.walletHint": "يُخصم الحجز من رصيدك بعد تأكيد الإدارة فقط، ولا دخول قبل التأكيد.",
+    "hqBook.walletEmpty": "رصيد ساعاتك لهذه السنة انتهى، ويتجدد مع سنة العضوية الجديدة.",
+    "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة"
   },
   "en": {
     "tabs.home": "Home",
@@ -1930,7 +1940,17 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.voiceEmpty": "We could not catch clear speech; try again.",
     "advisor.voiceFailed": "The recording could not be read; try again.",
     "home.appPublish": "Publish your app, no fees",
-    "home.appPublishHint": "The club publishes your app on Google Play and the App Store"
+    "home.appPublishHint": "The club publishes your app on Google Play and the App Store",
+    "hqBook.kind": "Booking type",
+    "hqBook.kindVisit": "HQ visit",
+    "hqBook.kindOffice": "Private office",
+    "hqBook.kindMeeting": "Meeting room",
+    "hqBook.duration": "Duration",
+    "hqBook.incompleteSpace": "Pick the day, time and duration",
+    "hqBook.walletLine": "Your annual hours balance: {left} of {total} hours left",
+    "hqBook.walletHint": "Hours are deducted only after the management confirms, and there is no entry before confirmation.",
+    "hqBook.walletEmpty": "Your hours for this membership year are used up; the balance renews with the new membership year.",
+    "hq.walletLine": "Your annual hours balance: {left} of {total} hours left"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

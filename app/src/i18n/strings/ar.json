@@ -962,5 +962,15 @@
   "advisor.voiceEmpty": "لم نلتقط كلامًا واضحًا، حاول مرة أخرى.",
   "advisor.voiceFailed": "تعذر قراءة التسجيل، حاول مرة أخرى.",
   "home.appPublish": "انشر تطبيقك بدون رسوم",
-  "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store"
+  "home.appPublishHint": "النادي ينشر تطبيقك على Google Play وApp Store",
+  "hqBook.kind": "نوع الحجز",
+  "hqBook.kindVisit": "زيارة المقر",
+  "hqBook.kindOffice": "مكتب خاص",
+  "hqBook.kindMeeting": "قاعة الاجتماعات",
+  "hqBook.duration": "مدة الحجز",
+  "hqBook.incompleteSpace": "اختر اليوم والوقت والمدة",
+  "hqBook.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة",
+  "hqBook.walletHint": "يُخصم الحجز من رصيدك بعد تأكيد الإدارة فقط، ولا دخول قبل التأكيد.",
+  "hqBook.walletEmpty": "رصيد ساعاتك لهذه السنة انتهى، ويتجدد مع سنة العضوية الجديدة.",
+  "hq.walletLine": "رصيد ساعاتك السنوي: المتبقي {left} من {total} ساعة"
 }
