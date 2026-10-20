@@ -16,6 +16,7 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -40,6 +41,7 @@ export default function ServiceScreen() {
   const [handedOver, setHandedOver] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [payGated, setPayGated] = useState(false);
   // M107: the discount code and what the server said it is worth against this price.
   const [code, setCode] = useState('');
   const [applied, setApplied] = useState<{ code: string; percent: number; amountAfter: number } | null>(null);
@@ -96,6 +98,7 @@ export default function ServiceScreen() {
     }
     setPaying(true);
     setPayError(null);
+    setPayGated(false);
     try {
       const { payment } = await paymentsApi.start(service.key, answers, applied ? applied.code : code.trim() || undefined);
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -106,6 +109,7 @@ export default function ServiceScreen() {
       router.navigate({ pathname: '/payment/[id]', params: { id: payment.id } });
     } catch (cause) {
       setPayError(errorMessage(cause));
+      setPayGated(isProfileGate(cause));
     } finally {
       setPaying(false);
     }
@@ -183,7 +187,8 @@ export default function ServiceScreen() {
       )}
       {payError ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={payError} />
+          {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
+          {payGated ? <ProfileGateNotice text={payError} /> : <Notice tone="warning" text={payError} />}
         </FadeInView>
       ) : null}
       {handedOver ? (

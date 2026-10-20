@@ -956,6 +956,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "profileNudge.text": "ملفك مكتمل بنسبة {percent}% — أكمل بياناتك لنعرفك أكثر ونرشّح لك الأنسب داخل النادي.",
     "profileNudge.cta": "أكمل بياناتي الآن",
     "profileNudge.later": "لاحقًا",
+    "profileGate.cta": "كمّل بياناتك",
+    "errors.code.profile_incomplete": "كمّل بياناتك أولًا لإتمام هذا الطلب: الوظيفة والشركة والمدينة والنبذة والموقع وحسابات التواصل — من «حسابي» ← «تعديل الملف الشخصي».",
     "card.notActiveBadge": "عضو غير مفعل",
     "card.printFree": "يصلك إلى عنوان بيتك أينما كنت بدون رسوم — حق لكل عضو فعّل عضويته.",
     "advisor.voiceTitle": "الإدخال الصوتي",
@@ -1923,6 +1925,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "profileNudge.text": "Your profile is {percent}% complete — finish it so we know you better and suggest what fits you in the club.",
     "profileNudge.cta": "Complete it now",
     "profileNudge.later": "Later",
+    "profileGate.cta": "Complete your profile",
+    "errors.code.profile_incomplete": "Complete your profile first to finish this request: job title, company, city, bio, website and social links — from My Account → Edit profile.",
     "card.notActiveBadge": "Inactive member",
     "card.printFree": "Delivered to your home address wherever you are, with no fees — every activated member’s right.",
     "advisor.voiceTitle": "Voice input",
@@ -1993,6 +1997,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "ticket": "تذكرة الفعالية",
     "interests": "الاهتمامات",
     "partners": "شركاؤنا",
-    "profileNudge": "تنبيه إكمال البيانات"
+    "profileNudge": "تنبيه إكمال البيانات",
+    "profileGate": "بوابة إكمال البيانات"
   }
 };

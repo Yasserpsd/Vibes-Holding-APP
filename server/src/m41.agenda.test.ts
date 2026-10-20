@@ -38,7 +38,7 @@ let freeEventId = '';
 
 const bearer = (token?: string) => (token ? { authorization: `Bearer ${token}` } : {});
 const get = (url: string, token?: string) => app.inject({ method: 'GET', url, headers: bearer(token) });
-const send = (method: 'POST' | 'PUT' | 'DELETE', url: string, payload: Record<string, unknown> | undefined, token?: string) =>
+const send = (method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload: Record<string, unknown> | undefined, token?: string) =>
   app.inject({ method, url, ...(payload ? { payload } : {}), headers: bearer(token) });
 
 async function signUp(email: string, phone: string): Promise<{ token: string; id: number }> {
@@ -46,7 +46,11 @@ async function signUp(email: string, phone: string): Promise<{ token: string; id
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);
-  return { token: verified.json().token as string, id: verified.json().me.id as number };
+  const token = verified.json().token as string;
+  // M109i: registrations sit behind the complete-profile gate — the test accounts fill the six fields.
+  const completed = await send('PATCH', '/api/me', { jobTitle: 'مدير', company: 'شركة الاختبار', city: 'الرياض', website: 'https://example.test', social: 'https://x.com/test' }, token);
+  assert.equal(completed.statusCode, 200, completed.body);
+  return { token, id: verified.json().me.id as number };
 }
 
 const soon = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);

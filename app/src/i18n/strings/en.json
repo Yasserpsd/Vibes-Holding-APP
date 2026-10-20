@@ -954,6 +954,8 @@
   "profileNudge.text": "Your profile is {percent}% complete — finish it so we know you better and suggest what fits you in the club.",
   "profileNudge.cta": "Complete it now",
   "profileNudge.later": "Later",
+  "profileGate.cta": "Complete your profile",
+  "errors.code.profile_incomplete": "Complete your profile first to finish this request: job title, company, city, bio, website and social links — from My Account → Edit profile.",
   "card.notActiveBadge": "Inactive member",
   "card.printFree": "Delivered to your home address wherever you are, with no fees — every activated member’s right.",
   "advisor.voiceTitle": "Voice input",

@@ -11,6 +11,7 @@ import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { EventDateBadge } from './index';
@@ -34,6 +35,7 @@ export default function AgendaEventScreen() {
   const register = useRegisterAgenda();
   const checkDiscount = useAgendaDiscount();
   const [error, setError] = useState<string | null>(null);
+  const [gated, setGated] = useState(false);
   // M107: the discount code the member typed, and what the server said it is worth here.
   const [code, setCode] = useState('');
   const [applied, setApplied] = useState<AgendaDiscount | null>(null);
@@ -60,6 +62,7 @@ export default function AgendaEventScreen() {
   const tap = (attendance: AgendaAttendance) => {
     if (!event || register.isPending) return;
     setError(null);
+    setGated(false);
     register.mutate(
       { eventId: event.id, attendance, discountCode: applied ? applied.code : code.trim() || undefined },
       {
@@ -72,7 +75,10 @@ export default function AgendaEventScreen() {
           }
           void query.refetch();
         },
-        onError: (cause) => setError(cause.message),
+        onError: (cause) => {
+          setError(cause.message);
+          setGated(isProfileGate(cause));
+        },
       },
     );
   };
@@ -194,7 +200,8 @@ export default function AgendaEventScreen() {
               ) : null}
               {error ? (
                 <FadeInView offset={8}>
-                  <Notice tone="warning" text={error} />
+                  {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
+                  {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} />}
                 </FadeInView>
               ) : null}
               {event.mode !== 'online' ? (

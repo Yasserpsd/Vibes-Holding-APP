@@ -69,6 +69,7 @@ import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { PollsService } from './polls/service.js';
+import { registerProfileGate } from './profiles/gate.js';
 import { profilesRoutes } from './profiles/routes.js';
 import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
@@ -407,6 +408,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     // Versions of the hub and Projects Bank bridges as last checked (the check runs in the background).
     bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
   }));
+
+  // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
+  registerProfileGate(app, auth);
 
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, publicUrl: config.PUBLIC_URL, fetchImpl });
   await app.register(interestsRoutes, { service: interests, auth });

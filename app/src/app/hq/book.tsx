@@ -12,6 +12,7 @@ import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -31,6 +32,7 @@ export default function BookVisitScreen() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [gated, setGated] = useState(false);
   const selectedDate = date ?? data?.days[0]?.date ?? null;
   const slots = useHqSlots(selectedDate);
 
@@ -57,12 +59,14 @@ export default function BookVisitScreen() {
     }
     setBusy(true);
     setSubmitError(null);
+    setGated(false);
     try {
       await hqApi.book({ date: selectedDate, time, purpose, note });
       await queryClient.invalidateQueries({ queryKey: ['hq'] });
       router.back();
     } catch (cause) {
       setSubmitError(errorMessage(cause));
+      setGated(isProfileGate(cause));
     } finally {
       setBusy(false);
     }
@@ -120,7 +124,8 @@ export default function BookVisitScreen() {
 
       {submitError ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={submitError} />
+          {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
+          {gated ? <ProfileGateNotice text={submitError} /> : <Notice tone="warning" text={submitError} />}
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(5)}>
