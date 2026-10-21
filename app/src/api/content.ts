@@ -36,7 +36,8 @@ export type HomeSectionKey =
   | 'savings'
   | 'tour'
   | 'opportunity'
-  | 'wallet';
+  | 'wallet'
+  | 'meetups';
 
 /** M74: how the home reads for one persona (or a guest). M99: visibility, tabs and the services grid too. */
 export type HomePersonaVariant = {
@@ -75,6 +76,8 @@ export type HomeContent = {
   opportunity?: { title: string; subtitle: string; cta: string };
   /** M99c: the investor's wallet card — words from the server, numbers from the wallet API. */
   wallet?: { title: string; subtitle: string; cta: string };
+  /** M119: the club meetups strip; an older server sends none and the block hides. */
+  meetups?: { title: string; subtitle: string; cta: string };
   /** M74: per-persona home variants; an older server sends none and one home serves everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   entrepreneurs: { title: string; intro: string; serviceKeys: string[] };
@@ -160,6 +163,54 @@ export function useHomeContent() {
     queryFn: () => apiGet<HomeContent>('/api/home'),
     staleTime: 10 * 60_000,
   });
+}
+
+// Mirrors server/src/content/meetups.ts (M119: the five club meetups).
+export type MeetupFeature = { title: string; text: string };
+
+export type Meetup = {
+  key: string;
+  number: string;
+  badge: string;
+  title: string;
+  tagline: string;
+  description: string;
+  features: MeetupFeature[];
+  /** Empty until the owner sends the film; the page shows the emblem hero instead. */
+  videoUrl: string;
+  formKey: string;
+  cta: string;
+};
+
+export type MeetupsPersonaVariant = { intro: string; order: string[] };
+
+export type MeetupsContent = {
+  title: string;
+  subtitle: string;
+  personas: Partial<Record<PortalKey | 'guest', MeetupsPersonaVariant>>;
+  meetups: Meetup[];
+  updatedAt: string;
+};
+
+export function useMeetupsContent() {
+  return useQuery({
+    queryKey: ['content', 'meetups'],
+    queryFn: () => apiGet<MeetupsContent>('/api/meetups'),
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** The meetups the way one persona reads them: his intro line, his order first, the rest after. */
+export function meetupsFor(content: MeetupsContent | undefined, persona: PortalKey | 'guest'): { intro: string; meetups: Meetup[] } {
+  if (!content) return { intro: '', meetups: [] };
+  const variant = content.personas?.[persona];
+  const lead = variant?.order ?? [];
+  const rank = (key: string): number => {
+    const index = lead.indexOf(key);
+    return index < 0 ? lead.length : index;
+  };
+  const meetups = [...content.meetups].sort((a, b) => rank(a.key) - rank(b.key));
+  return { intro: variant?.intro ?? '', meetups };
 }
 
 export function useAboutContent() {

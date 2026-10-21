@@ -17,6 +17,8 @@ import { GUIDE_CONTENT_KEY, GUIDE_SEED } from './guide.js';
 import { HOME_CONTENT_KEY, HOME_SEED } from './home.js';
 import { HQ_CONTENT_KEY, HQ_SEED } from './hq.js';
 import { at, wordingOf } from './i18n.js';
+import { MEETUPS_EN } from './en/meetups.js';
+import { MEETUPS_CONTENT_KEY, MEETUPS_SEED } from './meetups.js';
 import { MEMBERSHIP_CONTENT_KEY, MEMBERSHIP_SEED } from './membership.js';
 import { SERVICES_CONTENT_KEY, SERVICES_SEED } from './services.js';
 import { VIDEOS_CONTENT_KEY, VIDEOS_SEED } from './videos.js';
@@ -38,6 +40,7 @@ export const CONTENT_BLOCKS: readonly ContentBlock[] = [
   { key: 'videos', label: 'مكتبة الفيديو', storeKey: VIDEOS_CONTENT_KEY, seed: VIDEOS_SEED, translation: VIDEOS_EN },
   { key: 'guide', label: 'دليل المحايد والورش', storeKey: GUIDE_CONTENT_KEY, seed: GUIDE_SEED, translation: GUIDE_EN },
   { key: 'forms', label: 'نماذج التسجيل', storeKey: FORMS_CONTENT_KEY, seed: FORMS_SEED, translation: FORMS_EN },
+  { key: 'meetups', label: 'ملتقيات النادي', storeKey: MEETUPS_CONTENT_KEY, seed: MEETUPS_SEED, translation: MEETUPS_EN },
 ];
 
 export type AdminContentItem = { block: ContentBlockKey; path: string; ar: string; en: string; arEdit: ContentEdit | null; enEdit: ContentEdit | null };

@@ -72,6 +72,11 @@ export const HOME_EN: Translation<HomeContent> = {
     subtitle: 'A venture picked from the Projects Bank, renewed on every app open',
     cta: 'Discover the opportunity',
   },
+  meetups: {
+    title: 'Investors Club Meetups',
+    subtitle: 'Five distinctive experiences that open partnership doors — each meetup has its own character and audience',
+    cta: 'All meetups',
+  },
   personas: {
     guest: {
       heroSubtitle:

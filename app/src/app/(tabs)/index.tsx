@@ -11,6 +11,7 @@ import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AgendaBlock } from '@/components/AgendaBlock';
+import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
@@ -44,7 +45,7 @@ const VIDEO_WIDTH = 240;
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
 // The membership block left the home page for good (owner, 2026-10-17), and the golden strip followed it
 // (owner, 2026-10-18) — «جولة في النادي» stands in its place; a server order naming either is skipped.
-const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'portals', 'tour', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
+const DEFAULT_ORDER: HomeSectionKey[] = ['famous', 'posts', 'agenda', 'meetups', 'portals', 'tour', 'services', 'partners', 'videos', 'projectsBank', 'quickActions'];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -145,6 +146,8 @@ export default function HomeScreen() {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
     posts: () => <PostsBlock key="posts" />,
     agenda: () => <AgendaBlock key="agenda" ctaLabel={ctaOf('agenda')?.label} />,
+    // M119: the five club meetups — ordered per persona inside the block itself.
+    meetups: () => (content.meetups ? <MeetupsBlock key="meetups" block={content.meetups} ctaLabel={ctaOf('meetups')?.label} /> : null),
     // M74 addition 3 (owner): the three gateway icons show for a GUEST only, side by side, compact.
     portals: () =>
       signedIn && me?.persona ? null : (

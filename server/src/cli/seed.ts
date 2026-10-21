@@ -5,6 +5,7 @@ import { ensureGoldenSeed } from '../content/golden.js';
 import { ensureGuideSeed } from '../content/guide.js';
 import { ensureHomeSeed } from '../content/home.js';
 import { ensureHqSeed } from '../content/hq.js';
+import { ensureMeetupsSeed } from '../content/meetups.js';
 import { ensureMembershipSeed } from '../content/membership.js';
 import { ensureServicesSeed } from '../content/services.js';
 import { ensureVideosSeed } from '../content/videos.js';
@@ -30,6 +31,7 @@ const results = {
   videos: await ensureVideosSeed(kv, { force }),
   guide: await ensureGuideSeed(kv, { force }),
   forms: await ensureFormsSeed(kv, { force }),
+  meetups: await ensureMeetupsSeed(kv, { force }),
 };
 for (const [name, written] of Object.entries(results)) {
   console.log(written ? `${name}: content written.` : `${name}: content already present (use --force to overwrite).`);

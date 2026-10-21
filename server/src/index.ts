@@ -5,6 +5,7 @@ import { ensureGoldenSeed } from './content/golden.js';
 import { ensureGuideSeed } from './content/guide.js';
 import { ensureHomeSeed } from './content/home.js';
 import { ensureHqSeed } from './content/hq.js';
+import { ensureMeetupsSeed } from './content/meetups.js';
 import { ensureMembershipSeed } from './content/membership.js';
 import { ensureServicesSeed } from './content/services.js';
 import { ensureVideosSeed } from './content/videos.js';
@@ -25,6 +26,7 @@ const seeded = {
   videos: await ensureVideosSeed(kv),
   guide: await ensureGuideSeed(kv),
   forms: await ensureFormsSeed(kv),
+  meetups: await ensureMeetupsSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
 };
 const { app, projects, golden, news, videos, media, sync, analytics, companion } = await buildApp({ config, kv });

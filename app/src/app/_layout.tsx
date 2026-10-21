@@ -129,6 +129,8 @@ export default function RootLayout() {
                 <Stack.Screen name="people/apply" options={{ ...detailHeader, title: t('nav.peopleApply') }} />
                 <Stack.Screen name="guide" options={{ ...detailHeader, title: t('nav.guide') }} />
                 <Stack.Screen name="workshops" options={{ ...detailHeader, title: t('nav.workshops') }} />
+                <Stack.Screen name="meetups" options={{ ...detailHeader, title: t('nav.meetups') }} />
+                <Stack.Screen name="meetup/[key]" options={{ ...detailHeader, title: t('nav.meetup') }} />
                 <Stack.Screen name="about" options={{ ...detailHeader, title: t('nav.about') }} />
                 <Stack.Screen name="hq/index" options={{ ...detailHeader, title: t('nav.hq') }} />
                 <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />

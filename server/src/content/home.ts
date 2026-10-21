@@ -43,7 +43,8 @@ export type HomeSectionKey =
   | 'savings'
   | 'tour'
   | 'opportunity'
-  | 'wallet';
+  | 'wallet'
+  | 'meetups';
 
 /** M74: how the home reads for one persona (or a guest): its own copy, block order and block CTAs. */
 export type HomePersonaVariant = {
@@ -85,6 +86,8 @@ export type HomeContent = {
   opportunity?: { title: string; subtitle: string; cta: string };
   /** M99c: the investor's wallet card — his Projects Bank balance and unlocked projects at a glance. */
   wallet?: { title: string; subtitle: string; cta: string };
+  /** M119: the five club meetups strip (content/meetups.ts holds the meetups themselves). */
+  meetups?: { title: string; subtitle: string; cta: string };
   /** M74: per-persona home variants (guest included). Absent on an older stored block = one home for everyone. */
   personas?: Partial<Record<PortalKey | 'guest', HomePersonaVariant>>;
   /** The entrepreneurs portal page: intro plus the keys of the services it lists. */
@@ -203,6 +206,12 @@ export const HOME_SEED: HomeContent = {
     items: ['ورش العمل والملتقيات بدون رسوم للأعضاء', 'رصيد سنوي يفتح لك خدمات النادي', 'خصومات شركائنا برمز العضو الخاص بك'],
     cta: 'تعرّف على العضوية',
   },
+  // M119 (owner, 2026-10-21): the five meetups from vibesholding.com/mup as their own prominent section.
+  meetups: {
+    title: 'ملتقيات نادي المستثمرين',
+    subtitle: 'خمس تجارب نوعية تفتح أبواب الشراكة — لكل ملتقى طابعه وجمهوره',
+    cta: 'كل الملتقيات',
+  },
   // M99c: the investor's opening act (the wallet card left the home for good — owner, 2026-10-19: «ملهاش اي داعي»).
   opportunity: {
     title: 'الفرصة الذهبية',
@@ -216,14 +225,14 @@ export const HOME_SEED: HomeContent = {
       // M99a: the picker first, then مميزات العضوية as the guest's first CONTENT block; he browses ALL services.
       heroSubtitle:
         'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
-      order: ['portals', 'membership', 'posts', 'agenda', 'projectsBank', 'services', 'partners', 'videos', 'famous'],
+      order: ['portals', 'membership', 'meetups', 'posts', 'agenda', 'projectsBank', 'services', 'partners', 'videos', 'famous'],
     },
     neutral: {
       // M74-6..8 (owner-approved, 2026-10-17): the neutral's home is a discovery journey — events and the
       // companion advisor first, then the inspiration content (شخصية ومسيرة / تعرف علينا / the podcast stage),
       // the Projects Bank as a window, and what the membership saves him while he explores.
       heroSubtitle: 'استكشف الملتقيات وقصص الأعضاء، ودع مستشارك يرافقك حتى تحدّد وجهتك بثقة.',
-      order: ['posts', 'agenda', 'advisor', 'quickActions', 'famous', 'videos', 'podcast', 'projectsBank', 'services', 'savings', 'partners'],
+      order: ['posts', 'agenda', 'meetups', 'advisor', 'quickActions', 'famous', 'videos', 'podcast', 'projectsBank', 'services', 'savings', 'partners'],
       ctas: {
         projectsBank: { label: 'استكشف المشاريع للإلهام', route: '/projects' },
         agenda: { label: 'احضر الملتقى القادم', route: '/agenda' },
@@ -235,7 +244,7 @@ export const HOME_SEED: HomeContent = {
       // (the app collapses the grid for this persona). His journey: present yourself (podcast,
       // شخصية ومسيرة), meet investors (الملتقيات), grow the venture (الخدمات).
       heroSubtitle: 'مشروعك يستحق منصة النادي: اعرضه على المستثمرين في شركاء النجاح، وانشر تطبيقك بدون رسوم.',
-      order: ['services', 'posts', 'agenda', 'podcast', 'quickActions', 'famous', 'partners', 'videos'],
+      order: ['services', 'meetups', 'posts', 'agenda', 'podcast', 'quickActions', 'famous', 'partners', 'videos'],
       hide: ['projectsBank', 'golden', 'opportunity', 'wallet'],
       hideTabs: ['projects'],
       serviceKeys: ['app-publish', 'pitch-deck', 'meetup', 'studio', 'momentum', 'theater', 'famous'],
@@ -250,7 +259,7 @@ export const HOME_SEED: HomeContent = {
       // الكاروسيل، المحفظة) — the carousel block leaves; the opportunity opens and the wallet follows,
       // and the full bank lives in his بنك المشاريع tab.
       heroSubtitle: 'فرص شراكة حقيقية بانتظارك: بنك المشاريع والملتقيات ومجتمع الأعمال في مكان واحد.',
-      order: ['opportunity', 'posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
+      order: ['opportunity', 'meetups', 'posts', 'quickActions', 'agenda', 'services', 'partners', 'videos', 'famous'],
       hide: ['projectsBank', 'wallet'],
       serviceKeys: ['credit', 'theater', 'consultation', 'meetup'],
       ctas: {
@@ -268,8 +277,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 14,
-  updatedAt: '2026-10-19T00:00:00.000Z',
+  version: 15,
+  updatedAt: '2026-10-21T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

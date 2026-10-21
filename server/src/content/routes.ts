@@ -15,6 +15,7 @@ import { adminValues, saveContentValue } from './values.js';
 import { getGoldenContent } from './golden.js';
 import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
+import { getMeetupsContent } from './meetups.js';
 import { getMembershipContent } from './membership.js';
 import { bannerImages, imageSlots, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
@@ -113,6 +114,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
   app.get('/api/images', async () => ({ images: await bannerImages(kv) }));
   app.get('/api/membership', async (request) => getMembershipContent(kv, langOf(request)));
   app.get('/api/home', async (request) => getHomeContent(kv, langOf(request)));
+  // M119: the five club meetups — content only; registration goes through the forms module.
+  app.get('/api/meetups', async (request) => getMeetupsContent(kv, langOf(request)));
   app.get('/api/about', async (request) => getAboutContent(kv, langOf(request)));
   app.get('/api/guide', async (request) => getGuideContent(kv, langOf(request)));
 
