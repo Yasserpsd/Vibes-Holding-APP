@@ -1,6 +1,10 @@
 # Store listings — نصوص المتاجر (owner, 2026-10-21)
 
 Final store copy from the owner, both languages. Used for M114 (c) store listings.
+NAME DECISION (owner, 2026-10-21, overrides the names below): the app's store name is
+**«Investors Club»** in BOTH the Arabic and English listings (he wrote «التطبيق اصبح اسمه
+Investors Club» and picked it for the Arabic listing too). Descriptions keep «نادي المستثمرين» inside the text.
+ENTERED IN PLAY CONSOLE 2026-10-21: ar (default) + en-US listings both saved as draft with this copy.
 NOTE (unresolved): «فالصفقة تبدأ بمعرفة» uses صفقة — house style prefers الشراكات; owner to decide.
 
 ## Google Play — العربية
