@@ -69,6 +69,7 @@ import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { PollsService } from './polls/service.js';
+import { PEOPLE_TRANSLATE_SYSTEM, PersonLocalizer } from './profiles/english.js';
 import { registerProfileGate } from './profiles/gate.js';
 import { profilesRoutes } from './profiles/routes.js';
 import { ProfilesService } from './profiles/service.js';
@@ -277,7 +278,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     maxImageBytes: config.UPLOAD_MAX_IMAGE_MB * MEGABYTE,
     maxVideoBytes: config.UPLOAD_MAX_VIDEO_MB * MEGABYTE,
     enabled: mediaStore.durable || config.APP_ENV !== 'production',
-    referenced: async () => new Set((await posts.listAll()).flatMap(postMediaUrls).map((url) => MediaService.keyInPath(url)).filter((key): key is string => key !== null)),
+    // M118b (the night the sweep ATE the photos): «referenced» used to mean the POSTS' media only,
+    // so every people photo, agenda hero, service banner and image slot counted as an orphan and
+    // was deleted from the bucket. Now EVERY kv document that mentions a /media/ path keeps its
+    // files alive, with the posts kept as before.
+    referenced: async () => MediaService.referencedEverywhere(kv, (await posts.listAll()).flatMap(postMediaUrls)),
     sweepEnabled: config.UPLOADS_SWEEP === '1' && Boolean(config.DATABASE_URL),
     log: app.log,
   });
@@ -463,7 +468,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });
   await app.register(contactRoutes, { service: contact, auth });
-  await app.register(profilesRoutes, { service: profiles, auth });
+  // M118c: the English app's spotlight people — translated once per profile change, cached in kv.
+  const personLocalizer = new PersonLocalizer(
+    kv,
+    config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: PEOPLE_TRANSLATE_SYSTEM }) : new OffTranslator(),
+  );
+  await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });

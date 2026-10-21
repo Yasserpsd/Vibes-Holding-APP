@@ -3,9 +3,11 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, MEMBER_ONLY_UPSELL, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
+import type { PersonLocalizer } from './english.js';
 import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type ProfilesService } from './service.js';
 
-export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService };
+export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService; english?: PersonLocalizer };
 
 const linkSchema = z.object({
   label: z.string().trim().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا').default(''),
@@ -55,15 +57,20 @@ const configSchema = z.object({ intro: z.string().trim().min(10).max(500) });
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M11 «شخصية ومسيرة»: the public people, the member's own application, and the dashboard review. */
-export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (app, { service, auth }) => {
+export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (app, { service, auth, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   const whoIs = optionalSession(auth);
 
   app.get(
     '/api/people',
-    guard(async () => {
+    guard(async (request) => {
       const [config, people] = await Promise.all([service.config(), service.people()]);
+      // M118c: the English app reads the spotlight in English — names transliterated, the rest translated.
+      const lang = langOf(request);
+      if (english && lang === 'en') {
+        return { intro: await english.intro(config.intro, lang), people: await english.list(people, lang) };
+      }
       return { intro: config.intro, people: people.map(publicPerson) };
     }),
   );
@@ -81,7 +88,8 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       }
       const person = await service.person(params.id);
       if (!person) return reply.code(404).send({ error: { code: 'not_found', message: 'الملف غير موجود' } });
-      return { person: publicPersonFull(person) };
+      const lang = langOf(request);
+      return { person: english ? await english.person(person, lang) : publicPersonFull(person) };
     }),
   );
 

@@ -10,6 +10,7 @@ import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { LogMailer } from './mail/mailer.js';
 import { S3MediaStore } from './media/s3.js';
+import { MediaService } from './media/service.js';
 import { DiskMediaStore, UploadTooLargeError } from './media/store.js';
 import { MemoryKV } from './store.js';
 import { TemplateBlurbWriter } from './videos/blurbs.js';
@@ -23,6 +24,7 @@ const MP4 = Buffer.alloc(5000, 3);
 let uploadsDir = '';
 let built: BuiltApp;
 let app: BuiltApp['app'];
+let kv: MemoryKV;
 let adminToken = '';
 
 const bearer = (token?: string) => (token ? { authorization: `Bearer ${token}` } : {});
@@ -52,7 +54,8 @@ const post = (extra: Record<string, unknown>) => ({ title: 'منشور بملف�
 before(async () => {
   uploadsDir = await mkdtemp(join(tmpdir(), 'm15-uploads-'));
   const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', PUBLIC_URL, UPLOADS_DIR: uploadsDir, UPLOAD_MAX_IMAGE_MB: '1', UPLOAD_MAX_VIDEO_MB: '2' });
-  built = await buildApp({ config, kv: new MemoryKV(), hub: new MockHubClient(), blurbs: new TemplateBlurbWriter(), mailer: new LogMailer() });
+  kv = new MemoryKV();
+  built = await buildApp({ config, kv, hub: new MockHubClient(), blurbs: new TemplateBlurbWriter(), mailer: new LogMailer() });
   app = built.app;
   const registered = await send('POST', '/api/auth/register', { name: 'مدير تجريبي', country: 'sa', phone: '0558318815', email: 'm15.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار لرفع ملفات منشورات الإدارة.' });
   assert.equal(registered.statusCode, 200, registered.body);
@@ -225,6 +228,19 @@ test('the sweep removes abandoned uploads after a day and nothing else', async (
   assert.equal((await get(`/media/${used.key}`)).statusCode, 200);
   assert.equal(await stored(), count - removed);
   assert.equal(built.media.status().swept !== null, true);
+});
+
+test('M118b: a photo mentioned in ANY kv document is referenced — never an orphan for the sweep', async () => {
+  const peoplePhoto = await upload('image/png', PNG);
+  const slotPhoto = await upload('image/png', PNG);
+  const abandoned = await upload('image/png', PNG);
+  // People, slots, seeds… anything that stores a /media/ URL in kv now protects its file.
+  await kv.set('people:test-doc', { people: [{ name: 'اختبار', photoUrl: peoplePhoto.url }] });
+  await kv.set('content:slots-test', { slots: { 'service.test': slotPhoto.url } });
+  const referenced = await MediaService.referencedEverywhere(kv, []);
+  assert.ok(referenced.has(peoplePhoto.key), 'the people photo is referenced');
+  assert.ok(referenced.has(slotPhoto.key), 'the slot photo is referenced');
+  assert.ok(!referenced.has(abandoned.key), 'a file no document mentions stays an orphan');
 });
 
 test('a bucket ticket pins the key, the type and the size; reads are presigned links (no network)', async () => {

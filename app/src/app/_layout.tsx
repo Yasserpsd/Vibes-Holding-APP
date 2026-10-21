@@ -17,6 +17,7 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
+import { AppLockGate } from '@/components/AppLockGate';
 import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
@@ -136,6 +137,7 @@ export default function RootLayout() {
                 <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
                 <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
                 <Stack.Screen name="security" options={{ ...detailHeader, title: t('security.title') }} />
+                <Stack.Screen name="security-extra" options={{ ...detailHeader, title: t('security.extraTitle') }} />
                 <Stack.Screen name="delete-account" options={{ ...detailHeader, title: t('deleteAccount.title') }} />
                 {/* M116d: club pages inside the app (terms, privacy…) — the screen sets its own title. */}
                 <Stack.Screen name="webpage" options={{ ...detailHeader, title: '' }} />
@@ -158,6 +160,8 @@ export default function RootLayout() {
           <MembershipCelebration />
           {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
           <SplashFlash />
+          {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
+          <AppLockGate />
         </GuestGateProvider>
       </AuthProvider>
     </QueryClientProvider>

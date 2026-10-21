@@ -1,6 +1,6 @@
 import { useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { authApi } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -13,11 +13,13 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { authenticate, loadLocalAuth, lockAvailable, lockEnabled, setLockEnabled } from '@/lib/appLock';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
- * M79: the security settings of «حسابي» — change the password here, and the accident-proofed account
- * deletion lives tucked at the bottom (its own deliberate flow, /delete-account).
+ * M79: the security settings of «حسابي» — change the password here.
+ * M118d (owner): the biometric APP LOCK leads the screen, and everything sharp (delete account,
+ * report a problem) hides one level deeper behind «إعدادات أمان إضافية».
  */
 export default function SecurityScreen() {
   const router = useRouter();
@@ -27,6 +29,35 @@ export default function SecurityScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // M118d: the biometric lock — 'off' binary (pre-lock build), 'unenrolled' device, or ready.
+  const [lockState, setLockState] = useState<'loading' | 'missing' | 'unenrolled' | 'ready'>('loading');
+  const [lockOn, setLockOn] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      if (!loadLocalAuth()) {
+        setLockState('missing');
+        return;
+      }
+      const available = await lockAvailable();
+      setLockOn(await lockEnabled());
+      setLockState(available ? 'ready' : 'unenrolled');
+    })();
+  }, []);
+
+  const toggleLock = async (next: boolean) => {
+    if (lockBusy) return;
+    setLockBusy(true);
+    try {
+      // Turning it ON asks for the face first, so nobody locks an app he cannot open.
+      if (next && !(await authenticate(t('security.lockPrompt')))) return;
+      await setLockEnabled(next);
+      setLockOn(next);
+    } finally {
+      setLockBusy(false);
+    }
+  };
 
   if (!me) {
     return (
@@ -64,7 +95,31 @@ export default function SecurityScreen() {
 
   return (
     <Screen title={t('security.title')} subtitle={t('security.subtitle')}>
+      {/* M118d: the app lock first — the face opens the app. */}
       <FadeInView delay={entranceDelay(0)}>
+        <GlassCard radius={radii.lg} style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('security.lockTitle')}</Text>
+          {lockState === 'ready' ? (
+            <View style={styles.lockRow}>
+              <Text style={styles.lockText}>{t('security.lockToggle')}</Text>
+              <Switch
+                value={lockOn}
+                disabled={lockBusy}
+                onValueChange={(next) => void toggleLock(next)}
+                trackColor={{ true: colors.gold, false: colors.border }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
+          ) : lockState === 'unenrolled' ? (
+            <Text style={styles.lockHint}>{t('security.lockEnrollFirst')}</Text>
+          ) : lockState === 'missing' ? (
+            <Text style={styles.lockHint}>{t('security.lockNextUpdate')}</Text>
+          ) : null}
+          {lockState === 'ready' ? <Text style={styles.lockHint}>{t('security.lockHint')}</Text> : null}
+        </GlassCard>
+      </FadeInView>
+
+      <FadeInView delay={entranceDelay(1)}>
         <GlassCard radius={radii.lg} style={styles.card}>
           <Text style={styles.sectionTitle}>{t('security.changePassword')}</Text>
           <FormField
@@ -87,13 +142,13 @@ export default function SecurityScreen() {
         </GlassCard>
       </FadeInView>
 
-      {/* M79 (owner): deletion is tucked INSIDE security — never a stray tap away out in the open. */}
-      <FadeInView delay={entranceDelay(1)}>
+      {/* M118d (owner): the sharp things live one level deeper, out of a stray tap's reach. */}
+      <FadeInView delay={entranceDelay(2)}>
         <GlassCard radius={radii.lg} style={styles.card}>
-          <Text style={styles.sectionTitle}>{t('security.dangerZone')}</Text>
-          <Text style={styles.dangerText}>{t('security.deleteHint')}</Text>
+          <Text style={styles.sectionTitle}>{t('security.extraTitle')}</Text>
+          <Text style={styles.dangerText}>{t('security.extraHint')}</Text>
           <GoldHairline />
-          <AppButton label={t('account.menu.delete')} variant="outline" icon="trash-outline" onPress={() => router.push('/delete-account' as Href)} />
+          <AppButton label={t('security.extraOpen')} variant="outline" icon="settings-outline" onPress={() => router.push('/security-extra' as Href)} />
         </GlassCard>
       </FadeInView>
     </Screen>
@@ -104,4 +159,7 @@ const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.md },
   sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   dangerText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  lockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  lockText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
+  lockHint: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
 });

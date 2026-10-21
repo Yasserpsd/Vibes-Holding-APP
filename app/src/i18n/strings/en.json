@@ -1002,5 +1002,17 @@
   "deleteAccount.scheduledText": "You have {days} days to keep using the app as usual; after that your account is permanently deleted. Changed your mind? Tap “Undo deletion” in My Account at any time.",
   "deleteAccount.backHome": "Back",
   "deleteAccount.countdown": "Account deletion scheduled: {days} days left, then the account is permanently deleted.",
-  "deleteAccount.cancel": "Undo deletion"
+  "deleteAccount.cancel": "Undo deletion",
+  "security.lockTitle": "Biometric app lock",
+  "security.lockToggle": "Open the app with Face or fingerprint",
+  "security.lockHint": "When on, the app opens only with the biometrics enrolled on this device.",
+  "security.lockEnrollFirst": "Enroll a face or fingerprint in your device settings first, then turn the lock on here.",
+  "security.lockNextUpdate": "The biometric lock arrives with the next app update from the store.",
+  "security.lockPrompt": "Unlock Investors Club",
+  "security.lockedTitle": "The app is locked — unlock with your biometrics",
+  "security.unlock": "Unlock",
+  "security.extraTitle": "Additional security settings",
+  "security.extraHint": "Sensitive account actions — open only when needed.",
+  "security.extraOpen": "Open additional settings",
+  "security.reportProblem": "Report a problem"
 }

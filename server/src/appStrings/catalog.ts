@@ -1004,7 +1004,19 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "deleteAccount.scheduledText": "أمامك {days} يومًا يمكنك خلالها استخدام التطبيق كالمعتاد، وبعدها يُحذف حسابك نهائيًا. غيّرت رأيك؟ من «حسابي» اضغط «تراجع عن الحذف» في أي وقت.",
     "deleteAccount.backHome": "رجوع",
     "deleteAccount.countdown": "حذف حسابك مجدول: أمامك {days} يومًا ثم يُحذف الحساب نهائيًا.",
-    "deleteAccount.cancel": "تراجع عن الحذف"
+    "deleteAccount.cancel": "تراجع عن الحذف",
+    "security.lockTitle": "قفل التطبيق بالبصمة",
+    "security.lockToggle": "افتح التطبيق ببصمة الوجه أو الإصبع",
+    "security.lockHint": "عند التفعيل لا يفتح التطبيق إلا ببصمتك المسجلة على هذا الجهاز.",
+    "security.lockEnrollFirst": "سجّل بصمة الوجه أو الإصبع في إعدادات جهازك أولًا ثم فعّل القفل من هنا.",
+    "security.lockNextUpdate": "قفل البصمة يصلك مع تحديث التطبيق القادم من المتجر.",
+    "security.lockPrompt": "افتح نادي المستثمرين",
+    "security.lockedTitle": "التطبيق مقفل — افتح ببصمتك",
+    "security.unlock": "فتح التطبيق",
+    "security.extraTitle": "إعدادات أمان إضافية",
+    "security.extraHint": "إجراءات حساسة تخص حسابك — ادخل إليها فقط عند الحاجة.",
+    "security.extraOpen": "فتح الإعدادات الإضافية",
+    "security.reportProblem": "تبليغ عن مشكلة"
   },
   "en": {
     "tabs.home": "Home",
@@ -2010,7 +2022,19 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "deleteAccount.scheduledText": "You have {days} days to keep using the app as usual; after that your account is permanently deleted. Changed your mind? Tap “Undo deletion” in My Account at any time.",
     "deleteAccount.backHome": "Back",
     "deleteAccount.countdown": "Account deletion scheduled: {days} days left, then the account is permanently deleted.",
-    "deleteAccount.cancel": "Undo deletion"
+    "deleteAccount.cancel": "Undo deletion",
+    "security.lockTitle": "Biometric app lock",
+    "security.lockToggle": "Open the app with Face or fingerprint",
+    "security.lockHint": "When on, the app opens only with the biometrics enrolled on this device.",
+    "security.lockEnrollFirst": "Enroll a face or fingerprint in your device settings first, then turn the lock on here.",
+    "security.lockNextUpdate": "The biometric lock arrives with the next app update from the store.",
+    "security.lockPrompt": "Unlock Investors Club",
+    "security.lockedTitle": "The app is locked — unlock with your biometrics",
+    "security.unlock": "Unlock",
+    "security.extraTitle": "Additional security settings",
+    "security.extraHint": "Sensitive account actions — open only when needed.",
+    "security.extraOpen": "Open additional settings",
+    "security.reportProblem": "Report a problem"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

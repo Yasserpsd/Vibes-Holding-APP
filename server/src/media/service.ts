@@ -155,6 +155,21 @@ export class MediaService {
     }
   }
 
+  /**
+   * M118b (the night the sweep ate the photos): every media key mentioned ANYWHERE in the kv —
+   * people, agenda, image slots, seeds, reviews — plus the posts' own URLs. This is the only
+   * «referenced» set the sweep may trust: a file named by any stored document is never an orphan.
+   */
+  static async referencedEverywhere(kv: { textSearch(needle: string): Promise<string[]> }, postUrls: string[]): Promise<Set<string>> {
+    const keys = new Set(postUrls.map((url) => MediaService.keyInPath(url)).filter((key): key is string => key !== null));
+    for (const text of await kv.textSearch('/media/')) {
+      for (const match of text.matchAll(/\/media\/(posts\/\d{4}\/\d{2}\/[A-Za-z0-9-]+\.[a-z0-9]{2,5})/g)) {
+        if (match[1]) keys.add(match[1]);
+      }
+    }
+    return keys;
+  }
+
   /** Removes files no post points at (abandoned uploads), once they are a day old. */
   async sweep(referenced: Set<string>, now = new Date()): Promise<number> {
     const cutoff = now.getTime() - ORPHAN_HOURS * 60 * 60_000;

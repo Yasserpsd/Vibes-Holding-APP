@@ -8,6 +8,12 @@ export interface KV {
   get<T>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<void>;
+  /**
+   * M118b: the serialized documents that contain `needle`, as text. The media sweep scans EVERY
+   * stored document for /media/ paths, so a photo referenced anywhere (people, agenda, slots,
+   * seeds, reviews…) is never treated as an orphan again.
+   */
+  textSearch(needle: string): Promise<string[]>;
   close(): Promise<void>;
 }
 
@@ -16,6 +22,15 @@ export class MemoryKV implements KV {
 
   async get<T>(key: string): Promise<T | null> {
     return this.map.has(key) ? (this.map.get(key) as T) : null;
+  }
+
+  async textSearch(needle: string): Promise<string[]> {
+    const hits: string[] = [];
+    for (const value of this.map.values()) {
+      const text = JSON.stringify(value);
+      if (text.includes(needle)) hits.push(text);
+    }
+    return hits;
   }
 
   async set(key: string, value: unknown): Promise<void> {
@@ -66,6 +81,13 @@ export class PgKV implements KV {
 
   async delete(key: string): Promise<void> {
     await this.pool.query('DELETE FROM kv WHERE key = $1', [key]);
+  }
+
+  async textSearch(needle: string): Promise<string[]> {
+    // Plain substring over the serialized jsonb; the needle is code-chosen, never user input.
+    const escaped = needle.replace(/[%_\\]/g, (char) => `\\${char}`);
+    const result = await this.pool.query<{ text: string }>("SELECT value::text AS text FROM kv WHERE value::text LIKE $1 ESCAPE '\\'", [`%${escaped}%`]);
+    return result.rows.map((row) => row.text);
   }
 
   async close(): Promise<void> {

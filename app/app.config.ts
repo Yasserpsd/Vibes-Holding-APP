@@ -84,6 +84,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // M104: the advisor listens — microphone recording (native module: needs a new build; old
     // binaries hide the mic button via requireOptionalNativeModule).
     ['expo-audio', { microphonePermission: 'يستخدم التطبيق الميكروفون لتسجيل سؤالك الصوتي للمستشار.' }],
+    // M118d: the biometric app lock (native module: works from the NEXT build; older binaries
+    // hide the toggle via requireOptionalNativeModule).
+    ['expo-local-authentication', { faceIDPermission: 'يستخدم التطبيق بصمة الوجه لفتح التطبيق عند تفعيل قفل الأمان.' }],
   ],
   experiments: { typedRoutes: true },
   extra: {

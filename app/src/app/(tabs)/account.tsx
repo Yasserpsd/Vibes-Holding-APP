@@ -150,7 +150,7 @@ export default function AccountScreen() {
           {/* M116d (owner): legal pages render INSIDE the app — no browser bar, no hosting domain on show. */}
           {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.termsUrl ?? '', title: t('store.terms') } })} /> : null}
           {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.privacyUrl ?? '', title: t('store.privacy') } })} /> : null}
-          <MenuRow icon="trash-outline" label={t('account.menu.delete')} danger onPress={() => router.push('/delete-account' as Href)} />
+          {/* M118d (owner): deletion left «المزيد» — it lives deep inside الأمان ← إعدادات أمان إضافية. */}
         </MenuGroup>
       </FadeInView>
 
