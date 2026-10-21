@@ -25,7 +25,7 @@ Full scope, business facts, integrations and milestones: `docs/PROJECT_BRIEF.md`
 6. Never change the existing Paymob integration callback URLs and never recreate Paymob keys: vcmem membership auto-activation depends on them. App payments use a per-payment notification URL that points to this server.
 7. News items are never written by AI. Show only real items whose URL the server fetched successfully: original title, source name, time, the source's own snippet, and a «اقرأ من المصدر» button that opens the original page in-app. AI may only classify, deduplicate and rank.
 8. User-specific API responses send `Cache-Control: no-store`. If Cloudflare or any CDN sits in front, bypass its cache for `/api/*`.
-9. Preview builds use a separate app id (`.preview` suffix) and the name «نادي المستثمرين (تجريبي)». UPDATED (owner, 2026-10-17, launch phase): the preview is OPEN — anyone registers and signs in so the owner's circle tries the personas; `AUTH_ADMIN_ONLY=1` / `HUB_ALLOW_TEST_REGISTRATION=0` on Railway restore the old admins-only gate.
+9. Preview builds use a separate app id (`.preview` suffix) and the name «Investors Club (تجريبي)». UPDATED (owner, 2026-10-21): the app's public name is Latin «Investors Club» in BOTH languages — launcher, store listings and the in-app club-name string; Arabic prose may still say «نادي المستثمرين». UPDATED (owner, 2026-10-17, launch phase): the preview is OPEN — anyone registers and signs in so the owner's circle tries the personas; `AUTH_ADMIN_ONLY=1` / `HUB_ALLOW_TEST_REGISTRATION=0` on Railway restore the old admins-only gate.
 
 ## UI and copy rules
 - Arabic-first, forced RTL on both platforms. Font: IBM Plex Sans Arabic.

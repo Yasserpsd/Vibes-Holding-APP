@@ -19,7 +19,8 @@ const TEST_API_URL = 'https://vibes-holding-app-production.up.railway.app';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: IS_PRODUCTION ? 'نادي المستثمرين' : 'نادي المستثمرين (تجريبي)',
+  // Owner (2026-10-21): the public app name is Latin «Investors Club» in both languages.
+  name: IS_PRODUCTION ? 'Investors Club' : 'Investors Club (تجريبي)',
   slug: 'vibes-holding',
   owner: 'vibes-holding',
   // 1.1.0 (M27 stage 4): the first binary with the native modules added since M1 (secure store, notifications,
