@@ -44,6 +44,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     usesAppleSignIn: true,
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
+      // App Store export compliance: standard HTTPS only, no custom encryption.
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {

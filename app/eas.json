@@ -39,6 +39,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6825963092",
+        "bundleIdentifier": "com.vcmem.investorsclub",
+        "appleTeamId": "2A6QQ55CX3"
+      }
+    }
   }
 }
