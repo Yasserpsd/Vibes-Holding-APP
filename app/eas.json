@@ -30,6 +30,7 @@
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "APP_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://club-api-prod-production.up.railway.app",

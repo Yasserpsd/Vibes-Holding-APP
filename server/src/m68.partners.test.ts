@@ -85,7 +85,7 @@ test('the dashboard manages the partners: create, edit, hide, delete; the app li
 
   const listed = (await get('/api/admin/partners', adminToken)).json();
   assert.equal(listed.partners.length, 2);
-  assert.ok(listed.settings.title.includes('شركاؤنا'));
+  assert.ok(listed.settings.title.includes('Members Exclusive'));
 
   const pub = (await get('/api/partners')).json();
   assert.equal(pub.partners.length, 1, 'the hidden partner never reaches the app');

@@ -78,8 +78,8 @@ const promoMemberKey = (contactId: number): string => `partners:promo:member:${c
 const promoCodeKey = (code: string): string => `partners:promo:code:${code}`;
 
 export const PARTNERS_SETTINGS_SEED: PartnersSettings = {
-  title: 'شركاؤنا',
-  titleEn: 'Our partners',
+  title: 'Members Exclusive — حصريًا للأعضاء',
+  titleEn: 'Members Exclusive',
   intro:
     'برنامج شركاء نادي المستثمرين: جهات من داخل المنظومة وخارجها — مثل بودكاست الملتقى ووديني — تمنح أعضاء العضوية السنوية خصومات خاصة. لكل عضو برومو كود واحد باسمه يستخدمه عند جميع الشركاء، فيحصل على خصم أعضاء النادي فورًا.',
   introEn:

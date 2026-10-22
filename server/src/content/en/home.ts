@@ -31,12 +31,12 @@ export const HOME_EN: Translation<HomeContent> = {
     cta: 'All services',
   },
   partners: {
-    title: 'Our partners',
+    title: 'Members Exclusive',
     subtitle: "Your personal promo code opens the club partners' discounts",
     cta: 'All partners',
   },
   famous: {
-    title: 'Profile & Journey',
+    title: 'A Life & Legacy',
     subtitle: "A weekly space introducing the club's members, highlighting their expertise and building quality connections — apply yourself; applying is for subscribed members only",
     cta: 'Apply here',
   },

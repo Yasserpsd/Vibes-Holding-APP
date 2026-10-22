@@ -44,3 +44,6 @@ Thumbs.db
 
 # Uploaded media of the server's local disk store (development)
 server/data/
+
+# Local secrets vault: key files live ONLY here and in Railway/EAS (rule 1); never committed
+.secrets.local/
