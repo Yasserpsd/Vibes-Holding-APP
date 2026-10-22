@@ -69,7 +69,7 @@ export const HOME_EN: Translation<HomeContent> = {
   },
   opportunity: {
     title: 'The golden opportunity',
-    subtitle: 'A venture picked from the Projects Bank, renewed on every app open',
+    subtitle: 'Out of hundreds of ventures… we picked this one for you today',
     cta: 'Discover the opportunity',
   },
   meetups: {

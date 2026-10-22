@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
@@ -15,7 +16,8 @@ type Props = { service: Service; onPress: () => void };
 export function ServiceCard({ service, onPress }: Props) {
   const { locked } = service;
   return (
-    <PressScale onPress={onPress}>
+    // M120 (owner): tapping a members-only service answers with the subscribe popup, not the page.
+    <PressScale onPress={locked ? showMembershipGate : onPress}>
       <GlassCard style={[styles.card, locked && styles.lockedCard]}>
         <View style={[styles.iconBox, !locked && styles.iconBoxLit]}>
           <Ionicons name={iconFor(service.icon)} size={22} color={locked ? colors.textMuted : colors.gold} />

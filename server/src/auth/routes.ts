@@ -55,6 +55,9 @@ const registerSchema = z
     bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
     jobTitle: z.string().trim().max(150).optional(),
     inviteCode: z.string().trim().max(30).optional(),
+    // M120 (owner): the registration interests reach the hub's «عضو جديد» admin mail.
+    interests: z.array(z.string().trim().max(60)).max(6).optional(),
+    interestsOther: z.string().trim().max(120).optional(),
   })
   .refine((body) => body.memberType !== 'company' || (body.companyName ?? '').length >= 2, {
     message: 'اكتب اسم الشركة لإكمال التسجيل',

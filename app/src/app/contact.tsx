@@ -10,6 +10,7 @@ import { contactApi, useContactThread, type ContactMessage } from '@/api/contact
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
@@ -48,7 +49,8 @@ export default function ContactScreen() {
           <GlassCard golden style={styles.gateCard}>
             <Ionicons name="ribbon-outline" size={40} color={colors.gold} />
             <Text style={styles.gateText}>{t('contact.membersOnly')}</Text>
-            <AppButton label={t('contact.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+            {/* M120 (owner): the lock answers with the subscribe popup — price and pay in one tap. */}
+            <AppButton label={t('contact.activate')} icon="ribbon-outline" onPress={showMembershipGate} />
           </GlassCard>
         </FadeInView>
       </View>

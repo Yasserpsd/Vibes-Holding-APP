@@ -11,6 +11,7 @@ import type { ProjectAccess, ProjectContact, ProjectsBalance } from '@/api/types
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, PopIn, PressScale, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
@@ -108,7 +109,8 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
     case 'not_member':
       return (
         <Frame icon="ribbon-outline" text={hubText(access.message, 'unlock.membersOnly')}>
-          <AppButton label={t('account.benefits')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          {/* M120 (owner): the lock answers with the subscribe popup — price and pay in one tap. */}
+          <AppButton label={t('gate.activateNow')} icon="ribbon-outline" onPress={showMembershipGate} />
         </Frame>
       );
     case 'unavailable':

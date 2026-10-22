@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -31,8 +32,8 @@ export function LockedNotice({ text, guest }: Props) {
         </View>
         <View style={styles.actions}>
           {guest ? <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} /> : null}
-          {/* M83 (owner): every lock answers with the DIRECT subscribe door — «اشترك في العضوية مباشر». */}
-          <AppButton label={t('gate.subscribe')} variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+          {/* M83 + M120 (owner): every lock answers with the DIRECT subscribe popup — price and pay in one tap. */}
+          <AppButton label={t('gate.subscribe')} variant={guest ? 'outline' : 'primary'} icon="ribbon-outline" onPress={showMembershipGate} />
         </View>
       </GlassCard>
     </FadeInView>

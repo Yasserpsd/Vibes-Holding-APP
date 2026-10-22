@@ -18,6 +18,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
+import { MembershipGateHost } from '@/components/MembershipGate';
 import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
@@ -158,6 +159,8 @@ export default function RootLayout() {
           <GuestGate />
           {/* M74: the soft register invitation after the guest has browsed a while. */}
           <GuestNudge />
+          {/* M120: the members-only popup — opens on any locked tap, and once ever after the intro video. */}
+          <MembershipGateHost />
           {/* M85f: gold confetti the moment the membership turns active, wherever it is noticed. */}
           <MembershipCelebration />
           {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}

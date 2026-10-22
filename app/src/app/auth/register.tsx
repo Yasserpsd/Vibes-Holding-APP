@@ -120,6 +120,9 @@ export default function RegisterScreen() {
         bio: form.bio.trim(),
         jobTitle: form.jobTitle.trim() || undefined,
         inviteCode: form.inviteCode.trim() || undefined,
+        // M120 (owner): the interests ride to the hub so the «عضو جديد» admin mail names them.
+        interests: form.interests.length ? form.interests : undefined,
+        interestsOther: form.interestsOther.trim() || undefined,
       });
       router.push({
         pathname: '/auth/verify',

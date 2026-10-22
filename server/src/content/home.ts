@@ -216,7 +216,8 @@ export const HOME_SEED: HomeContent = {
   // M99c: the investor's opening act (the wallet card left the home for good — owner, 2026-10-19: «ملهاش اي داعي»).
   opportunity: {
     title: 'الفرصة الذهبية',
-    subtitle: 'مشروع مختار من بنك المشاريع، يتجدد مع كل فتح للتطبيق',
+    // M120 (owner, 2026-10-23): his wording replaced the technical line.
+    subtitle: 'من بين مئات المشاريع… اخترنا لك هذا المشروع اليوم',
     cta: 'اكتشف الفرصة',
   },
   // M74 + M99: four separate experiences — copy, order, visibility, tabs and the services grid per persona
@@ -278,8 +279,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 16,
-  updatedAt: '2026-10-21T00:00:00.000Z',
+  version: 17,
+  updatedAt: '2026-10-23T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

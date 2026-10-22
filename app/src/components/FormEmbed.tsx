@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { PaperCard, usePaper } from '@/components/paper';
 import { Notice } from '@/components/Notice';
@@ -63,7 +64,8 @@ export function FormEmbed({ formKey }: { formKey: string | undefined }) {
           <Notice tone="warning" text={t('form.membersOnly')} />
         </FadeInView>
         <FadeInView delay={entranceDelay(1)}>
-          <AppButton label={t('form.membership')} icon="star-outline" onPress={() => router.push('/membership')} />
+          {/* M120 (owner): the lock answers with the subscribe popup — price and pay in one tap. */}
+          <AppButton label={t('gate.activateNow')} icon="star-outline" onPress={showMembershipGate} />
         </FadeInView>
       </>
     );

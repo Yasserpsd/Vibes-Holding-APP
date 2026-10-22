@@ -15,6 +15,7 @@ import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { IntroVideoPopup } from '@/components/IntroVideo';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
+import { MembershipHomeCard } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
 import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
@@ -320,9 +321,8 @@ export default function HomeScreen() {
             </View>
           </Floating>
         </FadeInView>
-        <FadeInView delay={90} offset={10}>
-          <Text style={styles.eyebrow}>{content.hero.eyebrow}</Text>
-        </FadeInView>
+        {/* M120 (owner): the club-name eyebrow left the hero — letter-spaced Arabic breaks the
+            letter joins («فونت وحش»); the emblem and the title carry the name. */}
         <FadeInView delay={170} offset={10}>
           <Text style={styles.heroTitle}>{content.hero.title}</Text>
         </FadeInView>
@@ -337,6 +337,9 @@ export default function HomeScreen() {
       {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
       <HqBanner />
+
+      {/* M120 (owner's TestFlight feedback): the subscribe door, high on every non-member's home. */}
+      <MembershipHomeCard />
 
       {order.map((key) => sections[key]?.() ?? null)}
 
@@ -571,7 +574,6 @@ const styles = StyleSheet.create({
   },
   emblem: { width: 62, height: 62 },
   heroDivider: { width: 72, marginTop: spacing.xs, alignSelf: 'center' },
-  eyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold, letterSpacing: 1 },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   // M102: the HQ photo crowning the home.

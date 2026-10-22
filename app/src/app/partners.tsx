@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard, NeonPulse } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -51,7 +52,8 @@ export default function PartnersScreen() {
           <GlassCard style={styles.gate}>
             <Notice tone="warning" text={data.membersOnlyText} />
             {status === 'signedIn' ? (
-              <AppButton label={t('partners.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />
+              /* M120 (owner): the lock answers with the subscribe popup — price and pay in one tap. */
+              <AppButton label={t('partners.activate')} icon="ribbon-outline" onPress={showMembershipGate} />
             ) : (
               <AppButton label={t('card.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
             )}

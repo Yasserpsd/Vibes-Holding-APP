@@ -91,6 +91,9 @@ export type RegisterInput = {
   jobTitle?: string;
   /** M32: another member's membership number; the hub checks and stores it. */
   inviteCode?: string;
+  /** M120: interest keys (and the «أخرى» text) — the hub's «عضو جديد» admin mail names them. */
+  interests?: string[];
+  interestsOther?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };

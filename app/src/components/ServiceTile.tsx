@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -23,7 +24,8 @@ export function ServiceTile({ service, onPress }: Props) {
   const accent = serviceAccents[service.group] ?? serviceAccents.entrepreneur;
   const photo = service.imageUrls?.[0] ?? service.imageUrl ?? null;
   return (
-    <PressScale onPress={onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
+    // M120 (owner): tapping a members-only service answers with the subscribe popup, not the page.
+    <PressScale onPress={locked ? showMembershipGate : onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
       <View style={[styles.card, locked && styles.lockedCard]}>
         {photo && !locked ? (
           <>

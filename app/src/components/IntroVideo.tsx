@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
 import { getLang, t } from '@/i18n';
+import { noteIntroClosed } from '@/components/MembershipGate';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { playVideo } from '@/lib/player';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -44,6 +45,8 @@ export function IntroVideoPopup() {
   const dismiss = () => {
     setVisible(false);
     void saveSetting(SEEN_KEY, '1');
+    // M120: the one-time membership nudge waits its turn behind this popup.
+    noteIntroClosed();
   };
 
   const play = () => {
