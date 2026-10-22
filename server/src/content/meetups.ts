@@ -49,7 +49,7 @@ export const MEETUPS_CONTENT_KEY = 'content:meetups';
 
 // The texts come from vibesholding.com/mup (read 2026-10-21), brand-corrected per rule: the brand
 // is written «Vibes Ventures» even inside Arabic copy, and no valuation claims outside the brief's
-// disclaimer. اليوم المفتوح has no film yet — the owner sends it later and edits the URL in.
+// disclaimer. All five films are the owner's own YouTube picks (اليوم المفتوح arrived 2026-10-22).
 export const MEETUPS_SEED: MeetupsContent = {
   title: 'ملتقيات نادي المستثمرين',
   subtitle: 'خمس تجارب نوعية صُمّمت لتفتح أبواب الشراكة، وتُقصّر المسافة بين الفكرة والفرصة.',
@@ -136,7 +136,7 @@ export const MEETUPS_SEED: MeetupsContent = {
         { title: 'تجارب حقيقية', text: 'قصص نجاح وتعثّرات يشاركها الأعضاء بشفافية' },
         { title: 'بيئة احترافية', text: 'بيئة تحترم كل رأي وتُثمّن كل تجربة بدون استثناء' },
       ],
-      videoUrl: '',
+      videoUrl: 'https://www.youtube.com/watch?v=qvtBPNvmKvk',
       formKey: 'meetup-open-day',
       cta: 'انضم الآن',
     },
@@ -158,8 +158,8 @@ export const MEETUPS_SEED: MeetupsContent = {
       cta: 'اصنع ملتقاك الآن',
     },
   ],
-  version: 1,
-  updatedAt: '2026-10-21T00:00:00.000Z',
+  version: 2,
+  updatedAt: '2026-10-22T00:00:00.000Z',
 };
 
 export async function ensureMeetupsSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {

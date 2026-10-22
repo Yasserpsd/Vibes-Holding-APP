@@ -36,12 +36,12 @@ test('the meetups content serves the five meetups with per-persona variants, in 
   assert.equal(body.meetups.length, 5);
   const keys = body.meetups.map((meetup: { key: string }) => meetup.key);
   assert.deepEqual(keys, ['five-minutes', 'private-pitch', 'elite-challenge', 'open-day', 'your-own']);
-  // Every meetup points at a registration form and carries its three features; اليوم المفتوح has no film yet.
+  // Every meetup points at a registration form, carries its three features and opens on a film.
   for (const meetup of body.meetups) {
     assert.ok(String(meetup.formKey).startsWith('meetup-'));
     assert.equal(meetup.features.length, 3);
+    assert.match(String(meetup.videoUrl), /^https:\/\/www\.youtube\.com\/watch\?v=/);
   }
-  assert.equal(body.meetups.find((meetup: { key: string }) => meetup.key === 'open-day').videoUrl, '');
   // The investor's list leads with the private pitch; the entrepreneur's with 5 minutes.
   assert.equal(body.personas.investor.order[0], 'private-pitch');
   assert.equal(body.personas.entrepreneur.order[0], 'five-minutes');
