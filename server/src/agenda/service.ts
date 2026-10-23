@@ -223,22 +223,19 @@ export class AgendaService {
     };
   }
 
-  /** M77: a finished event stays listed (faded in the app) this many days before it leaves the agenda. */
-  private static readonly PAST_KEPT_DAYS = 90;
-
-  /** The upcoming events first (today included, Riyadh time), then the recently finished ones flagged `past`, with the viewer's own state. */
+  /** The upcoming events first (today included, Riyadh time), then every finished one flagged `past`, with the viewer's own state. */
   async forViewer(me: Me | null, lang: 'ar' | 'en' = 'ar', now = Date.now()): Promise<PublicAgendaEvent[]> {
     const today = riyadhDay(now);
-    const keptFrom = riyadhDay(now - AgendaService.PAST_KEPT_DAYS * 24 * 60 * 60 * 1000);
     const [events, registrations] = await Promise.all([this.loadEvents(), this.loadRegs()]);
     const mineByEvent = new Map<string, AgendaRegistration>();
     if (me) for (const registration of registrations) if (registration.contactId === me.id) mineByEvent.set(registration.eventId, registration);
     const publish = (event: AgendaEvent, past: boolean) => this.toPublic(event, mineByEvent.get(event.id) ?? null, me, lang, past);
     // M70: a workshop stays on the agenda (and open) until its LAST day has passed.
     const upcoming = events.filter((event) => lastDay(event) >= today).map((event) => publish(event, false));
-    // M77 (owner, 2026-10-16): «الورش السابقة تفضل موجودة ولكن باهتة» — the most recent first, after the upcoming ones.
+    // M77 (owner, 2026-10-16): «الورش السابقة تفضل موجودة ولكن باهتة» — the most recent first, after the
+    // upcoming ones. Owner (2026-10-23): they NEVER leave — everyone should see how many we held.
     const past = events
-      .filter((event) => lastDay(event) < today && lastDay(event) >= keptFrom)
+      .filter((event) => lastDay(event) < today)
       .sort((a, b) => lastDay(b).localeCompare(lastDay(a)))
       .map((event) => publish(event, true));
     return [...upcoming, ...past];

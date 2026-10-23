@@ -174,9 +174,10 @@ test('closed events and past days refuse registrations', async () => {
 
   const past = await send('POST', '/api/admin/agenda', { title: 'فعالية فاتت', date: '2026-01-01', mode: 'both', open: true }, adminToken);
   assert.equal((await send('POST', `/api/agenda/${past.json().event.id}/register`, { attendance: 'hq' }, memberToken)).statusCode, 409);
-  // M77: an event finished long ago (over 90 days) leaves the public agenda; the dashboard still sees it.
+  // Owner (2026-10-23): a finished event NEVER leaves the public agenda, however old — flagged `past`.
   const pub = await get('/api/agenda');
-  assert.ok(!(pub.json().events as { id: string }[]).some((entry) => entry.id === past.json().event.id));
+  const old = (pub.json().events as { id: string; past: boolean }[]).find((entry) => entry.id === past.json().event.id);
+  assert.equal(old?.past, true);
 
   // M77 (owner): a RECENTLY finished event stays listed — flagged `past`, closed, and AFTER the upcoming ones.
   const recentDay = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
