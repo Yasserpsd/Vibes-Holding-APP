@@ -601,6 +601,9 @@ export type Partner = {
   descriptionEn: string;
   discount: string;
   discountEn: string;
+  /** M123: the short headline on the card's gold ribbon; empty = no ribbon. */
+  ribbon: string;
+  ribbonEn: string;
   url: string;
   logoUrl: string | null;
   order: number;
@@ -615,6 +618,8 @@ export type PartnerInput = {
   descriptionEn?: string;
   discount?: string;
   discountEn?: string;
+  ribbon?: string;
+  ribbonEn?: string;
   url: string;
   logoUrl?: string | null;
   order?: number;

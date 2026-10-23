@@ -11,6 +11,7 @@ import { ensureServicesSeed } from './content/services.js';
 import { ensureVideosSeed } from './content/videos.js';
 import { ensureFormsSeed } from './forms/content.js';
 import { ensureNewsSourcesSeed } from './news/sources.js';
+import { ensurePartnersSeed } from './partners/service.js';
 import { createKV } from './store.js';
 
 loadDotEnv();
@@ -28,6 +29,7 @@ const seeded = {
   forms: await ensureFormsSeed(kv),
   meetups: await ensureMeetupsSeed(kv),
   newsSources: await ensureNewsSourcesSeed(kv),
+  partners: await ensurePartnersSeed(kv),
 };
 const { app, projects, golden, news, videos, media, sync, analytics, companion, englishSweep } = await buildApp({ config, kv });
 // A newer seed (for example the membership copy) is content the app should fetch again.

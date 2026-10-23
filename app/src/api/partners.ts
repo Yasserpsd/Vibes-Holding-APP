@@ -11,6 +11,8 @@ export type Partner = {
   description: string;
   /** The discount line as the owner words it, e.g. «خصم 20% لأعضاء النادي بالبرومو كود». */
   discount: string;
+  /** M123: the short headline on the card's gold ribbon; empty = no ribbon. */
+  ribbon: string;
   url: string;
   logoUrl: string | null;
 };

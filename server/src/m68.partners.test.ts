@@ -6,7 +6,7 @@ import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubBody, HubClient, HubOp, HubResponse } from './hub/types.js';
 import { LogMailer } from './mail/mailer.js';
-import { PROMO_CODE_RE } from './partners/service.js';
+import { ensurePartnersSeed, HEADLINE_PARTNERS_SEED, PARTNERS_LIST_KEY, PROMO_CODE_RE, type Partner } from './partners/service.js';
 import { MemoryKV } from './store.js';
 
 // M68 «شركاؤنا»: the dashboard-managed partners program and the members' personal promo codes.
@@ -71,6 +71,8 @@ test('the dashboard manages the partners: create, edit, hide, delete; the app li
     nameEn: 'Al-Moltaqa podcast',
     description: 'استوديو بودكاست مجهّز بالكامل لأعضاء النادي.',
     discount: 'خصم 50% بالبرومو كود',
+    ribbon: 'خصم 50%',
+    ribbonEn: '50% off',
     url: 'https://almoltaqapodcast.com/studio/',
     order: 1,
   }, adminToken);
@@ -90,12 +92,14 @@ test('the dashboard manages the partners: create, edit, hide, delete; the app li
   const pub = (await get('/api/partners')).json();
   assert.equal(pub.partners.length, 1, 'the hidden partner never reaches the app');
   assert.equal(pub.partners[0].name, 'بودكاست الملتقى');
+  assert.equal(pub.partners[0].ribbon, 'خصم 50%', 'M123: the card ribbon reaches the app');
   assert.equal(pub.promo, null);
   assert.equal(pub.isMember, false);
 
   // English wording falls back to Arabic when the English field is empty.
   const en = (await get('/api/partners?lang=en')).json();
   assert.equal(en.partners[0].name, 'Al-Moltaqa podcast');
+  assert.equal(en.partners[0].ribbon, '50% off');
   assert.equal(en.partners[0].description, 'استوديو بودكاست مجهّز بالكامل لأعضاء النادي.');
 
   const edited = await send('PUT', `/api/admin/partners/${partnerId}`, { discount: 'خصم 40% بالبرومو كود' }, adminToken);
@@ -105,6 +109,34 @@ test('the dashboard manages the partners: create, edit, hide, delete; the app li
   const removed = await send('DELETE', `/api/admin/partners/${listed.partners.find((entry: { name: string }) => entry.name === 'وديني').id}`, undefined, adminToken);
   assert.equal(removed.statusCode, 200);
   assert.equal((await get('/api/admin/partners', adminToken)).json().partners.length, 1);
+});
+
+test('M123: the headline partners seed writes once, with ribbons, and never duplicates or revives', async () => {
+  const kv = new MemoryKV();
+  assert.equal(await ensurePartnersSeed(kv), true, 'the seed writes on an empty list');
+  const first = (await kv.get<{ partners: Partner[] }>(PARTNERS_LIST_KEY))?.partners ?? [];
+  assert.equal(first.length, 2);
+  assert.equal(first[0]?.name, 'بودكاست الملتقى');
+  assert.equal(first[0]?.ribbon, 'خصم 50%');
+  assert.equal(first[1]?.name, 'وديني');
+  assert.equal(first[1]?.ribbon, 'هدية ترحيبية 1000 ريال');
+  assert.ok(first.every((partner) => partner.visible && partner.logoUrl && partner.url.startsWith('https://')));
+
+  // Second boot: the marker stops it — an owner delete stays deleted.
+  first.splice(1, 1);
+  await kv.set(PARTNERS_LIST_KEY, { partners: first });
+  assert.equal(await ensurePartnersSeed(kv), false, 'and never twice');
+  assert.equal(((await kv.get<{ partners: Partner[] }>(PARTNERS_LIST_KEY))?.partners ?? []).length, 1);
+
+  // Force re-adds the missing one but never touches an existing partner the owner edited.
+  const existing = new MemoryKV();
+  await existing.set(PARTNERS_LIST_KEY, {
+    partners: [{ ...HEADLINE_PARTNERS_SEED[0], id: 'owner-made', ribbon: 'عرض خاص', order: 5, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }],
+  });
+  assert.equal(await ensurePartnersSeed(existing), true);
+  const merged = (await existing.get<{ partners: Partner[] }>(PARTNERS_LIST_KEY))?.partners ?? [];
+  assert.equal(merged.length, 2, 'only the missing partner joined');
+  assert.equal(merged.find((partner) => partner.name === 'بودكاست الملتقى')?.ribbon, 'عرض خاص', 'the owner wording stays his');
 });
 
 test('the program wording is owner-editable', async () => {

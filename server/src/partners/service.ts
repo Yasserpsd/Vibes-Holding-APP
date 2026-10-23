@@ -23,6 +23,9 @@ export type Partner = {
   /** The discount line as the owner words it, e.g. «خصم 20% لأعضاء النادي بالبرومو كود». */
   discount: string;
   discountEn: string;
+  /** M123: the short headline on the card's gold ribbon, e.g. «خصم 50%». Empty = no ribbon. */
+  ribbon: string;
+  ribbonEn: string;
   /** Where «اشترِ من الشريك» leads (opened in the in-app browser). */
   url: string;
   logoUrl: string | null;
@@ -39,6 +42,8 @@ export type PartnerInput = {
   descriptionEn?: string;
   discount?: string;
   discountEn?: string;
+  ribbon?: string;
+  ribbonEn?: string;
   url: string;
   logoUrl?: string | null;
   order?: number;
@@ -70,7 +75,7 @@ export type PromoRecord = {
   issuedAt: string;
 };
 
-export type PublicPartner = { id: string; name: string; description: string; discount: string; url: string; logoUrl: string | null };
+export type PublicPartner = { id: string; name: string; description: string; discount: string; ribbon: string; url: string; logoUrl: string | null };
 
 export const PARTNERS_LIST_KEY = 'partners:list';
 export const PARTNERS_SETTINGS_KEY = 'partners:settings';
@@ -91,6 +96,84 @@ export const PARTNERS_SETTINGS_SEED: PartnersSettings = {
   membersOnlyText: 'البرومو كود لأعضاء العضوية السنوية. فعّل عضويتك ليصلك كودك الخاص وتحصل على خصومات الشركاء.',
   membersOnlyTextEn: 'The promo code is for annual-membership members. Activate your membership to receive your personal code and the partners’ discounts.',
 };
+
+export const PARTNERS_SEED_KEY = 'partners:seed';
+const PARTNERS_SEED_VERSION = 1;
+
+/**
+ * M123 «Members Exclusive»: the two headline partners the owner asked for, each with a gold
+ * ribbon on its card. Seeded once; afterwards the owner edits everything from the dashboard
+ * (including the logos, which start from the vibesholding.com uploads the golden companies use).
+ */
+export const HEADLINE_PARTNERS_SEED: PartnerInput[] = [
+  {
+    name: 'بودكاست الملتقى',
+    nameEn: 'Al-Moltaqa Podcast',
+    description: 'بودكاست الملتقى: استوديوهات مجهّزة بالكامل لتسجيل الحلقات والمحتوى — صوت وصورة بجودة احترافية وفريق إنتاج متكامل.',
+    descriptionEn: 'Al-Moltaqa Podcast: fully equipped studios for recording episodes and content — professional audio and video with a complete production team.',
+    discount: 'خصم 50% لأعضاء النادي بالبرومو كود الخاص بك.',
+    discountEn: 'A 50% discount for club members with your personal promo code.',
+    ribbon: 'خصم 50%',
+    ribbonEn: '50% off',
+    url: 'https://almoltaqapodcast.com/',
+    logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/08/Al-Moltaqa.webp',
+    order: 1,
+    visible: true,
+  },
+  {
+    name: 'وديني',
+    nameEn: 'Wdeny',
+    description: 'وديني: النقل والشحن والسفر في تطبيق واحد — خدمات تنقّل وتوصيل داخل منظومة Vibes Ventures.',
+    descriptionEn: 'Wdeny: transport, shipping and travel in one app — mobility and delivery services inside the Vibes Ventures group.',
+    discount: 'هدية ترحيبية بقيمة 1000 ريال لأعضاء النادي بالبرومو كود.',
+    discountEn: 'A welcome gift worth SAR 1,000 for club members with the promo code.',
+    ribbon: 'هدية ترحيبية 1000 ريال',
+    ribbonEn: 'SAR 1,000 welcome gift',
+    url: 'https://wdeny.com/',
+    logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/08/Wdeny-logo-png.webp',
+    order: 2,
+    visible: true,
+  },
+];
+
+/**
+ * Seeds the headline partners ONCE (version marker, so an owner delete stays deleted). A partner
+ * whose name already exists on the list is never duplicated or touched. Returns true when it wrote.
+ */
+export async function ensurePartnersSeed(kv: KV, options: { force?: boolean } = {}, now = new Date()): Promise<boolean> {
+  const marker = await kv.get<{ version: number }>(PARTNERS_SEED_KEY);
+  if (!options.force && (marker?.version ?? 0) >= PARTNERS_SEED_VERSION) return false;
+  const stored = (await kv.get<{ partners: Partner[] }>(PARTNERS_LIST_KEY))?.partners ?? [];
+  const names = new Set(stored.map((partner) => partner.name.trim()));
+  let wrote = false;
+  for (const input of HEADLINE_PARTNERS_SEED) {
+    if (names.has(input.name)) continue;
+    stored.push({
+      id: randomUUID(),
+      name: input.name,
+      nameEn: input.nameEn ?? '',
+      description: input.description ?? '',
+      descriptionEn: input.descriptionEn ?? '',
+      discount: input.discount ?? '',
+      discountEn: input.discountEn ?? '',
+      ribbon: input.ribbon ?? '',
+      ribbonEn: input.ribbonEn ?? '',
+      url: input.url,
+      logoUrl: input.logoUrl ?? null,
+      order: input.order ?? 100,
+      visible: input.visible ?? true,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+    wrote = true;
+  }
+  if (wrote) {
+    stored.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
+    await kv.set(PARTNERS_LIST_KEY, { partners: stored });
+  }
+  await kv.set(PARTNERS_SEED_KEY, { version: PARTNERS_SEED_VERSION });
+  return wrote;
+}
 
 /** No lookalike characters (I, L, O, 0, 1) in the random part, so the code survives being read out loud. */
 const CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -161,6 +244,8 @@ export class PartnersService {
       descriptionEn: trimmed(input.descriptionEn, 1000),
       discount: trimmed(input.discount, 200),
       discountEn: trimmed(input.discountEn, 200),
+      ribbon: trimmed(input.ribbon, 80),
+      ribbonEn: trimmed(input.ribbonEn, 80),
       url: trimmed(input.url, 500),
       logoUrl: input.logoUrl ? trimmed(input.logoUrl, 500) : null,
       order: Number.isFinite(input.order) ? Number(input.order) : 100,
@@ -182,6 +267,8 @@ export class PartnersService {
       if (typeof input.descriptionEn === 'string') partner.descriptionEn = trimmed(input.descriptionEn, 1000);
       if (typeof input.discount === 'string') partner.discount = trimmed(input.discount, 200);
       if (typeof input.discountEn === 'string') partner.discountEn = trimmed(input.discountEn, 200);
+      if (typeof input.ribbon === 'string') partner.ribbon = trimmed(input.ribbon, 80);
+      if (typeof input.ribbonEn === 'string') partner.ribbonEn = trimmed(input.ribbonEn, 80);
       if (typeof input.url === 'string') partner.url = trimmed(input.url, 500);
       if (input.logoUrl !== undefined) partner.logoUrl = input.logoUrl ? trimmed(input.logoUrl, 500) : null;
       if (Number.isFinite(input.order)) partner.order = Number(input.order);
@@ -211,6 +298,8 @@ export class PartnersService {
         name: lang === 'en' && partner.nameEn ? partner.nameEn : partner.name,
         description: lang === 'en' && partner.descriptionEn ? partner.descriptionEn : partner.description,
         discount: lang === 'en' && partner.discountEn ? partner.discountEn : partner.discount,
+        // A partner stored before M123 carries no ribbon fields at all.
+        ribbon: (lang === 'en' && partner.ribbonEn ? partner.ribbonEn : partner.ribbon) ?? '',
         url: partner.url,
         logoUrl: partner.logoUrl,
       }));

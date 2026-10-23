@@ -10,7 +10,7 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
  * wording in the app. The lookup box answers a partner's question: whose promo code is this?
  */
 
-const EMPTY: PartnerInput = { name: '', nameEn: '', description: '', descriptionEn: '', discount: '', discountEn: '', url: '', logoUrl: null, order: 100, visible: true };
+const EMPTY: PartnerInput = { name: '', nameEn: '', description: '', descriptionEn: '', discount: '', discountEn: '', ribbon: '', ribbonEn: '', url: '', logoUrl: null, order: 100, visible: true };
 
 type EditorState = { row: Partner | null; fields: PartnerInput };
 
@@ -176,6 +176,7 @@ export function Partners() {
                     ),
                   },
                   { key: 'discount', label: 'الخصم', cell: (row) => row.discount || '—' },
+                  { key: 'ribbon', label: 'الريبون', cell: (row) => (row.ribbon ? <Pill tone="ok">{row.ribbon}</Pill> : '—') },
                   {
                     key: 'url',
                     label: 'الرابط',
@@ -192,7 +193,7 @@ export function Partners() {
                     label: '',
                     cell: (row) => (
                       <span className="row-actions">
-                        <button type="button" onClick={() => setEditor({ row, fields: { name: row.name, nameEn: row.nameEn, description: row.description, descriptionEn: row.descriptionEn, discount: row.discount, discountEn: row.discountEn, url: row.url, logoUrl: row.logoUrl, order: row.order, visible: row.visible } })}>فتح</button>
+                        <button type="button" onClick={() => setEditor({ row, fields: { name: row.name, nameEn: row.nameEn, description: row.description, descriptionEn: row.descriptionEn, discount: row.discount, discountEn: row.discountEn, ribbon: row.ribbon ?? '', ribbonEn: row.ribbonEn ?? '', url: row.url, logoUrl: row.logoUrl, order: row.order, visible: row.visible } })}>فتح</button>
                         <button type="button" className="ghost" disabled={busy} onClick={() => void toggle(row)}>{row.visible ? 'إخفاء' : 'إظهار'}</button>
                       </span>
                     ),
@@ -230,6 +231,14 @@ export function Partners() {
             <label>
               سطر الخصم بالإنجليزية (اختياري)
               <input dir="ltr" value={editor.fields.discountEn ?? ''} maxLength={200} onChange={(event) => edit({ discountEn: event.target.value })} />
+            </label>
+            <label>
+              الريبون — سطر قصير يظهر على شريط ذهبي أعلى الكارت (مثال: «خصم 50%») — اتركه فارغًا بلا شريط
+              <input value={editor.fields.ribbon ?? ''} maxLength={80} onChange={(event) => edit({ ribbon: event.target.value })} />
+            </label>
+            <label>
+              الريبون بالإنجليزية (اختياري)
+              <input dir="ltr" value={editor.fields.ribbonEn ?? ''} maxLength={80} onChange={(event) => edit({ ribbonEn: event.target.value })} />
             </label>
             <label>
               رابط الشراء — الصفحة التي يفتحها زر «الشراء من الشريك»

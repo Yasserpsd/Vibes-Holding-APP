@@ -10,6 +10,7 @@ import { ensureMembershipSeed } from '../content/membership.js';
 import { ensureServicesSeed } from '../content/services.js';
 import { ensureVideosSeed } from '../content/videos.js';
 import { ensureFormsSeed } from '../forms/content.js';
+import { ensurePartnersSeed } from '../partners/service.js';
 import { createKV } from '../store.js';
 
 loadDotEnv();
@@ -32,6 +33,7 @@ const results = {
   guide: await ensureGuideSeed(kv, { force }),
   forms: await ensureFormsSeed(kv, { force }),
   meetups: await ensureMeetupsSeed(kv, { force }),
+  partners: await ensurePartnersSeed(kv, { force }),
 };
 for (const [name, written] of Object.entries(results)) {
   console.log(written ? `${name}: content written.` : `${name}: content already present (use --force to overwrite).`);

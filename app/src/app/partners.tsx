@@ -6,7 +6,7 @@ import { usePartners, type Partner } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { GlassCard, NeonPulse } from '@/components/lux';
+import { GlassCard, GoldGradient, NeonPulse } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -93,9 +93,18 @@ function PromoCard({ code, title, hint, onShare }: { code: string; title: string
   );
 }
 
+/** M123: a headline partner wears a gold ribbon across the card's top (server-driven wording). */
 function PartnerCard({ partner }: { partner: Partner }) {
   return (
-    <GlassCard style={styles.partner}>
+    <GlassCard golden={!!partner.ribbon} style={styles.partner}>
+      {partner.ribbon ? (
+        <GoldGradient style={styles.ribbon}>
+          <Ionicons name="diamond" size={12} color={colors.black} />
+          <Text style={styles.ribbonText} numberOfLines={1}>
+            {partner.ribbon}
+          </Text>
+        </GoldGradient>
+      ) : null}
       <View style={styles.partnerHead}>
         <View style={styles.logoBox}>
           {partner.logoUrl ? (
@@ -153,6 +162,18 @@ const styles = StyleSheet.create({
   promoHint: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
 
   partner: { gap: spacing.sm, padding: spacing.md },
+  // The ribbon bleeds past the card padding so the gold band runs edge to edge under the rounded corners.
+  ribbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: -spacing.md,
+    marginTop: -spacing.md,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+  },
+  ribbonText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.black },
   partnerHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
   logoBox: {
     width: 56,

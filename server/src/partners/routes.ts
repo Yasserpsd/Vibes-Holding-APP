@@ -16,6 +16,8 @@ const partnerSchema = z.object({
   descriptionEn: z.string().trim().max(1000).optional(),
   discount: z.string().trim().max(200).optional(),
   discountEn: z.string().trim().max(200).optional(),
+  ribbon: z.string().trim().max(80).optional(),
+  ribbonEn: z.string().trim().max(80).optional(),
   url: z.string().trim().url('اكتب رابط الشريك كاملًا (https://…)').max(500),
   logoUrl: z.string().trim().max(500).nullable().optional(),
   order: z.number().int().min(0).max(9999).optional(),
