@@ -14,6 +14,18 @@ export type GoldenCompany = {
   order: number;
 };
 
+/** M121: the owner's own «فرصة Vibes Ventures» that LEADS the home opportunity slot. */
+export type GoldenOpportunityEntry = {
+  /** The small badge over the premium card. */
+  badge: string;
+  title: string;
+  /** One short line under the title. */
+  tagline: string;
+  valuationSarMillions: number | null;
+  ctaLabel: string;
+  ctaUrl: string;
+};
+
 export type GoldenContent = {
   title: string;
   intro: string;
@@ -21,6 +33,8 @@ export type GoldenContent = {
   disclaimer: string;
   umbrella: GoldenCompany;
   companies: GoldenCompany[];
+  /** M121: dashboard-edited like every other text/value; the image rides an image slot (images.ts). */
+  opportunity: GoldenOpportunityEntry;
   updatedAt: string;
 };
 
@@ -67,18 +81,36 @@ export const GOLDEN_SEED: GoldenContent = {
     company('09', 'الصفقات السريعة للاستثمار', 10, 'https://qdealsi.com/offer/', 'الصفقات-السريعة-للاستثمار.png', 9),
     company('10', 'تمكين الامتياز', 10, 'https://franchment.com/offer', 'تمكين-الامتياز.png', 10),
   ],
+  opportunity: {
+    badge: 'فرصة Vibes Ventures',
+    title: 'محفظة Vibes Ventures الاستثمارية',
+    tagline: 'عشر شركات تحت مظلة واحدة، وفرص شراكة حقيقية في قطاعات متنوعة.',
+    valuationSarMillions: 161,
+    ctaLabel: 'اكتشف الفرصة',
+    ctaUrl: 'https://vibesholding.com/offer/',
+  },
   updatedAt: '2026-09-11T00:00:00.000Z',
 };
 
-/** Writes the seed when no golden content exists yet. Returns true when it wrote. */
+/**
+ * Writes the seed when no golden content exists yet. A stored block from before M121 gets the seed's
+ * opportunity grafted on (the owner's own values stay untouched). Returns true when it wrote.
+ */
 export async function ensureGoldenSeed(kv: KV, options: { force?: boolean } = {}): Promise<boolean> {
   const existing = options.force ? null : await kv.get<GoldenContent>(GOLDEN_CONTENT_KEY);
-  if (existing) return false;
+  if (existing) {
+    if (existing.opportunity) return false;
+    await kv.set(GOLDEN_CONTENT_KEY, { ...existing, opportunity: GOLDEN_SEED.opportunity });
+    return true;
+  }
   await kv.set(GOLDEN_CONTENT_KEY, GOLDEN_SEED);
   return true;
 }
 
 /** The block as the app of one language reads it: the stored Arabic block, the English translation for `en`, and the owner's edits (see edits.ts). */
 export async function getGoldenContent(kv: KV, lang: AppLang = 'ar'): Promise<GoldenContent> {
-  return localizeBlock(kv, 'golden', (await kv.get<GoldenContent>(GOLDEN_CONTENT_KEY)) ?? GOLDEN_SEED, GOLDEN_EN, lang);
+  const stored = await kv.get<GoldenContent>(GOLDEN_CONTENT_KEY);
+  // A pre-M121 block read before the boot migration lands still carries the seed's opportunity.
+  const base = stored ? { ...stored, opportunity: stored.opportunity ?? GOLDEN_SEED.opportunity } : GOLDEN_SEED;
+  return localizeBlock(kv, 'golden', base, GOLDEN_EN, lang);
 }

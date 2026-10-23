@@ -24,6 +24,9 @@ const stored = async (kv: KV): Promise<StoredImages> => (await kv.get<StoredImag
 
 const hqKeys = (): string[] => Array.from({ length: HQ_SLOTS }, (_, index) => `hq.${index + 1}`);
 
+/** M121: the owner's photo on the premium «فرصة Vibes Ventures» home card — the golden emblem wash stands in while empty. */
+const OPPORTUNITY_SLOT: ImageSlot = { key: 'golden.opportunity', label: 'صورة فرصة Vibes Ventures', group: 'الفرصة الذهبية (كارت الرئيسية)', url: null };
+
 /** Screen banners (M81 extension, owner 2026-10-18): a wide image slot per key screen — shown only when filled. */
 const BANNER_SLOTS: { key: string; label: string }[] = [
   { key: 'home.banner', label: 'بانر الرئيسية (تحت المقدمة)' },
@@ -56,7 +59,14 @@ export async function imageSlots(kv: KV): Promise<ImageSlot[]> {
   for (const banner of BANNER_SLOTS) {
     slots.push({ ...banner, group: 'بانرات الشاشات (تظهر فقط عند رفع صورة)', url: saved[banner.key] ?? null });
   }
+  slots.push({ ...OPPORTUNITY_SLOT, url: saved[OPPORTUNITY_SLOT.key] ?? null });
   return slots;
+}
+
+/** M121: the premium opportunity card's photo, or null while the owner has not filled the slot. */
+export async function opportunityImage(kv: KV): Promise<string | null> {
+  const saved = await stored(kv);
+  return saved[OPPORTUNITY_SLOT.key] ?? null;
 }
 
 /** The filled screen banners, key → url, served publicly at `GET /api/images`. */

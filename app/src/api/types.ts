@@ -93,6 +93,17 @@ export type GoldenCompany = {
   order: number;
 };
 
+/** M121: the owner's «فرصة Vibes Ventures» leading the home opportunity slot; `imageUrl` is his dashboard upload. */
+export type GoldenOpportunityEntry = {
+  badge: string;
+  title: string;
+  tagline: string;
+  valuationSarMillions: number | null;
+  ctaLabel: string;
+  ctaUrl: string;
+  imageUrl: string | null;
+};
+
 export type GoldenContent = {
   title: string;
   intro: string;
@@ -100,6 +111,7 @@ export type GoldenContent = {
   disclaimer: string;
   umbrella: GoldenCompany;
   companies: GoldenCompany[];
+  opportunity: GoldenOpportunityEntry;
   updatedAt: string;
 };
 

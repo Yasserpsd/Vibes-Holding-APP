@@ -4,11 +4,12 @@ import { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { HomeContent } from '@/api/content';
-import { useProjectsList } from '@/api/queries';
+import { useGolden, useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
 import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StarsRow } from '@/components/Stars';
+import { VibesOpportunityCard } from '@/components/VibesOpportunityCard';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -25,9 +26,16 @@ function pick(items: PublicProject[], seed: number): PublicProject | null {
   return pool[state % pool.length] ?? null;
 }
 
-/** M99c «الفرصة الذهبية»: the investor's opening act — one big-image project, a fresh one every open. */
+/**
+ * M99c «الفرصة الذهبية»: the investor's opening act. M121: the slot ALWAYS leads with the owner's own
+ * «فرصة Vibes Ventures» in its premium dress (server-seeded, so it is never empty); the Projects Bank
+ * pick keeps its familiar card underneath — one big-image project, a fresh one every open.
+ */
 export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['opportunity']> }) {
   const router = useRouter();
+  const golden = useGolden();
+  // Optional-chained on purpose: an app updated by OTA before the server deploys sees no entry yet.
+  const vibesEntry = golden.data?.opportunity ?? null;
   const list = useProjectsList({ q: '', sort: 'discover' });
   const page = list.data?.pages[0];
   const project = useMemo(() => pick(page?.items ?? [], OPEN_SEED), [page]);
@@ -42,12 +50,14 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
     setBrokenFor(imageUri);
     setImageBroken(false);
   }
-  if (!project) return null;
-  const showImage = Boolean(project.image) && !imageBroken;
+  if (!project && !vibesEntry) return null;
+  const showImage = Boolean(project?.image) && !imageBroken;
 
   return (
     <View>
       <SectionHeader icon="star-outline" title={block.title} subtitle={block.subtitle} />
+      {vibesEntry && golden.data ? <VibesOpportunityCard entry={vibesEntry} content={golden.data} /> : null}
+      {project ? (
       <PressScale
         onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(project.id) } })}
         glow
@@ -91,6 +101,7 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
           </View>
         </View>
       </PressScale>
+      ) : null}
     </View>
   );
 }

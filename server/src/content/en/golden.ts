@@ -19,4 +19,10 @@ export const GOLDEN_EN: Translation<GoldenContent> = {
     { code: '09', name: 'Quick Deals Investment' },
     { code: '10', name: 'Franchment' },
   ],
+  opportunity: {
+    badge: 'Vibes Ventures opportunity',
+    title: 'The Vibes Ventures investment portfolio',
+    tagline: 'Ten companies under one umbrella, with real partnership opportunities across diverse sectors.',
+    ctaLabel: 'Discover the opportunity',
+  },
 };

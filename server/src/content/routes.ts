@@ -18,7 +18,7 @@ import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
 import { getMeetupsContent } from './meetups.js';
 import { getMembershipContent } from './membership.js';
-import { bannerImages, imageSlots, saveImage, serviceGalleries, serviceImages } from './images.js';
+import { bannerImages, imageSlots, opportunityImage, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
 export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService; englishSweep?: EnglishSweep };
@@ -63,7 +63,11 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
   const whoIs = optionalSession(auth);
   const requireAdmin = dashboardGuard(auth);
 
-  app.get('/api/golden', async (request) => getGoldenContent(kv, langOf(request)));
+  app.get('/api/golden', async (request) => {
+    const content = await getGoldenContent(kv, langOf(request));
+    // M121: the owner's uploaded photo rides on the opportunity entry inside the block the app already reads.
+    return { ...content, opportunity: { ...content.opportunity, imageUrl: await opportunityImage(kv) } };
+  });
 
   // The native offer page (PROJECT_BRIEF §5.1): blocks pulled from the company's web /offer/ page.
   // Guests may read it like the golden portal. An empty blocks list means the first pull has not
