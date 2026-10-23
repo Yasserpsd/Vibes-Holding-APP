@@ -1,0 +1,15 @@
+diff --git a/node_modules/expo-localization/ios/LocalizationModule.swift b/node_modules/expo-localization/ios/LocalizationModule.swift
+index 4c21fbe..ec19c2f 100644
+--- a/node_modules/expo-localization/ios/LocalizationModule.swift
++++ b/node_modules/expo-localization/ios/LocalizationModule.swift
+@@ -70,7 +70,9 @@ public class LocalizationModule: Module {
+       i18nUtil?.forceRTL(true)
+     } else {
+       i18nUtil?.allowRTL(supportsRTL)
+-      i18nUtil?.forceRTL(supportsRTL ? isRTLPreferredForCurrentLocale() : false)
++      // PATCH (Investors Club): with supportsRTL alone, keep the persisted forceRTL — exactly what the
++      // Android module does. The app drives the direction from its own language (src/i18n/direction.ts);
++      // resetting it from the DEVICE locale forced LTR on every cold start for the Arabic app on English iPhones.
+     }
+ 
+     UserDefaults.standard.synchronize()
