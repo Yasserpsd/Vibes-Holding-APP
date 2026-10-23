@@ -391,7 +391,7 @@ export class AgendaService {
       const event = await this.event(confirmed.eventId);
       if (event) {
         this.deps.notifier.agendaRegistered(confirmed, event);
-        this.deps.push.agendaConfirmed(confirmed.contactId, event.title, event.id);
+        this.deps.push.agendaConfirmed(confirmed.contactId, event.title, event.id, event.en?.title ?? null);
       }
     })();
   }
@@ -480,7 +480,7 @@ export class AgendaService {
     });
     for (const entry of due) {
       const event = byId.get(entry.eventId);
-      if (event) this.deps.push.agendaReminder(entry.contactId, { id: event.id, title: event.title, date: event.date, time: event.time });
+      if (event) this.deps.push.agendaReminder(entry.contactId, { id: event.id, title: event.title, titleEn: event.en?.title ?? null, date: event.date, time: event.time });
     }
     return due.length;
   }

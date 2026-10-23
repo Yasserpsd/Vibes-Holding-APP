@@ -27,6 +27,7 @@ import { ContactService } from './contact/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
+import { EnglishSweep } from './content/englishSweep.js';
 import { contentRoutes } from './content/routes.js';
 import { discountsRoutes } from './discounts/routes.js';
 import { DiscountsService } from './discounts/service.js';
@@ -126,7 +127,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; englishSweep: EnglishSweep };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -210,10 +211,17 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       : new KeywordClassifier());
   // M42: a new Saudi decision notifies every device by itself (capped per day) unless AUTO_PUSH=0.
   const news = new NewsService({ kv, config, log: app.log, classifier: newsClassifier, fetchImpl, onChange: () => moved('news'), push: autoPush ? push : undefined });
+  // M43: the owner's own words (posts, agenda events, content edits) get their English once from AI; he edits it from the dashboard.
+  const translator: Translator = config.OPENAI_API_KEY
+    ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl })
+    : new OffTranslator();
   // Videos: the channel feed (or the Data API with a key); blurbs are marketing lines written once.
   const blurbWriter: BlurbWriter =
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
-  const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, fetchImpl });
+  // M122: the same translator turns each video's Arabic lines English once (owner: zero Arabic in the English app).
+  const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, translator, fetchImpl });
+  // M122: the English sweep — finds Arabic showing in the English content and translates it by itself.
+  const englishSweep = new EnglishSweep({ kv, translator, log: app.log, bump: () => sync.bump('content') });
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
   const posts = new PostsService(kv);
   const polls = new PollsService(kv);
@@ -348,10 +356,6 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       privacyUrl: config.STORE_PRIVACY_URL || `${config.PUBLIC_URL}/legal/privacy`,
     },
   });
-  // M43: the owner's own words (posts, agenda events) get their English once from AI; he edits it from the dashboard.
-  const translator: Translator = config.OPENAI_API_KEY
-    ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl })
-    : new OffTranslator();
   // M107: the unified interests — one list for the news ranking, the Projects Bank filter, the agenda and the push.
   const interests = new InterestsService({ kv, news });
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
@@ -429,7 +433,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(ratingsRoutes, { service: ratings, auth, projects });
   await app.register(interestsRoutes, { service: interests, auth });
   await app.register(discountsRoutes, { service: discounts, auth });
-  await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden });
+  await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep });
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
@@ -508,5 +512,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, englishSweep };
 }

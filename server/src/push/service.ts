@@ -1,7 +1,9 @@
 import type { FastifyBaseLogger } from 'fastify';
 
 import { RequestError } from '../auth/guard.js';
-import { arabicDay, formatAmount, riyadhDateTime } from '../mail/notify.js';
+import { PERSONAS } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
+import { arabicDay, englishDay, formatAmount, formatAmountEn, riyadhDateTime, riyadhDateTimeEn } from '../mail/notify.js';
 import type { KV } from '../store.js';
 
 /**
@@ -21,6 +23,8 @@ export type PushToken = {
   contactId: number;
   /** M29: the account's persona at the last registration (app launch); older tokens have none until then. */
   persona?: string | null;
+  /** M122: the app language at the last registration — the member pushes of this device follow it. */
+  lang?: AppLang | null;
   platform: string;
   deviceName: string | null;
   appVersion: string | null;
@@ -80,7 +84,13 @@ export class PushService {
   }
 
   /** Upserts a device token for the signed-in account; a token moves to the account that last signed in on the device. */
-  async register(contactId: number, input: { token: string; platform: string; deviceName?: string | null; appVersion?: string | null }, persona: string | null = null, now = Date.now()): Promise<{ tokens: number }> {
+  async register(
+    contactId: number,
+    input: { token: string; platform: string; deviceName?: string | null; appVersion?: string | null },
+    persona: string | null = null,
+    lang: AppLang | null = null,
+    now = Date.now(),
+  ): Promise<{ tokens: number }> {
     const token = input.token.trim();
     if (!isExpoPushToken(token)) throw new RequestError('invalid', 'رمز الإشعارات غير صالح');
     const platform = input.platform === 'ios' ? 'ios' : input.platform === 'android' ? 'android' : 'unknown';
@@ -92,13 +102,15 @@ export class PushService {
       if (existing) {
         // A persona missing this time (hub unreachable) keeps the known one — unless the device changed hands.
         existing.persona = persona ?? (existing.contactId === contactId ? (existing.persona ?? null) : null);
+        // M122: every registration carries the app language, so a language switch updates it on the next launch.
+        existing.lang = lang ?? (existing.contactId === contactId ? (existing.lang ?? null) : null);
         existing.contactId = contactId;
         existing.platform = platform;
         existing.deviceName = deviceName ?? existing.deviceName;
         existing.appVersion = appVersion ?? existing.appVersion;
         existing.updatedAt = stamp;
       } else {
-        tokens.push({ token, contactId, persona, platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
+        tokens.push({ token, contactId, persona, lang, platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
       }
     });
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId).length;
@@ -207,8 +219,24 @@ export class PushService {
     return outcome;
   }
 
-  private background(contactId: number, message: PushMessage): void {
-    const run = this.send(contactId, message).catch((error: unknown) => {
+  /** M122: one message in two languages — each device hears the language its app last ran in. */
+  private async sendLocalized(contactId: number, messageOf: (lang: AppLang) => PushMessage): Promise<PushOutcome> {
+    const mine = (await this.load()).filter((entry) => entry.contactId === contactId);
+    const english = mine.filter((entry) => entry.lang === 'en').map((entry) => entry.token);
+    const arabic = mine.filter((entry) => entry.lang !== 'en').map((entry) => entry.token);
+    const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
+    for (const [lang, tokens] of [['ar', arabic], ['en', english]] as const) {
+      if (!tokens.length) continue;
+      const part = await this.deliver(tokens, messageOf(lang), { contactId, lang });
+      outcome.sent += part.sent;
+      outcome.failed += part.failed;
+      outcome.dropped += part.dropped;
+    }
+    return outcome;
+  }
+
+  private background(contactId: number, messageOf: (lang: AppLang) => PushMessage): void {
+    const run = this.sendLocalized(contactId, messageOf).catch((error: unknown) => {
       this.deps.log.error({ err: error, contactId }, 'push failed');
     });
     this.inflight = this.inflight.then(() => run);
@@ -218,106 +246,175 @@ export class PushService {
     visit: { id: string; contactId: number; date: string; time: string; endTime: string; adminNote: string | null; space?: 'office' | 'meeting' | null },
     status: 'confirmed' | 'rejected',
   ): void {
-    const when = `${arabicDay(visit.date)} من ${visit.time} إلى ${visit.endTime}`;
     // M109a: office/meeting-room bookings speak of a booking, not a visit, and name the hours deduction.
     const booking = Boolean(visit.space);
     if (status === 'confirmed') {
-      this.background(visit.contactId, {
-        title: booking ? 'تم تأكيد حجزك في المقر' : 'تم تأكيد زيارتك للمقر',
-        body: `${when}. باركود الدخول جاهز في التطبيق${booking ? '، وخُصمت مدة الحجز من رصيد ساعاتك السنوي' : ''}.`,
-        data: { type: 'hq_visit', id: visit.id, status, screen: `/hq/pass/${visit.id}` },
+      this.background(visit.contactId, (lang) => {
+        const when = lang === 'en' ? `${englishDay(visit.date)} from ${visit.time} to ${visit.endTime}` : `${arabicDay(visit.date)} من ${visit.time} إلى ${visit.endTime}`;
+        return lang === 'en'
+          ? {
+              title: booking ? 'Your HQ booking is confirmed' : 'Your HQ visit is confirmed',
+              body: `${when}. Your entry barcode is ready in the app${booking ? ', and the booked hours were deducted from your annual balance' : ''}.`,
+              data: { type: 'hq_visit', id: visit.id, status, screen: `/hq/pass/${visit.id}` },
+            }
+          : {
+              title: booking ? 'تم تأكيد حجزك في المقر' : 'تم تأكيد زيارتك للمقر',
+              body: `${when}. باركود الدخول جاهز في التطبيق${booking ? '، وخُصمت مدة الحجز من رصيد ساعاتك السنوي' : ''}.`,
+              data: { type: 'hq_visit', id: visit.id, status, screen: `/hq/pass/${visit.id}` },
+            };
       });
       return;
     }
-    this.background(visit.contactId, {
-      title: booking ? 'تعذّر تأكيد حجزك في المقر' : 'تعذّر تأكيد زيارتك للمقر',
-      body: `${when}. ${visit.adminNote ? `ملاحظة الإدارة: ${visit.adminNote}` : 'يمكنك اختيار موعد آخر من التطبيق.'}${booking ? ' لم يُخصم شيء من رصيد ساعاتك.' : ''}`,
-      data: { type: 'hq_visit', id: visit.id, status, screen: '/hq' },
+    this.background(visit.contactId, (lang) => {
+      const when = lang === 'en' ? `${englishDay(visit.date)} from ${visit.time} to ${visit.endTime}` : `${arabicDay(visit.date)} من ${visit.time} إلى ${visit.endTime}`;
+      return lang === 'en'
+        ? {
+            title: booking ? 'Your HQ booking could not be confirmed' : 'Your HQ visit could not be confirmed',
+            body: `${when}. ${visit.adminNote ? `Management note: ${visit.adminNote}` : 'You can pick another time from the app.'}${booking ? ' Nothing was deducted from your hours balance.' : ''}`,
+            data: { type: 'hq_visit', id: visit.id, status, screen: '/hq' },
+          }
+        : {
+            title: booking ? 'تعذّر تأكيد حجزك في المقر' : 'تعذّر تأكيد زيارتك للمقر',
+            body: `${when}. ${visit.adminNote ? `ملاحظة الإدارة: ${visit.adminNote}` : 'يمكنك اختيار موعد آخر من التطبيق.'}${booking ? ' لم يُخصم شيء من رصيد ساعاتك.' : ''}`,
+            data: { type: 'hq_visit', id: visit.id, status, screen: '/hq' },
+          };
     });
   }
 
   paymentResult(payment: { id: string; contactId: number; serviceTitle: string; amount: number; currency: string; status: 'paid' | 'failed' }): void {
     const paid = payment.status === 'paid';
-    // M107: a 100% discount code settles at zero — the push confirms the order, not a transfer.
-    const paidBody =
-      payment.amount === 0
-        ? `تم تأكيد طلبك لخدمة «${payment.serviceTitle}» بكود الخصم. سنتواصل معك لبدء التنفيذ.`
-        : `اكتمل دفع ${formatAmount(payment.amount, payment.currency)} لخدمة «${payment.serviceTitle}». سنتواصل معك لبدء التنفيذ.`;
-    this.background(payment.contactId, {
-      title: paid ? (payment.amount === 0 ? 'تم تأكيد طلبك' : 'تم الدفع بنجاح') : 'لم يكتمل الدفع',
-      body: paid ? paidBody : `لم يكتمل دفع خدمة «${payment.serviceTitle}». يمكنك المحاولة مرة أخرى من التطبيق.`,
-      data: { type: 'payment', id: payment.id, status: payment.status, screen: `/payment/${payment.id}` },
+    const data = { type: 'payment', id: payment.id, status: payment.status, screen: `/payment/${payment.id}` };
+    this.background(payment.contactId, (lang) => {
+      if (lang === 'en') {
+        // M107: a 100% discount code settles at zero — the push confirms the order, not a transfer.
+        const paidBody =
+          payment.amount === 0
+            ? `Your order for "${payment.serviceTitle}" was confirmed with the discount code. We will contact you to get started.`
+            : `Your payment of ${formatAmountEn(payment.amount, payment.currency)} for "${payment.serviceTitle}" is complete. We will contact you to get started.`;
+        return {
+          title: paid ? (payment.amount === 0 ? 'Order confirmed' : 'Payment successful') : 'Payment incomplete',
+          body: paid ? paidBody : `The payment for "${payment.serviceTitle}" was not completed. You can try again from the app.`,
+          data,
+        };
+      }
+      const paidBody =
+        payment.amount === 0
+          ? `تم تأكيد طلبك لخدمة «${payment.serviceTitle}» بكود الخصم. سنتواصل معك لبدء التنفيذ.`
+          : `اكتمل دفع ${formatAmount(payment.amount, payment.currency)} لخدمة «${payment.serviceTitle}». سنتواصل معك لبدء التنفيذ.`;
+      return {
+        title: paid ? (payment.amount === 0 ? 'تم تأكيد طلبك' : 'تم الدفع بنجاح') : 'لم يكتمل الدفع',
+        body: paid ? paidBody : `لم يكتمل دفع خدمة «${payment.serviceTitle}». يمكنك المحاولة مرة أخرى من التطبيق.`,
+        data,
+      };
     });
   }
 
   /** A person of the club answered in the advisor conversation; the words stay there (no personal data in a push). */
   staffReplied(contactId: number): void {
-    this.background(contactId, {
-      title: 'رد من فريق النادي',
-      body: 'وصلك رد جديد من فريق نادي المستثمرين في محادثة المستشار.',
-      data: { type: 'advisor', screen: '/advisor' },
-    });
+    this.background(contactId, (lang) =>
+      lang === 'en'
+        ? { title: 'A reply from the club team', body: 'You have a new reply from the Investors Club team in the advisor conversation.', data: { type: 'advisor', screen: '/advisor' } }
+        : { title: 'رد من فريق النادي', body: 'وصلك رد جديد من فريق نادي المستثمرين في محادثة المستشار.', data: { type: 'advisor', screen: '/advisor' } },
+    );
   }
 
   /** M36: the management answered in «راسل الإدارة»; the words stay in the thread (no personal data in a push). */
   contactReplied(contactId: number): void {
-    this.background(contactId, {
-      title: 'رد من إدارة النادي',
-      body: 'وصلك رد جديد من الإدارة في «راسل الإدارة».',
-      data: { type: 'contact', screen: '/contact' },
-    });
+    this.background(contactId, (lang) =>
+      lang === 'en'
+        ? { title: 'A reply from the club management', body: 'You have a new reply from the management in "Message the management".', data: { type: 'contact', screen: '/contact' } }
+        : { title: 'رد من إدارة النادي', body: 'وصلك رد جديد من الإدارة في «راسل الإدارة».', data: { type: 'contact', screen: '/contact' } },
+    );
   }
 
-  /** M41: an agenda attendance fee was paid — the registration is confirmed. */
-  agendaConfirmed(contactId: number, eventTitle: string, eventId: string): void {
-    this.background(contactId, {
-      title: 'تم تأكيد حضورك ✅',
-      body: `حضورك في «${eventTitle}» مؤكد. تذكرتك جاهزة في التطبيق.`,
-      data: { type: 'agenda', screen: `/agenda/${eventId}` },
-    });
+  /** M41: an agenda attendance fee was paid — the registration is confirmed. `titleEn` when the event carries one (M43). */
+  agendaConfirmed(contactId: number, eventTitle: string, eventId: string, titleEn: string | null = null): void {
+    this.background(contactId, (lang) =>
+      lang === 'en'
+        ? { title: 'Your attendance is confirmed ✅', body: `Your attendance at "${titleEn || eventTitle}" is confirmed. Your ticket is ready in the app.`, data: { type: 'agenda', screen: `/agenda/${eventId}` } }
+        : { title: 'تم تأكيد حضورك ✅', body: `حضورك في «${eventTitle}» مؤكد. تذكرتك جاهزة في التطبيق.`, data: { type: 'agenda', screen: `/agenda/${eventId}` } },
+    );
   }
 
   /** M107: the day-before reminder for a confirmed attendee. */
-  agendaReminder(contactId: number, event: { id: string; title: string; date: string; time: string }): void {
-    const when = `${arabicDay(event.date)}${event.time ? ` الساعة ${event.time}` : ''}`;
-    this.background(contactId, {
-      title: 'تذكير بفعاليتك غدًا 📅',
-      body: `«${event.title}» — ${when}. تذكرتك في التطبيق.`,
-      data: { type: 'agenda', screen: `/agenda/${event.id}` },
+  agendaReminder(contactId: number, event: { id: string; title: string; titleEn?: string | null; date: string; time: string }): void {
+    this.background(contactId, (lang) => {
+      if (lang === 'en') {
+        const when = `${englishDay(event.date)}${event.time ? ` at ${event.time}` : ''}`;
+        return { title: 'Your event is tomorrow 📅', body: `"${event.titleEn || event.title}" — ${when}. Your ticket is in the app.`, data: { type: 'agenda', screen: `/agenda/${event.id}` } };
+      }
+      const when = `${arabicDay(event.date)}${event.time ? ` الساعة ${event.time}` : ''}`;
+      return { title: 'تذكير بفعاليتك غدًا 📅', body: `«${event.title}» — ${when}. تذكرتك في التطبيق.`, data: { type: 'agenda', screen: `/agenda/${event.id}` } };
     });
   }
 
   /** M11: the administration decided on the member's «شخصية ومسيرة» file. */
   profileDecided(contactId: number, approved: boolean, profileId: string): void {
-    this.background(contactId, {
-      title: approved ? 'تم اعتماد ملفك في «شخصية ومسيرة»' : 'تحديث بشأن ملفك في «شخصية ومسيرة»',
-      body: approved
-        ? 'أصبح ملفك ضمن شخصيات نادي المستثمرين الظاهرة في التطبيق.'
-        : 'راجعت الإدارة ملفك وكتبت لك ملاحظتها — افتح طلبك لقراءتها.',
-      data: { type: 'profile', screen: approved ? `/people/${profileId}` : '/people/apply' },
-    });
+    const data = { type: 'profile', screen: approved ? `/people/${profileId}` : '/people/apply' };
+    this.background(contactId, (lang) =>
+      lang === 'en'
+        ? {
+            title: approved ? 'Your "A Life & Legacy" profile is approved' : 'An update on your "A Life & Legacy" profile',
+            body: approved
+              ? 'Your profile now appears among the Investors Club personalities in the app.'
+              : 'The management reviewed your profile and left you a note — open your application to read it.',
+            data,
+          }
+        : {
+            title: approved ? 'تم اعتماد ملفك في «شخصية ومسيرة»' : 'تحديث بشأن ملفك في «شخصية ومسيرة»',
+            body: approved ? 'أصبح ملفك ضمن شخصيات نادي المستثمرين الظاهرة في التطبيق.' : 'راجعت الإدارة ملفك وكتبت لك ملاحظتها — افتح طلبك لقراءتها.',
+            data,
+          },
+    );
   }
 
-  /** M109d: the dashboard decided on the member's «طلب تغيير الصفة». */
-  personaChangeDecided(contactId: number, approved: boolean, label: string, adminNote: string | null): void {
-    this.background(contactId, {
-      title: approved ? 'تم اعتماد تغيير صفتك' : 'تحديث بشأن طلب تغيير الصفة',
-      body: approved
-        ? `أصبحت صفتك الآن: ${label}. سيتشكل التطبيق حول وجهتك الجديدة.`
-        : adminNote
-          ? `لم تعتمد الإدارة طلبك هذه المرة. ملاحظة الإدارة: ${adminNote}`
-          : 'لم تعتمد الإدارة طلب تغيير صفتك هذه المرة.',
-      data: { type: 'persona', screen: '/persona' },
+  /** M109d: the dashboard decided on the member's «طلب تغيير الصفة». `persona` is the key; each language shows its own label. */
+  personaChangeDecided(contactId: number, approved: boolean, persona: string, adminNote: string | null): void {
+    const entry = PERSONAS.find((item) => item.key === persona);
+    this.background(contactId, (lang) => {
+      if (lang === 'en') {
+        const label = entry?.labelEn ?? persona;
+        return {
+          title: approved ? 'Your category change is approved' : 'An update on your category change request',
+          body: approved
+            ? `Your category is now: ${label}. The app will take shape around your new direction.`
+            : adminNote
+              ? `The management did not approve your request this time. Management note: ${adminNote}`
+              : 'The management did not approve your category change request this time.',
+          data: { type: 'persona', screen: '/persona' },
+        };
+      }
+      const label = entry?.label ?? persona;
+      return {
+        title: approved ? 'تم اعتماد تغيير صفتك' : 'تحديث بشأن طلب تغيير الصفة',
+        body: approved
+          ? `أصبحت صفتك الآن: ${label}. سيتشكل التطبيق حول وجهتك الجديدة.`
+          : adminNote
+            ? `لم تعتمد الإدارة طلبك هذه المرة. ملاحظة الإدارة: ${adminNote}`
+            : 'لم تعتمد الإدارة طلب تغيير صفتك هذه المرة.',
+        data: { type: 'persona', screen: '/persona' },
+      };
     });
   }
 
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
-    this.background(contactId, {
-      title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',
-      body: activation.pending
-        ? 'سيتم تفعيل عضويتك خلال وقت قصير، وسنخبرك عند التفعيل.'
-        : `أهلًا بك في نادي المستثمرين. عضويتك فعّالة الآن${activation.expiresAt ? ` حتى ${riyadhDateTime(activation.expiresAt)}` : ''}.`,
-      data: { type: 'membership', status: activation.pending ? 'pending' : 'active', screen: '/membership' },
-    });
+    const data = { type: 'membership', status: activation.pending ? 'pending' : 'active', screen: '/membership' };
+    this.background(contactId, (lang) =>
+      lang === 'en'
+        ? {
+            title: activation.pending ? 'We received your subscription' : 'Your annual membership is active',
+            body: activation.pending
+              ? 'Your membership will be activated shortly, and we will let you know the moment it is.'
+              : `Welcome to the Investors Club. Your membership is active now${activation.expiresAt ? ` until ${riyadhDateTimeEn(activation.expiresAt)}` : ''}.`,
+            data,
+          }
+        : {
+            title: activation.pending ? 'تم استلام اشتراكك' : 'تم تفعيل عضويتك السنوية',
+            body: activation.pending
+              ? 'سيتم تفعيل عضويتك خلال وقت قصير، وسنخبرك عند التفعيل.'
+              : `أهلًا بك في نادي المستثمرين. عضويتك فعّالة الآن${activation.expiresAt ? ` حتى ${riyadhDateTime(activation.expiresAt)}` : ''}.`,
+            data,
+          },
+    );
   }
 }

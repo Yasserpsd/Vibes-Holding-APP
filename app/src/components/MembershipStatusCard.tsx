@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { Membership, MembershipContent } from '@/api/auth';
+import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { PopIn, Sheen, useCountUp } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -17,10 +19,12 @@ type Props = {
   activationNote?: string;
   /** Server-driven membership name («العضوية السنوية لنادي المستثمرين»). */
   title?: string;
+  /** M122 (owner): a loud subscribe button on the card for a non-member — straight into the purchase popup. */
+  subscribeCta?: boolean;
 };
 
 /** Membership state as a badge: guest, unactivated, active with the days left, or expired. */
-export function MembershipStatusCard({ membership, texts, activationNote, title }: Props) {
+export function MembershipStatusCard({ membership, texts, activationNote, title, subscribeCta }: Props) {
   const status = membership?.status ?? 'guest';
   const active = status === 'active';
   // V2: an active membership is a golden card with a metal sheen; the numbers count up into place.
@@ -57,6 +61,9 @@ export function MembershipStatusCard({ membership, texts, activationNote, title 
           </View>
         ) : null}
         {(status === 'unactivated' || status === 'expired') && activationNote ? <Text style={styles.note}>{activationNote}</Text> : null}
+        {subscribeCta && (status === 'unactivated' || status === 'expired') ? (
+          <AppButton label={t('gate.activateNow')} icon="card-outline" onPress={showMembershipGate} />
+        ) : null}
       </GlassCard>
     </View>
   );

@@ -38,6 +38,33 @@ export function formatAmount(amount: number, currency: string): string {
   return `${new Intl.NumberFormat('en-US').format(amount)} ${currency === 'SAR' ? 'ريال' : currency}`;
 }
 
+// M122: the same helpers in English, for the member pushes of English-language devices.
+const riyadhFormatEn = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Riyadh',
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const dayFormatEn = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+export function riyadhDateTimeEn(value: string | number | Date): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : riyadhFormatEn.format(date);
+}
+
+/** "Sunday 20 September 2026" for a YYYY-MM-DD date. */
+export function englishDay(date: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? date : dayFormatEn.format(parsed);
+}
+
+export function formatAmountEn(amount: number, currency: string): string {
+  return `${new Intl.NumberFormat('en-US').format(amount)} ${currency}`;
+}
+
 type Person = { name: string; phone: string; email: string };
 type Answer = { label: string; value: string };
 

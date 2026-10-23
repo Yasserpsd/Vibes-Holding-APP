@@ -5,6 +5,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Config } from '../config.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
+import type { AppLang } from '../lang.js';
 import type { SocialIdentity } from './social.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
@@ -13,11 +14,12 @@ import type { SessionRecord, SessionStore } from './sessions.js';
 
 export type Persona = 'neutral' | 'entrepreneur' | 'investor';
 
-export const PERSONAS: { key: Persona; label: string }[] = [
+export const PERSONAS: { key: Persona; label: string; labelEn: string }[] = [
   // The owner's wording and order (2026-09-21), the same three lines as the home portals.
-  { key: 'neutral', label: 'محايد — أستكشف توجهي' },
-  { key: 'entrepreneur', label: 'رائد أعمال — لدي مشروع' },
-  { key: 'investor', label: 'مستثمر — أبحث عن فرص' },
+  // M122: `labelEn` for the English member mails and pushes (the app shows its own strings).
+  { key: 'neutral', label: 'محايد — أستكشف توجهي', labelEn: 'Neutral — exploring my direction' },
+  { key: 'entrepreneur', label: 'رائد أعمال — لدي مشروع', labelEn: 'Entrepreneur — I have a project' },
+  { key: 'investor', label: 'مستثمر — أبحث عن فرص', labelEn: 'Investor — looking for opportunities' },
 ];
 
 export type MembershipStatus = 'unactivated' | 'active' | 'expired';
@@ -170,7 +172,7 @@ export class AuthService {
     return this.deps.config.APP_ENV !== 'production' && this.deps.config.AUTH_ADMIN_ONLY === '1';
   }
 
-  async register(input: RegisterInput, ip: string): Promise<PendingResult> {
+  async register(input: RegisterInput, ip: string, lang: AppLang = 'ar'): Promise<PendingResult> {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
     }
@@ -195,6 +197,9 @@ export class AuthService {
       persona: input.persona,
       bio: input.bio,
       job_title: input.jobTitle ?? '',
+      // M122: the hub stores the registration language (contacts.lang, hub 2.20.0) and every
+      // member mail it sends — activation code, welcome, receipts — follows it.
+      lang,
       page_url: 'app://register',
       ...(referral ? { referral } : {}),
       ...(interests ? { interests } : {}),
@@ -241,7 +246,7 @@ export class AuthService {
    * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
    * verified, so there is no code step; the same test-environment gates as password login apply.
    */
-  async socialLogin(identity: SocialIdentity, ip: string): Promise<SignedInResult> {
+  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar'): Promise<SignedInResult> {
     if (!identity.emailVerified) {
       throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
     }
@@ -257,6 +262,8 @@ export class AuthService {
         email_verified: 1,
         name: identity.name,
         allow_create: this.registrationOpen ? 1 : 0,
+        // M122: a first-time social registration stores the app's language at the hub (2.20.0).
+        lang,
         page_url: 'app://social',
       });
     } catch (error) {

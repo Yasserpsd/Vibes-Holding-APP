@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import type { PushService } from './service.js';
 
 export type PushRoutesOptions = { service: PushService; auth: AuthService };
@@ -35,7 +36,8 @@ export const pushRoutes: FastifyPluginAsync<PushRoutesOptions> = async (app, { s
       // M29: the persona rides on the token so category messages know their devices. The hub being
       // unreachable never blocks the registration; the next app launch fills the persona in.
       const persona = await auth.me(current.session).then((me) => me.persona || null, () => null);
-      const result = await service.register(current.session.contactId, input, persona);
+      // M122: the device's app language rides on the token, so member pushes speak it.
+      const result = await service.register(current.session.contactId, input, persona, langOf(request));
       return { ok: true, ...result };
     }),
   );

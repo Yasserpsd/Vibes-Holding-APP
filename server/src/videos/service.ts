@@ -1,10 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
+import { isArabic } from '../content/i18n.js';
 import { getVideosContent, type FeaturedVideo } from '../content/videos.js';
 import type { AppLang } from '../lang.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { KV } from '../store.js';
+import type { Translator } from '../translate.js';
 import type { BlurbWriter } from './blurbs.js';
 import { fetchUploadsViaApi, fetchVideoFeed, isVideoId, resolveChannel, thumbnailUrl, videoUrl, type ChannelInfo, type VideoEntry } from './youtube.js';
 
@@ -15,8 +17,12 @@ import { fetchUploadsViaApi, fetchVideoFeed, isVideoId, resolveChannel, thumbnai
  */
 export const VIDEOS_SNAPSHOT_KEY = 'videos:snapshot';
 export const VIDEO_BLURBS_KEY = 'content:videos:blurbs';
+export const VIDEO_ENGLISH_KEY = 'content:videos:english';
 
 export type Blurb = { text: string; source: 'ai' | 'template' | 'dashboard'; at: string };
+
+/** M122: the English of one video's Arabic lines, written once by AI; `hash` detects a changed source. */
+export type VideoEnglish = { title: string; description: string; blurb: string; hash: string; at: string };
 
 export type StoredVideo = VideoEntry & { firstSeenAt: string };
 
@@ -53,13 +59,22 @@ export type VideosPage = {
   updatedAt: string | null;
 };
 
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; blurbs: BlurbWriter; fetchImpl?: FetchImpl };
+type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; blurbs: BlurbWriter; translator?: Translator; fetchImpl?: FetchImpl };
 
 const EMPTY: VideosSnapshot = { channel: null, mode: null, fetchedAt: null, lastError: null, videos: [] };
+
+/** A cheap source fingerprint: retranslate only when a title, description or blurb actually changed. */
+function englishHash(video: { title: string; description: string }, blurb: string): string {
+  const text = `${video.title}\u0000${video.description}\u0000${blurb}`;
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) hash = (hash * 31 + text.charCodeAt(index)) | 0;
+  return String(hash);
+}
 
 export class VideosService {
   private snapshot: VideosSnapshot = EMPTY;
   private blurbs: Record<string, Blurb> = {};
+  private english: Record<string, VideoEnglish> = {};
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
@@ -68,6 +83,7 @@ export class VideosService {
   async start(): Promise<void> {
     this.snapshot = (await this.deps.kv.get<VideosSnapshot>(VIDEOS_SNAPSHOT_KEY)) ?? EMPTY;
     this.blurbs = (await this.deps.kv.get<Record<string, Blurb>>(VIDEO_BLURBS_KEY)) ?? {};
+    this.english = (await this.deps.kv.get<Record<string, VideoEnglish>>(VIDEO_ENGLISH_KEY)) ?? {};
     const minutes = this.deps.config.VIDEOS_REFRESH_MINUTES;
     if (minutes <= 0) return;
     void this.refresh();
@@ -123,6 +139,7 @@ export class VideosService {
       }
       const videos = [...known.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
       await this.writeBlurbs(videos);
+      await this.writeEnglish(videos);
       this.snapshot = { channel: { ...channel, title }, mode, fetchedAt: now, lastError: null, videos };
       await this.deps.kv.set(VIDEOS_SNAPSHOT_KEY, this.snapshot);
       log.info({ mode, count: videos.length, fresh: entries.length }, 'videos refreshed');
@@ -149,15 +166,46 @@ export class VideosService {
     await this.deps.kv.set(VIDEO_BLURBS_KEY, this.blurbs);
   }
 
-  private toPublic(video: StoredVideo, featuredLabel: string | null = null): PublicVideo {
+  /**
+   * M122 (owner: «ميبقاش في ولا كلمة عربي في نسخة انجليزي»): the English app reads each video
+   * through its one-time AI translation. A video not yet translated keeps its original lines —
+   * the next refresh translates it.
+   */
+  private async writeEnglish(videos: StoredVideo[]): Promise<void> {
+    const translator = this.deps.translator;
+    if (!translator || translator.mode === 'off') return;
+    const jobs = videos
+      .map((video) => ({ video, blurb: this.blurbs[video.id]?.text ?? '', hash: englishHash(video, this.blurbs[video.id]?.text ?? '') }))
+      .filter(({ video, blurb, hash }) => this.english[video.id]?.hash !== hash && [video.title, video.description, blurb].some(isArabic))
+      .slice(0, 20); // a bounded batch per refresh: the library catches up within a few cycles
+    if (!jobs.length) return;
+    const texts = jobs.flatMap(({ video, blurb }) => [video.title, video.description, blurb]);
+    const out = await translator.translate(texts);
+    if (!out) return;
+    const at = new Date().toISOString();
+    jobs.forEach(({ video, blurb, hash }, index) => {
+      this.english[video.id] = {
+        title: out[index * 3] || video.title,
+        description: out[index * 3 + 1] || video.description,
+        blurb: out[index * 3 + 2] || blurb,
+        hash,
+        at,
+      };
+    });
+    await this.deps.kv.set(VIDEO_ENGLISH_KEY, this.english);
+    this.deps.log.info({ translated: jobs.length }, 'video lines translated to English');
+  }
+
+  private toPublic(video: StoredVideo, featuredLabel: string | null = null, lang: AppLang = 'ar'): PublicVideo {
+    const en = lang === 'en' ? this.english[video.id] : undefined;
     return {
       id: video.id,
-      title: video.title,
-      description: video.description,
+      title: en?.title || video.title,
+      description: en?.description || video.description,
       publishedAt: video.publishedAt,
       thumbnail: video.thumbnail,
       url: videoUrl(video.id),
-      blurb: this.blurbs[video.id]?.text ?? '',
+      blurb: en?.blurb || (this.blurbs[video.id]?.text ?? ''),
       featuredLabel,
     };
   }
@@ -181,10 +229,10 @@ export class VideosService {
     const byId = new Map(this.snapshot.videos.map((video) => [video.id, video]));
     const featured = content.featured.filter((pick) => isVideoId(pick.id)).map((pick) => {
       const video = byId.get(pick.id);
-      return video ? this.toPublic(video, pick.label) : this.placeholder(pick);
+      return video ? this.toPublic(video, pick.label, lang) : this.placeholder(pick);
     });
     const start = (query.page - 1) * query.limit;
-    const items = this.snapshot.videos.slice(start, start + query.limit).map((video) => this.toPublic(video));
+    const items = this.snapshot.videos.slice(start, start + query.limit).map((video) => this.toPublic(video, null, lang));
     return {
       title: content.title,
       intro: content.intro,
@@ -202,7 +250,7 @@ export class VideosService {
 
   async get(id: string, lang: AppLang = 'ar'): Promise<PublicVideo | null> {
     const video = this.snapshot.videos.find((entry) => entry.id === id);
-    if (video) return this.toPublic(video);
+    if (video) return this.toPublic(video, null, lang);
     const content = await getVideosContent(this.deps.kv, lang);
     const pick = content.featured.find((entry) => entry.id === id);
     return pick ? this.placeholder(pick) : null;

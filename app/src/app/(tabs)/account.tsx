@@ -20,7 +20,7 @@ import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/comp
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
 import { env } from '@/config/env';
-import { languageChoiceOffered, t, tOptional } from '@/i18n';
+import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
@@ -91,7 +91,7 @@ export default function AccountScreen() {
       {/* M117: the 30-day deletion countdown with its «تراجع» door — only while a deletion is scheduled. */}
       {me ? <DeletionBanner account={String(me.id)} /> : null}
       <FadeInView delay={entranceDelay(1, 90)}>
-        <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} />
+        <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} subscribeCta />
       </FadeInView>
       {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 
@@ -162,7 +162,7 @@ export default function AccountScreen() {
 function ProfileHeader({ me }: { me: Me }) {
   // M109e: the English app shows the member's own data in English (display only).
   const shown = displayProfile(me);
-  const initial = shown.name.trim().charAt(0) || '؟';
+  const initial = shown.name.trim().charAt(0) || (getLang() === 'en' ? '?' : '؟');
   // M103: the completion meter around the avatar — golden dots fill as the profile does.
   const percent = profileCompletion(me);
   return (

@@ -10,6 +10,7 @@ import type { SyncService } from '../sync/service.js';
 import { getAboutContent } from './about.js';
 import type { GoldenOffersService } from '../golden/service.js';
 import { ContentError, adminContent, saveContentEdit } from './admin.js';
+import type { EnglishSweep } from './englishSweep.js';
 import { CONTENT_BLOCK_KEYS, MAX_CONTENT_TEXT } from './edits.js';
 import { adminValues, saveContentValue } from './values.js';
 import { getGoldenContent } from './golden.js';
@@ -20,7 +21,7 @@ import { getMembershipContent } from './membership.js';
 import { bannerImages, imageSlots, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
-export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService };
+export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService; englishSweep?: EnglishSweep };
 
 const requestSchema = z.object({
   answers: z.record(z.string().max(40), z.string().trim().max(300)).default({}),
@@ -58,7 +59,7 @@ const imageSchema = z.object({
  * otherwise). Services are the only list shaped per account (locked for non-members). The dashboard edits the
  * wording of every block in both languages through the admin routes.
  */
-export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (app, { kv, auth, notifier, sync, offers }) => {
+export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (app, { kv, auth, notifier, sync, offers, englishSweep }) => {
   const whoIs = optionalSession(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -200,11 +201,24 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
         const saved = await saveContentEdit(kv, { ...body, by: admin.me.name });
         // Open apps hear it through /api/sync and read the block again at once.
         await sync.bump('content').catch(() => undefined);
+        // M122: an Arabic edit gets its English written by AI moments later, with no step from the owner.
+        if (body.lang === 'ar') englishSweep?.kick();
         return { ok: true, ...saved };
       } catch (error) {
         if (error instanceof ContentError) return reply.code(400).send({ error: { code: 'invalid', message: error.message } });
         throw error;
       }
+    }),
+  );
+
+  // M122: run the English sweep now (the dashboard's «فحص الإنجليزية») and answer with what it did.
+  app.post(
+    '/api/admin/content/english-sweep',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      if (!englishSweep) return reply.code(404).send({ error: { code: 'off', message: 'الترجمة التلقائية غير مفعّلة (لا يوجد مفتاح OpenAI)' } });
+      return { ok: true, ...(await englishSweep.run()), ...englishSweep.status() };
     }),
   );
 

@@ -140,7 +140,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('register', 6, request, reply)) return;
       const body = parse(registerSchema, request.body, reply);
       if (!body) return;
-      return service.register(body, request.ip);
+      return service.register(body, request.ip, langOf(request));
     }),
   );
 
@@ -184,7 +184,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(socialSchema, request.body, reply);
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
-      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip);
+      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request));
       return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -298,13 +298,18 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (me.persona === body.persona) {
         return reply.code(400).send({ error: { code: 'persona_same', message: 'هذا هو توجهك الحالي بالفعل' } });
       }
-      const label = PERSONAS.find((item) => item.key === body.persona)?.label ?? body.persona;
+      const personaEntry = PERSONAS.find((item) => item.key === body.persona);
+      // M122: the member's code mail follows the app language the request came in.
+      const en = langOf(request) === 'en';
+      const label = (en ? personaEntry?.labelEn : personaEntry?.label) ?? body.persona;
       const result = await personaChange.request(me.id, body.persona, async (code) => {
         try {
           await mailer?.send({
             to: [me.email],
-            subject: 'رمز تغيير التوجه — نادي المستثمرين',
-            text: [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة خلال سنة العضوية.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
+            subject: en ? 'Your category change code — Investors Club' : 'رمز تغيير التوجه — نادي المستثمرين',
+            text: en
+              ? [`Your confirmation code for changing your category to "${label}": ${code}`, 'The code is valid for 10 minutes and for one use only.', '', 'You can change your category once per membership year.', 'If you did not ask for this change, ignore this message.'].join('\n')
+              : [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة خلال سنة العضوية.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
           });
         } catch (error) {
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'persona change code was not mailed');
@@ -432,8 +437,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         service.forget(pending.contactId);
       }
       const decided = await personaRequests.decide(params.id, body.action === 'approve' ? 'approved' : 'rejected', admin.me.name || admin.me.email, body.note);
-      const label = PERSONAS.find((item) => item.key === decided.to)?.label ?? decided.to;
-      push?.personaChangeDecided(decided.contactId, decided.status === 'approved', label, decided.adminNote);
+      // M122: the push service maps the persona key to each language's label itself.
+      push?.personaChangeDecided(decided.contactId, decided.status === 'approved', decided.to, decided.adminNote);
       return { request: toAdminPersonaRequest(decided) };
     }),
   );
@@ -483,12 +488,16 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!(await service.passwordMatches(auth.session, body.password))) {
         return reply.code(403).send({ error: { code: 'bad_password', message: 'كلمة المرور غير صحيحة' } });
       }
+      // M122: the deletion code mail follows the app language the request came in.
+      const en = langOf(request) === 'en';
       const result = await deletion.request(me.id, body.reason ?? '', async (code) => {
         try {
           await mailer?.send({
             to: [me.email],
-            subject: 'رمز تأكيد حذف الحساب — نادي المستثمرين',
-            text: [`رمز تأكيد حذف حسابك: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', `بعد التأكيد يبقى حسابك فعالًا ${DELETION_GRACE_DAYS} يومًا ويمكنك التراجع خلالها في أي وقت.`, 'إذا لم تطلب حذف حسابك فتجاهل هذه الرسالة وغيّر كلمة مرورك.'].join('\n'),
+            subject: en ? 'Your account deletion code — Investors Club' : 'رمز تأكيد حذف الحساب — نادي المستثمرين',
+            text: en
+              ? [`Your account deletion confirmation code: ${code}`, 'The code is valid for 10 minutes and for one use only.', '', `After you confirm, your account stays active for ${DELETION_GRACE_DAYS} days and you can cancel at any time during them.`, 'If you did not ask to delete your account, ignore this message and change your password.'].join('\n')
+              : [`رمز تأكيد حذف حسابك: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', `بعد التأكيد يبقى حسابك فعالًا ${DELETION_GRACE_DAYS} يومًا ويمكنك التراجع خلالها في أي وقت.`, 'إذا لم تطلب حذف حسابك فتجاهل هذه الرسالة وغيّر كلمة مرورك.'].join('\n'),
           });
         } catch (error) {
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'deletion code was not mailed');
