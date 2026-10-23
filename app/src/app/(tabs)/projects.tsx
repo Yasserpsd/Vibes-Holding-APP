@@ -4,14 +4,15 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useProjectFilters, useProjectsList } from '@/api/queries';
-import type { ProjectsSort } from '@/api/types';
+import { useGolden, useProjectFilters, useProjectsList } from '@/api/queries';
+import type { ProjectsSort, PublicProject } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
+import { VibesOpportunityCard } from '@/components/VibesOpportunityCard';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { markSeen } from '@/lib/seen';
@@ -56,6 +57,11 @@ export default function ProjectsScreen() {
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   const sorts = filters.data?.sorts ?? DEFAULT_SORTS;
+  // M121b (owner): the Vibes Ventures opportunity rides INSIDE the bank list, pinned on top of every
+  // sort in its premium dress — never a section of its own. A search or filter keeps the results honest.
+  const golden = useGolden();
+  const vibesEntry = !q && !sector && !stage && !mine ? (golden.data?.opportunity ?? null) : null;
+  const rows: (PublicProject | 'vibes')[] = vibesEntry && items.length > 0 ? ['vibes', ...items] : items;
 
   const header = (
     <View style={styles.header}>
@@ -139,15 +145,21 @@ export default function ProjectsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <FlatList
-        data={items}
-        keyExtractor={(item) => String(item.id)}
+        data={rows}
+        keyExtractor={(item) => (typeof item === 'string' ? 'vibes' : String(item.id))}
         renderItem={({ item, index }) => (
           <FadeInView delay={entranceDelay(index)}>
-            <ProjectCard
-              project={item}
-              onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
-              onContact={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id), contact: '1' } })}
-            />
+            {typeof item === 'string' ? (
+              vibesEntry && golden.data ? (
+                <VibesOpportunityCard entry={vibesEntry} content={golden.data} />
+              ) : null
+            ) : (
+              <ProjectCard
+                project={item}
+                onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
+                onContact={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id), contact: '1' } })}
+              />
+            )}
           </FadeInView>
         )}
         ListHeaderComponent={header}

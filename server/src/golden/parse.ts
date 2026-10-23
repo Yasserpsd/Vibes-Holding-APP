@@ -60,8 +60,15 @@ function imageUrl(tag: string, pageUrl: string): string | null {
   return resolved.toString();
 }
 
+/**
+ * M121b (brand rule): the web offer pages still write the old Arabic name; the app always reads
+ * Latin «Vibes Ventures». Longest variant first, so «فايبز القابضة» never becomes «Vibes Ventures القابضة».
+ */
+const BRAND_NAME = /(?:[ڤف]ايبز)(?:\s+القابضة(?:\s+للاستثمار)?)?|فيبس\s+فينشرز/gu;
+const brandText = (text: string): string => text.replace(BRAND_NAME, 'Vibes Ventures');
+
 function flatText(inner: string, max: number): string {
-  return htmlToText(inner).replace(/\s+/g, ' ').trim().slice(0, max);
+  return brandText(htmlToText(inner).replace(/\s+/g, ' ').trim()).slice(0, max);
 }
 
 /**

@@ -49,6 +49,20 @@ test('parseOfferPage keeps the page content in order and drops the chrome', () =
   assert.ok(h1 && h1.type === 'heading' && h1.level === 1);
 });
 
+test('M121b: the old Arabic brand name on a web page always reads «Vibes Ventures» in the app', () => {
+  const html = `<html><body><main data-elementor-type="wp-page">
+    <h1>شكرًا لاهتمامك بـ«فايبز القابضة للاستثمار»</h1>
+    <p>علامات تجارية مسجّلة تعمل فعليًا تحت مظلة فايبز القابضة.</p>
+    <p>تنفرد «ڤايبز» كشريك ملكية داخل بيئة «فايبز» نفسها، بدعم فيبس فينشرز.</p>
+  </main></body></html>`;
+  const texts = parseOfferPage(html, 'https://vibesholding.com/offer/').map((block) => (block.type === 'image' ? '' : block.text));
+  assert.deepEqual(texts, [
+    'شكرًا لاهتمامك بـ«Vibes Ventures»',
+    'علامات تجارية مسجّلة تعمل فعليًا تحت مظلة Vibes Ventures.',
+    'تنفرد «Vibes Ventures» كشريك ملكية داخل بيئة «Vibes Ventures» نفسها، بدعم Vibes Ventures.',
+  ]);
+});
+
 const kv = new MemoryKV();
 const config = loadConfig({ LOG_LEVEL: 'silent', NEWS_REFRESH_MINUTES: '0', GOLDEN_REFRESH_MINUTES: '0' });
 let built: Awaited<ReturnType<typeof buildApp>>;
