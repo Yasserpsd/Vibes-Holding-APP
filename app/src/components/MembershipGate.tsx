@@ -11,7 +11,7 @@ import { Floating, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { loadSetting } from '@/lib/deviceStore';
 import {
   fetchMembershipOffer,
   hasStorePurchases,
@@ -26,8 +26,11 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 /**
  * M120 (owner's TestFlight feedback, 2026-10-23): the subscribe path. One popup, opened the moment
  * a non-member taps anything members-only — short title, one line, the store price and a direct
- * subscribe button (CLAUDE.md rule 3: the store sheet, activation only from the server). Nothing
- * pops on its own, except ONCE ever after the intro video for a signed-in non-member.
+ * subscribe button (CLAUDE.md rule 3: the store sheet, activation only from the server).
+ * M122b (owner, same week: «عايز pop up تظهر فورًا… ولما أروح أفعّل العضوية أتحول على الدفع مباشر»):
+ * it now opens by itself ONCE PER LAUNCH for every signed-in non-member — a few seconds after the
+ * home settles (and after the intro video when that shows) — and the subscribe button goes straight
+ * to the store's payment sheet, fetching the offer on the spot when it is not cached yet.
  */
 
 let openGate: (() => void) | null = null;
@@ -46,7 +49,6 @@ export function noteIntroClosed(): void {
   introWaiter = null;
 }
 
-const NUDGE_KEY = 'investorsclub.membershipNudge.v1';
 const INTRO_SEEN_KEY = 'investorsclub.introSeen.v2'; // IntroVideoPopup's own key, read-only here.
 const NUDGE_DELAY_MS = 5000;
 
@@ -100,7 +102,8 @@ export function MembershipGateHost() {
     };
   }, [visible, signedIn, config, me]);
 
-  // ONE automatic appearance ever: a few seconds after the intro video, for a signed-in non-member.
+  // M122b: ONCE PER LAUNCH, by itself — a few seconds after the intro video (or right after the
+  // home settles when the intro is already seen), for every signed-in non-member.
   useEffect(() => {
     if (!signedIn || member || atGate || nudged.current) return;
     let alive = true;
@@ -109,15 +112,10 @@ export function MembershipGateHost() {
       timer = setTimeout(() => {
         if (!alive || nudged.current) return;
         nudged.current = true;
-        void saveSetting(NUDGE_KEY, '1');
         openGate?.();
       }, NUDGE_DELAY_MS);
     };
     void (async () => {
-      if (await loadSetting(NUDGE_KEY)) {
-        nudged.current = true;
-        return;
-      }
       if (!alive) return;
       if (introClosedNow || (await loadSetting(INTRO_SEEN_KEY))) fire();
       else introWaiter = fire;
@@ -157,15 +155,26 @@ export function MembershipGateHost() {
     setPhase('pending');
   }, [setMe]);
 
+  // M122b (owner): the button goes STRAIGHT to the store's payment sheet. An offer not cached yet
+  // is fetched on the spot; only a store this device truly cannot reach falls back to /membership.
   const buy = async () => {
-    if (!config || !offer) {
-      // No fetchable store price on this device yet: the membership screen holds the full card.
+    if (!config || !me || !hasStorePurchases() || !storeKeyFor(config)) {
       go('/membership');
       return;
     }
     setError(null);
     setPhase('busy');
-    const result = await purchaseMembership(config, offer);
+    let current = offer;
+    if (!current) {
+      current = await loadOffer(config, me.id);
+      if (current) setOffer(current);
+    }
+    if (!current) {
+      setPhase('idle');
+      go('/membership');
+      return;
+    }
+    const result = await purchaseMembership(config, current);
     if (result.status === 'cancelled') return setPhase('idle');
     if (result.status === 'failed') {
       setError(result.message);
