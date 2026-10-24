@@ -13,6 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
+import { UpsellCard, UpsellPopup } from '@/components/MembershipUpsell';
 import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -60,6 +61,11 @@ export default function ServiceScreen() {
 
   const { service, lockedText } = data;
   const askAdvisor = (prompt?: string) => openAdvisor({ type: 'service', id: service.key, title: service.title }, prompt);
+
+  // Owner (2026-10-25): a non-member on a service with a member cut hears the 50% pitch — an
+  // in-sight card always, plus the rotating popup for the signed-in non-payer. Subscribe = in-app store only.
+  const memberPerk = Boolean(service.savingsSar || service.memberLabel);
+  const showUpsell = Boolean(data.upsell && !data.isMember && !service.locked && memberPerk);
 
   const handOver = async (action: Extract<ServiceAction, { type: 'whatsapp' }>) => {
     // The management hears about the request right away, even if WhatsApp is closed without sending.
@@ -168,6 +174,8 @@ export default function ServiceScreen() {
             ))
         : null}
 
+      {showUpsell && data.upsell ? <UpsellCard upsell={data.upsell} /> : null}
+
       {service.locked || !service.action ? (
         // LockedNotice animates its own entrance; wrapping it again double-animates.
         <LockedNotice text={lockedText} guest={status !== 'signedIn'} />
@@ -209,6 +217,8 @@ export default function ServiceScreen() {
           <AppButton label={t('service.infoOnSite')} variant="outline" icon="open-outline" onPress={() => void openLink(service.infoUrl ?? '')} />
         </FadeInView>
       ) : null}
+
+      {showUpsell && data.upsell && status === 'signedIn' ? <UpsellPopup upsell={data.upsell} /> : null}
     </Screen>
   );
 }

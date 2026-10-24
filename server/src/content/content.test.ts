@@ -66,8 +66,8 @@ test('localize keeps the structure, swaps the wording, and lets an edit win', ()
 test('the app reads every block in its language; the logic keeps the Arabic structure', async () => {
   const arabic = (await get('/api/home')).json();
   const english = (await get('/api/home', 'en')).json();
-  assert.equal(arabic.hero.title, 'مجتمع راقٍ يؤمن بأن الفكر ثروة');
-  assert.equal(english.hero.title, 'A refined community that believes ideas are wealth');
+  assert.equal(arabic.hero.title, 'العلاقات لا تُقدَّر بثمن');
+  assert.equal(english.hero.title, 'Relationships are priceless');
   assert.deepEqual(english.portals.map((portal: { key: string; title: string }) => [portal.key, portal.title]), [['neutral', 'Neutral'], ['entrepreneur', 'Entrepreneur'], ['investor', 'Investor']]);
   assert.equal((await get('/api/home?lang=en')).json().hero.title, english.hero.title, '?lang= wins for the dashboard');
 

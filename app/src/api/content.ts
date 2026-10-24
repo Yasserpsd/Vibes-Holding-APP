@@ -126,12 +126,16 @@ export type Service = {
   imageUrls?: string[];
 };
 
+/** Owner (2026-10-25): the rotating 50% membership-upsell lines; an older server sends none. */
+export type ServicesUpsell = { title: string; variants: string[] };
+
 export type ServicesList = {
   title: string;
   intro: string;
   groups: { key: ServiceGroupKey; title: string }[];
   lockedText: string;
   isMember: boolean;
+  upsell?: ServicesUpsell;
   services: Service[];
   updatedAt: string;
 };
@@ -240,7 +244,7 @@ export function useService(key: string | undefined) {
   const account = useAccountKey();
   return useQuery({
     queryKey: ['service', key, account],
-    queryFn: () => apiGet<{ service: Service; lockedText: string; isMember: boolean }>(`/api/services/${encodeURIComponent(key ?? '')}`),
+    queryFn: () => apiGet<{ service: Service; lockedText: string; isMember: boolean; upsell?: ServicesUpsell }>(`/api/services/${encodeURIComponent(key ?? '')}`),
     enabled: Boolean(key),
     staleTime: 5 * 60_000,
   });

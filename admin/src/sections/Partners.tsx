@@ -10,7 +10,7 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
  * wording in the app. The lookup box answers a partner's question: whose promo code is this?
  */
 
-const EMPTY: PartnerInput = { name: '', nameEn: '', description: '', descriptionEn: '', discount: '', discountEn: '', ribbon: '', ribbonEn: '', url: '', logoUrl: null, order: 100, visible: true };
+const EMPTY: PartnerInput = { name: '', nameEn: '', description: '', descriptionEn: '', discount: '', discountEn: '', ribbon: '', ribbonEn: '', url: '', whatsapp: '', logoUrl: null, order: 100, visible: true };
 
 type EditorState = { row: Partner | null; fields: PartnerInput };
 
@@ -193,7 +193,7 @@ export function Partners() {
                     label: '',
                     cell: (row) => (
                       <span className="row-actions">
-                        <button type="button" onClick={() => setEditor({ row, fields: { name: row.name, nameEn: row.nameEn, description: row.description, descriptionEn: row.descriptionEn, discount: row.discount, discountEn: row.discountEn, ribbon: row.ribbon ?? '', ribbonEn: row.ribbonEn ?? '', url: row.url, logoUrl: row.logoUrl, order: row.order, visible: row.visible } })}>فتح</button>
+                        <button type="button" onClick={() => setEditor({ row, fields: { name: row.name, nameEn: row.nameEn, description: row.description, descriptionEn: row.descriptionEn, discount: row.discount, discountEn: row.discountEn, ribbon: row.ribbon ?? '', ribbonEn: row.ribbonEn ?? '', url: row.url, whatsapp: row.whatsapp ?? '', logoUrl: row.logoUrl, order: row.order, visible: row.visible } })}>فتح</button>
                         <button type="button" className="ghost" disabled={busy} onClick={() => void toggle(row)}>{row.visible ? 'إخفاء' : 'إظهار'}</button>
                       </span>
                     ),
@@ -241,7 +241,11 @@ export function Partners() {
               <input dir="ltr" value={editor.fields.ribbonEn ?? ''} maxLength={80} onChange={(event) => edit({ ribbonEn: event.target.value })} />
             </label>
             <label>
-              رابط الشراء — الصفحة التي يفتحها زر «الشراء من الشريك»
+              رقم واتساب الشريك — زر الكارت يصبح «تواصل مباشر» ويفتح واتساب على هذا الرقم. اتركه فارغًا ليفتح الزر رابط الشراء
+              <input dir="ltr" value={editor.fields.whatsapp ?? ''} maxLength={30} placeholder="+9665XXXXXXXX" onChange={(event) => edit({ whatsapp: event.target.value })} />
+            </label>
+            <label>
+              رابط الشراء — الصفحة التي يفتحها زر «الشراء من الشريك» عندما لا يوجد رقم واتساب
               <input dir="ltr" type="url" value={editor.fields.url ?? ''} maxLength={500} placeholder="https://…" onChange={(event) => edit({ url: event.target.value })} required />
             </label>
             <label>

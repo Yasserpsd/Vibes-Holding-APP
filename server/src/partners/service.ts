@@ -28,6 +28,8 @@ export type Partner = {
   ribbonEn: string;
   /** Where «اشترِ من الشريك» leads (opened in the in-app browser). */
   url: string;
+  /** Owner (2026-10-25): the card's button hands over to the partner's WhatsApp instead of the link. Empty = keep the link. */
+  whatsapp: string;
   logoUrl: string | null;
   order: number;
   visible: boolean;
@@ -45,6 +47,7 @@ export type PartnerInput = {
   ribbon?: string;
   ribbonEn?: string;
   url: string;
+  whatsapp?: string;
   logoUrl?: string | null;
   order?: number;
   visible?: boolean;
@@ -75,7 +78,7 @@ export type PromoRecord = {
   issuedAt: string;
 };
 
-export type PublicPartner = { id: string; name: string; description: string; discount: string; ribbon: string; url: string; logoUrl: string | null };
+export type PublicPartner = { id: string; name: string; description: string; discount: string; ribbon: string; url: string; whatsapp: string; logoUrl: string | null };
 
 export const PARTNERS_LIST_KEY = 'partners:list';
 export const PARTNERS_SETTINGS_KEY = 'partners:settings';
@@ -98,7 +101,8 @@ export const PARTNERS_SETTINGS_SEED: PartnersSettings = {
 };
 
 export const PARTNERS_SEED_KEY = 'partners:seed';
-const PARTNERS_SEED_VERSION = 1;
+// v2 (owner, 2026-10-25): the headline partners carry their WhatsApp numbers; stored rows get them too.
+const PARTNERS_SEED_VERSION = 2;
 
 /**
  * M123 «Members Exclusive»: the two headline partners the owner asked for, each with a gold
@@ -116,6 +120,7 @@ export const HEADLINE_PARTNERS_SEED: PartnerInput[] = [
     ribbon: 'خصم 50%',
     ribbonEn: '50% off',
     url: 'https://almoltaqapodcast.com/',
+    whatsapp: '+966538461110',
     logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/08/Al-Moltaqa.webp',
     order: 1,
     visible: true,
@@ -130,6 +135,7 @@ export const HEADLINE_PARTNERS_SEED: PartnerInput[] = [
     ribbon: 'هدية ترحيبية 1000 ريال',
     ribbonEn: 'SAR 1,000 welcome gift',
     url: 'https://wdeny.com/',
+    whatsapp: '+966556561515',
     logoUrl: 'https://vibesholding.com/wp-content/uploads/2026/08/Wdeny-logo-png.webp',
     order: 2,
     visible: true,
@@ -147,7 +153,16 @@ export async function ensurePartnersSeed(kv: KV, options: { force?: boolean } = 
   const names = new Set(stored.map((partner) => partner.name.trim()));
   let wrote = false;
   for (const input of HEADLINE_PARTNERS_SEED) {
-    if (names.has(input.name)) continue;
+    if (names.has(input.name)) {
+      // v2: a partner stored before the WhatsApp era gets the seed's number; an owner edit stays.
+      const existing = stored.find((partner) => partner.name.trim() === input.name);
+      if (existing && !existing.whatsapp && input.whatsapp) {
+        existing.whatsapp = input.whatsapp;
+        existing.updatedAt = now.toISOString();
+        wrote = true;
+      }
+      continue;
+    }
     stored.push({
       id: randomUUID(),
       name: input.name,
@@ -159,6 +174,7 @@ export async function ensurePartnersSeed(kv: KV, options: { force?: boolean } = 
       ribbon: input.ribbon ?? '',
       ribbonEn: input.ribbonEn ?? '',
       url: input.url,
+      whatsapp: input.whatsapp ?? '',
       logoUrl: input.logoUrl ?? null,
       order: input.order ?? 100,
       visible: input.visible ?? true,
@@ -247,6 +263,7 @@ export class PartnersService {
       ribbon: trimmed(input.ribbon, 80),
       ribbonEn: trimmed(input.ribbonEn, 80),
       url: trimmed(input.url, 500),
+      whatsapp: trimmed(input.whatsapp, 30),
       logoUrl: input.logoUrl ? trimmed(input.logoUrl, 500) : null,
       order: Number.isFinite(input.order) ? Number(input.order) : 100,
       visible: input.visible ?? true,
@@ -270,6 +287,7 @@ export class PartnersService {
       if (typeof input.ribbon === 'string') partner.ribbon = trimmed(input.ribbon, 80);
       if (typeof input.ribbonEn === 'string') partner.ribbonEn = trimmed(input.ribbonEn, 80);
       if (typeof input.url === 'string') partner.url = trimmed(input.url, 500);
+      if (typeof input.whatsapp === 'string') partner.whatsapp = trimmed(input.whatsapp, 30);
       if (input.logoUrl !== undefined) partner.logoUrl = input.logoUrl ? trimmed(input.logoUrl, 500) : null;
       if (Number.isFinite(input.order)) partner.order = Number(input.order);
       if (typeof input.visible === 'boolean') partner.visible = input.visible;
@@ -301,6 +319,8 @@ export class PartnersService {
         // A partner stored before M123 carries no ribbon fields at all.
         ribbon: (lang === 'en' && partner.ribbonEn ? partner.ribbonEn : partner.ribbon) ?? '',
         url: partner.url,
+        // A partner stored before 2026-10-25 carries no whatsapp field at all.
+        whatsapp: partner.whatsapp ?? '',
         logoUrl: partner.logoUrl,
       }));
   }

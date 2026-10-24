@@ -5,7 +5,7 @@ import type { Translation } from '../i18n.js';
 export const HOME_EN: Translation<HomeContent> = {
   hero: {
     eyebrow: 'Investors Club',
-    title: 'A refined community that believes ideas are wealth',
+    title: 'Relationships are priceless',
     subtitle:
       'The Investors Club® is an exclusive business community for neutrals, entrepreneurs and investors, serving its members through one app and a permanent HQ in the heart of the Saudi capital, Riyadh.',
   },

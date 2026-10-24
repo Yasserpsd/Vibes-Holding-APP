@@ -39,6 +39,11 @@ export type FormDef = {
   closedText: string;
   submitLabel: string;
   successText: string;
+  /**
+   * Owner (2026-10-25): shown to a NON-MEMBER as a popup right after a successful submission —
+   * «لن يُنشر مشروعك… إلا بالاشتراك» with the subscribe button. Empty/absent = no popup.
+   */
+  memberNudge?: string;
   fields: FormFieldDef[];
   order: number;
 };
@@ -66,6 +71,8 @@ export const FORMS_SEED: FormsContent = {
       submitLabel: 'إرسال الطلب',
       successText:
         'استلمنا تسجيل مشروعك في شركاء النجاح، وستراجعه لجنة البرنامج وتتواصل معك الإدارة. إن كان لديك ملخص جدوى أو ملفات إضافية فسيُطلب منك إرسالها عند التواصل.',
+      memberNudge:
+        'انتبه: لن يُنشر مشروعك في بنك المشاريع ولن يُعرض على أي من الشركاء المحتملين إلا بعد اشتراكك في العضوية السنوية. فعّل عضويتك الآن ليدخل مشروعك دائرة العرض على مستثمري النادي.',
       fields: [
         { key: 'firstName', label: 'الاسم الأول', type: 'text', required: true, prefill: 'firstName' },
         { key: 'lastName', label: 'الاسم الأخير', type: 'text', required: true, prefill: 'lastName' },
@@ -291,8 +298,9 @@ export const FORMS_SEED: FormsContent = {
       order: 8,
     },
   ],
-  version: 5,
-  updatedAt: '2026-10-21T00:00:00.000Z',
+  // v6 (owner, 2026-10-25): the post-submission membership popup on شركاء النجاح.
+  version: 6,
+  updatedAt: '2026-10-25T00:00:00.000Z',
 };
 
 /** Writes the seed when no forms content exists yet, or when the stored seed is older than this one. */

@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { openWhatsApp } from '@/lib/whatsapp';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -125,7 +126,12 @@ function PartnerCard({ partner }: { partner: Partner }) {
         </View>
       </View>
       {partner.description ? <Text style={styles.partnerDetail}>{partner.description}</Text> : null}
-      <AppButton label={t('partners.visit')} icon="cart-outline" onPress={() => void openLink(partner.url)} />
+      {/* Owner (2026-10-25): «الشراء من الشريك» leaves — whoever wants to order goes straight to WhatsApp. */}
+      {partner.whatsapp ? (
+        <AppButton label={t('partners.contact')} icon="logo-whatsapp" onPress={() => void openWhatsApp(partner.whatsapp, t('partners.contactMessage', { name: partner.name }))} />
+      ) : (
+        <AppButton label={t('partners.visit')} icon="cart-outline" onPress={() => void openLink(partner.url)} />
+      )}
     </GlassCard>
   );
 }

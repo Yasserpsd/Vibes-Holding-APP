@@ -64,6 +64,11 @@ export type ServicesContent = {
   lockedText: string;
   lockedGuestText: string;
   lockedExpiredText: string;
+  /**
+   * Owner (2026-10-25): the membership upsell on paid services for non-members — a different
+   * persuasion line every time («بوب اب تطلع كل مرة بوصف مختلف»), all dashboard-editable.
+   */
+  upsell: { title: string; variants: string[] };
   services: Service[];
   version: number;
   updatedAt: string;
@@ -104,6 +109,19 @@ export const SERVICES_SEED: ServicesContent = {
   lockedText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
   lockedGuestText: 'هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.',
   lockedExpiredText: 'انتهت عضويتك. جدّد عضويتك السنوية لاستخدام هذه الخدمة.',
+  upsell: {
+    title: 'وفّر 50% بعضويتك',
+    variants: [
+      'لماذا تدفع المبلغ كاملًا؟ اشترك في العضوية السنوية واحصل على خصم 50% على هذه الخدمة — وعلى كل خدمات النادي طوال عام كامل.',
+      'بحسبة بسيطة: خصم 50% على خدمة واحدة قد يغطي قيمة عضويتك كلها، ويبقى لك عام كامل من المزايا.',
+      'الأعضاء يدفعون النصف. الخدمة نفسها، الجودة نفسها، نصف السعر — والعضوية تفتح لك باقي المزايا أيضًا.',
+      'قيمة عضويتك تستردها من أول خدمة: خصم 50% هنا، وخصومات الشركاء، ورصيد بنك المشاريع — كلها بانتظارك.',
+      'قبل أن تدفع: عضويتك السنوية تخفض هذا المبلغ إلى النصف فورًا، وتبقى معك عامًا كاملًا لكل خدمات النادي.',
+      'قرار ذكي: بدل أن تدفع المبلغ كاملًا مرة واحدة، اشترك واحصل على خصم 50% هنا وعلى كل خدمة قادمة.',
+      'هذه الخدمة بنصف السعر للأعضاء. فعّل عضويتك الآن وادفع النصف فقط — ومعها مزايا النادي كلها.',
+      'أعضاء النادي لا يدفعون السعر الكامل. انضم إليهم اليوم واحصل على خصم 50% على هذه الخدمة فورًا.',
+    ],
+  },
   services: [
     {
       key: 'meetup',
@@ -365,9 +383,9 @@ export const SERVICES_SEED: ServicesContent = {
     },
     // M107 (owner, 2026-10-20): «حقيبة الامتياز» and «كود خصم منتجات منفذ» removed for good.
   ],
-  // v12 (M109f): the lock texts carry the owner's membership upsell sentence.
-  version: 13,
-  updatedAt: '2026-10-20T00:00:00.000Z',
+  // v14 (owner, 2026-10-25): the rotating 50% membership upsell lines.
+  version: 14,
+  updatedAt: '2026-10-25T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */
@@ -421,6 +439,7 @@ export function publicServices(content: ServicesContent, me: Me | null): {
   groups: { key: ServiceGroupKey; title: string }[];
   lockedText: string;
   isMember: boolean;
+  upsell: { title: string; variants: string[] };
   services: PublicService[];
   updatedAt: string;
 } {
@@ -431,6 +450,8 @@ export function publicServices(content: ServicesContent, me: Me | null): {
     groups: content.groups,
     lockedText: lockedTextFor(content, me),
     isMember: isActiveMember(me),
+    // A block stored before v14 carries no upsell yet; the seed's lines answer until the deploy reseeds.
+    upsell: content.upsell ?? SERVICES_SEED.upsell,
     services,
     updatedAt: content.updatedAt,
   };

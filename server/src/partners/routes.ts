@@ -19,6 +19,7 @@ const partnerSchema = z.object({
   ribbon: z.string().trim().max(80).optional(),
   ribbonEn: z.string().trim().max(80).optional(),
   url: z.string().trim().url('اكتب رابط الشريك كاملًا (https://…)').max(500),
+  whatsapp: z.string().trim().max(30).optional(),
   logoUrl: z.string().trim().max(500).nullable().optional(),
   order: z.number().int().min(0).max(9999).optional(),
   visible: z.boolean().optional(),

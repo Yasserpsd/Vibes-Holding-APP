@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AGREED, useFormDef, useMyFormSubmissions, useSubmitForm, type FormDef, type FormField as FormFieldDef } from '@/api/forms';
 import type { Me } from '@/api/auth';
@@ -9,15 +9,16 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
-import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
+import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
 import { PaperCard, usePaper } from '@/components/paper';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M119: the M16 registration form as an embeddable block — the form screen renders it alone,
@@ -114,12 +115,17 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
   if (sent) {
     // V2: the confirmation lands with a golden pop — celebratory, but quiet.
     return (
-      <FadeInView offset={12} style={styles.success}>
-        <PopIn delay={120}>
-          <Ionicons name="checkmark-circle" size={48} color={colors.gold} />
-        </PopIn>
-        <Text style={styles.successText}>{form.successText}</Text>
-      </FadeInView>
+      <>
+        <FadeInView offset={12} style={styles.success}>
+          <PopIn delay={120}>
+            <Ionicons name="checkmark-circle" size={48} color={colors.gold} />
+          </PopIn>
+          <Text style={styles.successText}>{form.successText}</Text>
+        </FadeInView>
+        {/* Owner (2026-10-25): the submission goes through for everyone, then the non-member hears
+            that the project stays unpublished until the membership — with the subscribe door. */}
+        {form.memberNudge && me?.membership.status !== 'active' ? <MemberNudgePopup text={form.memberNudge} /> : null}
+      </>
     );
   }
 
@@ -145,6 +151,44 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
         <AppButton label={form.submitLabel} icon="paper-plane-outline" loading={submit.isPending} onPress={send} />
       </FadeInView>
     </PaperCard>
+  );
+}
+
+const NUDGE_DELAY_MS = 900;
+
+/** The after-submission membership popup (server text): the project waits for the membership. */
+function MemberNudgePopup({ text }: { text: string }) {
+  const [visible, setVisible] = useState(false);
+
+  // A beat after the success check lands, so the confirmation is seen before the condition.
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), NUDGE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!visible) return null;
+  const subscribe = () => {
+    setVisible(false);
+    showMembershipGate();
+  };
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={() => setVisible(false)}>
+      <View style={styles.nudgeBackdrop}>
+        <PopIn style={styles.nudgeWrap}>
+          <GlassCard golden radius={radii.xxl} style={styles.nudgeCard}>
+            <View style={styles.nudgeRing}>
+              <Ionicons name="eye-off" size={24} color={colors.goldInk} />
+            </View>
+            <Text style={styles.nudgeTitle}>{t('form.nudgeTitle')}</Text>
+            <Text style={styles.nudgeText}>{text}</Text>
+            <AppButton label={t('store.subscribe')} icon="ribbon-outline" onPress={subscribe} />
+            <PressScale onPress={() => setVisible(false)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('gate.later')}>
+              <Text style={styles.nudgeLater}>{t('gate.later')}</Text>
+            </PressScale>
+          </GlassCard>
+        </PopIn>
+      </View>
+    </Modal>
   );
 }
 
@@ -221,4 +265,21 @@ const styles = StyleSheet.create({
   agreeLabel: { ...typography.caption, color: colors.textPrimary, flex: 1, textAlign: textStart },
   success: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xl },
   successText: { ...typography.body, color: colors.textPrimary, textAlign: 'center' },
+  // The after-submission membership popup (same language as the membership gate).
+  nudgeBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  nudgeWrap: { alignSelf: 'stretch' },
+  nudgeCard: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
+  nudgeRing: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gold,
+    boxShadow: shadows.glowGold,
+  },
+  nudgeTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
+  nudgeText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  nudgeLater: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },
 });

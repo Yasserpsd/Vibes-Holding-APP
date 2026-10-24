@@ -14,6 +14,8 @@ export type Partner = {
   /** M123: the short headline on the card's gold ribbon; empty = no ribbon. */
   ribbon: string;
   url: string;
+  /** Owner (2026-10-25): a number here turns the card's button into a direct WhatsApp handover. */
+  whatsapp: string;
   logoUrl: string | null;
 };
 

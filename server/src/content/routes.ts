@@ -148,7 +148,7 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       if (!service) return reply.code(404).send({ error: { code: 'not_found', message: 'الخدمة غير موجودة' } });
       const images = await serviceImages(kv);
       const galleries = await serviceGalleries(kv);
-      return { service: { ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] }, lockedText: list.lockedText, isMember: list.isMember };
+      return { service: { ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] }, lockedText: list.lockedText, isMember: list.isMember, upsell: list.upsell };
     }),
   );
 

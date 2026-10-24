@@ -605,6 +605,8 @@ export type Partner = {
   ribbon: string;
   ribbonEn: string;
   url: string;
+  /** Owner (2026-10-25): a number here turns the card's button into a direct WhatsApp handover. */
+  whatsapp: string;
   logoUrl: string | null;
   order: number;
   visible: boolean;
@@ -621,6 +623,7 @@ export type PartnerInput = {
   ribbon?: string;
   ribbonEn?: string;
   url: string;
+  whatsapp?: string;
   logoUrl?: string | null;
   order?: number;
   visible?: boolean;

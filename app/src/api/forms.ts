@@ -26,6 +26,8 @@ export type FormDef = {
   closedText: string;
   submitLabel: string;
   successText: string;
+  /** Owner (2026-10-25): the post-submission membership popup for non-members; an older server sends none. */
+  memberNudge?: string;
   fields: FormField[];
 };
 export type MyFormSubmission = { id: string; formKey: string; createdAt: string };

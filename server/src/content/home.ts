@@ -104,7 +104,8 @@ export const HOME_CONTENT_KEY = 'content:home';
 export const HOME_SEED: HomeContent = {
   hero: {
     eyebrow: 'نادي المستثمرين',
-    title: 'مجتمع راقٍ يؤمن بأن الفكر ثروة',
+    // Owner (2026-10-25): the brand slogan changed on every banner — the app follows.
+    title: 'العلاقات لا تُقدَّر بثمن',
     // M82 (owner, 2026-10-17): the CANONICAL definition leads the home — verbatim first paragraph.
     subtitle:
       'نادي المستثمرين® مجتمع أعمال حصري للمحايدين ورواد الأعمال والمستثمرين، يقدّم خدماته لأعضائه عبر تطبيق واحد ومقر دائم في قلب العاصمة السعودية الرياض.',
@@ -279,8 +280,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 17,
-  updatedAt: '2026-10-23T00:00:00.000Z',
+  version: 18,
+  updatedAt: '2026-10-25T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */

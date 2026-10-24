@@ -13,6 +13,19 @@ export const SERVICES_EN: Translation<ServicesContent> = {
   lockedText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
   lockedGuestText: 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.',
   lockedExpiredText: 'Your membership has ended. Renew your annual membership to use this service.',
+  upsell: {
+    title: 'Save 50% with your membership',
+    variants: [
+      'Why pay the full amount? Subscribe to the annual membership and get a 50% discount on this service — and on every club service for a whole year.',
+      'Simple math: a 50% discount on one service can cover the whole cost of your membership, with a full year of benefits still ahead of you.',
+      'Members pay half. The same service, the same quality, half the price — and the membership opens every other benefit too.',
+      "You earn your membership back from the first service: 50% off here, the partners' discounts and the Projects Bank credit — all waiting for you.",
+      'Before you pay: your annual membership cuts this amount in half at once, and stays with you for a whole year across all club services.',
+      'A smart decision: instead of paying the full amount once, subscribe and get 50% off here and on every service to come.',
+      'This service is half price for members. Activate your membership now and pay only half — with all the club benefits alongside it.',
+      'Club members never pay full price. Join them today and get a 50% discount on this service at once.',
+    ],
+  },
   services: [
     {
       key: 'meetup',
