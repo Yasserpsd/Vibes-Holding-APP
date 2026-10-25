@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
+import { normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
 import type { AppLang } from '../lang.js';
@@ -229,9 +230,11 @@ export class AuthService {
     return this.signIn(pending.uuid, contact);
   }
 
-  async login(login: string, password: string, ip: string): Promise<LoginResult> {
+  async login(login: string, password: string, ip: string, country?: string): Promise<LoginResult> {
     const uuid = newUuid();
-    const result = await this.deps.hub.call('login', { uuid, ip, login, password, page_url: 'app://login' });
+    // The login field takes a phone from ANY country (the app sends the picked country code);
+    // normalised here because the hub's own vai_norm_phone only understands Saudi local forms.
+    const result = await this.deps.hub.call('login', { uuid, ip, login: normLogin(login, country), password, page_url: 'app://login' });
     const contact = requireContact(result);
     if (result.pending) {
       const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
@@ -298,7 +301,7 @@ export class AuthService {
   /** Dashboard sign-in: the hub checks the password and the admin role (rule 2); with ADMIN_OTP a code goes to the account's e-mail. */
   async adminLogin(login: string, password: string, ip: string): Promise<AdminLoginResult> {
     const uuid = newUuid();
-    const result = await this.deps.hub.call('login', { uuid, ip, login, password, page_url: 'app://dashboard' });
+    const result = await this.deps.hub.call('login', { uuid, ip, login: normLogin(login), password, page_url: 'app://dashboard' });
     const contact = requireContact(result);
     if (result.pending) {
       const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
@@ -432,12 +435,12 @@ export class AuthService {
     }
   }
 
-  async requestReset(login: string, ip: string): Promise<void> {
-    await this.deps.hub.call('reset_request', { login, ip });
+  async requestReset(login: string, ip: string, country?: string): Promise<void> {
+    await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip });
   }
 
-  async confirmReset(login: string, code: string, password: string, ip: string): Promise<void> {
-    await this.deps.hub.call('reset_confirm', { login, code, password, ip });
+  async confirmReset(login: string, code: string, password: string, ip: string, country?: string): Promise<void> {
+    await this.deps.hub.call('reset_confirm', { login: normLogin(login, country), code, password, ip });
   }
 
   /** M117: true when the password matches this account — a hub login check, no session is created. */

@@ -40,6 +40,18 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
   const limiter = new RateLimiter();
   const proxy = new PbImageProxy(fetchImpl);
 
+  // M127 (owner, 2026-10-25): browsing felt heavy because each cover was a cold proxy fetch.
+  // The covers are warmed right after the feed's first refresh and re-warmed within the TTL.
+  const warmCovers = () => void proxy.warm(service.all().flatMap((project) => (project.image ? [project.image] : [])));
+  const warmStart = setTimeout(warmCovers, 30_000);
+  warmStart.unref();
+  const warmTimer = setInterval(warmCovers, 5 * 60 * 60 * 1000);
+  warmTimer.unref();
+  app.addHook('onClose', async () => {
+    clearTimeout(warmStart);
+    clearInterval(warmTimer);
+  });
+
   // M107b: the app loads every project photo through the server (images.ts says why).
   // M116: every answered project also carries its stars summary for the cards and the page header.
   const proxied = (project: PublicProject): PublicProject => {

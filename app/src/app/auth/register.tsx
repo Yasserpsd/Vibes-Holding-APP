@@ -77,6 +77,8 @@ export default function RegisterScreen() {
   const [busy, setBusy] = useState(false);
 
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
+  // M126 (owner): the dial code is right there, so the number never shows a leading zero.
+  const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
   const set = (key: Exclude<keyof Form, 'interests'>) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
   const maxInterests = interestsList.data?.max ?? 3;
   const toggleInterest = (key: string) =>
@@ -94,7 +96,7 @@ export default function RegisterScreen() {
     if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
     if (form.memberType === 'company' && form.companyName.trim().length < 2) next.companyName = t('auth.register.error.companyName');
     if (!isLocalPhone(form.phone, country?.pattern))
-      next.phone = country?.example ? t('auth.register.error.phone', { example: country.example }) : t('auth.register.error.phoneNoExample');
+      next.phone = phoneExample ? t('auth.register.error.phone', { example: phoneExample }) : t('auth.register.error.phoneNoExample');
     if (!isEmail(form.email)) next.email = t('auth.register.error.email');
     if (form.password.length < 6) next.password = t('auth.register.error.password');
     if (!form.persona) next.persona = t('auth.register.error.persona');
@@ -211,9 +213,9 @@ export default function RegisterScreen() {
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           value={form.phone}
-          onChangeText={set('phone')}
-          placeholder={country?.example || undefined}
-          hint={country?.example ? t('auth.register.phoneHint', { example: country.example }) : t('auth.register.phoneHintNoExample')}
+          onChangeText={(value) => set('phone')(value.replace(/\D+/g, '').replace(/^0+/, ''))}
+          placeholder={phoneExample || undefined}
+          hint={phoneExample ? t('auth.register.phoneHint', { example: phoneExample }) : t('auth.register.phoneHintNoExample')}
           error={errors.phone}
         />
       </FadeInView>

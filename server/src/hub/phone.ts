@@ -13,7 +13,7 @@ const GENERIC_LOCAL = /^\d{5,12}$/;
 /** Loose client-side pattern sent to the app for countries without a strict rule. */
 export const GENERIC_PATTERN = '^0*\\d{5,12}$';
 
-export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة — في السعودية مثلًا بهذا الشكل: 0512345678.';
+export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة وبدون الصفر الأول — في السعودية مثلًا: 512345678.';
 export const EMAIL_POLICY_TEXT = 'نقبل التسجيل بأي بريد إلكتروني صحيح، شخصي أو بريد عمل — يصلك عليه رمز التفعيل';
 
 export function countryByCode(code: string | undefined): Country | undefined {
@@ -54,6 +54,22 @@ export function normPhone(input: string): string {
   if (digits.length === 10 && digits.startsWith('0')) digits = `966${digits.slice(1)}`;
   else if (digits.length === 9 && digits.startsWith('5')) digits = `966${digits}`;
   return digits;
+}
+
+/**
+ * What the member typed in the login field → what the hub matches on: a clean e-mail, or
+ * international phone digits. The chosen country supplies the dial code (world-wide, not the
+ * hub's Saudi-biased vai_norm_phone); a number typed with + or 00 keeps its own dial code.
+ * Anything else passes through unchanged so the hub answers with its own message.
+ */
+export function normLogin(input: string, countryCode?: string): string {
+  const email = normEmail(input);
+  if (email) return email;
+  const raw = input.trim();
+  const digits = raw.replace(/\D+/g, '');
+  if (!/^[\d\s+().-]+$/.test(raw) || digits.length < 5) return raw;
+  if (raw.includes('+') || digits.startsWith('00')) return normPhone(raw);
+  return phoneIntl(countryCode ?? 'sa', raw) || normPhone(raw);
 }
 
 export function normEmail(input: string): string {

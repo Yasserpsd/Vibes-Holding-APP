@@ -7,6 +7,7 @@ import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { EMPTY_IDENTIFIER, identifierPayload, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -19,20 +20,22 @@ export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const { data: config } = useAuthConfig();
-  const [login, setLogin] = useState('');
+  // M126: the phone is the first-class identifier — a number from any country or an e-mail.
+  const [identifier, setIdentifier] = useState<Identifier>(EMPTY_IDENTIFIER);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!login.trim() || !password) {
-      setError(t('auth.login.required'));
+    if (!identifierValid(identifier) || !password) {
+      setError(t(identifier.mode === 'phone' ? 'auth.login.requiredPhone' : 'auth.login.requiredEmail'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const result = await authApi.login(login.trim(), password);
+      const { login, country } = identifierPayload(identifier);
+      const result = await authApi.login(login, password, country);
       if (result.pending) {
         router.push({ pathname: '/auth/verify', params: { pendingToken: result.pendingToken, email: result.email, text: result.text } });
         return;
@@ -58,17 +61,7 @@ export default function LoginScreen() {
         <SocialButtons onError={setError} />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
-        <FormField
-          label={t('auth.login.field')}
-          latin
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="username"
-          value={login}
-          onChangeText={setLogin}
-          placeholder={t('auth.login.placeholder')}
-        />
+        <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} />
       </FadeInView>
       <FadeInView delay={entranceDelay(3)}>
         <FormField

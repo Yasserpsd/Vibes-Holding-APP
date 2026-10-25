@@ -65,7 +65,9 @@ const registerSchema = z
   });
 const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });
-const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200) });
+// `country` rides along when the member typed a phone number (world-wide dial codes, M126).
+const countrySchema = z.string().trim().toLowerCase().max(5).optional();
+const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), country: countrySchema });
 // M46: the provider's ID token (a JWT the server verifies itself); Apple sends the name separately on first sign-in.
 const socialSchema = z.object({
   provider: z.enum(['google', 'apple']),
@@ -74,7 +76,7 @@ const socialSchema = z.object({
 });
 const otpChallengeSchema = z.object({ challengeToken: pendingTokenSchema });
 const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema });
-const resetRequestSchema =z.object({ login: loginFieldSchema });
+const resetRequestSchema = z.object({ login: loginFieldSchema, country: countrySchema });
 const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, password: passwordSchema });
 const profileSchema = z
   .object({
@@ -171,7 +173,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('login', 12, request, reply)) return;
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
-      const result = await service.login(body.login, body.password, request.ip);
+      const result = await service.login(body.login, body.password, request.ip, body.country);
       return result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -226,7 +228,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('reset', 6, request, reply)) return;
       const body = parse(resetRequestSchema, request.body, reply);
       if (!body) return;
-      await service.requestReset(body.login, request.ip);
+      await service.requestReset(body.login, request.ip, body.country);
       return { ok: true };
     }),
   );
@@ -237,7 +239,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('reset', 6, request, reply)) return;
       const body = parse(resetConfirmSchema, request.body, reply);
       if (!body) return;
-      await service.confirmReset(body.login, body.code, body.password, request.ip);
+      await service.confirmReset(body.login, body.code, body.password, request.ip, body.country);
       return { ok: true };
     }),
   );

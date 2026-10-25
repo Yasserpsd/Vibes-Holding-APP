@@ -7,6 +7,7 @@ import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { EMPTY_IDENTIFIER, identifierPayload, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -18,7 +19,7 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
   const { data: config } = useAuthConfig();
   const [step, setStep] = useState<'request' | 'confirm' | 'done'>('request');
-  const [login, setLogin] = useState('');
+  const [identifier, setIdentifier] = useState<Identifier>(EMPTY_IDENTIFIER);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -26,14 +27,15 @@ export default function ResetPasswordScreen() {
 
   const request = async () => {
     if (busy) return;
-    if (login.trim().length < 3) {
+    if (!identifierValid(identifier)) {
       setError(t('auth.reset.loginRequired'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await authApi.resetRequest(login.trim());
+      const { login, country } = identifierPayload(identifier);
+      await authApi.resetRequest(login, country);
       setStep('confirm');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -55,7 +57,8 @@ export default function ResetPasswordScreen() {
     setBusy(true);
     setError(null);
     try {
-      await authApi.resetConfirm(login.trim(), code, password);
+      const { login, country } = identifierPayload(identifier);
+      await authApi.resetConfirm(login, code, password, country);
       setStep('done');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -83,20 +86,11 @@ export default function ResetPasswordScreen() {
   return (
     <Screen
       title={t('auth.reset.title')}
-      subtitle={step === 'request' ? t('auth.reset.subtitleRequest') : t('auth.reset.subtitleConfirm', { login: login.trim() })}
+      subtitle={step === 'request' ? t('auth.reset.subtitleRequest') : t('auth.reset.subtitleConfirm', { login: identifier.value.trim() })}
     >
       <FadeInView key={step} style={styles.fields}>
         {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
-        <FormField
-          label={t('auth.login.field')}
-          latin
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          value={login}
-          onChangeText={setLogin}
-          editable={step === 'request'}
-        />
+        <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} editable={step === 'request'} />
         {step === 'confirm' ? (
           <>
             <FormField label={t('auth.verify.code')} latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />

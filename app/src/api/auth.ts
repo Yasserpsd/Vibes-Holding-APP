@@ -134,13 +134,17 @@ export const authApi = {
   register: (input: RegisterInput) => apiRequest<PendingResult>('POST', '/api/auth/register', { body: input, token: null }),
   resend: (pendingToken: string) => apiRequest<{ mailSent: boolean; text: string }>('POST', '/api/auth/resend', { body: { pendingToken }, token: null }),
   verify: (pendingToken: string, code: string) => apiRequest<SignedInResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
-  login: (login: string, password: string) => apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password }, token: null }),
+  // M126: `country` rides along when the member typed a phone number, so the server can build
+  // the international digits for any country (the hub itself only understands Saudi local forms).
+  login: (login: string, password: string, country?: string) =>
+    apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}) }, token: null }),
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
     apiRequest<SignedInResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
-  resetRequest: (login: string) => apiRequest<{ ok: true }>('POST', '/api/auth/reset/request', { body: { login }, token: null }),
-  resetConfirm: (login: string, code: string, password: string) =>
-    apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password }, token: null }),
+  resetRequest: (login: string, country?: string) =>
+    apiRequest<{ ok: true }>('POST', '/api/auth/reset/request', { body: { login, ...(country ? { country } : {}) }, token: null }),
+  resetConfirm: (login: string, code: string, password: string, country?: string) =>
+    apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password, ...(country ? { country } : {}) }, token: null }),
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),
   updateMe: (patch: ProfilePatch) => apiRequest<{ me: Me }>('PATCH', '/api/me', { body: patch }),
   logout: () => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {} }),

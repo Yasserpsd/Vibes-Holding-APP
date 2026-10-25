@@ -16,13 +16,15 @@ type Props = {
   countries: Country[];
   selected: string;
   onSelect: (code: string) => void;
+  /** M126: flag + dial code only — sits beside the phone field on the login screen. */
+  compact?: boolean;
 };
 
 /**
  * Country selector for the world list (M64): a field that opens a searchable sheet.
  * Search matches the Arabic name, the English name and the dial code.
  */
-export function CountryPicker({ countries, selected, onSelect }: Props) {
+export function CountryPicker({ countries, selected, onSelect, compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const current = countries.find((item) => item.code === selected) ?? countries[0];
@@ -47,15 +49,17 @@ export function CountryPicker({ countries, selected, onSelect }: Props) {
   return (
     <>
       <Pressable
-        style={styles.field}
+        style={[styles.field, compact && styles.fieldCompact]}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={t('auth.register.country')}
+        accessibilityLabel={compact && current ? `${countryLabel(current)} +${current.dial}` : t('auth.register.country')}
       >
         <Text style={styles.flag}>{current?.flag ?? ''}</Text>
-        <Text style={styles.fieldText} numberOfLines={1}>
-          {current ? countryLabel(current) : ''}
-        </Text>
+        {compact ? null : (
+          <Text style={styles.fieldText} numberOfLines={1}>
+            {current ? countryLabel(current) : ''}
+          </Text>
+        )}
         <Text style={styles.dial}>{current ? `‎+${current.dial}` : ''}</Text>
         <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
       </Pressable>
@@ -116,6 +120,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  // The compact form keeps the same height as a FormField input so the login row lines up.
+  fieldCompact: { alignSelf: 'stretch' },
   fieldText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   flag: { fontSize: 18 },
   dial: { ...typography.caption, color: colors.textMuted },

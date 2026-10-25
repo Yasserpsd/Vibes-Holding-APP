@@ -5,7 +5,9 @@
  * The API rewrites every image URL to /img/pb/…, and this proxy fetches, caches and serves it.
  */
 
-const CACHE_MAX = 80;
+// M127: room for every project's cover (260+ today, ~50–100KB webp each ≈ 30MB) — with only 80
+// slots most flips hit a cold proxy fetch, which is what made browsing feel heavy.
+const CACHE_MAX = 400;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_BYTES = 6 * 1024 * 1024;
@@ -23,6 +25,18 @@ export class PbImageProxy {
   private readonly cache = new Map<string, CachedImage>();
 
   constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+
+  /**
+   * M127: fetches the given images ahead of the members' scrolling, one by one (gentle on the
+   * site). An entry still fresh for half its TTL is skipped; failures are simply left cold.
+   */
+  async warm(urls: Iterable<string>): Promise<void> {
+    for (const url of urls) {
+      const hit = this.cache.get(url);
+      if (hit && Date.now() - hit.at < CACHE_TTL_MS / 2) continue;
+      await this.get(url);
+    }
+  }
 
   /** The image bytes, from the cache or the site; null when the source cannot be fetched. */
   async get(url: string): Promise<CachedImage | null> {

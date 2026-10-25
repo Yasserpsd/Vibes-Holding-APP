@@ -163,6 +163,43 @@ test('login with e-mail or phone, wrong password rejected', async () => {
   assert.equal(byPhone.json().me.id, byEmail.json().me.id);
 });
 
+// M126: a phone from ANY country signs in — the app sends the picked country, the server builds
+// the international digits (the hub's own normaliser only understands Saudi local forms).
+// Its own app instance: the shared one has already spent this IP's register/login budget.
+test('world phone login: local digits + country, leading zero forgiven, intl form too', async () => {
+  const built = await buildApp({ config, kv: new MemoryKV(), hub: new MockHubClient() });
+  const send = (url: string, payload: Record<string, unknown>) => built.app.inject({ method: 'POST', url, payload });
+  try {
+    const world = { ...registration, name: 'منى من مصر', country: 'eg', phone: '1012345678', email: 'mona+eg@gmail.com' };
+    const registered = await send('/api/auth/register', world);
+    assert.equal(registered.statusCode, 200, registered.body);
+    const verified = await send('/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
+    assert.equal(verified.statusCode, 200, verified.body);
+    const id = verified.json().me.id;
+
+    const byLocal = await send('/api/auth/login', { login: '1012345678', country: 'eg', password: world.password });
+    assert.equal(byLocal.statusCode, 200, byLocal.body);
+    assert.equal(byLocal.json().me.id, id);
+
+    // The leading zero people habitually type is stripped (owner, 2026-10-25).
+    const byZero = await send('/api/auth/login', { login: '01012345678', country: 'eg', password: world.password });
+    assert.equal(byZero.statusCode, 200, byZero.body);
+    assert.equal(byZero.json().me.id, id);
+
+    // Typed internationally, the country pick does not matter.
+    const byIntl = await send('/api/auth/login', { login: '+20 101 234 5678', country: 'sa', password: world.password });
+    assert.equal(byIntl.statusCode, 200, byIntl.body);
+    assert.equal(byIntl.json().me.id, id);
+
+    const reset = await send('/api/auth/reset/request', { login: '01012345678', country: 'eg' });
+    assert.equal(reset.statusCode, 200, reset.body);
+    const confirmed = await send('/api/auth/reset/confirm', { login: '01012345678', country: 'eg', code: MOCK_CODE, password: 'newpass2' });
+    assert.equal(confirmed.statusCode, 200, confirmed.body);
+  } finally {
+    await built.app.close();
+  }
+});
+
 test('unverified login returns a pending token; reset password works', async () => {
   const pendingReg = await post('/api/auth/register', {
     ...registration,

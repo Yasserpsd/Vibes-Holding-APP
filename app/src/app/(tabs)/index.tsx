@@ -38,6 +38,10 @@ import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
 const clubEmblem = require('../../../assets/images/club-emblem.png');
 
+// M127 (owner): every app open leads with a DIFFERENT corner of the HQ — one draw per JS launch,
+// stable while the app stays open so the banner never flickers between renders.
+const HQ_BANNER_DRAW = Math.random();
+
 // Card widths of the horizontal strips; the snap step is the width plus the strip gap.
 const MINI_WIDTH = 124;
 const MINI_LOGO = 72;
@@ -359,7 +363,9 @@ export default function HomeScreen() {
 /** M102: the home's top image — the real HQ, opening the HQ screen; the banner slot is the fallback. */
 function HqBanner() {
   const router = useRouter();
-  const photo = useHq().data?.photos?.[0] ?? null;
+  const photos = useHq().data?.photos ?? [];
+  // M127: a different HQ photo each app open (same one for the whole session).
+  const photo = photos.length > 0 ? photos[Math.floor(HQ_BANNER_DRAW * photos.length) % photos.length] : null;
   if (!photo) return <SlotBanner slot="home.banner" />;
   return (
     <FadeInView delay={140}>
