@@ -1,10 +1,12 @@
 import { requireOptionalNativeModule } from 'expo';
+// The legacy entry gates its own native module (M92 pattern inside the package): safe on every binary.
+import * as FileSystem from 'expo-file-system/legacy';
 
 type SecureStoreModule = typeof import('expo-secure-store');
 
-// expo-secure-store is the only on-device storage in the binary. Binaries built before it was added
-// (the M1 APK) do not contain it: the native module registry is checked first, because requiring the
-// package when the module is missing is a fatal error before any try/catch can run (see auth/storage.ts).
+// expo-secure-store is native. Binaries built before it was added (the M1 APK) do not contain
+// it: the native module registry is checked first, because requiring the package when the
+// module is missing is a fatal error before any try/catch can run (see auth/storage.ts).
 function loadSecureStore(): SecureStoreModule | null {
   if (!requireOptionalNativeModule('ExpoSecureStore')) return null;
   try {
@@ -16,30 +18,109 @@ function loadSecureStore(): SecureStoreModule | null {
   }
 }
 
-/** Small settings kept across launches (the app language). Without storage they last for this launch only. */
+/**
+ * M125: iOS 26 loses keychain items across launches on some devices (reads work all session,
+ * the item is gone after a relaunch — errSecItemNotFound at the OS level). Every value is
+ * therefore mirrored in a JSON file inside the app sandbox, and reads fall back to it, so a
+ * signed-in member stays signed in even where the keychain forgets. The sandbox file is
+ * app-private and encrypted at rest by both platforms.
+ */
+const MIRROR_FILE = 'device-store.v1.json';
+
+let mirror: Record<string, string> | null = null;
+let mirrorLoad: Promise<Record<string, string>> | null = null;
+
+function mirrorUri(): string | null {
+  const dir = FileSystem.documentDirectory;
+  return dir ? `${dir}${MIRROR_FILE}` : null;
+}
+
+function loadMirror(): Promise<Record<string, string>> {
+  if (mirror) return Promise.resolve(mirror);
+  mirrorLoad ??= (async () => {
+    const uri = mirrorUri();
+    if (uri) {
+      try {
+        const parsed = JSON.parse(await FileSystem.readAsStringAsync(uri)) as unknown;
+        if (parsed && typeof parsed === 'object') {
+          mirror = Object.fromEntries(
+            Object.entries(parsed as Record<string, unknown>).filter(([, value]) => typeof value === 'string'),
+          ) as Record<string, string>;
+          return mirror;
+        }
+      } catch {
+        // No file yet, or an unreadable one: start empty.
+      }
+    }
+    mirror = {};
+    return mirror;
+  })();
+  return mirrorLoad;
+}
+
+// Writes coalesce (saveLargeSetting saves dozens of parts back to back) and run one at a
+// time, so the file never holds half of one snapshot interleaved with another.
+let mirrorTimer: ReturnType<typeof setTimeout> | null = null;
+let mirrorWaiters: (() => void)[] = [];
+let mirrorWrite: Promise<void> = Promise.resolve();
+
+function flushMirror(): void {
+  mirrorTimer = null;
+  const waiters = mirrorWaiters;
+  mirrorWaiters = [];
+  const uri = mirrorUri();
+  const snapshot = JSON.stringify(mirror ?? {});
+  mirrorWrite = mirrorWrite
+    .then(async () => {
+      if (uri) await FileSystem.writeAsStringAsync(uri, snapshot);
+    })
+    .catch(() => {
+      // The secure store and this launch's memory copy still hold the values.
+    })
+    .then(() => waiters.forEach((resolve) => resolve()));
+}
+
+async function mirrorSet(key: string, value: string | null): Promise<void> {
+  const map = await loadMirror();
+  if (value === null) delete map[key];
+  else map[key] = value;
+  return new Promise((resolve) => {
+    mirrorWaiters.push(resolve);
+    mirrorTimer ??= setTimeout(flushMirror, 50);
+  });
+}
+
+/** Small settings kept across launches (the app language, the session token). Without any storage they last for this launch only. */
 const memory = new Map<string, string>();
 
 export async function loadSetting(key: string): Promise<string | null> {
   const store = loadSecureStore();
-  if (!store) return memory.get(key) ?? null;
-  try {
-    return await store.getItemAsync(key);
-  } catch {
-    return memory.get(key) ?? null;
+  if (store) {
+    try {
+      const value = await store.getItemAsync(key);
+      if (value !== null) return value;
+    } catch {
+      // Fall through to the mirror.
+    }
   }
+  const mirrored = (await loadMirror())[key];
+  if (mirrored !== undefined) return mirrored;
+  return memory.get(key) ?? null;
 }
 
 export async function saveSetting(key: string, value: string | null): Promise<void> {
   if (value === null) memory.delete(key);
   else memory.set(key, value);
   const store = loadSecureStore();
-  if (!store) return;
-  try {
-    if (value === null) await store.deleteItemAsync(key);
-    else await store.setItemAsync(key, value);
-  } catch {
-    // The in-memory copy serves this launch.
+  if (store) {
+    try {
+      if (value === null) await store.deleteItemAsync(key);
+      else await store.setItemAsync(key, value);
+    } catch {
+      // The mirror and the in-memory copy still serve.
+    }
   }
+  await mirrorSet(key, value);
 }
 
 // The iOS keychain is meant for values up to about 2 KB, and Arabic takes up to 3 bytes a character:
@@ -76,4 +157,9 @@ export async function loadLargeSetting(key: string): Promise<string | null> {
   if (count <= 0 || count > MAX_PARTS) return null;
   const parts = await Promise.all(Array.from({ length: count }, (_, index) => loadSetting(`${key}.${index}`)));
   return parts.some((part) => part === null) ? null : parts.join('');
+}
+
+/** True when the binary can keep values across launches in the OS secure store (read by auth/storage.ts). */
+export function hasSecureStoreModule(): boolean {
+  return loadSecureStore() !== null;
 }

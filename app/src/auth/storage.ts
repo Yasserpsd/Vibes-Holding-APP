@@ -1,49 +1,21 @@
-import { requireOptionalNativeModule } from 'expo';
-
-type SecureStoreModule = typeof import('expo-secure-store');
+import { hasSecureStoreModule, loadSetting, saveSetting } from '@/lib/deviceStore';
 
 const TOKEN_KEY = 'investorsclub.session';
 
-// expo-secure-store is native. Binaries built before it was added (the M1 APK) do not contain
-// it. The native module registry is checked first: requiring the package when the module is
-// missing is reported by React Native as a fatal error before any try/catch can run, which
-// closes the app. Without it the session lives in memory for the current launch only.
-function loadSecureStore(): SecureStoreModule | null {
-  if (!requireOptionalNativeModule('ExpoSecureStore')) return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const module = require('expo-secure-store') as SecureStoreModule;
-    return typeof module.getItemAsync === 'function' ? module : null;
-  } catch {
-    return null;
-  }
-}
-
-let memoryToken: string | null = null;
-
+/**
+ * The session token rides the shared device store: the OS secure store first, with the M125
+ * sandbox-file mirror behind it — iOS 26 loses keychain items across launches on some devices,
+ * and a signed-in member must stay signed in until an explicit logout.
+ */
 export async function loadToken(): Promise<string | null> {
-  const store = loadSecureStore();
-  if (!store) return memoryToken;
-  try {
-    return await store.getItemAsync(TOKEN_KEY);
-  } catch {
-    return memoryToken;
-  }
+  return loadSetting(TOKEN_KEY);
 }
 
 export async function saveToken(token: string | null): Promise<void> {
-  memoryToken = token;
-  const store = loadSecureStore();
-  if (!store) return;
-  try {
-    if (token) await store.setItemAsync(TOKEN_KEY, token);
-    else await store.deleteItemAsync(TOKEN_KEY);
-  } catch {
-    // The in-memory copy keeps the session alive for this launch.
-  }
+  await saveSetting(TOKEN_KEY, token);
 }
 
 /** True when the binary can keep the session across launches. */
 export function hasSecureStorage(): boolean {
-  return loadSecureStore() !== null;
+  return hasSecureStoreModule();
 }
