@@ -21,6 +21,7 @@ import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
@@ -104,8 +105,13 @@ export default function ServiceScreen() {
 
   return (
     <Screen>
-      {/* M81 + M105: the owner's photos of this service lead the page — several rotate on their own. */}
-      {service.imageUrls?.length || service.imageUrl ? (
+      {/* M130 (owner): a service with its own film opens on the film — the photo banner steps aside.
+          M81 + M105 otherwise: the owner's photos of this service lead the page — several rotate on their own. */}
+      {service.videoUrl ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <YouTubeEmbed url={service.videoUrl} title={service.title} />
+        </FadeInView>
+      ) : service.imageUrls?.length || service.imageUrl ? (
         <FadeInView delay={entranceDelay(0)}>
           <RotatingBanner urls={service.imageUrls?.length ? service.imageUrls : [service.imageUrl as string]} accessibilityLabel={service.title} />
         </FadeInView>

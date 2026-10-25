@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProjectFilters, useProjectsList } from '@/api/queries';
@@ -59,6 +59,12 @@ export default function ProjectsScreen() {
   // M128 (owner, 2026-10-26: «محفظة Vibes Ventures تختفي تمامًا»): the pinned M121b showcase card
   // left the list. Vibes companies will appear as REGULAR bank entries, lightly marked (next milestone).
   const rows: PublicProject[] = items;
+  // M130b (owner: «في تقل في تقليب بنك المشاريع»): the newest page's covers start downloading as
+  // soon as the page lands, so scrolling meets cached images instead of one load per card.
+  const lastPage = list.data?.pages[list.data.pages.length - 1];
+  useEffect(() => {
+    for (const row of lastPage?.items ?? []) if (row.image) void Image.prefetch(row.image).catch(() => undefined);
+  }, [lastPage]);
 
   const header = (
     <View style={styles.header}>
@@ -156,15 +162,21 @@ export default function ProjectsScreen() {
       <FlatList
         data={rows}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item, index }) => (
-          <FadeInView delay={entranceDelay(index)}>
+        renderItem={({ item, index }) => {
+          const card = (
             <ProjectCard
               project={item}
               onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
               onContact={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id), contact: '1' } })}
             />
-          </FadeInView>
-        )}
+          );
+          // M130b (owner: «في تقل في تقليب بنك المشاريع»): the entrance animation is for the first
+          // screenful only — a card mounting mid-scroll renders at once instead of fading in late.
+          return index < 6 ? <FadeInView delay={entranceDelay(index)}>{card}</FadeInView> : card;
+        }}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
         ListHeaderComponent={header}
         ListEmptyComponent={
           <StateView

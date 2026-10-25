@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import { RequestError } from '../auth/guard.js';
+import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
@@ -115,13 +116,26 @@ export class DashboardService {
   private async hub<K extends keyof HubResults>(admin: AdminActor, op: K, body: HubBody, cached = true): Promise<HubResults[K]> {
     const load = async (): Promise<HubResults[K]> => {
       try {
-        return await hubCall(this.deps.hub, op, { ...body, uuid: admin.session.uuid });
+        const result = await hubCall(this.deps.hub, op, { ...body, uuid: admin.session.uuid });
+        // M130: the hub just honoured this uuid as an admin — remember it for the nightly members export.
+        this.rememberAdmin(admin.session.uuid);
+        return result;
       } catch (error) {
         if (error instanceof HubError && error.code === 'hub_not_supported') throw new HubError('hub_not_supported', UPGRADE_HUB, 501);
         throw error;
       }
     };
     return cached ? this.cache.get(`hub:${op}:${JSON.stringify(body)}`, load) : load();
+  }
+
+  /** One kv write an hour at most; the backup's members export reads it (backup/service.ts). */
+  private adminRememberedAt = 0;
+  private rememberAdmin(uuid: string): void {
+    if (!uuid || Date.now() - this.adminRememberedAt < 60 * 60_000) return;
+    this.adminRememberedAt = Date.now();
+    void this.deps.kv.set(BACKUP_ADMIN_UUID_KEY, { uuid, at: new Date().toISOString() }).catch(() => {
+      this.adminRememberedAt = 0;
+    });
   }
 
   /** Versions of both bridges, for /health and the dashboard's home. Checked at most every few minutes, never throws. */

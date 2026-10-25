@@ -124,6 +124,8 @@ export type Service = {
   imageUrl?: string | null;
   /** M105: the service page's rotating banner photos, slot order; an older server sends none. */
   imageUrls?: string[];
+  /** M130: the service's own film (YouTube watch URL); empty or absent = none. */
+  videoUrl?: string;
 };
 
 /** Owner (2026-10-25): the rotating 50% membership-upsell lines; an older server sends none. */

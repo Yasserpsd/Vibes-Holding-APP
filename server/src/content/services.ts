@@ -55,6 +55,8 @@ export type Service = {
   cta?: string;
   /** M81: the owner's photo for this service (filled from the image slots at read time, never stored here). */
   imageUrl?: string | null;
+  /** M130 (owner, 2026-10-26): the service's own film, a YouTube watch URL; empty = none (edited from «القيم والأسعار»). */
+  videoUrl?: string;
 };
 
 export type ServicesContent = {
@@ -139,6 +141,8 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'date', label: 'الموعد المفضل', placeholder: 'مثال: النصف الثاني من أكتوبر' },
       ]),
       infoUrl: 'https://vibesholding.com/urmeet/',
+      // The owner's own «اصنع ملتقاك» film (same pick as the meetups section); he swaps it from «القيم والأسعار».
+      videoUrl: 'https://www.youtube.com/watch?v=xpxKMnj_Nzk',
       order: 1,
       cta: 'اطلب ملتقاك',
     },
@@ -169,6 +173,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'about', label: 'نبذة عنك وعن عملك', placeholder: 'خبراتك ولماذا تسعى لحقوق التشغيل' },
       ]),
       infoUrl: 'https://vibesholding.com/operating-rights/',
+      videoUrl: '',
       order: 2,
       cta: 'اطلب حقوق التشغيل',
     },
@@ -185,6 +190,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'everyone',
       action: { type: 'form', formKey: 'success-partners', label: 'سجّل مشروعك' },
       infoUrl: null,
+      videoUrl: '',
       order: 3,
       cta: 'سجّل مشروعك',
     },
@@ -203,6 +209,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'stage', label: 'مرحلة المشروع', options: ['فكرة', 'نموذج أولي', 'مشروع قائم', 'توسّع'] },
       ]),
       infoUrl: null,
+      videoUrl: '',
       order: 4,
       cta: 'اطلب تصميمك',
     },
@@ -219,6 +226,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'form', formKey: 'app-publish', label: 'املأ بيانات تطبيقك' },
       infoUrl: null,
+      videoUrl: '',
       order: 5,
       cta: 'انشر تطبيقك',
     },
@@ -234,6 +242,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'everyone',
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
+      videoUrl: '',
       order: 6,
       cta: 'سجّل في الورشة',
     },
@@ -252,6 +261,7 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'time', label: 'الوقت المفضل', placeholder: 'مثال: الثلاثاء 4 عصرًا' },
       ]),
       infoUrl: 'https://almoltaqapodcast.com/studio/',
+      videoUrl: '',
       order: 7,
       cta: 'احجز الاستديو',
     },
@@ -267,6 +277,8 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'hq' },
       infoUrl: null,
+      // The HQ tour film (docs/PROJECT_BRIEF.md 5.3) — the owner swaps it from «القيم والأسعار».
+      videoUrl: 'https://www.youtube.com/watch?v=XERenNWNziA',
       order: 8,
       cta: 'احجز زيارتك',
     },
@@ -283,6 +295,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'hq' },
       infoUrl: null,
+      videoUrl: '',
       order: 9,
       cta: 'احجز القاعة',
     },
@@ -299,6 +312,7 @@ export const SERVICES_SEED: ServicesContent = {
       // Owner (2026-10-21): theatre bookings go straight to the podcast/stage number, like the studio.
       action: studio('أرغب في حجز مسرح النادي.', [{ key: 'time', label: 'الموعد المفضل' }]),
       infoUrl: null,
+      videoUrl: '',
       order: 10,
       cta: 'احجز المسرح',
     },
@@ -314,6 +328,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'advisor', prompt: 'أرغب في استشارة أونلاين: لديّ فكرة وأحتاج من يساعدني على فهمها وتحديد خطواتي التالية.' },
       infoUrl: null,
+      videoUrl: '',
       order: 11,
       cta: 'ابدأ استشارتك',
     },
@@ -330,6 +345,7 @@ export const SERVICES_SEED: ServicesContent = {
       // M73: «قدّم من هنا» opens the M11 application (apply → committee review → published).
       action: { type: 'route', path: '/people/apply', label: 'قدّم من هنا' },
       infoUrl: null,
+      videoUrl: '',
       order: 12,
       cta: 'قدّم من هنا',
     },
@@ -345,6 +361,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: management('أرغب في نشر مشروعي على منصات النادي.', [{ key: 'project', label: 'اسم المشروع أو رابطه في بنك المشاريع' }]),
       infoUrl: null,
+      videoUrl: '',
       order: 13,
       cta: 'اطلب الإبراز',
     },
@@ -360,6 +377,7 @@ export const SERVICES_SEED: ServicesContent = {
       access: 'member',
       action: { type: 'projects' },
       infoUrl: null,
+      videoUrl: '',
       order: 14,
       cta: 'استخدم رصيدك',
     },
@@ -378,14 +396,16 @@ export const SERVICES_SEED: ServicesContent = {
         { key: 'service', label: 'الخدمة', options: ['موقع إلكتروني', 'تطبيق', 'تسويق إلكتروني', 'إعلانات مؤثرين'] },
       ]),
       infoUrl: 'https://momentummix.com/',
+      videoUrl: '',
       order: 15,
       cta: 'اطلب الخدمة',
     },
     // M107 (owner, 2026-10-20): «حقيبة الامتياز» and «كود خصم منتجات منفذ» removed for good.
   ],
   // v15 (owner, 2026-10-26): «انشر تطبيقك على Android و iOS» replaces «على المتجرين».
-  version: 15,
-  updatedAt: '2026-10-26T00:00:00.000Z',
+  // v16 (owner, 2026-10-26): every service carries its own film (`videoUrl`, dashboard-edited; «اصنع ملتقاك» seeded).
+  version: 16,
+  updatedAt: '2026-10-26T12:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

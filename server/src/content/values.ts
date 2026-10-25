@@ -47,6 +47,8 @@ function kindOf(lastSegment: string, value: unknown): ValueKind | null {
   if (typeof value === 'boolean') return 'switch';
   if (typeof value === 'string') {
     if (NAME_KEYS.has(lastSegment) || lastSegment === 'updatedAt') return null;
+    // M130: a film field is a url even while empty, so the owner can fill it (empty = no film).
+    if (lastSegment === 'videoUrl') return 'url';
     if (isUrl(value)) return 'url';
     if (isPhone(value)) return 'phone';
   }
@@ -128,7 +130,7 @@ async function save(kv: KV, input: ValueInput): Promise<{ value: number | string
   const seed = at(block.seed, input.path);
   const next = input.value === null ? seed : input.value;
   if (typeof next !== typeof current) throw new ContentError('نوع القيمة غير مطابق');
-  const problem = valueProblem(kind, next as number | string | boolean);
+  const problem = valueProblem(kind, next as number | string | boolean, lastSegment);
   if (problem) throw new ContentError(problem);
   const doc = withValue(base, input.path, next as number | string | boolean);
   if (isRecord(doc) && typeof doc.updatedAt === 'string') doc.updatedAt = new Date().toISOString();
@@ -145,11 +147,13 @@ async function save(kv: KV, input: ValueInput): Promise<{ value: number | string
   return { value: next as number | string | boolean, edit };
 }
 
-function valueProblem(kind: ValueKind, value: number | string | boolean): string | null {
+function valueProblem(kind: ValueKind, value: number | string | boolean, lastSegment: string): string | null {
   if (kind === 'number' && typeof value === 'number') {
     if (!Number.isFinite(value) || Math.abs(value) > 100_000_000) return 'رقم غير صالح';
     return null;
   }
+  // A film can be removed: an empty videoUrl means «لا فيديو» and the app hides the player.
+  if (kind === 'url' && typeof value === 'string' && lastSegment === 'videoUrl' && value.trim() === '') return null;
   if (kind === 'url' && typeof value === 'string') return isUrl(value) && value.length <= 500 ? null : 'اكتب رابطًا يبدأ بـ https://';
   if (kind === 'phone' && typeof value === 'string') return isPhone(value) ? null : 'اكتب الرقم بصيغة دولية مثل +966500000000';
   if (kind === 'switch' && typeof value === 'boolean') return null;

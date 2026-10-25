@@ -391,9 +391,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
 
   // M129 off-site backup: db snapshot + media mirror to the owner's hosting over SFTP.
+  // M130: + the hub member registry per run (admin_accounts through the remembered admin uuid).
   const backup = new BackupService({
     kv,
     media: mediaStore,
+    hub: hubClient,
     log: app.log,
     envName: config.APP_ENV,
     target:

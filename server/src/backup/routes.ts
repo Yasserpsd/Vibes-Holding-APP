@@ -15,6 +15,8 @@ export const backupRoutes: FastifyPluginAsync<BackupRoutesOptions> = async (app,
     guard(async (request, reply) => {
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
+      // M130: a verified admin is here — remember his hub uuid for the unattended members export.
+      service.rememberAdmin(admin.session.uuid);
       return service.getStatus();
     }),
   );
@@ -24,6 +26,7 @@ export const backupRoutes: FastifyPluginAsync<BackupRoutesOptions> = async (app,
     guard(async (request, reply) => {
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
+      service.rememberAdmin(admin.session.uuid);
       const before = service.getStatus();
       if (!before.enabled) return reply.code(409).send({ error: { code: 'backup_disabled', message: 'النسخ الاحتياطي غير مفعّل على هذا الخادم' } });
       if (before.running) return reply.code(409).send({ error: { code: 'backup_running', message: 'نسخة احتياطية قيد التنفيذ الآن' } });

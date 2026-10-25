@@ -38,6 +38,12 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
     return () => clearInterval(timer);
   }, [opacity, usable.length]);
 
+  // M130b (owner: «تقليب الصور تقيل»): the set's other photos download behind the first one,
+  // so every swap shows an already-cached image instead of a loading hitch. Never fatal.
+  useEffect(() => {
+    for (const entry of key.split('|').slice(1)) void Image.prefetch(entry).catch(() => undefined);
+  }, [key]);
+
   const url = usable[usable.length ? index % usable.length : 0];
   if (!url) return null;
 
