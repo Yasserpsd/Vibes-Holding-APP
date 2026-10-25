@@ -42,7 +42,7 @@ export default function VideosScreen() {
     <Screen title={first.title} subtitle={first.intro}>
       {first.featured.length ? (
         <>
-          <SectionHeader title={first.featuredTitle} />
+          <SectionHeader icon="star-outline" title={first.featuredTitle} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -59,7 +59,7 @@ export default function VideosScreen() {
         </>
       ) : null}
 
-      <SectionHeader title={t('videos.all')} subtitle={first.total ? t('videos.count', { count: formatNumber(first.total) }) : null} />
+      <SectionHeader icon="play-circle-outline" title={t('videos.all')} subtitle={first.total ? t('videos.count', { count: formatNumber(first.total) }) : null} />
       {items.length ? (
         <View style={styles.list}>
           {items.map((video, index) => (

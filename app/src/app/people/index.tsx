@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -10,8 +11,9 @@ import { PersonAvatar } from '@/components/PeopleBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
-import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { chevronForward, textStart } from '@/i18n/direction';
+import { formatPeopleCount } from '@/lib/format';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** M11 «شخصية ومسيرة»: the approved club figures, and the member's way to apply. */
 export default function PeopleScreen() {
@@ -31,6 +33,18 @@ export default function PeopleScreen() {
           onPress={() => router.push((status === 'signedIn' ? '/people/apply' : '/auth/login') as Href)}
         />
       </FadeInView>
+
+      {/* Icons pass: the roster's size as a small golden pill. */}
+      {items.length > 0 ? (
+        <FadeInView delay={100} offset={6}>
+          <View style={styles.countRow}>
+            <View style={styles.countPill}>
+              <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
+              <Text style={styles.countPillText}>{formatPeopleCount(items.length)}</Text>
+            </View>
+          </View>
+        </FadeInView>
+      ) : null}
 
       {!people.data ? (
         <StateView loading={people.isLoading} error={people.error} onRetry={() => void people.refetch()} />
@@ -62,6 +76,7 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
             {[person.title, person.company].filter(Boolean).join(' · ')}
           </Text>
         </View>
+        <Ionicons name={chevronForward()} size={18} color={colors.goldLight} />
       </GlassCard>
     </PressScale>
   );
@@ -69,6 +84,20 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
 
 const styles = StyleSheet.create({
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
+  // Icons pass: the roster-size pill.
+  countRow: { flexDirection: 'row' },
+  countPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+  },
+  countPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
