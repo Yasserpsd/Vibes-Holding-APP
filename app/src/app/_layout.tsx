@@ -137,6 +137,9 @@ export default function RootLayout() {
                 <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />
                 <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: t('nav.hqPass') }} />
                 <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: t('nav.hqAdmin') }} />
+                {/* M128 (owner: «صفحة الدفع مرمية فوق») — the embedded checkout gets the same gold
+                    header and back arrow as every detail screen, on a white sheet. */}
+                <Stack.Screen name="checkout/[id]" options={{ ...detailHeader, title: t('checkout.title'), contentStyle: { backgroundColor: '#FFFFFF' } }} />
                 <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
                 <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
                 <Stack.Screen name="security" options={{ ...detailHeader, title: t('security.title') }} />

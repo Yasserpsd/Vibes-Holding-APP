@@ -10,6 +10,7 @@ import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { claimAutoPopup } from '@/lib/popupGate';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -44,7 +45,7 @@ export function UpsellPopup({ upsell }: { upsell: ServicesUpsell }) {
     const timer = setTimeout(() => {
       void loadSetting(POPUP_DAY_KEY).then((last) => {
         const today = new Date().toISOString().slice(0, 10);
-        if (cancelled || last === today) return;
+        if (cancelled || last === today || !claimAutoPopup()) return;
         setVisible(true);
         void saveSetting(POPUP_DAY_KEY, today);
       });

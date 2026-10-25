@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
@@ -6,9 +7,10 @@ import { amountLabel, usePayment } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { appScheme, openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { loadWebView } from '@/lib/player';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, spacing, typography } from '@/theme/tokens';
 
 /**
  * M111 (owner, 2026-10-20: «أهم شرط إن الدفع يتم داخل التطبيق جوا نفس الصفحة»): the gateway
@@ -57,11 +59,19 @@ export default function CheckoutScreen() {
   return (
     <View style={styles.page}>
       <Stack.Screen options={{ title: t('checkout.title') }} />
+      {/* M128 (owner: «الخدمة غير واضحة»): the order — service, amount, the secure-payment line — reads
+          as one clean receipt header above the gateway. */}
       <View style={styles.summary}>
-        <Text style={styles.service} numberOfLines={1}>
-          {payment.serviceTitle}
-        </Text>
-        <Text style={styles.amount}>{amountLabel(payment)}</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.service} numberOfLines={2}>
+            {payment.serviceTitle}
+          </Text>
+          <Text style={styles.amount}>{amountLabel(payment)}</Text>
+        </View>
+        <View style={styles.secureRow}>
+          <Ionicons name="lock-closed" size={13} color={colors.gold} />
+          <Text style={styles.secureText}>{t('checkout.secure')}</Text>
+        </View>
       </View>
       {WebView && status === 'created' ? (
         <WebView
@@ -125,18 +135,18 @@ const INK = '#1C1C1C';
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: PAPER },
   summary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E8E2D2',
     backgroundColor: PAPER,
   },
-  service: { ...typography.body, color: INK, flex: 1 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  service: { ...typography.body, fontFamily: fonts.semiBold, color: INK, flex: 1, textAlign: textStart },
   amount: { ...typography.subtitle, color: colors.gold },
+  secureRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  secureText: { ...typography.caption, color: '#6E6754', textAlign: textStart },
   web: { flex: 1, backgroundColor: PAPER },
   webContainer: { flex: 1, backgroundColor: PAPER },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PAPER },

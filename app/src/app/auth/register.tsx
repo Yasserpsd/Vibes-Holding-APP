@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -69,6 +69,8 @@ function PersonaRow({ selected, onPress, children }: { selected: boolean; onPres
 
 export default function RegisterScreen() {
   const router = useRouter();
+  // M128: arriving from a failed sign-in with no account behind it — say so, plainly.
+  const { fromLogin } = useLocalSearchParams<{ fromLogin?: string }>();
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
   const interestsList = useInterests();
   const [form, setForm] = useState<Form>(EMPTY);
@@ -160,6 +162,11 @@ export default function RegisterScreen() {
 
   return (
     <Screen title={t('auth.register.title')} subtitle={t('auth.register.subtitle')}>
+      {fromLogin ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={t('auth.register.fromLogin')} />
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(0)}>
         <SocialButtons onError={setSubmitError} />
       </FadeInView>

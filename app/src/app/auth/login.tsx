@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
-import { errorMessage } from '@/api/client';
+import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
@@ -51,6 +51,10 @@ export default function LoginScreen() {
       else router.replace('/account');
     } catch (cause) {
       setError(errorMessage(cause));
+      // M128 (owner): no account behind these details → straight to registration, with a notice there.
+      if (cause instanceof ApiError && cause.code === 'no_account') {
+        router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
+      }
     } finally {
       setBusy(false);
     }

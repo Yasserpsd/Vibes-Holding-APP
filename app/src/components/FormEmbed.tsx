@@ -18,6 +18,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { claimAutoPopup } from '@/lib/popupGate';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -160,9 +161,12 @@ const NUDGE_DELAY_MS = 900;
 function MemberNudgePopup({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
 
-  // A beat after the success check lands, so the confirmation is seen before the condition.
+  // A beat after the success check lands, so the confirmation is seen before the condition —
+  // and only when no other automatic popup already took this session's single slot (M128).
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), NUDGE_DELAY_MS);
+    const timer = setTimeout(() => {
+      if (claimAutoPopup()) setVisible(true);
+    }, NUDGE_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

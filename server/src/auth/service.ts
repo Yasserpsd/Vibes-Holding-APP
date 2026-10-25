@@ -234,7 +234,18 @@ export class AuthService {
     const uuid = newUuid();
     // The login field takes a phone from ANY country (the app sends the picked country code);
     // normalised here because the hub's own vai_norm_phone only understands Saudi local forms.
-    const result = await this.deps.hub.call('login', { uuid, ip, login: normLogin(login, country), password, page_url: 'app://login' });
+    const normalized = normLogin(login, country);
+    let result: HubResponse;
+    try {
+      result = await this.deps.hub.call('login', { uuid, ip, login: normalized, password, page_url: 'app://login' });
+    } catch (cause) {
+      // M128 (owner): a sign-in with NO account behind it gets its own answer («حسابك غير مسجل»),
+      // so the app carries the person straight to registration instead of a wrong-password message.
+      if (cause instanceof HubError && (cause.status === 401 || cause.status === 404) && !(await this.accountExists(normalized))) {
+        throw new AuthError('no_account', 'لا يوجد حساب مسجل بهذه البيانات — أنشئ حسابك الجديد أولًا', 404);
+      }
+      throw cause;
+    }
     const contact = requireContact(result);
     if (result.pending) {
       const pendingToken = await this.deps.sessions.createPending(uuid, contact.email);
@@ -242,6 +253,22 @@ export class AuthService {
     }
     await this.gate(uuid, contact);
     return this.signIn(uuid, contact);
+  }
+
+  /**
+   * M128: true when the hub knows this e-mail or phone (member_status looks the contact up without
+   * a session). Any doubt — odd input, a hub hiccup, an old hub — answers true, so the regular
+   * wrong-password message stands and nobody is bounced to registration by mistake.
+   */
+  private async accountExists(login: string): Promise<boolean> {
+    const body = login.includes('@') ? { email: login } : /^\d{8,15}$/.test(login) ? { phone: login } : null;
+    if (!body) return true;
+    try {
+      const result = await this.deps.hub.call('member_status', body);
+      return result.found !== false;
+    } catch {
+      return true;
+    }
   }
 
   /**
