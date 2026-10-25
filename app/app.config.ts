@@ -15,7 +15,7 @@ const BRAND_GOLD = '#C9A227';
 // variable in app/.env pointing at the git-ignored google-services.json.
 const GOOGLE_SERVICES = process.env.GOOGLE_SERVICES_JSON;
 // Public value: the test API. Production gets its URL from EXPO_PUBLIC_API_URL only.
-const TEST_API_URL = 'https://vibes-holding-app-production.up.railway.app';
+const TEST_API_URL = 'https://api-test.vibesholdingsa.com';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
