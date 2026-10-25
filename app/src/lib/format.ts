@@ -67,6 +67,18 @@ function arabicCount(count: number, singular: string, dual: string, plural: stri
   return `${formatNumber(count)} ${count <= 10 ? plural : singular}`;
 }
 
+/** Icons pass: a services group's size under its header — «خدمة»، «خدمتان»، «5 خدمات» (EN: "5 services"). */
+export function formatServiceCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 service' : `${count} services`;
+  return arabicCount(count, 'خدمة', 'خدمتان', 'خدمات');
+}
+
+/** Icons pass: the bank's sector spread — «قطاع»، «قطاعان»، «8 قطاعات» (EN: "8 sectors"). */
+export function formatSectorCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 sector' : `${count} sectors`;
+  return arabicCount(count, 'قطاع', 'قطاعان', 'قطاعات');
+}
+
 /** "قبل 5 دقائق" / "قبل ساعتين" / "أمس" / a spelled-out date for anything older. */
 export function formatRelativeTime(iso: string, now: number = Date.now()): string {
   const then = Date.parse(iso);

@@ -92,6 +92,16 @@ export function useProjectReviews(id: string | undefined, account: string | null
   });
 }
 
+/** Icons pass: the bank's headline number alone — the lightest possible page (one item) for its `total`. */
+export function useProjectsCount() {
+  return useQuery({
+    queryKey: ['projects', 'count'],
+    queryFn: () => apiGet<ProjectsPage>('/api/projects', { q: '', sort: 'latest', page: 1, limit: 1 }),
+    staleTime: 5 * 60_000,
+    select: (page) => page.total,
+  });
+}
+
 export function useProjectFilters() {
   return useQuery({
     queryKey: ['projects', 'filters'],
