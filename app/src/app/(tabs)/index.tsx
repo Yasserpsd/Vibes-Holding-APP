@@ -6,6 +6,7 @@ import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react
 import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { useHq } from '@/api/hq';
 import { usePartners, type Partner } from '@/api/partners';
+import { useProjectFilters, useProjectsCount } from '@/api/queries';
 import { useLatestPosts } from '@/api/posts';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
@@ -23,6 +24,7 @@ import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SlotBanner } from '@/components/SlotBanner';
+import { StatStrip } from '@/components/StatStrip';
 import { GoldenOpportunity } from '@/components/GoldenOpportunity';
 import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { WalletCard } from '@/components/WalletCard';
@@ -342,6 +344,9 @@ export default function HomeScreen() {
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
       <HqBanner />
 
+      {/* Icons pass (owner's priority 1): the club in live numbers, straight under the HQ photo. */}
+      <ClubStatsStrip servicesCount={allServices.length} />
+
       {/* M120 (owner's TestFlight feedback): the subscribe door, high on every non-member's home. */}
       <MembershipHomeCard />
 
@@ -373,6 +378,22 @@ function HqBanner() {
         <Image source={{ uri: photo }} style={styles.hqBanner} resizeMode="cover" resizeMethod="resize" accessibilityLabel={t('nav.hq')} />
       </PressScale>
     </FadeInView>
+  );
+}
+
+/** Icons pass: three live counts — the bank's projects, its sectors, the services. All from the API, never hardcoded. */
+function ClubStatsStrip({ servicesCount }: { servicesCount: number }) {
+  const projects = useProjectsCount().data ?? 0;
+  const sectors = useProjectFilters().data?.sectors.length ?? 0;
+  return (
+    <StatStrip
+      delay={160}
+      stats={[
+        { icon: 'briefcase-outline', value: projects, label: t('stats.projects') },
+        { icon: 'pie-chart-outline', value: sectors, label: t('stats.sectors') },
+        { icon: 'grid-outline', value: servicesCount, label: t('stats.services') },
+      ]}
+    />
   );
 }
 
