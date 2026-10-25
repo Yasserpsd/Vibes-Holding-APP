@@ -12,7 +12,7 @@ import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
-import { formatMillionsSar } from '@/lib/format';
+import { formatMillionsSar, formatNumber } from '@/lib/format';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function GoldenScreen() {
@@ -24,6 +24,8 @@ export default function GoldenScreen() {
   const clearance = useAskAdvisorClearance();
   // V2: the portfolio number counts up to its value — measured, not pasted.
   const portfolioShown = useCountUp(content?.portfolioValueSarMillions ?? 0);
+  // Icons pass: the portfolio's size counts up beside its value.
+  const companiesShown = useCountUp(content?.companies.length ?? 0);
   // The hero's metal sheen sweeps the card's rendered size.
   const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
@@ -63,9 +65,16 @@ export default function GoldenScreen() {
             </View>
             <Text style={styles.heroTitle}>{content.umbrella.name}</Text>
             <Text style={styles.intro}>{content.intro}</Text>
-            <View style={styles.valueBadge}>
-              <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
-              <Text style={styles.valueText}>{formatMillionsSar(portfolioShown)}</Text>
+            <View style={styles.valueRow}>
+              <View style={styles.valueBadge}>
+                <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
+                <Text style={styles.valueText}>{formatMillionsSar(portfolioShown)}</Text>
+              </View>
+              {/* Icons pass: how many companies stand under the umbrella — the same live feed. */}
+              <View style={styles.valueBadge}>
+                <Text style={styles.valueLabel}>{t('stats.companies')}</Text>
+                <Text style={styles.valueText}>{formatNumber(companiesShown)}</Text>
+              </View>
             </View>
             {/* §5.1: the umbrella's offer opens as a native page in the app, never in the browser. */}
             <AppButton label={t('golden.vibesPage')} icon="reader-outline" onPress={() => router.push(`/golden/${content.umbrella.code}`)} />
@@ -105,7 +114,10 @@ const styles = StyleSheet.create({
   logo: { width: '100%', height: '100%' },
   heroTitle: { ...typography.title, color: colors.gold, textAlign: 'center' },
   intro: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  valueRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch', alignSelf: 'stretch' },
   valueBadge: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 2,
     paddingVertical: spacing.sm,

@@ -79,6 +79,18 @@ export function formatSectorCount(count: number): string {
   return arabicCount(count, 'قطاع', 'قطاعان', 'قطاعات');
 }
 
+/** Icons pass: the «شخصية ومسيرة» roster size — «شخصية»، «شخصيتان»، «5 شخصيات» (EN: "5 figures"). */
+export function formatPeopleCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 figure' : `${count} figures`;
+  return arabicCount(count, 'شخصية', 'شخصيتان', 'شخصيات');
+}
+
+/** Icons pass: the news feed's size — «خبر»، «خبران»، «8 أخبار» (EN: "8 news items"). */
+export function formatNewsCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 news item' : `${count} news items`;
+  return arabicCount(count, 'خبر', 'خبران', 'أخبار');
+}
+
 /** "قبل 5 دقائق" / "قبل ساعتين" / "أمس" / a spelled-out date for anything older. */
 export function formatRelativeTime(iso: string, now: number = Date.now()): string {
   const then = Date.parse(iso);

@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { StatStrip } from '@/components/StatStrip';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
@@ -49,6 +50,14 @@ export default function WorkshopsScreen() {
               <AppButton label={t('guide.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
             </>
           ) : null}
+          {/* Icons pass: the schedule in numbers — the open workshops, and how many this member joined. */}
+          <StatStrip
+            delay={100}
+            stats={[
+              { icon: 'school-outline', value: items.length, label: t('stats.workshops') },
+              { icon: 'checkmark-done-outline', value: registered.size, label: t('stats.myWorkshops') },
+            ]}
+          />
           {items.map((workshop, index) => (
             <FadeInView key={workshop.id} delay={entranceDelay(index, 80)}>
               <WorkshopCard workshop={workshop} texts={data} signedIn={signedIn} registered={registered.has(workshop.id)} />

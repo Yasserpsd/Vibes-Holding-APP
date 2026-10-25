@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
 import { useStoreConfig } from '@/api/membership';
+import { useProjectsWallet } from '@/api/queries';
 import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
@@ -19,6 +20,7 @@ import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
+import { StatStrip } from '@/components/StatStrip';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
@@ -93,11 +95,13 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(1, 90)}>
         <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} subscribeCta />
       </FadeInView>
+      {/* Icons pass: the member's own bank numbers — opened projects and the «رصيد» still in hand. */}
+      {me ? <WalletStatsStrip account={String(me.id)} /> : null}
       {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 
       {/* M79 (owner): «الحاجات اللي ليها علاقة ببعض لازم تتحط مع بعض» — the pile became titled groups. */}
       <FadeInView delay={entranceDelay(2, 90)}>
-        <MenuGroup title={t('account.group.data')}>
+        <MenuGroup title={t('account.group.data')} icon="person-circle-outline">
           <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
           <MenuRow icon="heart-outline" label={t('nav.interests')} onPress={() => router.push('/news/interests' as Href)} />
           {/* M101: the member changes his direction with an e-mailed code, once every 30 days. */}
@@ -108,7 +112,7 @@ export default function AccountScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(3, 90)}>
-        <MenuGroup title={t('account.group.membership')}>
+        <MenuGroup title={t('account.group.membership')} icon="ribbon-outline">
           <MenuRow icon="ribbon-outline" label={t('account.menu.membership')} onPress={() => router.push('/membership')} />
           <MenuRow icon="receipt-outline" label={t('account.menu.payments')} onPress={() => router.push('/payments')} />
           <MenuRow icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} />
@@ -116,7 +120,7 @@ export default function AccountScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(4, 90)}>
-        <MenuGroup title={t('account.group.club')}>
+        <MenuGroup title={t('account.group.club')} icon="business-outline">
           <MenuRow icon="grid-outline" label={t('account.menu.services')} onPress={() => router.push('/services')} />
           {/* M99b: the Projects Bank stays reachable from here for the persona whose tabs hide it. */}
           <MenuRow icon="briefcase-outline" label={t('tabs.projects')} onPress={() => router.push('/projects')} />
@@ -128,13 +132,13 @@ export default function AccountScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(5, 90)}>
-        <MenuGroup title={t('account.group.security')}>
+        <MenuGroup title={t('account.group.security')} icon="shield-checkmark-outline">
           <MenuRow icon="shield-checkmark-outline" label={t('security.title')} onPress={() => router.push('/security' as Href)} />
         </MenuGroup>
       </FadeInView>
 
       <FadeInView delay={entranceDelay(6, 90)}>
-        <MenuGroup title={t('account.group.preferences')}>
+        <MenuGroup title={t('account.group.preferences')} icon="options-outline">
           {/* M87b: the daily advisor message, on or off — server-side, follows the account. */}
           <CompanionToggleRow />
           {languageChoiceOffered(me?.isAdmin === true) ? <MenuRow icon="language-outline" label={t('account.menu.language')} onPress={chooseLanguage} /> : null}
@@ -145,7 +149,7 @@ export default function AccountScreen() {
 
       {/* M109c «المزيد»: the low-traffic legal and account rows, gathered in one quiet group. */}
       <FadeInView delay={entranceDelay(7, 90)}>
-        <MenuGroup title={t('account.group.more')}>
+        <MenuGroup title={t('account.group.more')} icon="ellipsis-horizontal-outline">
           <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
           {/* M116d (owner): legal pages render INSIDE the app — no browser bar, no hosting domain on show. */}
           {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.termsUrl ?? '', title: t('store.terms') } })} /> : null}
@@ -225,11 +229,28 @@ function CompanionToggleRow() {
   );
 }
 
-/** M79: one titled group of related rows — the eyebrow title sits above its card. */
-function MenuGroup({ title, children }: { title: string; children: ReactNode }) {
+/** Icons pass: the member's Projects Bank wallet, at a glance — hidden entirely while both are zero. */
+function WalletStatsStrip({ account }: { account: string }) {
+  const wallet = useProjectsWallet(account).data;
+  return (
+    <StatStrip
+      delay={140}
+      stats={[
+        { icon: 'lock-open-outline', value: wallet?.unlockedCount ?? 0, label: t('stats.unlocked') },
+        { icon: 'wallet-outline', value: wallet?.balance?.left ?? 0, label: t('stats.creditsLeft') },
+      ]}
+    />
+  );
+}
+
+/** M79: one titled group of related rows — the eyebrow title sits above its card (icons pass: with its small gold icon). */
+function MenuGroup({ title, icon, children }: { title: string; icon?: IoniconName; children: ReactNode }) {
   return (
     <View style={styles.group}>
-      <Text style={styles.groupTitle}>{title}</Text>
+      <View style={styles.groupHead}>
+        {icon ? <Ionicons name={icon} size={14} color={colors.gold} /> : null}
+        <Text style={styles.groupTitle}>{title}</Text>
+      </View>
       <GlassCard radius={radii.lg}>{children}</GlassCard>
     </View>
   );
@@ -282,7 +303,8 @@ const styles = StyleSheet.create({
   contact: { ...typography.caption, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr' },
   // M79: the titled groups.
   group: { gap: spacing.xs },
-  groupTitle: { ...typography.caption, color: colors.gold, textAlign: textStart, paddingHorizontal: spacing.xs },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs },
+  groupTitle: { ...typography.caption, color: colors.gold, textAlign: textStart, flex: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

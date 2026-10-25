@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
@@ -14,6 +15,7 @@ import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { authenticate, loadLocalAuth, lockAvailable, lockEnabled, setLockEnabled } from '@/lib/appLock';
+import type { IoniconName } from '@/lib/icons';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -98,7 +100,7 @@ export default function SecurityScreen() {
       {/* M118d: the app lock first — the face opens the app. */}
       <FadeInView delay={entranceDelay(0)}>
         <GlassCard radius={radii.lg} style={styles.card}>
-          <Text style={styles.sectionTitle}>{t('security.lockTitle')}</Text>
+          <CardTitle icon="finger-print-outline" title={t('security.lockTitle')} />
           {lockState === 'ready' ? (
             <View style={styles.lockRow}>
               <Text style={styles.lockText}>{t('security.lockToggle')}</Text>
@@ -121,7 +123,7 @@ export default function SecurityScreen() {
 
       <FadeInView delay={entranceDelay(1)}>
         <GlassCard radius={radii.lg} style={styles.card}>
-          <Text style={styles.sectionTitle}>{t('security.changePassword')}</Text>
+          <CardTitle icon="key-outline" title={t('security.changePassword')} />
           <FormField
             label={t('security.newPassword')}
             value={password}
@@ -145,7 +147,7 @@ export default function SecurityScreen() {
       {/* M118d (owner): the sharp things live one level deeper, out of a stray tap's reach. */}
       <FadeInView delay={entranceDelay(2)}>
         <GlassCard radius={radii.lg} style={styles.card}>
-          <Text style={styles.sectionTitle}>{t('security.extraTitle')}</Text>
+          <CardTitle icon="settings-outline" title={t('security.extraTitle')} />
           <Text style={styles.dangerText}>{t('security.extraHint')}</Text>
           <GoldHairline />
           <AppButton label={t('security.extraOpen')} variant="outline" icon="settings-outline" onPress={() => router.push('/security-extra' as Href)} />
@@ -155,9 +157,30 @@ export default function SecurityScreen() {
   );
 }
 
+/** Icons pass: each security card leads with its own small golden icon badge. */
+function CardTitle({ icon, title }: { icon: IoniconName; title: string }) {
+  return (
+    <View style={styles.cardTitleRow}>
+      <View style={styles.cardTitleIcon}>
+        <Ionicons name={icon} size={16} color={colors.gold} />
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.md },
-  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardTitleIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.goldSoft,
+  },
+  sectionTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
   dangerText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   lockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   lockText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },

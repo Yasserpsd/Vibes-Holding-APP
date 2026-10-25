@@ -14,7 +14,8 @@ import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { formatNewsCount } from '@/lib/format';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 // The decisions strip snaps card by card: the compact NewsCard width (260) plus the strip gap.
 const STRIP_SNAP = 260 + spacing.sm;
@@ -110,7 +111,16 @@ export default function NewsListScreen() {
         </ScrollView>
       </FadeInView>
       <FadeInView delay={entranceDelay(4)}>
-        <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
+        {/* Icons pass: the feed's size rides the ranking line as a small golden pill. */}
+        <View style={styles.countRow}>
+          <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
+          {(feed.data?.pages[0]?.total ?? 0) > 0 ? (
+            <View style={styles.countPill}>
+              <Ionicons name="newspaper-outline" size={13} color={colors.gold} />
+              <Text style={styles.countPillText}>{formatNewsCount(feed.data?.pages[0]?.total ?? 0)}</Text>
+            </View>
+          ) : null}
+        </View>
       </FadeInView>
     </View>
   );
@@ -184,7 +194,20 @@ const styles = StyleSheet.create({
   },
   bannerText: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
-  count: { ...typography.caption, color: colors.textMuted },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  count: { ...typography.caption, color: colors.textMuted, flex: 1 },
+  countPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+  },
+  countPillText: { ...typography.caption, fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLight },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
 });
