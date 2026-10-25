@@ -9,13 +9,13 @@ import type { ProjectsSort, PublicProject } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
-import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { entranceDelay, FadeInView, PressScale, useCountUp } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { markSeen } from '@/lib/seen';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatSectorCount } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -131,9 +131,21 @@ export default function ProjectsScreen() {
       ) : null}
 
       {typeof total === 'number' ? (
-        // Keyed by the total: a new filter result fades its count in instead of snapping.
+        // Icons pass: the count as golden stat pills — keyed by the total, so a new filter result
+        // remounts and the number counts up into place instead of snapping.
         <FadeInView key={total} offset={6} duration={320}>
-          <Text style={styles.count}>{t('projects.count', { count: formatNumber(total) })}</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statPill}>
+              <Ionicons name="briefcase-outline" size={14} color={colors.gold} />
+              <BankTotal total={total} />
+            </View>
+            {!sector && (filters.data?.sectors.length ?? 0) > 0 ? (
+              <View style={styles.statPill}>
+                <Ionicons name="pie-chart-outline" size={14} color={colors.gold} />
+                <Text style={styles.statPillText}>{formatSectorCount(filters.data?.sectors.length ?? 0)}</Text>
+              </View>
+            ) : null}
+          </View>
         </FadeInView>
       ) : null}
     </View>
@@ -196,6 +208,12 @@ export default function ProjectsScreen() {
   );
 }
 
+/** Icons pass: the bank's headline figure, counting up into its pill. */
+function BankTotal({ total }: { total: number }) {
+  const shown = useCountUp(total, 600);
+  return <Text style={styles.statPillText}>{t('projects.count', { count: formatNumber(shown) })}</Text>;
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.black },
   // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
@@ -238,7 +256,20 @@ const styles = StyleSheet.create({
   filterButtonText: { ...typography.caption, color: colors.goldLight },
   filterButtonTextActive: { color: colors.goldInk, fontFamily: fonts.semiBold },
   activeFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  count: { ...typography.caption, color: colors.textMuted },
+  // Icons pass: the count's golden stat pills.
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGoldSoft,
+    backgroundColor: colors.goldFaint,
+  },
+  statPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
 });
