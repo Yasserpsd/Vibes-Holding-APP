@@ -209,9 +209,9 @@ export const SERVICES_SEED: ServicesContent = {
     // M83 (owner, 2026-10-17): «لرائد الأعمال يقدر ينشر تطبيقه علي جوجل وiOS بدون رسوم اهم حاجه يكون معاه عضوية».
     {
       key: 'app-publish',
-      title: 'انشر تطبيقك على المتجرين',
+      title: 'انشر تطبيقك على Android و iOS',
       summary: 'النادي ينشر تطبيقك على Google Play وApp Store بدون رسوم — ميزة حصرية للأعضاء المشتركين.',
-      detail: 'املأ بيانات تطبيقك وتتواصل معك الإدارة لاستلام الملفات وإتمام النشر على المتجرين. الشرط الوحيد عضوية سنوية سارية.',
+      detail: 'املأ بيانات تطبيقك وتتواصل معك الإدارة لاستلام الملفات وإتمام النشر على Android و iOS. الشرط الوحيد عضوية سنوية سارية.',
       icon: 'cloud-upload',
       group: 'entrepreneur',
       priceLabel: null,
@@ -383,9 +383,9 @@ export const SERVICES_SEED: ServicesContent = {
     },
     // M107 (owner, 2026-10-20): «حقيبة الامتياز» and «كود خصم منتجات منفذ» removed for good.
   ],
-  // v14 (owner, 2026-10-25): the rotating 50% membership upsell lines.
-  version: 14,
-  updatedAt: '2026-10-25T00:00:00.000Z',
+  // v15 (owner, 2026-10-26): «انشر تطبيقك على Android و iOS» replaces «على المتجرين».
+  version: 15,
+  updatedAt: '2026-10-26T00:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

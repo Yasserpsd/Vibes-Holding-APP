@@ -78,7 +78,7 @@ export const FORMS_EN: Translation<FormsContent> = {
     },
     {
       key: 'app-publish',
-      title: 'Publish your app on both stores',
+      title: 'Publish your app on Android and iOS',
       intro:
         'With your annual membership the club publishes your app on Google Play and the App Store at no charge. Fill in your app details and the management will contact you to collect the files and complete the publishing.',
       closedText: "Publishing requests are paused for now. Follow the club's announcements or message the management.",

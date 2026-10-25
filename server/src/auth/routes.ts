@@ -6,6 +6,7 @@ import { langOf } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
+import { mobileRule } from '../hub/countries.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { dashboardGuard, guard, parse, sessionGuard } from './guard.js';
 import type { Mailer } from '../mail/mailer.js';
@@ -124,6 +125,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       flag: country.flag,
       example: country.example,
       pattern: country.local ? country.local.source : GENERIC_PATTERN,
+      // Owner (2026-10-26): length + leading digits ride along so the app can say
+      // «تأكد من رقم الجوال» the moment the number is too long or starts wrong.
+      min: mobileRule(country.code)?.min ?? 5,
+      max: mobileRule(country.code)?.max ?? 12,
+      starts: mobileRule(country.code)?.starts ?? [],
     })),
     personas: PERSONAS,
     phonePolicy: PHONE_POLICY_TEXT,

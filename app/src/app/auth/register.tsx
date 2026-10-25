@@ -17,7 +17,7 @@ import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { isEmail, isLocalPhone } from '@/lib/validation';
+import { isEmail, phoneIssue } from '@/lib/validation';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Form = {
@@ -95,7 +95,7 @@ export default function RegisterScreen() {
     const next: Partial<Record<keyof Form, string>> = {};
     if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
     if (form.memberType === 'company' && form.companyName.trim().length < 2) next.companyName = t('auth.register.error.companyName');
-    if (!isLocalPhone(form.phone, country?.pattern))
+    if (phoneIssue(form.phone, country) !== null)
       next.phone = phoneExample ? t('auth.register.error.phone', { example: phoneExample }) : t('auth.register.error.phoneNoExample');
     if (!isEmail(form.email)) next.email = t('auth.register.error.email');
     if (form.password.length < 6) next.password = t('auth.register.error.password');

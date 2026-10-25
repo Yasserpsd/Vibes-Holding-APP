@@ -22,7 +22,7 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
     <View style={styles.field}>
       <Text style={[styles.label, paper && styles.paperLabel]}>{label}</Text>
       <TextInput
-        placeholderTextColor={paper ? colors.paperMuted : colors.textMuted}
+        placeholderTextColor={paper ? colors.paperFaint : colors.textFaint}
         selectionColor={paper ? colors.paperGold : colors.gold}
         multiline={multiline}
         {...inputProps}

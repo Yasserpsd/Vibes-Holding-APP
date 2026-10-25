@@ -20,6 +20,8 @@ export const colors = {
   textPrimary: '#FFFFFF',
   textSecondary: '#B9B9C0',
   textMuted: '#7E7E86',
+  // M128 (owner): placeholders only — barely-there gray so an empty field never looks prefilled.
+  textFaint: '#55555E',
 
   // Translucent accents shared by the cards.
   goldSoft: 'rgba(217, 168, 60, 0.14)',
@@ -41,6 +43,8 @@ export const colors = {
   paperInk: '#17130A',
   paperInkSoft: '#57503F',
   paperMuted: '#8C8472',
+  // M128: the paper fields' placeholder — same barely-there idea on the light surface.
+  paperFaint: '#BDB6A6',
   paperBorder: '#E7E0D1',
   /** Gold dark enough to read on paper. */
   paperGold: '#8A6D1D',

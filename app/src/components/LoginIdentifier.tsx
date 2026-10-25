@@ -5,7 +5,7 @@ import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
-import { isEmail } from '@/lib/validation';
+import { isEmail, phoneIssue } from '@/lib/validation';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -31,6 +31,18 @@ export function identifierValid(identifier: Identifier): boolean {
   return isEmail(identifier.value);
 }
 
+/**
+ * M128 (owner): a typed phone that is too short, too long or starts wrong gets one clear
+ * message — «تأكد من رقم الجوال» with the country's X-format. Null when the number is fine.
+ */
+export function identifierPhoneProblem(identifier: Identifier, countries: Country[] | undefined): string | null {
+  if (identifier.mode !== 'phone') return null;
+  const country = countries?.find((item) => item.code === identifier.country);
+  if (phoneIssue(identifier.value, country) === null) return null;
+  const format = country?.example?.replace(/^0+/, '') || t('auth.login.phonePlaceholder');
+  return t('auth.phone.check', { format });
+}
+
 /** Digits only, and never a leading zero — the country code next to the field already covers it. */
 export function localPhoneDigits(value: string): string {
   return value.replace(/\D+/g, '').replace(/^0+/, '');
@@ -48,6 +60,8 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
   const [drafts, setDrafts] = useState<Record<IdentifierMode, string>>({ phone: '', email: '' });
   const country = countries?.find((item) => item.code === value.country);
   const placeholder = useMemo(() => (country?.example ? country.example.replace(/^0+/, '') : t('auth.login.phonePlaceholder')), [country]);
+  // Live check: flag the number the moment it starts wrong or runs long; a short one waits for submit.
+  const phoneBad = value.mode === 'phone' && phoneIssue(value.value, country) === 'bad';
 
   const switchMode = (mode: IdentifierMode) => {
     if (mode === value.mode || !editable) return;
@@ -94,6 +108,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               onChangeText={(text) => onChange({ ...value, value: localPhoneDigits(text) })}
               placeholder={placeholder}
               hint={t('auth.login.phoneHint')}
+              error={phoneBad ? t('auth.phone.check', { format: placeholder }) : undefined}
             />
           </View>
         </View>

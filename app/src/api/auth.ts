@@ -61,8 +61,21 @@ export type PersonaChangeRequest = {
   adminNote: string | null;
 };
 
-/** M64: `nameEn` arrives with the world country list; an older server sends none. */
-export type Country = { code: string; name: string; nameEn?: string; dial: string; flag: string; example: string; pattern: string };
+/** M64: `nameEn` arrives with the world country list; an older server sends none.
+ * M128: `min`/`max`/`starts` describe the country's mobile numbers (length and leading digits)
+ * so the app can flag a wrong number as it is typed; an older server sends none. */
+export type Country = {
+  code: string;
+  name: string;
+  nameEn?: string;
+  dial: string;
+  flag: string;
+  example: string;
+  pattern: string;
+  min?: number;
+  max?: number;
+  starts?: string[];
+};
 
 export type AuthConfig = {
   countries: Country[];

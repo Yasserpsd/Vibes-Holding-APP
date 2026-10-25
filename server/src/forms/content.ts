@@ -166,7 +166,7 @@ export const FORMS_SEED: FormsContent = {
     // condition is an active annual membership, so this is the first 'member' form.
     {
       key: 'app-publish',
-      title: 'نشر تطبيقك على المتجرين',
+      title: 'نشر تطبيقك على Android و iOS',
       intro:
         'بعضويتك السنوية ينشر النادي تطبيقك على Google Play وApp Store بدون رسوم. املأ بيانات تطبيقك وستتواصل معك الإدارة لاستلام الملفات وإتمام النشر.',
       access: 'member',
@@ -298,9 +298,9 @@ export const FORMS_SEED: FormsContent = {
       order: 8,
     },
   ],
-  // v6 (owner, 2026-10-25): the post-submission membership popup on شركاء النجاح.
-  version: 6,
-  updatedAt: '2026-10-25T00:00:00.000Z',
+  // v7 (owner, 2026-10-26): «نشر تطبيقك على Android و iOS» replaces «على المتجرين».
+  version: 7,
+  updatedAt: '2026-10-26T00:00:00.000Z',
 };
 
 /** Writes the seed when no forms content exists yet, or when the stored seed is older than this one. */

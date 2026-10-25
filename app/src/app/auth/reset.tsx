@@ -7,7 +7,7 @@ import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
-import { EMPTY_IDENTIFIER, identifierPayload, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
+import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -29,6 +29,12 @@ export default function ResetPasswordScreen() {
     if (busy) return;
     if (!identifierValid(identifier)) {
       setError(t('auth.reset.loginRequired'));
+      return;
+    }
+    // M128: a wrong-length or wrong-start number never reaches the server.
+    const phoneProblem = identifierPhoneProblem(identifier, config?.countries);
+    if (phoneProblem) {
+      setError(phoneProblem);
       return;
     }
     setBusy(true);

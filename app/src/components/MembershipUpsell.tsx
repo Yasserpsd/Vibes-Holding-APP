@@ -9,6 +9,7 @@ import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -28,16 +29,30 @@ function nextLine(upsell: ServicesUpsell): string {
 }
 
 const POPUP_DELAY_MS = 1200;
+/** M128 (owner): the popup still opens itself on any service, but at most once a day. */
+const POPUP_DAY_KEY = 'upsell.popup.day';
 
 /** The popup over a service page: one rotated line and the direct subscribe door. */
 export function UpsellPopup({ upsell }: { upsell: ServicesUpsell }) {
   const [line] = useState(() => nextLine(upsell));
   const [visible, setVisible] = useState(false);
 
-  // A breath after the page settles, so the service shows itself before the pitch does.
+  // A breath after the page settles, so the service shows itself before the pitch does —
+  // and only if today has not had its one appearance yet.
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), POPUP_DELAY_MS);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void loadSetting(POPUP_DAY_KEY).then((last) => {
+        const today = new Date().toISOString().slice(0, 10);
+        if (cancelled || last === today) return;
+        setVisible(true);
+        void saveSetting(POPUP_DAY_KEY, today);
+      });
+    }, POPUP_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   if (!line || !visible) return null;

@@ -1,6 +1,10 @@
 /** All world countries for registration — GCC first with strict local rules (mirrors the hub plugin's
  * vai_gcc_countries), then the Arab countries, then the rest sorted by Arabic name. Generated once;
  * keep in sync with the plugin (includes/helpers.php).
+ *
+ * Owner (2026-10-26): every country gets its own mobile rule (length + leading digits) from
+ * MOBILE_RULES below; `example` and `local` in the raw rows are overridden by the rule, and the
+ * placeholder is the X form («5XXXXXXXX») so nobody mistakes it for a prefilled number.
  */
 export type CountryRow = {
   code: string;
@@ -13,7 +17,7 @@ export type CountryRow = {
   local: RegExp | null;
 };
 
-export const COUNTRY_ROWS: readonly CountryRow[] = [
+const RAW_ROWS: readonly CountryRow[] = [
   { code: 'sa', name: 'السعودية', nameEn: 'Saudi Arabia', dial: '966', flag: '🇸🇦', example: '0512345678', local: /^0?5\d{8}$/ },
   { code: 'ae', name: 'الإمارات', nameEn: 'United Arab Emirates', dial: '971', flag: '🇦🇪', example: '0501234567', local: /^0?5\d{8}$/ },
   { code: 'kw', name: 'الكويت', nameEn: 'Kuwait', dial: '965', flag: '🇰🇼', example: '51234567', local: /^[569]\d{7}$/ },
@@ -213,3 +217,249 @@ export const COUNTRY_ROWS: readonly CountryRow[] = [
   { code: 'nl', name: 'هولندا', nameEn: 'Netherlands', dial: '31', flag: '🇳🇱', example: '', local: null },
   { code: 'hk', name: 'هونغ كونغ', nameEn: 'Hong Kong', dial: '852', flag: '🇭🇰', example: '', local: null },
 ];
+
+/** Mobile rule: local digit count (dial code and leading zero stripped) + the leading digits mobiles use. */
+export type MobileRule = {
+  /** Allowed leading digit strings, all the same length; empty/absent = any start. */
+  starts?: string[];
+  min: number;
+  max: number;
+};
+
+/* ITU national mobile plans. Starts are listed only where they are stable and well known —
+ * a wrong start would lock a real member out, so uncertain countries carry lengths only. */
+const MOBILE_RULES: Record<string, MobileRule> = {
+  // GCC (mirrors the hub's strict rules).
+  sa: { starts: ['5'], min: 9, max: 9 },
+  ae: { starts: ['5'], min: 9, max: 9 },
+  kw: { starts: ['5', '6', '9'], min: 8, max: 8 },
+  qa: { starts: ['3', '5', '6', '7'], min: 8, max: 8 },
+  bh: { starts: ['3', '6', '7', '9'], min: 8, max: 8 },
+  om: { starts: ['7', '9'], min: 8, max: 8 },
+  // Arab world.
+  eg: { starts: ['10', '11', '12', '15'], min: 10, max: 10 },
+  jo: { starts: ['7'], min: 9, max: 9 },
+  lb: { starts: ['3', '7', '8'], min: 7, max: 8 },
+  sy: { starts: ['9'], min: 9, max: 9 },
+  iq: { starts: ['7'], min: 10, max: 10 },
+  ps: { starts: ['56', '59'], min: 9, max: 9 },
+  ye: { starts: ['7'], min: 9, max: 9 },
+  ly: { starts: ['9'], min: 9, max: 9 },
+  tn: { starts: ['2', '4', '5', '9'], min: 8, max: 8 },
+  dz: { starts: ['5', '6', '7'], min: 9, max: 9 },
+  ma: { starts: ['6', '7'], min: 9, max: 9 },
+  sd: { starts: ['1', '9'], min: 9, max: 9 },
+  so: { starts: ['6', '7', '9'], min: 7, max: 9 },
+  mr: { starts: ['2', '3', '4'], min: 8, max: 8 },
+  dj: { starts: ['77'], min: 8, max: 8 },
+  km: { starts: ['3'], min: 7, max: 7 },
+  // Rest of the world (list order).
+  is: { starts: ['6', '7', '8'], min: 7, max: 7 },
+  et: { starts: ['7', '9'], min: 9, max: 9 },
+  az: { starts: ['4', '5', '7', '9'], min: 9, max: 9 },
+  am: { starts: ['4', '5', '7', '9'], min: 8, max: 8 },
+  er: { starts: ['1', '7'], min: 7, max: 7 },
+  es: { starts: ['6', '7'], min: 9, max: 9 },
+  au: { starts: ['4'], min: 9, max: 9 },
+  ee: { starts: ['5'], min: 7, max: 8 },
+  sz: { starts: ['7'], min: 8, max: 8 },
+  cf: { starts: ['7'], min: 8, max: 8 },
+  af: { starts: ['7'], min: 9, max: 9 },
+  ar: { min: 10, max: 10 },
+  ec: { starts: ['9'], min: 9, max: 9 },
+  al: { starts: ['6'], min: 9, max: 9 },
+  bs: { min: 7, max: 7 },
+  br: { min: 10, max: 11 },
+  pt: { starts: ['9'], min: 9, max: 9 },
+  ba: { starts: ['6'], min: 8, max: 8 },
+  cz: { starts: ['6', '7'], min: 9, max: 9 },
+  me: { starts: ['6'], min: 8, max: 8 },
+  dk: { min: 8, max: 8 },
+  do: { min: 7, max: 7 },
+  cv: { starts: ['5', '9'], min: 7, max: 7 },
+  sv: { starts: ['6', '7'], min: 8, max: 8 },
+  sn: { starts: ['7'], min: 9, max: 9 },
+  se: { starts: ['7'], min: 9, max: 9 },
+  cn: { starts: ['1'], min: 11, max: 11 },
+  ga: { starts: ['6', '7'], min: 8, max: 8 },
+  va: { min: 6, max: 10 },
+  ph: { starts: ['9'], min: 10, max: 10 },
+  cm: { starts: ['6'], min: 9, max: 9 },
+  cg: { min: 8, max: 9 },
+  cd: { starts: ['8', '9'], min: 9, max: 9 },
+  mv: { starts: ['7', '9'], min: 7, max: 7 },
+  de: { starts: ['1'], min: 10, max: 11 },
+  hu: { starts: ['2', '3', '5', '7'], min: 9, max: 9 },
+  mx: { min: 10, max: 10 },
+  no: { starts: ['4', '9'], min: 8, max: 8 },
+  at: { starts: ['6'], min: 9, max: 13 },
+  ne: { starts: ['8', '9'], min: 8, max: 8 },
+  in: { starts: ['6', '7', '8', '9'], min: 10, max: 10 },
+  us: { min: 10, max: 10 },
+  jp: { starts: ['7', '8', '9'], min: 10, max: 10 },
+  gr: { starts: ['6'], min: 10, max: 10 },
+  ag: { min: 7, max: 7 },
+  ad: { starts: ['3', '6'], min: 6, max: 6 },
+  id: { starts: ['8'], min: 9, max: 12 },
+  ao: { starts: ['9'], min: 9, max: 9 },
+  uy: { starts: ['9'], min: 8, max: 8 },
+  uz: { min: 9, max: 9 },
+  ug: { starts: ['7'], min: 9, max: 9 },
+  ua: { min: 9, max: 9 },
+  ir: { starts: ['9'], min: 10, max: 10 },
+  ie: { starts: ['8'], min: 9, max: 9 },
+  it: { starts: ['3'], min: 9, max: 10 },
+  pg: { starts: ['7'], min: 8, max: 8 },
+  py: { starts: ['9'], min: 9, max: 9 },
+  bb: { min: 7, max: 7 },
+  pk: { starts: ['3'], min: 10, max: 10 },
+  pw: { min: 7, max: 7 },
+  bn: { starts: ['7', '8'], min: 7, max: 7 },
+  gb: { starts: ['7'], min: 10, max: 10 },
+  be: { starts: ['4'], min: 9, max: 9 },
+  bg: { starts: ['8', '9'], min: 9, max: 9 },
+  bz: { starts: ['6'], min: 7, max: 7 },
+  bd: { starts: ['1'], min: 10, max: 10 },
+  pa: { starts: ['6'], min: 8, max: 8 },
+  bj: { min: 8, max: 10 },
+  bt: { starts: ['1', '7'], min: 8, max: 8 },
+  bw: { starts: ['7'], min: 8, max: 8 },
+  bf: { starts: ['5', '6', '7'], min: 8, max: 8 },
+  bi: { starts: ['6', '7'], min: 8, max: 8 },
+  pl: { starts: ['4', '5', '6', '7', '8'], min: 9, max: 9 },
+  bo: { starts: ['6', '7'], min: 8, max: 8 },
+  pe: { starts: ['9'], min: 9, max: 9 },
+  by: { starts: ['2', '3', '4'], min: 9, max: 9 },
+  th: { starts: ['6', '8', '9'], min: 9, max: 9 },
+  tw: { starts: ['9'], min: 9, max: 9 },
+  tm: { starts: ['6'], min: 8, max: 8 },
+  tr: { starts: ['5'], min: 10, max: 10 },
+  tt: { min: 7, max: 7 },
+  td: { starts: ['6', '7', '9'], min: 8, max: 8 },
+  cl: { starts: ['9'], min: 9, max: 9 },
+  tz: { starts: ['6', '7'], min: 9, max: 9 },
+  tg: { starts: ['7', '9'], min: 8, max: 8 },
+  tv: { min: 6, max: 7 },
+  to: { starts: ['7', '8'], min: 7, max: 7 },
+  tl: { starts: ['7'], min: 8, max: 8 },
+  jm: { min: 7, max: 7 },
+  sb: { min: 5, max: 7 },
+  mh: { min: 7, max: 7 },
+  za: { starts: ['6', '7', '8'], min: 9, max: 9 },
+  ss: { starts: ['9'], min: 9, max: 9 },
+  ge: { starts: ['5'], min: 9, max: 9 },
+  dm: { min: 7, max: 7 },
+  rw: { starts: ['7'], min: 9, max: 9 },
+  ru: { starts: ['9'], min: 10, max: 10 },
+  ro: { starts: ['7'], min: 9, max: 9 },
+  zm: { starts: ['7', '9'], min: 9, max: 9 },
+  zw: { starts: ['7'], min: 9, max: 9 },
+  ci: { min: 8, max: 10 },
+  ws: { min: 5, max: 7 },
+  sm: { min: 6, max: 10 },
+  vc: { min: 7, max: 7 },
+  kn: { min: 7, max: 7 },
+  lc: { min: 7, max: 7 },
+  st: { starts: ['9'], min: 7, max: 7 },
+  lk: { starts: ['7'], min: 9, max: 9 },
+  sk: { starts: ['9'], min: 9, max: 9 },
+  si: { starts: ['3', '4', '5', '6', '7'], min: 8, max: 8 },
+  sg: { starts: ['8', '9'], min: 8, max: 8 },
+  sr: { starts: ['6', '7', '8'], min: 7, max: 7 },
+  ch: { starts: ['7'], min: 9, max: 9 },
+  sl: { min: 8, max: 8 },
+  sc: { starts: ['2'], min: 7, max: 7 },
+  rs: { starts: ['6'], min: 8, max: 9 },
+  tj: { min: 9, max: 9 },
+  gm: { min: 7, max: 7 },
+  gh: { starts: ['2', '5'], min: 9, max: 9 },
+  gd: { min: 7, max: 7 },
+  gt: { starts: ['3', '4', '5'], min: 8, max: 8 },
+  gy: { starts: ['6'], min: 7, max: 7 },
+  gn: { starts: ['6'], min: 9, max: 9 },
+  gq: { starts: ['2', '5'], min: 9, max: 9 },
+  gw: { starts: ['5', '6', '9'], min: 7, max: 7 },
+  vu: { starts: ['5', '7'], min: 7, max: 7 },
+  fr: { starts: ['6', '7'], min: 9, max: 9 },
+  ve: { starts: ['4'], min: 10, max: 10 },
+  fi: { starts: ['4', '5'], min: 9, max: 10 },
+  vn: { starts: ['3', '5', '7', '8', '9'], min: 9, max: 9 },
+  fj: { starts: ['7', '8', '9'], min: 7, max: 7 },
+  cy: { starts: ['9'], min: 8, max: 8 },
+  kg: { min: 9, max: 9 },
+  kz: { starts: ['7'], min: 10, max: 10 },
+  hr: { starts: ['9'], min: 8, max: 9 },
+  kh: { min: 8, max: 9 },
+  ca: { min: 10, max: 10 },
+  cu: { starts: ['5'], min: 8, max: 8 },
+  kr: { starts: ['1'], min: 9, max: 10 },
+  kp: { min: 7, max: 10 },
+  cr: { starts: ['6', '7', '8'], min: 8, max: 8 },
+  xk: { starts: ['4'], min: 8, max: 8 },
+  co: { starts: ['3'], min: 10, max: 10 },
+  ki: { min: 5, max: 8 },
+  ke: { starts: ['1', '7'], min: 9, max: 9 },
+  lv: { starts: ['2'], min: 8, max: 8 },
+  la: { starts: ['2'], min: 9, max: 10 },
+  lu: { starts: ['6'], min: 9, max: 9 },
+  lr: { min: 7, max: 9 },
+  lt: { starts: ['6'], min: 8, max: 8 },
+  li: { starts: ['7'], min: 7, max: 7 },
+  ls: { starts: ['5', '6'], min: 8, max: 8 },
+  mo: { starts: ['6'], min: 8, max: 8 },
+  mw: { starts: ['7', '8', '9'], min: 7, max: 9 },
+  mt: { starts: ['7', '9'], min: 8, max: 8 },
+  ml: { min: 8, max: 8 },
+  my: { starts: ['1'], min: 9, max: 10 },
+  mg: { starts: ['3'], min: 9, max: 9 },
+  mk: { starts: ['7'], min: 8, max: 8 },
+  mn: { min: 8, max: 8 },
+  mu: { starts: ['5'], min: 7, max: 8 },
+  mz: { starts: ['8'], min: 9, max: 9 },
+  md: { starts: ['6', '7'], min: 8, max: 8 },
+  mc: { starts: ['4', '6'], min: 8, max: 9 },
+  mm: { starts: ['9'], min: 8, max: 10 },
+  fm: { min: 7, max: 7 },
+  na: { starts: ['8'], min: 9, max: 9 },
+  nr: { starts: ['5'], min: 7, max: 7 },
+  np: { starts: ['9'], min: 10, max: 10 },
+  ng: { starts: ['7', '8', '9'], min: 10, max: 10 },
+  ni: { starts: ['5', '7', '8'], min: 8, max: 8 },
+  nz: { starts: ['2'], min: 8, max: 10 },
+  ht: { starts: ['3', '4'], min: 8, max: 8 },
+  hn: { starts: ['3', '7', '8', '9'], min: 8, max: 8 },
+  nl: { starts: ['6'], min: 9, max: 9 },
+  hk: { starts: ['4', '5', '6', '7', '9'], min: 8, max: 8 },
+};
+
+export function mobileRule(code: string): MobileRule | undefined {
+  return MOBILE_RULES[code];
+}
+
+/** `^0*(?:starts)\d{rest}$` — the optional leading zero mirrors how members type their numbers. */
+function mobileRegex(rule: MobileRule): RegExp {
+  const startLen = rule.starts?.[0]?.length ?? 0;
+  const starts = rule.starts?.length ? `(?:${rule.starts.join('|')})` : '';
+  const min = rule.min - startLen;
+  const max = rule.max - startLen;
+  return new RegExp(`^0*${starts}${min === max ? `\\d{${min}}` : `\\d{${min},${max}}`}$`);
+}
+
+/** Placeholder in the X form: the shared leading digits, X for the rest («1XXXXXXXXX»). */
+function mobileExample(rule: MobileRule): string {
+  let prefix = '';
+  if (rule.starts?.length) {
+    prefix = rule.starts.reduce((common, start) => {
+      let index = 0;
+      while (index < common.length && common[index] === start[index]) index += 1;
+      return common.slice(0, index);
+    });
+    if (!prefix) prefix = rule.starts[0]?.slice(0, 1) ?? '';
+  }
+  return prefix + 'X'.repeat(Math.max(rule.min - prefix.length, 0));
+}
+
+export const COUNTRY_ROWS: readonly CountryRow[] = RAW_ROWS.map((row) => {
+  const rule = MOBILE_RULES[row.code];
+  return rule ? { ...row, example: mobileExample(rule), local: mobileRegex(rule) } : row;
+});
