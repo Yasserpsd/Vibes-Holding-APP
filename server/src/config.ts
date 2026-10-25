@@ -96,6 +96,17 @@ const envSchema = z.object({
   UPLOADS_SWEEP: z.enum(['0', '1']).optional(),
   UPLOAD_MAX_IMAGE_MB: z.coerce.number().int().min(1).max(50).default(10),
   UPLOAD_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(2000).default(200),
+  // M129 off-site backup: a nightly copy of the kv table and the media bucket to the owner's own
+  // hosting over SFTP. The key is the PRIVATE OpenSSH key, base64-encoded into one line (rule 1:
+  // environment only, never in git). Host, user and key unset = backups off (local runs, tests).
+  BACKUP_SSH_HOST: z.string().min(1).optional(),
+  BACKUP_SSH_PORT: z.coerce.number().int().positive().default(65002),
+  BACKUP_SSH_USER: z.string().min(1).optional(),
+  BACKUP_SSH_KEY_B64: z.string().min(100).optional(),
+  BACKUP_DIR: z.string().min(1).default('backups-club'),
+  // Hours between runs; 0 disables the timer (a dashboard trigger still works).
+  BACKUP_HOURS: z.coerce.number().nonnegative().default(24),
+  BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(14),
   // Store purchases: the RevenueCat webhook carries this Authorization header value verbatim.
   REVENUECAT_WEBHOOK_AUTH: z.string().min(10).optional(),
   // RevenueCat public SDK keys (they ship in the app) and, optionally, the REST secret key for /api/membership/sync.

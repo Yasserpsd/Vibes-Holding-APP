@@ -10,6 +10,8 @@ import { AgendaService } from './agenda/service.js';
 import { analyticsRoutes } from './analytics/routes.js';
 import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { authRoutes } from './auth/routes.js';
+import { backupRoutes } from './backup/routes.js';
+import { BackupService } from './backup/service.js';
 import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
@@ -388,6 +390,29 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     },
   });
 
+  // M129 off-site backup: db snapshot + media mirror to the owner's hosting over SFTP.
+  const backup = new BackupService({
+    kv,
+    media: mediaStore,
+    log: app.log,
+    envName: config.APP_ENV,
+    target:
+      config.BACKUP_SSH_HOST && config.BACKUP_SSH_USER && config.BACKUP_SSH_KEY_B64
+        ? {
+            host: config.BACKUP_SSH_HOST,
+            port: config.BACKUP_SSH_PORT,
+            username: config.BACKUP_SSH_USER,
+            privateKey: Buffer.from(config.BACKUP_SSH_KEY_B64, 'base64').toString('utf8'),
+          }
+        : null,
+    dir: config.BACKUP_DIR,
+    intervalHours: config.BACKUP_HOURS,
+    retentionDays: config.BACKUP_RETENTION_DAYS,
+    fetchImpl,
+  });
+  backup.start();
+  app.addHook('onClose', async () => backup.stop());
+
   app.get('/health', async () => ({
     ok: true,
     env: config.APP_ENV,
@@ -422,6 +447,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     membership: membership.status(),
     push: push.status(),
     uploads: media.status(),
+    backup: backup.getStatus(),
     // Versions of the hub and Projects Bank bridges as last checked (the check runs in the background).
     bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
   }));
@@ -491,6 +517,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   await app.register(mediaRoutes, { service: media, auth });
+  await app.register(backupRoutes, { service: backup, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });

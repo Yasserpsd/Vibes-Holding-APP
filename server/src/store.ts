@@ -14,6 +14,8 @@ export interface KV {
    * seeds, reviews…) is never treated as an orphan again.
    */
   textSearch(needle: string): Promise<string[]>;
+  /** M129: every stored document, for the off-site backup. */
+  dump(): Promise<Array<{ key: string; value: unknown; updatedAt: string }>>;
   close(): Promise<void>;
 }
 
@@ -39,6 +41,11 @@ export class MemoryKV implements KV {
 
   async delete(key: string): Promise<void> {
     this.map.delete(key);
+  }
+
+  async dump(): Promise<Array<{ key: string; value: unknown; updatedAt: string }>> {
+    const now = new Date().toISOString();
+    return [...this.map.entries()].map(([key, value]) => ({ key, value, updatedAt: now }));
   }
 
   async close(): Promise<void> {
@@ -88,6 +95,13 @@ export class PgKV implements KV {
     const escaped = needle.replace(/[%_\\]/g, (char) => `\\${char}`);
     const result = await this.pool.query<{ text: string }>("SELECT value::text AS text FROM kv WHERE value::text LIKE $1 ESCAPE '\\'", [`%${escaped}%`]);
     return result.rows.map((row) => row.text);
+  }
+
+  async dump(): Promise<Array<{ key: string; value: unknown; updatedAt: string }>> {
+    const result = await this.pool.query<{ key: string; value: unknown; updated_at: Date }>(
+      'SELECT key, value, updated_at FROM kv ORDER BY key',
+    );
+    return result.rows.map((row) => ({ key: row.key, value: row.value, updatedAt: row.updated_at.toISOString() }));
   }
 
   async close(): Promise<void> {
