@@ -6,6 +6,9 @@ import { colors, radii } from '@/theme/tokens';
 const ROTATE_MS = 5000;
 const FADE_OUT_MS = 240;
 const FADE_IN_MS = 340;
+/** M130b (owner: «متبقاش مقصوصة»): the box follows the photo's own shape within these bounds. */
+const MIN_HEIGHT = 150;
+const MAX_HEIGHT = 320;
 
 /**
  * M105 (owner): «بانر بيتحرك لوحده» — an auto-rotating fade banner for the owner's photo sets
@@ -44,11 +47,32 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
     for (const entry of key.split('|').slice(1)) void Image.prefetch(entry).catch(() => undefined);
   }, [key]);
 
+  // M130b (owner: «الصور تظهر كاملة، متبقاش مقصوصة»): each photo's natural shape sizes the box,
+  // so a wide marketing visual with text or a logo renders WHOLE instead of cover-cropped. A very
+  // tall photo is capped (a phone portrait would swallow the page) and keeps the old cover crop.
+  const [boxWidth, setBoxWidth] = useState(0);
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  useEffect(() => {
+    for (const entry of key.split('|')) {
+      Image.getSize(
+        entry,
+        (w, h) => {
+          if (w > 0 && h > 0) setRatios((current) => (current[entry] ? current : { ...current, [entry]: w / h }));
+        },
+        () => undefined,
+      );
+    }
+  }, [key]);
+
   const url = usable[usable.length ? index % usable.length : 0];
   if (!url) return null;
 
+  // The whole-photo height for the current slide; clamped, and the prop height until measured.
+  const fitted = boxWidth > 0 && ratios[url] ? boxWidth / ratios[url] : null;
+  const boxHeight = fitted ? Math.round(Math.min(Math.max(fitted, MIN_HEIGHT), MAX_HEIGHT)) : height;
+
   return (
-    <View style={[styles.box, { height }, style]}>
+    <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
         <Image
           source={{ uri: url }}
