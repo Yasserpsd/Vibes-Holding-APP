@@ -449,6 +449,36 @@ export class NewsService {
     }
   }
 
+  /** M134: the owner's manual send («ابعت خبر دلوقتي») — the best fresh story goes to every device at once, same rules as the daily digest. */
+  async pushDigestNow(kind: DigestSlug): Promise<{ sent: number; failed: number; title: string | null }> {
+    const push = this.deps.push;
+    if (!push) return { sent: 0, failed: 0, title: null };
+    const now = Date.now();
+    const today = riyadhDay(now);
+    const stored = await this.deps.kv.get<DailyDigestState>(NEWS_DAILY_PUSH_KEY);
+    const state: DailyDigestState =
+      stored && stored.day === today
+        ? { day: today, sent: [...stored.sent], pushedIds: [...(stored.pushedIds ?? [])] }
+        : { day: today, sent: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+    const already = new Set(state.pushedIds);
+    const picked: Partial<Record<NewsLang, NewsItem>> = {
+      ar: this.pickDigestItem(kind, 'ar', now, already),
+      en: this.pickDigestItem(kind, 'en', now, already),
+    };
+    if (!picked.ar && !picked.en) return { sent: 0, failed: 0, title: null };
+    const digest = DAILY_DIGESTS.find((entry) => entry.slug === kind)!;
+    const outcome = await push.broadcastLocalized((lang) => {
+      const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
+      if (!item) return null;
+      return { title: digest.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
+    });
+    // A manual send never marks the scheduled digest as done; it only remembers the stories, so nothing repeats.
+    for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
+    state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
+    await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies DailyDigestState);
+    return { sent: outcome.sent, failed: outcome.failed, title: picked.ar?.title ?? picked.en?.title ?? null };
+  }
+
   /** The digest's story: the best-scored item of the last 24 hours — sports for the sports digest, everything else for the morning one. */
   private pickDigestItem(kind: DigestSlug, lang: NewsLang, now: number, exclude: Set<string>): NewsItem | undefined {
     const dayAgo = now - 24 * 3_600_000;

@@ -21,6 +21,7 @@ const prefsSchema = z.object({ topics: z.array(z.string().trim().max(30)).max(NE
 const idSchema = z.object({ id: z.string().regex(/^[a-f0-9]{16}$/, 'رقم الخبر غير صالح') });
 const sourceIdSchema = z.object({ id: z.string().trim().min(1).max(60) });
 const toggleSchema = z.object({ enabled: z.boolean() });
+const digestSchema = z.object({ kind: z.enum(['top', 'sports']).default('top') });
 
 /**
  * Public feeds for everyone; interests need a session. A signed-in member gets a personalized ranking.
@@ -153,6 +154,20 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
       // A source turned on shows its first items on the next poll; the refresh below brings that forward.
       if (body.enabled) void service.refresh();
       return { ok: true, source };
+    }),
+  );
+
+  // M134: the owner's «send a story now» — broadcasts the best fresh story (top or sports) to every device.
+  app.post(
+    '/api/admin/news/push',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(digestSchema, (request.body ?? {}) as Record<string, unknown>, reply);
+      if (!body) return;
+      const result = await service.pushDigestNow(body.kind);
+      if (!result.title) return reply.code(409).send({ error: { code: 'no_fresh_story', message: 'لا يوجد خبر جديد خلال آخر 24 ساعة لم يُرسل من قبل' } });
+      return { ok: true, ...result };
     }),
   );
 

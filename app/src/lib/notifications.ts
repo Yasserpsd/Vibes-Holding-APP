@@ -70,6 +70,7 @@ export async function obtainPushToken(): Promise<PushDevice | null> {
     const extra = (Constants.expoConfig?.extra ?? {}) as { eas?: { projectId?: string } };
     const projectId = extra.eas?.projectId ?? Constants.easConfig?.projectId;
     const { data } = await notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    if (__DEV__) console.warn('push token (dev only)', data);
     currentToken = data;
     return { token: data, platform: Platform.OS };
   } catch (error) {
