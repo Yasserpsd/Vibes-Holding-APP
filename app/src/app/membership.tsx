@@ -3,8 +3,6 @@ import { useRouter, type Href } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useMembershipContent, type MembershipGroup, type MembershipItem, type NeutralReason } from '@/api/auth';
-import { useServices } from '@/api/content';
-import { useProjectsCount } from '@/api/queries';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
@@ -14,7 +12,6 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
-import { StatStrip } from '@/components/StatStrip';
 import { StorePurchaseCard } from '@/components/StorePurchaseCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
@@ -62,8 +59,6 @@ export default function MembershipScreen() {
           title={data.title}
         />
       </FadeInView>
-      {/* Icons pass (owner's priority 1): what the membership opens, in live numbers. */}
-      <MembershipStatsStrip benefits={data.groups.reduce((sum, group) => sum + group.items.length, 0)} />
       {status === 'signedIn' ? (
         <FadeInView delay={entranceDelay(2)}>
           <StorePurchaseCard title={data.title} />
@@ -104,21 +99,6 @@ export default function MembershipScreen() {
 }
 
 /** Icons pass: the membership's weight in numbers — its benefit lines, the services, the bank's projects. */
-function MembershipStatsStrip({ benefits }: { benefits: number }) {
-  const services = useServices().data?.services.length ?? 0;
-  const projects = useProjectsCount().data ?? 0;
-  return (
-    <StatStrip
-      delay={120}
-      stats={[
-        { icon: 'ribbon-outline', value: benefits, label: t('stats.benefits') },
-        { icon: 'grid-outline', value: services, label: t('stats.services') },
-        { icon: 'briefcase-outline', value: projects, label: t('stats.bankProjects') },
-      ]}
-    />
-  );
-}
-
 /** M99d: one of the neutral's ten reasons — a numbered golden badge, the title, its gold pills, the text. */
 function ReasonCard({ index, reason }: { index: number; reason: NeutralReason }) {
   return (

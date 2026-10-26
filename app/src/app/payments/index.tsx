@@ -10,7 +10,6 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
-import { StatStrip } from '@/components/StatStrip';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
@@ -35,8 +34,6 @@ export default function PaymentsScreen() {
 
   return (
     <Screen title={t('payments.title')} subtitle={t('payments.subtitle')}>
-      {/* Icons pass: the member's payments in numbers — the rows themselves, counted and summed. */}
-      {data && data.payments.length > 0 ? <PaymentsStatsStrip payments={data.payments} /> : null}
       {data ? (
         data.payments.length ? (
           data.payments.map((payment, index) => (
@@ -60,21 +57,6 @@ export default function PaymentsScreen() {
 }
 
 /** Icons pass: operations, how many went through, and the paid total in SAR. */
-function PaymentsStatsStrip({ payments }: { payments: Payment[] }) {
-  const paid = payments.filter((payment) => payment.status === 'paid');
-  const totalSar = paid.reduce((sum, payment) => sum + (payment.currency === 'SAR' ? payment.amount : 0), 0);
-  return (
-    <StatStrip
-      delay={80}
-      stats={[
-        { icon: 'receipt-outline', value: payments.length, label: t('stats.payments') },
-        { icon: 'checkmark-circle-outline', value: paid.length, label: t('stats.paid') },
-        { icon: 'cash-outline', value: totalSar, label: t('stats.paidSar') },
-      ]}
-    />
-  );
-}
-
 function PaymentRow({ payment, onPress }: { payment: Payment; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} accessibilityRole="button">

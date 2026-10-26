@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
 import { useStoreConfig } from '@/api/membership';
-import { useProjectsWallet } from '@/api/queries';
 import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
@@ -20,7 +19,6 @@ import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
-import { StatStrip } from '@/components/StatStrip';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
@@ -95,8 +93,6 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(1, 90)}>
         <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} subscribeCta />
       </FadeInView>
-      {/* Icons pass: the member's own bank numbers — opened projects and the «رصيد» still in hand. */}
-      {me ? <WalletStatsStrip account={String(me.id)} /> : null}
       {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 
       {/* M79 (owner): «الحاجات اللي ليها علاقة ببعض لازم تتحط مع بعض» — the pile became titled groups. */}
@@ -230,19 +226,6 @@ function CompanionToggleRow() {
 }
 
 /** Icons pass: the member's Projects Bank wallet, at a glance — hidden entirely while both are zero. */
-function WalletStatsStrip({ account }: { account: string }) {
-  const wallet = useProjectsWallet(account).data;
-  return (
-    <StatStrip
-      delay={140}
-      stats={[
-        { icon: 'lock-open-outline', value: wallet?.unlockedCount ?? 0, label: t('stats.unlocked') },
-        { icon: 'wallet-outline', value: wallet?.balance?.left ?? 0, label: t('stats.creditsLeft') },
-      ]}
-    />
-  );
-}
-
 /** M79: one titled group of related rows — the eyebrow title sits above its card (icons pass: with its small gold icon). */
 function MenuGroup({ title, icon, children }: { title: string; icon?: IoniconName; children: ReactNode }) {
   return (

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { useServices, type Service, type ServiceGroupKey } from '@/api/content';
+import { useServices, type ServiceGroupKey } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { LockedNotice } from '@/components/LockedNotice';
@@ -10,7 +10,6 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { StateView } from '@/components/StateView';
-import { StatStrip } from '@/components/StatStrip';
 import { t } from '@/i18n';
 import { formatServiceCount } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
@@ -45,8 +44,6 @@ export default function ServicesScreen() {
     <Screen title={data.title} subtitle={data.intro}>
       {/* LockedNotice animates its own entrance — wrapping it again would stall the lock's pop. */}
       {!data.isMember ? <LockedNotice text={data.lockedText} guest={status !== 'signedIn'} /> : null}
-      {/* Icons pass: the page's live numbers — every count comes from the services the server sent. */}
-      <ServicesStatsStrip services={data.services} />
       {data.groups.map((group) => {
         const items = data.services.filter((service) => service.group === group.key);
         if (!items.length) return null;
@@ -71,21 +68,6 @@ export default function ServicesScreen() {
 }
 
 /** Icons pass: the services in numbers — how many, how many are members-only, and the total member saving. */
-function ServicesStatsStrip({ services }: { services: Service[] }) {
-  const membersOnly = services.filter((service) => service.access === 'member').length;
-  const savings = services.reduce((sum, service) => sum + (service.savingsSar ?? 0), 0);
-  return (
-    <StatStrip
-      delay={120}
-      stats={[
-        { icon: 'grid-outline', value: services.length, label: t('stats.services') },
-        { icon: 'star-outline', value: membersOnly, label: t('stats.membersOnly') },
-        { icon: 'wallet-outline', value: savings, label: t('stats.savings') },
-      ]}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
 });
