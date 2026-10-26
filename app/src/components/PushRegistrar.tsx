@@ -29,8 +29,9 @@ export function PushRegistrar() {
       if (!device || cancelled) return;
       try {
         await pushApi.register({ ...device, deviceName: deviceLabel(), appVersion: env.appVersion });
-      } catch {
-        // Offline or an older server: the next launch registers again.
+      } catch (error) {
+        // Offline or an older server: the next launch registers again. Logged since M134: silence here hid real failures.
+        console.warn('push register failed', error instanceof Error ? error.message : String(error));
       }
     })();
     return () => {

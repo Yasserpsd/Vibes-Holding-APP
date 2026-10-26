@@ -4,7 +4,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
 import type { PushService } from '../push/service.js';
-import { riyadhDay } from '../riyadh.js';
+import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
@@ -63,6 +63,19 @@ export const NEWS_PUSH_KEY = 'push:news:decisions';
 const NEWS_PUSH_DAILY_MAX = 3;
 const NEWS_PUSH_SEEN_MAX = 600;
 type NewsPushState = { seen: string[]; day: string; sentToday: number };
+
+/**
+ * M134 (owner: «عايز نوتفكيشن توصل تخلي الناس تفتح الأبلكيشن»): two fixed daily digests — the morning's
+ * top business story and the evening's top sports story. Each goes out once per Riyadh day on the first
+ * poll after its hour, per device language (M122), and the body is the source's own title (rule 7).
+ */
+export const NEWS_DAILY_PUSH_KEY = 'push:news:daily';
+type DailyDigestState = { day: string; sent: string[]; pushedIds: string[] };
+type DigestSlug = 'top' | 'sports';
+const DAILY_DIGESTS: { slug: DigestSlug; hour: number; title: (lang: NewsLang) => string }[] = [
+  { slug: 'top', hour: 10, title: (lang) => (lang === 'en' ? 'Top business story today 📈' : 'أهم أخبار اليوم 📈') },
+  { slug: 'sports', hour: 19, title: (lang) => (lang === 'en' ? 'Sports today ⚽' : 'أخبار الرياضة اليوم ⚽') },
+];
 
 export function newsIdOf(url: string): string {
   return createHash('sha1').update(url).digest('hex').slice(0, 16);
@@ -151,6 +164,7 @@ export class NewsService {
       await this.persist();
       if (added > 0) this.deps.onChange?.();
       await this.pushNewDecisions();
+      await this.pushDailyDigests();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
         'news refreshed',
@@ -393,6 +407,63 @@ export class NewsService {
     } catch (error) {
       this.deps.log.error({ err: error }, 'news decision notifications failed');
     }
+  }
+
+  /** M134: the two daily digests (see DAILY_DIGESTS). A digest with no fresh story, or whose send reached nobody, retries on the next poll of the same day. */
+  private async pushDailyDigests(now = Date.now()): Promise<void> {
+    const push = this.deps.push;
+    if (!push) return;
+    try {
+      const today = riyadhDay(now);
+      const hour = riyadhHour(now);
+      const stored = await this.deps.kv.get<DailyDigestState>(NEWS_DAILY_PUSH_KEY);
+      const state: DailyDigestState =
+        stored && stored.day === today
+          ? { day: today, sent: [...stored.sent], pushedIds: [...(stored.pushedIds ?? [])] }
+          : { day: today, sent: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+      const already = new Set(state.pushedIds);
+      let changed = stored?.day !== today;
+      for (const digest of DAILY_DIGESTS) {
+        if (hour < digest.hour || state.sent.includes(digest.slug)) continue;
+        const picked: Partial<Record<NewsLang, NewsItem>> = {
+          ar: this.pickDigestItem(digest.slug, 'ar', now, already),
+          en: this.pickDigestItem(digest.slug, 'en', now, already),
+        };
+        if (!picked.ar && !picked.en) continue;
+        const outcome = await push.broadcastLocalized((lang) => {
+          const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
+          if (!item) return null;
+          return { title: digest.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
+        });
+        if (outcome.sent === 0) continue;
+        state.sent.push(digest.slug);
+        for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
+        changed = true;
+      }
+      if (changed) {
+        state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
+        await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies DailyDigestState);
+      }
+    } catch (error) {
+      this.deps.log.error({ err: error }, 'news daily digest failed');
+    }
+  }
+
+  /** The digest's story: the best-scored item of the last 24 hours — sports for the sports digest, everything else for the morning one. */
+  private pickDigestItem(kind: DigestSlug, lang: NewsLang, now: number, exclude: Set<string>): NewsItem | undefined {
+    const dayAgo = now - 24 * 3_600_000;
+    const pool = this.visible(lang).filter(
+      (item) =>
+        Date.parse(item.publishedAt) >= dayAgo &&
+        !exclude.has(item.id) &&
+        !item.decision &&
+        item.topics.includes('sports') === (kind === 'sports'),
+    );
+    const wanted = new Set<TopicKey>(kind === 'sports' ? ['sports'] : ['economy', 'markets', 'finance']);
+    const best = pool
+      .map((item) => ({ item, score: scoreOf(item, wanted, now) + (this.boosts.get(item.sourceId) ?? 0) }))
+      .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
+    return best[0]?.item;
   }
 
   /** The fixed section, newest first, the same for everyone. */

@@ -84,6 +84,12 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'goal-saudi', name: 'Goal', url: bing('site:goal.com الدوري السعودي'), tier: 'global', lang: 'ar', enabled: true, hint: 'Goal عربي — الدوري السعودي وكرة القدم' },
   { id: 'okaz-sports', name: 'عكاظ', url: bing('site:okaz.com.sa رياضة'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'عكاظ — القسم الرياضي' },
   { id: 'beinsports-ar', name: 'beIN SPORTS', url: bing('site:beinsports.com'), tier: 'global', lang: 'ar', enabled: false, hint: 'beIN SPORTS — صفحات المقالات ترفض طلبات الخادم' },
+  // M134 (owner, 2026-10-27): more sports — probed 2026-10-27 with news:probe (feed + 3 article pages OK each).
+  // sport24.sa and arabia.eurosport.com answered empty feeds, Arab News sport has no RSS: no row for them.
+  { id: 'alriyadh-sports', name: 'الرياض', url: bing('site:alriyadh.com رياضة'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة الرياض — الرياضة والمحليات' },
+  { id: 'almarssad-sports', name: 'المرصد', url: bing('site:al-marsd.com رياضة'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'المرصد — الرياضة السعودية والأندية' },
+  { id: 'yallakora', name: 'يلا كورة', url: bing('site:yallakora.com'), tier: 'global', lang: 'ar', enabled: true, hint: 'يلا كورة — أخبار كرة القدم العربية والعالمية' },
+  { id: 'filgoal', name: 'في الجول', url: bing('site:filgoal.com'), tier: 'global', lang: 'ar', enabled: true, hint: 'في الجول — أخبار كرة القدم العربية والعالمية' },
 ];
 
 /**
@@ -95,8 +101,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  * 4 = M61 (owner, 2026-10-04): أرقام is THE primary source (on, fixed query, boost 25); واس fully off («ألغي واس
  *     تمامًا وأنا لو حبيت أفعلها» — the rows stay for his dashboard toggle); BBC عربي، اليوم، الوطن، المدينة، مكة،
  *     البلد ومباشر kept but off («خليهم موجودين ولكن غير مفعلين اللي أحب أفعله أنا»); sports sources added.
+ * 5 = M134 (owner, 2026-10-27, «نزود الأخبار الرياضية»): four more Arabic sports sources (probed the same day).
  */
-export const NEWS_SEED_VERSION = 4;
+export const NEWS_SEED_VERSION = 5;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -156,6 +163,10 @@ const OUTLET_NAMES: Record<string, string> = {
   'kooora.com': 'كووورة',
   'goal.com': 'Goal',
   'beinsports.com': 'beIN SPORTS',
+  'alriyadh.com': 'الرياض',
+  'al-marsd.com': 'المرصد',
+  'yallakora.com': 'يلا كورة',
+  'filgoal.com': 'في الجول',
 };
 
 /** The same, for items of the English feed: an outlet keeps its English name there. */

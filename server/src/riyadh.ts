@@ -7,6 +7,11 @@ export function riyadhDay(ms: number): string {
   return new Date(ms + OFFSET_MS).toISOString().slice(0, 10);
 }
 
+/** Hour of the Riyadh day (0–23) that contains this instant. */
+export function riyadhHour(ms: number): number {
+  return new Date(ms + OFFSET_MS).getUTCHours();
+}
+
 /** The UTC instant at which a Riyadh day starts. */
 export function riyadhDayStart(day: string): number {
   return Date.parse(`${day}T00:00:00.000Z`) - OFFSET_MS;

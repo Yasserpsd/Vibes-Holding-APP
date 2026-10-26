@@ -165,6 +165,23 @@ export class PushService {
     return this.deliver(await this.tokensForPersona(persona, exclude), message, { persona });
   }
 
+  /** M134: a broadcast in two languages — each device hears the language its app last ran in (M122); `messageOf` returning null skips that language. */
+  async broadcastLocalized(messageOf: (lang: AppLang) => PushMessage | null): Promise<PushOutcome> {
+    const tokens = await this.load();
+    const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
+    for (const lang of ['ar', 'en'] as const) {
+      const batch = tokens.filter((entry) => (entry.lang === 'en') === (lang === 'en')).map((entry) => entry.token);
+      if (!batch.length) continue;
+      const message = messageOf(lang);
+      if (!message) continue;
+      const result = await this.deliver(batch, message, { broadcast: true, lang });
+      outcome.sent += result.sent;
+      outcome.failed += result.failed;
+      outcome.dropped += result.dropped;
+    }
+    return outcome;
+  }
+
   private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {
     const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
     if (!tokens.length) return outcome;

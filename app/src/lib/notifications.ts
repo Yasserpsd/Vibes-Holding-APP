@@ -13,11 +13,17 @@ export type NotificationTarget = { screen: string; type: string };
 // module registry is checked first, because requiring the package without its modules is reported
 // by React Native as a fatal error before any try/catch can run (see auth/storage.ts).
 export function loadNotifications(): NotificationsModule | null {
-  if (!requireOptionalNativeModule('ExpoPushTokenManager') || !requireOptionalNativeModule('ExpoNotificationsEmitter')) return null;
+  const tokenManager = requireOptionalNativeModule('ExpoPushTokenManager');
+  const emitter = requireOptionalNativeModule('ExpoNotificationsEmitter');
+  if (!tokenManager || !emitter) {
+    console.warn('push module missing', { tokenManager: Boolean(tokenManager), emitter: Boolean(emitter) });
+    return null;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('expo-notifications') as NotificationsModule;
-  } catch {
+  } catch (error) {
+    console.warn('push module require failed', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
@@ -66,8 +72,10 @@ export async function obtainPushToken(): Promise<PushDevice | null> {
     const { data } = await notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
     currentToken = data;
     return { token: data, platform: Platform.OS };
-  } catch {
+  } catch (error) {
     // Simulator, no FCM credentials in this build, or the user refused: no push for this device.
+    // The reason is logged (not shown): push silently missing for everyone is how M134 started.
+    console.warn('push token unavailable', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
