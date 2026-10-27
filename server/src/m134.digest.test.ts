@@ -11,9 +11,9 @@ import type { NewsItem, NewsSnapshot, TopicKey } from './news/types.js';
 import { riyadhDay } from './riyadh.js';
 import { MemoryKV } from './store.js';
 
-// M134 (owner: «عايز نوتفكيشن توصل تخلي الناس تفتح الأبلكيشن»): two daily digests — the morning's top
-// business story (10:00 Riyadh) and the evening's top sports story (19:00 Riyadh), once per Riyadh day,
-// per device language, the body always the source's own title (rule 7).
+// M135 (owner, 2026-10-27: «كل ساعة خبر تقريبًا من ٩ص لحد ١٢ بالليل»): one push per Riyadh hour between
+// 9:00 and 23:00 — the best fresh story nobody was notified about yet, any topic, per device language,
+// the body always the source's own title (rule 7). Nothing repeats and quiet hours stay quiet.
 const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', NOTIFY_EMAIL: 'admin@vcmem.com' });
 
 type PushMessage = { to: string; title: string; body: string; data: Record<string, string> };
@@ -51,9 +51,11 @@ const kv = new MemoryKV();
 let built: BuiltApp;
 let app: BuiltApp['app'];
 
-// A Riyadh evening instant of "today": both digest hours (10 and 19) have passed.
-const evening = Date.parse(`${riyadhDay(Date.now())}T19:30:00.000+03:00`);
-const digests = () => built.news as unknown as { pushDailyDigests(now?: number): Promise<void> };
+// Riyadh instants of "today": inside the window (19:xx, 20:xx) and before it (03:30).
+const at = (time: string) => Date.parse(`${riyadhDay(Date.now())}T${time}+03:00`);
+const evening = at('19:30:00.000');
+const hourly = () => built.news as unknown as { pushHourlyNews(now?: number): Promise<void> };
+type State = { day: string; sentHours: number[]; pushedIds: string[] };
 
 before(async () => {
   await kv.set(NEWS_SOURCES_KEY, { sources: [], updatedAt: new Date().toISOString(), seedVersion: NEWS_SEED_VERSION });
@@ -74,12 +76,12 @@ after(async () => {
   await app.close();
 });
 
-test('each digest goes out once per day, per language, with the source title as the body', async () => {
+test('one push per hour: the best fresh story each hour, per language, nothing twice', async () => {
   await kv.set(NEWS_SNAPSHOT_KEY, {
     version: 1,
     items: [
       story('markets-ar', { title: 'أرباح الشركات السعودية ترتفع في الربع الثالث' }),
-      story('sports-ar', { sourceId: 'arriyadiyah', sourceName: 'الرياضية', title: 'الهلال يحسم ديربي الرياض', topics: ['sports'] as TopicKey[] }),
+      story('sports-ar', { sourceId: 'arriyadiyah', sourceName: 'الرياضية', title: 'الهلال يحسم ديربي الرياض', topics: ['sports'] as TopicKey[], publishedAt: new Date(Date.now() - 4 * 3_600_000).toISOString() }),
       story('markets-en', { lang: 'en', title: 'Saudi market closes higher', sourceName: 'Arab News', sourceId: 'arabnews' }),
     ],
     updatedAt: new Date().toISOString(),
@@ -87,29 +89,41 @@ test('each digest goes out once per day, per language, with the source title as 
   await built.news.start();
   const before = pushBatches.length;
 
-  await digests().pushDailyDigests(evening);
-  // Two digests × (arabic batch + english batch). The english sports digest falls back to the Arabic story.
-  const sent = pushBatches.slice(before).flat();
-  const top = sent.filter((message) => message.title.includes('أهم أخبار اليوم') || message.title.includes('Top business story'));
-  const sports = sent.filter((message) => message.title.includes('أخبار الرياضة اليوم') || message.title.includes('Sports today'));
-  assert.equal(top.length, 2, JSON.stringify(sent));
-  assert.equal(sports.length, 2, JSON.stringify(sent));
-  assert.equal(top.find((message) => message.to === 'ExponentPushToken[m134-arabic]')?.body, 'أرباح الشركات السعودية ترتفع في الربع الثالث');
-  assert.equal(top.find((message) => message.to === 'ExponentPushToken[m134-english]')?.body, 'Saudi market closes higher');
-  for (const message of sports) assert.equal(message.body, 'الهلال يحسم ديربي الرياض');
-  for (const message of sent) assert.match(message.data.screen ?? '', /^\/news\/[a-f0-9]{16}$/);
+  // Before the window (03:30 Riyadh): quiet.
+  await hourly().pushHourlyNews(at('03:30:00.000'));
+  assert.equal(pushBatches.length, before, 'no push outside the 9→23 window');
 
-  // The same evening again: both digests are already recorded for today, nothing more goes out.
-  await digests().pushDailyDigests(evening + 60_000);
-  assert.equal(pushBatches.length - before, 4);
+  // 19:30 — one push only (arabic + english batches), the top business story of each language.
+  await hourly().pushHourlyNews(evening);
+  const first = pushBatches.slice(before).flat();
+  assert.equal(first.filter((message) => message.to === 'ExponentPushToken[m134-arabic]').length, 1, JSON.stringify(first));
+  assert.equal(first.find((message) => message.to === 'ExponentPushToken[m134-arabic]')?.body, 'أرباح الشركات السعودية ترتفع في الربع الثالث');
+  assert.equal(first.find((message) => message.to === 'ExponentPushToken[m134-english]')?.body, 'Saudi market closes higher');
+  assert.ok(first.every((message) => message.title.includes('أهم أخبار اليوم') || message.title.includes('Top business story')), JSON.stringify(first));
+  for (const message of first) assert.match(message.data.screen ?? '', /^\/news\/[a-f0-9]{16}$/);
 
-  // A new day before the morning hour: still quiet; after the morning hour the top digest returns with a FRESH story only.
-  const state = await kv.get<{ day: string; sent: string[] }>(NEWS_DAILY_PUSH_KEY);
-  assert.deepEqual(state?.sent.sort(), ['sports', 'top']);
+  // The same hour again: already sent, nothing more.
+  const afterFirst = pushBatches.length;
+  await hourly().pushHourlyNews(evening + 60_000);
+  assert.equal(pushBatches.length, afterFirst);
+
+  // The next hour: the next-best unpushed story (sports) goes out with the sports title.
+  await hourly().pushHourlyNews(at('20:30:00.000'));
+  const second = pushBatches.slice(afterFirst).flat();
+  assert.ok(second.length > 0, 'the next hour pushes the next story');
+  for (const message of second) assert.equal(message.body, 'الهلال يحسم ديربي الرياض');
+  assert.ok(second.every((message) => message.title.includes('أخبار الرياضة اليوم') || message.title.includes('Sports today')), JSON.stringify(second));
+
+  // Everything is pushed: the following hour stays quiet, and both hours are recorded.
+  const afterSecond = pushBatches.length;
+  await hourly().pushHourlyNews(at('21:30:00.000'));
+  assert.equal(pushBatches.length, afterSecond, 'no fresh story left, no push');
+  const state = await kv.get<State>(NEWS_DAILY_PUSH_KEY);
+  assert.deepEqual(state?.sentHours.sort(), [19, 20]);
 });
 
-test('a digest with no fresh story stays silent and retries later the same day', async () => {
-  await kv.set(NEWS_DAILY_PUSH_KEY, { day: '2020-01-01', sent: [], pushedIds: [] });
+test('an hour with no fresh story stays silent and is not recorded, so the same hour retries', async () => {
+  await kv.set(NEWS_DAILY_PUSH_KEY, { day: '2020-01-01', sentHours: [], pushedIds: [] });
   await kv.set(NEWS_SNAPSHOT_KEY, {
     version: 1,
     items: [story('stale', { publishedAt: new Date(Date.now() - 30 * 3_600_000).toISOString() })],
@@ -117,8 +131,8 @@ test('a digest with no fresh story stays silent and retries later the same day',
   } satisfies NewsSnapshot);
   await built.news.start();
   const before = pushBatches.length;
-  await digests().pushDailyDigests(evening);
+  await hourly().pushHourlyNews(evening);
   assert.equal(pushBatches.length, before, 'a stale-only feed must not notify');
-  const state = await kv.get<{ sent: string[] }>(NEWS_DAILY_PUSH_KEY);
-  assert.deepEqual(state?.sent, [], 'an unsent digest is not recorded, so the next poll retries');
+  const state = await kv.get<State>(NEWS_DAILY_PUSH_KEY);
+  assert.deepEqual(state?.sentHours ?? [], [], 'an unsent hour is not recorded, so the next poll retries');
 });

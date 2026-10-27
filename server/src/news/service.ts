@@ -65,17 +65,21 @@ const NEWS_PUSH_SEEN_MAX = 600;
 type NewsPushState = { seen: string[]; day: string; sentToday: number };
 
 /**
- * M134 (owner: «عايز نوتفكيشن توصل تخلي الناس تفتح الأبلكيشن»): two fixed daily digests — the morning's
- * top business story and the evening's top sports story. Each goes out once per Riyadh day on the first
- * poll after its hour, per device language (M122), and the body is the source's own title (rule 7).
+ * M135 (owner, 2026-10-27: «كل ساعة خبر تقريبًا من ٩ص لحد ١٢ بالليل») replaces the M134 pair of fixed
+ * daily digests: one push per Riyadh hour between HOURLY_FROM and HOURLY_TO — the best fresh story nobody
+ * was notified about yet, any topic, per device language (M122), the body always the source's own title
+ * (rule 7). An hour with no fresh story stays silent; nothing is ever pushed twice.
  */
 export const NEWS_DAILY_PUSH_KEY = 'push:news:daily';
-type DailyDigestState = { day: string; sent: string[]; pushedIds: string[] };
+type HourlyPushState = { day: string; sentHours: number[]; pushedIds: string[] };
 type DigestSlug = 'top' | 'sports';
-const DAILY_DIGESTS: { slug: DigestSlug; hour: number; title: (lang: NewsLang) => string }[] = [
-  { slug: 'top', hour: 10, title: (lang) => (lang === 'en' ? 'Top business story today 📈' : 'أهم أخبار اليوم 📈') },
-  { slug: 'sports', hour: 19, title: (lang) => (lang === 'en' ? 'Sports today ⚽' : 'أخبار الرياضة اليوم ⚽') },
-];
+const HOURLY_FROM = 9;
+const HOURLY_TO = 23; // the 23:00 slot is the last one before midnight
+const HOURLY_WANTED = new Set<TopicKey>(['economy', 'markets', 'finance', 'sports']);
+const TOP_DIGEST = { slug: 'top' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Top business story today 📈' : 'أهم أخبار اليوم 📈') };
+const SPORTS_DIGEST = { slug: 'sports' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Sports today ⚽' : 'أخبار الرياضة اليوم ⚽') };
+const DIGESTS = [TOP_DIGEST, SPORTS_DIGEST];
+const digestTitleFor = (item: NewsItem, lang: NewsLang): string => (item.topics.includes('sports') ? SPORTS_DIGEST : TOP_DIGEST).title(lang);
 
 export function newsIdOf(url: string): string {
   return createHash('sha1').update(url).digest('hex').slice(0, 16);
@@ -164,7 +168,7 @@ export class NewsService {
       await this.persist();
       if (added > 0) this.deps.onChange?.();
       await this.pushNewDecisions();
-      await this.pushDailyDigests();
+      await this.pushHourlyNews();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
         'news refreshed',
@@ -409,44 +413,49 @@ export class NewsService {
     }
   }
 
-  /** M134: the two daily digests (see DAILY_DIGESTS). A digest with no fresh story, or whose send reached nobody, retries on the next poll of the same day. */
-  private async pushDailyDigests(now = Date.now()): Promise<void> {
+  /** M135: one push per Riyadh hour (HOURLY_FROM–HOURLY_TO). An hour with no fresh story, or whose send reached nobody, retries on the next poll of the same hour. */
+  private async pushHourlyNews(now = Date.now()): Promise<void> {
     const push = this.deps.push;
     if (!push) return;
     try {
-      const today = riyadhDay(now);
       const hour = riyadhHour(now);
-      const stored = await this.deps.kv.get<DailyDigestState>(NEWS_DAILY_PUSH_KEY);
-      const state: DailyDigestState =
+      if (hour < HOURLY_FROM || hour > HOURLY_TO) return;
+      const today = riyadhDay(now);
+      const stored = await this.deps.kv.get<HourlyPushState>(NEWS_DAILY_PUSH_KEY);
+      const state: HourlyPushState =
         stored && stored.day === today
-          ? { day: today, sent: [...stored.sent], pushedIds: [...(stored.pushedIds ?? [])] }
-          : { day: today, sent: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+          ? { day: today, sentHours: [...(stored.sentHours ?? [])], pushedIds: [...(stored.pushedIds ?? [])] }
+          : { day: today, sentHours: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+      if (state.sentHours.includes(hour)) return;
       const already = new Set(state.pushedIds);
-      let changed = stored?.day !== today;
-      for (const digest of DAILY_DIGESTS) {
-        if (hour < digest.hour || state.sent.includes(digest.slug)) continue;
-        const picked: Partial<Record<NewsLang, NewsItem>> = {
-          ar: this.pickDigestItem(digest.slug, 'ar', now, already),
-          en: this.pickDigestItem(digest.slug, 'en', now, already),
-        };
-        if (!picked.ar && !picked.en) continue;
-        const outcome = await push.broadcastLocalized((lang) => {
-          const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
-          if (!item) return null;
-          return { title: digest.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
-        });
-        if (outcome.sent === 0) continue;
-        state.sent.push(digest.slug);
-        for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
-        changed = true;
-      }
-      if (changed) {
-        state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
-        await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies DailyDigestState);
-      }
+      const picked: Partial<Record<NewsLang, NewsItem>> = {
+        ar: this.pickHourlyItem('ar', now, already),
+        en: this.pickHourlyItem('en', now, already),
+      };
+      if (!picked.ar && !picked.en) return;
+      const outcome = await push.broadcastLocalized((lang) => {
+        const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
+        if (!item) return null;
+        return { title: digestTitleFor(item, lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
+      });
+      if (outcome.sent === 0) return;
+      state.sentHours.push(hour);
+      for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
+      state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
+      await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies HourlyPushState);
     } catch (error) {
-      this.deps.log.error({ err: error }, 'news daily digest failed');
+      this.deps.log.error({ err: error }, 'news hourly push failed');
     }
+  }
+
+  /** The hourly story: the best-scored item of the last 24 hours that nobody was notified about, any topic. */
+  private pickHourlyItem(lang: NewsLang, now: number, exclude: Set<string>): NewsItem | undefined {
+    const dayAgo = now - 24 * 3_600_000;
+    const pool = this.visible(lang).filter((item) => Date.parse(item.publishedAt) >= dayAgo && !exclude.has(item.id) && !item.decision);
+    const best = pool
+      .map((item) => ({ item, score: scoreOf(item, HOURLY_WANTED, now) + (this.boosts.get(item.sourceId) ?? 0) }))
+      .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
+    return best[0]?.item;
   }
 
   /** M134: the owner's manual send («ابعت خبر دلوقتي») — the best fresh story goes to every device at once, same rules as the daily digest. */
@@ -455,27 +464,27 @@ export class NewsService {
     if (!push) return { sent: 0, failed: 0, title: null };
     const now = Date.now();
     const today = riyadhDay(now);
-    const stored = await this.deps.kv.get<DailyDigestState>(NEWS_DAILY_PUSH_KEY);
-    const state: DailyDigestState =
+    const stored = await this.deps.kv.get<HourlyPushState>(NEWS_DAILY_PUSH_KEY);
+    const state: HourlyPushState =
       stored && stored.day === today
-        ? { day: today, sent: [...stored.sent], pushedIds: [...(stored.pushedIds ?? [])] }
-        : { day: today, sent: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+        ? { day: today, sentHours: [...(stored.sentHours ?? [])], pushedIds: [...(stored.pushedIds ?? [])] }
+        : { day: today, sentHours: [], pushedIds: [...(stored?.pushedIds ?? [])] };
     const already = new Set(state.pushedIds);
     const picked: Partial<Record<NewsLang, NewsItem>> = {
       ar: this.pickDigestItem(kind, 'ar', now, already),
       en: this.pickDigestItem(kind, 'en', now, already),
     };
     if (!picked.ar && !picked.en) return { sent: 0, failed: 0, title: null };
-    const digest = DAILY_DIGESTS.find((entry) => entry.slug === kind)!;
+    const digest = DIGESTS.find((entry) => entry.slug === kind)!;
     const outcome = await push.broadcastLocalized((lang) => {
       const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
       if (!item) return null;
       return { title: digest.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
     });
-    // A manual send never marks the scheduled digest as done; it only remembers the stories, so nothing repeats.
+    // A manual send never marks the hour as done; it only remembers the stories, so nothing repeats.
     for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
     state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
-    await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies DailyDigestState);
+    await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies HourlyPushState);
     return { sent: outcome.sent, failed: outcome.failed, title: picked.ar?.title ?? picked.en?.title ?? null };
   }
 
