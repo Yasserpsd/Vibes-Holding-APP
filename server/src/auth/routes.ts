@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
-import { langOf } from '../lang.js';
+import { langOf, sourceOf } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
@@ -154,7 +154,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('register', 6, request, reply)) return;
       const body = parse(registerSchema, request.body, reply);
       if (!body) return;
-      return service.register(body, request.ip, langOf(request));
+      return service.register(body, request.ip, langOf(request), sourceOf(request));
     }),
   );
 
@@ -198,7 +198,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(socialSchema, request.body, reply);
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
-      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request));
+      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request), sourceOf(request));
       return 'totp' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
 
@@ -54,7 +56,8 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   }
   const token = options.token === undefined ? currentToken : options.token;
   // The server answers in the app's language where it has both (news feeds, topics, content).
-  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang() };
+  // M146: the platform rides along so the hub's «عضو جديد» mail says iPhone / Android.
+  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 

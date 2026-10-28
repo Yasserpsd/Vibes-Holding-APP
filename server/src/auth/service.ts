@@ -6,7 +6,7 @@ import type { Config } from '../config.js';
 import { normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
-import type { AppLang } from '../lang.js';
+import type { AppLang, AppSource } from '../lang.js';
 import type { SocialIdentity } from './social.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
@@ -181,7 +181,7 @@ export class AuthService {
     return this.deps.config.APP_ENV !== 'production' && this.deps.config.AUTH_ADMIN_ONLY === '1';
   }
 
-  async register(input: RegisterInput, ip: string, lang: AppLang = 'ar'): Promise<PendingResult> {
+  async register(input: RegisterInput, ip: string, lang: AppLang = 'ar', source: AppSource = 'app'): Promise<PendingResult> {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
     }
@@ -210,6 +210,8 @@ export class AuthService {
       // member mail it sends — activation code, welcome, receipts — follows it.
       lang,
       page_url: 'app://register',
+      // M146: the hub stores it and the admin «عضو جديد» mail shows iPhone / Android (hub 2.21.1+; older hubs ignore it).
+      source,
       ...(referral ? { referral } : {}),
       ...(interests ? { interests } : {}),
     });
@@ -284,7 +286,7 @@ export class AuthService {
    * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
    * verified, so there is no code step; the same test-environment gates as password login apply.
    */
-  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar'): Promise<MemberLoginResult> {
+  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar', source: AppSource = 'app'): Promise<MemberLoginResult> {
     if (!identity.emailVerified) {
       throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
     }
@@ -294,6 +296,7 @@ export class AuthService {
       result = await this.deps.hub.call('social_login', {
         uuid,
         ip,
+        source,
         provider: identity.provider,
         sub: identity.sub,
         email: identity.email,
