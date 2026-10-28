@@ -5,6 +5,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { RequestError } from '../auth/guard.js';
 import { membershipNumber } from '../auth/service.js';
 import { hubCall, type HubClient, type HubContact } from '../hub/types.js';
+import { APP_STORE_URL, PLAY_STORE_URL } from '../legal/applink.js';
 import type { Notifier } from '../mail/notify.js';
 import type { KV } from '../store.js';
 
@@ -49,8 +50,14 @@ export type InvitesConfig = { giftText: string; shareText: string };
 /** Server-driven wording (UI rule: the owner edits marketing copy from the dashboard). */
 export const DEFAULT_INVITES_CONFIG: InvitesConfig = {
   giftText: 'كل من يسجّل بكود دعوتك يحصل على هدية من إدارة النادي بعد تفعيل حسابه، والإدارة تتواصل معه مباشرةً لتسليمها.',
-  shareText:
-    'أدعوك للانضمام إلى نادي المستثمرين — مجتمع أعمال وشراكات وخدمات لروّاد الأعمال والمستثمرين. سجّل في التطبيق واكتب كود الدعوة {code} في خانة «كود الدعوة» أثناء التسجيل، ولك هدية من إدارة النادي بعد تفعيل حسابك.',
+  // Owner, 2026-10-28: «لما أدوس دعوة لازم توصل الروابط» — the share text carries both store links.
+  shareText: [
+    'أدعوك للانضمام إلى نادي المستثمرين Investors Club — مجتمع أعمال وشراكات وخدمات لروّاد الأعمال والمستثمرين.',
+    'حمّل التطبيق:',
+    `iPhone: ${APP_STORE_URL}`,
+    `Android: ${PLAY_STORE_URL}`,
+    'ثم سجّل واكتب كود الدعوة {code} في خانة «كود الدعوة» أثناء التسجيل، ولك هدية من إدارة النادي بعد تفعيل حسابك.',
+  ].join('\n'),
 };
 
 /** What the inviter sees about his own nominees in the app. */
