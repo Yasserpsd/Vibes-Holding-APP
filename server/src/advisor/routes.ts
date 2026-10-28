@@ -29,6 +29,16 @@ const messageSchema = z.object({
   text: z.string().trim().min(1, 'اكتب رسالتك أولًا').max(4000, 'الرسالة طويلة، الحد 4000 حرف'),
   context: contextSchema.nullish(),
 });
+// M151: 10 MB of PDF is ~13.4 MB of base64; the route limit leaves room for the line and the context.
+const FILE_MAX_BYTES = 10 * 1024 * 1024;
+const FILE_BODY_LIMIT = 15 * 1024 * 1024;
+const PDF_MAGIC = Buffer.from('%PDF-', 'latin1');
+const fileSchema = z.object({
+  file: z.string().regex(/^[A-Za-z0-9+/=\s]+$/, 'ملف غير صالح').min(100).max(14_200_000),
+  name: z.string().trim().min(1).max(200),
+  text: z.string().trim().max(4000).default(''),
+  context: contextSchema.nullish(),
+});
 const pollSchema = z.object({ after: z.coerce.number().int().nonnegative().default(0) });
 // M145: the app asks whether a chat line is an APP action before sending it to the hub.
 const pendingSchema = z.object({
@@ -121,6 +131,36 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       } catch {
         return reply.code(502).send({ error: { code: 'voice_failed', message: 'تعذر تحويل الصوت إلى نص، حاول مرة أخرى' } });
       }
+    }),
+  );
+
+  // M151 «المستشار يقرأ ملفك»: one PDF (base64, ≤ 10 MB) with an optional line. Checked here (magic bytes, size),
+  // stored by the hub in vcmem's uploads under a random name, read by the workflow. Never kept on this server.
+  app.post(
+    '/api/advisor/file',
+    { bodyLimit: FILE_BODY_LIMIT },
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (!limiter.hit(`file:${current.session.uuid}`, 12, 60 * 60_000)) {
+        return reply.code(429).send({ error: { code: 'rate', message: 'ملفات كثيرة في وقت قصير، حاول بعد قليل' } });
+      }
+      const body = parse(fileSchema, request.body, reply);
+      if (!body) return;
+      const bytes = Buffer.from(body.file, 'base64');
+      if (bytes.length < 100 || !bytes.subarray(0, 5).equals(PDF_MAGIC)) {
+        return reply.code(400).send({ error: { code: 'bad_file', message: 'الملف ليس PDF صالحًا' } });
+      }
+      if (bytes.length > FILE_MAX_BYTES) {
+        return reply.code(413).send({ error: { code: 'too_big', message: 'حجم الملف أكبر من 10 MB' } });
+      }
+      const name = body.name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 120) || 'file.pdf';
+      const result = await service.send(current.session, body.text, body.context ?? null, request.ip, langOf(request), {
+        name: /\.pdf$/i.test(name) ? name : `${name}.pdf`,
+        base64: bytes.toString('base64'),
+      });
+      reply.header('cache-control', 'no-store');
+      return result;
     }),
   );
 

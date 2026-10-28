@@ -46,6 +46,8 @@ export type HubMessage = {
   actions: unknown[];
   image?: string;
   audio?: string;
+  /** M151 (hub 2.23.0): a PDF sent with the message. */
+  file?: { url?: string; name?: string; size?: number };
   by?: string;
   at: string;
 };
@@ -128,6 +130,8 @@ export type HubResponse = {
   human?: boolean;
   image_url?: string;
   audio_url?: string;
+  /** M151 (hub 2.23.0): where the PDF was stored. */
+  file_url?: string;
   transcript?: string;
   /** `poll` / `history` */
   messages?: HubMessage[];
@@ -339,9 +343,12 @@ export class HubError extends Error {
   }
 }
 
+/** M151: a per-call override (a PDF upload needs longer than the 30 s default). */
+export type HubCallOptions = { timeoutMs?: number };
+
 export interface HubClient {
   readonly mode: 'live' | 'mock';
-  call(op: HubOp, body: HubBody): Promise<HubResponse>;
+  call(op: HubOp, body: HubBody, options?: HubCallOptions): Promise<HubResponse>;
 }
 
 /** `call()` with the answer typed by op (bridge v2 ops answer fields the generic `HubResponse` does not list). */

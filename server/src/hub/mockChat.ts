@@ -62,7 +62,13 @@ export class MockChat {
   }
 
   message(contactId: number, contact: HubContact, body: HubBody): HubResponse {
-    const text = str(body, 'message', 4000);
+    // M151: a PDF data URL + name — stored as hub 2.23.0 does (random name) and echoed on the row.
+    const fileData = str(body, 'file', 20_000_000);
+    const fileName = str(body, 'file_name', 160) || 'file.pdf';
+    const file = fileData.startsWith('data:application/pdf;base64,')
+      ? { url: `https://hub.example.test/wp-content/uploads/vai-file-${Math.random().toString(36).slice(2, 10)}.pdf`, name: fileName, size: Buffer.from(fileData.slice(28), 'base64').length }
+      : null;
+    const text = str(body, 'message', 4000) || (file ? `📎 ${file.name}` : '');
     if (!text) throw new HubError('empty', 'الرسالة فارغة', 400);
     const room = this.room(contactId);
     if (contact.member_expired) {
@@ -73,7 +79,7 @@ export class MockChat {
     }
     const now = Date.now();
     const pageTitle = str(body, 'page_title', 200);
-    const userId = this.push(room, { role: 'user', content: text, actions: [], by: '', at: iso(now), revealAt: now, pageUrl: str(body, 'page_url', 300) });
+    const userId = this.push(room, { role: 'user', content: text, actions: [], by: '', at: iso(now), revealAt: now, pageUrl: str(body, 'page_url', 300), ...(file ? { file } : {}) });
     const revealAt = now + this.replyDelayMs;
     if (/الإدارة|موظف|بشري/.test(text)) {
       this.push(room, { role: 'human', by: 'فريق النادي', content: 'أهلًا بك، معك فريق النادي. وصلتنا رسالتك وسنرد عليك هنا.', actions: [], at: iso(revealAt), revealAt });
@@ -97,7 +103,7 @@ export class MockChat {
       });
     }
     room.replies += 1;
-    return { ok: true, message_id: userId, waiting: true, human: false, image_url: '', audio_url: '', transcript: '', contact };
+    return { ok: true, message_id: userId, waiting: true, human: false, image_url: '', audio_url: '', file_url: file?.url ?? '', transcript: '', contact };
   }
 
   poll(contactId: number | null, contact: HubContact | null, body: HubBody): HubResponse {

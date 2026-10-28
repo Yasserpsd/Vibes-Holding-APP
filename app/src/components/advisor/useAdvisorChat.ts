@@ -44,6 +44,8 @@ const initialState: ChatState = {
 
 /** How a send ended. `contextRefused`: the server took the message only without its context, so the «تسأل عن» pill no longer holds. */
 export type SendOutcome = { accepted: boolean; contextRefused: boolean };
+/** M151: a PDF read into base64, ready for `/api/advisor/file`. */
+export type OutgoingFile = { name: string; size: number; base64: string };
 
 function mergeMessages(current: ChatMessage[], incoming: AdvisorMessage[]): ChatMessage[] {
   if (!incoming.length) return current;
@@ -115,8 +117,8 @@ export function useAdvisorChat() {
     optimisticCount.current += 1;
     const base = OPTIMISTIC_BASE + optimisticCount.current * 2;
     const at = new Date().toISOString();
-    const mine: ChatMessage[] = userText ? [{ id: base, clientKey: base, role: 'user', text: userText, at, by: null, image: null, audio: null, actions: [] }] : [];
-    const theirs: ChatMessage = { id: base + 1, clientKey: base + 1, role: 'assistant', text: reply, at, by: null, image: null, audio: null, actions };
+    const mine: ChatMessage[] = userText ? [{ id: base, clientKey: base, role: 'user', text: userText, at, by: null, image: null, audio: null, file: null, actions: [] }] : [];
+    const theirs: ChatMessage = { id: base + 1, clientKey: base + 1, role: 'assistant', text: reply, at, by: null, image: null, audio: null, file: null, actions };
     setState((prev) => ({ ...prev, messages: [...prev.messages, ...mine, theirs], sendError: null }));
     return base + 1;
   }, []);
@@ -126,17 +128,31 @@ export function useAdvisorChat() {
     setState((prev) => ({ ...prev, messages: prev.messages.map((message) => (message.id === id ? { ...message, text: reply, actions } : message)) }));
   }, []);
 
-  /** Sends a message; `accepted` when the hub took it. */
+  /**
+   * Sends a message; `accepted` when the hub took it. M151: with `file` (a PDF as base64) the line may be
+   * empty — the bubble shows the file, the hub stores «📎 name» and the brain reads the file's text.
+   */
   const send = useCallback(
-    async (text: string, context: AdvisorContext | null): Promise<SendOutcome> => {
+    async (text: string, context: AdvisorContext | null, file: OutgoingFile | null = null): Promise<SendOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed) return { accepted: false, contextRefused: false };
+      if (!trimmed && !file) return { accepted: false, contextRefused: false };
       optimisticCount.current += 1;
       const tempId = OPTIMISTIC_BASE + optimisticCount.current;
-      const draft: ChatMessage = { id: tempId, clientKey: tempId, role: 'user', text: trimmed, at: new Date().toISOString(), by: null, image: null, audio: null, actions: [] };
+      const draft: ChatMessage = {
+        id: tempId,
+        clientKey: tempId,
+        role: 'user',
+        text: trimmed,
+        at: new Date().toISOString(),
+        by: null,
+        image: null,
+        audio: null,
+        file: file ? { url: '', name: file.name, size: file.size } : null,
+        actions: [],
+      };
       setState((prev) => ({ ...prev, messages: [...prev.messages, draft], sending: true, sendError: null, gate: null }));
       try {
-        const result = await advisorApi.send(trimmed, context);
+        const result = file ? await advisorApi.sendFile(file.base64, file.name, trimmed, context) : await advisorApi.send(trimmed, context);
         const contextRefused = result.contextRefused;
         if (result.me) setMe(result.me);
         if (result.gate) {

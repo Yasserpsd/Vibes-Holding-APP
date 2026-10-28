@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 
-import { HubError, type HubBody, type HubClient, type HubOp, type HubResponse } from './types.js';
+import { HubError, type HubBody, type HubCallOptions, type HubClient, type HubOp, type HubResponse } from './types.js';
 
 type LiveHubOptions = { url: string; siteKey: string; log: FastifyBaseLogger; timeoutMs?: number };
 
@@ -22,7 +22,7 @@ export class LiveHubClient implements HubClient {
     this.base = options.url.replace(/\/+$/, '');
   }
 
-  async call(op: HubOp, body: HubBody): Promise<HubResponse> {
+  async call(op: HubOp, body: HubBody, callOptions: HubCallOptions = {}): Promise<HubResponse> {
     const url = `${this.base}/wp-json/vibes-ai/v1/hub/${op}`;
     let response: Response;
     try {
@@ -35,7 +35,7 @@ export class LiveHubClient implements HubClient {
           'user-agent': 'InvestorsClubServer/0.1',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(this.options.timeoutMs ?? 30_000),
+        signal: AbortSignal.timeout(callOptions.timeoutMs ?? this.options.timeoutMs ?? 30_000),
       });
     } catch (error) {
       this.options.log.warn({ op, err: error }, 'hub unreachable');

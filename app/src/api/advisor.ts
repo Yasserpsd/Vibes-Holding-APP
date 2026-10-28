@@ -53,8 +53,12 @@ export type AdvisorMessage = {
   by: string | null;
   image: string | null;
   audio: string | null;
+  /** M151: a PDF the member sent (stored on vcmem under a random name). */
+  file: AdvisorFile | null;
   actions: AdvisorAction[];
 };
+
+export type AdvisorFile = { url: string; name: string; size: number };
 
 export type AdvisorGateType = 'membership' | 'daily' | 'rate' | 'site_cap' | 'contact' | 'other';
 export type AdvisorGate = { type: AdvisorGateType; text: string; membership: boolean; expired: boolean };
@@ -85,6 +89,9 @@ export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout
 
 const postMessage = (text: string, context: AdvisorContext | null) =>
   apiRequest<SendResult>('POST', '/api/advisor/message', { body: { text, context } });
+// M151: a PDF (base64, up to 10 MB) with an optional line; the server checks it and hands it to the hub.
+const postFile = (file: string, name: string, text: string, context: AdvisorContext | null) =>
+  apiRequest<SendResult>('POST', '/api/advisor/file', { body: { file, name, text, context }, timeoutMs: 90_000 });
 
 export const advisorApi = {
   history: () => apiGet<HistoryResult>('/api/advisor/history'),
@@ -99,6 +106,15 @@ export const advisorApi = {
     } catch (error) {
       if (!context || !(error instanceof ApiError) || error.status !== 400 || error.code !== 'invalid') throw error;
       return { ...(await postMessage(text, null)), contextRefused: true };
+    }
+  },
+  /** M151: same refusal rule as `send` for an older server that knows fewer context types. */
+  sendFile: async (file: string, name: string, text: string, context: AdvisorContext | null): Promise<SentMessage> => {
+    try {
+      return { ...(await postFile(file, name, text, context)), contextRefused: false };
+    } catch (error) {
+      if (!context || !(error instanceof ApiError) || error.status !== 400 || error.code !== 'invalid') throw error;
+      return { ...(await postFile(file, name, text, null)), contextRefused: true };
     }
   },
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),

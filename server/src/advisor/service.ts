@@ -12,6 +12,9 @@ import type { VideosService } from '../videos/service.js';
 import { ContextResolver, type AdvisorContext } from './context.js';
 import { BlockList, blockListFromConfig, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
 
+/** M151: a PDF the member attached, as base64 (checked by the route: magic bytes, ≤ 10 MB). */
+export type OutgoingFile = { name: string; base64: string };
+
 const SETTINGS_TTL_MS = 30 * 60_000;
 const SETTINGS_RETRY_MS = 60_000;
 const DEFAULT_BOT_NAME = 'المستشار';
@@ -60,12 +63,24 @@ export class AdvisorService {
     };
   }
 
-  async send(session: SessionRecord, message: string, context: AdvisorContext | null, ip: string, lang: AppLang = 'ar'): Promise<SendResult> {
+  /**
+   * M151 `file`: a PDF the member attached, handed to the hub as a data URL (`store_file()` in hub 2.23.0 keeps it in
+   * vcmem's uploads under a random name and the workflow reads its text). An empty line is allowed with a file.
+   */
+  async send(session: SessionRecord, message: string, context: AdvisorContext | null, ip: string, lang: AppLang = 'ar', file: OutgoingFile | null = null): Promise<SendResult> {
     const settings = await this.settingsOf();
     // What the member points at («اسأل المستشار»), built here from public data: the hub hands it to the workflow as `focus`.
     // The English app says so in the page title and the focus, so the brain answers in English (no plugin change).
     const page = await this.contexts.resolve(context, lang);
-    const result = await this.deps.hub.call('message', { uuid: session.uuid, message, page_url: page.url, page_title: page.title, ip, ...(page.focus ? { context: page.focus } : {}) });
+    const result = await this.deps.hub.call('message', {
+      uuid: session.uuid,
+      message,
+      page_url: page.url,
+      page_title: page.title,
+      ip,
+      ...(page.focus ? { context: page.focus } : {}),
+      ...(file ? { file: `data:application/pdf;base64,${file.base64}`, file_name: file.name } : {}),
+    }, file ? { timeoutMs: 90_000 } : {});
     const me = meOf(result.contact);
     if (result.gated) {
       return { messageId: null, waiting: false, human: false, gate: toGate(result.gate, result.contact ?? null, settings.block), me };

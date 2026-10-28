@@ -9,7 +9,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { advisorApi, type AdvisorGate, type AdvisorProfile, type HqProposal } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { hqApi } from '@/api/hq';
+import type { PendingFile } from '@/components/advisor/FileButton';
 import type { ChatMessage } from '@/components/advisor/useAdvisorChat';
+import { readBase64 } from '@/components/advisor/VoiceButton';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -67,6 +69,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   const chat = useAdvisorChat();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState('');
+  // M151: the PDF picked for the next message (only binaries with the picker can set it).
+  const [attachment, setAttachment] = useState<PendingFile | null>(null);
   // M145: the server reads each line for an app action first; a booking still being completed rides along.
   const [actBusy, setActBusy] = useState(false);
   const pendingHq = useRef<HqProposal | null>(null);
@@ -90,9 +94,32 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   }, [chat.messages]);
 
   const submit = async (text: string) => {
-    if (!text.trim() || chat.sending) return;
+    if ((!text.trim() && !attachment) || chat.sending) return;
     setDraft('');
     setAnsweredOpening(opening);
+    // M151: a PDF goes straight to the advisor (no app-intent pass): the file is read into base64 here.
+    if (attachment) {
+      const pending = attachment;
+      setAttachment(null);
+      setActBusy(true);
+      let base64 = '';
+      try {
+        base64 = await readBase64(pending.uri);
+      } catch {
+        chat.addLocal(null, t('advisor.file.failed'), []);
+        setAttachment(pending);
+        setActBusy(false);
+        return;
+      }
+      setActBusy(false);
+      const outcome = await chat.send(text, toApiContext(context), { name: pending.name, size: pending.size, base64 });
+      if (!outcome.accepted) {
+        setDraft((current) => current || text);
+        setAttachment(pending);
+      }
+      if (outcome.contextRefused && latestContext.current === context) onClearContext();
+      return;
+    }
     // M145: an app action (HQ booking card, a screen, a prefilled service) is answered by the app itself
     // and never reaches the hub; anything else goes to the advisor as before.
     setActBusy(true);
@@ -234,7 +261,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
             </View>
           </FadeInView>
         ) : null}
-        <Composer value={draft} onChange={setDraft} onSend={() => void submit(draft)} busy={busy} />
+        <Composer value={draft} onChange={setDraft} onSend={() => void submit(draft)} busy={busy} attachment={attachment} onAttach={setAttachment} onDetach={() => setAttachment(null)} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

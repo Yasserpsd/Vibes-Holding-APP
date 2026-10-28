@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import type { AdvisorAction, AdvisorMessage, AppScreen, HqProposal } from '@/api/advisor';
+import type { AdvisorAction, AdvisorFile, AdvisorMessage, AppScreen, HqProposal } from '@/api/advisor';
+import { formatFileSize } from '@/components/advisor/FileButton';
 import { Chip } from '@/components/Chip';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
@@ -50,7 +51,8 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply, onAct, 
       {message.image ? (
         <Image source={{ uri: message.image }} style={styles.image} resizeMode="cover" accessibilityLabel={t('advisor.attachedImage')} />
       ) : null}
-      {message.text ? (
+      {message.file ? <FileChip file={message.file} mine={mine} /> : null}
+      {message.text && !(message.file && message.text === t('advisor.file.sent', { name: message.file.name })) ? (
         <RichText
           text={message.text}
           style={[styles.text, mine ? styles.textMine : styles.textTheirs]}
@@ -128,6 +130,26 @@ function ActionView({ action, messageId, onAct, busy }: { action: AdvisorAction;
   }
 }
 
+/** M151: the PDF the member sent — name and size; a stored copy (url) opens in the in-app browser. */
+function FileChip({ file, mine }: { file: AdvisorFile; mine: boolean }) {
+  const color = mine ? colors.goldInk : colors.gold;
+  const body = (
+    <>
+      <Ionicons name="document-text" size={18} color={color} />
+      <Text style={[styles.fileName, { color }]} numberOfLines={1}>
+        {file.name}
+      </Text>
+      {file.size > 0 ? <Text style={[styles.fileSize, { color }]}>{formatFileSize(file.size)}</Text> : null}
+    </>
+  );
+  if (!file.url) return <View style={[styles.file, mine ? styles.fileMine : styles.fileTheirs]}>{body}</View>;
+  return (
+    <PressScale onPress={() => void openLink(file.url)} glow={false} style={[styles.file, mine ? styles.fileMine : styles.fileTheirs]} accessibilityLabel={t('advisor.file.attached')}>
+      {body}
+    </PressScale>
+  );
+}
+
 function ActionButton({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.pill} wrapStyle={styles.actionWrap} style={styles.action}>
@@ -150,6 +172,11 @@ const styles = StyleSheet.create({
   bubbleWide: { alignSelf: 'stretch', maxWidth: '100%' },
   by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
   image: { width: 220, height: 160, borderRadius: radii.md, backgroundColor: colors.surface },
+  file: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.md, borderWidth: 1, maxWidth: 260 },
+  fileMine: { borderColor: 'rgba(0,0,0,0.18)', backgroundColor: 'rgba(255,255,255,0.22)' },
+  fileTheirs: { borderColor: colors.borderGold, backgroundColor: colors.goldFaint },
+  fileName: { ...typography.caption, fontFamily: fonts.medium, flexShrink: 1, writingDirection: 'ltr' },
+  fileSize: { ...typography.caption, fontSize: 11, writingDirection: 'ltr' },
   text: { ...typography.body, textAlign: textStart },
   textMine: { color: colors.goldInk },
   textTheirs: { color: colors.textPrimary },

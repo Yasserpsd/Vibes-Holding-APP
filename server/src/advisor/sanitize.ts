@@ -24,8 +24,12 @@ export type AdvisorMessage = {
   by: string | null;
   image: string | null;
   audio: string | null;
+  /** M151: the PDF the member sent (vcmem uploads, random name). */
+  file: AdvisorFile | null;
   actions: AdvisorAction[];
 };
+
+export type AdvisorFile = { url: string; name: string; size: number };
 
 export type AdvisorGateType = 'membership' | 'daily' | 'rate' | 'site_cap' | 'contact' | 'other';
 export type AdvisorGate = { type: AdvisorGateType; text: string; membership: boolean; expired: boolean };
@@ -177,6 +181,15 @@ export function toActions(raw: unknown, block: BlockList): AdvisorAction[] {
 
 const ROLES: Record<string, AdvisorRole> = { user: 'user', assistant: 'assistant', human: 'staff', system: 'system' };
 
+/** M151: `history_rows()` / `op_poll()` carry `file {url, name, size}` for a message sent with a PDF (hub 2.23.0). */
+function toFile(raw: unknown): AdvisorFile | null {
+  if (!isRecord(raw)) return null;
+  const url = asString(raw.url, 2000);
+  if (!/^https:\/\//i.test(url)) return null;
+  const size = Number(raw.size);
+  return { url, name: asString(raw.name, 160) || 'file.pdf', size: Number.isFinite(size) && size > 0 ? Math.round(size) : 0 };
+}
+
 export function toMessage(message: HubMessage, block: BlockList): AdvisorMessage {
   const role = ROLES[message.role] ?? 'system';
   const content = asString(message.content, 12_000);
@@ -186,6 +199,7 @@ export function toMessage(message: HubMessage, block: BlockList): AdvisorMessage
     text: role === 'user' ? content : stripUrls(content, block),
     at: asString(message.at, 40),
     by: asString(message.by, 120) || null,
+    file: toFile(message.file),
     image: asString(message.image, 2000) || null,
     audio: asString(message.audio, 2000) || null,
     actions: role === 'assistant' || role === 'staff' ? toActions(message.actions, block) : [],
