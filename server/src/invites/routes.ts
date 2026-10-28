@@ -35,7 +35,7 @@ export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (ap
       const config = await service.config();
       return {
         code: me.cardNumber,
-        eligible: me.membership.status === 'active',
+        eligible: true, // M143: every signed-in (verified) account may invite; the membership gate is gone.
         giftText: config.giftText,
         shareText: config.shareText.replaceAll('{code}', me.cardNumber),
         invited: await service.mine(me.id),

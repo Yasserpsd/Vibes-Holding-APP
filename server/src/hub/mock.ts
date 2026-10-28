@@ -179,8 +179,8 @@ export class MockHubClient implements HubClient {
     if (!referral) return null;
     const id = Number.parseInt(referral.replace(/\D+/g, ''), 10);
     const contact = id > 0 ? this.contacts.get(id) : undefined;
-    if (!contact || !contact.passHash || !contact.verified || this.publicContact(contact).is_member !== 1) {
-      throw new HubError('referral', 'كود الدعوة غير صحيح أو عضوية صاحبه غير سارية — راجعه مع من دعاك، أو امسحه وأكمل التسجيل', 400);
+    if (!contact || !contact.passHash || !contact.verified) {
+      throw new HubError('referral', 'كود الدعوة غير صحيح — راجعه مع من دعاك، أو امسحه وأكمل التسجيل', 400);
     }
     return contact;
   }

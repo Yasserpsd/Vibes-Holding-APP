@@ -90,14 +90,8 @@ export default function InviteScreen() {
           </FadeInView>
 
           <FadeInView delay={entranceDelay(2)}>
-            {data.eligible ? (
-              <AppButton label={t('invite.share')} icon="share-social-outline" onPress={() => void share()} />
-            ) : (
-              <View style={styles.lockedBlock}>
-                <Notice tone="warning" text={t('invite.locked')} />
-                <AppButton label={t('invite.activate')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
-              </View>
-            )}
+            {/* M143: every signed-in account shares its code — the membership lock is gone (owner, 2026-10-28). */}
+            <AppButton label={t('invite.share')} icon="share-social-outline" onPress={() => void share()} />
           </FadeInView>
 
           <FadeInView delay={entranceDelay(3)}>
@@ -151,7 +145,6 @@ const styles = StyleSheet.create({
   codeLabel: { ...typography.caption, color: colors.textSecondary },
   code: { ...typography.title, color: colors.gold, letterSpacing: 2, fontVariant: ['tabular-nums'] },
   codeHint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-  lockedBlock: { gap: spacing.md },
   listHead: { gap: 2, marginTop: spacing.md },
   listTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   listHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },

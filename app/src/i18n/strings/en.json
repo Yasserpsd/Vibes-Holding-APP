@@ -845,8 +845,6 @@
   "invite.codeHint": "It is your membership number. The person you invite enters it in the “Invite code” field when registering in the app.",
   "invite.share": "Share the invitation",
   "invite.shareFailed": "Sharing failed — try again.",
-  "invite.locked": "Sharing invitations opens once your annual membership is active.",
-  "invite.activate": "Activate membership",
   "invite.invitedTitle": "Registered through you",
   "invite.invitedHint": "You nominate; the administration delivers the gift to your invitee once their account is verified.",
   "invite.empty": "No one has registered with your code yet — share the invitation now.",

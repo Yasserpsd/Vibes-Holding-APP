@@ -100,11 +100,10 @@ test('a wrong code stops the registration with a clear word', async () => {
   assert.equal(unknown.statusCode, 400, unknown.body);
   assert.equal(unknown.json().error.code, 'referral');
 
-  // A verified account whose membership is not active cannot be the inviter.
+  // M143: a verified account WITHOUT a membership may invite too (owner, 2026-10-28).
   const adminMe = (await get('/api/me', adminToken)).json().me;
-  const inactive = await register('m32.bad3@gmail.com', { inviteCode: adminMe.cardNumber });
-  assert.equal(inactive.statusCode, 400, inactive.body);
-  assert.equal(inactive.json().error.code, 'referral');
+  const inactive = await register('m32.ok3@gmail.com', { inviteCode: adminMe.cardNumber });
+  assert.equal(inactive.statusCode, 200, inactive.body);
 });
 
 test('a registration through the code is attributed by the hub, and the mail goes out on verification', async () => {
@@ -150,9 +149,9 @@ test('the inviter sees his code, the share text and how far each nominee got', a
   assert.equal(invited.length, 1);
   assert.equal(invited[0]?.state, 'verified');
 
-  // An account without an active membership sees the screen locked (the app side).
-  const locked = await get('/api/invites', adminToken);
-  assert.equal(locked.json().eligible, false);
+  // M143: an account without a membership is eligible too (the app shows the share button).
+  const noMembership = await get('/api/invites', adminToken);
+  assert.equal(noMembership.json().eligible, true);
 
   assert.equal((await get('/api/invites')).statusCode, 401);
 });
