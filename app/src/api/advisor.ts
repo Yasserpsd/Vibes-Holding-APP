@@ -8,7 +8,40 @@ export type AdvisorAction =
   | { type: 'video'; title: string; url: string }
   /** The hub offered the membership: the app points to its own membership screen. */
   | { type: 'membership' }
-  | { type: 'card'; title: string; price: string | null; note: string | null; bullets: string[]; url: string | null };
+  | { type: 'card'; title: string; price: string | null; note: string | null; bullets: string[]; url: string | null }
+  // M145: app actions the server detects in the member's own line (never from the hub).
+  | { type: 'hq_book'; proposal: HqProposal; missing: ('date' | 'time' | 'purpose')[]; options: HqProposalOptions; summary: string[] }
+  | { type: 'screen'; screen: AppScreen; label: string }
+  | { type: 'service'; key: string; title: string; answers: Record<string, string>; label: string };
+
+/** M145 (mirrors server/src/advisor/intents.ts). */
+export type AppScreen =
+  | 'home'
+  | 'projects'
+  | 'golden'
+  | 'membership'
+  | 'services'
+  | 'hq'
+  | 'news'
+  | 'videos'
+  | 'posts'
+  | 'account'
+  | 'card'
+  | 'invite'
+  | 'agenda'
+  | 'people'
+  | 'people_apply'
+  | 'guide'
+  | 'workshops'
+  | 'meetups'
+  | 'payments'
+  | 'profile'
+  | 'security'
+  | 'about';
+export type HqKind = 'visit' | 'office' | 'meeting';
+export type HqProposal = { kind: HqKind; hours: number; date: string | null; time: string | null; purpose: string | null; note: string };
+export type HqProposalOptions = { kinds: { key: HqKind; label: string }[]; days: { date: string; label: string }[]; times: string[]; purposes: string[]; hours: number[] };
+export type IntentResult = { action: Extract<AdvisorAction, { type: 'hq_book' | 'screen' | 'service' }> | null; reply: string | null };
 
 export type AdvisorRole = 'user' | 'assistant' | 'staff' | 'system';
 
@@ -71,6 +104,15 @@ export const advisorApi = {
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),
   // M104: the recorded question (base64) comes back as text; the app then sends it as a message.
   transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime } }),
+  // M145: is this line an app action? An older server answers 404 → treated as «no».
+  intent: async (text: string, pending: HqProposal | null): Promise<IntentResult> => {
+    try {
+      return await apiRequest<IntentResult>('POST', '/api/advisor/intent', { body: { text, pending } });
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 429)) return { action: null, reply: null };
+      throw error;
+    }
+  },
   // M142: one spoken message → the form's values; the server normalises phones, e-mails, dates and choices.
   fillForm: (input: FillFormInput) => apiRequest<FillFormResult>('POST', '/api/advisor/fill-form', { body: input }),
 };

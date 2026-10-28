@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import type { AdvisorAction, AdvisorMessage } from '@/api/advisor';
+import type { AdvisorAction, AdvisorMessage, AppScreen, HqProposal } from '@/api/advisor';
 import { Chip } from '@/components/Chip';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
@@ -12,10 +12,18 @@ import { textEnd, textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
+import { HqProposalCard } from './HqProposalCard';
 import { RichText, hasTable } from './RichText';
 
+/** M145: what a chat card asks the screen to do (the screen owns navigation, booking and the pending proposal). */
+export type ChatAct =
+  | { kind: 'hq_pick'; messageId: number; proposal: HqProposal }
+  | { kind: 'hq_confirm'; messageId: number; proposal: HqProposal }
+  | { kind: 'screen'; screen: AppScreen }
+  | { kind: 'service'; key: string; answers: Record<string, string> };
+
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type Props = { message: AdvisorMessage; showQuickReplies: boolean; onQuickReply: (text: string) => void };
+type Props = { message: AdvisorMessage; showQuickReplies: boolean; onQuickReply: (text: string) => void; onAct?: (act: ChatAct) => void; actBusy?: boolean };
 
 export function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -26,7 +34,7 @@ export function formatTime(iso: string): string {
 }
 
 /** One chat message. The member's own messages sit on the left, replies on the right (mirrored for RTL). */
-export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props) {
+export function MessageBubble({ message, showQuickReplies, onQuickReply, onAct, actBusy = false }: Props) {
   if (message.role === 'system') {
     return <Text style={styles.system}>{message.text}</Text>;
   }
@@ -60,7 +68,7 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props
         <View style={styles.widgets}>
           {widgets.map((action, index) => (
             <FadeInView key={index} delay={entranceDelay(index)} offset={8} duration={240}>
-              <ActionView action={action} />
+              <ActionView action={action} messageId={message.id} onAct={onAct} busy={actBusy} />
             </FadeInView>
           ))}
         </View>
@@ -78,9 +86,23 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply }: Props
   );
 }
 
-function ActionView({ action }: { action: AdvisorAction }) {
+function ActionView({ action, messageId, onAct, busy }: { action: AdvisorAction; messageId: number; onAct?: (act: ChatAct) => void; busy: boolean }) {
   const router = useRouter();
   switch (action.type) {
+    // M145: app actions — the screen executes them with the member's own session.
+    case 'hq_book':
+      return (
+        <HqProposalCard
+          action={action}
+          busy={busy}
+          onPick={(proposal) => onAct?.({ kind: 'hq_pick', messageId, proposal })}
+          onConfirm={(proposal) => onAct?.({ kind: 'hq_confirm', messageId, proposal })}
+        />
+      );
+    case 'screen':
+      return <ActionButton icon="arrow-forward-circle-outline" label={action.label} onPress={() => onAct?.({ kind: 'screen', screen: action.screen })} />;
+    case 'service':
+      return <ActionButton icon="document-text-outline" label={action.label} onPress={() => onAct?.({ kind: 'service', key: action.key, answers: action.answers })} />;
     case 'link':
       return <ActionButton icon="open-outline" label={action.label} onPress={() => void openLink(action.url)} />;
     case 'video':

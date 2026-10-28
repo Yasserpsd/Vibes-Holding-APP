@@ -73,7 +73,12 @@ function optionKey(value: string): string {
     .join(' ');
 }
 
-/** Spoken choice → one of the field's options (exact, normalised, then containment), or ''. */
+const STOP_WORDS = new Set(['في', 'من', 'على', 'الى', 'إلى', 'عن', 'مع', 'و', 'the', 'a', 'an', 'of', 'in', 'and', 'for', 'to']);
+function tokens(key: string): string[] {
+  return key.split(' ').filter((word) => word && !STOP_WORDS.has(word));
+}
+
+/** Spoken choice → one of the field's options (exact, normalised, word overlap, then containment), or ''. */
 export function snapOption(value: string, options: string[]): string {
   const raw = value.trim();
   if (!raw) return '';
@@ -83,6 +88,19 @@ export function snapOption(value: string, options: string[]): string {
   if (!key) return '';
   const normalised = options.find((option) => optionKey(option) === key);
   if (normalised) return normalised;
+  // Word overlap, stop-words aside: «جوله بالمقر» → «جولة في المقر», «Tech» → «Technology» (below).
+  const spoken = tokens(key);
+  if (spoken.length) {
+    const scored = options
+      .map((option) => {
+        const own = tokens(optionKey(option));
+        const hits = spoken.filter((word) => own.some((candidate) => candidate === word || (word.length >= 3 && candidate.startsWith(word)))).length;
+        return { option, score: hits / Math.max(spoken.length, own.length) };
+      })
+      .filter((entry) => entry.score >= 0.5)
+      .sort((x, y) => y.score - x.score);
+    if (scored.length && (scored.length === 1 || (scored[0]?.score ?? 0) > (scored[1]?.score ?? 0))) return scored[0]?.option ?? '';
+  }
   const contained = options.filter((option) => {
     const optionK = optionKey(option);
     return optionK.length >= 2 && (optionK.includes(key) || key.includes(optionK));

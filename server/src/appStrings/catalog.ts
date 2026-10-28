@@ -1134,7 +1134,20 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "voiceFill.hint": "تكلّم بكل البيانات مرة واحدة، والمستشار يعبّئ الحقول وأنت تراجع قبل الإرسال.",
     "voiceFill.done": "تمت التعبئة، راجع البيانات ثم أرسل.",
     "voiceFill.partial": "عبّأت ما سمعته. اضغط الميكروفون وأجب:",
-    "voiceFill.hintInterests": "اختر من قائمة الاهتمامات"
+    "voiceFill.hintInterests": "اختر من قائمة الاهتمامات",
+    "advisor.act.title": "حجز في مقر النادي",
+    "advisor.act.kind": "نوع الحجز",
+    "advisor.act.hours": "المدة بالساعات",
+    "advisor.act.pickDay": "اليوم",
+    "advisor.act.pickTime": "الوقت المتاح",
+    "advisor.act.pickPurpose": "الغرض من الزيارة",
+    "advisor.act.noTimes": "لا توجد أوقات متاحة في هذا اليوم، اختر يومًا آخر.",
+    "advisor.act.confirm": "تأكيد الحجز",
+    "advisor.act.incomplete": "أكمل الاختيارات أولًا",
+    "advisor.act.working": "لحظة…",
+    "advisor.act.foot": "يُرسل الطلب للإدارة، ويصلك التأكيد وتصريح الدخول في التطبيق.",
+    "advisor.act.booked": "تم إرسال طلب الحجز، وبانتظار تأكيد الإدارة. تابعه من صفحة المقر.",
+    "advisor.act.openHq": "حجوزاتي في المقر"
   },
   "en": {
     "tabs.home": "Home",
@@ -2270,7 +2283,20 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "voiceFill.hint": "Say all the details once; the advisor fills the fields and you review before sending.",
     "voiceFill.done": "Filled. Review the details, then send.",
     "voiceFill.partial": "I filled what I heard. Tap the mic and answer:",
-    "voiceFill.hintInterests": "Pick from the interests list"
+    "voiceFill.hintInterests": "Pick from the interests list",
+    "advisor.act.title": "Booking at the club HQ",
+    "advisor.act.kind": "Booking type",
+    "advisor.act.hours": "Duration (hours)",
+    "advisor.act.pickDay": "Day",
+    "advisor.act.pickTime": "Available times",
+    "advisor.act.pickPurpose": "Purpose of the visit",
+    "advisor.act.noTimes": "No available times that day; pick another day.",
+    "advisor.act.confirm": "Confirm booking",
+    "advisor.act.incomplete": "Complete the choices first",
+    "advisor.act.working": "One moment…",
+    "advisor.act.foot": "The request goes to the club; the confirmation and your entry pass arrive in the app.",
+    "advisor.act.booked": "Booking request sent; awaiting the club’s confirmation. Follow it on the HQ page.",
+    "advisor.act.openHq": "My HQ bookings"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

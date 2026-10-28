@@ -7,10 +7,11 @@ import type { AuthService } from '../auth/service.js';
 import { riyadhNow } from '../hq/service.js';
 import { langOf } from '../lang.js';
 import { FILL_FIELD_TYPES, type FormFiller } from './fill.js';
+import type { HqProposal, IntentDetector } from './intents.js';
 import type { AdvisorService } from './service.js';
 import type { VoiceTranscriber } from './voice.js';
 
-export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber; filler?: FormFiller };
+export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber; filler?: FormFiller; intents?: IntentDetector };
 
 // The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
 const selection = z.string().trim().max(1000).nullish();
@@ -29,6 +30,16 @@ const messageSchema = z.object({
   context: contextSchema.nullish(),
 });
 const pollSchema = z.object({ after: z.coerce.number().int().nonnegative().default(0) });
+// M145: the app asks whether a chat line is an APP action before sending it to the hub.
+const pendingSchema = z.object({
+  kind: z.enum(['visit', 'office', 'meeting']),
+  hours: z.number().int().min(1).max(12),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  time: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
+  purpose: z.string().trim().max(120).nullable(),
+  note: z.string().trim().max(300),
+});
+const intentSchema = z.object({ text: z.string().trim().max(4000).default(''), pending: pendingSchema.nullish() });
 
 /** Chat with the hub advisor. Every route needs a session; the hub adds its own per-account limits. */
 // A one-minute m4a clip is ~1 MB; base64 adds a third. The cap keeps the route harmless.
@@ -56,7 +67,7 @@ const fillSchema = z.object({
   country: z.string().regex(/^[a-z]{2}$/i).optional(),
 });
 
-export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler }) => {
+export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler, intents }) => {
   const requireSession = sessionGuard(auth);
   const maybeSession = optionalSession(auth);
   const limiter = new RateLimiter();
@@ -109,6 +120,27 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
         return { text };
       } catch {
         return reply.code(502).send({ error: { code: 'voice_failed', message: 'تعذر تحويل الصوت إلى نص، حاول مرة أخرى' } });
+      }
+    }),
+  );
+
+  // M145 «المساعد ينفّذ»: app intents (HQ booking card, open a screen, prefilled service request). No intent → the app sends to the hub as usual.
+  app.post(
+    '/api/advisor/intent',
+    guard(async (request, reply) => {
+      if (!intents) return { action: null, reply: null };
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (!limiter.hit(`intent:${request.ip}`, 90, 15 * 60_000)) return { action: null, reply: null };
+      const body = parse(intentSchema, request.body, reply);
+      if (!body) return;
+      if (!body.text && !body.pending) return { action: null, reply: null };
+      const me = await auth.me(current.session);
+      try {
+        return await intents.detect({ text: body.text, lang: langOf(request), me, pending: (body.pending ?? null) as HqProposal | null });
+      } catch (error) {
+        request.log.warn({ err: error }, 'intent detection failed');
+        return { action: null, reply: null };
       }
     }),
   );

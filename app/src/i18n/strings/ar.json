@@ -1133,5 +1133,18 @@
   "voiceFill.hint": "تكلّم بكل البيانات مرة واحدة، والمستشار يعبّئ الحقول وأنت تراجع قبل الإرسال.",
   "voiceFill.done": "تمت التعبئة، راجع البيانات ثم أرسل.",
   "voiceFill.partial": "عبّأت ما سمعته. اضغط الميكروفون وأجب:",
-  "voiceFill.hintInterests": "اختر من قائمة الاهتمامات"
+  "voiceFill.hintInterests": "اختر من قائمة الاهتمامات",
+  "advisor.act.title": "حجز في مقر النادي",
+  "advisor.act.kind": "نوع الحجز",
+  "advisor.act.hours": "المدة بالساعات",
+  "advisor.act.pickDay": "اليوم",
+  "advisor.act.pickTime": "الوقت المتاح",
+  "advisor.act.pickPurpose": "الغرض من الزيارة",
+  "advisor.act.noTimes": "لا توجد أوقات متاحة في هذا اليوم، اختر يومًا آخر.",
+  "advisor.act.confirm": "تأكيد الحجز",
+  "advisor.act.incomplete": "أكمل الاختيارات أولًا",
+  "advisor.act.working": "لحظة…",
+  "advisor.act.foot": "يُرسل الطلب للإدارة، ويصلك التأكيد وتصريح الدخول في التطبيق.",
+  "advisor.act.booked": "تم إرسال طلب الحجز، وبانتظار تأكيد الإدارة. تابعه من صفحة المقر.",
+  "advisor.act.openHq": "حجوزاتي في المقر"
 }

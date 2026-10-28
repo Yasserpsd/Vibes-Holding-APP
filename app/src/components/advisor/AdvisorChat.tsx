@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AdvisorGate, AdvisorProfile } from '@/api/advisor';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { advisorApi, type AdvisorGate, type AdvisorProfile, type HqProposal } from '@/api/advisor';
+import { errorMessage } from '@/api/client';
+import { hqApi } from '@/api/hq';
 import type { ChatMessage } from '@/components/advisor/useAdvisorChat';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -12,6 +16,7 @@ import { Chip } from '@/components/Chip';
 import { GlassCard, GoldHairline } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, SkeletonCards, usePulse } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { isProfileGate } from '@/components/ProfileGate';
 import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { showAdvisorBalance } from '@/lib/advisorBalance';
@@ -20,7 +25,8 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 
 import { Composer } from './Composer';
 import { CONTEXT_ICONS, toApiContext, welcomeStarters, type ChatContext, type ChatOpening } from './context';
-import { MessageBubble } from './MessageBubble';
+import { MessageBubble, type ChatAct } from './MessageBubble';
+import { SCREEN_ROUTES } from './screens';
 import { useAdvisorChat } from './useAdvisorChat';
 
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
@@ -59,7 +65,11 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   const insets = useSafeAreaInsets();
   const { me } = useAuth();
   const chat = useAdvisorChat();
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState('');
+  // M145: the server reads each line for an app action first; a booking still being completed rides along.
+  const [actBusy, setActBusy] = useState(false);
+  const pendingHq = useRef<HqProposal | null>(null);
   // The opening the member already answered; a new one (another portal or service) shows again.
   const [answeredOpening, setAnsweredOpening] = useState<ChatOpening | null>(null);
   const listRef = useRef<FlatList<Item>>(null);
@@ -83,6 +93,21 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     if (!text.trim() || chat.sending) return;
     setDraft('');
     setAnsweredOpening(opening);
+    // M145: an app action (HQ booking card, a screen, a prefilled service) is answered by the app itself
+    // and never reaches the hub; anything else goes to the advisor as before.
+    setActBusy(true);
+    try {
+      const intent = await advisorApi.intent(text, pendingHq.current);
+      if (intent.action) {
+        pendingHq.current = intent.action.type === 'hq_book' && intent.action.missing.length ? intent.action.proposal : null;
+        chat.addLocal(text, intent.reply ?? '', [intent.action]);
+        return;
+      }
+    } catch {
+      // The hub answers instead.
+    } finally {
+      setActBusy(false);
+    }
     const outcome = await chat.send(text, toApiContext(context));
     if (!outcome.accepted) setDraft((current) => current || text);
     // An older server took the message only without its context: the pill would claim what the advisor never
@@ -90,10 +115,45 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     if (outcome.contextRefused && latestContext.current === context) onClearContext();
   };
 
+  /** M145: a card's request — navigation, a re-check after a pick, or the booking itself. */
+  const act = async (request: ChatAct) => {
+    if (request.kind === 'screen') {
+      router.push(SCREEN_ROUTES[request.screen]);
+      return;
+    }
+    if (request.kind === 'service') {
+      router.push({ pathname: '/service/[key]', params: { key: request.key, answers: JSON.stringify(request.answers) } });
+      return;
+    }
+    if (actBusy) return;
+    setActBusy(true);
+    try {
+      if (request.kind === 'hq_pick') {
+        const result = await advisorApi.intent('', request.proposal);
+        if (result.action) {
+          pendingHq.current = result.action.type === 'hq_book' && result.action.missing.length ? result.action.proposal : null;
+          chat.replaceLocal(request.messageId, result.reply ?? '', [result.action]);
+        }
+        return;
+      }
+      const proposal = request.proposal;
+      if (!proposal.date || !proposal.time) return;
+      const space = proposal.kind === 'visit' ? null : proposal.kind;
+      await hqApi.book({ date: proposal.date, time: proposal.time, purpose: space ? '' : (proposal.purpose ?? ''), note: proposal.note, ...(space ? { space, hours: proposal.hours } : {}) });
+      await queryClient.invalidateQueries({ queryKey: ['hq'] });
+      pendingHq.current = null;
+      chat.replaceLocal(request.messageId, t('advisor.act.booked'), [{ type: 'screen', screen: 'hq', label: t('advisor.act.openHq') }]);
+    } catch (cause) {
+      chat.addLocal(null, errorMessage(cause), isProfileGate(cause) ? [{ type: 'membership' }] : []);
+    } finally {
+      setActBusy(false);
+    }
+  };
+
   // The balance shows up only when it is nearly out (owner's rule): otherwise the header carries no counter.
   const dailyLeft = me?.membership.aiDailyLeft ?? null;
   const nearlyOut = showAdvisorBalance(dailyLeft, me?.membership.aiDailyLimit);
-  const busy = chat.sending || chat.status !== 'ready';
+  const busy = chat.sending || actBusy || chat.status !== 'ready';
   const showOpening = Boolean(opening) && answeredOpening !== opening;
 
   return (
@@ -137,6 +197,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
                   message={item.message}
                   showQuickReplies={item.message.id === lastReplyId && !chat.waiting && !chat.sending && !showOpening}
                   onQuickReply={(text) => void submit(text)}
+                  onAct={(request) => void act(request)}
+                  actBusy={actBusy}
                 />
               </View>
             )}

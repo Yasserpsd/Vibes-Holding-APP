@@ -1133,5 +1133,18 @@
   "voiceFill.hint": "Say all the details once; the advisor fills the fields and you review before sending.",
   "voiceFill.done": "Filled. Review the details, then send.",
   "voiceFill.partial": "I filled what I heard. Tap the mic and answer:",
-  "voiceFill.hintInterests": "Pick from the interests list"
+  "voiceFill.hintInterests": "Pick from the interests list",
+  "advisor.act.title": "Booking at the club HQ",
+  "advisor.act.kind": "Booking type",
+  "advisor.act.hours": "Duration (hours)",
+  "advisor.act.pickDay": "Day",
+  "advisor.act.pickTime": "Available times",
+  "advisor.act.pickPurpose": "Purpose of the visit",
+  "advisor.act.noTimes": "No available times that day; pick another day.",
+  "advisor.act.confirm": "Confirm booking",
+  "advisor.act.incomplete": "Complete the choices first",
+  "advisor.act.working": "One moment…",
+  "advisor.act.foot": "The request goes to the club; the confirmation and your entry pass arrive in the app.",
+  "advisor.act.booked": "Booking request sent; awaiting the club’s confirmation. Follow it on the HQ page.",
+  "advisor.act.openHq": "My HQ bookings"
 }

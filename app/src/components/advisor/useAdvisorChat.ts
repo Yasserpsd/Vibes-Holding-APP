@@ -107,6 +107,25 @@ export function useAdvisorChat() {
     }
   }, [setMe]);
 
+  /**
+   * M145: an exchange handled by the app itself (an action card) — shown in the thread but never
+   * stored on the hub, so it lives until the next full reload. Returns the reply's id for later edits.
+   */
+  const addLocal = useCallback((userText: string | null, reply: string, actions: AdvisorMessage['actions']): number => {
+    optimisticCount.current += 1;
+    const base = OPTIMISTIC_BASE + optimisticCount.current * 2;
+    const at = new Date().toISOString();
+    const mine: ChatMessage[] = userText ? [{ id: base, clientKey: base, role: 'user', text: userText, at, by: null, image: null, audio: null, actions: [] }] : [];
+    const theirs: ChatMessage = { id: base + 1, clientKey: base + 1, role: 'assistant', text: reply, at, by: null, image: null, audio: null, actions };
+    setState((prev) => ({ ...prev, messages: [...prev.messages, ...mine, theirs], sendError: null }));
+    return base + 1;
+  }, []);
+
+  /** M145: replaces a local message's text and actions (a card after a pick or a confirm). */
+  const replaceLocal = useCallback((id: number, reply: string, actions: AdvisorMessage['actions']) => {
+    setState((prev) => ({ ...prev, messages: prev.messages.map((message) => (message.id === id ? { ...message, text: reply, actions } : message)) }));
+  }, []);
+
   /** Sends a message; `accepted` when the hub took it. */
   const send = useCallback(
     async (text: string, context: AdvisorContext | null): Promise<SendOutcome> => {
@@ -171,5 +190,5 @@ export function useAdvisorChat() {
   const dismissGate = useCallback(() => setState((prev) => ({ ...prev, gate: null })), []);
   const dismissError = useCallback(() => setState((prev) => ({ ...prev, sendError: null })), []);
 
-  return { ...state, load, send, dismissGate, dismissError };
+  return { ...state, load, send, addLocal, replaceLocal, dismissGate, dismissError };
 }
