@@ -328,6 +328,13 @@ export class MockHubClient implements HubClient {
     for (const [field, key, max] of fields) {
       if (key in body) (contact as unknown as Record<string, string>)[field] = str(body, key, max);
     }
+    // M147: the completion gate sends the phone (with its country) and the interests labels.
+    if ('phone' in body) {
+      const phone = str(body, 'phone', 40).replace(/\D+/g, '');
+      if (phone.length < 7) throw new HubError('phone', 'رقم الجوال غير صحيح', 400);
+      contact.phone = phone.startsWith('966') ? `0${phone.slice(3)}` : phone;
+    }
+    if ('interests' in body) contact.interests = str(body, 'interests', 300);
     // M74: the in-app category switch (mirrors the planned hub op_profile persona support).
     if ('persona' in body) {
       const persona = str(body, 'persona', 20).toLowerCase();
@@ -395,6 +402,8 @@ export class MockHubClient implements HubClient {
       avatar: contact.avatar,
       company: contact.company,
       member_type: contact.memberType,
+      // M147: like hub 2.21.3 — present only once the member picked interests (an empty value would block every mock account).
+      interests: contact.interests || undefined,
       city: contact.city,
       bio: contact.bio,
       pending_pay: contact.passHash && contact.verified && !contact.isMember ? 1 : 0,

@@ -24,6 +24,8 @@ export type MockContact = {
   company: string;
   /** M69: «فرد / شركة» chosen at registration ('' = legacy contact, treated as individual). */
   memberType: 'individual' | 'company' | '';
+  /** M147: the interests labels as the hub stores them (register / profile). */
+  interests: string;
   city: string;
   website: string;
   social: string;
@@ -97,6 +99,7 @@ export function blankContact(id: number, now: number): MockContact {
     bio: '',
     company: '',
     memberType: '',
+    interests: '',
     city: '',
     website: '',
     social: '',

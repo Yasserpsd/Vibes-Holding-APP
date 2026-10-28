@@ -97,6 +97,11 @@ const profileSchema = z
     bio: z.string().trim().max(600),
     social: z.string().trim().max(800),
     password: passwordSchema,
+    // M147: the completion gate.
+    phone: z.string().trim().min(5).max(40),
+    country: z.string().trim().toLowerCase().max(5),
+    interests: z.array(z.string().trim().min(1).max(40)).max(10),
+    interestsOther: z.string().trim().max(120),
   })
   .partial();
 // M79: the deliberate delete flow sends WHY (a picked reason or the member's own words) so the owner learns from it.

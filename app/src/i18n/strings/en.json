@@ -1146,5 +1146,16 @@
   "advisor.act.working": "One moment…",
   "advisor.act.foot": "The request goes to the club; the confirmation and your entry pass arrive in the app.",
   "advisor.act.booked": "Booking request sent; awaiting the club’s confirmation. Follow it on the HQ page.",
-  "advisor.act.openHq": "My HQ bookings"
+  "advisor.act.openHq": "My HQ bookings",
+  "completeProfile.title": "Welcome {name}, complete your profile first",
+  "completeProfile.body": "One step before the club opens: your basic details let the advisor and the team serve you properly. You can say them by voice.",
+  "completeProfile.persona": "Your category in the club",
+  "completeProfile.save": "Save and enter the club",
+  "completeProfile.saving": "Saving…",
+  "completeProfile.foot": "Your details live in your vcmem.com account; you can edit them later under «My account».",
+  "completeProfile.error.company": "Enter the company name.",
+  "completeProfile.error.phone": "Enter a valid mobile number after picking your country.",
+  "completeProfile.error.persona": "Pick your category in the club.",
+  "completeProfile.error.interests": "Pick at least one interest.",
+  "completeProfile.error.bio": "Write a short bio (at least one line)."
 }

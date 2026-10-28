@@ -1147,7 +1147,18 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.act.working": "لحظة…",
     "advisor.act.foot": "يُرسل الطلب للإدارة، ويصلك التأكيد وتصريح الدخول في التطبيق.",
     "advisor.act.booked": "تم إرسال طلب الحجز، وبانتظار تأكيد الإدارة. تابعه من صفحة المقر.",
-    "advisor.act.openHq": "حجوزاتي في المقر"
+    "advisor.act.openHq": "حجوزاتي في المقر",
+    "completeProfile.title": "أهلًا {name}، أكمل ملفك أولًا",
+    "completeProfile.body": "خطوة واحدة قبل ما يفتح النادي: بياناتك الأساسية تخلّي المستشار والإدارة يخدموك صح. تقدر تقولها بصوتك.",
+    "completeProfile.persona": "فئتك في النادي",
+    "completeProfile.save": "حفظ ودخول النادي",
+    "completeProfile.saving": "جارٍ الحفظ…",
+    "completeProfile.foot": "بياناتك محفوظة في حسابك على vcmem.com، وتقدر تعدّلها لاحقًا من «حسابي».",
+    "completeProfile.error.company": "اكتب اسم الشركة.",
+    "completeProfile.error.phone": "اكتب رقم جوال صحيح بعد اختيار دولتك.",
+    "completeProfile.error.persona": "اختر فئتك في النادي.",
+    "completeProfile.error.interests": "اختر اهتمامًا واحدًا على الأقل.",
+    "completeProfile.error.bio": "اكتب نبذة مختصرة عنك (سطر على الأقل)."
   },
   "en": {
     "tabs.home": "Home",
@@ -2296,7 +2307,18 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "advisor.act.working": "One moment…",
     "advisor.act.foot": "The request goes to the club; the confirmation and your entry pass arrive in the app.",
     "advisor.act.booked": "Booking request sent; awaiting the club’s confirmation. Follow it on the HQ page.",
-    "advisor.act.openHq": "My HQ bookings"
+    "advisor.act.openHq": "My HQ bookings",
+    "completeProfile.title": "Welcome {name}, complete your profile first",
+    "completeProfile.body": "One step before the club opens: your basic details let the advisor and the team serve you properly. You can say them by voice.",
+    "completeProfile.persona": "Your category in the club",
+    "completeProfile.save": "Save and enter the club",
+    "completeProfile.saving": "Saving…",
+    "completeProfile.foot": "Your details live in your vcmem.com account; you can edit them later under «My account».",
+    "completeProfile.error.company": "Enter the company name.",
+    "completeProfile.error.phone": "Enter a valid mobile number after picking your country.",
+    "completeProfile.error.persona": "Pick your category in the club.",
+    "completeProfile.error.interests": "Pick at least one interest.",
+    "completeProfile.error.bio": "Write a short bio (at least one line)."
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2365,6 +2387,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "ratings": "تقييمات المشاريع",
     "retired": "قفل النسخة التجريبية",
     "rateUs": "دعوة تقييم التطبيق على المتجر",
-    "voiceFill": "التعبئة الصوتية للنماذج"
+    "voiceFill": "التعبئة الصوتية للنماذج",
+    "completeProfile": "إكمال الملف بعد الدخول"
   }
 };

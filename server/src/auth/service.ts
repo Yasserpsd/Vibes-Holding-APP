@@ -73,7 +73,25 @@ export type Me = {
   cardNumber: string;
   /** M109e: filled per-request when the app asks in English; absent otherwise (display only). */
   en?: MeEnglish | null;
+  /**
+   * M147 «أكمل ملفك»: what the sign-in gate still needs before the app opens — a Google/Apple-born
+   * account lands with name + e-mail only. Empty = complete. Interests count only when the hub
+   * reports them (2.21.3+), so an older hub never blocks a member for a field it cannot show.
+   */
+  profileMissing: ProfileMissing[];
 };
+
+export type ProfileMissing = 'phone' | 'persona' | 'bio' | 'interests' | 'company';
+
+export function profileMissingOf(contact: HubContact): ProfileMissing[] {
+  const missing: ProfileMissing[] = [];
+  if (!String(contact.phone ?? '').trim()) missing.push('phone');
+  if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
+  if (String(contact.bio ?? '').trim().length < 10) missing.push('bio');
+  if (contact.interests !== undefined && !String(contact.interests).trim()) missing.push('interests');
+  if (contact.member_type === 'company' && !String(contact.company ?? '').trim()) missing.push('company');
+  return missing;
+}
 
 export type RegisterInput = {
   name: string;
@@ -98,6 +116,11 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
   password?: string;
   /** M74: the in-app category switch (the hub stores the persona; one identity source). */
   persona?: Persona;
+  /** M147: the completion gate fills the phone (with its country) and the interests (keys → Arabic labels for the hub). */
+  phone?: string;
+  country?: string;
+  interests?: string[];
+  interestsOther?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
@@ -160,6 +183,7 @@ export function toMe(contact: HubContact): Me {
     isModerator: contact.role === 'publisher',
     membership: membershipOf(contact),
     cardNumber: membershipNumber({ id: contact.id, persona: persona?.key ?? '' }),
+    profileMissing: profileMissingOf(contact),
   };
 }
 
@@ -565,6 +589,17 @@ export class AuthService {
     if (patch.social !== undefined) body.social = patch.social;
     if (patch.password) body.password = patch.password;
     if (patch.persona !== undefined) body.persona = patch.persona;
+    // M147: phone + interests from the completion gate (the hub validates the phone against the country).
+    if (patch.phone !== undefined) {
+      body.phone = patch.phone;
+      body.country = patch.country ?? 'sa';
+    }
+    if (patch.interests !== undefined) {
+      body.interests = patch.interests
+        .filter(isInterestKey)
+        .map((key) => (key === 'other' && patch.interestsOther?.trim() ? `أخرى: ${patch.interestsOther.trim()}` : interestLabel(key)))
+        .join('، ');
+    }
     const result = await this.deps.hub.call('profile', body);
     const contact = requireContact(result);
     // A hub plugin older than the persona-aware op_profile silently drops the field: say so instead of pretending.

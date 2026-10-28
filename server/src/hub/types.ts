@@ -29,6 +29,8 @@ export type HubContact = {
   company: string;
   /** M69 (plugin 2.18.0): «فرد / شركة» chosen at registration; '' on pre-2.18.0 contacts (treated as individual). */
   member_type: 'individual' | 'company' | '';
+  /** M147 (hub 2.21.3+): the stored interests labels («العقار، التقنية»); undefined on older hubs. */
+  interests?: string;
   city: string;
   bio: string;
   pending_pay: 0 | 1;
