@@ -329,6 +329,10 @@ export class MockHubClient implements HubClient {
       if (key in body) (contact as unknown as Record<string, string>)[field] = str(body, key, max);
     }
     // M147: the completion gate sends the phone (with its country) and the interests labels.
+    if ('member_type' in body) {
+      const kind = str(body, 'member_type', 20);
+      if (kind === 'individual' || kind === 'company') contact.memberType = kind;
+    }
     if ('phone' in body) {
       const phone = str(body, 'phone', 40).replace(/\D+/g, '');
       if (phone.length < 7) throw new HubError('phone', 'رقم الجوال غير صحيح', 400);

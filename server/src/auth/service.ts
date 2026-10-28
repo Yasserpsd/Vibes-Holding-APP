@@ -81,10 +81,12 @@ export type Me = {
   profileMissing: ProfileMissing[];
 };
 
-export type ProfileMissing = 'phone' | 'persona' | 'bio' | 'interests' | 'company';
+export type ProfileMissing = 'memberType' | 'phone' | 'persona' | 'bio' | 'interests' | 'company';
 
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
+  // Owner (2026-10-28): «فرد / شركة» is the first question — a social-born account never answered it.
+  if (contact.member_type !== 'individual' && contact.member_type !== 'company') missing.push('memberType');
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
   if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
   if (String(contact.bio ?? '').trim().length < 10) missing.push('bio');
@@ -117,6 +119,7 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
   /** M74: the in-app category switch (the hub stores the persona; one identity source). */
   persona?: Persona;
   /** M147: the completion gate fills the phone (with its country) and the interests (keys → Arabic labels for the hub). */
+  memberType?: 'individual' | 'company';
   phone?: string;
   country?: string;
   interests?: string[];
@@ -590,6 +593,7 @@ export class AuthService {
     if (patch.password) body.password = patch.password;
     if (patch.persona !== undefined) body.persona = patch.persona;
     // M147: phone + interests from the completion gate (the hub validates the phone against the country).
+    if (patch.memberType !== undefined) body.member_type = patch.memberType;
     if (patch.phone !== undefined) {
       body.phone = patch.phone;
       body.country = patch.country ?? 'sa';

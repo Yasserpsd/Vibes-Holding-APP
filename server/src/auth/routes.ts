@@ -98,6 +98,7 @@ const profileSchema = z
     social: z.string().trim().max(800),
     password: passwordSchema,
     // M147: the completion gate.
+    memberType: z.enum(['individual', 'company']),
     phone: z.string().trim().min(5).max(40),
     country: z.string().trim().toLowerCase().max(5),
     interests: z.array(z.string().trim().min(1).max(40)).max(10),

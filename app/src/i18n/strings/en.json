@@ -1157,5 +1157,6 @@
   "completeProfile.error.phone": "Enter a valid mobile number after picking your country.",
   "completeProfile.error.persona": "Pick your category in the club.",
   "completeProfile.error.interests": "Pick at least one interest.",
-  "completeProfile.error.bio": "Write a short bio (at least one line)."
+  "completeProfile.error.bio": "Write a short bio (at least one line).",
+  "completeProfile.error.memberType": "Pick: individual or company."
 }

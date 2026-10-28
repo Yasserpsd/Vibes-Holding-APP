@@ -18,7 +18,14 @@ export type AppSource = 'app-ios' | 'app-android' | 'app';
 export function sourceOf(request: FastifyRequest): AppSource {
   const header = request.headers['x-app-platform'];
   const value = (Array.isArray(header) ? header[0] : header)?.trim().toLowerCase();
-  return value === 'ios' ? 'app-ios' : value === 'android' ? 'app-android' : 'app';
+  if (value === 'ios') return 'app-ios';
+  if (value === 'android') return 'app-android';
+  // An app bundle older than M146 sends no header: React Native's own user agent still names the platform
+  // (okhttp on Android, CFNetwork/Darwin on iOS), so the admin mail reads right during the OTA rollout.
+  const ua = String(request.headers['user-agent'] ?? '');
+  if (/okhttp|android/i.test(ua)) return 'app-android';
+  if (/iphone|ipad|ios|darwin|cfnetwork/i.test(ua)) return 'app-ios';
+  return 'app';
 }
 
 export function langOf(request: FastifyRequest): AppLang {

@@ -1157,5 +1157,6 @@
   "completeProfile.error.phone": "اكتب رقم جوال صحيح بعد اختيار دولتك.",
   "completeProfile.error.persona": "اختر فئتك في النادي.",
   "completeProfile.error.interests": "اختر اهتمامًا واحدًا على الأقل.",
-  "completeProfile.error.bio": "اكتب نبذة مختصرة عنك (سطر على الأقل)."
+  "completeProfile.error.bio": "اكتب نبذة مختصرة عنك (سطر على الأقل).",
+  "completeProfile.error.memberType": "اختر: فرد أم شركة."
 }

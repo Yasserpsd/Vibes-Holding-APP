@@ -27,13 +27,13 @@ const base = {
 } as unknown as HubContact;
 
 test('m147: a Google-born account misses phone, الفئة and bio; interests only when the hub reports them', () => {
-  assert.deepEqual(profileMissingOf(base), ['phone', 'persona', 'bio']);
-  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['phone', 'persona', 'bio', 'interests']);
-  assert.deepEqual(profileMissingOf({ ...base, interests: 'العقار' }), ['phone', 'persona', 'bio']);
+  assert.deepEqual(profileMissingOf(base), ['memberType', 'phone', 'persona', 'bio']);
+  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['memberType', 'phone', 'persona', 'bio', 'interests']);
+  assert.deepEqual(profileMissingOf({ ...base, interests: 'العقار' }), ['memberType', 'phone', 'persona', 'bio']);
 });
 
 test('m147: complete profiles pass; a company without its name does not', () => {
-  const full = { ...base, phone: '0551234567', persona: 'investor', bio: 'نبذة طويلة بما يكفي للتحقق.', interests: 'العقار، التقنية' };
+  const full = { ...base, member_type: 'individual' as const, phone: '0551234567', persona: 'investor', bio: 'نبذة طويلة بما يكفي للتحقق.', interests: 'العقار، التقنية' };
   assert.deepEqual(profileMissingOf(full), []);
   assert.deepEqual(profileMissingOf({ ...full, bio: 'قصيرة' }), ['bio']);
   assert.deepEqual(profileMissingOf({ ...full, member_type: 'company' }), ['company']);

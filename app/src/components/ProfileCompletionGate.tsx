@@ -13,6 +13,7 @@ import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
+import { PaperCard } from '@/components/paper';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -49,6 +50,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
   const [interestsOther, setInterestsOther] = useState('');
   const [bio, setBio] = useState(me?.bio ?? '');
   const [company, setCompany] = useState(me?.company ?? '');
+  const [memberType, setMemberType] = useState<'individual' | 'company' | ''>(me?.memberType || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +61,9 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
 
   const submit = async () => {
     if (busy) return;
-    if (need('company') && company.trim().length < 2) return setError(t('completeProfile.error.company'));
+    if (need('memberType') && !memberType) return setError(t('completeProfile.error.memberType'));
+    const wantsCompany = memberType === 'company' || (need('company') && !need('memberType'));
+    if (wantsCompany && company.trim().length < 2) return setError(t('completeProfile.error.company'));
     if (need('phone') && phoneIssue(phone, country) !== null) return setError(t('completeProfile.error.phone'));
     if (need('persona') && !persona) return setError(t('completeProfile.error.persona'));
     if (need('interests') && interests.length === 0) return setError(t('completeProfile.error.interests'));
@@ -69,7 +73,8 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
     try {
       if (need('interests')) await interestsApi.save({ keys: interests, other: interests.includes('other') ? interestsOther : '' });
       const { me: updated } = await authApi.updateMe({
-        ...(need('company') ? { company: company.trim() } : {}),
+        ...(need('memberType') && memberType ? { memberType } : {}),
+        ...(wantsCompany ? { company: company.trim() } : {}),
         ...(need('phone') ? { phone: phone.trim(), country: countryCode } : {}),
         ...(need('persona') && persona ? { persona } : {}),
         ...(need('interests') ? { interests, interestsOther } : {}),
@@ -95,9 +100,10 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           </View>
           <Text style={styles.body}>{t('completeProfile.body')}</Text>
 
+          <PaperCard pinned>
           <VoiceFill
             fields={[
-              ...(need('company') ? [{ key: 'company', label: t('auth.register.companyName'), type: 'text' as const, required: true }] : []),
+              ...(need('company') || memberType === 'company' ? [{ key: 'company', label: t('auth.register.companyName'), type: 'text' as const, required: true }] : []),
               ...(need('phone') ? [{ key: 'phone', label: t('auth.register.phone'), type: 'phone' as const, required: true }] : []),
               ...(need('persona') && config ? [{ key: 'persona', label: t('completeProfile.persona'), type: 'select' as const, options: config.personas.map((item) => item.label), required: true }] : []),
               ...(need('interests') && interestsList.data
@@ -130,7 +136,17 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
             }}
           />
 
-          {need('company') ? <FormField label={t('auth.register.companyName')} value={company} onChangeText={setCompany} textContentType="organizationName" /> : null}
+          {need('memberType') ? (
+            <View style={styles.group}>
+              <Text style={styles.label}>{t('auth.register.memberType')}</Text>
+              <View style={styles.chips}>
+                <Chip label={t('auth.register.memberType.individual')} selected={memberType === 'individual'} onPress={() => setMemberType('individual')} />
+                <Chip label={t('auth.register.memberType.company')} selected={memberType === 'company'} onPress={() => setMemberType('company')} />
+              </View>
+            </View>
+          ) : null}
+
+          {need('company') || memberType === 'company' ? <FormField label={t('auth.register.companyName')} value={company} onChangeText={setCompany} textContentType="organizationName" /> : null}
 
           {need('phone') && config ? (
             <View style={styles.group}>
@@ -175,6 +191,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           {need('bio') ? <FormField label={t('auth.register.bio')} multiline value={bio} onChangeText={setBio} placeholder={t('auth.register.bioPlaceholder')} maxLength={600} /> : null}
 
           {error ? <Notice tone="warning" text={error} /> : null}
+          </PaperCard>
           <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} onPress={() => void submit()} />
           <Text style={styles.foot}>{t('completeProfile.foot')}</Text>
         </ScrollView>
@@ -190,9 +207,9 @@ const styles = StyleSheet.create({
   emblem: { width: 110, height: 110, alignSelf: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: NAVY, textAlign: 'center' },
-  body: { fontFamily: fonts.regular, fontSize: 14.5, lineHeight: 24, color: '#4A5568', textAlign: 'center' },
+  body: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 25, color: '#111827', textAlign: 'center' },
   group: { gap: spacing.xs },
-  label: { ...typography.caption, color: '#4A5568', textAlign: textStart },
+  label: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 14, color: '#111827', textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  foot: { ...typography.caption, color: '#718096', textAlign: 'center', borderRadius: radii.md },
+  foot: { ...typography.caption, color: '#374151', textAlign: 'center', borderRadius: radii.md },
 });

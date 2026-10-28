@@ -1158,7 +1158,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "completeProfile.error.phone": "اكتب رقم جوال صحيح بعد اختيار دولتك.",
     "completeProfile.error.persona": "اختر فئتك في النادي.",
     "completeProfile.error.interests": "اختر اهتمامًا واحدًا على الأقل.",
-    "completeProfile.error.bio": "اكتب نبذة مختصرة عنك (سطر على الأقل)."
+    "completeProfile.error.bio": "اكتب نبذة مختصرة عنك (سطر على الأقل).",
+    "completeProfile.error.memberType": "اختر: فرد أم شركة."
   },
   "en": {
     "tabs.home": "Home",
@@ -2318,7 +2319,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "completeProfile.error.phone": "Enter a valid mobile number after picking your country.",
     "completeProfile.error.persona": "Pick your category in the club.",
     "completeProfile.error.interests": "Pick at least one interest.",
-    "completeProfile.error.bio": "Write a short bio (at least one line)."
+    "completeProfile.error.bio": "Write a short bio (at least one line).",
+    "completeProfile.error.memberType": "Pick: individual or company."
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

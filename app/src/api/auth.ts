@@ -119,13 +119,14 @@ export type LoginResult = PendingResult | SignedInResult | TotpStepResult;
 export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLeft: number };
 export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
-export type ProfileMissing = 'phone' | 'persona' | 'bio' | 'interests' | 'company';
+export type ProfileMissing = 'memberType' | 'phone' | 'persona' | 'bio' | 'interests' | 'company';
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
   /** M74: the neutral's in-app category switch; the hub stores it (one identity source). */
   persona?: Persona;
   /** M147: the completion gate. */
+  memberType?: 'individual' | 'company';
   phone?: string;
   country?: string;
   interests?: string[];
