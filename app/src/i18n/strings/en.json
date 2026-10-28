@@ -1078,5 +1078,8 @@
   "security.extraTitle": "Additional security settings",
   "security.extraHint": "Sensitive account actions — open only when needed.",
   "security.extraOpen": "Open additional settings",
-  "security.reportProblem": "Report a problem"
+  "security.reportProblem": "Report a problem",
+  "retired.title": "The preview version has ended",
+  "retired.body": "Download the official Investors Club app from the store and sign in with the same account. The app is free of charge.",
+  "retired.button": "Get the official app"
 }

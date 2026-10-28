@@ -18,6 +18,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
+import { RetiredBuildGate } from '@/components/RetiredBuildGate';
 import { MembershipGateHost } from '@/components/MembershipGate';
 import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
@@ -170,6 +171,8 @@ export default function RootLayout() {
           <SplashFlash />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
           <AppLockGate />
+          {/* M137: the preview build is retired — a TEST binary shows only the «download the store app» cover. */}
+          <RetiredBuildGate />
         </GuestGateProvider>
       </AuthProvider>
     </QueryClientProvider>
