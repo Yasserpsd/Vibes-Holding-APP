@@ -182,6 +182,28 @@ export class PushService {
     return outcome;
   }
 
+  /** M136: one message per device, chosen by its account (interest targeting); devices that get the same message go out in one batch. */
+  async broadcastEach(choose: (device: { contactId: number; persona: string | null; lang: AppLang | null }) => Promise<PushMessage | null> | PushMessage | null): Promise<PushOutcome> {
+    const tokens = await this.load();
+    const groups = new Map<string, { message: PushMessage; tokens: string[] }>();
+    for (const entry of tokens) {
+      const message = await choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null });
+      if (!message) continue;
+      const key = JSON.stringify(message);
+      const group = groups.get(key) ?? { message, tokens: [] };
+      group.tokens.push(entry.token);
+      groups.set(key, group);
+    }
+    const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
+    for (const group of groups.values()) {
+      const result = await this.deliver(group.tokens, group.message, { targeted: true, devices: group.tokens.length });
+      outcome.sent += result.sent;
+      outcome.failed += result.failed;
+      outcome.dropped += result.dropped;
+    }
+    return outcome;
+  }
+
   private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {
     const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
     if (!tokens.length) return outcome;

@@ -361,6 +361,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
   // M107: the unified interests — one list for the news ranking, the Projects Bank filter, the agenda and the push.
   const interests = new InterestsService({ kv, news });
+  // M136: edition pushes follow each account's news topics (unified interests, else the legacy per-topic prefs).
+  news.useTopics(async (contactId) => (await interests.newsTopicsFor(contactId)) ?? (await news.prefs(contactId))?.topics ?? null);
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
   const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content') });
   // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).

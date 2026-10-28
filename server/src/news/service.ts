@@ -13,6 +13,7 @@ import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
 import { getNewsSources, outletNameFor } from './sources.js';
 import { fetchSpaSnippet } from './spa.js';
 import {
+  TOPIC_KEYS,
   tierLabel,
   topicLabel,
   type NewsItem,
@@ -57,6 +58,8 @@ export type Audience = { prefs: NewsPrefs | null; persona: string };
 type Indexed = { item: NewsItem; tokens: Set<string> };
 type Fresh = { source: NewsSource; entry: FeedEntry };
 type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl; /** Called after a run that stored new items (/api/sync). */ onChange?: () => void; /** M42: a NEW Saudi decision notifies every device (capped per day). */ push?: PushService };
+/** M136: the news topics an account chose (unified interests, else legacy prefs), null when it never saved any. */
+export type TopicsResolver = (contactId: number) => Promise<TopicKey[] | null>;
 
 /** M42: which decisions were already announced, and how many went out today (Riyadh). */
 export const NEWS_PUSH_KEY = 'push:news:decisions';
@@ -65,17 +68,26 @@ const NEWS_PUSH_SEEN_MAX = 600;
 type NewsPushState = { seen: string[]; day: string; sentToday: number };
 
 /**
- * M135 (owner, 2026-10-27: «كل ساعة خبر تقريبًا من ٩ص لحد ١٢ بالليل») replaces the M134 pair of fixed
- * daily digests: one push per Riyadh hour between HOURLY_FROM and HOURLY_TO — the best fresh story nobody
- * was notified about yet, any topic, per device language (M122), the body always the source's own title
- * (rule 7). An hour with no fresh story stays silent; nothing is ever pushed twice.
+ * M136 (owner, 2026-10-28: «العملاء اشتكوا من كتر الأخبار — خبرين فقط في اليوم لكل مجال، حسب اهتماماته»)
+ * replaces the M135 hourly pushes. The day has two EDITIONS (Riyadh EDITION_HOURS); each edition picks ONE
+ * story per topic — the best fresh story (last 24h) never picked before, every story placed under one topic
+ * only — so a topic never gets more than two stories a day. The feed shows only the picks of the latest two
+ * editions, narrowed to the member's interests; each edition sends ONE push per device: the best pick among
+ * that account's interests (else the edition's best story), per device language (M122), the body always the
+ * source's own title (rule 7). Two pushes a day per device, never more; nothing is ever pushed twice.
  */
+export const NEWS_PICKS_KEY = 'news:daily:picks';
+export const EDITION_HOURS = [10, 19] as const;
+const PICKS_PER_TOPIC_PER_EDITION = 1;
+const MAX_PER_TOPIC_PER_DAY = PICKS_PER_TOPIC_PER_EDITION * EDITION_HOURS.length;
+const PICKED_IDS_MAX = 600;
+export type EditionPick = { topic: TopicKey; id: string };
+export type Edition = { day: string; slot: number; filledAt: string; picks: Record<NewsLang, EditionPick[]>; pushedAt: string | null };
+export type PicksState = { editions: Edition[]; pickedIds: string[] };
+/** M134: the admin send-now remembers what it pushed so nothing repeats. */
 export const NEWS_DAILY_PUSH_KEY = 'push:news:daily';
-type HourlyPushState = { day: string; sentHours: number[]; pushedIds: string[] };
+type DigestPushState = { day: string; pushedIds: string[] };
 type DigestSlug = 'top' | 'sports';
-const HOURLY_FROM = 9;
-const HOURLY_TO = 23; // the 23:00 slot is the last one before midnight
-const HOURLY_WANTED = new Set<TopicKey>(['economy', 'markets', 'finance', 'sports']);
 const TOP_DIGEST = { slug: 'top' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Top business story today 📈' : 'أهم أخبار اليوم 📈') };
 const SPORTS_DIGEST = { slug: 'sports' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Sports today ⚽' : 'أخبار الرياضة اليوم ⚽') };
 const DIGESTS = [TOP_DIGEST, SPORTS_DIGEST];
@@ -102,13 +114,24 @@ export class NewsService {
   private sourceStatus = new Map<string, SourceStatus>();
   private timer: NodeJS.Timeout | null = null;
   private inflight: Promise<void> | null = null;
+  /** M136: the day's editions (latest first), kept in memory so the feed answers synchronously. */
+  private picks: PicksState = { editions: [], pickedIds: [] };
+  private topicsResolver: TopicsResolver | null = null;
 
   constructor(private readonly deps: Deps) {}
+
+  /** M136: wired after the interests service exists (app.ts) — edition pushes follow each account's interests. */
+  useTopics(resolver: TopicsResolver): void {
+    this.topicsResolver = resolver;
+  }
 
   async start(): Promise<void> {
     const snapshot = await this.deps.kv.get<NewsSnapshot>(NEWS_SNAPSHOT_KEY);
     if (snapshot?.items) this.load(snapshot.items, snapshot.updatedAt);
+    const picks = await this.deps.kv.get<PicksState>(NEWS_PICKS_KEY);
+    if (picks?.editions) this.picks = { editions: picks.editions, pickedIds: picks.pickedIds ?? [] };
     this.loadBoosts(await getNewsSources(this.deps.kv));
+    await this.runEditions();
     const minutes = this.deps.config.NEWS_REFRESH_MINUTES;
     if (minutes <= 0) {
       this.deps.log.warn('NEWS_REFRESH_MINUTES=0: news polling is disabled');
@@ -168,7 +191,7 @@ export class NewsService {
       await this.persist();
       if (added > 0) this.deps.onChange?.();
       await this.pushNewDecisions();
-      await this.pushHourlyNews();
+      await this.runEditions();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
         'news refreshed',
@@ -362,17 +385,141 @@ export class NewsService {
     return entry ? { title: entry.item.title, url: entry.item.url } : null;
   }
 
-  /** Personalized ranking: source tier, freshness, relevance and the member's interests (or persona defaults). */
+  /**
+   * M136: the feed is the day's picks only — the latest two editions, at most two stories per topic — narrowed
+   * to the member's interests (or persona defaults; guests see every topic), best first.
+   */
   feed(query: ListQuery, audience: Audience): NewsPage {
     const interests = audience.prefs?.topics.length ? audience.prefs.topics : this.suggestedTopics(audience.persona);
     const wanted = new Set(interests);
-    let rows = this.visible(query.lang ?? 'ar');
-    if (query.topic) rows = rows.filter((item) => item.topics.includes(query.topic as TopicKey));
     const now = Date.now();
-    const scored = rows
-      .map((item) => ({ item, score: scoreOf(item, wanted, now) + (this.boosts.get(item.sourceId) ?? 0) }))
+    const ranked = this.currentPicks(query.lang ?? 'ar', now)
+      .map((pick) => ({ item: pick.item, score: scoreOf(pick.item, wanted, now) + (this.boosts.get(pick.item.sourceId) ?? 0) }))
+      .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt))
+      .map(({ item }) => item);
+    // A story shows under every interest it carries, but no interest ever shows more than two stories a day.
+    const topics = query.topic ? [query.topic] : wanted.size ? [...wanted] : null;
+    const count = new Map<TopicKey, number>();
+    const rows = !topics
+      ? ranked
+      : ranked.filter((item) => {
+          const mine = topics.filter((topic) => item.topics.includes(topic));
+          if (!mine.some((topic) => (count.get(topic) ?? 0) < MAX_PER_TOPIC_PER_DAY)) return false;
+          for (const topic of mine) count.set(topic, (count.get(topic) ?? 0) + 1);
+          return true;
+        });
+    return paginate(rows, query, this.updatedAt, wanted.size > 0);
+  }
+
+  /** The picks on show: the latest two editions of this language; before the first edition ever, a live preview of the same rule. */
+  private currentPicks(lang: NewsLang, now: number): Array<EditionPick & { item: NewsItem }> {
+    const editions = this.picks.editions.slice(0, 2);
+    if (!editions.length) return this.choosePicks(lang, now, new Set(), MAX_PER_TOPIC_PER_DAY);
+    const rows: Array<EditionPick & { item: NewsItem }> = [];
+    for (const edition of editions) {
+      for (const pick of edition.picks[lang] ?? []) {
+        const item = this.items.get(pick.id)?.item;
+        if (item && !item.hidden && !item.duplicateOf) rows.push({ ...pick, item });
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * At most `perTopic` stories per topic: the fresh stories of the last 24 hours, best first, each placed under
+   * the first of its topics that still has room — so a story counts for one topic only.
+   */
+  private choosePicks(lang: NewsLang, now: number, exclude: Set<string>, perTopic: number): Array<EditionPick & { item: NewsItem }> {
+    const dayAgo = now - 24 * 3_600_000;
+    const pool = this.visible(lang).filter((item) => Date.parse(item.publishedAt) >= dayAgo && !exclude.has(item.id) && item.topics.length > 0);
+    const ranked = pool
+      .map((item) => ({ item, score: scoreOf(item, new Set(), now) + (this.boosts.get(item.sourceId) ?? 0) }))
       .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
-    return paginate(scored.map(({ item }) => item), query, this.updatedAt, wanted.size > 0);
+    // A story goes under its most specific topic first (the one fewest fresh stories carry), so «الاقتصاد» never swallows a startup or a sports story.
+    const common = new Map<TopicKey, number>();
+    for (const { item } of ranked) for (const key of item.topics) common.set(key, (common.get(key) ?? 0) + 1);
+    const taken = new Map<TopicKey, number>();
+    const picks: Array<EditionPick & { item: NewsItem }> = [];
+    for (const { item } of ranked) {
+      const own = TOPIC_KEYS.filter((key) => item.topics.includes(key)).sort((a, b) => (common.get(a) ?? 0) - (common.get(b) ?? 0));
+      const topic = own.find((key) => (taken.get(key) ?? 0) < perTopic);
+      if (!topic) continue;
+      taken.set(topic, (taken.get(topic) ?? 0) + 1);
+      picks.push({ topic, id: item.id, item });
+    }
+    return picks;
+  }
+
+  /** M136: fills every edition whose hour has passed today (one story per topic, both languages), then sends the unsent ones. */
+  async runEditions(now = Date.now()): Promise<void> {
+    try {
+      const day = riyadhDay(now);
+      const hour = riyadhHour(now);
+      let changed = false;
+      EDITION_HOURS.forEach((editionHour, index) => {
+        const slot = index + 1;
+        if (hour < editionHour || this.picks.editions.some((edition) => edition.day === day && edition.slot === slot)) return;
+        const exclude = new Set(this.picks.pickedIds);
+        const picks: Record<NewsLang, EditionPick[]> = { ar: [], en: [] };
+        for (const lang of ['ar', 'en'] as const) {
+          for (const pick of this.choosePicks(lang, now, exclude, PICKS_PER_TOPIC_PER_EDITION)) {
+            picks[lang].push({ topic: pick.topic, id: pick.id });
+            exclude.add(pick.id);
+          }
+        }
+        if (!picks.ar.length && !picks.en.length) return; // nothing fresh yet: the next poll retries this edition
+        this.picks.editions.unshift({ day, slot, filledAt: new Date(now).toISOString(), picks, pushedAt: null });
+        this.picks.editions = this.picks.editions.slice(0, 6);
+        this.picks.pickedIds = [...this.picks.pickedIds, ...picks.ar.map((pick) => pick.id), ...picks.en.map((pick) => pick.id)].slice(-PICKED_IDS_MAX);
+        changed = true;
+      });
+      if (changed) await this.deps.kv.set(NEWS_PICKS_KEY, this.picks satisfies PicksState);
+      await this.pushEditions(now);
+    } catch (error) {
+      this.deps.log.error({ err: error }, 'news editions failed');
+    }
+  }
+
+  /** Each unsent edition of today: one push per device — the best pick among the account's interests, else the edition's best story. */
+  private async pushEditions(now: number): Promise<void> {
+    const push = this.deps.push;
+    if (!push) return;
+    const day = riyadhDay(now);
+    for (const edition of this.picks.editions) {
+      if (edition.day !== day || edition.pushedAt) continue;
+      const ranked: Record<NewsLang, Array<EditionPick & { item: NewsItem }>> = { ar: [], en: [] };
+      for (const lang of ['ar', 'en'] as const) {
+        ranked[lang] = edition.picks[lang]
+          .flatMap((pick) => {
+            const item = this.items.get(pick.id)?.item;
+            return item ? [{ ...pick, item }] : [];
+          })
+          .sort((a, b) => scoreOf(b.item, new Set(), now) - scoreOf(a.item, new Set(), now));
+      }
+      const topicsCache = new Map<number, Promise<TopicKey[] | null>>();
+      const topicsOf = (contactId: number): Promise<TopicKey[] | null> => {
+        let pending = topicsCache.get(contactId);
+        if (!pending) {
+          pending = (this.topicsResolver ? this.topicsResolver(contactId) : Promise.resolve(null)).catch(() => null);
+          topicsCache.set(contactId, pending);
+        }
+        return pending;
+      };
+      const outcome = await push.broadcastEach(async (device) => {
+        const lang: NewsLang = device.lang === 'en' ? 'en' : 'ar';
+        const pool = ranked[lang].length ? ranked[lang] : ranked.ar;
+        if (!pool.length) return null;
+        const chosen = (await topicsOf(device.contactId)) ?? this.suggestedTopics(device.persona ?? '');
+        const wanted = new Set(chosen);
+        const pick = (wanted.size ? pool.find((entry) => entry.item.topics.some((topic) => wanted.has(topic))) : undefined) ?? pool[0];
+        if (!pick) return null;
+        const item = pick.item;
+        return { title: digestTitleFor(item, lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
+      });
+      if (outcome.sent === 0) continue; // nobody reached: the next poll retries
+      edition.pushedAt = new Date(now).toISOString();
+      await this.deps.kv.set(NEWS_PICKS_KEY, this.picks satisfies PicksState);
+    }
   }
 
   /**
@@ -413,62 +560,14 @@ export class NewsService {
     }
   }
 
-  /** M135: one push per Riyadh hour (HOURLY_FROM–HOURLY_TO). An hour with no fresh story, or whose send reached nobody, retries on the next poll of the same hour. */
-  private async pushHourlyNews(now = Date.now()): Promise<void> {
-    const push = this.deps.push;
-    if (!push) return;
-    try {
-      const hour = riyadhHour(now);
-      if (hour < HOURLY_FROM || hour > HOURLY_TO) return;
-      const today = riyadhDay(now);
-      const stored = await this.deps.kv.get<HourlyPushState>(NEWS_DAILY_PUSH_KEY);
-      const state: HourlyPushState =
-        stored && stored.day === today
-          ? { day: today, sentHours: [...(stored.sentHours ?? [])], pushedIds: [...(stored.pushedIds ?? [])] }
-          : { day: today, sentHours: [], pushedIds: [...(stored?.pushedIds ?? [])] };
-      if (state.sentHours.includes(hour)) return;
-      const already = new Set(state.pushedIds);
-      const picked: Partial<Record<NewsLang, NewsItem>> = {
-        ar: this.pickHourlyItem('ar', now, already),
-        en: this.pickHourlyItem('en', now, already),
-      };
-      if (!picked.ar && !picked.en) return;
-      const outcome = await push.broadcastLocalized((lang) => {
-        const item = lang === 'en' ? (picked.en ?? picked.ar) : picked.ar;
-        if (!item) return null;
-        return { title: digestTitleFor(item, lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
-      });
-      if (outcome.sent === 0) return;
-      state.sentHours.push(hour);
-      for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
-      state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
-      await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies HourlyPushState);
-    } catch (error) {
-      this.deps.log.error({ err: error }, 'news hourly push failed');
-    }
-  }
-
-  /** The hourly story: the best-scored item of the last 24 hours that nobody was notified about, any topic. */
-  private pickHourlyItem(lang: NewsLang, now: number, exclude: Set<string>): NewsItem | undefined {
-    const dayAgo = now - 24 * 3_600_000;
-    const pool = this.visible(lang).filter((item) => Date.parse(item.publishedAt) >= dayAgo && !exclude.has(item.id) && !item.decision);
-    const best = pool
-      .map((item) => ({ item, score: scoreOf(item, HOURLY_WANTED, now) + (this.boosts.get(item.sourceId) ?? 0) }))
-      .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt));
-    return best[0]?.item;
-  }
-
   /** M134: the owner's manual send («ابعت خبر دلوقتي») — the best fresh story goes to every device at once, same rules as the daily digest. */
   async pushDigestNow(kind: DigestSlug): Promise<{ sent: number; failed: number; title: string | null }> {
     const push = this.deps.push;
     if (!push) return { sent: 0, failed: 0, title: null };
     const now = Date.now();
     const today = riyadhDay(now);
-    const stored = await this.deps.kv.get<HourlyPushState>(NEWS_DAILY_PUSH_KEY);
-    const state: HourlyPushState =
-      stored && stored.day === today
-        ? { day: today, sentHours: [...(stored.sentHours ?? [])], pushedIds: [...(stored.pushedIds ?? [])] }
-        : { day: today, sentHours: [], pushedIds: [...(stored?.pushedIds ?? [])] };
+    const stored = await this.deps.kv.get<DigestPushState>(NEWS_DAILY_PUSH_KEY);
+    const state: DigestPushState = { day: today, pushedIds: [...(stored?.pushedIds ?? [])] };
     const already = new Set(state.pushedIds);
     const picked: Partial<Record<NewsLang, NewsItem>> = {
       ar: this.pickDigestItem(kind, 'ar', now, already),
@@ -481,10 +580,10 @@ export class NewsService {
       if (!item) return null;
       return { title: digest.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
     });
-    // A manual send never marks the hour as done; it only remembers the stories, so nothing repeats.
+    // A manual send only remembers the stories, so nothing repeats.
     for (const item of [picked.ar, picked.en]) if (item && !state.pushedIds.includes(item.id)) state.pushedIds.push(item.id);
     state.pushedIds = state.pushedIds.slice(-NEWS_PUSH_SEEN_MAX);
-    await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies HourlyPushState);
+    await this.deps.kv.set(NEWS_DAILY_PUSH_KEY, state satisfies DigestPushState);
     return { sent: outcome.sent, failed: outcome.failed, title: picked.ar?.title ?? picked.en?.title ?? null };
   }
 
