@@ -214,7 +214,7 @@ export type AppPayment = {
   currency: string;
   memberPrice: boolean;
   status: 'created' | 'paid' | 'failed';
-  provider: 'paymob' | 'mock';
+  provider: 'paymob' | 'moyasar' | 'mock' | 'code' | 'hub';
   transactionId: string | null;
   failureReason: string | null;
   createdAt: string;

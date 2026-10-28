@@ -107,6 +107,8 @@ export class MockHubClient implements HubClient {
         return answer(this.admin.member(body));
       case 'admin_payments':
         return answer(this.admin.payments(body));
+      case 'payment_get':
+        return answer(this.admin.paymentGet(body));
       case 'admin_tickets':
         return answer(this.admin.tickets(body));
       case 'admin_leads':

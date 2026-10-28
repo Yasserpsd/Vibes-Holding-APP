@@ -102,7 +102,7 @@ function AppPayments() {
                   { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
                   { key: 'service', label: 'الخدمة', cell: (row) => `${row.serviceTitle}${row.memberPrice ? ' · سعر الأعضاء' : ''}` },
                   { key: 'amount', label: 'المبلغ', num: true, cell: (row) => formatMoney(row.amount, row.currency) },
-                  { key: 'status', label: 'الحالة', cell: (row) => <Pill tone={APP_STATUSES[row.status].tone}>{APP_STATUSES[row.status].label}{row.provider === 'mock' ? ' · تجريبي' : ''}</Pill> },
+                  { key: 'status', label: 'الحالة', cell: (row) => <Pill tone={APP_STATUSES[row.status].tone}>{APP_STATUSES[row.status].label}{row.provider === 'mock' ? ' · تجريبي' : row.provider === 'hub' ? ' · من الموقع' : ''}</Pill> },
                   { key: 'why', label: 'ملاحظة', cell: (row) => row.failureReason || '—' },
                   { key: 'at', label: 'الوقت', cell: (row) => formatDateTime(row.paidAt ?? row.failedAt ?? row.createdAt) },
                 ]}

@@ -528,7 +528,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(dashboardRoutes, { service: dashboard, auth, interests });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });
-  await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync });
+  await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync, hub: hubClient, payments });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });

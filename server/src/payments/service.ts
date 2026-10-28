@@ -6,6 +6,7 @@ import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { priceFor, toPublicService, type ServicesContent } from '../content/services.js';
 import type { AppliedDiscount, DiscountsService } from '../discounts/service.js';
+import type { HubPayment } from '../hub/types.js';
 import type { Notifier, PaymentLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
@@ -15,6 +16,15 @@ import type { AppLang } from '../lang.js';
 import { invoiceHtml, invoiceSubject, invoiceText } from './invoice.js';
 import type { MoyasarConfirmer } from './moyasar.js';
 import type { PaymobGateway } from './paymob.js';
+
+/** M132a: what a hub (site) payment `action` is called on the invoice; anything else keeps the hub's own note. */
+const SITE_ACTION_TITLES: Record<string, string> = {
+  membership: 'العضوية السنوية لنادي المستثمرين',
+  workshop: 'ورشة عمل',
+  event: 'تسجيل فعالية',
+  pitchdeck: 'Pitch Deck',
+  urmeet: 'اصنع ملتقاك',
+};
 
 /**
  * In-app payments for real-world services (CLAUDE.md rule 3): the server creates the Paymob intention,
@@ -45,7 +55,7 @@ export type Payment = {
   memberPrice: boolean;
   status: PaymentStatus;
   /** M107: `code` = confirmed by a 100% discount code, no gateway involved. */
-  provider: 'paymob' | 'moyasar' | 'mock' | 'code';
+  provider: 'paymob' | 'moyasar' | 'mock' | 'code' | 'hub';
   /** M107: the discount code applied to this payment, if any (the use is recorded once it settles paid). */
   discountCode?: string | null;
   discountPercent?: number | null;
@@ -490,6 +500,71 @@ export class PaymentsService {
   /** Sends a minimal admin mail and surfaces the SMTP error text (why nothing arrives). */
   mailProbe(): Promise<{ sent: boolean; error: string | null; recipients: number }> {
     return this.deps.notifier.probe();
+  }
+
+  /**
+   * M132a (owner: «لو حد دفع من السايت نفس الفاتورة زي ابليكشن»): a payment the hub recorded on the SITE (Paymob on
+   * vcmem) becomes a paid payment here too, so the customer gets the SAME numbered invoice the app issues (mail +
+   * /pay/invoice/:id). Idempotent on the hub payment id; the hub's own receipt and admin mails are not repeated here.
+   */
+  async recordSitePayment(hubPayment: HubPayment & { lang?: string }, now = Date.now()): Promise<Payment | null> {
+    if (!hubPayment.success) return null;
+    const orderId = `hub:${hubPayment.id}`;
+    const existing = (await this.load()).find((entry) => entry.provider === 'hub' && entry.orderId === orderId);
+    if (existing) return existing;
+    const action = hubPayment.action || 'service';
+    const title = SITE_ACTION_TITLES[action] ?? (hubPayment.note || action);
+    const amountCents = Math.max(0, Math.round(hubPayment.amount_cents));
+    const paidAt = hubPayment.created_at ? new Date(`${hubPayment.created_at.replace(' ', 'T')}Z`) : new Date(now);
+    const stamp = Number.isNaN(paidAt.getTime()) ? new Date(now).toISOString() : paidAt.toISOString();
+    const lang: AppLang = hubPayment.lang === 'en' ? 'en' : 'ar';
+    const payment: Payment = {
+      id: randomUUID(),
+      contactId: hubPayment.contact_id || 0,
+      name: hubPayment.name || '',
+      email: hubPayment.email || '',
+      phone: hubPayment.phone || '',
+      serviceKey: `site:${action}`,
+      serviceTitle: title,
+      answers: hubPayment.note ? [{ key: 'note', label: lang === 'en' ? 'Site payment' : 'دفعة من الموقع', value: hubPayment.note }] : [],
+      amount: amountCents / 100,
+      amountCents,
+      currency: (hubPayment.currency || 'SAR').toUpperCase(),
+      memberPrice: false,
+      status: 'paid',
+      provider: 'hub',
+      discountCode: null,
+      discountPercent: null,
+      preDiscountSar: null,
+      intentionId: `hub:${hubPayment.txn_id || hubPayment.id}`,
+      orderId,
+      clientSecret: '',
+      checkoutUrl: '',
+      transactionId: hubPayment.txn_id || null,
+      failureReason: null,
+      lang,
+      createdAt: stamp,
+      updatedAt: new Date(now).toISOString(),
+      paidAt: stamp,
+      failedAt: null,
+    };
+    await this.mutate((payments) => {
+      payments.push(payment);
+    }, now);
+    const invoiceNo = await this.assignInvoiceNo(payment.id, now);
+    if (invoiceNo) {
+      payment.invoiceNo = invoiceNo;
+      if (payment.email) {
+        await this.deps.notifier.invoiceSend({
+          email: payment.email,
+          subject: invoiceSubject(invoiceNo, lang),
+          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+          html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
+        });
+      }
+    }
+    this.deps.log.info({ payment: payment.id, hub: hubPayment.id, action, invoiceNo: payment.invoiceNo ?? null }, 'site payment recorded with the app invoice');
+    return payment;
   }
 
   /** M110: the printable invoice page (/pay/invoice/:id) — paid payments only, in the buyer's language. */

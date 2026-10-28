@@ -1079,7 +1079,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "security.extraTitle": "إعدادات أمان إضافية",
     "security.extraHint": "إجراءات حساسة تخص حسابك — ادخل إليها فقط عند الحاجة.",
     "security.extraOpen": "فتح الإعدادات الإضافية",
-    "security.reportProblem": "تبليغ عن مشكلة"
+    "security.reportProblem": "تبليغ عن مشكلة",
+    "retired.title": "النسخة التجريبية انتهت",
+    "retired.body": "حمّل النسخة الرسمية Investors Club من المتجر وسجّل دخولك بنفس حسابك. التطبيق بدون رسوم.",
+    "retired.button": "تحميل النسخة الرسمية"
   },
   "en": {
     "tabs.home": "Home",
@@ -2160,7 +2163,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "security.extraTitle": "Additional security settings",
     "security.extraHint": "Sensitive account actions — open only when needed.",
     "security.extraOpen": "Open additional settings",
-    "security.reportProblem": "Report a problem"
+    "security.reportProblem": "Report a problem",
+    "retired.title": "The preview version has ended",
+    "retired.body": "Download the official Investors Club app from the store and sign in with the same account. The app itself costs nothing.",
+    "retired.button": "Get the official app"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2226,6 +2232,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "partners": "شركاؤنا",
     "profileNudge": "تنبيه إكمال البيانات",
     "profileGate": "بوابة إكمال البيانات",
-    "ratings": "تقييمات المشاريع"
+    "ratings": "تقييمات المشاريع",
+    "retired": "قفل النسخة التجريبية"
   }
 };

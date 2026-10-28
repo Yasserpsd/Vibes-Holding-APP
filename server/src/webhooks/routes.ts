@@ -4,6 +4,8 @@ import { z } from 'zod';
 import type { AdvisorService } from '../advisor/service.js';
 import type { AuthService } from '../auth/service.js';
 import type { DashboardService } from '../dashboard/service.js';
+import type { HubClient, HubResults } from '../hub/types.js';
+import type { PaymentsService } from '../payments/service.js';
 import type { ProjectsService } from '../projectsBank/service.js';
 import type { PushService } from '../push/service.js';
 import type { FeedService } from '../sync/feed.js';
@@ -20,6 +22,9 @@ export type WebhookRoutesOptions = {
   push: PushService;
   feed: FeedService;
   sync: SyncService;
+  /** M132a: a successful site payment is fetched from the hub (`payment_get`) and gets the app's numbered invoice. */
+  hub?: HubClient;
+  payments?: PaymentsService;
 };
 
 const eventSchema = z.object({ event: z.string().min(1).max(60), at: z.union([z.string(), z.number()]).optional(), data: z.record(z.string(), z.unknown()).default({}) });
@@ -104,6 +109,19 @@ export const webhookRoutes: FastifyPluginAsync<WebhookRoutesOptions> = async (ap
         break;
       case 'payment.recorded':
         options.dashboard.bust('hub');
+        // M132a: the webhook carries ids only; the hub answers payment_get with the row (trusted site). A failure is
+        // logged and the webhook still answers 200 — the hub never retries a 5xx into a duplicate invoice.
+        if (options.hub && options.payments && Number(data.success) === 1 && Number(data.id) > 0) {
+          try {
+            const answer = (await options.hub.call('payment_get', { id: Number(data.id) })) as Partial<HubResults['payment_get']>;
+            if (answer.ok && answer.payment) {
+              const payment = await options.payments.recordSitePayment(answer.payment);
+              request.log.info({ hub: data.id, payment: payment?.id ?? null, invoiceNo: payment?.invoiceNo ?? null }, 'site payment → app invoice');
+            }
+          } catch (error) {
+            request.log.warn({ err: error, hub: data.id }, 'site payment could not be turned into an app invoice');
+          }
+        }
         break;
       case 'config.changed':
         options.advisor.resetSettings();

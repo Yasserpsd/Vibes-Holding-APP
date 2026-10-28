@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
-import { articlePage } from './pages.js';
+import { APP_STORE_BADGE, PLAY_STORE_BADGE } from './badges.js';
 
 /**
  * M133 smart download link: ONE public URL (`/app`) that reads the device from the
@@ -17,16 +17,42 @@ export function storeUrlFor(userAgent: string): string | null {
   return null;
 }
 
+/** The club logo as the owner's site serves it (vcmem.com/app) — the original artwork, not a themed copy. */
+const CLUB_LOGO_URL = 'https://vcmem.com/wp-content/uploads/2025/11/%D9%84%D9%88%D8%AC%D9%88-%D9%86%D8%A7%D8%AF%D9%8A-%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%AB%D9%85%D8%B1%D9%8A%D9%86-%D8%AC%D9%88%D9%88%D9%84%D8%AF-%D8%B4%D9%81%D8%A7%D9%81.png';
+
+/**
+ * M132 (owner, 2026-10-28: «عربي انجليزي… اللوجوهات الأصلية… خلفية بيضاء باللون الأصلي»): the desktop page is white,
+ * bilingual, with the original logo and the official store badges — the same look as vcmem.com/app.
+ */
 export function downloadPage(): string {
-  const body = `
-<h1>حمّل تطبيق نادي المستثمرين</h1>
-<p>افتح هذه الصفحة من جوالك لتُحوَّل تلقائيًا إلى متجر جهازك، أو اختر المتجر بنفسك:</p>
-<div class="card" style="text-align:center">
-<a href="${APP_STORE_URL}" style="display:block;margin:10px 0;padding:14px 18px;border-radius:12px;background:#161616;border:1px solid #C9A227;color:#EDEDED;text-decoration:none;font-weight:700"> App Store — للآيفون</a>
-<a href="${PLAY_STORE_URL}" style="display:block;margin:10px 0;padding:14px 18px;border-radius:12px;background:#161616;border:1px solid #C9A227;color:#EDEDED;text-decoration:none;font-weight:700">▶ Google Play — للأندرويد</a>
+  return `<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Investors Club — حمّل تطبيق نادي المستثمرين</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+body{margin:0;background:#fff;color:#0d274a;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+.card{max-width:440px;width:100%;text-align:center;border:1px solid #e7ad3f;border-radius:24px;padding:36px 28px;box-shadow:0 24px 60px rgba(13,39,74,.12)}
+.logo{width:150px;height:150px;object-fit:contain;display:block;margin:0 auto 18px}
+h1{font-size:22px;margin:0 0 4px;line-height:1.4}
+h2{font-size:17px;font-weight:600;margin:0 0 14px;direction:ltr}
+p{font-size:14.5px;line-height:1.8;color:#4A5568;margin:0 0 4px}
+p.en{direction:ltr;font-size:13px;margin-bottom:18px}
+.badges{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:8px 0 10px}
+.badges a{line-height:0}.badges img{height:48px;width:auto;border-radius:8px}
+.hint{font-size:12px;color:#718096;margin-top:8px}
+</style></head><body>
+<div class="card">
+<img class="logo" alt="Investors Club" src="${CLUB_LOGO_URL}">
+<h1>حمّل تطبيق Investors Club الآن</h1>
+<h2>Download the Investors Club app now</h2>
+<p>سجّل حسابك في ثوانٍ — مستشارك، بنك المشاريع، الورش وكل الخدمات في التطبيق.</p>
+<p class="en">Register in seconds — your advisor, the Projects Bank, workshops and every service live in the app.</p>
+<div class="badges">
+<a href="${APP_STORE_URL}" aria-label="App Store"><img alt="Download on the App Store" src="${APP_STORE_BADGE}"></a>
+<a href="${PLAY_STORE_URL}" aria-label="Google Play"><img alt="Get it on Google Play" src="${PLAY_STORE_BADGE}"></a>
 </div>
-<p class="en" style="color:#7A7A7A">Open this page on your phone to be redirected to your store automatically, or pick a store above.</p>`;
-  return articlePage({ title: 'تحميل تطبيق نادي المستثمرين', body });
+<div class="hint">اضغط على الشعار للتحميل · Tap the badge to download</div>
+</div></body></html>`;
 }
 
 export const appLinkRoutes: FastifyPluginAsync = async (app) => {

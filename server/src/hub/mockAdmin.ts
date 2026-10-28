@@ -308,6 +308,14 @@ export class MockAdmin {
     return { ok: true, ...paged(rows, body), sum_cents_ok: rows.reduce((sum, row) => sum + (row.success ? row.amount_cents : 0), 0) };
   }
 
+  /** M132a (plugin 2.21.0 `payment_get`): one recorded payment by id — trusted site only, no admin uuid needed. */
+  paymentGet(body: HubBody): HubResults['payment_get'] {
+    const id = Number(body.id);
+    const row = this.deps.state.payments.find((entry) => entry.id === id);
+    if (!row) throw new HubError('not_found', 'الدفعة غير موجودة', 404);
+    return { ok: true, payment: { ...this.payment(row), lang: 'ar' } };
+  }
+
   tickets(body: HubBody): HubResults['admin_tickets'] {
     this.requireRole(body, ['admin']);
     const q = str(body, 'q', 120).toLowerCase();

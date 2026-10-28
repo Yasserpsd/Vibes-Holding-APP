@@ -96,6 +96,8 @@ export type HubOp =
   | 'changes'
   | 'publish'
   | 'send_mail'
+  // M132a (plugin 2.21.0): one recorded site payment by id, so a site payment gets the app's numbered invoice.
+  | 'payment_get'
   | 'feed';
 
 export type HubBody = Record<string, unknown>;
@@ -313,6 +315,7 @@ export type HubResults = {
   admin_mail: { ok: true; stats: HubMailStats; items: HubMailItem[] };
   /** M112: the hub sends a mail on the app's behalf (wp_mail there — HTTPS, no SMTP ports). */
   send_mail: { ok: true; sent: boolean; to: number };
+  payment_get: { ok: true; payment: HubPayment & { lang?: string } };
   admin_grant: { ok: true; contact: HubContact; event: HubEvent };
   admin_set_role: { ok: true; contact: HubContact };
   activate_member: { ok: true; contact: HubContact; already: boolean };

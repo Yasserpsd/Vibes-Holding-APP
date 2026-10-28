@@ -8,6 +8,8 @@ import { colors, fonts, spacing } from '@/theme/tokens';
 
 /** M133b: the smart download link — iPhone → App Store, Android → Google Play, anything else → a page with both. */
 const STORE_LINK = 'https://api.vibesholdingsa.com/app';
+/** The club's original navy (vcmem.com/app), on white. */
+const NAVY = '#0d274a';
 
 /**
  * M137 (owner, 2026-10-28: «مش عايز تجريبي، عايز أجبر كله ينزل الرسمي فقط»): the preview build is retired.
@@ -18,9 +20,10 @@ export function RetiredBuildGate() {
   if (env.isProduction || __DEV__) return null;
   return (
     <View style={styles.cover}>
-      <Image source={require('../../assets/images/club-emblem.png')} style={styles.emblem} resizeMode="contain" />
+      {/* M132 (owner, 2026-10-28): white, the original logo and colours — not the dark-gold theme */}
+      <Image source={require('../../assets/images/club-logo.png')} style={styles.emblem} resizeMode="contain" />
       <View style={styles.row}>
-        <Ionicons name="cloud-download-outline" size={20} color={colors.gold} />
+        <Ionicons name="cloud-download-outline" size={20} color={NAVY} />
         <Text style={styles.title}>{t('retired.title')}</Text>
       </View>
       <Text style={styles.body}>{t('retired.body')}</Text>
@@ -38,14 +41,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
     elevation: 1000,
-    backgroundColor: colors.black,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.lg,
     padding: spacing.xl,
   },
-  emblem: { width: 110, height: 110, opacity: 0.9 },
+  emblem: { width: 160, height: 160 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: colors.textPrimary, textAlign: 'center' },
-  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 26, color: colors.textSecondary, textAlign: 'center' },
+  title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: NAVY, textAlign: 'center' },
+  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 26, color: '#4A5568', textAlign: 'center' },
 });
