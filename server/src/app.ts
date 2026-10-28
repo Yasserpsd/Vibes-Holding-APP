@@ -14,6 +14,7 @@ import { backupRoutes } from './backup/routes.js';
 import { BackupService } from './backup/service.js';
 import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
+import { TotpStore } from './auth/totp.js';
 import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { PersonaRequestsService } from './auth/personaRequests.js';
@@ -249,7 +250,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
-  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites });
+  // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
+  const totp = new TotpStore(kv);
+  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   const hq = new HqService({ kv, log: app.log, notifier, push });
@@ -433,6 +436,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       registrationOpen: auth.registrationOpen,
       adminOnly: auth.adminOnly,
       adminOtp: auth.adminOtpStatus,
+      adminTotp: auth.adminTotpEnabled ? 'on' : 'off',
       social: social.status,
       ...(config.APP_ENV === 'test' ? { keyFingerprint: keyFingerprint(config.HUB_SITE_KEY) } : {}),
     },

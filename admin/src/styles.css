@@ -201,6 +201,12 @@ button.tile:hover { border-color: var(--gold-line); }
 .confirm { display: grid; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--gold-line); background: var(--gold-wash); }
 .confirm.danger { border-color: rgba(229, 72, 77, 0.5); background: var(--danger-wash); }
 .confirm.danger h3 { color: #ff8589; }
+/* M140: authenticator enrolment and backup codes. */
+.totp-enrol { display: grid; gap: 12px; justify-items: center; }
+.totp-steps { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; justify-self: stretch; color: var(--muted); font-size: 0.9rem; }
+.totp-qr { width: 220px; height: 220px; border-radius: 12px; background: #fff; padding: 6px; display: grid; place-items: center; }
+.totp-secret { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 1px; font-size: 0.95rem; color: var(--gold-bright); text-align: center; user-select: all; }
+.totp-codes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; letter-spacing: 1px; user-select: all; }
 /* «نصوص التطبيق»: each text as the member reads it; a tap opens its wording. */
 .wording-list { display: grid; gap: 8px; }
 .wording { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; }

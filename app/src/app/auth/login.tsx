@@ -1,4 +1,4 @@
-import { Link, useRouter } from 'expo-router';
+import { Link, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
@@ -44,6 +44,11 @@ export default function LoginScreen() {
       const result = await authApi.login(login, password, country);
       if (result.pending) {
         router.push({ pathname: '/auth/verify', params: { pendingToken: result.pendingToken, email: result.email, text: result.text } });
+        return;
+      }
+      // M140: the account has an authenticator app — its code ends the sign-in.
+      if ('totp' in result) {
+        router.push(`/auth/totp?stepToken=${encodeURIComponent(result.stepToken)}` as Href);
         return;
       }
       await signIn(result.token, result.me);

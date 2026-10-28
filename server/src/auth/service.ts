@@ -11,6 +11,7 @@ import type { SocialIdentity } from './social.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
+import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
 export type Persona = 'neutral' | 'entrepreneur' | 'investor';
@@ -104,7 +105,14 @@ export type SignedInResult = { pending: false; token: string; me: Me };
 export type LoginResult = PendingResult | SignedInResult;
 /** The dashboard's password was right; the session starts after the e-mailed code (M18). */
 export type OtpResult = { pending: false; otp: true; challengeToken: string; email: string; seconds: number; resendAfter: number };
-export type AdminLoginResult = LoginResult | OtpResult;
+/** M140: the account has an authenticator app; the session starts after its 6-digit code (or a backup code). */
+export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
+/** M140: a dashboard account without an authenticator yet (ADMIN_TOTP=1) enrols one before its first session. */
+export type TotpSetupResult = { pending: false; totpSetup: true; setupToken: string; secret: string; uri: string; seconds: number };
+export type MemberLoginResult = LoginResult | TotpStepResult;
+export type AdminLoginResult = LoginResult | OtpResult | TotpStepResult | TotpSetupResult;
+/** The first dashboard sign-in after enrolment: the session plus the backup codes, shown once. */
+export type EnrolledResult = SignedInResult & { backupCodes: string[] };
 
 export class AuthError extends Error {
   constructor(
@@ -155,7 +163,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -219,7 +227,7 @@ export class AuthService {
     return { mailSent: result.mail_sent === 1, text: result.text ?? '' };
   }
 
-  async verify(pendingToken: string, code: string, ip: string): Promise<SignedInResult> {
+  async verify(pendingToken: string, code: string, ip: string): Promise<MemberLoginResult> {
     const pending = await this.requirePending(pendingToken);
     const result = await this.deps.hub.call('verify', { uuid: pending.uuid, code, ip, page_url: 'app://verify' });
     const contact = requireContact(result);
@@ -230,7 +238,7 @@ export class AuthService {
     return this.signIn(pending.uuid, contact);
   }
 
-  async login(login: string, password: string, ip: string, country?: string): Promise<LoginResult> {
+  async login(login: string, password: string, ip: string, country?: string): Promise<MemberLoginResult> {
     const uuid = newUuid();
     // The login field takes a phone from ANY country (the app sends the picked country code);
     // normalised here because the hub's own vai_norm_phone only understands Saudi local forms.
@@ -276,7 +284,7 @@ export class AuthService {
    * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
    * verified, so there is no code step; the same test-environment gates as password login apply.
    */
-  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar'): Promise<SignedInResult> {
+  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar'): Promise<MemberLoginResult> {
     if (!identity.emailVerified) {
       throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
     }
@@ -340,7 +348,7 @@ export class AuthService {
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }
     const { otp } = this.deps;
-    if (!this.adminOtpEnabled || !otp) return this.signIn(uuid, contact);
+    if (!this.adminOtpEnabled || !otp) return this.adminSecondFactor(uuid, contact, false);
     if (this.adminOtpStatus === 'no_mail') {
       await this.dropVisitor(uuid);
       throw new AuthError('otp_mail_off', 'تعذر إرسال رمز الدخول: بريد الخادم غير مهيأ', 503);
@@ -367,7 +375,7 @@ export class AuthService {
     return { seconds: otp.seconds, resendAfter: OTP_RESEND_GAP_SECONDS };
   }
 
-  async adminVerify(challengeToken: string, code: string): Promise<SignedInResult> {
+  async adminVerify(challengeToken: string, code: string): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
     const result = await this.requireOtp().check(challengeToken, code);
     if (!result.ok) {
       if (result.reason === 'bad_code') throw new AuthError('otp_bad_code', `الرمز غير صحيح، باقي ${result.attemptsLeft} محاولات`, 400);
@@ -383,8 +391,133 @@ export class AuthService {
       await this.dropVisitor(uuid);
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }
-    const token = await this.deps.sessions.createSession(uuid, contact.id, true);
-    return { pending: false, token, me: this.remember(uuid, contact) };
+    return this.adminSecondFactor(uuid, contact, true);
+  }
+
+  // ---- M140: authenticator app (TOTP) — mandatory for the dashboard with ADMIN_TOTP=1, optional for members.
+
+  get adminTotpEnabled(): boolean {
+    return this.deps.config.ADMIN_TOTP === '1' && Boolean(this.deps.totp);
+  }
+
+  /** After the password (and the e-mailed code): the authenticator code of an enrolled account, or the enrolment of a new one. */
+  private async adminSecondFactor(uuid: string, contact: HubContact, viaOtp: boolean): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
+    const { totp } = this.deps;
+    if (!this.adminTotpEnabled || !totp) return this.issueSession(uuid, contact, viaOtp, false);
+    if (await totp.enabled(contact.id)) {
+      const stepToken = await totp.beginStep(contact.id, uuid, 'dashboard', viaOtp);
+      return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
+    }
+    const setup = await totp.beginSetup(contact.id, uuid, 'dashboard', viaOtp);
+    return { pending: false, totpSetup: true, setupToken: setup.token, secret: setup.secret, uri: otpauthUri(contact.email, setup.secret), seconds: TOTP_TOKEN_SECONDS };
+  }
+
+  /** Dashboard: the authenticator code (or a backup code) of an enrolled account ends the sign-in. */
+  async adminTotpVerify(stepToken: string, code: string): Promise<SignedInResult> {
+    const result = await this.requireTotp().checkStep(stepToken, code);
+    if (!result.ok) throw totpFailure(result.reason);
+    if (result.audience !== 'dashboard') throw new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    const contact = await this.dashboardContact(result.uuid);
+    return this.issueSession(result.uuid, contact, result.adminVerified, true);
+  }
+
+  /** Dashboard: the first code of a fresh enrolment proves the app holds the secret; the session starts and the backup codes show once. */
+  async adminTotpEnroll(setupToken: string, code: string): Promise<EnrolledResult> {
+    const result = await this.requireTotp().completeSetup(setupToken, code);
+    if (!result.ok) throw totpFailure(result.reason);
+    if (result.audience !== 'dashboard' || !result.uuid) throw new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    const contact = await this.dashboardContact(result.uuid);
+    this.notifyTotp(contact.email, 'enabled');
+    const signedIn = await this.issueSession(result.uuid, contact, result.adminVerified, true);
+    return { ...signedIn, backupCodes: result.backupCodes };
+  }
+
+  /** App: the authenticator code of a member who switched the extra protection on ends the sign-in. */
+  async totpLogin(stepToken: string, code: string): Promise<SignedInResult> {
+    const result = await this.requireTotp().checkStep(stepToken, code);
+    if (!result.ok) throw totpFailure(result.reason);
+    const account = await this.deps.hub.call('account', { uuid: result.uuid });
+    const contact = account.contact;
+    if (!contact || !contact.has_account) {
+      await this.dropVisitor(result.uuid);
+      throw new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    }
+    return this.issueSession(result.uuid, contact, false, true);
+  }
+
+  async totpStatus(contactId: number): Promise<TotpStatus> {
+    return this.requireTotp().status(contactId);
+  }
+
+  /** Account: start (or re-link, which needs a current code) the authenticator; nothing changes until the first code confirms. */
+  async totpSetup(session: SessionRecord, code: string | undefined): Promise<{ setupToken: string; secret: string; uri: string; seconds: number }> {
+    const totp = this.requireTotp();
+    const me = await this.me(session);
+    if (await totp.enabled(me.id)) {
+      if (!code) throw new AuthError('totp_code_needed', 'أدخل رمز تطبيق المصادقة الحالي أولًا', 400);
+      const verified = await totp.verify(me.id, code);
+      if (!verified.ok) throw new AuthError('totp_bad_code', 'الرمز غير صحيح', 400);
+    }
+    const setup = await totp.beginSetup(me.id, null, 'app', false);
+    return { setupToken: setup.token, secret: setup.secret, uri: otpauthUri(me.email, setup.secret), seconds: TOTP_TOKEN_SECONDS };
+  }
+
+  /** Account: the first code goes live; the backup codes are shown once. */
+  async totpConfirm(session: SessionRecord, setupToken: string, code: string): Promise<{ backupCodes: string[] }> {
+    const result = await this.requireTotp().completeSetup(setupToken, code);
+    if (!result.ok) throw totpFailure(result.reason);
+    if (result.contactId !== session.contactId) throw new AuthError('totp_expired', 'انتهت مهلة التفعيل، ابدأ من جديد', 410);
+    const me = await this.me(session);
+    this.notifyTotp(me.email, 'enabled');
+    return { backupCodes: result.backupCodes };
+  }
+
+  async totpBackup(session: SessionRecord, code: string): Promise<{ backupCodes: string[] }> {
+    const totp = this.requireTotp();
+    const verified = await totp.verify(session.contactId, code);
+    if (!verified.ok) throw new AuthError(verified.reason === 'none' ? 'totp_off' : 'totp_bad_code', verified.reason === 'none' ? 'الحماية الإضافية غير مفعلة' : 'الرمز غير صحيح', 400);
+    const backupCodes = await totp.regenerateBackup(session.contactId);
+    if (!backupCodes) throw new AuthError('totp_off', 'الحماية الإضافية غير مفعلة', 400);
+    return { backupCodes };
+  }
+
+  /** Account: off again with a current code — never for a dashboard account while ADMIN_TOTP is on. */
+  async totpDisable(session: SessionRecord, code: string): Promise<void> {
+    const totp = this.requireTotp();
+    const me = await this.me(session);
+    if (this.adminTotpEnabled && (me.isAdmin || me.isModerator)) {
+      throw new AuthError('totp_mandatory', 'حسابات إدارة النادي لا يمكنها إيقاف تطبيق المصادقة', 403);
+    }
+    const verified = await totp.verify(me.id, code);
+    if (!verified.ok) throw new AuthError(verified.reason === 'none' ? 'totp_off' : 'totp_bad_code', verified.reason === 'none' ? 'الحماية الإضافية غير مفعلة' : 'الرمز غير صحيح', 400);
+    await totp.disable(me.id);
+    this.notifyTotp(me.email, 'disabled');
+  }
+
+  private requireTotp(): TotpStore {
+    if (!this.deps.totp) throw new AuthError('totp_off', 'تطبيق المصادقة غير متاح على هذا الخادم', 503);
+    return this.deps.totp;
+  }
+
+  /** The role is read again: the hub may have changed it while the code was on its way. */
+  private async dashboardContact(uuid: string): Promise<HubContact> {
+    const account = await this.deps.hub.call('account', { uuid });
+    const contact = account.contact;
+    if (!contact || !contact.has_account || (contact.is_admin !== 1 && contact.role !== 'publisher')) {
+      await this.dropVisitor(uuid);
+      throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
+    }
+    return contact;
+  }
+
+  /** A word to the account's e-mail whenever its authenticator changes; never blocks the action. */
+  private notifyTotp(email: string, kind: 'enabled' | 'disabled'): void {
+    const text = kind === 'enabled'
+      ? ['تم ربط تطبيق المصادقة بحسابك في نادي المستثمرين Investors Club.', 'من الآن يطلب الدخول رمز التطبيق بعد كلمة المرور.', '', 'إذا لم تكن أنت من فعل ذلك فغيّر كلمة مرورك فورًا وتواصل مع إدارة النادي.']
+      : ['تم إيقاف الحماية الإضافية (تطبيق المصادقة) على حسابك في نادي المستثمرين Investors Club.', '', 'إذا لم تكن أنت من فعل ذلك فغيّر كلمة مرورك فورًا وتواصل مع إدارة النادي.'];
+    void this.deps.mailer?.send({ to: [email], subject: kind === 'enabled' ? 'تم تفعيل الحماية الإضافية على حسابك' : 'تم إيقاف الحماية الإضافية على حسابك', text: text.join('\n') }).catch((error: unknown) => {
+      this.deps.log.warn({ err: error instanceof Error ? error.message : 'unknown' }, 'authenticator notice was not mailed');
+    });
   }
 
   async authenticate(token: string): Promise<SessionRecord | null> {
@@ -528,8 +661,18 @@ export class AuthService {
     throw new AuthError('admin_only', 'النسخة التجريبية متاحة لحسابات إدارة النادي فقط', 403);
   }
 
-  private async signIn(uuid: string, contact: HubContact): Promise<SignedInResult> {
-    const token = await this.deps.sessions.createSession(uuid, contact.id);
+  /** A member sign-in: straight to a session, unless the account switched the authenticator on (M140). */
+  private async signIn(uuid: string, contact: HubContact): Promise<MemberLoginResult> {
+    const { totp } = this.deps;
+    if (totp && (await totp.enabled(contact.id))) {
+      const stepToken = await totp.beginStep(contact.id, uuid, 'app', false);
+      return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
+    }
+    return this.issueSession(uuid, contact, false, false);
+  }
+
+  private async issueSession(uuid: string, contact: HubContact, adminVerified: boolean, totpVerified: boolean): Promise<SignedInResult> {
+    const token = await this.deps.sessions.createSession(uuid, contact.id, adminVerified, totpVerified);
     return { pending: false, token, me: this.remember(uuid, contact) };
   }
 
@@ -539,6 +682,12 @@ export class AuthService {
     if (this.meCache.size > 5_000) this.meCache.clear();
     return me;
   }
+}
+
+function totpFailure(reason: 'gone' | 'bad_code' | 'locked'): AuthError {
+  if (reason === 'bad_code') return new AuthError('totp_bad_code', 'الرمز غير صحيح، تأكد من وقت جهازك وحاول مرة أخرى', 400);
+  if (reason === 'locked') return new AuthError('totp_locked', 'محاولات خاطئة كثيرة، ابدأ الدخول من جديد', 429);
+  return new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
 }
 
 function newUuid(): string {

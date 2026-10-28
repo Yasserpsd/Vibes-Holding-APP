@@ -144,8 +144,18 @@ export default function SecurityScreen() {
         </GlassCard>
       </FadeInView>
 
-      {/* M118d (owner): the sharp things live one level deeper, out of a stray tap's reach. */}
+      {/* M140 (owner): «حماية إضافية» — any authenticator app as the second step of the sign-in. */}
       <FadeInView delay={entranceDelay(2)}>
+        <GlassCard radius={radii.lg} style={styles.card}>
+          <CardTitle icon="shield-checkmark-outline" title={t('security.totpTitle')} />
+          <Text style={styles.lockHint}>{t('security.totpCardHint')}</Text>
+          <GoldHairline />
+          <AppButton label={t('security.totpOpen')} variant="outline" icon="shield-checkmark-outline" onPress={() => router.push('/security-2fa' as Href)} />
+        </GlassCard>
+      </FadeInView>
+
+      {/* M118d (owner): the sharp things live one level deeper, out of a stray tap's reach. */}
+      <FadeInView delay={entranceDelay(3)}>
         <GlassCard radius={radii.lg} style={styles.card}>
           <CardTitle icon="settings-outline" title={t('security.extraTitle')} />
           <Text style={styles.dangerText}>{t('security.extraHint')}</Text>

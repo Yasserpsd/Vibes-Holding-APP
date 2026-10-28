@@ -33,6 +33,8 @@ const envSchema = z.object({
   // Dashboard sign-in code by e-mail (M18): a second step after the hub password. Off until the mail delay is measured.
   // A code lives ADMIN_OTP_SECONDS; a dashboard session asks for a new code after ADMIN_SESSION_HOURS.
   ADMIN_OTP: z.enum(['0', '1']).default('0'),
+  // M140: every dashboard account (admin + moderator) must sign in with an authenticator app code; members choose.
+  ADMIN_TOTP: z.enum(['0', '1']).default('0'),
   ADMIN_OTP_SECONDS: z.coerce.number().int().min(30).max(600).default(60),
   ADMIN_SESSION_HOURS: z.coerce.number().positive().max(720).default(12),
   // Golden offer pages: pulled from each company's WordPress /offer/ page on this schedule. 0 disables polling (tests).

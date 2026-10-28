@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -54,6 +54,11 @@ export default function VerifyScreen() {
     setError(null);
     try {
       const result = await authApi.verify(pendingToken, code);
+      // M140: an account with an authenticator app finishes on its code screen.
+      if ('totp' in result) {
+        router.push(`/auth/totp?stepToken=${encodeURIComponent(result.stepToken)}` as Href);
+        return;
+      }
       // Interests chosen at signup are saved before the session is announced, so mounted screens
       // (the news tab) load them on their first request; a failure here must not block the account.
       const chosen = (interests ?? '').split(',').filter(Boolean);

@@ -111,7 +111,11 @@ export type RegisterInput = {
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
 export type SignedInResult = { pending: false; token: string; me: Me };
-export type LoginResult = PendingResult | SignedInResult;
+/** M140: the account switched «حماية إضافية» on — the sign-in ends with its authenticator code. */
+export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
+export type LoginResult = PendingResult | SignedInResult | TotpStepResult;
+export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLeft: number };
+export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
@@ -146,14 +150,21 @@ export type MembershipContent = {
 export const authApi = {
   register: (input: RegisterInput) => apiRequest<PendingResult>('POST', '/api/auth/register', { body: input, token: null }),
   resend: (pendingToken: string) => apiRequest<{ mailSent: boolean; text: string }>('POST', '/api/auth/resend', { body: { pendingToken }, token: null }),
-  verify: (pendingToken: string, code: string) => apiRequest<SignedInResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
+  verify: (pendingToken: string, code: string) => apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
+  // M140: the authenticator code (or a backup code) that ends a sign-in answered with `totp: true`.
+  totp: (stepToken: string, code: string) => apiRequest<SignedInResult>('POST', '/api/auth/totp', { body: { stepToken, code }, token: null }),
+  totpStatus: () => apiRequest<TotpStatus>('GET', '/api/me/totp'),
+  totpSetup: (code?: string) => apiRequest<TotpSetup>('POST', '/api/me/totp/setup', { body: code ? { code } : {} }),
+  totpConfirm: (setupToken: string, code: string) => apiRequest<{ backupCodes: string[] }>('POST', '/api/me/totp/confirm', { body: { setupToken, code } }),
+  totpBackup: (code: string) => apiRequest<{ backupCodes: string[] }>('POST', '/api/me/totp/backup', { body: { code } }),
+  totpDisable: (code: string) => apiRequest<{ ok: true }>('POST', '/api/me/totp/disable', { body: { code } }),
   // M126: `country` rides along when the member typed a phone number, so the server can build
   // the international digits for any country (the hub itself only understands Saudi local forms).
   login: (login: string, password: string, country?: string) =>
     apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}) }, token: null }),
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
-    apiRequest<SignedInResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
+    apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
   resetRequest: (login: string, country?: string) =>
     apiRequest<{ ok: true }>('POST', '/api/auth/reset/request', { body: { login, ...(country ? { country } : {}) }, token: null }),
   resetConfirm: (login: string, code: string, password: string, country?: string) =>

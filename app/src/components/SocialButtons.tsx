@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -35,6 +35,11 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
         return;
       }
       const signedIn = await authApi.social(result.provider, result.token, result.name || undefined);
+      // M140: an account with an authenticator app finishes on its code screen.
+      if ('totp' in signedIn) {
+        router.push(`/auth/totp?stepToken=${encodeURIComponent(signedIn.stepToken)}` as Href);
+        return;
+      }
       await signIn(signedIn.token, signedIn.me);
       if (router.canDismiss()) router.dismissAll();
       else router.replace('/account');

@@ -77,6 +77,12 @@ const socialSchema = z.object({
 });
 const otpChallengeSchema = z.object({ challengeToken: pendingTokenSchema });
 const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema });
+// M140: a 6-digit authenticator code, or a backup code («XXXX-XXXX»).
+const totpCodeSchema = z.string().trim().min(6, 'أدخل الرمز').max(12);
+const totpStepSchema = z.object({ stepToken: pendingTokenSchema, code: totpCodeSchema });
+const totpSetupSchema = z.object({ setupToken: pendingTokenSchema, code: totpCodeSchema });
+const totpCodeBodySchema = z.object({ code: totpCodeSchema });
+const totpSetupStartSchema = z.object({ code: totpCodeSchema.optional() });
 const resetRequestSchema = z.object({ login: loginFieldSchema, country: countrySchema });
 const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, password: passwordSchema });
 const profileSchema = z
@@ -169,7 +175,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(verifySchema, request.body, reply);
       if (!body) return;
       const result = await service.verify(body.pendingToken, body.code, request.ip);
-      return { ...result, me: await withEnglish(request, result.me) };
+      return 'totp' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -180,7 +186,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
       const result = await service.login(body.login, body.password, request.ip, body.country);
-      return result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+      return result.pending || 'totp' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -193,7 +199,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
       const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request));
-      return { ...result, me: await withEnglish(request, result.me) };
+      return 'totp' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -225,6 +231,102 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(otpChallengeSchema, request.body, reply);
       if (!body) return;
       return service.adminResend(body.challengeToken);
+    }),
+  );
+
+  // M140: the authenticator code completes a member sign-in whose account has one.
+  app.post(
+    '/api/auth/totp',
+    guard(async (request, reply) => {
+      if (limited('totp', 20, request, reply)) return;
+      const body = parse(totpStepSchema, request.body, reply);
+      if (!body) return;
+      const result = await service.totpLogin(body.stepToken, body.code);
+      return { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  // M140: dashboard — the authenticator code of an enrolled account, or the first code of a fresh enrolment.
+  app.post(
+    '/api/admin/auth/totp/verify',
+    guard(async (request, reply) => {
+      if (limited('admin-totp', 20, request, reply)) return;
+      const body = parse(totpStepSchema, request.body, reply);
+      if (!body) return;
+      return service.adminTotpVerify(body.stepToken, body.code);
+    }),
+  );
+
+  app.post(
+    '/api/admin/auth/totp/enroll',
+    guard(async (request, reply) => {
+      if (limited('admin-totp', 20, request, reply)) return;
+      const body = parse(totpSetupSchema, request.body, reply);
+      if (!body) return;
+      return service.adminTotpEnroll(body.setupToken, body.code);
+    }),
+  );
+
+  // M140: «حماية إضافية» in the account — status, enrol / re-link, backup codes, off (never off for dashboard accounts while ADMIN_TOTP=1).
+  app.get(
+    '/api/me/totp',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      void reply.header('cache-control', 'no-store');
+      return service.totpStatus(current.session.contactId);
+    }),
+  );
+
+  app.post(
+    '/api/me/totp/setup',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (limited('totp-account', 20, request, reply)) return;
+      const body = parse(totpSetupStartSchema, request.body ?? {}, reply);
+      if (!body) return;
+      void reply.header('cache-control', 'no-store');
+      return service.totpSetup(current.session, body.code);
+    }),
+  );
+
+  app.post(
+    '/api/me/totp/confirm',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (limited('totp-account', 20, request, reply)) return;
+      const body = parse(totpSetupSchema, request.body, reply);
+      if (!body) return;
+      void reply.header('cache-control', 'no-store');
+      return service.totpConfirm(current.session, body.setupToken, body.code);
+    }),
+  );
+
+  app.post(
+    '/api/me/totp/backup',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (limited('totp-account', 20, request, reply)) return;
+      const body = parse(totpCodeBodySchema, request.body, reply);
+      if (!body) return;
+      void reply.header('cache-control', 'no-store');
+      return service.totpBackup(current.session, body.code);
+    }),
+  );
+
+  app.post(
+    '/api/me/totp/disable',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (limited('totp-account', 20, request, reply)) return;
+      const body = parse(totpCodeBodySchema, request.body, reply);
+      if (!body) return;
+      await service.totpDisable(current.session, body.code);
+      return { ok: true };
     }),
   );
 

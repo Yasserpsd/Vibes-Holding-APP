@@ -10,7 +10,13 @@ export type LoginResult =
   | { pending: false; otp?: undefined; token: string; me: Me };
 /** The password was right and the server e-mailed a short-lived code: the session starts after it (M18). */
 export type OtpStep = { pending: false; otp: true; challengeToken: string; email: string; seconds: number; resendAfter: number };
-export type AdminLoginResult = LoginResult | OtpStep;
+/** M140: the account has an authenticator app; the session starts after its code (or a backup code). */
+export type TotpStep = { pending: false; totp: true; stepToken: string; seconds: number };
+/** M140: a dashboard account without an authenticator yet links one before its first session. */
+export type TotpSetupStep = { pending: false; totpSetup: true; setupToken: string; secret: string; uri: string; seconds: number };
+export type AdminLoginResult = LoginResult | OtpStep | TotpStep | TotpSetupStep;
+export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLeft: number };
+export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
 export type PostLink = { label: string; url: string };
 /** An uploaded video: both values are `url`s the uploads endpoint returned. */
@@ -429,6 +435,11 @@ async function call<T>(method: string, path: string, body?: unknown, token: stri
   }
   const data = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
   if (!response.ok) {
+    // M18/M140: a session that lacks the e-mailed code or the authenticator step is over — back to the sign-in page.
+    if (response.status === 403 && token && (data?.error?.code === 'otp_required' || data?.error?.code === 'totp_required')) {
+      session.set(null);
+      window.location.reload();
+    }
     throw new ApiError(data?.error?.message ?? 'حدث خطأ غير متوقع', response.status, data?.error?.code ?? 'error');
   }
   return data as T;
@@ -466,6 +477,13 @@ export const api = {
   },
   otpVerify: (challengeToken: string, code: string) => call<LoginResult>('POST', '/api/admin/auth/verify', { challengeToken, code }, null),
   otpResend: (challengeToken: string) => call<{ seconds: number; resendAfter: number }>('POST', '/api/admin/auth/resend', { challengeToken }, null),
+  // M140: the authenticator step of the dashboard sign-in, and the account's own authenticator settings.
+  totpVerify: (stepToken: string, code: string) => call<LoginResult>('POST', '/api/admin/auth/totp/verify', { stepToken, code }, null),
+  totpEnroll: (setupToken: string, code: string) => call<LoginResult & { backupCodes: string[] }>('POST', '/api/admin/auth/totp/enroll', { setupToken, code }, null),
+  totpStatus: () => call<TotpStatus>('GET', '/api/me/totp'),
+  totpSetup: (code?: string) => call<TotpSetup>('POST', '/api/me/totp/setup', code ? { code } : {}),
+  totpConfirm: (setupToken: string, code: string) => call<{ backupCodes: string[] }>('POST', '/api/me/totp/confirm', { setupToken, code }),
+  totpBackup: (code: string) => call<{ backupCodes: string[] }>('POST', '/api/me/totp/backup', { code }),
   verify: (pendingToken: string, code: string) => call<LoginResult>('POST', '/api/auth/verify', { pendingToken, code }, null),
   me: () => call<{ me: Me }>('GET', '/api/me?fresh=1'),
   logout: (token?: string) => call<unknown>('POST', '/api/auth/logout', {}, token),

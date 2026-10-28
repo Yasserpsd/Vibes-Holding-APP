@@ -11,6 +11,8 @@ export type SessionRecord = {
   lastSeenAt: string;
   /** Set when the session started with the dashboard's e-mailed code (M18). */
   adminVerifiedAt?: string;
+  /** M140: set when the session started with the account's authenticator code (or its enrolment). */
+  totpVerifiedAt?: string;
 };
 
 /** A registration (or unverified login) waiting for the e-mail code. */
@@ -40,7 +42,7 @@ export class SessionStore {
     private readonly sessionDays: number,
   ) {}
 
-  async createSession(uuid: string, contactId: number, adminVerified = false): Promise<string> {
+  async createSession(uuid: string, contactId: number, adminVerified = false, totpVerified = false): Promise<string> {
     const token = newToken();
     const now = new Date();
     const record: SessionRecord = {
@@ -50,6 +52,7 @@ export class SessionStore {
       expiresAt: new Date(now.getTime() + this.sessionDays * 86_400_000).toISOString(),
       lastSeenAt: now.toISOString(),
       ...(adminVerified ? { adminVerifiedAt: now.toISOString() } : {}),
+      ...(totpVerified ? { totpVerifiedAt: now.toISOString() } : {}),
     };
     await this.kv.set(keyFor('session', token), record);
     return token;

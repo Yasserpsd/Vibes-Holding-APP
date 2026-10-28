@@ -141,6 +141,11 @@ export function dashboardGuard(service: AuthService, allowModerator = false) {
       void reply.code(403).send({ error: { code: 'otp_required', message: 'ادخل اللوحة من جديد برمز البريد الإلكتروني' } });
       return null;
     }
+    // M140: a session from before the authenticator (or an app session of an admin) never opens the dashboard.
+    if (service.adminTotpEnabled && !current.session.totpVerifiedAt) {
+      void reply.code(403).send({ error: { code: 'totp_required', message: 'ادخل اللوحة من جديد برمز تطبيق المصادقة' } });
+      return null;
+    }
     return { ...current, me, level };
   };
 }

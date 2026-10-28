@@ -18,6 +18,7 @@ import { Paylinks } from './sections/Paylinks';
 import { Payments } from './sections/Payments';
 import { Posts } from './sections/Posts';
 import { Ratings } from './sections/Ratings';
+import { Security } from './sections/Security';
 import { Threads } from './sections/Threads';
 import { Companion } from './sections/Companion';
 import { Content } from './sections/Content';
@@ -56,7 +57,10 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
   { key: 'news', label: 'مصادر الأخبار', icon: 'news' },
   { key: 'companion', label: 'المستشار اليومي', icon: 'companion' },
+  { key: 'security', label: 'أمان الحساب', icon: 'security' },
 ];
+/** M140: what a moderator's dashboard holds besides the posts. */
+const MODERATOR_SECTIONS: SectionKey[] = ['posts', 'security'];
 /** A phone's bar holds four sections and «المزيد»; a desk's rail lists them all. */
 const BAR: SectionKey[] = ['home', 'members', 'payments', 'threads'];
 const LEAVE_EDITOR = 'لم تحفظ المنشور بعد. هل تترك الصفحة وتفقد ما كتبته؟';
@@ -214,9 +218,9 @@ export function App() {
   if (!me) return <Login onSignedIn={setMe} />;
 
   // M28: a moderator's dashboard is the posts section alone; any other address lands there too.
-  const sections = me.isAdmin ? SECTIONS : SECTIONS.filter((entry) => entry.key === 'posts');
+  const sections = me.isAdmin ? SECTIONS : SECTIONS.filter((entry) => MODERATOR_SECTIONS.includes(entry.key));
   const bar = me.isAdmin ? BAR : sections.map((entry) => entry.key);
-  const section = me.isAdmin || route.section === 'posts' ? route.section : 'posts';
+  const section = me.isAdmin || MODERATOR_SECTIONS.includes(route.section) ? route.section : 'posts';
   const inBar = bar.includes(section);
   const navButton = (entry: (typeof SECTIONS)[number]) => (
     <button key={entry.key} type="button" className={entry.key === section ? 'nav-item on' : 'nav-item'} aria-current={entry.key === section ? 'page' : undefined} onClick={() => shell.openSection(entry.key)}>
@@ -290,6 +294,7 @@ export function App() {
             {section === 'wording' ? <Wording /> : null}
             {section === 'content' ? <Content /> : null}
             {section === 'news' ? <News /> : null}
+            {section === 'security' ? <Security /> : null}
             {section === 'companion' ? <Companion /> : null}
           </Boundary>
         </main>
