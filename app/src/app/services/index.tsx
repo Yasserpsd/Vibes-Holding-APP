@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceTile, serviceGridStyle, serviceTileWrapStyle } from '@/components/ServiceTile';
 import { StateView } from '@/components/StateView';
+import { WalletCard } from '@/components/WalletCard';
 import { t } from '@/i18n';
 import { formatServiceCount } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
@@ -44,6 +45,12 @@ export default function ServicesScreen() {
     <Screen title={data.title} subtitle={data.intro}>
       {/* LockedNotice animates its own entrance — wrapping it again would stall the lock's pop. */}
       {!data.isMember ? <LockedNotice text={data.lockedText} guest={status !== 'signedIn'} /> : null}
+      {/* M144 (owner): «رصيد بنك المشاريع» inside the services — balance, open a project, or renew. */}
+      {status === 'signedIn' ? (
+        <FadeInView delay={entranceDelay(order++)}>
+          <WalletCard />
+        </FadeInView>
+      ) : null}
       {data.groups.map((group) => {
         const items = data.services.filter((service) => service.group === group.key);
         if (!items.length) return null;

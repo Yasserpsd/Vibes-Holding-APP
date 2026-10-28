@@ -19,6 +19,7 @@ import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
+import { WalletCard } from '@/components/WalletCard';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
@@ -116,6 +117,8 @@ export default function AccountScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(4, 90)}>
+        {/* M144 (owner): the Projects Bank balance sits with the club group too. */}
+        <WalletCard />
         <MenuGroup title={t('account.group.club')} icon="business-outline">
           <MenuRow icon="grid-outline" label={t('account.menu.services')} onPress={() => router.push('/services')} />
           {/* M99b: the Projects Bank stays reachable from here for the persona whose tabs hide it. */}

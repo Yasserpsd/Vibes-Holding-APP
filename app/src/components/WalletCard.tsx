@@ -17,24 +17,37 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
  * (what is left of his balance and how many projects he opened). A non-member reads the promise and
  * the card walks him to the membership.
  */
-export function WalletCard({ block }: { block: NonNullable<HomeContent['wallet']> }) {
+// Left-to-right mark: keeps the Latin count readable inside the Arabic sentence (Android RTL).
+const LRM = '‎';
+
+/**
+ * M144 (owner): the same card also sits in «خدمات النادي» and the account tab, with no home block —
+ * the words then come from the strings catalog. Three states: balance left → «افتح مشروعًا» (PB tab),
+ * balance exhausted → «بدون رصيد — جدّد عضويتك» (membership), guest / no membership → activate (membership).
+ */
+export function WalletCard({ block }: { block?: NonNullable<HomeContent['wallet']> }) {
   const router = useRouter();
   const { me } = useAuth();
   const wallet = useProjectsWallet(me ? String(me.id) : null);
   const balance = wallet.data?.balance ?? null;
   const total = balance ? balance.credits + balance.granted : 0;
   const member = wallet.data?.isMember === true;
-  const onPress = () => router.push((member ? '/projects' : '/membership') as Href);
+  const exhausted = member && balance !== null && balance.left <= 0;
+  const title = block?.title ?? t('wallet.title');
+  const subtitle =
+    member && balance && !exhausted ? t('wallet.available', { count: `${LRM}${formatNumber(balance.left)}${LRM}` }) : (block?.subtitle ?? t('wallet.subtitle'));
+  const cta = !member ? t('wallet.activate') : exhausted ? t('wallet.exhausted') : (block?.cta ?? t('wallet.open'));
+  const onPress = () => router.push((member && !exhausted ? '/projects' : '/membership') as Href);
 
   return (
-    <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={block.title}>
+    <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={title}>
       <GlassCard golden radius={radii.xl} style={styles.card}>
         <GoldGradient style={styles.icon}>
           <Ionicons name="wallet" size={24} color={colors.goldInk} />
         </GoldGradient>
         <View style={styles.texts}>
-          <Text style={styles.title}>{block.title}</Text>
-          <Text style={styles.subtitle}>{block.subtitle}</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
           {balance ? (
             <View style={styles.statsRow}>
               <Stat value={formatNumber(balance.left)} label={t('wallet.left')} />
@@ -42,7 +55,7 @@ export function WalletCard({ block }: { block: NonNullable<HomeContent['wallet']
             </View>
           ) : null}
           <View style={styles.ctaRow}>
-            <Text style={styles.cta}>{member ? block.cta : t('wallet.activate')}</Text>
+            <Text style={styles.cta}>{cta}</Text>
             <Ionicons name={chevronForward()} size={14} color={colors.gold} />
           </View>
         </View>
