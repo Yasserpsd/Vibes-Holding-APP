@@ -1120,5 +1120,10 @@
   "security.reportProblem": "Report a problem",
   "retired.title": "The preview version has ended",
   "retired.body": "Download the official Investors Club app from the store and sign in with the same account. The app itself costs nothing.",
-  "retired.button": "Get the official app"
+  "retired.button": "Get the official app",
+  "rateUs.title": "Enjoying the club? Rate us on the store",
+  "rateUs.text": "Rating Investors Club takes a minute and helps new members find the club.",
+  "rateUs.now": "Rate now",
+  "rateUs.later": "Later",
+  "rateUs.done": "Already rated"
 }

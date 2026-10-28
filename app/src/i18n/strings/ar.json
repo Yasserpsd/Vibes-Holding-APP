@@ -1120,5 +1120,10 @@
   "security.reportProblem": "تبليغ عن مشكلة",
   "retired.title": "النسخة التجريبية انتهت",
   "retired.body": "حمّل النسخة الرسمية Investors Club من المتجر وسجّل دخولك بنفس حسابك. التطبيق بدون رسوم.",
-  "retired.button": "تحميل النسخة الرسمية"
+  "retired.button": "تحميل النسخة الرسمية",
+  "rateUs.title": "أعجبك النادي؟ قيّمنا على المتجر",
+  "rateUs.text": "تقييمك لتطبيق Investors Club يأخذ دقيقة ويساعد أعضاء جدد في الوصول إلى النادي.",
+  "rateUs.now": "قيّم الآن",
+  "rateUs.later": "لاحقًا",
+  "rateUs.done": "قيّمت بالفعل"
 }

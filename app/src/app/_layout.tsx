@@ -18,6 +18,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
+import { RateUsPrompt } from '@/components/RateUsPrompt';
 import { RetiredBuildGate } from '@/components/RetiredBuildGate';
 import { MembershipGateHost } from '@/components/MembershipGate';
 import { SplashFlash } from '@/components/SplashFlash';
@@ -167,6 +168,8 @@ export default function RootLayout() {
           <MembershipGateHost />
           {/* M85f: gold confetti the moment the membership turns active, wherever it is noticed. */}
           <MembershipCelebration />
+          {/* M141: «قيّمنا على المتجر» — a small sheet for signed-in members, at most once a week. */}
+          <RateUsPrompt />
           {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
           <SplashFlash />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
