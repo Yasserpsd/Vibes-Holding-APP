@@ -15,6 +15,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { isEmail, phoneIssue } from '@/lib/validation';
@@ -172,6 +173,52 @@ export default function RegisterScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <Notice text={t('auth.register.phonePolicy')} />
+      </FadeInView>
+      {/* M142: the member says it all once; phone, e-mail, password and code stay typed. */}
+      <FadeInView delay={entranceDelay(1)}>
+        <VoiceFill
+          fields={[
+            { key: 'name', label: t('auth.register.name'), type: 'text', required: true },
+            { key: 'companyName', label: t('auth.register.companyName'), type: 'text' },
+            { key: 'jobTitle', label: t('auth.register.jobTitle'), type: 'text' },
+            { key: 'bio', label: t('auth.register.bio'), type: 'textarea', required: true },
+            ...(interestsList.data
+              ? [{ key: 'interests', label: t('auth.register.interests'), type: 'multiselect' as const, options: interestsList.data.interests.map((item) => item.label), hint: t('voiceFill.hintInterests') }]
+              : []),
+            { key: 'interestsOther', label: t('interests.otherLabel'), type: 'text' },
+          ]}
+          values={{
+            name: form.name,
+            companyName: form.companyName,
+            jobTitle: form.jobTitle,
+            bio: form.bio,
+            interests: form.interests.map((key) => interestsList.data?.interests.find((item) => item.key === key)?.label ?? '').filter(Boolean).join('، '),
+            interestsOther: form.interestsOther,
+          }}
+          country={form.country}
+          onFill={(values) =>
+            setForm((current) => {
+              const list = interestsList.data?.interests ?? [];
+              const picked = values.interests
+                ? values.interests
+                    .split('، ')
+                    .map((label) => list.find((item) => item.label === label)?.key)
+                    .filter((key): key is string => Boolean(key))
+                    .slice(0, maxInterests)
+                : current.interests;
+              return {
+                ...current,
+                name: values.name ?? current.name,
+                companyName: values.companyName ?? current.companyName,
+                memberType: values.companyName ? 'company' : current.memberType,
+                jobTitle: values.jobTitle ?? current.jobTitle,
+                bio: values.bio ?? current.bio,
+                interests: picked,
+                interestsOther: values.interestsOther ?? current.interestsOther,
+              };
+            })
+          }
+        />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
         <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { advisorRoutes } from './advisor/routes.js';
+import { FormFiller } from './advisor/fill.js';
 import { VoiceTranscriber } from './advisor/voice.js';
 import { AdvisorService } from './advisor/service.js';
 import { agendaRoutes } from './agenda/routes.js';
@@ -501,7 +502,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
-  await app.register(advisorRoutes, { service: advisor, auth, voice });
+  // M142: voice-filled forms — the same key; the member still submits himself.
+  const filler = config.OPENAI_API_KEY ? new FormFiller({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl }) : undefined;
+  await app.register(advisorRoutes, { service: advisor, auth, voice, filler });
   await app.register(newsRoutes, { service: news, auth, kv, interests });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });

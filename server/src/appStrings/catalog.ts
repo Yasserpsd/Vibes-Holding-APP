@@ -1126,7 +1126,15 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "rateUs.text": "تقييمك لتطبيق Investors Club يأخذ دقيقة ويساعد أعضاء جدد في الوصول إلى النادي.",
     "rateUs.now": "قيّم الآن",
     "rateUs.later": "لاحقًا",
-    "rateUs.done": "قيّمت بالفعل"
+    "rateUs.done": "قيّمت بالفعل",
+    "voiceFill.title": "التعبئة الصوتية",
+    "voiceFill.start": "املأ بصوتك",
+    "voiceFill.stop": "أوقف التسجيل وعبّئ",
+    "voiceFill.working": "جارٍ التعبئة…",
+    "voiceFill.hint": "تكلّم بكل البيانات مرة واحدة، والمستشار يعبّئ الحقول وأنت تراجع قبل الإرسال.",
+    "voiceFill.done": "تمت التعبئة، راجع البيانات ثم أرسل.",
+    "voiceFill.partial": "عبّأت ما سمعته. اضغط الميكروفون وأجب:",
+    "voiceFill.hintInterests": "اختر من قائمة الاهتمامات"
   },
   "en": {
     "tabs.home": "Home",
@@ -2254,7 +2262,15 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "rateUs.text": "Rating Investors Club takes a minute and helps new members find the club.",
     "rateUs.now": "Rate now",
     "rateUs.later": "Later",
-    "rateUs.done": "Already rated"
+    "rateUs.done": "Already rated",
+    "voiceFill.title": "Voice fill",
+    "voiceFill.start": "Fill by voice",
+    "voiceFill.stop": "Stop and fill",
+    "voiceFill.working": "Filling…",
+    "voiceFill.hint": "Say all the details once; the advisor fills the fields and you review before sending.",
+    "voiceFill.done": "Filled. Review the details, then send.",
+    "voiceFill.partial": "I filled what I heard. Tap the mic and answer:",
+    "voiceFill.hintInterests": "Pick from the interests list"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2322,6 +2338,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "profileGate": "بوابة إكمال البيانات",
     "ratings": "تقييمات المشاريع",
     "retired": "قفل النسخة التجريبية",
-    "rateUs": "دعوة تقييم التطبيق على المتجر"
+    "rateUs": "دعوة تقييم التطبيق على المتجر",
+    "voiceFill": "التعبئة الصوتية للنماذج"
   }
 };

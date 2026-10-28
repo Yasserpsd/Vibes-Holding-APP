@@ -13,6 +13,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -154,6 +155,17 @@ export default function ComposeScreen() {
       ) : null}
 
       <FadeInView delay={entranceDelay(2)}>
+        <VoiceFill
+          fields={[
+            { key: 'title', label: t('compose.titleField'), type: 'text', required: true },
+            { key: 'body', label: t('compose.bodyField'), type: 'textarea', required: true },
+          ]}
+          values={{ title, body }}
+          onFill={(values) => {
+            setTitle(values.title ?? title);
+            setBody(values.body ?? body);
+          }}
+        />
         <FormField label={t('compose.titleField')} value={title} onChangeText={setTitle} maxLength={140} />
       </FadeInView>
       <FadeInView delay={entranceDelay(3)}>

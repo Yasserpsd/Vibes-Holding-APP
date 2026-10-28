@@ -15,6 +15,7 @@ import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motio
 import { PaperCard, usePaper } from '@/components/paper';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
+import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
@@ -133,6 +134,22 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
   return (
     // M85 (owner): the whole registration form sits on one paper sheet.
     <PaperCard pinned>
+      {/* M142: every field but the consent box can be spoken. */}
+      <VoiceFill
+        fields={form.fields
+          .filter((field) => field.type !== 'agree')
+          .map(
+            (field): FillField => ({
+              key: field.key,
+              label: field.label,
+              type: field.type === 'select' ? 'select' : field.type === 'textarea' ? 'textarea' : field.prefill === 'phone' ? 'phone' : field.prefill === 'email' ? 'email' : 'text',
+              options: field.options,
+              required: field.required,
+            }),
+          )}
+        values={answers}
+        onFill={(values) => setAnswers((current) => ({ ...current, ...values }))}
+      />
       {form.fields.map((field, index) => (
         <FadeInView key={field.key} delay={entranceDelay(index)}>
           <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />

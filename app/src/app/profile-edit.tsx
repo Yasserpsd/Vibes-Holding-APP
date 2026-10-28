@@ -10,6 +10,7 @@ import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, typography } from '@/theme/tokens';
@@ -76,6 +77,19 @@ export default function ProfileEditScreen() {
   return (
     <Screen title={t('profile.title')} subtitle={t('profile.subtitle')}>
       <FadeInView delay={entranceDelay(0)}>
+        <VoiceFill
+          fields={[
+            { key: 'name', label: t('profile.name'), type: 'text', required: true },
+            { key: 'jobTitle', label: t('profile.jobTitle'), type: 'text' },
+            { key: 'company', label: t('profile.company'), type: 'text' },
+            { key: 'city', label: t('profile.city'), type: 'text' },
+            { key: 'website', label: t('profile.website'), type: 'text' },
+            { key: 'bio', label: t('profile.bio'), type: 'textarea' },
+            { key: 'social', label: t('profile.social'), type: 'textarea' },
+          ]}
+          values={{ name: form.name, jobTitle: form.jobTitle, company: form.company, city: form.city, website: form.website, bio: form.bio, social: form.social }}
+          onFill={(values) => setForm((current) => ({ ...current, ...values }))}
+        />
         <FormField label={t('profile.name')} value={form.name} onChangeText={set('name')} textContentType="name" />
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>

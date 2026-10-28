@@ -14,7 +14,7 @@ import { colors, radii, shadows } from '@/theme/tokens';
  * the clip into text and the composer receives it. expo-audio is a NATIVE module: binaries built
  * before it hide the button entirely (requireOptionalNativeModule), so OTA updates stay safe.
  */
-const audio = requireOptionalNativeModule('ExpoAudio')
+export const audio = requireOptionalNativeModule('ExpoAudio')
   ? // eslint-disable-next-line @typescript-eslint/no-require-imports
     (require('expo-audio') as typeof import('expo-audio'))
   : null;
@@ -24,7 +24,7 @@ export function voiceInputAvailable(): boolean {
 }
 
 /** file:// clip → base64 without expo-file-system (fetch + FileReader work on local uris in RN). */
-async function readBase64(uri: string): Promise<string> {
+export async function readBase64(uri: string): Promise<string> {
   const blob = await (await fetch(uri)).blob();
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();

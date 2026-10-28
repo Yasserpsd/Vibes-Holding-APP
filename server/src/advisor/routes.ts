@@ -1,14 +1,16 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { guard, parse, sessionGuard } from '../auth/guard.js';
+import { guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import { riyadhNow } from '../hq/service.js';
 import { langOf } from '../lang.js';
+import { FILL_FIELD_TYPES, type FormFiller } from './fill.js';
 import type { AdvisorService } from './service.js';
 import type { VoiceTranscriber } from './voice.js';
 
-export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber };
+export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber; filler?: FormFiller };
 
 // The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
 const selection = z.string().trim().max(1000).nullish();
@@ -34,9 +36,29 @@ const voiceSchema = z.object({
   audio: z.string().min(100).max(8_000_000),
   mime: z.enum(['audio/m4a', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/wav']).default('audio/m4a'),
 });
+// M142: the app describes the form; the key is what the screen stores, the label what the member sees.
+const fillSchema = z.object({
+  transcript: z.string().trim().min(1).max(6000),
+  fields: z
+    .array(
+      z.object({
+        key: z.string().regex(/^[A-Za-z0-9_.-]{1,60}$/),
+        label: z.string().trim().min(1).max(160),
+        type: z.enum(FILL_FIELD_TYPES).default('text'),
+        options: z.array(z.string().trim().min(1).max(160)).max(60).optional(),
+        required: z.boolean().optional(),
+        hint: z.string().trim().max(200).optional(),
+      }),
+    )
+    .min(1)
+    .max(40),
+  known: z.record(z.string(), z.string().max(4000)).optional(),
+  country: z.string().regex(/^[a-z]{2}$/i).optional(),
+});
 
-export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice }) => {
+export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler }) => {
   const requireSession = sessionGuard(auth);
+  const maybeSession = optionalSession(auth);
   const limiter = new RateLimiter();
 
   app.get(
@@ -68,9 +90,9 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
     { bodyLimit: 10_000_000 },
     guard(async (request, reply) => {
       if (!voice) return reply.code(404).send({ error: { code: 'voice_off', message: 'الإدخال الصوتي غير متاح حاليًا' } });
-      const current = await requireSession(request, reply);
-      if (!current) return;
-      if (!limiter.hit(`voice:${request.ip}`, 20, 15 * 60_000)) {
+      // M142: guests may speak too (the registration form) — on a smaller per-IP budget.
+      const current = await maybeSession(request);
+      if (!limiter.hit(`voice:${request.ip}`, current ? 20 : 8, 15 * 60_000)) {
         return reply.code(429).send({ error: { code: 'rate', message: 'تسجيلات كثيرة في وقت قصير، حاول بعد قليل' } });
       }
       const body = parse(voiceSchema, request.body, reply);
@@ -87,6 +109,32 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
         return { text };
       } catch {
         return reply.code(502).send({ error: { code: 'voice_failed', message: 'تعذر تحويل الصوت إلى نص، حاول مرة أخرى' } });
+      }
+    }),
+  );
+
+  // M142 «املأ بصوتك»: one spoken message → the form's values (normalised server-side). The member reviews and submits.
+  app.post(
+    '/api/advisor/fill-form',
+    guard(async (request, reply) => {
+      if (!filler) return reply.code(404).send({ error: { code: 'voice_off', message: 'التعبئة الصوتية غير متاحة حاليًا' } });
+      const current = await maybeSession(request);
+      if (!limiter.hit(`fill:${request.ip}`, current ? 30 : 10, 15 * 60_000)) {
+        return reply.code(429).send({ error: { code: 'rate', message: 'محاولات كثيرة في وقت قصير، حاول بعد قليل' } });
+      }
+      const body = parse(fillSchema, request.body, reply);
+      if (!body) return;
+      try {
+        return await filler.fill({
+          transcript: body.transcript,
+          lang: langOf(request),
+          fields: body.fields,
+          known: body.known,
+          country: (body.country ?? 'sa').toLowerCase(),
+          today: riyadhNow().date,
+        });
+      } catch {
+        return reply.code(502).send({ error: { code: 'fill_failed', message: 'تعذر فهم التسجيل، حاول مرة أخرى' } });
       }
     }),
   );

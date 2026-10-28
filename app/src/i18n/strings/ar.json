@@ -1125,5 +1125,13 @@
   "rateUs.text": "تقييمك لتطبيق Investors Club يأخذ دقيقة ويساعد أعضاء جدد في الوصول إلى النادي.",
   "rateUs.now": "قيّم الآن",
   "rateUs.later": "لاحقًا",
-  "rateUs.done": "قيّمت بالفعل"
+  "rateUs.done": "قيّمت بالفعل",
+  "voiceFill.title": "التعبئة الصوتية",
+  "voiceFill.start": "املأ بصوتك",
+  "voiceFill.stop": "أوقف التسجيل وعبّئ",
+  "voiceFill.working": "جارٍ التعبئة…",
+  "voiceFill.hint": "تكلّم بكل البيانات مرة واحدة، والمستشار يعبّئ الحقول وأنت تراجع قبل الإرسال.",
+  "voiceFill.done": "تمت التعبئة، راجع البيانات ثم أرسل.",
+  "voiceFill.partial": "عبّأت ما سمعته. اضغط الميكروفون وأجب:",
+  "voiceFill.hintInterests": "اختر من قائمة الاهتمامات"
 }

@@ -15,6 +15,7 @@ import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatHours, formatNumber, weekdayName } from '@/lib/format';
@@ -94,6 +95,30 @@ export default function BookVisitScreen() {
 
   return (
     <Screen title={t('hqBook.title')} subtitle={t('hqBook.subtitle')}>
+      {/* M142: kind, duration, purpose and note by voice; the day and the slot stay a tap. */}
+      <VoiceFill
+        fields={[
+          { key: 'kind', label: t('hqBook.kind'), type: 'select', options: KINDS.map((item) => t(item.label)), required: true },
+          { key: 'hours', label: t('hqBook.duration'), type: 'number' },
+          { key: 'purpose', label: t('hqBook.purpose'), type: 'select', options: data.content.purposes },
+          { key: 'note', label: t('hqBook.note'), type: 'textarea' },
+        ]}
+        values={{ kind: t(KINDS.find((item) => item.key === kind)?.label ?? 'hqBook.kindVisit'), hours: String(hours), purpose: purpose ?? '', note }}
+        onFill={(values) => {
+          const pickedKind = KINDS.find((item) => t(item.label) === values.kind)?.key;
+          if (pickedKind && pickedKind !== kind) {
+            setKind(pickedKind);
+            setTime(null);
+          }
+          const pickedHours = Number(values.hours);
+          if (Number.isInteger(pickedHours) && durations.includes(pickedHours) && pickedHours !== hours) {
+            setHours(pickedHours);
+            setTime(null);
+          }
+          if (values.purpose && data.content.purposes.includes(values.purpose)) setPurpose(values.purpose);
+          setNote(values.note ?? note);
+        }}
+      />
       {/* M109a: what is being booked — a visit, or one of the hours-wallet spaces. */}
       <FadeInView delay={entranceDelay(0)}>
         <Text style={styles.label}>{t('hqBook.kind')}</Text>

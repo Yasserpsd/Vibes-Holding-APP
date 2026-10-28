@@ -43,6 +43,11 @@ export type HistoryResult = { messages: AdvisorMessage[]; profile: AdvisorProfil
 export type SendResult = { messageId: number | null; waiting: boolean; human: boolean; gate: AdvisorGate | null; me: Me | null };
 /** `contextRefused`: the server took the message only without its context. */
 export type SentMessage = SendResult & { contextRefused: boolean };
+/** M142: how the app describes a form to the server (mirrors server/src/advisor/fill.ts). */
+export type FillFieldType = 'text' | 'textarea' | 'phone' | 'email' | 'number' | 'date' | 'time' | 'select' | 'multiselect';
+export type FillField = { key: string; label: string; type: FillFieldType; options?: string[]; required?: boolean; hint?: string };
+export type FillFormInput = { transcript: string; fields: FillField[]; known?: Record<string, string>; country?: string };
+export type FillFormResult = { values: Record<string, string>; missing: string[]; followUp: string | null };
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 const postMessage = (text: string, context: AdvisorContext | null) =>
@@ -66,4 +71,6 @@ export const advisorApi = {
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),
   // M104: the recorded question (base64) comes back as text; the app then sends it as a message.
   transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime } }),
+  // M142: one spoken message → the form's values; the server normalises phones, e-mails, dates and choices.
+  fillForm: (input: FillFormInput) => apiRequest<FillFormResult>('POST', '/api/advisor/fill-form', { body: input }),
 };

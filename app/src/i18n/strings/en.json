@@ -1125,5 +1125,13 @@
   "rateUs.text": "Rating Investors Club takes a minute and helps new members find the club.",
   "rateUs.now": "Rate now",
   "rateUs.later": "Later",
-  "rateUs.done": "Already rated"
+  "rateUs.done": "Already rated",
+  "voiceFill.title": "Voice fill",
+  "voiceFill.start": "Fill by voice",
+  "voiceFill.stop": "Stop and fill",
+  "voiceFill.working": "Filling…",
+  "voiceFill.hint": "Say all the details once; the advisor fills the fields and you review before sending.",
+  "voiceFill.done": "Filled. Review the details, then send.",
+  "voiceFill.partial": "I filled what I heard. Tap the mic and answer:",
+  "voiceFill.hintInterests": "Pick from the interests list"
 }

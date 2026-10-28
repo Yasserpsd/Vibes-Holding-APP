@@ -21,6 +21,7 @@ import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -232,6 +233,13 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
       return (
         <PaperCard pinned>
           {action.fields.length ? <Text style={styles.paperTitle}>{t('service.requestDetails')}</Text> : null}
+          {action.fields.length ? (
+            <VoiceFill
+              fields={action.fields.map((field): FillField => ({ key: field.key, label: field.label, type: field.options?.length ? 'select' : 'text', options: field.options, required: true }))}
+              values={answers}
+              onFill={(values) => Object.entries(values).forEach(([field, value]) => onAnswer(field, value))}
+            />
+          ) : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}
@@ -242,6 +250,13 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
       return (
         <PaperCard pinned>
           {action.fields.length ? <Text style={styles.paperTitle}>{t('service.requestDetails')}</Text> : null}
+          {action.fields.length ? (
+            <VoiceFill
+              fields={action.fields.map((field): FillField => ({ key: field.key, label: field.label, type: field.options?.length ? 'select' : 'text', options: field.options, required: true }))}
+              values={answers}
+              onFill={(values) => Object.entries(values).forEach(([field, value]) => onAnswer(field, value))}
+            />
+          ) : null}
           {action.fields.map((field) => (
             <FieldInput key={field.key} field={field} value={answers[field.key] ?? ''} onChange={(value) => onAnswer(field.key, value)} />
           ))}

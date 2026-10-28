@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
@@ -111,6 +112,7 @@ function WorkshopCard({
         <Text style={styles.closed}>{texts.closedText}</Text>
       ) : !signedIn ? null : asking ? (
         <FadeInView style={styles.form} offset={10}>
+          <VoiceFill fields={[{ key: 'note', label: t('guide.noteField'), type: 'textarea' }]} values={{ note }} onFill={(values) => setNote(values.note ?? note)} />
           <FormField label={t('guide.noteField')} value={note} onChangeText={setNote} maxLength={300} multiline />
           {register.error ? <Notice tone="warning" text={register.error.message} /> : null}
           <AppButton label={t('guide.send')} icon="paper-plane-outline" loading={register.isPending} onPress={send} />

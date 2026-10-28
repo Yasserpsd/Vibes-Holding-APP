@@ -15,6 +15,7 @@ import { GlassCard, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
@@ -273,6 +274,21 @@ function PrintBlock({ active }: { active: boolean }) {
         <Notice tone="success" text={t('card.printPending')} />
       ) : open ? (
         <FadeInView offset={12} style={styles.form}>
+          <VoiceFill
+            fields={[
+              { key: 'city', label: t('card.city'), type: 'text', required: true },
+              { key: 'address', label: t('card.address'), type: 'textarea', required: true, hint: t('card.addressHint') },
+              { key: 'phone', label: t('card.phoneField'), type: 'phone' },
+              { key: 'note', label: t('card.noteField'), type: 'text' },
+            ]}
+            values={{ city, address, phone, note }}
+            onFill={(values) => {
+              setCity(values.city ?? city);
+              setAddress(values.address ?? address);
+              setPhone(values.phone ?? phone);
+              setNote(values.note ?? note);
+            }}
+          />
           <FormField label={t('card.city')} value={city} onChangeText={setCity} maxLength={80} />
           <FormField label={t('card.address')} hint={t('card.addressHint')} value={address} onChangeText={setAddress} multiline maxLength={300} />
           <FormField label={t('card.phoneField')} value={phone} onChangeText={setPhone} latin keyboardType="phone-pad" maxLength={30} />

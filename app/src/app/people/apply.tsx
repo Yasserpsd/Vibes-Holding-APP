@@ -10,6 +10,7 @@ import { Notice } from '@/components/Notice';
 import { PaperCard } from '@/components/paper';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 
 const toLines = (list: string[]) => list.join('\n');
@@ -139,6 +140,37 @@ function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; 
 
       {/* M85 (owner): the application fields sit on one paper sheet. */}
       <PaperCard pinned>
+      <VoiceFill
+        fields={[
+          { key: 'title', label: t('people.form.title'), type: 'text', required: true },
+          { key: 'company', label: t('people.form.company'), type: 'text' },
+          { key: 'specialty', label: t('people.form.specialty'), type: 'text', hint: t('people.form.specialtyHint') },
+          { key: 'city', label: t('people.form.city'), type: 'text' },
+          { key: 'bio', label: t('people.form.bio'), type: 'textarea', required: true, hint: t('people.form.bioHint') },
+          { key: 'milestones', label: t('people.form.milestones'), type: 'textarea' },
+          { key: 'achievements', label: t('people.form.achievements'), type: 'textarea' },
+          { key: 'benefit', label: t('people.form.benefit'), type: 'textarea' },
+          { key: 'seeking', label: t('people.form.seeking'), type: 'textarea' },
+          { key: 'phone', label: t('people.form.phone'), type: 'phone' },
+          { key: 'email', label: t('people.form.email'), type: 'email' },
+          { key: 'links', label: t('people.form.links'), type: 'textarea' },
+        ]}
+        values={{ title, company, specialty, city, bio, milestones, achievements, benefit, seeking, phone, email, links }}
+        onFill={(values) => {
+          setTitle(values.title ?? title);
+          setCompany(values.company ?? company);
+          setSpecialty(values.specialty ?? specialty);
+          setCity(values.city ?? city);
+          setBio(values.bio ?? bio);
+          setMilestones(values.milestones ?? milestones);
+          setAchievements(values.achievements ?? achievements);
+          setBenefit(values.benefit ?? benefit);
+          setSeeking(values.seeking ?? seeking);
+          setPhone(values.phone ?? phone);
+          setEmail(values.email ?? email);
+          setLinks(values.links ?? links);
+        }}
+      />
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('people.form.title')} value={title} onChangeText={setTitle} maxLength={80} />
       </FadeInView>
