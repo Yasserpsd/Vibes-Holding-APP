@@ -4,7 +4,7 @@ import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, Vi
 
 import { FileButton, fileInputAvailable, formatFileSize, type PendingFile } from '@/components/advisor/FileButton';
 import { VoiceButton, voiceInputAvailable } from '@/components/advisor/VoiceButton';
-import { PopIn, PressScale } from '@/components/motion';
+import { GlowButton, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { inputStart } from '@/i18n/direction';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
@@ -70,6 +70,8 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
         {voiceInputAvailable() ? (
           <VoiceButton disabled={busy} onBusy={setListening} onText={(text) => onChange(value.trim() ? `${value.trim()} ${text}` : text)} />
         ) : null}
+        {/* M152: the ready send button breathes with a soft golden halo — «أفهم إن ده بوتون». */}
+        <GlowButton enabled={canSend}>
         <PressScale
           onPress={onSend}
           disabled={!canSend}
@@ -87,6 +89,7 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
             </Animated.View>
           </PopIn>
         </PressScale>
+        </GlowButton>
       </View>
     </View>
   );

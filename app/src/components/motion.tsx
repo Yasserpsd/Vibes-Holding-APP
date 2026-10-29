@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -8,8 +8,14 @@ import { colors, radii, shadows, spacing } from '@/theme/tokens';
  * animation ships over OTA on the current binary. Transforms and opacity run on the native driver.
  */
 
+/**
+ * M152 (owner: «التطبيق بطيء شوية»): every entrance delay in the app is scaled down here, so the
+ * content stops «arriving» long after its data is there. 1 restores the M38 timings.
+ */
+const DELAY_SCALE = 0.55;
+
 /** Staggers a list: the first cards slide in one after the other, the rest appear instantly. */
-export const entranceDelay = (index: number, step = 60, cap = 8) => Math.min(Math.max(index, 0), cap) * step;
+export const entranceDelay = (index: number, step = 60, cap = 5) => Math.min(Math.max(index, 0), cap) * step;
 
 type FadeInProps = {
   children: ReactNode;
@@ -21,10 +27,10 @@ type FadeInProps = {
 };
 
 /** Mount entrance: fade in while sliding up a little. Vertical only, so RTL never mirrors it. */
-export function FadeInView({ children, delay = 0, duration = 420, offset = 16, style }: FadeInProps) {
+export function FadeInView({ children, delay = 0, duration = 340, offset = 16, style }: FadeInProps) {
   const [progress] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    const animation = Animated.timing(progress, { toValue: 1, duration, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    const animation = Animated.timing(progress, { toValue: 1, duration, delay: delay * DELAY_SCALE, easing: Easing.out(Easing.cubic), useNativeDriver: true });
     animation.start();
     return () => animation.stop();
   }, [progress, delay, duration]);
@@ -104,7 +110,7 @@ export function PopIn({ children, delay = 0, style }: { children: ReactNode; del
   const [pop] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const animation = Animated.sequence([
-      Animated.delay(delay),
+      Animated.delay(delay * DELAY_SCALE),
       Animated.spring(pop, { toValue: 1, speed: 16, bounciness: 9, useNativeDriver: true }),
     ]);
     animation.start();
@@ -139,6 +145,108 @@ export function Wiggle({ children, delay = 0, repeatEvery, style }: { children: 
   }, [swing, delay, repeatEvery]);
   return (
     <Animated.View style={[style, { transform: [{ rotate: swing.interpolate({ inputRange: [-1, 1], outputRange: ['-9deg', '9deg'] }) }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * M152: the OS «reduce motion» switch is respected app-wide — the endless breathing loops below
+ * hold still at a mid value; one-shot entrances keep running (short, and they settle).
+ */
+let reduceMotion = false;
+AccessibilityInfo.isReduceMotionEnabled()
+  .then((on) => {
+    reduceMotion = on;
+  })
+  .catch(() => undefined);
+
+export function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(reduceMotion);
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((on) => {
+        reduceMotion = on;
+        if (live) setReduced(on);
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (on) => {
+      reduceMotion = on;
+      setReduced(on);
+    });
+    return () => {
+      live = false;
+      subscription.remove();
+    };
+  }, []);
+  return reduced;
+}
+
+/**
+ * M152: a slow in-out breath (0 → 1 → 0, `period` ms per cycle) on the native driver. Idle while
+ * `active` is false, and held still at 0.5 under reduce-motion so the glow stays visible without moving.
+ */
+export function useBreath(active: boolean, period = 2000): Animated.Value {
+  const [breath] = useState(() => new Animated.Value(0));
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    if (!active || reduced) {
+      breath.setValue(active && reduced ? 0.5 : 0);
+      return;
+    }
+    const half = period / 2;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breath, { toValue: 1, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(breath, { toValue: 0, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [breath, active, reduced, period]);
+  return breath;
+}
+
+type GlowButtonProps = {
+  children: ReactNode;
+  /** False parks the button: no halo, no motion (a send button with nothing to send). */
+  enabled?: boolean;
+  /** The louder state — faster breath, wider neon ring (the mic while it records). */
+  strong?: boolean;
+  /** Corner radius of the halo; match the button's borderRadius. */
+  radius?: number;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * M152 (owner: «أي بوتون كده يكون متوهج خفيف ومتحرك خفيف بحيث أفهم إن ده بوتون»): a primary action
+ * wrapped in a breathing golden halo — the ring swells and brightens (~2 s per breath) while the
+ * button itself scales 1 → 1.05. Core Animated + boxShadow only, so it ships over OTA on the 1.1.0 binary.
+ */
+export function GlowButton({ children, enabled = true, strong = false, radius = radii.pill, style }: GlowButtonProps) {
+  const breath = useBreath(enabled, strong ? 1300 : 2000);
+  const scale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, strong ? 1.07 : 1.05] });
+  const haloOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [strong ? 0.6 : 0.3, 1] });
+  const haloScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1.02, strong ? 1.24 : 1.14] });
+  return (
+    <Animated.View style={[style, { transform: [{ scale }] }]}>
+      {enabled ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderRadius: radius,
+              borderWidth: 1,
+              borderColor: strong ? colors.goldNeon : colors.borderGold,
+              boxShadow: strong ? shadows.glowGoldStrong : shadows.glowGold,
+              opacity: haloOpacity,
+              transform: [{ scale: haloScale }],
+            },
+          ]}
+        />
+      ) : null}
       {children}
     </Animated.View>
   );

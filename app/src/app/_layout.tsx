@@ -32,6 +32,7 @@ import { initI18n, t } from '@/i18n';
 import { isRTL, syncDirection } from '@/i18n/direction';
 import { syncStrings } from '@/i18n/remote';
 import { installNotificationHandler } from '@/lib/notifications';
+import { persistQueryCache, restoreQueryCache } from '@/lib/queryCache';
 import { colors, fonts, typography } from '@/theme/tokens';
 
 installNotificationHandler();
@@ -76,7 +77,19 @@ export default function RootLayout() {
       });
   }, []);
 
-  const ready = (fontsLoaded || fontError !== null) && i18nReady;
+  // M152: the last visit's content comes back from disk behind the splash, so the home draws at once
+  // and refreshes behind; from then on every change is mirrored to the file (see lib/queryCache.ts).
+  const [cacheReady, setCacheReady] = useState(false);
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    void restoreQueryCache(queryClient).finally(() => {
+      unsubscribe = persistQueryCache(queryClient);
+      setCacheReady(true);
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  const ready = (fontsLoaded || fontError !== null) && i18nReady && cacheReady;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);

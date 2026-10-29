@@ -5,7 +5,7 @@ import { Alert, Animated, StyleSheet } from 'react-native';
 
 import { advisorApi } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
-import { PressScale } from '@/components/motion';
+import { GlowButton, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { colors, radii, shadows } from '@/theme/tokens';
 
@@ -113,7 +113,9 @@ function VoiceButtonInner({ onText, onBusy, disabled }: Props) {
     void (recording ? stop() : start());
   };
 
+  // M152 (owner): the mic glows and breathes all the time — stronger and faster while it listens.
   return (
+    <GlowButton strong={recording} enabled={!disabled || recording}>
     <PressScale
       onPress={press}
       glow={recording}
@@ -127,6 +129,7 @@ function VoiceButtonInner({ onText, onBusy, disabled }: Props) {
         <Ionicons name={recording ? 'stop' : sending ? 'hourglass-outline' : 'mic'} size={20} color={recording ? colors.white : colors.gold} />
       </Animated.View>
     </PressScale>
+    </GlowButton>
   );
 }
 

@@ -3,10 +3,13 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useHomeContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
+import { useAgenda } from '@/api/agenda';
+import { useHomeContent, useMeetupsContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { useHq } from '@/api/hq';
 import { usePartners, type Partner } from '@/api/partners';
+import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
+import { useProjectsList } from '@/api/queries';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
@@ -61,6 +64,13 @@ export default function HomeScreen() {
   const partners = usePartners();
   // Same query as <PostsBlock />: one cache entry, refetched with the rest on pull-to-refresh.
   const latestPosts = useLatestPosts(HOME_POSTS_LIMIT);
+  // M152: the blocks' own queries (same keys as inside PeopleBlock, AgendaBlock, MeetupsBlock and the
+  // Projects Bank carousel) start in the FIRST wave with the home, not half a second later when the
+  // blocks mount — measured on the test API: ten requests in parallel finish in under a second.
+  usePeople();
+  useAgenda();
+  useMeetupsContent();
+  useProjectsList({ q: '', sort: 'discover' });
   const [refreshing, setRefreshing] = useState(false);
   // M102: the entrepreneur's collapsed services grid.
   const [gridOpen, setGridOpen] = useState(false);

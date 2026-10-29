@@ -5,7 +5,7 @@ import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 import { advisorApi, type FillField } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { audio, readBase64 } from '@/components/advisor/VoiceButton';
-import { PressScale } from '@/components/motion';
+import { GlowButton, PressScale } from '@/components/motion';
 import { usePaper } from '@/components/paper';
 import { textStart } from '@/i18n/direction';
 import { t } from '@/i18n';
@@ -109,6 +109,8 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
   const label = recording ? t('voiceFill.stop') : working ? t('voiceFill.working') : t('voiceFill.start');
   return (
     <View style={styles.wrap}>
+      {/* M152: the pill breathes with a golden halo so the member sees he can dictate the form. */}
+      <GlowButton strong={recording} enabled={!disabled || recording} style={styles.glow}>
       <PressScale
         onPress={press}
         glow={recording}
@@ -125,6 +127,7 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
           {label}
         </Text>
       </PressScale>
+      </GlowButton>
       <Text style={[styles.hint, paper && styles.hintPaper]}>{outcome ? outcome.text : t('voiceFill.hint')}</Text>
       {outcome ? (
         <View style={[styles.outcomeBar, outcome.tone === 'done' ? styles.outcomeDone : styles.outcomePartial]} accessibilityElementsHidden />
@@ -135,6 +138,8 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs, marginBottom: spacing.xs },
+  // The halo hugs the pill (the pill keeps its own flex-start inside the wrapper).
+  glow: { alignSelf: 'flex-start' },
   pill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
