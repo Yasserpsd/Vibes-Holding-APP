@@ -194,6 +194,20 @@ export class Notifier {
     this.sendRoyal(to, subject, mail, what);
   }
 
+  /** M138b: a ready document (the M108 invoice layout) to ONE member — the receipts built in requests/mail.ts. */
+  memberDocument(to: string, subject: string, html: string, text: string, what: string): void {
+    const address = to.trim();
+    if (!address) {
+      this.deps.log.warn({ what }, 'member mail skipped: no address');
+      return;
+    }
+    const fullSubject = `${this.deps.appEnv === 'test' ? '[تجريبي] ' : ''}${subject}`;
+    this.deps.mailer
+      .send({ to: [address], subject: fullSubject, text, html })
+      .then((sent) => this.deps.log.info({ subject: fullSubject, sent, what }, 'member mail'))
+      .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject, what }, 'member mail failed'));
+  }
+
   hqVisitRequested(visit: VisitLike): void {
     this.dispatch(`حجز زيارة للمقر من التطبيق: ${visit.name}`, [
       `طلب العضو حجز زيارة لمقر النادي من ${APP_NAME}.`,

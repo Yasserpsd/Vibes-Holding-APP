@@ -86,7 +86,9 @@ test('a card delivery request mails the member a royal no-fee receipt at once', 
   assert.match(receipt.subject, /إيصال طلب توصيل كارت العضوية/);
   assert.match(receipt.text, /بدون رسوم/);
   assert.doesNotMatch(receipt.text, /0\.00/);
-  assert.match(receipt.html ?? '', /#0d274a/i);
+  assert.match(receipt.html ?? '', /#1F3A6E/i, 'the M108 customer invoice look');
+  assert.match(receipt.html ?? '', /بيانات البائع/);
+  assert.match(receipt.html ?? '', /إجمالي|الإجمالي/);
   assert.match(receipt.text, /حي الياسمين/);
   // The admin mail is untouched: still the plain management notice.
   const admin = mailer.sent.filter((mail) => mail.to.includes('admin@vcmem.com')).at(-1)!;

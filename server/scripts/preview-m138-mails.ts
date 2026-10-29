@@ -68,8 +68,8 @@ const card = fromCard({
   adminNote: null,
   lang: 'ar',
 });
-const receipt = receiptMail(card, 'سارة العتيبي', 'ar', 'https://api-test.vibesholdingsa.com/app');
-writeFileSync(join(out, 'card-receipt.html'), royalHtml({ ...receipt.mail, sealUrl: 'https://api-test.vibesholdingsa.com/pay/invoice-stamp.png' }));
+const receipt = receiptMail(card, { name: 'سارة العتيبي', email: 'sara@example.com' }, 'ar', 'https://api-test.vibesholdingsa.com/app', 'https://api-test.vibesholdingsa.com');
+writeFileSync(join(out, 'card-receipt.html'), receipt.html);
 
 const changed = changeMail({ ...card, status: 'in_progress', note: 'الكارت في الطباعة، يصلك خلال يومين', updatedAt: '2026-10-30T09:00:00.000Z' }, 'سارة العتيبي', 'ar', 'https://api-test.vibesholdingsa.com/app');
 writeFileSync(join(out, 'status-notice.html'), royalHtml({ ...changed.mail, sealUrl: 'https://api-test.vibesholdingsa.com/pay/invoice-stamp.png' }));

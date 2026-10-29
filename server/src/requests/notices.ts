@@ -26,8 +26,9 @@ export class MemberNotices {
   /** The receipt: mailed at once, in the member's language. */
   received(entry: MemberRequest, to: Recipient): void {
     const lang = to.lang === 'en' ? 'en' : 'ar';
-    const { subject, mail } = receiptMail(entry, to.name, lang, this.appUrl);
-    this.deps.notifier.memberMail(MemberNotices.address(to), subject, mail, `${entry.kind} receipt`);
+    const address = MemberNotices.address(to);
+    const { subject, html, text } = receiptMail(entry, { name: to.name, email: address }, lang, this.appUrl, this.deps.publicUrl);
+    this.deps.notifier.memberDocument(address, subject, html, text, `${entry.kind} receipt`);
   }
 
   /** A status change: mail + push (the push is skipped where the store already sends its own). */

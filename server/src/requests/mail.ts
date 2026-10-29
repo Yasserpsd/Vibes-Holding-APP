@@ -1,4 +1,5 @@
 import type { AppLang } from '../lang.js';
+import { receiptHtml, receiptText, type ReceiptCustomer } from '../payments/invoice.js';
 import { riyadhDateTime, riyadhDateTimeEn } from '../mail/notify.js';
 import type { RoyalMail, RoyalRow } from '../mail/royal.js';
 import { kindLabel, statusLabel, type MemberRequest, type RequestStatus } from './model.js';
@@ -9,80 +10,30 @@ import { kindLabel, statusLabel, type MemberRequest, type RequestStatus } from '
  * receipt («بدون رسوم», never a bare zero — rule 3: membership is never invoiced here).
  */
 export type MemberMail = { subject: string; mail: RoyalMail };
-
-const NO_FEE = { ar: 'بدون رسوم', en: 'No fees' };
+/** M138b: the receipt is the M108 customer invoice document, ready to send (HTML + text). */
+export type MemberDocument = { subject: string; html: string; text: string };
 
 function when(iso: string, lang: AppLang): string {
   return lang === 'en' ? riyadhDateTimeEn(iso) : riyadhDateTime(iso);
 }
 
-function detailRows(entry: MemberRequest, lang: AppLang): RoyalRow[] {
-  return entry.rows.map((row) => ({ label: lang === 'en' ? row.labelEn : row.label, value: row.value }));
-}
-
-function amountRow(entry: MemberRequest, lang: AppLang): RoyalRow[] {
-  if (entry.noFee) return [{ label: lang === 'en' ? 'Amount' : 'المبلغ', value: NO_FEE[lang === 'en' ? 'en' : 'ar'] }];
-  if (entry.amountSar !== null) return [{ label: lang === 'en' ? 'Amount' : 'المبلغ', value: `${entry.amountSar} SAR`, ltr: true }];
-  return [];
-}
-
-export function receiptMail(entry: MemberRequest, name: string, lang: AppLang, appUrl: string): MemberMail {
+/**
+ * M138b (owner, 2026-10-29: «الفاتورة اللي اقصدها توصل للعميل حاجه زي كده… بنفس الشكل ده بالظبط»): the receipt
+ * for every member action is the SAME document as the M108 customer invoice (payments/invoice.ts) — the card
+ * delivery and every other no-payment request read «بدون رسوم» (never a bare zero; rule 3).
+ */
+export function receiptMail(entry: MemberRequest, customer: ReceiptCustomer, lang: AppLang, appUrl: string, publicUrl?: string): MemberDocument {
   const en = lang === 'en';
-  const title = en ? entry.titleEn : entry.title;
   const kind = kindLabel(entry.kind, lang);
-  const rows: RoyalRow[] = [
-    { label: en ? 'Request no.' : 'رقم الطلب', value: entry.number, ltr: true },
-    { label: en ? 'Type' : 'النوع', value: kind },
-    { label: en ? 'Request' : 'الطلب', value: title },
-    ...amountRow(entry, lang),
-    ...detailRows(entry, lang),
-    { label: en ? 'Received' : 'تاريخ الاستلام', value: when(entry.createdAt, lang) },
-    { label: en ? 'Status' : 'الحالة', value: statusLabel(entry.status, lang) },
-  ];
-  const card = entry.kind === 'card';
-  const greeting = name.trim() ? (en ? `Dear ${name.trim()},` : `أهلًا بك يا ${name.trim()}،`) : en ? 'Dear member,' : 'أهلًا بك،';
-  if (card) {
-    return {
-      subject: en ? `Receipt — membership card delivery (No. ${entry.number})` : `إيصال طلب توصيل كارت العضوية (رقم ${entry.number})`,
-      mail: {
-        lang,
-        eyebrow: en ? 'RECEIPT · INVESTORS CLUB' : 'إيصال · INVESTORS CLUB',
-        title: en ? 'Membership card delivery' : 'توصيل كارت العضوية',
-        subtitle: en ? `Receipt No. ${entry.number} · ${NO_FEE.en}` : `إيصال رقم ${entry.number} · ${NO_FEE.ar}`,
-        greeting,
-        lead: [
-          en
-            ? 'We received your request for a printed membership card delivered to your address. Printing and delivery carry no fees. You will be notified when it is on its way.'
-            : 'استلمنا طلبك لنسخة مطبوعة من كارت عضويتك تصلك إلى عنوانك. الطباعة والتوصيل بدون رسوم، وستصلك رسالة عند إرساله.',
-        ],
-        rows,
-        cta: { label: en ? 'Track my requests' : 'متابعة طلباتي', url: appUrl },
-        note: en
-          ? 'This receipt covers the delivery request only; it is not a membership invoice.'
-          : 'هذا الإيصال خاص بطلب التوصيل فقط وليس فاتورة عضوية.',
-      },
-    };
-  }
-  return {
-    subject: en ? `We received your request — ${kind} (No. ${entry.number})` : `استلمنا طلبك — ${kind} (رقم ${entry.number})`,
-    mail: {
-      lang,
-      title: en ? 'We received your request' : 'استلمنا طلبك',
-      subtitle: kind,
-      greeting,
-      lead: [
-        entry.status === 'done'
-          ? en
-            ? 'Your request is confirmed. Its details are below, and you can review it any time in the app under «My requests».'
-            : 'تم تأكيد طلبك. تفاصيله أدناه، ويمكنك مراجعته في أي وقت من التطبيق: حسابي ← متابعة طلباتي.'
-          : en
-            ? 'The club team will follow it up. You will get a message at every update, and you can track it in the app under «My requests».'
-            : 'سيتابعه فريق النادي، وستصلك رسالة عند كل تحديث. يمكنك متابعة الحالة من التطبيق: حسابي ← متابعة طلباتي.',
-      ],
-      rows,
-      cta: { label: en ? 'Track my requests' : 'متابعة طلباتي', url: appUrl },
-    },
-  };
+  const subject =
+    entry.kind === 'card'
+      ? en
+        ? `Receipt — membership card delivery (No. ${entry.number})`
+        : `إيصال طلب توصيل كارت العضوية (رقم ${entry.number})`
+      : en
+        ? `We received your request — ${kind} (No. ${entry.number})`
+        : `استلمنا طلبك — ${kind} (رقم ${entry.number})`;
+  return { subject, html: receiptHtml(entry, customer, lang, publicUrl), text: receiptText(entry, lang, appUrl) };
 }
 
 export const CHANGE_TITLE: Record<RequestStatus, { ar: string; en: string }> = {
