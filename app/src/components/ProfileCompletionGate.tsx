@@ -159,17 +159,21 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           {need('name') ? <FormField label={t('completeProfile.name')} value={name} onChangeText={setName} hint={t('completeProfile.nameHint')} textContentType="name" /> : null}
 
           {need('contactEmail') ? (
-            <FormField
-              label={t('completeProfile.contactEmail')}
-              value={contactEmail}
-              onChangeText={setContactEmail}
-              hint={t('completeProfile.contactEmailHint')}
-              latin
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="emailAddress"
-            />
+            <View style={styles.group}>
+              {/* Owner (2026-10-30): the member must understand WHY — invoices and every contact go to this address only. */}
+              <Notice text={t('completeProfile.contactEmailWhy')} />
+              <FormField
+                label={t('completeProfile.contactEmail')}
+                value={contactEmail}
+                onChangeText={setContactEmail}
+                hint={t('completeProfile.contactEmailHint')}
+                latin
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="emailAddress"
+              />
+            </View>
           ) : null}
 
           {need('memberType') ? (
