@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import { fromCard } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 
 /**
@@ -14,7 +17,7 @@ import type { KV } from '../store.js';
 export const CARD_REQUESTS_KEY = 'card:printRequests';
 const MAX_REQUESTS = 1000;
 
-export type CardRequestStatus = 'pending' | 'done';
+export type CardRequestStatus = 'pending' | 'in_progress' | 'done' | 'rejected';
 
 export type CardPrintRequest = {
   id: string;
@@ -33,6 +36,9 @@ export type CardPrintRequest = {
   createdAt: string;
   doneAt: string | null;
   doneBy: string | null;
+  /** M138: the dashboard's note on a decision and the member's app language (for his mails). */
+  adminNote?: string | null;
+  lang?: AppLang;
 };
 
 /** What the member sees about his own request. */
@@ -45,7 +51,7 @@ export function publicCardRequest(request: CardPrintRequest): PublicCardRequest 
   return { id, status, city, address, createdAt, doneAt };
 }
 
-type Deps = { kv: KV; notifier: Notifier };
+type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
 
 export class CardService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -77,8 +83,13 @@ export class CardService {
     return this.load();
   }
 
+  /** M138: every request of one member, newest first (the timeline). */
+  async allMine(contactId: number): Promise<CardPrintRequest[]> {
+    return (await this.load()).filter((request) => request.contactId === contactId);
+  }
+
   /** The member himself asks for the printed card; an active annual membership is the door. */
-  async request(me: Me, input: CardRequestInput, now = new Date()): Promise<CardPrintRequest> {
+  async request(me: Me, input: CardRequestInput, now = new Date(), lang: AppLang = 'ar'): Promise<CardPrintRequest> {
     if (me.membership.status !== 'active') {
       throw new RequestError('membership_required', 'طلب النسخة المطبوعة متاح بعد تفعيل العضوية السنوية', 403);
     }
@@ -98,6 +109,8 @@ export class CardService {
       createdAt: now.toISOString(),
       doneAt: null,
       doneBy: null,
+      adminNote: null,
+      lang,
     };
     await this.mutate((requests) => {
       if (requests.some((entry) => entry.contactId === me.id && entry.status === 'pending')) {
@@ -106,20 +119,31 @@ export class CardService {
       requests.push(request);
     });
     this.deps.notifier.cardPrintRequested(request);
+    // M138: the member's no-fee receipt, at once.
+    this.deps.notices?.received(fromCard(request), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
     return request;
+  }
+
+  /** M138: the dashboard moves the request along (in progress / delivered / declined); the member is mailed and pushed on a real change. */
+  async setStatus(id: string, status: CardRequestStatus, adminName: string, note = '', now = new Date()): Promise<CardPrintRequest | null> {
+    const result = await this.mutate((requests) => {
+      const request = requests.find((entry) => entry.id === id);
+      if (!request) return null;
+      const changed = request.status !== status;
+      request.status = status;
+      if (changed && (status === 'done' || status === 'rejected')) {
+        request.doneAt = now.toISOString();
+        request.doneBy = adminName;
+      }
+      if (note.trim()) request.adminNote = note.trim().slice(0, 300);
+      return { request, changed };
+    });
+    if (result?.changed) this.deps.notices?.changed(fromCard(result.request), { email: result.request.email, name: result.request.name, lang: result.request.lang });
+    return result?.request ?? null;
   }
 
   /** The dashboard marks the card printed and delivered. */
   async markDone(id: string, adminName: string, now = new Date()): Promise<CardPrintRequest | null> {
-    return this.mutate((requests) => {
-      const request = requests.find((entry) => entry.id === id);
-      if (!request) return null;
-      if (request.status !== 'done') {
-        request.status = 'done';
-        request.doneAt = now.toISOString();
-        request.doneBy = adminName;
-      }
-      return request;
-    });
+    return this.setStatus(id, 'done', adminName, '', now);
   }
 }

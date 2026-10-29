@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type CardRequest, type InviteRecord, type InvitesConfig, type PersonaChangeRequest, type WorkshopRegistration } from '../api';
+import { api, type CardRequest, type InviteRecord, type InvitesConfig, type LedgerEntry, type PersonaChangeRequest, type RequestStatus, type WorkshopRegistration } from '../api';
 import { formatDateTime, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { AuditEntry, Lead, MailItem, Ticket } from '../types';
 import { Async, AsyncPage, Chips, DataTable, Intent, MemberLink, messageOf, Pill, SearchBox, SectionHead, sessionOver, useDebounced, useLoad, useShell, type Tone } from '../ui';
@@ -41,19 +41,50 @@ export function Tickets() {
   );
 }
 
+/** M138: the status every member request moves through, as the member reads it. */
+export const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = { pending: 'قيد المراجعة', in_progress: 'جارٍ التنفيذ', done: 'تم', rejected: 'مرفوض', cancelled: 'ملغي' };
+const REQUEST_STATUS_TONE: Record<RequestStatus, Tone> = { pending: 'muted', in_progress: 'gold', done: 'ok', rejected: 'danger', cancelled: 'muted' };
+
+/**
+ * M138 (owner): «قيد التنفيذ / تم / مرفوض» on every member request. Each press mails the member
+ * (in his language) and pushes his phones; a note travels with the decision.
+ */
+export function RequestStatusControl({ status, busy, onChange }: { status: RequestStatus; busy: boolean; onChange: (status: RequestStatus, note: string) => void }) {
+  const choices: RequestStatus[] = ['in_progress', 'done', 'rejected'];
+  function pick(next: RequestStatus) {
+    const note = next === 'rejected' ? (window.prompt('سبب الرفض (يصل للعضو كما تكتبه):', '') ?? '') : '';
+    if (next === 'rejected' && !window.confirm('رفض الطلب؟ سيصل العضو بريد وإشعار بالقرار.')) return;
+    onChange(next, note);
+  }
+  return (
+    <div className="status-control">
+      <Pill tone={REQUEST_STATUS_TONE[status]}>{REQUEST_STATUS_LABEL[status]}</Pill>
+      <div className="row-actions">
+        {choices
+          .filter((choice) => choice !== status)
+          .map((choice) => (
+            <button key={choice} type="button" className={choice === 'rejected' ? 'danger' : undefined} disabled={busy} onClick={() => pick(choice)}>
+              {REQUEST_STATUS_LABEL[choice]}
+            </button>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 /** M30: members asking for the printed membership card, delivered to the door at no charge. */
 export function CardRequests() {
   const { signOut, notify } = useShell();
   const state = useLoad(() => api.cardRequests(), []);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const pending = state.data?.requests.filter((row) => row.status === 'pending').length ?? 0;
+  const pending = state.data?.requests.filter((row) => row.status === 'pending' || row.status === 'in_progress').length ?? 0;
 
-  async function markDone(row: CardRequest) {
-    if (!window.confirm(`تم تسليم الكارت المطبوع للعضو «${row.name}»؟`)) return;
+  async function setStatus(row: CardRequest, status: RequestStatus, note: string) {
+    if (status === 'done' && !window.confirm(`تم تسليم الكارت المطبوع للعضو «${row.name}»؟`)) return;
     setBusyId(row.id);
     try {
-      await api.cardRequestDone(row.id);
-      notify('ok', 'سُجّل التسليم.');
+      await api.cardRequestStatus(row.id, status, note);
+      notify('ok', status === 'done' ? 'سُجّل التسليم وأُبلغ العضو.' : 'تحدّثت الحالة وأُبلغ العضو.');
       state.reload();
     } catch (failure) {
       if (sessionOver(failure)) signOut();
@@ -87,7 +118,7 @@ export function CardRequests() {
                   row.status === 'done' ? (
                     <Pill tone="ok">سُلّم {row.doneAt ? formatDateTime(row.doneAt) : ''}</Pill>
                   ) : (
-                    <button type="button" disabled={busyId === row.id} onClick={() => void markDone(row)}>تم التسليم</button>
+                    <RequestStatusControl status={row.status} busy={busyId === row.id} onChange={(status, note) => void setStatus(row, status, note)} />
                   ),
               },
             ]}
@@ -171,8 +202,25 @@ export function PersonaRequests() {
 
 /** M10: workshop interest registrations from «دليل المحايد» — the management sends the timing details itself. */
 export function Workshops() {
+  const { signOut, notify } = useShell();
   const state = useLoad(() => api.workshopRegistrations(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const rows = state.data?.registrations ?? [];
+
+  // M138: the registration finally has a status; the member hears every change.
+  async function setStatus(row: WorkshopRegistration, status: RequestStatus, note: string) {
+    setBusyId(row.id);
+    try {
+      await api.workshopStatus(row.id, status, note);
+      notify('ok', 'تحدّثت الحالة وأُبلغ المسجّل.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
   const byWorkshop = new Map<string, number>();
   for (const row of rows) byWorkshop.set(row.workshopTitle, (byWorkshop.get(row.workshopTitle) ?? 0) + 1);
   return (
@@ -199,6 +247,100 @@ export function Workshops() {
               { key: 'mail', label: 'البريد', cell: (row) => (row.email ? <bdi dir="ltr" className="num">{row.email}</bdi> : '—') },
               { key: 'note', label: 'ملاحظته', cell: (row) => row.note || '—' },
               { key: 'at', label: 'سجّل', cell: (row) => formatDateTime(row.createdAt) },
+              {
+                key: 'status',
+                label: 'الحالة',
+                cell: (row) => <RequestStatusControl status={row.status ?? 'pending'} busy={busyId === row.id} onChange={(status, note) => void setStatus(row, status, note)} />,
+              },
+            ]}
+          />
+        )}
+      </Async>
+    </>
+  );
+}
+
+const LEDGER_KIND: Record<LedgerEntry['kind'], string> = { service: 'طلب خدمة', golden: 'اهتمام بفرصة شراكة' };
+
+/** M138 «طلبات الخدمات»: service requests and golden interests, which had no list before; every status change reaches the member. */
+export function MemberRequests() {
+  const { signOut, notify } = useShell();
+  const state = useLoad(() => api.memberRequests(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [kind, setKind] = useState<'' | LedgerEntry['kind']>('');
+  const all = state.data?.requests ?? [];
+  const rows = kind ? all.filter((row) => row.kind === kind) : all;
+  const waiting = all.filter((row) => row.status === 'pending' || row.status === 'in_progress').length;
+
+  async function setStatus(row: LedgerEntry, status: RequestStatus, note: string) {
+    setBusyId(row.id);
+    try {
+      await api.memberRequestStatus(row.id, status, note);
+      notify('ok', 'تحدّثت الحالة وأُبلغ العضو.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      <SectionHead title="طلبات الخدمات" hint={state.data ? `قيد العمل: ${formatNumber(waiting)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <p className="muted">
+        كل صف هنا طلب خدمة (قبل تحويل واتساب) أو تسجيل اهتمام بفرصة شراكة من عضو مسجّل. العضو استلم إيصالًا على بريده لحظة الطلب، ويتابع الحالة من
+        التطبيق: حسابي ← «متابعة طلباتي». كل ضغطة هنا تصل إليه بريدًا وإشعارًا.
+      </p>
+      <div className="filters">
+        <Chips<'' | LedgerEntry['kind']>
+          label="النوع"
+          options={[
+            { value: '', label: 'الكل' },
+            { value: 'service', label: LEDGER_KIND.service },
+            { value: 'golden', label: LEDGER_KIND.golden },
+          ]}
+          value={kind}
+          onChange={setKind}
+        />
+      </div>
+      <Async state={state} rows={5} empty={() => rows.length === 0} emptyText="لا توجد طلبات بعد.">
+        {() => (
+          <DataTable<LedgerEntry>
+            caption="طلبات الخدمات والاهتمام بالشراكات"
+            rows={rows}
+            rowKey={(row) => row.id}
+            columns={[
+              { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
+              { key: 'kind', label: 'النوع', cell: (row) => LEDGER_KIND[row.kind] },
+              { key: 'title', label: 'الطلب', cell: (row) => row.title },
+              {
+                key: 'rows',
+                label: 'التفاصيل',
+                cell: (row) =>
+                  row.rows.length ? (
+                    <details>
+                      <summary>{formatNumber(row.rows.length)} بند</summary>
+                      <ul className="answers">
+                        {row.rows.map((item, index) => (
+                          <li key={`${item.label}-${index}`}>
+                            <strong>{item.label}:</strong> {item.value}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : (
+                    '—'
+                  ),
+              },
+              { key: 'phone', label: 'الجوال', cell: (row) => (row.phone ? <bdi dir="ltr" className="num">{row.phone}</bdi> : '—') },
+              { key: 'at', label: 'طُلب', cell: (row) => formatDateTime(row.createdAt) },
+              {
+                key: 'status',
+                label: 'الحالة',
+                cell: (row) => <RequestStatusControl status={row.status} busy={busyId === row.id} onChange={(status, note) => void setStatus(row, status, note)} />,
+              },
             ]}
           />
         )}

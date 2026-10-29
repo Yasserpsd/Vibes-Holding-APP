@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import { publicCardRequest, type CardService } from './service.js';
 
 export type CardRoutesOptions = { service: CardService; auth: AuthService };
@@ -14,6 +15,7 @@ const requestSchema = z.object({
   note: z.string().trim().max(300).optional(),
 });
 const idSchema = z.object({ id: z.string().uuid() });
+const statusSchema = z.object({ status: z.enum(['pending', 'in_progress', 'done', 'rejected']), note: z.string().trim().max(300).default('') });
 
 /**
  * M30: the membership card's print-and-deliver requests. The card itself needs no endpoint —
@@ -41,7 +43,7 @@ export const cardRoutes: FastifyPluginAsync<CardRoutesOptions> = async (app, { s
       const input = parse(requestSchema, request.body, reply);
       if (!input) return;
       const me = await auth.me(current.session);
-      const created = await service.request(me, input);
+      const created = await service.request(me, input, new Date(), langOf(request));
       return reply.code(201).send({ request: publicCardRequest(created) });
     }),
   );
@@ -65,6 +67,22 @@ export const cardRoutes: FastifyPluginAsync<CardRoutesOptions> = async (app, { s
       const done = await service.markDone(params.id, admin.me.name || admin.me.email);
       if (!done) return reply.code(404).send({ error: { code: 'not_found', message: 'الطلب غير موجود' } });
       return { request: done };
+    }),
+  );
+
+  // M138: the dashboard's status control (in progress / delivered / declined) — the member is mailed and pushed.
+  app.post(
+    '/api/admin/card-requests/:id/status',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(statusSchema, request.body, reply);
+      if (!body) return;
+      const updated = await service.setStatus(params.id, body.status, admin.me.name || admin.me.email, body.note);
+      if (!updated) return reply.code(404).send({ error: { code: 'not_found', message: 'الطلب غير موجود' } });
+      return { request: updated };
     }),
   );
 };

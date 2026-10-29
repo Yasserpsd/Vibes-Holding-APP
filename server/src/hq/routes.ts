@@ -82,7 +82,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       const body = parse(bookSchema, request.body, reply);
       if (!body) return;
       const me = await auth.me(current.session);
-      return { visit: await service.book(me, body) };
+      return { visit: await service.book(me, body, Date.now(), langOf(request)) };
     }),
   );
 

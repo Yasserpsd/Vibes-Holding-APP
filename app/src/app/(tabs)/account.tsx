@@ -112,6 +112,8 @@ export default function AccountScreen() {
         <MenuGroup title={t('account.group.membership')} icon="ribbon-outline">
           <MenuRow icon="ribbon-outline" label={t('account.menu.membership')} onPress={() => router.push('/membership')} />
           <MenuRow icon="receipt-outline" label={t('account.menu.payments')} onPress={() => router.push('/payments')} />
+          {/* M138: every operation the member started, with its status. */}
+          <MenuRow icon="list-outline" label={t('account.menu.requests')} onPress={() => router.push('/requests' as Href)} />
           <MenuRow icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} />
         </MenuGroup>
       </FadeInView>

@@ -4,6 +4,8 @@ import { RequestError } from '../auth/guard.js';
 import { PERSONAS } from '../auth/service.js';
 import type { AppLang } from '../lang.js';
 import { arabicDay, englishDay, formatAmount, formatAmountEn, riyadhDateTime, riyadhDateTimeEn } from '../mail/notify.js';
+import { CHANGE_TITLE } from '../requests/mail.js';
+import { kindLabel, type MemberRequest } from '../requests/model.js';
 import type { KV } from '../store.js';
 
 /**
@@ -433,6 +435,18 @@ export class PushService {
             : 'لم تعتمد الإدارة طلب تغيير صفتك هذه المرة.',
         data: { type: 'persona', screen: '/persona' },
       };
+    });
+  }
+
+  /** M138: a request moved to a new status (the dashboard) — each device hears it in its own language. */
+  requestChanged(entry: MemberRequest): void {
+    const data = { type: 'request', kind: entry.kind, id: entry.id, status: entry.status, screen: entry.screen ?? '/requests' };
+    this.background(entry.contactId, (lang) => {
+      const en = lang === 'en';
+      const title = CHANGE_TITLE[entry.status][en ? 'en' : 'ar'];
+      const what = en ? entry.titleEn : entry.title;
+      const note = entry.note ? ` · ${entry.note}` : '';
+      return { title, body: `${kindLabel(entry.kind, lang)}: ${what} (${en ? 'No.' : 'رقم'} ${entry.number})${note}`, data };
     });
   }
 

@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
 import { getGuideContent } from '../content/guide.js';
+import type { AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import { fromWorkshop, type RequestStatus } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 
 /**
@@ -26,6 +29,12 @@ export type WorkshopRegistration = {
   personaLabel: string;
   note: string;
   createdAt: string;
+  /** M138: the dashboard's status (old rows read as pending), its note, the member's language. */
+  status?: RequestStatus;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  adminNote?: string | null;
+  lang?: AppLang;
 };
 
 export type MyRegistration = Pick<WorkshopRegistration, 'id' | 'workshopId' | 'createdAt'>;
@@ -35,7 +44,7 @@ export function myRegistration(entry: WorkshopRegistration): MyRegistration {
   return { id, workshopId, createdAt };
 }
 
-type Deps = { kv: KV; notifier: Notifier };
+type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
 
 export class WorkshopsService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -66,7 +75,7 @@ export class WorkshopsService {
     return this.load();
   }
 
-  async register(me: Me, input: { workshopId: string; note?: string }, now = new Date()): Promise<WorkshopRegistration> {
+  async register(me: Me, input: { workshopId: string; note?: string }, now = new Date(), lang: AppLang = 'ar'): Promise<WorkshopRegistration> {
     const guide = await getGuideContent(this.deps.kv);
     const workshop = guide.workshops.items.find((item) => item.id === input.workshopId);
     if (!workshop) throw new RequestError('not_found', 'هذه الورشة غير موجودة', 404);
@@ -82,6 +91,8 @@ export class WorkshopsService {
       personaLabel: me.personaLabel,
       note: (input.note ?? '').trim(),
       createdAt: now.toISOString(),
+      status: 'pending',
+      lang,
     };
     await this.mutate((registrations) => {
       if (registrations.some((entry) => entry.contactId === me.id && entry.workshopId === workshop.id)) {
@@ -90,6 +101,24 @@ export class WorkshopsService {
       registrations.push(registration);
     });
     this.deps.notifier.workshopRegistered(registration);
+    // M138: the member's own receipt.
+    this.deps.notices?.received(fromWorkshop(registration), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
     return registration;
+  }
+
+  /** M138: the dashboard's status control; the member is mailed and pushed on a real change. */
+  async setStatus(id: string, status: RequestStatus, adminName: string, note = '', now = new Date()): Promise<WorkshopRegistration> {
+    const { entry, changed } = await this.mutate((registrations) => {
+      const entry = registrations.find((registration) => registration.id === id);
+      if (!entry) throw new RequestError('not_found', 'هذا التسجيل غير موجود', 404);
+      const changed = (entry.status ?? 'pending') !== status;
+      entry.status = status;
+      entry.decidedAt = now.toISOString();
+      entry.decidedBy = adminName;
+      if (note.trim()) entry.adminNote = note.trim().slice(0, 300);
+      return { entry, changed };
+    });
+    if (changed) this.deps.notices?.changed(fromWorkshop(entry), { email: entry.email, name: entry.name, lang: entry.lang });
+    return entry;
   }
 }

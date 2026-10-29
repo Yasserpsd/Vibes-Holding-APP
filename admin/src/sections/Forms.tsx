@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import { api, type FormSubmission, type NotifySettings } from '../api';
+import { api, type FormSubmission, type NotifySettings, type RequestStatus } from '../api';
 import { formatDateTime, formatNumber } from '../format';
 import { Async, Chips, DataTable, MemberLink, Pill, SectionHead, messageOf, sessionOver, useLoad, useShell } from '../ui';
+import { RequestStatusControl } from './Lists';
 
 /**
  * M16 «نماذج التسجيل»: the in-app registration forms (شركاء النجاح, الورشة…) land here, and the
@@ -18,6 +19,21 @@ export function Forms() {
   const rows = formKey ? all.filter((row) => row.formKey === formKey) : all;
   const waiting = all.filter((row) => !row.handled).length;
   const formChips = [{ value: '', label: 'الكل' }, ...(state.data?.forms ?? []).map((form) => ({ value: form.key, label: form.title }))];
+
+  // M138: the finer control — the member (when it is a member) is mailed and pushed on every change.
+  async function setStatus(row: FormSubmission, status: RequestStatus, note: string) {
+    setBusyId(row.id);
+    try {
+      await api.formStatus(row.id, status, note);
+      notify('ok', 'تحدّثت الحالة وأُبلغ صاحب التسجيل.');
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function toggle(row: FormSubmission) {
     if (row.handled && !window.confirm(`إعادة التسجيل «${row.name || row.formTitle}» إلى قائمة الانتظار؟`)) return;
@@ -88,7 +104,7 @@ export function Forms() {
                       <Pill tone="ok">{`عولج${row.handledBy ? ` · ${row.handledBy}` : ''}`}</Pill>
                     </button>
                   ) : (
-                    <button type="button" disabled={busyId === row.id} onClick={() => void toggle(row)}>تمت المعالجة</button>
+                    <RequestStatusControl status={row.status ?? 'pending'} busy={busyId === row.id} onChange={(status, note) => void setStatus(row, status, note)} />
                   ),
               },
             ]}

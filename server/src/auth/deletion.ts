@@ -169,6 +169,11 @@ export class AccountDeletionStore {
     });
   }
 
+  /** M138: the scheduled row itself (the member's timeline); null when none. */
+  async scheduledOf(contactId: number): Promise<ScheduledDeletion | null> {
+    return (await this.loadScheduled()).byContact[String(contactId)] ?? null;
+  }
+
   /** The countdown the app shows; null when no deletion is scheduled. */
   async statusOf(contactId: number, now = Date.now()): Promise<{ dueAt: string; daysLeft: number } | null> {
     const row = (await this.loadScheduled()).byContact[String(contactId)];

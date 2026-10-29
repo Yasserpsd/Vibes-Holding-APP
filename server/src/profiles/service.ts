@@ -2,8 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
+import { fromProfile } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 
 /**
@@ -69,6 +72,9 @@ export type Profile = {
   updatedAt: string;
   decidedAt: string | null;
   decidedBy: string | null;
+  /** M138: where the member's decision mail goes and in which language (set on apply). */
+  email?: string;
+  lang?: AppLang;
 };
 
 export type ProfilesConfig = { intro: string };
@@ -103,7 +109,7 @@ export function myProfile(profile: Profile): MyProfile {
 
 export type ProfileInput = Omit<ProfileFields, 'photo' | 'name'> & { name?: string };
 
-type Deps = { kv: KV; notifier: Notifier; push: PushService; onChange?: () => void };
+type Deps = { kv: KV; notifier: Notifier; push: PushService; onChange?: () => void; notices?: MemberNotices };
 
 export class ProfilesService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -163,7 +169,7 @@ export class ProfilesService {
   }
 
   /** The member applies (or re-applies) himself; the active annual membership is the door. */
-  async apply(me: Me, input: ProfileInput, now = new Date()): Promise<Profile> {
+  async apply(me: Me, input: ProfileInput, now = new Date(), lang: AppLang = 'ar'): Promise<Profile> {
     if (me.membership.status !== 'active') {
       throw new RequestError('membership_required', 'التقديم في «شخصية ومسيرة» متاح بعد تفعيل العضوية السنوية', 403);
     }
@@ -202,6 +208,8 @@ export class ProfilesService {
           updatedAt: at,
           decidedAt: null,
           decidedBy: null,
+          email: me.contactEmail || me.email,
+          lang,
         };
         items.push(created);
         return created;
@@ -216,9 +224,13 @@ export class ProfilesService {
       }
       existing.note = '';
       existing.updatedAt = at;
+      existing.email = me.contactEmail || me.email;
+      existing.lang = lang;
       return existing;
     });
     this.deps.notifier.profileApplied({ name: me.name, phone: me.phone, email: me.email, memberNumber: me.cardNumber, resubmission: profile.status === 'approved' });
+    // M138: the member's own receipt.
+    this.deps.notices?.received(fromProfile(profile), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
     return profile;
   }
 
@@ -288,6 +300,8 @@ export class ProfilesService {
       return profile;
     });
     if (decided?.contactId) this.deps.push.profileDecided(decided.contactId, action === 'approve', decided.id);
+    // M138: the decision mail (the push above is the profile's own).
+    if (decided?.contactId && decided.email) this.deps.notices?.changed(fromProfile(decided), { email: decided.email, name: decided.fields.name, lang: decided.lang }, { push: false });
     return decided;
   }
 

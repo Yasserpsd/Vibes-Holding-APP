@@ -81,12 +81,16 @@ const L = {
   },
 } as const satisfies Record<AppLang, Record<string, string>>;
 
-const NAVY = '#1F3A6E';
-const INK = '#1C2B4A';
-const MUTED = '#5A6B8C';
-const LINE = '#E1E6F0';
-const WASH = '#F4F6FB';
-const GOLD = '#F6C445';
+// M138 (owner, 2026-10-29: «فاتورة ملكية»): the invoice wears the royal shell's palette (mail/royal.ts) —
+// navy #0d274a, gold #e7ad3f, ivory washes, the club logo in the header and a gold frame.
+const NAVY = '#0d274a';
+const INK = '#111111';
+const MUTED = '#7A6320';
+const LINE = '#EADFC2';
+const WASH = '#FBF7EC';
+const GOLD = '#e7ad3f';
+const CLUB_LOGO_URL =
+  'https://vcmem.com/wp-content/uploads/2025/11/%D9%84%D9%88%D8%AC%D9%88-%D9%86%D8%A7%D8%AF%D9%8A-%D8%A7%D9%84%D9%85%D8%B3%D8%AA%D8%AB%D9%85%D8%B1%D9%8A%D9%86-%D8%AC%D9%88%D9%88%D9%84%D8%AF-%D8%B4%D9%81%D8%A7%D9%81.png';
 const FONT = `font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif`;
 
 function escape(value: string): string {
@@ -161,11 +165,18 @@ export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang =
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>${invoiceTitle(invoiceNo, lang)} — ${escape(SELLER.brand)}</title>
 <style>:root{color-scheme:light}@media print{body{background:#fff !important}}</style></head>
-<body style="margin:0;padding:0;background:#EEF1F6;${FONT}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF1F6"><tr><td align="center" style="padding:18px 8px">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden">
+<body style="margin:0;padding:0;background:#F3EFE6;${FONT}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3EFE6"><tr><td align="center" style="padding:22px 8px">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#FFFFFF;border:1px solid ${GOLD};border-radius:22px;overflow:hidden;box-shadow:0 14px 40px rgba(13,39,74,.14)">
 
-<tr><td style="background:${NAVY};padding:12px 24px">
+<tr><td style="background:${NAVY};padding:26px 24px 18px;text-align:center;border-bottom:3px solid ${GOLD}">
+  <img src="${CLUB_LOGO_URL}" alt="Investors Club" width="96" style="width:96px;height:auto;display:inline-block;border:0">
+  <div style="${FONT};color:#F3E4B5;font-size:12px;letter-spacing:3px;margin-top:12px">INVESTORS CLUB · VIBES VENTURES</div>
+  <div style="${FONT};color:#FFFFFF;font-size:22px;font-weight:700;margin-top:8px;line-height:1.5">${invoiceTitle(invoiceNo, lang)}</div>
+  <div style="${FONT};color:${GOLD};font-size:15px;font-weight:600;margin-top:4px">${t.paid}</div>
+</td></tr>
+
+<tr><td style="background:${NAVY};padding:10px 24px;border-bottom:1px solid rgba(231,173,63,.35)">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
     <td style="${FONT};color:#FFFFFF;font-size:14px;font-weight:700;white-space:nowrap">${t.cr}: ${ltr(SELLER.cr)}</td>
     <td dir="ltr" style="${FONT};color:#FFFFFF;font-size:13px;text-align:${end};white-space:nowrap">${escape(SELLER.brand)}</td>
@@ -175,7 +186,7 @@ export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang =
 <tr><td style="padding:22px 24px 6px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
     <td style="${FONT};font-size:21px;font-weight:700;color:${NAVY};line-height:1.6"><bdi>${t.invoice} — ${escape(payment.serviceTitle)}</bdi></td>
-    <td align="${end}" style="vertical-align:top;padding-${start}:10px;white-space:nowrap"><span style="${FONT};display:inline-block;background:${GOLD};color:${INK};border-radius:20px;padding:6px 16px;font-weight:700;font-size:13px;white-space:nowrap">${t.paid}</span></td>
+    <td align="${end}" style="vertical-align:top;padding-${start}:10px;white-space:nowrap"><span style="${FONT};display:inline-block;background:${GOLD};color:${NAVY};border-radius:20px;padding:6px 16px;font-weight:700;font-size:13px;white-space:nowrap">${t.paid}</span></td>
   </tr></table>
 </td></tr>
 
@@ -244,7 +255,7 @@ export function invoiceHtml(payment: Payment, invoiceNo: number, lang: AppLang =
 
 ${publicUrl ? `<tr><td align="center" style="padding:18px 24px 6px"><img src="${publicUrl}/pay/invoice-stamp.png" width="128" height="128" alt="${escape(SELLER.brand)}" style="display:block;width:128px;height:128px;opacity:0.92"></td></tr>` : ''}
 
-<tr><td style="background:${NAVY};padding:14px 24px;margin-top:20px">
+<tr><td style="background:${NAVY};padding:14px 24px;margin-top:20px;border-top:3px solid ${GOLD}">
   <div dir="ltr" style="${FONT};color:#FFFFFF;font-size:12.5px;text-align:center;line-height:2">
     <span style="color:#FFFFFF">${escape(SELLER.addressEn)}</span><br>
     ${SELLER.phones.map((phone) => `<a href="tel:${escape(phone)}" style="color:#FFFFFF;text-decoration:none">${escape(phone)}</a>`).join(' · ')}

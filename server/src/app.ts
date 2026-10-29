@@ -88,6 +88,9 @@ import { companionRoutes } from './companion/routes.js';
 import { CompanionService } from './companion/service.js';
 import { pushRoutes } from './push/routes.js';
 import { PushService } from './push/service.js';
+import { MemberNotices } from './requests/notices.js';
+import { requestsRoutes } from './requests/routes.js';
+import { RequestsService } from './requests/service.js';
 import { AccountDeletionStore } from './auth/deletion.js';
 import { ratingsRoutes } from './ratings/routes.js';
 import { RatingsService } from './ratings/service.js';
@@ -260,15 +263,17 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
-  const hq = new HqService({ kv, log: app.log, notifier, push });
-  const card = new CardService({ kv, notifier });
+  // M138: the member's receipt mail on every action and mail + push on every status change.
+  const notices = new MemberNotices({ notifier, push, log: app.log, publicUrl: config.PUBLIC_URL });
+  const hq = new HqService({ kv, log: app.log, notifier, push, notices });
+  const card = new CardService({ kv, notifier, notices });
   const contact = new ContactService({ kv, notifier, push });
   // «شخصية ومسيرة» (M11): member profiles, applied from the app and reviewed in the dashboard.
-  const profiles = new ProfilesService({ kv, notifier, push, onChange: () => moved('content') });
+  const profiles = new ProfilesService({ kv, notifier, push, onChange: () => moved('content'), notices });
   // «دليل المحايد» workshops (M10): interest registrations to the management.
-  const workshops = new WorkshopsService({ kv, notifier });
+  const workshops = new WorkshopsService({ kv, notifier, notices });
   // M16: the websites' registration forms, native; and the dashboard's notification-recipients list.
-  const forms = new FormsService({ kv, notifier });
+  const forms = new FormsService({ kv, notifier, notices });
   const notifyRecipients = new NotifyRecipients({ kv, envRecipients: parseRecipients(config.NOTIFY_EMAIL), notifier });
   await notifyRecipients.init();
   // Uploaded images and video of the posts (M15): a bucket when its values are set, else a local folder.
@@ -372,7 +377,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M136: edition pushes follow each account's news topics (unified interests, else the legacy per-topic prefs).
   news.useTopics(async (contactId) => (await interests.newsTopicsFor(contactId)) ?? (await news.prefs(contactId))?.topics ?? null);
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
-  const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content') });
+  const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices });
   // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).
   if (autoPush) agenda.startReminders();
   // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
@@ -469,16 +474,21 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
   registerProfileGate(app, auth);
 
+  // M117: the three-step, 30-day account deletion; the due-day sweep (below) mails the management to execute.
+  const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
+  const personaRequests = new PersonaRequestsService(kv);
+  // M138 «متابعة طلباتي»: one timeline over every store, and the ledger of service requests + golden interests.
+  const requests = new RequestsService({ kv, log: app.log, notices, sources: { card, hq, forms, workshops, agenda, persona: personaRequests, profiles, payments, deletion } });
+  await app.register(requestsRoutes, { service: requests, auth });
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl });
   await app.register(ratingsRoutes, { service: ratings, auth, projects });
   await app.register(interestsRoutes, { service: interests, auth });
   await app.register(discountsRoutes, { service: discounts, auth });
-  await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep });
+  await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep, requests });
   await app.register(appStringsRoutes, { kv, auth, sync });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  // M117: the three-step, 30-day account deletion; the due-day sweep mails the management to execute.
-  const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const deletionSweep = async (): Promise<void> => {
     for (const row of await deletion.due()) {
       notifier.accountDeletionRequested({
@@ -501,9 +511,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
-  const personaRequests = new PersonaRequestsService(kv);
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   // M142: voice-filled forms — the same key; the member still submits himself.

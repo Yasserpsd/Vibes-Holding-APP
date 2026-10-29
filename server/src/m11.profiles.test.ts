@@ -97,8 +97,8 @@ test('the member applies: pending, mailed to the management, hidden from the pub
   assert.equal(applied.json().profile.status, 'pending');
   profileId = applied.json().profile.id as string;
 
-  assert.equal(mailer.sent.length, before + 1);
-  assert.match(mailer.sent.at(-1)?.subject ?? '', /شخصية ومسيرة/);
+  assert.equal(mailer.sent.length, before + 2);
+  assert.match(mailer.sent.at(-2)?.subject ?? '', /شخصية ومسيرة/);
 
   const pub = await get('/api/people');
   assert.equal(pub.statusCode, 200);

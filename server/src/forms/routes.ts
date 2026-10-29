@@ -5,6 +5,7 @@ import { dashboardGuard, guard, optionalSession, parse, sessionGuard } from '../
 import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
 import type { NotifyRecipients } from '../mail/recipients.js';
+import { statusSchema } from '../requests/routes.js';
 import type { KV } from '../store.js';
 import { getFormsContent } from './content.js';
 import { mySubmission, type FormsService } from './service.js';
@@ -57,7 +58,7 @@ export const formsRoutes: FastifyPluginAsync<FormsRoutesOptions> = async (app, {
       if (!input) return;
       const who = await whoIs(request);
       const me = who?.me ?? null;
-      const submission = await service.submit(key, input.answers, me);
+      const submission = await service.submit(key, input.answers, me, new Date(), langOf(request));
       return reply.code(201).send({ submission: mySubmission(submission) });
     }),
   );
@@ -81,6 +82,20 @@ export const formsRoutes: FastifyPluginAsync<FormsRoutesOptions> = async (app, {
       if (!input) return;
       const id = String((request.params as { id?: string }).id ?? '');
       const submission = await service.setHandled(id, input.handled, admin.me.name || admin.me.email);
+      return { submission };
+    }),
+  );
+
+  // M138: the finer status control — the member is mailed and pushed on a real change.
+  app.post(
+    '/api/admin/forms/:id/status',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const input = parse(statusSchema, request.body, reply);
+      if (!input) return;
+      const id = String((request.params as { id?: string }).id ?? '');
+      const submission = await service.setStatus(id, input.status, admin.me.name || admin.me.email, input.note);
       return { submission };
     }),
   );

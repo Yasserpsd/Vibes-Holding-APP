@@ -109,8 +109,8 @@ test('a member registers with one tap: confirmed at once, mailed, and duplicates
   assert.equal(registered.statusCode, 201, registered.body);
   assert.equal(registered.json().registration.paid, true);
   assert.equal(registered.json().payment, null);
-  assert.equal(mailer.sent.length, before + 1);
-  assert.match(mailer.sent.at(-1)?.text ?? '', /عضو — بدون رسوم/);
+  assert.equal(mailer.sent.length, before + 2);
+  assert.match(mailer.sent.at(-2)?.text ?? '', /عضو — بدون رسوم/);
 
   assert.equal((await send('POST', `/api/agenda/${feeEventId}/register`, { attendance: 'online' }, memberToken)).statusCode, 409);
 

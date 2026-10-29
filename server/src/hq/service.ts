@@ -10,6 +10,8 @@ import { hqPhotos } from '../content/images.js';
 import type { AppLang } from '../lang.js';
 import type { Notifier, VisitLike } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
+import { fromVisit } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 
 /**
@@ -52,6 +54,8 @@ export type Visit = {
   hours: number;
   /** The member's membership-year key at booking time, so the approval charges the right year. */
   walletYear: string | null;
+  /** M138: the app language at booking — the member's mails follow it. */
+  lang?: AppLang;
 };
 
 export type PublicVisit = {
@@ -97,7 +101,7 @@ export type BookInput = { date: string; time: string; purpose: string; note: str
 /** M109a: the member's annual hours wallet as the app shows it (live counter). */
 export type HqWallet = { total: number; used: number; pending: number; remaining: number };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier; push: PushService };
+type Deps = { kv: KV; log: FastifyBaseLogger; notifier: Notifier; push: PushService; notices?: MemberNotices };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
@@ -339,7 +343,7 @@ export class HqService {
     return visits.sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`)).map((visit) => this.toPublic(visit, content, now));
   }
 
-  async book(me: Me, input: BookInput, now = Date.now()): Promise<PublicVisit> {
+  async book(me: Me, input: BookInput, now = Date.now(), lang: AppLang = 'ar'): Promise<PublicVisit> {
     const content = await this.content();
     if (HqService.accessOf(me) !== 'member') throw new RequestError('members_only', content.memberOnlyText, 403);
     if (!DATE.test(input.date) || !bookableDays(content, now).some((day) => day.date === input.date)) {
@@ -399,12 +403,16 @@ export class HqService {
         space,
         hours,
         walletYear,
+        lang,
       };
       visits.push(visit);
       this.deps.log.info({ visit: visit.id, date: visit.date, time: visit.time, space, hours }, 'hq visit requested');
       return visit;
     });
-    this.deps.notifier.hqVisitRequested(this.toMail(visit, content));
+    const mail = this.toMail(visit, content);
+    this.deps.notifier.hqVisitRequested(mail);
+    // M138: the member's own receipt.
+    this.deps.notices?.received(fromVisit(visit, mail.endTime), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
     return this.toPublic(visit, content, now);
   }
 
@@ -438,6 +446,12 @@ export class HqService {
     return { visit: this.toPublic(visit, content, now), name: visit.name, code, qr, validFrom: validFrom.toISOString(), validTo: validTo.toISOString(), state };
   }
 
+  /** M138: every booking of one member, any status, for «متابعة طلباتي». */
+  async history(contactId: number, now = Date.now()): Promise<PublicVisit[]> {
+    const content = await this.content();
+    return (await this.load()).filter((visit) => visit.contactId === contactId).map((visit) => this.toPublic(visit, content, now));
+  }
+
   async adminList(status: VisitStatus | null, now = Date.now()): Promise<AdminVisit[]> {
     const content = await this.content();
     const visits = (await this.load()).filter((visit) => !status || visit.status === status);
@@ -466,6 +480,8 @@ export class HqService {
       { id: visit.id, contactId: visit.contactId, date: visit.date, time: visit.time, endTime: mail.endTime, adminNote: visit.adminNote, space: visit.space },
       status,
     );
+    // M138: the decision mail (the push above already speaks of the barcode / the hours).
+    this.deps.notices?.changed(fromVisit(visit, mail.endTime), { email: visit.email, name: visit.name, lang: visit.lang }, { push: false });
     return this.toAdmin(visit, content, now);
   }
 

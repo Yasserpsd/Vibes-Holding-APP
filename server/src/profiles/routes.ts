@@ -111,7 +111,7 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       const input = parse(applySchema, request.body, reply);
       if (!input) return;
       const me = await auth.me(current.session);
-      const profile = await service.apply(me, input);
+      const profile = await service.apply(me, input, new Date(), langOf(request));
       return reply.code(201).send({ profile: myProfile(profile) });
     }),
   );

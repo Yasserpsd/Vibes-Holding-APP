@@ -415,3 +415,8 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* M138: the member-request status control on the dashboard lists. */
+.status-control { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.status-control .row-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.status-control .row-actions button { padding: 4px 10px; font-size: 12.5px; }

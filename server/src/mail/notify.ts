@@ -189,6 +189,11 @@ export class Notifier {
       .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject, what }, 'member mail failed'));
   }
 
+  /** M138: one royal mail to a member — the receipts and status notices built in requests/mail.ts. */
+  memberMail(to: string, subject: string, mail: RoyalMail, what: string): void {
+    this.sendRoyal(to, subject, mail, what);
+  }
+
   hqVisitRequested(visit: VisitLike): void {
     this.dispatch(`حجز زيارة للمقر من التطبيق: ${visit.name}`, [
       `طلب العضو حجز زيارة لمقر النادي من ${APP_NAME}.`,

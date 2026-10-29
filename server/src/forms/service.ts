@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { RequestError } from '../auth/guard.js';
 import type { Me } from '../auth/service.js';
+import type { AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import { formStatus, fromForm, type RequestStatus } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 import { getFormsContent, type FormDef, type FormFieldDef } from './content.js';
 
@@ -35,6 +38,10 @@ export type FormSubmission = {
   handled: boolean;
   handledBy: string | null;
   handledAt: string | null;
+  /** M138: the finer status (`handled` stays for old rows and the toggle), the admin's note, the member's language. */
+  status?: RequestStatus;
+  adminNote?: string | null;
+  lang?: AppLang;
 };
 
 export type MySubmission = Pick<FormSubmission, 'id' | 'formKey' | 'createdAt'>;
@@ -54,7 +61,7 @@ function fieldProblem(field: FormFieldDef, raw: string, optionsOf: (field: FormF
   return value.length > max ? `«${field.label}» أطول من المسموح` : null;
 }
 
-type Deps = { kv: KV; notifier: Notifier };
+type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
 
 export class FormsService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -85,7 +92,7 @@ export class FormsService {
     return this.load();
   }
 
-  async submit(formKey: string, raw: Record<string, string>, me: Me | null, now = new Date()): Promise<FormSubmission> {
+  async submit(formKey: string, raw: Record<string, string>, me: Me | null, now = new Date(), lang: AppLang = 'ar'): Promise<FormSubmission> {
     const arabic = await getFormsContent(this.deps.kv, 'ar');
     const form = arabic.forms.find((entry) => entry.key === formKey);
     if (!form) throw new RequestError('not_found', 'هذا النموذج غير موجود', 404);
@@ -131,6 +138,8 @@ export class FormsService {
       handled: false,
       handledBy: null,
       handledAt: null,
+      status: 'pending',
+      lang,
     };
     await this.mutate((submissions) => {
       if (form.once && me && submissions.some((entry) => entry.contactId === me.id && entry.formKey === form.key)) {
@@ -139,19 +148,31 @@ export class FormsService {
       submissions.push(submission);
     });
     this.deps.notifier.formSubmitted(submission);
+    // M138: the member's own receipt (guests get nothing — no account to follow it from).
+    if (me) this.deps.notices?.received(fromForm(submission), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
     return submission;
+  }
+
+  /** M138: the dashboard's status control; the member is mailed and pushed on a real change. */
+  async setStatus(id: string, status: RequestStatus, adminName: string, note = '', now = new Date()): Promise<FormSubmission> {
+    const { entry, changed } = await this.mutate((submissions) => {
+      const entry = submissions.find((submission) => submission.id === id);
+      if (!entry) throw new RequestError('not_found', 'هذا التسجيل غير موجود', 404);
+      const changed = formStatus(entry) !== status;
+      entry.status = status;
+      entry.handled = status === 'done';
+      entry.handledBy = status === 'pending' ? null : adminName;
+      entry.handledAt = status === 'pending' ? null : now.toISOString();
+      if (note.trim()) entry.adminNote = note.trim().slice(0, 300);
+      return { entry, changed };
+    });
+    if (changed && entry.contactId !== null) this.deps.notices?.changed(fromForm(entry), { email: entry.email, name: entry.name, lang: entry.lang });
+    return entry;
   }
 
   /** The dashboard marks a submission answered (or back again); the name on the toggle is kept. */
   async setHandled(id: string, handled: boolean, adminName: string, now = new Date()): Promise<FormSubmission> {
-    return this.mutate((submissions) => {
-      const entry = submissions.find((submission) => submission.id === id);
-      if (!entry) throw new RequestError('not_found', 'هذا التسجيل غير موجود', 404);
-      entry.handled = handled;
-      entry.handledBy = handled ? adminName : null;
-      entry.handledAt = handled ? now.toISOString() : null;
-      return entry;
-    });
+    return this.setStatus(id, handled ? 'done' : 'pending', adminName, '', now);
   }
 
   /** The open forms and their titles, for the dashboard's filter chips. */

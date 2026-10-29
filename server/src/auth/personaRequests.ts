@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { RequestError } from './guard.js';
 import type { Me, Persona } from './service.js';
+import type { AppLang } from '../lang.js';
 import type { KV } from '../store.js';
 
 /**
@@ -27,6 +28,8 @@ export type PersonaChangeRequest = {
   decidedAt: string | null;
   decidedBy: string | null;
   adminNote: string | null;
+  /** M138: the app language at request time — the member's mails follow it. */
+  lang?: AppLang;
 };
 
 /** What the member sees about his own request (no uuid, no admin identity). */
@@ -66,7 +69,7 @@ export class PersonaRequestsService {
     return run;
   }
 
-  async create(me: Me, uuid: string, to: Persona, note: string): Promise<PersonaChangeRequest> {
+  async create(me: Me, uuid: string, to: Persona, note: string, lang: AppLang = 'ar'): Promise<PersonaChangeRequest> {
     return this.mutate((items) => {
       if (items.some((item) => item.contactId === me.id && item.status === 'pending')) {
         throw new RequestError('duplicate', 'لديك طلب تغيير قائم بالفعل، وستصلك نتيجته بإشعار');
@@ -85,10 +88,16 @@ export class PersonaRequestsService {
         decidedAt: null,
         decidedBy: null,
         adminNote: null,
+        lang,
       };
       items.push(request);
       return request;
     });
+  }
+
+  /** M138: every request of the member, newest first (the timeline). */
+  async allMine(contactId: number): Promise<PersonaChangeRequest[]> {
+    return (await this.load()).filter((item) => item.contactId === contactId);
   }
 
   /** The member's latest request, newest first; null when he never asked. */

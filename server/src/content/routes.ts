@@ -5,6 +5,7 @@ import { dashboardGuard, guard, optionalSession, parse } from '../auth/guard.js'
 import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
+import type { RequestsService } from '../requests/service.js';
 import type { KV } from '../store.js';
 import type { SyncService } from '../sync/service.js';
 import { getAboutContent } from './about.js';
@@ -21,7 +22,7 @@ import { getMembershipContent } from './membership.js';
 import { bannerImages, imageSlots, opportunityImage, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
-export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService; englishSweep?: EnglishSweep };
+export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService; englishSweep?: EnglishSweep; requests?: RequestsService };
 
 const requestSchema = z.object({
   answers: z.record(z.string().max(40), z.string().trim().max(300)).default({}),
@@ -59,7 +60,7 @@ const imageSchema = z.object({
  * otherwise). Services are the only list shaped per account (locked for non-members). The dashboard edits the
  * wording of every block in both languages through the admin routes.
  */
-export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (app, { kv, auth, notifier, sync, offers, englishSweep }) => {
+export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (app, { kv, auth, notifier, sync, offers, englishSweep, requests }) => {
   const whoIs = optionalSession(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -112,6 +113,11 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
         phone: body.phone,
         note: body.note,
       });
+      // M138: a member's interest lands on his timeline with a receipt mail; a guest leaves only the admin mail.
+      if (me) {
+        const note = body.note.trim();
+        await requests?.record(me, { kind: 'golden', title: company.name, ref: company.code, rows: note ? [{ label: 'ملاحظتك', labelEn: 'Your note', value: note }] : [], lang: langOf(request) });
+      }
       return { ok: true };
     }),
   );
@@ -181,6 +187,11 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
         sender: me ? { name: me.name, phone: me.phone, email: me.email } : null,
         channel: service.action.phone,
       });
+      // M138: the request is kept for «متابعة طلباتي» and the member gets his receipt at once.
+      if (me) {
+        const rows = fields.map((field, index) => ({ label: answers[index]?.label ?? field.label, labelEn: field.label, value: (body.answers[field.key] ?? '').trim() })).filter((row) => row.value);
+        await requests?.record(me, { kind: 'service', title: arabicService?.title ?? service.title, ref: key, rows, lang });
+      }
       return { ok: true };
     }),
   );

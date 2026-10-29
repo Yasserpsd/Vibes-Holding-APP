@@ -115,10 +115,33 @@ export type CardRequest = {
   city: string;
   address: string;
   note: string;
-  status: 'pending' | 'done';
+  status: RequestStatus;
   createdAt: string;
   doneAt: string | null;
   doneBy: string | null;
+  adminNote?: string | null;
+};
+
+/** M138: the status every member request moves through — mirrors server/src/requests/model.ts. */
+export type RequestStatus = 'pending' | 'in_progress' | 'done' | 'rejected' | 'cancelled';
+
+/** M138: a service request or golden interest on the ledger (the operations that had no store before). */
+export type LedgerEntry = {
+  id: string;
+  kind: 'service' | 'golden';
+  contactId: number;
+  name: string;
+  phone: string;
+  email: string;
+  lang: 'ar' | 'en';
+  title: string;
+  ref: string;
+  rows: { label: string; labelEn: string; value: string }[];
+  status: RequestStatus;
+  createdAt: string;
+  updatedAt: string | null;
+  decidedBy: string | null;
+  adminNote: string | null;
 };
 
 /** M32: one invited registration — mirrors server/src/invites/service.ts. */
@@ -221,6 +244,8 @@ export type FormSubmission = {
   handled: boolean;
   handledBy: string | null;
   handledAt: string | null;
+  status?: RequestStatus;
+  adminNote?: string | null;
 };
 export type FormInfo = { key: string; title: string; open: boolean };
 export type NotifySettings = { recipients: string[]; source: 'dashboard' | 'env'; envRecipients: string[]; by: string | null; at: string | null };
@@ -237,6 +262,10 @@ export type WorkshopRegistration = {
   personaLabel: string;
   note: string;
   createdAt: string;
+  status?: RequestStatus;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  adminNote?: string | null;
 };
 
 /** M41 «أجندة النادي» — mirrors server/src/agenda/service.ts. */
@@ -490,6 +519,11 @@ export const api = {
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),
+  cardRequestStatus: (id: string, status: RequestStatus, note = '') => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/status`, { status, note }),
+  memberRequests: () => call<{ requests: LedgerEntry[] }>('GET', '/api/admin/requests'),
+  memberRequestStatus: (id: string, status: RequestStatus, note = '') => call<{ request: LedgerEntry }>('POST', `/api/admin/requests/${id}/status`, { status, note }),
+  workshopStatus: (id: string, status: RequestStatus, note = '') => call<{ registration: WorkshopRegistration }>('POST', `/api/admin/workshops/${id}/status`, { status, note }),
+  formStatus: (id: string, status: RequestStatus, note = '') => call<{ submission: FormSubmission }>('POST', `/api/admin/forms/${id}/status`, { status, note }),
   contactThreads: () => call<{ threads: ContactThreadSummary[] }>('GET', '/api/admin/contact'),
   contactThread: (contactId: number) => call<{ thread: ContactThread }>('GET', `/api/admin/contact/${contactId}`),
   contactReply: (contactId: number, text: string) => call<{ message: ContactMessage }>('POST', `/api/admin/contact/${contactId}/reply`, { text }),

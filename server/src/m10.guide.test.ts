@@ -88,9 +88,9 @@ test('a signed-in account (no membership needed) registers once per workshop, an
   const registered = await send('POST', '/api/workshops/register', { workshopId: 'investing-basics', note: 'أفضل الحضور أونلاين.' }, neutralToken);
   assert.equal(registered.statusCode, 201, registered.body);
   assert.equal(registered.json().registration.workshopId, 'investing-basics');
-  assert.equal(mailer.sent.length, before + 1);
-  assert.match(mailer.sent.at(-1)?.subject ?? '', /تسجيل في ورشة/);
-  assert.match(mailer.sent.at(-1)?.text ?? '', /أفضل الحضور أونلاين/);
+  assert.equal(mailer.sent.length, before + 2);
+  assert.match(mailer.sent.at(-2)?.subject ?? '', /تسجيل في ورشة/);
+  assert.match(mailer.sent.at(-2)?.text ?? '', /أفضل الحضور أونلاين/);
 
   const again = await send('POST', '/api/workshops/register', { workshopId: 'investing-basics' }, neutralToken);
   assert.equal(again.statusCode, 409);

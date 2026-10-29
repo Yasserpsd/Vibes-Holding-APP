@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/card/routes.ts (M30): the membership card's print-and-deliver requests.
-export type CardRequestStatus = 'pending' | 'done';
+export type CardRequestStatus = 'pending' | 'in_progress' | 'done' | 'rejected';
 
 export type CardPrintRequest = {
   id: string;

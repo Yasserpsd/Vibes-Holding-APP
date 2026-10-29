@@ -100,8 +100,8 @@ test('the member requests the printed card once; the management is mailed; a sec
   // The member sees his own request, never the management fields.
   assert.equal('phone' in created.json().request, false);
 
-  assert.equal(mailer.sent.length, before + 1);
-  const mail = mailer.sent.at(-1);
+  assert.equal(mailer.sent.length, before + 2);
+  const mail = mailer.sent.at(-2);
   assert.match(mail?.subject ?? '', /طلب طباعة كارت العضوية/);
   assert.match(mail?.text ?? '', /بدون رسوم/);
   assert.match(mail?.text ?? '', new RegExp(`I-${String(memberId).padStart(10, '0')}`));

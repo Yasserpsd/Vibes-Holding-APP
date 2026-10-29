@@ -14,6 +14,8 @@ import type { PushService } from '../push/service.js';
 import { DELETION_GRACE_DAYS, type AccountDeletionStore } from './deletion.js';
 import { PERSONA_CHANGE_DAYS, type PersonaChangeStore } from './personaChange.js';
 import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService } from './personaRequests.js';
+import { fromDeletion, fromPersona } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
 import { PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
@@ -33,6 +35,8 @@ export type AuthRoutesOptions = {
   push?: PushService;
   /** M117: the three-step, 30-day account deletion (absent only in old tests; the routes then 404). */
   deletion?: AccountDeletionStore;
+  /** M138: the member's receipt and status mails. */
+  notices?: MemberNotices;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -113,7 +117,7 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -513,7 +517,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (daysLeft === 0) {
         return reply.code(400).send({ error: { code: 'window_open', message: 'تغييرك السنوي ما زال متاحًا — غيّر توجهك مباشرة بالرمز المرسل إلى بريدك' } });
       }
-      const created = await personaRequests.create(me, auth.session.uuid, body.persona, body.note);
+      const created = await personaRequests.create(me, auth.session.uuid, body.persona, body.note, langOf(request));
+      notices?.received(fromPersona(created), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang: langOf(request) });
       return reply.code(201).send({ request: toMyPersonaRequest(created) });
     }),
   );
@@ -559,6 +564,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const decided = await personaRequests.decide(params.id, body.action === 'approve' ? 'approved' : 'rejected', admin.me.name || admin.me.email, body.note);
       // M122: the push service maps the persona key to each language's label itself.
       push?.personaChangeDecided(decided.contactId, decided.status === 'approved', decided.to, decided.adminNote);
+      notices?.changed(fromPersona(decided), { email: decided.email, name: decided.name, lang: decided.lang }, { push: false });
       return { request: toAdminPersonaRequest(decided) };
     }),
   );
@@ -583,6 +589,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         return { ok: true };
       }
       const row = await deletion.schedule({ contactId: me.id, uuid: auth.session.uuid, email: me.email, name: me.name, phone: me.phone }, body.reason ?? '');
+      notices?.received(fromDeletion(row), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang: langOf(request) });
       notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: `${body.reason ?? ''} — حذف مجدول بعد ${DELETION_GRACE_DAYS} يومًا (${row.dueAt.slice(0, 10)})`, ip: request.ip });
       return { ok: true, dueAt: row.dueAt, daysLeft: DELETION_GRACE_DAYS };
     }),
@@ -661,6 +668,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         return reply.code(400).send({ error: { code: `delete_${result.reason}`, message } });
       }
       const row = await deletion.schedule({ contactId: me.id, uuid: auth.session.uuid, email: me.email, name: me.name, phone: me.phone }, result.reason);
+      notices?.received(fromDeletion(row), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang: langOf(request) });
       notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: `${result.reason} — حذف مجدول بعد ${DELETION_GRACE_DAYS} يومًا (${row.dueAt.slice(0, 10)})`, ip: request.ip });
       return { ok: true, dueAt: row.dueAt, daysLeft: DELETION_GRACE_DAYS };
     }),

@@ -48,8 +48,9 @@ async function signUp(email: string, phone: string): Promise<string> {
   return verified.json().token as string;
 }
 
+// M138: the member now gets his own receipt too, so «the last mail» means the last one to the management.
 const lastMail = () => {
-  const mail = mailer.sent.at(-1);
+  const mail = mailer.sent.filter((entry) => entry.to.includes('admin@vcmem.com')).at(-1);
   if (!mail) throw new Error('no mail was sent');
   return mail;
 };
@@ -98,7 +99,7 @@ test('service requests e-mail the management before the WhatsApp handover', asyn
   const before = mailer.sent.length;
   const ok = await post('/api/services/studio/request', { answers: { package: 'الكاملة', time: 'الثلاثاء 4 عصرًا' } }, memberToken);
   assert.equal(ok.statusCode, 200, ok.body);
-  assert.equal(mailer.sent.length, before + 1);
+  assert.equal(mailer.sent.length, before + 2);
   const mail = lastMail();
   assert.deepEqual(mail.to, ['admin@vcmem.com', 'second@vcmem.com']);
   assert.ok(mail.subject.startsWith('[Vibes Ventures] [تجريبي] طلب خدمة من التطبيق:'), mail.subject);

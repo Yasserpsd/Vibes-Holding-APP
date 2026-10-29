@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
+import { statusSchema } from '../requests/routes.js';
 import { myRegistration, type WorkshopsService } from './service.js';
 
 export type WorkshopsRoutesOptions = { service: WorkshopsService; auth: AuthService };
@@ -34,7 +36,7 @@ export const workshopsRoutes: FastifyPluginAsync<WorkshopsRoutesOptions> = async
       const input = parse(registerSchema, request.body, reply);
       if (!input) return;
       const me = await auth.me(current.session);
-      const registration = await service.register(me, input);
+      const registration = await service.register(me, input, new Date(), langOf(request));
       return reply.code(201).send({ registration: myRegistration(registration) });
     }),
   );
@@ -45,6 +47,20 @@ export const workshopsRoutes: FastifyPluginAsync<WorkshopsRoutesOptions> = async
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
       return { registrations: await service.list() };
+    }),
+  );
+
+  // M138: the status control the list never had — the member is mailed and pushed on a real change.
+  app.post(
+    '/api/admin/workshops/:id/status',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const input = parse(statusSchema, request.body, reply);
+      if (!input) return;
+      const id = String((request.params as { id?: string }).id ?? '');
+      const registration = await service.setStatus(id, input.status, admin.me.name || admin.me.email, input.note);
+      return { registration };
     }),
   );
 };

@@ -11,6 +11,8 @@ import { isInterestKey, type InterestKey } from '../interests/types.js';
 import type { Notifier } from '../mail/notify.js';
 import type { Payment, PaymentsService, PublicPayment } from '../payments/service.js';
 import type { PushService } from '../push/service.js';
+import { fromAgenda } from '../requests/model.js';
+import type { MemberNotices } from '../requests/notices.js';
 import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 
@@ -94,6 +96,8 @@ export type AgendaRegistration = {
   discountCode?: string | null;
   /** M107: what this attendee actually paid (after any code), SAR. */
   amountSar?: number;
+  /** M138: the app language at registration — the member's mails follow it. */
+  lang?: AppLang;
 };
 
 /** The days an event runs: the `dates` list of a multi-day workshop, or the single `date`. */
@@ -123,7 +127,7 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
 
-type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; discounts?: DiscountsService; interests?: InterestsService; onChange?: () => void };
+type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; discounts?: DiscountsService; interests?: InterestsService; onChange?: () => void; notices?: MemberNotices };
 
 const ATTENDANCE_LABEL: Record<AgendaAttendance, string> = { hq: 'حضوري في المقر', online: 'أونلاين' };
 const TICKET_PREFIX = 'VCEV';
@@ -322,6 +326,7 @@ export class AgendaService {
         paymentId: null,
         createdAt: stamp,
         confirmedAt: null,
+        lang,
       };
       registrations.push(created);
       return created;
@@ -343,6 +348,7 @@ export class AgendaService {
     if (fee <= 0) {
       const confirmed = await confirm(null);
       this.deps.notifier.agendaRegistered(confirmed, event);
+      this.deps.notices?.received(fromAgenda(confirmed, event), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
       return { registration: confirmed, payment: null };
     }
 
@@ -359,6 +365,7 @@ export class AgendaService {
       // A 100% code settled at zero on the spot (the payments push already told the member).
       const confirmed = await confirm(payment.id);
       this.deps.notifier.agendaRegistered(confirmed, event);
+      this.deps.notices?.received(fromAgenda(confirmed, event), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
       return { registration: confirmed, payment };
     }
     const pending = await this.mutateRegs((registrations) => {
@@ -388,6 +395,7 @@ export class AgendaService {
       const event = await this.event(confirmed.eventId);
       if (event) {
         this.deps.notifier.agendaRegistered(confirmed, event);
+        this.deps.notices?.received(fromAgenda(confirmed, event), { email: confirmed.email, name: confirmed.name, lang: confirmed.lang });
         this.deps.push.agendaConfirmed(confirmed.contactId, event.title, event.id, event.en?.title ?? null);
       }
     })();
@@ -403,6 +411,12 @@ export class AgendaService {
   }
 
   /** The confirmed attendee's ticket: event details plus the QR (a pre-M107 confirmation gets its code here). */
+  /** M138: the member's registrations with their events, for «متابعة طلباتي». */
+  async mineRegistrations(contactId: number): Promise<{ registration: AgendaRegistration; event: AgendaEvent | null }[]> {
+    const mine = (await this.loadRegs()).filter((entry) => entry.contactId === contactId);
+    return Promise.all(mine.map(async (registration) => ({ registration, event: await this.event(registration.eventId) })));
+  }
+
   async ticket(contactId: number, eventId: string, now = Date.now()): Promise<AgendaTicket> {
     const event = await this.event(eventId);
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);

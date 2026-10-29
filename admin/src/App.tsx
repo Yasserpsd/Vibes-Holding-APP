@@ -6,7 +6,7 @@ import { Agenda } from './sections/Agenda';
 import { Discounts } from './sections/Discounts';
 import { Home } from './sections/Home';
 import { Interests } from './sections/Interests';
-import { Audit, CardRequests, Invites, Leads, Mail, PersonaRequests, Tickets, Workshops } from './sections/Lists';
+import { Audit, CardRequests, Invites, Leads, Mail, MemberRequests, PersonaRequests, Tickets, Workshops } from './sections/Lists';
 import { HqBookings } from './sections/Hq';
 import { Forms } from './sections/Forms';
 import { MemberMail } from './sections/MemberMail';
@@ -47,6 +47,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'personas', label: 'طلبات تغيير الصفة', icon: 'members' },
   { key: 'workshops', label: 'تسجيلات الورش', icon: 'workshops' },
   { key: 'forms', label: 'نماذج التسجيل', icon: 'forms' },
+  { key: 'requests', label: 'طلبات الخدمات', icon: 'forms' },
   { key: 'tickets', label: 'التذاكر', icon: 'tickets' },
   { key: 'leads', label: 'العملاء المحتملون', icon: 'leads' },
   { key: 'threads', label: 'المحادثات', icon: 'threads' },
@@ -285,6 +286,7 @@ export function App() {
             {section === 'personas' ? <PersonaRequests /> : null}
             {section === 'workshops' ? <Workshops /> : null}
             {section === 'forms' ? <Forms /> : null}
+            {section === 'requests' ? <MemberRequests /> : null}
             {section === 'tickets' ? <Tickets /> : null}
             {section === 'leads' ? <Leads /> : null}
             {section === 'threads' ? <Threads openId={route.thread} onOpen={pickThread} onClose={closeThread} /> : null}
