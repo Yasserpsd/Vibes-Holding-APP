@@ -177,7 +177,7 @@ test('the dashboard enters and orders profiles by hand and edits the owner\'s in
   const created = await send(
     'POST',
     '/api/admin/profiles',
-    { fields: { name: 'ضيف الشرف', title: 'مستشار', company: '', bio: 'ملف أدخلته الإدارة يدويًا كما قرر المالك في 2026-09-11 ليظهر مباشرة.', milestones: ['محطة يدوية'], links: [], photo: null } },
+    { fields: { name: 'ضياء الشريف', title: 'مستشار', company: '', bio: 'ملف أدخلته الإدارة يدويًا كما قرر المالك في 2026-09-11 ليظهر مباشرة.', milestones: ['محطة يدوية'], links: [], photo: null } },
     adminToken,
   );
   assert.equal(created.statusCode, 201, created.body);

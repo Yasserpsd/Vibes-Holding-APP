@@ -34,7 +34,7 @@ const post = (url: string, payload: Record<string, unknown>, token?: string, hea
 
 async function signUp(email: string, phone: string): Promise<string> {
   const registered = await post('/api/auth/register', {
-    name: 'عضو تجريبي',
+    name: 'عضو التجارب',
     country: 'sa',
     phone,
     email,
@@ -102,7 +102,7 @@ test('service requests e-mail the management before the WhatsApp handover', asyn
   const mail = lastMail();
   assert.deepEqual(mail.to, ['admin@vcmem.com', 'second@vcmem.com']);
   assert.ok(mail.subject.startsWith('[Vibes Ventures] [تجريبي] طلب خدمة من التطبيق:'), mail.subject);
-  assert.ok(mail.text.includes('الباقة: الكاملة') && mail.text.includes('الاسم: عضو تجريبي'), mail.text);
+  assert.ok(mail.text.includes('الباقة: الكاملة') && mail.text.includes('الاسم: عضو التجارب'), mail.text);
 
   const locked = await post('/api/services/studio/request', { answers: {} });
   assert.equal(locked.statusCode, 403);
@@ -118,18 +118,18 @@ test('HQ: booking, decisions and cancellations e-mail the management; the pass c
   const booked = await post('/api/hq/visits', { date: first.date, time: '18:00', purpose, note: 'اجتماع مع شريك' }, memberToken);
   assert.equal(booked.statusCode, 200, booked.body);
   let mail = lastMail();
-  assert.ok(mail.subject.includes('حجز زيارة للمقر من التطبيق: عضو تجريبي'), mail.subject);
+  assert.ok(mail.subject.includes('حجز زيارة للمقر من التطبيق: عضو التجارب'), mail.subject);
   assert.ok(mail.text.includes('الوقت: من 18:00 إلى 19:00') && mail.text.includes('ملاحظة العضو: اجتماع مع شريك'), mail.text);
 
   const visitId = booked.json().visit.id as string;
   const confirmed = await post(`/api/hq/visits/${visitId}/decision`.replace('/api/hq', '/api/admin/hq'), { status: 'confirmed', note: '' }, memberToken);
   assert.equal(confirmed.statusCode, 200, confirmed.body);
   mail = lastMail();
-  assert.ok(mail.subject.includes('تأكيد زيارة للمقر: عضو تجريبي'), mail.subject);
+  assert.ok(mail.subject.includes('تأكيد زيارة للمقر: عضو التجارب'), mail.subject);
 
   const pass = await get(`/api/hq/visits/${visitId}/pass`, memberToken);
   assert.equal(pass.statusCode, 200, pass.body);
-  assert.equal(pass.json().pass.name, 'عضو تجريبي');
+  assert.equal(pass.json().pass.name, 'عضو التجارب');
   assert.ok(pass.json().pass.visit.createdAt);
 
   const other = await post('/api/hq/visits', { date: second.date, time: '10:00', purpose, note: '' }, memberToken);
@@ -228,7 +228,7 @@ test('payments: services are paid through the gateway; only the signed callback 
   const admin = await get('/api/admin/payments?status=paid', memberToken);
   assert.equal(admin.statusCode, 200, admin.body);
   assert.equal(admin.json().payments.length, 2);
-  assert.equal(admin.json().payments[0].name, 'عضو تجريبي');
+  assert.equal(admin.json().payments[0].name, 'عضو التجارب');
 });
 
 test('store purchases: the RevenueCat webhook activates the membership and e-mails the management', async () => {
@@ -251,6 +251,9 @@ test('store purchases: the RevenueCat webhook activates the membership and e-mai
   assert.equal(after.json().me.membership.status, 'active');
   assert.ok(lastMail().subject.includes('تفعيل عضوية سنوية من المتجر'), lastMail().subject);
   assert.ok(lastMail().text.includes('المدة: 365 يومًا'), lastMail().text);
+  // M156: the member's own royal confirmation went out first, to his address.
+  assert.ok(mailer.sent.at(-2)?.subject.includes('عضويتك في Investors Club مفعّلة'), mailer.sent.at(-2)?.subject);
+  assert.ok(mailer.sent.at(-2)?.html?.includes('invoice-stamp.png'), 'member mail is HTML');
 
   const ignored = await post('/api/webhooks/revenuecat', event('ev-2', 'EXPIRATION', `vc-${contactId}`), undefined, { authorization: 'test-webhook-secret-123' });
   assert.equal(ignored.json().activation, 'ignored');

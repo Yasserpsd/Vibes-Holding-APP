@@ -41,7 +41,7 @@ const send = (method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload:
   app.inject({ method, url, ...(payload ? { payload } : {}), headers: bearer(token) });
 
 async function signUp(email: string, phone: string, complete = true): Promise<{ token: string; id: number }> {
-  const registered = await send('POST', '/api/auth/register', { name: 'عضو اختبار', country: 'sa', phone, email, password: 'secret123', persona: 'neutral', bio: 'حساب اختبار دفعة مالك أكتوبر M109.' });
+  const registered = await send('POST', '/api/auth/register', { name: 'عامر السبيعي', country: 'sa', phone, email, password: 'secret123', persona: 'neutral', bio: 'حساب اختبار دفعة مالك أكتوبر M109.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);

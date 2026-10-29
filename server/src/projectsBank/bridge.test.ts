@@ -14,7 +14,7 @@ const KEY = 'test-pb-bridge-key-0000000000001';
 // A membership year that started 65 days ago.
 const memberEnd = new Date(Date.now() + 300 * DAY_MS).toISOString().slice(0, 10);
 const periodStart = hubTime(Date.parse(`${memberEnd}T00:00:00+03:00`) - 365 * DAY_MS);
-const member: PbMember = { contact_id: 7, member_end: memberEnd, member_days: 365, name: 'عضو', email: 'member@example.com', phone: '0550000007' };
+const member: PbMember = { contact_id: 7, member_end: memberEnd, member_days: 365, name: 'عضو النادي', email: 'member@example.com', phone: '0550000007' };
 
 function fakePb(answers: Record<string, { status: number; body: unknown }>) {
   const requests: { url: string; key: string | null; body: Record<string, unknown> }[] = [];
@@ -38,7 +38,7 @@ test('the live bridge posts to {url}/{op} with the header-only key and the membe
     balances: { status: 200, body: { ok: true, items: { 7: { credits: 5, granted: 0, used: 1, left: 4 } } } },
     unlock: { status: 200, body: { ok: true, already: false, left: 3, contact: { whatsapp: '+966500000000', email: 'f@example.com', website: 'https://example.com', pitch_url: '' } } },
     grant: { status: 200, body: { ok: true, granted: 3, left: 6 } },
-    unlocks: { status: 200, body: { ok: true, total: 1, items: [{ contact_id: 7, pid: 11, title: 'مشروع', name: 'عضو', unlocked_at: '2026-09-19 10:00:00' }] } },
+    unlocks: { status: 200, body: { ok: true, total: 1, items: [{ contact_id: 7, pid: 11, title: 'مشروع', name: 'عضو النادي', unlocked_at: '2026-09-19 10:00:00' }] } },
   });
   assert.deepEqual(await bridge.ping(), { version: '39' });
   assert.deepEqual(await bridge.balance(member), { credits: 5, granted: 1, used: 2, left: 4, period_start: periodStart, unlocked: [11, 12] });

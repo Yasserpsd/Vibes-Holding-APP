@@ -59,7 +59,7 @@ test('the daily wave fires once inside the send hour, taps open the advisor, and
 // M87b: the dashboard edits the pools, the member mutes his daily message, and the wave respects both.
 test('owner templates replace the seed, placeholders fill from live data, and the copy rules hold', async () => {
   const { MOCK_CODE } = await import('../hub/mock.js');
-  const register = await built.app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'مدير القوالب', country: 'sa', phone: '0558618851', email: 'companion.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب لاختبار قوالب المستشار اليومي.' } });
+  const register = await built.app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'طارق المطيري', country: 'sa', phone: '0558618851', email: 'companion.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب لاختبار قوالب المستشار اليومي.' } });
   const verified = await built.app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: register.json().pendingToken, code: MOCK_CODE } });
   const token = verified.json().token as string;
   const auth = { authorization: `Bearer ${token}` };

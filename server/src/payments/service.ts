@@ -359,7 +359,7 @@ export class PaymentsService {
     const missing = service.action.fields.find((field) => !(rawAnswers[field.key] ?? '').trim());
     if (missing) throw new RequestError('invalid', `أكمل تفاصيل الطلب قبل الدفع: ${missing.label}`, 400);
     const answers = service.action.fields.map((field) => ({ key: field.key, label: field.label, value: (rawAnswers[field.key] ?? '').trim().slice(0, 300) }));
-    const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
+    const customer = { contactId: me.id, name: me.name, email: me.contactEmail || me.email, phone: me.phone };
     // M107: a discount code shrinks the amount; a 100% code confirms with no gateway.
     const discount = discountCode && this.deps.discounts ? await this.deps.discounts.apply(discountCode, price.amount, now) : undefined;
     const base = { key: service.key, title: service.title, answers, currency: price.currency, memberPrice: price.memberPrice, lang };
@@ -376,7 +376,7 @@ export class PaymentsService {
     input: { eventId: string; eventTitle: string; attendanceLabel: string; amountSar: number; memberPrice?: boolean; discount?: AppliedDiscount; lang?: AppLang },
     now = Date.now(),
   ): Promise<PublicPayment> {
-    const customer = { contactId: me.id, name: me.name, email: me.email, phone: me.phone };
+    const customer = { contactId: me.id, name: me.name, email: me.contactEmail || me.email, phone: me.phone };
     const base = {
       key: `agenda:${input.eventId}`,
       title: `حضور فعالية: ${input.eventTitle}`,

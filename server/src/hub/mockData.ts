@@ -26,6 +26,8 @@ export type MockContact = {
   memberType: 'individual' | 'company' | '';
   /** M147: the interests labels as the hub stores them (register / profile). */
   interests: string;
+  /** M156: the real address of an Apple-relay account (hub 2.26.0). */
+  contactEmail?: string;
   city: string;
   website: string;
   social: string;

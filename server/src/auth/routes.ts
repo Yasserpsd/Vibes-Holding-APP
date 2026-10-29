@@ -54,6 +54,8 @@ const registerSchema = z
     password: passwordSchema,
     persona: personaSchema,
     bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
+    // M156: the app's form requires the job and the interests; the server stays lenient here because the
+    // sign-in gate (`profileMissing`) is the real wall — nothing opens until they exist.
     jobTitle: z.string().trim().max(150).optional(),
     inviteCode: z.string().trim().max(30).optional(),
     // M120 (owner): the registration interests reach the hub's «عضو جديد» admin mail.
@@ -103,6 +105,8 @@ const profileSchema = z
     country: z.string().trim().toLowerCase().max(5),
     interests: z.array(z.string().trim().min(1).max(40)).max(10),
     interestsOther: z.string().trim().max(120),
+    // M156: the real address of an Apple-relay account.
+    contactEmail: z.string().trim().toLowerCase().min(5, 'اكتب بريدك الإلكتروني').max(190).regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'اكتب بريدًا إلكترونيًا صحيحًا'),
   })
   .partial();
 // M79: the deliberate delete flow sends WHY (a picked reason or the member's own words) so the owner learns from it.
@@ -394,7 +398,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
           return reply.code(403).send({ error: { code: 'persona_code_required', message: 'تغيير التوجه يتم بالرمز المُرسل إلى بريدك الإلكتروني' } });
         }
       }
-      const me = await service.updateProfile(auth.session, body, sourceOf(request));
+      const me = await service.updateProfile(auth.session, body, sourceOf(request), langOf(request));
       return { me: await withEnglish(request, me) };
     }),
   );

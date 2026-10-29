@@ -186,7 +186,7 @@ test('membership activation reaches the invitations list', async () => {
   const kv = new MemoryKV();
   const notifier = new Notifier({ mailer: new LogMailer(), recipients: [], log: built.app.log, appEnv: 'test' });
   const service = new InvitesService({ kv, hub, notifier, log: built.app.log });
-  const contact = { id: 900, name: 'مدعو', phone: '0551112233', email: 'x@gmail.com' } as unknown as HubContact;
+  const contact = { id: 900, name: 'راشد الحازمي', phone: '0551112233', email: 'x@gmail.com' } as unknown as HubContact;
   await service.recordFromRegister(contact, inviterId, 'الداعي', 'I-42');
   await service.onActivated(900);
   const [row] = await service.list();

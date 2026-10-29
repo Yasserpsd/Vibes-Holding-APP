@@ -45,7 +45,7 @@ before(async () => {
   };
   built = await buildApp({ config, kv, hub, mailer: new LogMailer(), fetchImpl: noNetwork });
   app = built.app;
-  const registered = await send('POST', '/api/auth/register', { name: 'أدمن المصادر', country: 'sa', phone: '0558618831', email: 'm34.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار قسم مصادر الأخبار في اللوحة.' });
+  const registered = await send('POST', '/api/auth/register', { name: 'أديب المصري', country: 'sa', phone: '0558618831', email: 'm34.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار قسم مصادر الأخبار في اللوحة.' });
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   adminToken = verified.json().token as string;
   const registered2 = await send('POST', '/api/auth/register', { name: 'عضو المصادر', country: 'sa', phone: '0558618832', email: 'm34+member@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب عضو عادي لاختبار صلاحيات مصادر الأخبار.' });

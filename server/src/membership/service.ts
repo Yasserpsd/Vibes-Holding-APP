@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
 import { RequestError } from '../auth/guard.js';
-import type { AuthService, Me } from '../auth/service.js';
+import { membershipNumber, type AuthService, type Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
@@ -337,8 +337,14 @@ export class MembershipService {
         mail.name = result.contact.name || mail.name;
         mail.email = result.contact.email;
         mail.phone = result.contact.phone;
+        mail.contactEmail = String(result.contact.contact_email ?? '').trim();
+        mail.lang = result.contact.lang === 'en' ? 'en' : 'ar';
+        mail.cardNumber = membershipNumber({ id: contactId, persona: result.contact.persona });
+        mail.expiresAt = mail.expiresAt ?? (result.contact.member_end ? `${result.contact.member_end}T00:00:00+03:00` : null);
       }
       this.deps.auth.forget(contactId);
+      // M156 (owner): the member's own royal confirmation goes out the same instant, then the admins' copy.
+      if (result.contact) this.deps.notifier.memberActivated(mail);
       this.deps.notifier.membershipActivated(mail);
       this.deps.push.membershipActivated(contactId, { expiresAt: event.expiresAt, pending: false });
       if (this.deps.invites) await this.deps.invites.onActivated(contactId);

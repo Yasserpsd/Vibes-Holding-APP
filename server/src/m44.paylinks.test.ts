@@ -91,14 +91,14 @@ test('the paid webhook activates the membership instantly and the mail says ever
 });
 
 test('a workshop link needs no activation and its mail names the sale', async () => {
-  const created = await send('POST', '/api/admin/paylinks', { kind: 'workshop', label: 'ورشة مشروعك الريادي', amountSar: 290, customer: { name: 'ضيف الورشة', phone: '0558600001', email: '' } }, adminToken);
+  const created = await send('POST', '/api/admin/paylinks', { kind: 'workshop', label: 'ورشة مشروعك الريادي', amountSar: 290, customer: { name: 'ضياء الورشان', phone: '0558600001', email: '' } }, adminToken);
   assert.equal(created.statusCode, 201, created.body);
   assert.equal(created.json().link.activation, 'none');
   const before = mailer.sent.length;
   await built.payments.mockComplete(created.json().link.paymentId, true);
   await settle();
   const mail = mailer.sent.slice(before).map((entry) => entry.subject + '\n' + entry.text).join('\n');
-  assert.match(mail, /✅ دفعة ورشة \/ فعالية: ورشة مشروعك الريادي — ضيف الورشة \(290 ريال\)/);
+  assert.match(mail, /✅ دفعة ورشة \/ فعالية: ورشة مشروعك الريادي — ضياء الورشان \(290 ريال\)/);
   assert.match(mail, /لا يلزم/);
   // The generic payment mail stays quiet for link sales: one clear sale mail — plus, since M110,
   // the admin copy of the customer invoice (owner: «ابعت للأدمن زيها بالظبط»).

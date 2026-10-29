@@ -10,7 +10,7 @@ import { MemoryKV } from './store.js';
 // slots, purposes, services — and a pick from the card completes a pending booking without the model.
 
 const log = { warn() {}, info() {}, error() {}, debug() {} } as unknown as ConstructorParameters<typeof IntentDetector>[0]['log'];
-const ME = { id: 7, name: 'عضو', membership: { status: 'active' } } as unknown as Me;
+const ME = { id: 7, name: 'عضو النادي', membership: { status: 'active' } } as unknown as Me;
 
 const CONTENT = {
   leadDays: 0,

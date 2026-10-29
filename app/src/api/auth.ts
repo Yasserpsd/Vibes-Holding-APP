@@ -25,6 +25,10 @@ export type Me = {
   personaLabel: string;
   /** M147: what the sign-in gate still needs (empty = complete); an older server sends none. */
   profileMissing?: ProfileMissing[];
+  /** M156: the real address given over an Apple «Hide My Email» relay ('' until given); an older server sends none. */
+  contactEmail?: string;
+  /** M156: true when the account's e-mail is an Apple private relay. */
+  emailRelay?: boolean;
   bio: string;
   jobTitle: string;
   company: string;
@@ -119,7 +123,8 @@ export type LoginResult = PendingResult | SignedInResult | TotpStepResult;
 export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLeft: number };
 export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
-export type ProfileMissing = 'memberType' | 'phone' | 'persona' | 'bio' | 'interests' | 'company';
+/** M156 adds `name` (a kunya or a made-up name), `jobTitle` and `contactEmail` (an Apple-relay account's real address). */
+export type ProfileMissing = 'name' | 'memberType' | 'phone' | 'persona' | 'bio' | 'jobTitle' | 'interests' | 'company' | 'contactEmail';
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
@@ -131,6 +136,8 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
   country?: string;
   interests?: string[];
   interestsOther?: string;
+  /** M156: the real address of an Apple-relay account. */
+  contactEmail?: string;
 };
 
 export type MembershipBenefit = { icon: string; title: string; detail: string | null };

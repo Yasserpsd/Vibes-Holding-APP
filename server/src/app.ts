@@ -20,6 +20,7 @@ import { TotpStore } from './auth/totp.js';
 import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { PersonaRequestsService } from './auth/personaRequests.js';
+import { NameJudge } from './auth/name.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
@@ -249,12 +250,14 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const mail: Mailer = mailer ?? (smtpMail && hubMail ? new FallbackMailer(smtpMail, hubMail, app.log) : (smtpMail ?? hubMail ?? new LogMailer(app.log)));
   // Dashboard sign-in code (M18). On the mock hub without SMTP the code is the mock's public test code.
   const otp = new AdminOtpStore(kv, config.ADMIN_OTP_SECONDS, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV });
+  const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV, publicUrl: config.PUBLIC_URL });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
   const totp = new TotpStore(kv);
-  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp });
+  // M156: the AI pass on display names (rules run without it); fails open on any model trouble.
+  const nameJudge = config.OPENAI_API_KEY ? new NameJudge({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl }) : null;
+  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   const hq = new HqService({ kv, log: app.log, notifier, push });

@@ -319,6 +319,7 @@ export class MockHubClient implements HubClient {
     if (str(body, 'name', 120)) contact.name = str(body, 'name', 120);
     const fields: [keyof MockContact & string, string, number][] = [
       ['jobTitle', 'job_title', 150],
+      ['contactEmail', 'contact_email', 190],
       ['company', 'company', 190],
       ['city', 'city', 120],
       ['website', 'website', 300],
@@ -408,6 +409,8 @@ export class MockHubClient implements HubClient {
       member_type: contact.memberType,
       // M147: like hub 2.21.3 — present only once the member picked interests (an empty value would block every mock account).
       interests: contact.interests || undefined,
+      // M156: like hub 2.26.0 — the real address of an Apple-relay account ('' until given).
+      contact_email: contact.contactEmail ?? '',
       city: contact.city,
       bio: contact.bio,
       pending_pay: contact.passHash && contact.verified && !contact.isMember ? 1 : 0,

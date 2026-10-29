@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { FastifyBaseLogger } from 'fastify';
 
-import type { AuthService } from '../auth/service.js';
+import { membershipNumber, type AuthService } from '../auth/service.js';
 import { hubCall, HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Notifier } from '../mail/notify.js';
@@ -207,6 +207,24 @@ export class PayLinksService {
             activationNote = null;
             memberEnd = result.contact?.member_end ?? '';
             this.deps.auth.forget(link.contactId);
+            // M156 (owner): every membership purchase mails the member his royal confirmation at once.
+            if (result.contact) {
+              this.deps.notifier.memberActivated({
+                contactId: link.contactId,
+                name: result.contact.name,
+                email: result.contact.email,
+                phone: result.contact.phone,
+                contactEmail: String(result.contact.contact_email ?? '').trim(),
+                lang: payment.lang === 'en' || result.contact.lang === 'en' ? 'en' : 'ar',
+                cardNumber: membershipNumber({ id: link.contactId, persona: result.contact.persona }),
+                productId: 'membership',
+                store: 'PAYMOB_LINK',
+                reference: payment.invoiceNo ? `INV-${payment.invoiceNo}` : payment.id,
+                days: link.days ?? 365,
+                expiresAt: memberEnd ? `${memberEnd}T00:00:00+03:00` : null,
+                environment: 'PRODUCTION',
+              });
+            }
             this.deps.push.membershipActivated(link.contactId, { expiresAt: null, pending: false });
             if (this.deps.invites) await this.deps.invites.onActivated(link.contactId);
           } catch (error) {

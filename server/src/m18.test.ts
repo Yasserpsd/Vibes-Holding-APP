@@ -52,7 +52,7 @@ class RoleHub implements HubClient {
 }
 
 const account = {
-  name: 'مدير التجربة',
+  name: 'مشرف التجربة',
   country: 'sa',
   phone: '0558318777',
   email: 'owner+otp@gmail.com',

@@ -27,7 +27,7 @@ const rejects = async (run: Promise<unknown>, code: string, status: number): Pro
 afterEach(() => mock.restoreAll());
 
 test('bridge v2 ops go to /hub/{op} with the site key in the header, typed by op', async () => {
-  const requests = answerWith(200, { ok: true, total: 1, page: 1, per_page: 25, counts: { all: 1 }, items: [{ id: 5, name: 'عضو', state: 'member' }] });
+  const requests = answerWith(200, { ok: true, total: 1, page: 1, per_page: 25, counts: { all: 1 }, items: [{ id: 5, name: 'عضو النادي', state: 'member' }] });
   const hub = new LiveHubClient({ url: 'https://hub.example.com/', siteKey: SITE_KEY, log });
   const result = await hubCall(hub, 'admin_accounts', { uuid: 'app-12345678', state: 'member' });
   assert.deepEqual([result.total, result.items[0]?.state], [1, 'member']);
@@ -59,7 +59,7 @@ test('an untrusted site is a setup problem (502), never a 403 that would sign th
 
 test('the mock hub: store activations are idempotent on the reference and never lose remaining days', async () => {
   const hub = new MockHubClient({ seed: true });
-  const registered = await hub.call('register', { uuid: 'app-owner-0001', name: 'مالك', country: 'sa', phone: '0558318731', email: 'mock.owner@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب إدارة لاختبار الهب الوهمي.' });
+  const registered = await hub.call('register', { uuid: 'app-owner-0001', name: 'مالك النادي', country: 'sa', phone: '0558318731', email: 'mock.owner@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب إدارة لاختبار الهب الوهمي.' });
   await hub.call('verify', { uuid: 'app-owner-0001', code: '123456' });
   const id = registered.contact?.id ?? 0;
   const first = await hubCall(hub, 'activate_member', { contact_id: id, days: 365, reference: 'GPA.1111', product: 'club_membership_annual', store: 'PLAY_STORE' });

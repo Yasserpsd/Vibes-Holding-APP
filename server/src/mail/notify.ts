@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Mailer } from './mailer.js';
+import { royalHtml, royalText, type RoyalMail } from './royal.js';
 
 /**
  * Management notifications: one plain-text Arabic e-mail per action, in the style of the website's
@@ -105,9 +106,24 @@ export type ActivationLike = {
   days: number;
   expiresAt: string | null;
   environment: string;
+  /** M156: the real address of an Apple-relay account (hub 2.26.0), '' when none. */
+  contactEmail?: string;
+  /** M156: the member's language for his own mail. */
+  lang?: 'ar' | 'en';
+  /** M156: the number on the membership card. */
+  cardNumber?: string;
 };
 
-export type NotifierDeps = { mailer: Mailer; recipients: string[]; log: FastifyBaseLogger; appEnv: 'test' | 'production' };
+export type NotifierDeps = { mailer: Mailer; recipients: string[]; log: FastifyBaseLogger; appEnv: 'test' | 'production'; publicUrl?: string };
+
+/** The store as a member reads it on his mail. */
+function storeLabel(store: string, lang: 'ar' | 'en'): string {
+  const key = store.toUpperCase();
+  if (key === 'APP_STORE') return lang === 'en' ? 'Apple App Store' : 'متجر Apple App Store';
+  if (key === 'PLAY_STORE') return lang === 'en' ? 'Google Play' : 'متجر Google Play';
+  if (key === 'PAYMOB_LINK' || key === 'MOYASAR' || key === 'PAYMOB') return lang === 'en' ? 'online payment' : 'الدفع الإلكتروني';
+  return store;
+}
 
 function personLines(person: Person | null): string[] {
   if (!person) return ['المرسل: زائر بدون حساب'];
@@ -144,7 +160,7 @@ export class Notifier {
     return { configured: this.configured, recipients: this.recipients.length };
   }
 
-  private dispatch(subject: string, lines: (string | null)[]): void {
+  private dispatch(subject: string, lines: (string | null)[], html?: string): void {
     const fullSubject = `${SUBJECT_PREFIX}${this.deps.appEnv === 'test' ? ' [تجريبي]' : ''} ${subject}`;
     const body = lines.filter((line): line is string => line !== null);
     const text = [...body, '', `التاريخ: ${riyadhDateTime(Date.now())} (الرياض)`, `المصدر: ${APP_NAME}`].join('\n');
@@ -153,9 +169,24 @@ export class Notifier {
       return;
     }
     this.deps.mailer
-      .send({ to: this.recipients, subject: fullSubject, text })
+      .send({ to: this.recipients, subject: fullSubject, text, ...(html ? { html } : {}) })
       .then((sent) => this.deps.log.info({ subject: fullSubject, sent }, 'notification'))
       .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject }, 'notification mail failed'));
+  }
+
+  /** M156: a royal (HTML + text) mail to ONE member, in his language; the [تجريبي] mark in the test environment only. */
+  private sendRoyal(to: string, subject: string, mail: RoyalMail, what: string): void {
+    const address = to.trim();
+    if (!address) {
+      this.deps.log.warn({ what }, 'member mail skipped: no address');
+      return;
+    }
+    const fullSubject = `${this.deps.appEnv === 'test' ? '[تجريبي] ' : ''}${subject}`;
+    const seal = this.deps.publicUrl ? { sealUrl: `${this.deps.publicUrl}/pay/invoice-stamp.png` } : {};
+    this.deps.mailer
+      .send({ to: [address], subject: fullSubject, text: royalText(mail), html: royalHtml({ ...mail, ...seal }) })
+      .then((sent) => this.deps.log.info({ subject: fullSubject, sent, what }, 'member mail'))
+      .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject, what }, 'member mail failed'));
   }
 
   hqVisitRequested(visit: VisitLike): void {
@@ -467,15 +498,89 @@ export class Notifier {
   }
 
   membershipActivated(activation: ActivationLike): void {
-    this.dispatch(`تفعيل عضوية سنوية من المتجر: ${activation.name}`, [
-      `اشترى العضو العضوية السنوية لنادي المستثمرين من داخل ${APP_NAME} عبر متجر التطبيقات، وفُعّلت عضويته في الهب.`,
-      '',
-      ...personLines(activation),
-      `المنتج: ${activation.productId}`,
-      `المتجر: ${activation.store}${activation.environment === 'SANDBOX' ? ' (بيئة اختبار)' : ''}`,
-      `المدة: ${activation.days} يومًا${activation.expiresAt ? ` · تنتهي في ${riyadhDateTime(activation.expiresAt)}` : ''}`,
-      `مرجع العملية: ${activation.reference}`,
-    ]);
+    const sandbox = activation.environment === 'SANDBOX';
+    const rows = [
+      { label: 'الاسم', value: activation.name || '—' },
+      { label: 'الجوال', value: activation.phone || '—' },
+      { label: 'البريد', value: activation.email || '—' },
+      ...(activation.contactEmail ? [{ label: 'بريد التواصل', value: activation.contactEmail }] : []),
+      ...(activation.cardNumber ? [{ label: 'رقم العضوية', value: activation.cardNumber }] : []),
+      { label: 'المنتج', value: activation.productId },
+      { label: 'المتجر', value: `${storeLabel(activation.store, 'ar')}${sandbox ? ' (بيئة اختبار)' : ''}` },
+      { label: 'المدة', value: `${activation.days} يومًا${activation.expiresAt ? ` · تنتهي في ${riyadhDateTime(activation.expiresAt)}` : ''}` },
+      { label: 'مرجع العملية', value: activation.reference },
+    ];
+    // M156 (owner): the admins' copy wears the same royal shell as the member's.
+    const html = royalHtml({
+      lang: 'ar',
+      title: 'تفعيل عضوية سنوية من المتجر',
+      subtitle: activation.name,
+      lead: [`اشترى العضو العضوية السنوية لنادي المستثمرين من داخل ${APP_NAME} عبر المتجر، وفُعّلت عضويته في الهب فورًا.`],
+      rows,
+      note: `${riyadhDateTime(Date.now())} (الرياض) · ${APP_NAME}`,
+      ...(this.deps.publicUrl ? { sealUrl: `${this.deps.publicUrl}/pay/invoice-stamp.png` } : {}),
+    });
+    this.dispatch(
+      `تفعيل عضوية سنوية من المتجر: ${activation.name}`,
+      [
+        `اشترى العضو العضوية السنوية لنادي المستثمرين من داخل ${APP_NAME} عبر متجر التطبيقات، وفُعّلت عضويته في الهب.`,
+        '',
+        ...personLines(activation),
+        activation.contactEmail ? `بريد التواصل: ${activation.contactEmail}` : null,
+        `المنتج: ${activation.productId}`,
+        `المتجر: ${activation.store}${sandbox ? ' (بيئة اختبار)' : ''}`,
+        `المدة: ${activation.days} يومًا${activation.expiresAt ? ` · تنتهي في ${riyadhDateTime(activation.expiresAt)}` : ''}`,
+        `مرجع العملية: ${activation.reference}`,
+      ],
+      html,
+    );
+  }
+
+  /**
+   * M156 (owner, 2026-10-29: «أي حد يشتري عضوية لازم فورًا يوصله إيميل… ملكي… قصير… على إيميله الحقيقي»): the
+   * member's own confirmation, sent the moment the hub activates the membership — to the real address he gave
+   * us over an Apple relay, else to the account's e-mail (a relay forwards it to his inbox anyway).
+   */
+  memberActivated(activation: ActivationLike): void {
+    const lang = activation.lang === 'en' ? 'en' : 'ar';
+    const to = (activation.contactEmail ?? '').trim() || activation.email;
+    const name = activation.name.trim();
+    const store = storeLabel(activation.store, lang);
+    const until = activation.expiresAt ? (lang === 'en' ? riyadhDateTimeEn(activation.expiresAt) : riyadhDateTime(activation.expiresAt)).split(' ')[0] : '';
+    const appUrl = `${this.deps.publicUrl ?? 'https://vcmem.com'}/app`;
+    const mail: RoyalMail =
+      lang === 'en'
+        ? {
+            lang,
+            title: 'Your membership is active',
+            subtitle: 'Investors Club · annual membership',
+            greeting: name ? `Welcome, ${name}.` : 'Welcome.',
+            lead: ['Your annual Investors Club membership is now active. Every partnership, service and privilege of the club is open to you inside the app.'],
+            rows: [
+              ...(activation.cardNumber ? [{ label: 'Membership no.', value: activation.cardNumber }] : []),
+              ...(until ? [{ label: 'Valid until', value: until }] : []),
+              { label: 'Purchased via', value: store },
+              { label: 'Reference', value: activation.reference },
+            ],
+            cta: { label: 'Open your membership card', url: appUrl },
+            note: `This is your activation confirmation. The purchase receipt is issued by ${store} to your store account.`,
+          }
+        : {
+            lang,
+            title: 'عضويتك مفعّلة',
+            subtitle: 'Investors Club · العضوية السنوية',
+            greeting: name ? `أهلًا بك يا ${name}.` : 'أهلًا بك.',
+            lead: ['فُعّلت عضويتك السنوية في نادي المستثمرين. كل الشراكات والخدمات والمزايا متاحة لك الآن من داخل التطبيق.'],
+            rows: [
+              ...(activation.cardNumber ? [{ label: 'رقم العضوية', value: activation.cardNumber }] : []),
+              ...(until ? [{ label: 'سارية حتى', value: until }] : []),
+              { label: 'تم الشراء عبر', value: store },
+              { label: 'مرجع العملية', value: activation.reference },
+            ],
+            cta: { label: 'افتح بطاقة عضويتك', url: appUrl },
+            note: `هذه الرسالة تأكيد تفعيل العضوية. إيصال الشراء يصلك من ${store} على حساب متجرك.`,
+          };
+    this.sendRoyal(to, lang === 'en' ? 'Your Investors Club membership is active' : 'عضويتك في Investors Club مفعّلة', mail, 'membership activation');
   }
 
   membershipActivationPending(activation: ActivationLike, reason: string): void {

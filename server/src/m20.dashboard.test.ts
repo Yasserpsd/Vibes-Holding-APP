@@ -62,7 +62,7 @@ const post = (url: string, payload: Record<string, unknown>, token?: string) => 
 const get = (url: string, token?: string) => app.inject({ method: 'GET', url, headers: token ? { authorization: `Bearer ${token}` } : {} });
 
 async function signUp(email: string, phone: string): Promise<{ token: string; id: number }> {
-  const registered = await post('/api/auth/register', { name: 'مدير اللوحة', country: 'sa', phone, email, password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار لوحة الإدارة الموحدة.' });
+  const registered = await post('/api/auth/register', { name: 'فهد القحطاني', country: 'sa', phone, email, password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار لوحة الإدارة الموحدة.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await post('/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);
@@ -216,7 +216,7 @@ test('a staff reply lands in the conversation, signed with the admin name, and i
   assert.equal(sent.statusCode, 200, sent.body);
   assert.ok(sent.json().message_id > 0);
   const thread = (await get(`/api/admin/threads/${contactId}`, adminToken)).json();
-  assert.deepEqual([thread.messages.at(-1).role, thread.messages.at(-1).by], ['human', 'مدير اللوحة']);
+  assert.deepEqual([thread.messages.at(-1).role, thread.messages.at(-1).by], ['human', 'فهد القحطاني']);
   const still = (await get('/api/admin/threads?filter=waiting', adminToken)).json();
   assert.ok(!still.items.some((item: { contact_id: number }) => item.contact_id === contactId), 'the list was dropped from the cache and no longer waits');
   const entry = (await get('/api/admin/audit', adminToken)).json().entries[0] as AuditEntry;
@@ -350,7 +350,7 @@ test('a hub older than 2.7.0 degrades per section instead of failing the dashboa
   const oldKv = new MemoryKV();
   const oldHub = new StagedHub();
   const built = await buildApp({ config, kv: oldKv, hub: oldHub, pb: new OffPbBridge() });
-  const registered = await built.app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'مدير قديم', country: 'sa', phone: '0558318703', email: 'm20.old@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار الهب القديم.' } });
+  const registered = await built.app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'قاسم الحربي', country: 'sa', phone: '0558318703', email: 'm20.old@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار الهب القديم.' } });
   const verified = await built.app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: registered.json().pendingToken, code: MOCK_CODE } });
   const headers = { authorization: `Bearer ${verified.json().token as string}` };
   oldHub.old = true;

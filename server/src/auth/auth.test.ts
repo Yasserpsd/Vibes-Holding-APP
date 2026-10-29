@@ -205,7 +205,7 @@ test('unverified login returns a pending token; reset password works', async () 
     ...registration,
     email: 'noura@icloud.com',
     phone: '0501234567',
-    name: 'نورة',
+    name: 'نورة السالم',
     persona: 'entrepreneur',
   });
   assert.equal(pendingReg.statusCode, 200, pendingReg.body);

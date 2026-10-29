@@ -49,7 +49,7 @@ const send = (method: 'POST' | 'PUT' | 'DELETE', url: string, payload: Record<st
   app.inject({ method, url, ...(payload ? { payload } : {}), headers: bearer(token) });
 
 async function signUp(email: string, phone: string, persona: 'neutral' | 'entrepreneur' | 'investor'): Promise<{ token: string; id: number }> {
-  const registered = await send('POST', '/api/auth/register', { name: `عضو ${email.split('.')[1]?.split('@')[0] ?? ''}`, country: 'sa', phone, email, password: 'secret123', persona, bio: 'حساب اختبار الرسائل الموجهة من الإدارة.' });
+  const registered = await send('POST', '/api/auth/register', { name: `ناصر ${({ admin: 'العلي', mod: 'المطيري', inv: 'السالم', neu: 'القحطاني', ent: 'الزهراني' } as Record<string, string>)[email.split('.')[1]?.split('@')[0] ?? ''] ?? 'الحربي'}`, country: 'sa', phone, email, password: 'secret123', persona, bio: 'حساب اختبار الرسائل الموجهة من الإدارة.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);

@@ -22,13 +22,18 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const NAVY = '#0d274a';
 const PERSONAS: Persona[] = ['neutral', 'entrepreneur', 'investor'];
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** M156: a real name is at least two words of two letters each (the server applies the full rule). */
+const twoWords = (value: string) => value.trim().split(/\s+/).filter((word) => word.length >= 2).length >= 2;
 
 /**
  * M147 «أكمل ملفك» (owner: «إجباري يكمل باقي البيانات بمجرد ما يسجل دخول»): a Google/Apple-born
  * account lands with a name and an e-mail only. While the server lists missing fields, this cover
  * sits over the whole app and nothing else is usable until the member saves them. The hub then
  * mails the admins «اكتمل تسجيل عضو» (plugin 2.21.3). Admins and older servers (no list) are never
- * blocked.
+ * blocked. M156 (owner, 2026-10-29) adds the job, a real first + family name (a kunya such as
+ * «أبو جنا» is sent back here) and, for an Apple «Hide My Email» account, the real address his
+ * invoices and membership confirmations go to.
  */
 export function ProfileCompletionGate() {
   const { status, me } = useAuth();
@@ -43,12 +48,15 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
   const { data: config } = useAuthConfig();
   const interestsList = useInterests();
   const need = (key: string) => (missing ?? []).includes(key as never);
+  const [name, setName] = useState(me?.name ?? '');
+  const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState('sa');
   const [persona, setPersona] = useState<Persona | ''>('');
   const [interests, setInterests] = useState<string[]>([]);
   const [interestsOther, setInterestsOther] = useState('');
   const [bio, setBio] = useState(me?.bio ?? '');
+  const [jobTitle, setJobTitle] = useState(me?.jobTitle ?? '');
   const [company, setCompany] = useState(me?.company ?? '');
   const [memberType, setMemberType] = useState<'individual' | 'company' | ''>(me?.memberType || '');
   const [busy, setBusy] = useState(false);
@@ -61,6 +69,8 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
 
   const submit = async () => {
     if (busy) return;
+    if (need('name') && !twoWords(name)) return setError(t('completeProfile.error.name'));
+    if (need('contactEmail') && !EMAIL.test(contactEmail.trim())) return setError(t('completeProfile.error.contactEmail'));
     if (need('memberType') && !memberType) return setError(t('completeProfile.error.memberType'));
     const wantsCompany = memberType === 'company' || (need('company') && !need('memberType'));
     if (wantsCompany && company.trim().length < 2) return setError(t('completeProfile.error.company'));
@@ -68,17 +78,21 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
     if (need('persona') && !persona) return setError(t('completeProfile.error.persona'));
     if (need('interests') && interests.length === 0) return setError(t('completeProfile.error.interests'));
     if (need('bio') && bio.trim().length < 10) return setError(t('completeProfile.error.bio'));
+    if (need('jobTitle') && jobTitle.trim().length < 2) return setError(t('completeProfile.error.jobTitle'));
     setBusy(true);
     setError(null);
     try {
       if (need('interests')) await interestsApi.save({ keys: interests, other: interests.includes('other') ? interestsOther : '' });
       const { me: updated } = await authApi.updateMe({
+        ...(need('name') ? { name: name.trim() } : {}),
+        ...(need('contactEmail') ? { contactEmail: contactEmail.trim().toLowerCase() } : {}),
         ...(need('memberType') && memberType ? { memberType } : {}),
         ...(wantsCompany ? { company: company.trim() } : {}),
         ...(need('phone') ? { phone: phone.trim(), country: countryCode } : {}),
         ...(need('persona') && persona ? { persona } : {}),
         ...(need('interests') ? { interests, interestsOther } : {}),
         ...(need('bio') ? { bio: bio.trim() } : {}),
+        ...(need('jobTitle') ? { jobTitle: jobTitle.trim() } : {}),
       });
       setMe(updated);
       void queryClient.invalidateQueries({ queryKey: ['interests'] });
@@ -103,6 +117,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           <PaperCard pinned>
           <VoiceFill
             fields={[
+              ...(need('name') ? [{ key: 'name', label: t('completeProfile.name'), type: 'text' as const, required: true }] : []),
               ...(need('company') || memberType === 'company' ? [{ key: 'company', label: t('auth.register.companyName'), type: 'text' as const, required: true }] : []),
               ...(need('phone') ? [{ key: 'phone', label: t('auth.register.phone'), type: 'phone' as const, required: true }] : []),
               ...(need('persona') && config ? [{ key: 'persona', label: t('completeProfile.persona'), type: 'select' as const, options: config.personas.map((item) => item.label), required: true }] : []),
@@ -110,16 +125,20 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 ? [{ key: 'interests', label: t('auth.register.interests'), type: 'multiselect' as const, options: interestsList.data.interests.map((item) => item.label), required: true }]
                 : []),
               ...(need('bio') ? [{ key: 'bio', label: t('auth.register.bio'), type: 'textarea' as const, required: true }] : []),
+              ...(need('jobTitle') ? [{ key: 'jobTitle', label: t('completeProfile.jobTitle'), type: 'text' as const, required: true }] : []),
             ]}
             values={{
+              name,
               company,
               phone,
               persona: config?.personas.find((item) => item.key === persona)?.label ?? '',
               interests: interests.map((key) => interestsList.data?.interests.find((item) => item.key === key)?.label ?? '').filter(Boolean).join('، '),
               bio,
+              jobTitle,
             }}
             country={countryCode}
             onFill={(values) => {
+              if (values.name) setName(values.name);
               if (values.company) setCompany(values.company);
               if (values.phone) setPhone(values.phone);
               const pickedPersona = config?.personas.find((item) => item.label === values.persona)?.key;
@@ -133,8 +152,25 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 if (keys.length) setInterests(keys);
               }
               if (values.bio) setBio(values.bio);
+              if (values.jobTitle) setJobTitle(values.jobTitle);
             }}
           />
+
+          {need('name') ? <FormField label={t('completeProfile.name')} value={name} onChangeText={setName} hint={t('completeProfile.nameHint')} textContentType="name" /> : null}
+
+          {need('contactEmail') ? (
+            <FormField
+              label={t('completeProfile.contactEmail')}
+              value={contactEmail}
+              onChangeText={setContactEmail}
+              hint={t('completeProfile.contactEmailHint')}
+              latin
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
+            />
+          ) : null}
 
           {need('memberType') ? (
             <View style={styles.group}>
@@ -189,6 +225,8 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           ) : null}
 
           {need('bio') ? <FormField label={t('auth.register.bio')} multiline value={bio} onChangeText={setBio} placeholder={t('auth.register.bioPlaceholder')} maxLength={600} /> : null}
+
+          {need('jobTitle') ? <FormField label={t('completeProfile.jobTitle')} value={jobTitle} onChangeText={setJobTitle} textContentType="jobTitle" /> : null}
 
           {error ? <Notice tone="warning" text={error} /> : null}
           </PaperCard>

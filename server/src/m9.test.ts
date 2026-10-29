@@ -50,7 +50,7 @@ const send = (method: 'POST' | 'PUT' | 'DELETE', url: string, payload: Record<st
   app.inject({ method, url, ...(payload ? { payload } : {}), headers: bearer(token) });
 
 async function signUp(email: string, phone: string): Promise<string> {
-  const registered = await send('POST', '/api/auth/register', { name: 'مدير تجريبي', country: 'sa', phone, email, password: 'secret123', persona: 'investor', bio: 'حساب اختبار لإدارة النادي ومنشوراتها.' });
+  const registered = await send('POST', '/api/auth/register', { name: 'ماجد العمري', country: 'sa', phone, email, password: 'secret123', persona: 'investor', bio: 'حساب اختبار لإدارة النادي ومنشوراتها.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);

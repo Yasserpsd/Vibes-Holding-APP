@@ -60,7 +60,7 @@ const lastPush = () => {
 };
 
 async function signUp(email: string, phone: string): Promise<string> {
-  const registered = await post('/api/auth/register', { name: 'عضو تجريبي', country: 'sa', phone, email, password: 'secret123', persona: 'investor', bio: 'مستثمر مهتم بفرص الشراكة في قطاع التقنية.' });
+  const registered = await post('/api/auth/register', { name: 'عضو التجارب', country: 'sa', phone, email, password: 'secret123', persona: 'investor', bio: 'مستثمر مهتم بفرص الشراكة في قطاع التقنية.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await post('/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   assert.equal(verified.statusCode, 200, verified.body);

@@ -96,7 +96,10 @@ export default function RegisterScreen() {
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof Form, string>> = {};
-    if (form.name.trim().length < 2) next.name = t('auth.register.error.name');
+    // M156 (owner): a real first + family name; the server applies the full rule (kunya, placeholders, AI).
+    if (form.name.trim().split(/\s+/).filter((word) => word.length >= 2).length < 2) next.name = t('auth.register.error.name');
+    if (form.jobTitle.trim().length < 2) next.jobTitle = t('auth.register.error.jobTitle');
+    if (interestsList.data && interestsList.data.interests.length > 0 && form.interests.length === 0) next.interests = t('auth.register.error.interests');
     if (form.memberType === 'company' && form.companyName.trim().length < 2) next.companyName = t('auth.register.error.companyName');
     if (phoneIssue(form.phone, country) !== null)
       next.phone = phoneExample ? t('auth.register.error.phone', { example: phoneExample }) : t('auth.register.error.phoneNoExample');
@@ -180,10 +183,10 @@ export default function RegisterScreen() {
           fields={[
             { key: 'name', label: t('auth.register.name'), type: 'text', required: true },
             { key: 'companyName', label: t('auth.register.companyName'), type: 'text' },
-            { key: 'jobTitle', label: t('auth.register.jobTitle'), type: 'text' },
+            { key: 'jobTitle', label: t('auth.register.jobTitle'), type: 'text', required: true },
             { key: 'bio', label: t('auth.register.bio'), type: 'textarea', required: true },
             ...(interestsList.data
-              ? [{ key: 'interests', label: t('auth.register.interests'), type: 'multiselect' as const, options: interestsList.data.interests.map((item) => item.label), hint: t('voiceFill.hintInterests') }]
+              ? [{ key: 'interests', label: t('auth.register.interests'), type: 'multiselect' as const, options: interestsList.data.interests.map((item) => item.label), hint: t('voiceFill.hintInterests'), required: true }]
               : []),
             { key: 'interestsOther', label: t('interests.otherLabel'), type: 'text' },
           ]}
@@ -221,7 +224,7 @@ export default function RegisterScreen() {
         />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
-        <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} textContentType="name" />
+        <FormField label={t('auth.register.name')} value={form.name} onChangeText={set('name')} error={errors.name} hint={t('auth.register.nameHint')} textContentType="name" />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)} style={styles.group}>
         <Text style={styles.label}>{t('auth.register.memberType')}</Text>
@@ -327,7 +330,7 @@ export default function RegisterScreen() {
         <FormField label={t('auth.register.bio')} multiline value={form.bio} onChangeText={set('bio')} error={errors.bio} placeholder={t('auth.register.bioPlaceholder')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(9)}>
-        <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+        <FormField label={t('auth.register.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} error={errors.jobTitle} textContentType="jobTitle" />
       </FadeInView>
       <FadeInView delay={entranceDelay(10)}>
         <FormField
@@ -344,6 +347,7 @@ export default function RegisterScreen() {
       {interestsList.data && interestsList.data.interests.length > 0 ? (
         <FadeInView delay={entranceDelay(11)} style={styles.group}>
           <Text style={styles.label}>{t('auth.register.interests')}</Text>
+          {errors.interests ? <Text style={styles.error}>{errors.interests}</Text> : null}
           <View style={styles.chips}>
             {interestsList.data.interests.map((interest) => (
               <Chip key={interest.key} label={interest.label} selected={form.interests.includes(interest.key)} onPress={() => toggleInterest(interest.key)} />

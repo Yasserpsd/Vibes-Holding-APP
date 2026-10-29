@@ -57,7 +57,7 @@ before(async () => {
   kv = new MemoryKV();
   built = await buildApp({ config, kv, hub: new MockHubClient(), blurbs: new TemplateBlurbWriter(), mailer: new LogMailer() });
   app = built.app;
-  const registered = await send('POST', '/api/auth/register', { name: 'مدير تجريبي', country: 'sa', phone: '0558318815', email: 'm15.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار لرفع ملفات منشورات الإدارة.' });
+  const registered = await send('POST', '/api/auth/register', { name: 'ماجد العمري', country: 'sa', phone: '0558318815', email: 'm15.admin@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار لرفع ملفات منشورات الإدارة.' });
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   adminToken = verified.json().token as string;

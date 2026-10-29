@@ -62,7 +62,7 @@ function hook(event: string, data: Record<string, unknown>) {
 
 before(async () => {
   app = (await buildApp({ config, kv: new MemoryKV(), hub, mailer })).app;
-  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'أدمن الفواتير', country: 'sa', phone: '0558318722', email: 'm132.admin+member@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب يراجع فواتير الموقع.' } });
+  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'أدهم الفوزان', country: 'sa', phone: '0558318722', email: 'm132.admin+member@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب يراجع فواتير الموقع.' } });
   const verified = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: registered.json().pendingToken, code: MOCK_CODE } });
   assert.equal(verified.statusCode, 200, verified.body);
   token = verified.json().token as string;

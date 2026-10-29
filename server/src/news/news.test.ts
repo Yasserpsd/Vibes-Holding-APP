@@ -215,7 +215,7 @@ test('interests need a session, personalize the feed and reach the advisor conte
   const register = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { name: 'مختبر', country: 'sa', phone: '0558318777', email: 'tester@gmail.com', password: 'secret1', persona: 'investor', bio: 'أختبر التطبيق هنا' },
+    payload: { name: 'خالد المختبر', country: 'sa', phone: '0558318777', email: 'tester@gmail.com', password: 'secret1', persona: 'investor', bio: 'أختبر التطبيق هنا' },
   });
   const verify = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: register.json().pendingToken, code: '123456' } });
   const token = verify.json().token as string;

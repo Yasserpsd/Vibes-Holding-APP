@@ -76,7 +76,7 @@ async function signUp(email: string, lang: 'ar' | 'en'): Promise<{ token: string
   phoneSeq += 1;
   const registered = await post(
     '/api/auth/register',
-    { name: 'Lang Tester', phone: `051234${String(phoneSeq).padStart(4, '0')}`, email, password: 'secret1', persona: 'investor', bio: 'عضو تجريبي لاختبار اللغة في M122' },
+    { name: 'Lana Carter', phone: `051234${String(phoneSeq).padStart(4, '0')}`, email, password: 'secret1', persona: 'investor', bio: 'عضو التجارب لاختبار اللغة في M122' },
     headers,
   );
   assert.equal(registered.statusCode, 200, registered.body);

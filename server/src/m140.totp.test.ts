@@ -28,7 +28,7 @@ const hub = new MockHubClient();
 const mailer = new CaptureMailer();
 let strict: BuiltApp;
 let relaxed: BuiltApp;
-const account = { name: 'مدير المصادقة', country: 'sa', phone: '0558618899', email: 'm140@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار تطبيق المصادقة.' };
+const account = { name: 'صالح الغامدي', country: 'sa', phone: '0558618899', email: 'm140@gmail.com', password: 'secret123', persona: 'investor', bio: 'حساب اختبار تطبيق المصادقة.' };
 let caller = 0;
 const call = (app: BuiltApp['app'], method: 'GET' | 'POST', url: string, payload?: Record<string, unknown>, token?: string) =>
   app.inject({ method, url, payload, remoteAddress: `10.1.0.${(caller += 1)}`, headers: token ? { authorization: `Bearer ${token}` } : {} });

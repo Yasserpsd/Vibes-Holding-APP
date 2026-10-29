@@ -19,7 +19,7 @@ let token = '';
 
 before(async () => {
   app = (await buildApp({ config, kv, hub: new MockHubClient() })).app;
-  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'مدير المحتوى', country: 'sa', phone: '0558318712', email: 'content.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار تعديل محتوى التطبيق.' } });
+  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'حسن الزهراني', country: 'sa', phone: '0558318712', email: 'content.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار تعديل محتوى التطبيق.' } });
   const verified = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: registered.json().pendingToken, code: MOCK_CODE } });
   token = verified.json().token as string;
 });
@@ -93,7 +93,7 @@ test('only a dashboard admin edits a text; each language keeps its own edits; th
   const syncBefore = (await get('/api/sync')).json().v.content as number;
   const saved = await put({ block: 'hq', path: 'title', lang: 'ar', value: '  مقر النادي بالرياض ' });
   assert.equal(saved.statusCode, 200, saved.body);
-  assert.deepEqual([saved.json().edit.value, saved.json().edit.by], ['مقر النادي بالرياض', 'مدير المحتوى']);
+  assert.deepEqual([saved.json().edit.value, saved.json().edit.by], ['مقر النادي بالرياض', 'حسن الزهراني']);
   assert.notEqual((await get('/api/sync')).json().v.content, syncBefore, 'open apps hear of the edit');
   assert.equal((await get('/api/hq')).json().content.title, 'مقر النادي بالرياض');
   assert.equal((await get('/api/hq', 'en')).json().content.title, 'Club HQ', 'the English version keeps its own text');

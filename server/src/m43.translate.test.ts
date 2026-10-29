@@ -76,7 +76,7 @@ const postInput = (over: Record<string, unknown> = {}) => ({
 before(async () => {
   built = await buildApp({ config, kv: new MemoryKV(), hub, mailer, fetchImpl: fetchStub });
   app = built.app;
-  const registered = await send('POST', '/api/auth/register', { name: 'أدمن الترجمة', country: 'sa', phone: '0558618861', email: 'm43.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب اختبار الترجمة التلقائية للمحتوى.' });
+  const registered = await send('POST', '/api/auth/register', { name: 'أديب الترجمان', country: 'sa', phone: '0558618861', email: 'm43.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب اختبار الترجمة التلقائية للمحتوى.' });
   const verified = await send('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
   adminToken = verified.json().token as string;
 });

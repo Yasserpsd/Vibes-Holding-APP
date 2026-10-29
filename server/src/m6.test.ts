@@ -35,7 +35,7 @@ const post = (url: string, payload: Record<string, unknown>, token?: string) =>
 
 async function signUp(email: string, phone: string): Promise<string> {
   const registered = await post('/api/auth/register', {
-    name: 'عضو تجريبي',
+    name: 'عضو التجارب',
     country: 'sa',
     phone,
     email,
@@ -194,7 +194,7 @@ test('HQ: member books → admin confirms → QR pass → verify; others are ref
   const pending = await get('/api/admin/hq/visits?status=pending', memberToken);
   assert.equal(pending.statusCode, 200, pending.body);
   assert.equal(pending.json().visits.length, 1);
-  assert.equal(pending.json().visits[0].name, 'عضو تجريبي');
+  assert.equal(pending.json().visits[0].name, 'عضو التجارب');
   assert.ok(pending.json().visits[0].phone);
 
   const confirmed = await post(`/api/admin/hq/visits/${visit.id}/decision`, { status: 'confirmed', note: 'أهلًا بك' }, memberToken);
@@ -215,7 +215,7 @@ test('HQ: member books → admin confirms → QR pass → verify; others are ref
   assert.equal(verified.statusCode, 200, verified.body);
   assert.equal(verified.json().state, 'upcoming');
   assert.equal(verified.json().valid, false);
-  assert.equal(verified.json().visit.name, 'عضو تجريبي');
+  assert.equal(verified.json().visit.name, 'عضو التجارب');
   const unknown = await post('/api/admin/hq/verify', { code: 'VCHQ:x:nope' }, memberToken);
   assert.equal(unknown.json().state, 'unknown');
 

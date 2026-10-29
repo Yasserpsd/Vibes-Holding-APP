@@ -31,6 +31,10 @@ export type HubContact = {
   member_type: 'individual' | 'company' | '';
   /** M147 (hub 2.21.3+): the stored interests labels («العقار، التقنية»); undefined on older hubs. */
   interests?: string;
+  /** M156 (hub 2.26.0+): the real address of an Apple-relay account ('' until given); undefined on older hubs. */
+  contact_email?: string;
+  /** M156 (hub 2.26.0+): the member's stored language ('ar' | 'en' | ''); undefined on older hubs. */
+  lang?: string;
   city: string;
   bio: string;
   pending_pay: 0 | 1;

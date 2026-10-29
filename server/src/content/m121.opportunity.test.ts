@@ -16,7 +16,7 @@ let token = '';
 
 before(async () => {
   app = (await buildApp({ config, kv, hub: new MockHubClient() })).app;
-  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'مدير الفرص', country: 'sa', phone: '0558318719', email: 'm121.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار فرصة Vibes Ventures.' } });
+  const registered = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'يوسف الدوسري', country: 'sa', phone: '0558318719', email: 'm121.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب لاختبار فرصة Vibes Ventures.' } });
   const verified = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: registered.json().pendingToken, code: MOCK_CODE } });
   token = verified.json().token as string;
 });

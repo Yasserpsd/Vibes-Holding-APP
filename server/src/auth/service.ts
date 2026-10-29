@@ -8,6 +8,7 @@ import { HubError, type HubClient, type HubContact, type HubResponse } from '../
 import { interestLabel, isInterestKey } from '../interests/types.js';
 import type { AppLang, AppSource } from '../lang.js';
 import type { SocialIdentity } from './social.js';
+import { nameProblem, nameRuleIssue, type NameJudge } from './name.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
@@ -53,6 +54,13 @@ export type Me = {
   id: number;
   name: string;
   email: string;
+  /**
+   * M156: the address the member wants mail at when the account's own e-mail is an Apple «Hide My Email»
+   * relay (hub 2.26.0 stores it; '' on older hubs or when never asked). Every member mail prefers it.
+   */
+  contactEmail: string;
+  /** M156: true when `email` is an Apple private relay — the app asks for a real address then. */
+  emailRelay: boolean;
   phone: string;
   persona: Persona | '';
   personaLabel: string;
@@ -81,17 +89,34 @@ export type Me = {
   profileMissing: ProfileMissing[];
 };
 
-export type ProfileMissing = 'memberType' | 'phone' | 'persona' | 'bio' | 'interests' | 'company';
+export type ProfileMissing = 'name' | 'memberType' | 'phone' | 'persona' | 'bio' | 'jobTitle' | 'interests' | 'company' | 'contactEmail';
+
+/** Apple «Hide My Email» addresses forward to the real inbox but hide it from us. */
+export function isRelayEmail(email: string): boolean {
+  return /@privaterelay\.appleid\.com$/i.test(String(email ?? '').trim());
+}
+
+/** The address a member's mail goes to: the real one he gave us over an Apple relay, else the account's. */
+export function mailAddressOf(contact: { email: string; contact_email?: string }): string {
+  const real = String(contact.contact_email ?? '').trim();
+  return real || String(contact.email ?? '').trim();
+}
 
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
+  // M156 (owner): a kunya or a made-up name meets the gate too — the member writes a real first + family name.
+  if (nameRuleIssue(String(contact.name ?? ''))) missing.push('name');
   // Owner (2026-10-28): «فرد / شركة» is the first question — a social-born account never answered it.
   if (contact.member_type !== 'individual' && contact.member_type !== 'company') missing.push('memberType');
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
   if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
   if (String(contact.bio ?? '').trim().length < 10) missing.push('bio');
+  // M156 (owner, 2026-10-29: «مفيش حد يقدر يفتح التطبيق غير لما يكمل كل بياناته»): the job joins the rule.
+  if (!String(contact.job_title ?? '').trim()) missing.push('jobTitle');
   if (contact.interests !== undefined && !String(contact.interests).trim()) missing.push('interests');
   if (contact.member_type === 'company' && !String(contact.company ?? '').trim()) missing.push('company');
+  // M156: an Apple-relay account must give a real address (only when the hub can store it, 2.26.0+).
+  if (contact.contact_email !== undefined && isRelayEmail(contact.email) && !String(contact.contact_email).trim()) missing.push('contactEmail');
   return missing;
 }
 
@@ -124,6 +149,8 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
   country?: string;
   interests?: string[];
   interestsOther?: string;
+  /** M156: the real address of an Apple-relay account (hub 2.26.0 `contact_email`). */
+  contactEmail?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
@@ -170,6 +197,8 @@ export function toMe(contact: HubContact): Me {
     id: contact.id,
     name: contact.name,
     email: contact.email,
+    contactEmail: String(contact.contact_email ?? '').trim(),
+    emailRelay: isRelayEmail(contact.email),
     phone: contact.phone,
     persona: persona?.key ?? '',
     personaLabel: persona?.label ?? '',
@@ -190,7 +219,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -212,6 +241,9 @@ export class AuthService {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
     }
+    // M156 (owner): a real first + family name or no account — rules, then the model when configured.
+    const badName = await nameProblem(input.name, lang, this.deps.nameJudge);
+    if (badName) throw new AuthError('bad_name', badName, 400);
     // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
     const referral = input.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(input.inviteCode) : '';
     // M120 (owner): the picked interests travel as Arabic labels so the hub's «عضو جديد» mail reads at a glance.
@@ -581,11 +613,17 @@ export class AuthService {
     return result.contact;
   }
 
-  async updateProfile(session: SessionRecord, patch: ProfilePatch, source?: AppSource): Promise<Me> {
+  async updateProfile(session: SessionRecord, patch: ProfilePatch, source?: AppSource, lang: AppLang = 'ar'): Promise<Me> {
     const body: Record<string, unknown> = { uuid: session.uuid };
     // Hub 2.25.0: the platform rides along so the «اكتمل تسجيل عضو» mail of an older account (no stored source) says Apple / Google.
     if (source) body.source = source;
-    if (patch.name !== undefined) body.name = patch.name;
+    if (patch.name !== undefined) {
+      // M156: the completion gate (and the editor) fix a kunya or a made-up name — same rule as registration.
+      const badName = await nameProblem(patch.name, lang, this.deps.nameJudge);
+      if (badName) throw new AuthError('bad_name', badName, 400);
+      body.name = patch.name;
+    }
+    if (patch.contactEmail !== undefined) body.contact_email = patch.contactEmail;
     if (patch.jobTitle !== undefined) body.job_title = patch.jobTitle;
     if (patch.company !== undefined) body.company = patch.company;
     if (patch.city !== undefined) body.city = patch.city;
