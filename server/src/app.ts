@@ -42,6 +42,10 @@ import { GoldenOffersService } from './golden/service.js';
 import { interestsRoutes } from './interests/routes.js';
 import { InterestsService } from './interests/service.js';
 import { dashboardRoutes } from './dashboard/routes.js';
+import { AppStoreClient } from './downloads/appStore.js';
+import { PlayStoreClient } from './downloads/playStore.js';
+import { downloadsRoutes } from './downloads/routes.js';
+import { DownloadsService } from './downloads/service.js';
 import { DashboardService } from './dashboard/service.js';
 import { formsRoutes } from './forms/routes.js';
 import { FormsService } from './forms/service.js';
@@ -547,6 +551,24 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(backupRoutes, { service: backup, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests });
+  // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
+  const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER
+    ? new AppStoreClient({ issuerId: config.ASC_ISSUER_ID, keyId: config.ASC_KEY_ID, privateKey: config.ASC_PRIVATE_KEY, vendorNumber: config.ASC_VENDOR_NUMBER, appleId: config.ASC_APP_ID }, fetchImpl)
+    : undefined;
+  let google: PlayStoreClient | undefined;
+  if (config.PLAY_REPORTING_SERVICE_ACCOUNT && config.PLAY_STATS_BUCKET) {
+    try {
+      google = new PlayStoreClient({ serviceAccountJson: config.PLAY_REPORTING_SERVICE_ACCOUNT, bucket: config.PLAY_STATS_BUCKET, packageName: config.PLAY_PACKAGE_NAME }, fetchImpl);
+    } catch (error) {
+      app.log.error({ err: error }, 'PLAY_REPORTING_SERVICE_ACCOUNT is not a valid service-account key');
+    }
+  }
+  const downloads = new DownloadsService({ kv, push, log: app.log, apple, google });
+  const downloadsTimer = setInterval(() => void downloads.snapshot().catch((error: unknown) => app.log.error({ err: error }, 'downloads snapshot failed')), 6 * 3_600_000);
+  downloadsTimer.unref();
+  app.addHook('onClose', async () => clearInterval(downloadsTimer));
+  setTimeout(() => void downloads.snapshot().catch(() => undefined), 60_000).unref();
+  await app.register(downloadsRoutes, { service: downloads, auth });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });
   await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync, hub: hubClient, payments });

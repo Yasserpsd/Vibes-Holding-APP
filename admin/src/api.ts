@@ -1,4 +1,4 @@
-import type { AccountFilter, AccountsResult, Personas, PersonaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
+import type { AccountFilter, AccountsResult, Personas, PersonaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://vibes-holding-app-production.up.railway.app';
@@ -534,6 +534,9 @@ export const api = {
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),
   notifyPost: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/posts/${id}/notify`),
+  // M158: the downloads card and its «حدّث الآن».
+  downloads: () => call<Downloads>('GET', '/api/admin/downloads'),
+  downloadsSnapshot: () => call<Downloads>('POST', '/api/admin/downloads/snapshot'),
   home: (days: number) => call<Home>('GET', `/api/admin/home${query({ days })}`),
   accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter }) =>
     call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona })}`),

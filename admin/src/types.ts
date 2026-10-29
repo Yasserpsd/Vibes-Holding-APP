@@ -173,6 +173,21 @@ export type PaymentTotals = { count: number; cents: number; paid: number };
 export type BridgeSide = { version: string | null; ok: boolean };
 
 /** Never fails as a whole: a part that could not load is null with its entry in `errors`. */
+/** M158: the home downloads card — devices per platform until the store keys exist, then real installs. */
+export type Downloads = {
+  mode: 'devices' | 'stores';
+  android: number;
+  ios: number;
+  total: number;
+  devices: { android: number; ios: number; total: number; accounts: { android: number; ios: number; total: number } };
+  stores: {
+    apple: { configured: boolean; installs: number | null; since: string | null; error?: string };
+    google: { configured: boolean; installs: number | null; since: string | null; error?: string };
+  };
+  series: { day: string; android: number; ios: number }[];
+  snapshotAt: string | null;
+};
+
 export type Home = {
   hub: HubStats | null;
   app: {

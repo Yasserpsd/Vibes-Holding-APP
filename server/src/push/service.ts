@@ -138,6 +138,24 @@ export class PushService {
       .map((entry) => entry.token);
   }
 
+  /** M158: signed-in devices and distinct accounts per platform — the downloads card before the store keys exist. */
+  async platforms(): Promise<{ devices: { android: number; ios: number }; accounts: { android: number; ios: number; total: number } }> {
+    const tokens = await this.load();
+    const devices = { android: 0, ios: 0 };
+    const android = new Set<number>();
+    const ios = new Set<number>();
+    for (const entry of tokens) {
+      if (entry.platform === 'android') {
+        devices.android += 1;
+        android.add(entry.contactId);
+      } else if (entry.platform === 'ios') {
+        devices.ios += 1;
+        ios.add(entry.contactId);
+      }
+    }
+    return { devices, accounts: { android: android.size, ios: ios.size, total: new Set(tokens.map((entry) => entry.contactId)).size } };
+  }
+
   async summary(): Promise<{ total: number; accounts: number; byPlatform: Record<string, number> }> {
     const tokens = await this.load();
     const byPlatform: Record<string, number> = {};

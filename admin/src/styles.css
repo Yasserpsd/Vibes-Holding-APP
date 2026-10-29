@@ -420,3 +420,38 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .status-control { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .status-control .row-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .status-control .row-actions button { padding: 4px 10px; font-size: 12.5px; }
+
+/* M158: the royal downloads card — navy + gold, the two store marks, the total in the middle, a 30-day line. */
+.card.royal { --royal-navy: #0d274a; --royal-gold: #e7ad3f; --royal-ivory: #f6efe2; background: radial-gradient(900px 260px at 90% -80px, rgba(231, 173, 63, 0.22), transparent 70%), linear-gradient(160deg, #143563, var(--royal-navy) 55%, #091a33); border-color: rgba(231, 173, 63, 0.55); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(231, 173, 63, 0.18); color: var(--royal-ivory); gap: 14px; }
+.card.royal h2 { color: #fff; font-size: 1.15rem; }
+.royal-kicker { margin: 0; color: var(--royal-gold); font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; }
+.downloads-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.royal-chip, .chip.royal-chip { border-color: rgba(231, 173, 63, 0.6); color: var(--royal-gold); background: rgba(231, 173, 63, 0.1); }
+.chip.royal-chip:hover:not(:disabled) { background: rgba(231, 173, 63, 0.2); }
+.store-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
+.store-col, .store-total { display: grid; justify-items: center; align-content: center; gap: 4px; padding: 14px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); text-align: center; min-width: 0; }
+.store-total { padding-inline: 22px; background: linear-gradient(180deg, rgba(231, 173, 63, 0.26), rgba(231, 173, 63, 0.08)); border-color: rgba(231, 173, 63, 0.55); }
+.store-mark { display: block; color: #fff; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35)); }
+.store-name { color: rgba(246, 239, 226, 0.8); font-size: 0.82rem; }
+.store-value { font-size: 2.1rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: #fff; }
+.store-value.big { font-size: 2.8rem; color: var(--royal-gold); }
+.store-caption { color: rgba(246, 239, 226, 0.65); font-size: 0.74rem; }
+.store-trend { margin: 0; display: grid; gap: 6px; }
+.store-trend svg { display: block; inline-size: 100%; block-size: auto; direction: ltr; overflow: visible; }
+.store-trend-base { stroke: rgba(246, 239, 226, 0.25); }
+.store-trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.store-trend-line.total { stroke: var(--royal-gold); stroke-width: 2.5; }
+.store-trend-line.android { stroke: #00c3ff; opacity: 0.85; stroke-width: 1.5; }
+.store-trend-line.ios { stroke: #fff; opacity: 0.75; stroke-width: 1.5; }
+.store-trend-dot { fill: var(--royal-gold); stroke: var(--royal-navy); stroke-width: 2; }
+.store-trend-tick { fill: rgba(246, 239, 226, 0.65); font-size: 11px; font-variant-numeric: tabular-nums; }
+.store-legend { display: flex; gap: 14px; flex-wrap: wrap; color: rgba(246, 239, 226, 0.75); font-size: 0.78rem; }
+.store-legend .swatch { display: inline-block; inline-size: 14px; block-size: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 6px; }
+.store-legend .swatch.total { background: var(--royal-gold); }
+.store-legend .swatch.android { background: #00c3ff; }
+.store-legend .swatch.ios { background: #fff; }
+.store-foot { margin: 0; color: rgba(246, 239, 226, 0.7); font-size: 0.8rem; }
+@media (max-width: 560px) {
+  .store-grid { grid-template-columns: 1fr 1fr; }
+  .store-total { grid-column: 1 / -1; order: -1; }
+}

@@ -5,6 +5,7 @@ import { BarChart, type ChartPoint } from '../Chart';
 import { daysText, formatCents, formatDateTime, formatDay, formatMoney, formatNumber } from '../format';
 import type { AccountFilter, BridgeSide, Home as HomeData, HubStats, StatsDay } from '../types';
 import { Async, Boundary, Chips, ErrorCard, Pill, SectionHead, useLoad, useShell } from '../ui';
+import { DownloadsCard } from './Downloads';
 
 type Range = '7' | '30' | '90';
 const RANGES: { value: Range; label: string }[] = [
@@ -243,6 +244,8 @@ export function Home() {
           const part = (block: ReactNode) => <Boundary watch={data}>{block}</Boundary>;
           return (
             <div className="stack">
+              {/* M158 (owner): the downloads counter comes first, before anything else. */}
+              {part(<DownloadsCard />)}
               {data.hub ? part(<Tiles hub={data.hub} />) : data.errors.hub ? <ErrorCard error={data.errors.hub} onRetry={state.reload} /> : null}
               {part(<Today data={data} />)}
               {data.hub ? part(<Daily hub={data.hub} days={days} />) : null}

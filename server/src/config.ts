@@ -122,6 +122,17 @@ const envSchema = z.object({
   STORE_PRIVACY_URL: z.string().url().optional(),
   // Expo push service: optional access token when "enhanced push security" is on for the Expo project.
   EXPO_PUSH_ACCESS_TOKEN: z.string().min(10).optional(),
+  // M158: real store installs for the dashboard downloads card. All optional; unset = the card shows signed-in devices.
+  // App Store Connect API key (Users and Access → Integrations → App Store Connect API): issuer id, key id, the .p8 contents, the vendor number from Sales and Trends.
+  ASC_ISSUER_ID: z.string().min(10).optional(),
+  ASC_KEY_ID: z.string().min(5).optional(),
+  ASC_PRIVATE_KEY: z.string().min(50).optional(),
+  ASC_VENDOR_NUMBER: z.string().min(5).optional(),
+  ASC_APP_ID: z.string().min(5).optional(),
+  // Google Play: the service-account key JSON, the Play Console stats bucket (pubsite_prod_rev_…) and the package name.
+  PLAY_REPORTING_SERVICE_ACCOUNT: z.string().min(50).optional(),
+  PLAY_STATS_BUCKET: z.string().min(5).optional(),
+  PLAY_PACKAGE_NAME: z.string().min(5).default('com.vcmem.investorsclub'),
   // M42: automatic notifications (a published post, a new agenda event, a new Saudi decision). '0' switches them off.
   AUTO_PUSH: z.enum(['0', '1']).default('1'),
 });
