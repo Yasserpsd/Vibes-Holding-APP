@@ -28,6 +28,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 import { Composer } from './Composer';
 import { CONTEXT_ICONS, toApiContext, welcomeStarters, type ChatContext, type ChatOpening } from './context';
 import { MessageBubble, type ChatAct } from './MessageBubble';
+import { stopSpeech } from './speech';
 import { SCREEN_ROUTES } from './screens';
 import { useAdvisorChat } from './useAdvisorChat';
 
@@ -77,6 +78,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   // The opening the member already answered; a new one (another portal or service) shows again.
   const [answeredOpening, setAnsweredOpening] = useState<ChatOpening | null>(null);
   const listRef = useRef<FlatList<Item>>(null);
+  // M148: leaving the chat silences a playing reply.
+  useEffect(() => () => stopSpeech(), []);
   const latestContext = useRef(context);
 
   useEffect(() => {

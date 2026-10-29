@@ -9,9 +9,17 @@ import { langOf } from '../lang.js';
 import { FILL_FIELD_TYPES, type FormFiller } from './fill.js';
 import type { HqProposal, IntentDetector } from './intents.js';
 import type { AdvisorService } from './service.js';
+import { speakable, type SpeechSynthesizer } from './speech.js';
 import type { VoiceTranscriber } from './voice.js';
 
-export type AdvisorRoutesOptions = { service: AdvisorService; auth: AuthService; voice?: VoiceTranscriber; filler?: FormFiller; intents?: IntentDetector };
+export type AdvisorRoutesOptions = {
+  service: AdvisorService;
+  auth: AuthService;
+  voice?: VoiceTranscriber;
+  filler?: FormFiller;
+  intents?: IntentDetector;
+  speech?: SpeechSynthesizer;
+};
 
 // The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
 const selection = z.string().trim().max(1000).nullish();
@@ -57,6 +65,8 @@ const voiceSchema = z.object({
   audio: z.string().min(100).max(8_000_000),
   mime: z.enum(['audio/m4a', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/wav']).default('audio/m4a'),
 });
+// M148: the reply's own text, as the app holds it (4000 is the hub's reply cap).
+const speakSchema = z.object({ text: z.string().trim().min(1).max(4000) });
 // M142: the app describes the form; the key is what the screen stores, the label what the member sees.
 const fillSchema = z.object({
   transcript: z.string().trim().min(1).max(6000),
@@ -77,10 +87,34 @@ const fillSchema = z.object({
   country: z.string().regex(/^[a-z]{2}$/i).optional(),
 });
 
-export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler, intents }) => {
+export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler, intents, speech }) => {
   const requireSession = sessionGuard(auth);
   const maybeSession = optionalSession(auth);
   const limiter = new RateLimiter();
+
+  // M148 «المستشار يرد بالصوت»: a reply's text comes back as an MP3 clip (base64) in the member's language.
+  // Members only; the clip is never stored on disk and the same reply is synthesised once.
+  app.post(
+    '/api/advisor/speak',
+    guard(async (request, reply) => {
+      if (!speech) return reply.code(404).send({ error: { code: 'speech_off', message: 'الرد الصوتي غير متاح حاليًا' } });
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      if (!limiter.hit(`speak:${request.ip}`, 40, 15 * 60_000)) {
+        return reply.code(429).send({ error: { code: 'rate', message: 'طلبات صوتية كثيرة في وقت قصير، حاول بعد قليل' } });
+      }
+      const body = parse(speakSchema, request.body, reply);
+      if (!body) return;
+      const text = speakable(body.text);
+      if (!text) return reply.code(400).send({ error: { code: 'empty', message: 'لا يوجد نص يُقرأ' } });
+      try {
+        const audio = await speech.speak(text, langOf(request));
+        return { audio: audio.toString('base64'), mime: 'audio/mpeg', chars: text.length };
+      } catch {
+        return reply.code(502).send({ error: { code: 'speech_failed', message: 'تعذر تحويل الرد إلى صوت، حاول مرة أخرى' } });
+      }
+    }),
+  );
 
   app.get(
     '/api/advisor/history',

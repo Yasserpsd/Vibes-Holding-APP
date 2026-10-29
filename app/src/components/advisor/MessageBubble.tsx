@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, View } from 'react-native';
 
 import type { AdvisorAction, AdvisorFile, AdvisorMessage, AppScreen, HqProposal } from '@/api/advisor';
 import { formatFileSize } from '@/components/advisor/FileButton';
+import { errorMessage } from '@/api/client';
 import { Chip } from '@/components/Chip';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
@@ -15,6 +16,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 import { HqProposalCard } from './HqProposalCard';
 import { RichText, hasTable } from './RichText';
+import { speechAvailable, toggleSpeech, useSpeechState } from './speech';
 
 /** M145: what a chat card asks the screen to do (the screen owns navigation, booking and the pending proposal). */
 export type ChatAct =
@@ -60,7 +62,10 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply, onAct, 
           plain={mine}
         />
       ) : null}
-      <Text style={[styles.time, mine ? styles.timeMine : styles.timeTheirs]}>{formatTime(message.at)}</Text>
+      <View style={styles.foot}>
+        {!mine && message.text && speechAvailable() ? <SpeakButton id={message.id} text={message.text} /> : null}
+        <Text style={[styles.time, mine ? styles.timeMine : styles.timeTheirs]}>{formatTime(message.at)}</Text>
+      </View>
     </>
   );
   return (
@@ -150,6 +155,24 @@ function FileChip({ file, mine }: { file: AdvisorFile; mine: boolean }) {
   );
 }
 
+/** M148: the speaker on a reply — tap to hear it, tap again to stop; a spinner while the clip is made. */
+function SpeakButton({ id, text }: { id: number; text: string }) {
+  const state = useSpeechState(id);
+  const press = () => {
+    toggleSpeech(id, text).catch((cause: unknown) => Alert.alert(t('advisor.speak.title'), errorMessage(cause) || t('advisor.speak.failed')));
+  };
+  const label = state === 'playing' ? t('advisor.speak.stop') : state === 'loading' ? t('advisor.speak.loading') : t('advisor.speak.play');
+  return (
+    <PressScale onPress={press} glow={state === 'playing'} glowRadius={radii.pill} style={[styles.speak, state !== 'idle' && styles.speakActive]} accessibilityLabel={label}>
+      {state === 'loading' ? (
+        <ActivityIndicator color={colors.gold} size="small" />
+      ) : (
+        <Ionicons name={state === 'playing' ? 'stop-circle' : 'volume-high-outline'} size={18} color={colors.gold} />
+      )}
+    </PressScale>
+  );
+}
+
 function ActionButton({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.pill} wrapStyle={styles.actionWrap} style={styles.action}>
@@ -180,6 +203,9 @@ const styles = StyleSheet.create({
   text: { ...typography.body, textAlign: textStart },
   textMine: { color: colors.goldInk },
   textTheirs: { color: colors.textPrimary },
+  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.sm },
+  speak: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.goldFaint },
+  speakActive: { borderColor: colors.gold },
   time: { ...typography.caption, fontSize: 11, lineHeight: 14, textAlign: textEnd },
   timeMine: { color: colors.goldInk },
   timeTheirs: { color: colors.textMuted },

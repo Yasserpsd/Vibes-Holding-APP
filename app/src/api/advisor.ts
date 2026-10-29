@@ -85,6 +85,8 @@ export type FillFieldType = 'text' | 'textarea' | 'phone' | 'email' | 'number' |
 export type FillField = { key: string; label: string; type: FillFieldType; options?: string[]; required?: boolean; hint?: string };
 export type FillFormInput = { transcript: string; fields: FillField[]; known?: Record<string, string>; country?: string };
 export type FillFormResult = { values: Record<string, string>; missing: string[]; followUp: string | null };
+/** M148: base64 MP3 of a reply (mirrors `POST /api/advisor/speak`). */
+export type SpeakResult = { audio: string; mime: string; chars: number };
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 const postMessage = (text: string, context: AdvisorContext | null) =>
@@ -120,6 +122,8 @@ export const advisorApi = {
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),
   // M104: the recorded question (base64) comes back as text; the app then sends it as a message.
   transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime } }),
+  // M148: a reply's text comes back as an MP3 clip (base64) in the member's language.
+  speak: (text: string) => apiRequest<SpeakResult>('POST', '/api/advisor/speak', { body: { text }, timeoutMs: 60_000 }),
   // M145: is this line an app action? An older server answers 404 → treated as «no».
   intent: async (text: string, pending: HqProposal | null): Promise<IntentResult> => {
     try {

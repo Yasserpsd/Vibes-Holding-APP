@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { advisorRoutes } from './advisor/routes.js';
 import { FormFiller } from './advisor/fill.js';
 import { IntentDetector } from './advisor/intents.js';
+import { SpeechSynthesizer } from './advisor/speech.js';
 import { VoiceTranscriber } from './advisor/voice.js';
 import { AdvisorService } from './advisor/service.js';
 import { agendaRoutes } from './agenda/routes.js';
@@ -522,7 +523,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const filler = config.OPENAI_API_KEY ? new FormFiller({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl }) : undefined;
   // M145: chat lines that are app actions (HQ booking, open a screen, prefilled service request).
   const intents = config.OPENAI_API_KEY ? new IntentDetector({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, hq, kv }) : undefined;
-  await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents });
+  // M148: voice replies — the same key; the app plays the clip.
+  const speech = config.OPENAI_API_KEY ? new SpeechSynthesizer({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
+  await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents, speech });
   await app.register(newsRoutes, { service: news, auth, kv, interests });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
