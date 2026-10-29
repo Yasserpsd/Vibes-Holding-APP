@@ -394,7 +394,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
           return reply.code(403).send({ error: { code: 'persona_code_required', message: 'تغيير التوجه يتم بالرمز المُرسل إلى بريدك الإلكتروني' } });
         }
       }
-      const me = await service.updateProfile(auth.session, body);
+      const me = await service.updateProfile(auth.session, body, sourceOf(request));
       return { me: await withEnglish(request, me) };
     }),
   );
@@ -472,7 +472,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
                 : 'لا يوجد طلب تغيير قائم، ابدأ من جديد';
         return reply.code(400).send({ error: { code: `persona_${result.reason}`, message } });
       }
-      const updated = await service.updateProfile(auth.session, { persona: result.persona });
+      const updated = await service.updateProfile(auth.session, { persona: result.persona }, sourceOf(request));
       if (!updated.isAdmin) await personaChange.stamp(me.id);
       return { me: await withEnglish(request, updated) };
     }),

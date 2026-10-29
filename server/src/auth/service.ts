@@ -581,8 +581,10 @@ export class AuthService {
     return result.contact;
   }
 
-  async updateProfile(session: SessionRecord, patch: ProfilePatch): Promise<Me> {
+  async updateProfile(session: SessionRecord, patch: ProfilePatch, source?: AppSource): Promise<Me> {
     const body: Record<string, unknown> = { uuid: session.uuid };
+    // Hub 2.25.0: the platform rides along so the «اكتمل تسجيل عضو» mail of an older account (no stored source) says Apple / Google.
+    if (source) body.source = source;
     if (patch.name !== undefined) body.name = patch.name;
     if (patch.jobTitle !== undefined) body.job_title = patch.jobTitle;
     if (patch.company !== undefined) body.company = patch.company;
