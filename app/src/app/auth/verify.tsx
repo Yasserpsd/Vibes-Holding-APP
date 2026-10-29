@@ -13,12 +13,14 @@ import { entranceDelay, FadeInView, GrowBar } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
+import { trackRegistration } from '@/lib/adsAttribution';
 import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
-type Params = { pendingToken?: string; email?: string; text?: string; interests?: string; interestsOther?: string };
+/** M157: `flow: 'register'` marks the signup path (login also lands here for a new device). */
+type Params = { flow?: string; pendingToken?: string; email?: string; text?: string; interests?: string; interestsOther?: string };
 
 export default function VerifyScreen() {
-  const { pendingToken, email, text, interests, interestsOther } = useLocalSearchParams<Params>();
+  const { flow, pendingToken, email, text, interests, interestsOther } = useLocalSearchParams<Params>();
   const router = useRouter();
   const { signIn } = useAuth();
   const queryClient = useQueryClient();
@@ -64,6 +66,7 @@ export default function VerifyScreen() {
       const chosen = (interests ?? '').split(',').filter(Boolean);
       if (chosen.length > 0) await interestsApi.save({ keys: chosen, other: interestsOther || undefined }, result.token).catch(() => undefined);
       await signIn(result.token, result.me);
+      if (flow === 'register') trackRegistration('email');
       void queryClient.invalidateQueries({ queryKey: ['news'] });
       void queryClient.invalidateQueries({ queryKey: ['interests'] });
       finish();

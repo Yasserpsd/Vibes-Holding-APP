@@ -6,6 +6,7 @@ type Extra = {
   appEnv?: AppEnv;
   apiBaseUrl?: string;
   googleWebClientId?: string;
+  appsflyerDevKey?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
@@ -25,5 +26,7 @@ export const env = {
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
     extra.googleWebClientId ||
     '980470249678-g51bg4r3u4op57tse8t2nt4vut1fp0cm.apps.googleusercontent.com',
+  // M157: the AppsFlyer dev key (a public app key; set in the EAS environment, never in code).
+  appsflyerDevKey: process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY || extra.appsflyerDevKey || '',
   appVersion: Constants.expoConfig?.version ?? '0.0.0',
 } as const;

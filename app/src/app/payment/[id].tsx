@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { amountLabel, usePayment, type PaymentStatus } from '@/api/payments';
@@ -10,6 +10,7 @@ import { entranceDelay, FadeInView, PopIn, Sheen, usePulse } from '@/components/
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
+import { trackServicePurchase } from '@/lib/adsAttribution';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -43,6 +44,15 @@ export default function PaymentScreen() {
   // V2: a pending payment breathes; a paid one gets the gold sheen (needs the hero's measured size).
   const pulse = usePulse();
   const [heroSize, setHeroSize] = useState<{ width: number; height: number } | null>(null);
+  // M157: a payment watched here from «created» to «paid» (the refresh button) counts as a conversion;
+  // reopening an old receipt does not.
+  const watched = data?.payment;
+  const sawCreated = useRef(false);
+  useEffect(() => {
+    if (!watched) return;
+    if (watched.status === 'created') sawCreated.current = true;
+    else if (watched.status === 'paid' && sawCreated.current) trackServicePurchase(watched);
+  }, [watched]);
 
   if (!data) {
     return (

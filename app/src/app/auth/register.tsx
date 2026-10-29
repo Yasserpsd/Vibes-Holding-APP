@@ -134,7 +134,7 @@ export default function RegisterScreen() {
       });
       router.push({
         pathname: '/auth/verify',
-        params: { pendingToken: result.pendingToken, email: result.email, text: result.text, interests: form.interests.join(','), interestsOther: form.interestsOther.trim() },
+        params: { flow: 'register', pendingToken: result.pendingToken, email: result.email, text: result.text, interests: form.interests.join(','), interestsOther: form.interestsOther.trim() },
       });
     } catch (cause) {
       setSubmitError(errorMessage(cause));

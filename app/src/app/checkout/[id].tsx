@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { trackServicePurchase } from '@/lib/adsAttribution';
 import { appScheme, openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { loadWebView } from '@/lib/player';
 import { colors, fonts, spacing, typography } from '@/theme/tokens';
@@ -42,6 +43,8 @@ export default function CheckoutScreen() {
   }, [status, refetch]);
 
   useEffect(() => {
+    // M157: the server flipped this payment to paid while the checkout was open — one conversion.
+    if (status === 'paid' && payment) trackServicePurchase(payment);
     if (status && status !== 'created') finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);

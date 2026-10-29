@@ -25,6 +25,7 @@ import { MembershipGateHost } from '@/components/MembershipGate';
 import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
+import { AdsAttribution } from '@/components/AdsAttribution';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { ScreenTracker } from '@/components/ScreenTracker';
 import { SyncPoller } from '@/components/SyncPoller';
@@ -103,6 +104,7 @@ export default function RootLayout() {
       <AuthProvider>
         <GuestGateProvider>
           <PushRegistrar />
+          <AdsAttribution />
           <SyncPoller />
           <ScreenTracker />
           <StatusBar style="light" />

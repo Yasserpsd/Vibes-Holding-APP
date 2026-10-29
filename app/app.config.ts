@@ -60,6 +60,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   // Mobile only: keeps expo export and eas update from bundling a web build.
   platforms: ['ios', 'android'],
+  // M157: per-language iOS permission texts (InfoPlist.strings): the tracking prompt in Arabic and English.
+  locales: { ar: './locales/ar.json', en: './locales/en.json' },
   plugins: [
     'expo-router',
     'expo-font',
@@ -91,6 +93,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // M118d: the biometric app lock (native module: works from the NEXT build; older binaries
     // hide the toggle via requireOptionalNativeModule).
     ['expo-local-authentication', { faceIDPermission: 'يستخدم التطبيق بصمة الوجه لفتح التطبيق عند تفعيل قفل الأمان.' }],
+    // M157: ads attribution (TikTok, Meta, X, LinkedIn, Google Ads) through AppsFlyer — native module, binary
+    // 1.3.0; older binaries skip it via lib/adsAttribution.ts. The iOS tracking prompt text lives in `locales`
+    // (Arabic + English); this default covers any other device language.
+    'react-native-appsflyer',
+    [
+      'expo-tracking-transparency',
+      { userTrackingPermission: 'This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.' },
+    ],
   ],
   experiments: { typedRoutes: true },
   extra: {
@@ -102,6 +112,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // for the ID token with this audience. Empty until the owner creates it in Google Cloud; the app
     // hides the Google button while it is empty.
     googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
+    // M157, public app key (rule 1 allows it): the AppsFlyer dev key from the EAS environment
+    // (EXPO_PUBLIC_APPSFLYER_DEV_KEY). Empty = the attribution SDK never starts.
+    appsflyerDevKey: process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? '',
     supportsRTL: true,
     eas: { projectId: EAS_PROJECT_ID },
   },
