@@ -12,7 +12,26 @@ export type PlayStoreConfig = { serviceAccountJson: string; bucket: string; pack
 type ServiceAccount = { client_email: string; private_key: string; token_uri?: string };
 
 const SCOPE = 'https://www.googleapis.com/auth/devstorage.read_only';
+const TIMEOUT_MS = 20_000;
 const b64url = (input: Buffer | string): string => Buffer.from(input).toString('base64url');
+
+/** `gs://pubsite_prod_rev_123/stats/installs/` (as the console copies it) → the bare bucket name. */
+export function bucketName(value: string): string {
+  return value.trim().replace(/^gs:\/\//i, '').split('/')[0] ?? '';
+}
+
+/** Google's error message (`error.message`), else the first bytes of the body — for the server log. */
+async function responseDetail(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  try {
+    const json = JSON.parse(text) as { error?: { message?: string } | string; error_description?: string };
+    const detail = typeof json.error === 'string' ? `${json.error} ${json.error_description ?? ''}` : json.error?.message;
+    if (detail?.trim()) return detail.trim().slice(0, 200);
+  } catch {
+    // not JSON — fall through to the raw snippet
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200);
+}
 
 export function parseServiceAccount(json: string): ServiceAccount {
   const parsed = JSON.parse(json) as Partial<ServiceAccount>;
@@ -55,6 +74,7 @@ export function parseInstallsCsv(csv: string): PlayDay[] {
 
 export class PlayStoreClient {
   private readonly account: ServiceAccount;
+  private readonly bucket: string;
   private token: { value: string; expiresAt: number } | null = null;
 
   constructor(
@@ -62,6 +82,8 @@ export class PlayStoreClient {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {
     this.account = parseServiceAccount(config.serviceAccountJson);
+    this.bucket = bucketName(config.bucket);
+    if (!this.bucket) throw new Error('PLAY_STATS_BUCKET is empty');
   }
 
   private async accessToken(now = Date.now()): Promise<string> {
@@ -70,8 +92,9 @@ export class PlayStoreClient {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: playAssertion(this.account, now) }).toString(),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!response.ok) throw new Error(`Google token endpoint answered ${response.status}`);
+    if (!response.ok) throw new Error(`Google token endpoint answered ${response.status}: ${await responseDetail(response)}`);
     const json = (await response.json()) as { access_token?: string; expires_in?: number };
     if (!json.access_token) throw new Error('Google token endpoint returned no access_token');
     this.token = { value: json.access_token, expiresAt: now + (json.expires_in ?? 3600) * 1000 };
@@ -81,10 +104,11 @@ export class PlayStoreClient {
   /** The overview export of one month (YYYYMM); `null` when the Play Console has not written it yet (404). */
   async month(yyyymm: string): Promise<PlayDay[] | null> {
     const object = encodeURIComponent(`stats/installs/installs_${this.config.packageName}_${yyyymm}_overview.csv`);
-    const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(this.config.bucket)}/o/${object}?alt=media`;
-    const response = await this.fetchImpl(url, { headers: { authorization: `Bearer ${await this.accessToken()}` } });
+    const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(this.bucket)}/o/${object}?alt=media`;
+    const response = await this.fetchImpl(url, { headers: { authorization: `Bearer ${await this.accessToken()}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`Cloud Storage answered ${response.status}`);
+    // 403 here = the service account is not yet invited in the Play Console (or lacks «download bulk reports»).
+    if (!response.ok) throw new Error(`Cloud Storage answered ${response.status} for ${yyyymm}: ${await responseDetail(response)}`);
     const bytes = Buffer.from(await response.arrayBuffer());
     const utf16 = bytes.length > 1 && bytes[0] === 0xff && bytes[1] === 0xfe;
     return parseInstallsCsv(utf16 ? bytes.toString('utf16le') : bytes.toString('utf8'));

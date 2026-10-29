@@ -59,24 +59,35 @@ function Trend({ series }: { series: DownloadsData['series'] }) {
   const area = `${line((index) => totals[index]!)} L${(pad.x + (series.length - 1) * stepX).toFixed(1)},${height - pad.bottom} L${pad.x},${height - pad.bottom} Z`;
   const first = series[0];
   const last = series[series.length - 1];
+  const endX = (pad.x + (series.length - 1) * stepX).toFixed(1);
+  const endY = y(totals[totals.length - 1]!).toFixed(1);
   return (
     <figure className="store-trend">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="اتجاه آخر 30 يومًا">
+      {/* The drawing stretches to the card's width at a fixed height (phones would otherwise get a 70px strip);
+          strokes never scale, and the end dot is a round-capped zero-length stroke so it stays round. */}
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="اتجاه آخر 30 يومًا">
         <defs>
           <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#e7ad3f" stopOpacity="0.45" />
             <stop offset="100%" stopColor="#e7ad3f" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <line x1={pad.x} x2={width - pad.x} y1={height - pad.bottom} y2={height - pad.bottom} className="store-trend-base" />
+        <line x1={pad.x} x2={width - pad.x} y1={height - pad.bottom} y2={height - pad.bottom} className="store-trend-base" vectorEffect="non-scaling-stroke" />
         <path d={area} fill={`url(#${id}-fill)`} />
-        <path d={line((index) => series[index]!.android)} className="store-trend-line android" />
-        <path d={line((index) => series[index]!.ios)} className="store-trend-line ios" />
-        <path d={line((index) => totals[index]!)} className="store-trend-line total" />
-        {last ? <circle cx={pad.x + (series.length - 1) * stepX} cy={y(totals[totals.length - 1]!)} r="4" className="store-trend-dot" /> : null}
-        {first ? <text x={pad.x} y={height - 6} className="store-trend-tick">{formatDay(first.day, 'short')}</text> : null}
-        {last ? <text x={width - pad.x} y={height - 6} textAnchor="end" className="store-trend-tick">{formatDay(last.day, 'short')}</text> : null}
+        <path d={line((index) => series[index]!.android)} className="store-trend-line android" vectorEffect="non-scaling-stroke" />
+        <path d={line((index) => series[index]!.ios)} className="store-trend-line ios" vectorEffect="non-scaling-stroke" />
+        <path d={line((index) => totals[index]!)} className="store-trend-line total" vectorEffect="non-scaling-stroke" />
+        {last ? (
+          <>
+            <path d={`M${endX},${endY} h0.01`} className="store-trend-dot ring" vectorEffect="non-scaling-stroke" />
+            <path d={`M${endX},${endY} h0.01`} className="store-trend-dot" vectorEffect="non-scaling-stroke" />
+          </>
+        ) : null}
       </svg>
+      <div className="store-ticks" aria-hidden="true">
+        <span>{first ? formatDay(first.day, 'short') : ''}</span>
+        <span>{last ? formatDay(last.day, 'short') : ''}</span>
+      </div>
       <figcaption className="store-legend">
         <span><i className="swatch total" /> الإجمالي</span>
         <span><i className="swatch android" /> Google Play</span>
@@ -102,7 +113,9 @@ export function DownloadsCard() {
   const data = state.data;
   if (!data) return <Skeleton rows={4} />;
   const stores = data.mode === 'stores';
-  const caption = stores ? 'تحميل من المتجر' : 'جهاز مسجّل';
+  // In stores mode a store that has not answered yet still shows its device count — captioned as such.
+  const caption = (installs: number | null) => (stores && installs !== null ? 'تحميل من المتجر' : 'جهاز مسجّل');
+  const both = stores && data.stores.google.installs !== null && data.stores.apple.installs !== null;
   const pending = [!data.stores.google.configured ? 'Google Play' : null, !data.stores.apple.configured ? 'App Store' : null].filter(Boolean);
   return (
     <section className="card royal downloads" aria-labelledby="downloads-title">
@@ -116,13 +129,13 @@ export function DownloadsCard() {
         </button>
       </header>
       <div className="store-grid">
-        <StoreColumn mark={<PlayMark />} name="Google Play" value={data.android} caption={caption} />
+        <StoreColumn mark={<PlayMark />} name="Google Play" value={data.android} caption={caption(data.stores.google.installs)} />
         <div className="store-total">
           <span className="store-name">الإجمالي</span>
           <strong className="store-value big num">{formatNumber(data.total)}</strong>
-          <span className="store-caption">{stores ? 'تحميل من المتجرين' : 'جهاز مسجّل الآن'}</span>
+          <span className="store-caption">{both ? 'تحميل من المتجرين' : stores ? 'متجر + أجهزة' : 'جهاز مسجّل الآن'}</span>
         </div>
-        <StoreColumn mark={<AppleMark />} name="App Store" value={data.ios} caption={caption} />
+        <StoreColumn mark={<AppleMark />} name="App Store" value={data.ios} caption={caption(data.stores.apple.installs)} />
       </div>
       <Trend series={data.series} />
       <p className="store-foot">
@@ -130,6 +143,8 @@ export function DownloadsCard() {
           <>
             أجهزة مسجّلة الآن: <bdi className="num">{formatNumber(data.devices.android)}</bdi> Android · <bdi className="num">{formatNumber(data.devices.ios)}</bdi> iPhone · حسابات <bdi className="num">{formatNumber(data.devices.accounts.total)}</bdi>
             {data.stores.apple.since ? <> · App Store منذ {formatDay(data.stores.apple.since, 'short')}</> : null}
+            {data.stores.google.installs === null ? <> · رقم Google Play لم يصل بعد{data.stores.google.configured ? ' (المتجر لم يكتب تقرير الشهر أو الصلاحية ناقصة)' : ' (مفاتيح Railway غير مضبوطة)'}</> : null}
+            {data.stores.apple.installs === null ? <> · رقم App Store لم يصل بعد{data.stores.apple.configured ? ' (تقرير أمس لم يُكتب أو المفتاح بلا صلاحية Sales)' : ' (مفاتيح Railway غير مضبوطة)'}</> : null}
           </>
         ) : (
           <>

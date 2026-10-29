@@ -437,14 +437,15 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .store-value.big { font-size: 2.8rem; color: var(--royal-gold); }
 .store-caption { color: rgba(246, 239, 226, 0.65); font-size: 0.74rem; }
 .store-trend { margin: 0; display: grid; gap: 6px; }
-.store-trend svg { display: block; inline-size: 100%; block-size: auto; direction: ltr; overflow: visible; }
+.store-trend svg { display: block; inline-size: 100%; block-size: 150px; direction: ltr; overflow: visible; }
 .store-trend-base { stroke: rgba(246, 239, 226, 0.25); }
 .store-trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .store-trend-line.total { stroke: var(--royal-gold); stroke-width: 2.5; }
 .store-trend-line.android { stroke: #00c3ff; opacity: 0.85; stroke-width: 1.5; }
 .store-trend-line.ios { stroke: #fff; opacity: 0.75; stroke-width: 1.5; }
-.store-trend-dot { fill: var(--royal-gold); stroke: var(--royal-navy); stroke-width: 2; }
-.store-trend-tick { fill: rgba(246, 239, 226, 0.65); font-size: 11px; font-variant-numeric: tabular-nums; }
+.store-trend-dot { fill: none; stroke: var(--royal-gold); stroke-width: 9; stroke-linecap: round; }
+.store-trend-dot.ring { stroke: var(--royal-navy); stroke-width: 13; }
+.store-ticks { display: flex; justify-content: space-between; direction: ltr; margin-inline: 2px; color: rgba(246, 239, 226, 0.65); font-size: 0.74rem; font-variant-numeric: tabular-nums; }
 .store-legend { display: flex; gap: 14px; flex-wrap: wrap; color: rgba(246, 239, 226, 0.75); font-size: 0.78rem; }
 .store-legend .swatch { display: inline-block; inline-size: 14px; block-size: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 6px; }
 .store-legend .swatch.total { background: var(--royal-gold); }

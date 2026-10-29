@@ -4,8 +4,8 @@ import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
-import { appStoreToken, parseSalesReport } from './downloads/appStore.js';
-import { parseInstallsCsv, playAssertion } from './downloads/playStore.js';
+import { type AppStoreClient, appStoreToken, parseSalesReport } from './downloads/appStore.js';
+import { bucketName, parseInstallsCsv, playAssertion } from './downloads/playStore.js';
 import { DAILY_KEY, DownloadsService, type DailyDoc } from './downloads/service.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { LogMailer } from './mail/mailer.js';
@@ -128,6 +128,44 @@ test('store installs switch the card to stores mode: Apple summed from the store
   assert.deepEqual({ android: answer.android, ios: answer.ios, total: answer.total }, { android: 129, ios: 10, total: 139 });
   assert.equal(answer.stores.apple.since, day(3));
   assert.equal(answer.stores.google.since, null);
+  // Stores mode: the trend is the stores' installs per day, a day a store has not written counts 0.
+  const at = (offset: number) => answer.series.find((point) => point.day === day(offset))!;
+  assert.deepEqual([at(3), at(2), at(1)].map((point) => [point.android, point.ios]), [[7, 4], [9, 6], [0, 0]]);
+});
+
+test('a store that has not answered yet keeps its device count beside the other store’s installs', async () => {
+  const local = new MemoryKV();
+  const now = Date.now();
+  const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
+  await local.set(DAILY_KEY, { [day(2)]: { android: 1, ios: 1, storeIos: 6 } } satisfies DailyDoc);
+  const push = new PushService({ kv: local, log: app.log });
+  const service = new DownloadsService({ kv: local, push, log: app.log });
+  const answer = await service.read(now);
+  assert.equal(answer.mode, 'stores');
+  assert.equal(answer.ios, 6);
+  assert.equal(answer.android, answer.devices.android, 'Google has no number yet → the Android column keeps the device count');
+  assert.equal(answer.stores.google.installs, null);
+});
+
+test('Apple’s «no sales» 404 settles older days as 0 and leaves yesterday to be asked again', async () => {
+  const local = new MemoryKV();
+  const now = Date.now();
+  const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
+  const asked: string[] = [];
+  const apple = { installsOn: async (d: string) => { asked.push(d); return d === day(3) ? 3 : null; } } as unknown as AppStoreClient;
+  const push = new PushService({ kv: local, log: app.log });
+  const service = new DownloadsService({ kv: local, push, log: app.log, apple });
+  await service.snapshot(now);
+  const doc = (await local.get<DailyDoc>(DAILY_KEY)) ?? {};
+  assert.equal(doc[day(3)]?.storeIos, 3);
+  assert.equal(doc[day(2)]?.storeIos, 0, 'two days old without a report = no downloads');
+  assert.equal(doc[day(1)]?.storeIos, undefined, 'yesterday’s report may still be on its way');
+  assert.equal(asked.length, 30);
+  asked.length = 0;
+  await service.snapshot(now);
+  assert.deepEqual(asked, [day(1)], 'settled days are never asked again');
+  assert.equal(bucketName('gs://pubsite_prod_rev_01234567890987654321/stats/installs/'), 'pubsite_prod_rev_01234567890987654321');
+  assert.equal(bucketName(' pubsite_prod_rev_1 '), 'pubsite_prod_rev_1');
 });
 
 test('the App Store Connect JWT is a signed ES256 token and the sales report parser counts first downloads only', () => {

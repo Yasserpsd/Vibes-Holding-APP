@@ -14,8 +14,23 @@ const AUDIENCE = 'appstoreconnect-v1';
 const BASE = 'https://api.appstoreconnect.apple.com/v1/salesReports';
 /** Product type identifiers that mean a first-time app download (free, paid, universal, Mac). */
 const INSTALL_TYPES = new Set(['1', '1F', '1T', 'F1', 'F1-B']);
+const TIMEOUT_MS = 20_000;
 
 const b64url = (input: Buffer | string): string => Buffer.from(input).toString('base64url');
+
+/** The first error detail Apple's JSON carries (`errors[0].detail`), else the first bytes of the body — for the server log. */
+export async function responseDetail(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  try {
+    const json = JSON.parse(text) as { errors?: { detail?: string; title?: string }[]; error?: { message?: string } | string };
+    const first = json.errors?.[0];
+    const detail = first?.detail ?? first?.title ?? (typeof json.error === 'string' ? json.error : json.error?.message);
+    if (detail) return detail.slice(0, 200);
+  } catch {
+    // not JSON — fall through to the raw snippet
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200);
+}
 
 /** A 15-minute ES256 token, signed with the .p8 key (the JWT the App Store Connect API expects). */
 export function appStoreToken(config: AppStoreConfig, now = Date.now()): string {
@@ -65,9 +80,11 @@ export class AppStoreClient {
     });
     const response = await this.fetchImpl(`${BASE}?${params.toString()}`, {
       headers: { authorization: `Bearer ${appStoreToken(this.config)}`, accept: 'application/a-gzip' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+    // 404 = «There were no sales for the date specified» or the report is not written yet (Apple publishes a day late).
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`App Store Connect answered ${response.status}`);
+    if (!response.ok) throw new Error(`App Store Connect answered ${response.status} for ${day}: ${await responseDetail(response)}`);
     const body = Buffer.from(await response.arrayBuffer());
     const text = body.length > 2 && body[0] === 0x1f && body[1] === 0x8b ? gunzipSync(body).toString('utf8') : body.toString('utf8');
     return parseSalesReport(text, this.config.appleId);

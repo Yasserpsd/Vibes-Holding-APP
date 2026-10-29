@@ -39,6 +39,7 @@ export type DownloadsAnswer = {
     apple: { configured: boolean; installs: number | null; since: string | null; error?: string };
     google: { configured: boolean; installs: number | null; since: string | null; error?: string };
   };
+  /** Last 30 Riyadh days: signed-in devices per platform (devices mode) or the stores' installs on that day (stores mode). */
   series: { day: string; android: number; ios: number }[];
   snapshotAt: string | null;
 };
@@ -73,14 +74,17 @@ export class DownloadsService {
   /** Yesterday's store numbers land today (both stores publish a day late); earlier gaps of the last 30 days are backfilled once. */
   private async fillStores(doc: DailyDoc, today: DailyRow, now: number): Promise<void> {
     const days = lastRiyadhDays(31, now).slice(0, 30);
+    // Apple writes a day's report by the next Pacific morning (≈ 16:00 Riyadh): from two Riyadh days later a 404
+    // means «no sales that day», so the day settles as 0 instead of being asked again every 6 hours.
+    const settledBefore = days[days.length - 1]!;
     if (this.deps.apple) {
       const apple = this.deps.apple;
       try {
         for (const day of days) {
           if (doc[day]?.storeIos !== undefined) continue;
           const installs = await apple.installsOn(day);
-          if (installs === null) continue;
-          doc[day] = { ...(doc[day] ?? { android: 0, ios: 0 }), storeIos: installs };
+          if (installs === null && day >= settledBefore) continue;
+          doc[day] = { ...(doc[day] ?? { android: 0, ios: 0 }), storeIos: installs ?? 0 };
         }
         today.storeIos = doc[riyadhDay(now)]?.storeIos ?? today.storeIos;
       } catch (error) {
@@ -138,17 +142,24 @@ export class DownloadsService {
     const google = { configured: Boolean(this.deps.google), installs: playTotal ?? googleSum.installs, since: playTotal !== undefined ? null : googleSum.since };
     const apple = { configured: Boolean(this.deps.apple), installs: appleSum.installs, since: appleSum.since };
     const storesMode = apple.installs !== null || google.installs !== null;
-    // The trend carries the device counts; a day without a snapshot repeats the last known one so the line never drops to zero.
-    let last: { android: number; ios: number } = { android: 0, ios: 0 };
-    const series = days.map((day) => {
-      const row = doc[day];
-      if (row) last = { android: row.android, ios: row.ios };
-      return { day, ...last };
-    });
     const today = riyadhDay(now);
-    if (series.length) series[series.length - 1] = { day: today, android: devices.android, ios: devices.ios };
-    const android = storesMode ? (google.installs ?? 0) : devices.android;
-    const ios = storesMode ? (apple.installs ?? 0) : devices.ios;
+    let series: DownloadsAnswer['series'];
+    if (storesMode) {
+      // Stores mode: the stores' own installs per day (a day a store has not written yet counts 0 for it).
+      series = days.map((day) => ({ day, android: doc[day]?.storeAndroid ?? 0, ios: doc[day]?.storeIos ?? 0 }));
+    } else {
+      // Devices mode: the trend carries the device counts; a day without a snapshot repeats the last known one so the line never drops to zero.
+      let last: { android: number; ios: number } = { android: 0, ios: 0 };
+      series = days.map((day) => {
+        const row = doc[day];
+        if (row) last = { android: row.android, ios: row.ios };
+        return { day, ...last };
+      });
+      if (series.length) series[series.length - 1] = { day: today, android: devices.android, ios: devices.ios };
+    }
+    // A store that has not answered yet keeps its device count (the card captions each column by what it holds).
+    const android = storesMode ? (google.installs ?? devices.android) : devices.android;
+    const ios = storesMode ? (apple.installs ?? devices.ios) : devices.ios;
     return {
       mode: storesMode ? 'stores' : 'devices',
       android,
