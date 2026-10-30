@@ -19,7 +19,7 @@ import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
-import { claimAutoPopup } from '@/lib/popupGate';
+import { claimWeeklyMembershipPrompt } from '@/lib/popupGate';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -179,12 +179,18 @@ function MemberNudgePopup({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
 
   // A beat after the success check lands, so the confirmation is seen before the condition —
-  // and only when no other automatic popup already took this session's single slot (M128).
+  // and only inside the device's one automatic membership pitch a week (M164, shared slot).
   useEffect(() => {
+    let alive = true;
     const timer = setTimeout(() => {
-      if (claimAutoPopup()) setVisible(true);
+      void claimWeeklyMembershipPrompt().then((allowed) => {
+        if (allowed && alive) setVisible(true);
+      });
     }, NUDGE_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   if (!visible) return null;

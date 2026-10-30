@@ -12,6 +12,7 @@ import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { loadSetting } from '@/lib/deviceStore';
+import { claimWeeklyMembershipPrompt } from '@/lib/popupGate';
 import {
   fetchMembershipOffer,
   hasStorePurchases,
@@ -28,9 +29,12 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
  * a non-member taps anything members-only — short title, one line, the store price and a direct
  * subscribe button (CLAUDE.md rule 3: the store sheet, activation only from the server).
  * M122b (owner, same week: «عايز pop up تظهر فورًا… ولما أروح أفعّل العضوية أتحول على الدفع مباشر»):
- * it now opens by itself ONCE PER LAUNCH for every signed-in non-member — a few seconds after the
+ * it now opens by itself for every signed-in non-member — a few seconds after the
  * home settles (and after the intro video when that shows) — and the subscribe button goes straight
  * to the store's payment sheet, fetching the offer on the spot when it is not cached yet.
+ * M164 (owner, 2026-10-30, member complaints): the self-opening is ONCE A WEEK per device, shared
+ * with every other automatic membership pitch (popupGate.claimWeeklyMembershipPrompt). Every other
+ * appearance is the member's own tap on something members-only.
  */
 
 let openGate: (() => void) | null = null;
@@ -112,7 +116,9 @@ export function MembershipGateHost() {
       timer = setTimeout(() => {
         if (!alive || nudged.current) return;
         nudged.current = true;
-        openGate?.();
+        void claimWeeklyMembershipPrompt().then((allowed) => {
+          if (allowed && alive) openGate?.();
+        });
       }, NUDGE_DELAY_MS);
     };
     void (async () => {

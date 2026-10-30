@@ -9,8 +9,7 @@ import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { loadSetting, saveSetting } from '@/lib/deviceStore';
-import { claimAutoPopup } from '@/lib/popupGate';
+import { claimWeeklyMembershipPrompt } from '@/lib/popupGate';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -30,24 +29,23 @@ function nextLine(upsell: ServicesUpsell): string {
 }
 
 const POPUP_DELAY_MS = 1200;
-/** M128 (owner): the popup still opens itself on any service, but at most once a day. */
-const POPUP_DAY_KEY = 'upsell.popup.day';
 
-/** The popup over a service page: one rotated line and the direct subscribe door. */
+/**
+ * The popup over a service page: one rotated line and the direct subscribe door.
+ * M164 (owner): it opens by itself only inside the device's ONE automatic membership pitch a week
+ * (shared with the launch nudge and the after-form nudge); the card below stays in sight anyway.
+ */
 export function UpsellPopup({ upsell }: { upsell: ServicesUpsell }) {
   const [line] = useState(() => nextLine(upsell));
   const [visible, setVisible] = useState(false);
 
   // A breath after the page settles, so the service shows itself before the pitch does —
-  // and only if today has not had its one appearance yet.
+  // and only if this week has not had its one appearance yet.
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      void loadSetting(POPUP_DAY_KEY).then((last) => {
-        const today = new Date().toISOString().slice(0, 10);
-        if (cancelled || last === today || !claimAutoPopup()) return;
-        setVisible(true);
-        void saveSetting(POPUP_DAY_KEY, today);
+      void claimWeeklyMembershipPrompt().then((allowed) => {
+        if (allowed && !cancelled) setVisible(true);
       });
     }, POPUP_DELAY_MS);
     return () => {
