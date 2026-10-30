@@ -40,7 +40,7 @@
   },
   "submit": {
     "production": {
-      "android": { "applicationId": "com.vcmem.investorsclub" },
+      "android": { "applicationId": "com.vcmem.investorsclub", "track": "production" },
       "ios": {
         "ascAppId": "6825963092",
         "bundleIdentifier": "com.vcmem.investorsclub",
