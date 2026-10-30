@@ -5,11 +5,12 @@ import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { displayProfile } from '@/api/auth';
-import { cardApi, usePrintRequest } from '@/api/card';
+import { cardApi, usePrintRequest, type CardDeliveryMethod } from '@/api/card';
 import { errorMessage } from '@/api/client';
 import { usePartners } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { GlassCard, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
@@ -217,11 +218,15 @@ function GoldRule({ active }: { active: boolean }) {
   );
 }
 
-/** The printed copy: the member himself asks, the club delivers to his address at no charge. */
+/**
+ * The printed copy (M162, owner): the member picks it up at the HQ without fees — the default — or asks
+ * for delivery to his address, which carries shipping fees by region that the management quotes first.
+ */
 function PrintBlock({ active }: { active: boolean }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = usePrintRequest(active);
   const [open, setOpen] = useState(false);
+  const [method, setMethod] = useState<CardDeliveryMethod>('pickup');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -234,17 +239,17 @@ function PrintBlock({ active }: { active: boolean }) {
 
   const submit = async () => {
     setError(null);
-    if (city.trim().length < 2) {
+    if (method === 'delivery' && city.trim().length < 2) {
       setError(t('card.needCity'));
       return;
     }
-    if (address.trim().length < 5) {
+    if (method === 'delivery' && address.trim().length < 5) {
       setError(t('card.needAddress'));
       return;
     }
     setBusy(true);
     try {
-      await cardApi.requestPrint({ city: city.trim(), address: address.trim(), phone: phone.trim() || undefined, note: note.trim() || undefined });
+      await cardApi.requestPrint({ method, city: method === 'delivery' ? city.trim() : undefined, address: method === 'delivery' ? address.trim() : undefined, phone: phone.trim() || undefined, note: note.trim() || undefined });
       await queryClient.invalidateQueries({ queryKey: ['card'] });
       setSent(true);
       setOpen(false);
@@ -259,38 +264,47 @@ function PrintBlock({ active }: { active: boolean }) {
     <GlassCard style={styles.print}>
       <Text style={styles.printTitle}>{t('card.printTitle')}</Text>
       <Text style={styles.printText}>{t('card.printText')}</Text>
-      {/* M103 (owner): say it loud — the printed card reaches the member's home address with no fees. */}
+      {/* M162 (owner): say it loud — pickup at the HQ costs nothing; home delivery carries shipping fees by region. */}
       <View style={styles.printFreeRow}>
-        <Ionicons name="gift-outline" size={16} color={colors.gold} />
+        <Ionicons name="business-outline" size={16} color={colors.gold} />
         <Text style={styles.printFree}>{t('card.printFree')}</Text>
       </View>
       {!active ? (
         <Text style={styles.hint}>{t('card.printMembersOnly')}</Text>
       ) : sent ? (
         <FadeInView offset={8}>
-          <Notice tone="success" text={t('card.sent')} />
+          <Notice tone="success" text={t(method === 'pickup' ? 'card.sentPickup' : 'card.sentDelivery')} />
         </FadeInView>
       ) : pending ? (
-        <Notice tone="success" text={t('card.printPending')} />
+        <Notice tone="success" text={t(data?.request?.method === 'pickup' ? 'card.pendingPickup' : 'card.printPending')} />
       ) : open ? (
         <FadeInView offset={12} style={styles.form}>
-          <VoiceFill
-            fields={[
-              { key: 'city', label: t('card.city'), type: 'text', required: true },
-              { key: 'address', label: t('card.address'), type: 'textarea', required: true, hint: t('card.addressHint') },
-              { key: 'phone', label: t('card.phoneField'), type: 'phone' },
-              { key: 'note', label: t('card.noteField'), type: 'text' },
-            ]}
-            values={{ city, address, phone, note }}
-            onFill={(values) => {
-              setCity(values.city ?? city);
-              setAddress(values.address ?? address);
-              setPhone(values.phone ?? phone);
-              setNote(values.note ?? note);
-            }}
-          />
-          <FormField label={t('card.city')} value={city} onChangeText={setCity} maxLength={80} />
-          <FormField label={t('card.address')} hint={t('card.addressHint')} value={address} onChangeText={setAddress} multiline maxLength={300} />
+          <View style={styles.methodRow} accessibilityRole="tablist">
+            <Chip label={t('card.method.pickup')} selected={method === 'pickup'} onPress={() => setMethod('pickup')} />
+            <Chip label={t('card.method.delivery')} selected={method === 'delivery'} onPress={() => setMethod('delivery')} />
+          </View>
+          <Text style={styles.methodNote}>{t(method === 'pickup' ? 'card.pickupInfo' : 'card.deliveryFee')}</Text>
+          {method === 'delivery' ? (
+            <>
+              <VoiceFill
+                fields={[
+                  { key: 'city', label: t('card.city'), type: 'text', required: true },
+                  { key: 'address', label: t('card.address'), type: 'textarea', required: true, hint: t('card.addressHint') },
+                  { key: 'phone', label: t('card.phoneField'), type: 'phone' },
+                  { key: 'note', label: t('card.noteField'), type: 'text' },
+                ]}
+                values={{ city, address, phone, note }}
+                onFill={(values) => {
+                  setCity(values.city ?? city);
+                  setAddress(values.address ?? address);
+                  setPhone(values.phone ?? phone);
+                  setNote(values.note ?? note);
+                }}
+              />
+              <FormField label={t('card.city')} value={city} onChangeText={setCity} maxLength={80} />
+              <FormField label={t('card.address')} hint={t('card.addressHint')} value={address} onChangeText={setAddress} multiline maxLength={300} />
+            </>
+          ) : null}
           <FormField label={t('card.phoneField')} value={phone} onChangeText={setPhone} latin keyboardType="phone-pad" maxLength={30} />
           <FormField label={t('card.noteField')} value={note} onChangeText={setNote} maxLength={300} />
           {error ? <Notice tone="warning" text={error} /> : null}
@@ -423,4 +437,6 @@ const styles = StyleSheet.create({
   printFreeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   printFree: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart, flex: 1 },
   form: { gap: spacing.sm },
+  methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  methodNote: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
 });

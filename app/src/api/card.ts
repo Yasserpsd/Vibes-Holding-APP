@@ -4,6 +4,8 @@ import { apiGet, apiRequest } from './client';
 
 // Mirrors server/src/card/routes.ts (M30): the membership card's print-and-deliver requests.
 export type CardRequestStatus = 'pending' | 'in_progress' | 'done' | 'rejected';
+/** M162: the printed card is picked up at the HQ (no fees) or delivered to the member's address (shipping fees by region). */
+export type CardDeliveryMethod = 'pickup' | 'delivery';
 
 export type CardPrintRequest = {
   id: string;
@@ -12,9 +14,11 @@ export type CardPrintRequest = {
   address: string;
   createdAt: string;
   doneAt: string | null;
+  /** An older server sends none: it only knew delivery. */
+  method?: CardDeliveryMethod;
 };
 
-export type CardRequestInput = { city: string; address: string; phone?: string; note?: string };
+export type CardRequestInput = { method: CardDeliveryMethod; city?: string; address?: string; phone?: string; note?: string };
 
 export const cardApi = {
   requestPrint: (input: CardRequestInput) => apiRequest<{ request: CardPrintRequest }>('POST', '/api/card/print', { body: input }),

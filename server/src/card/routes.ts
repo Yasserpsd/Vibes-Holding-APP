@@ -8,12 +8,21 @@ import { publicCardRequest, type CardService } from './service.js';
 
 export type CardRoutesOptions = { service: CardService; auth: AuthService };
 
-const requestSchema = z.object({
-  city: z.string().trim().min(2, 'اكتب المدينة').max(80),
-  address: z.string().trim().min(5, 'اكتب العنوان الذي يصل إليه الكارت').max(300),
+// M162 (owner): the printed card is picked up at the HQ (no fees) unless the member asks for delivery
+// to his address (shipping fees by region). Older apps send no method: they always meant delivery.
+const requestSchema = z
+  .object({
+    method: z.enum(['pickup', 'delivery']).default('delivery'),
+    city: z.string().trim().max(80).default(''),
+    address: z.string().trim().max(300).default(''),
   phone: z.string().trim().max(30).optional(),
   note: z.string().trim().max(300).optional(),
-});
+  })
+  .superRefine((value, ctx) => {
+    if (value.method !== 'delivery') return;
+    if (value.city.length < 2) ctx.addIssue({ code: 'custom', path: ['city'], message: 'اكتب المدينة' });
+    if (value.address.length < 5) ctx.addIssue({ code: 'custom', path: ['address'], message: 'اكتب العنوان الذي يصل إليه الكارت' });
+  });
 const idSchema = z.object({ id: z.string().uuid() });
 const statusSchema = z.object({ status: z.enum(['pending', 'in_progress', 'done', 'rejected']), note: z.string().trim().max(300).default('') });
 

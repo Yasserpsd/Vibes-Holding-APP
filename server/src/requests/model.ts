@@ -108,8 +108,9 @@ export function fromCard(request: CardPrintRequest): MemberRequest {
     kind: 'card',
     id: request.id,
     contactId: request.contactId,
-    title: 'توصيل كارت العضوية المطبوع',
-    titleEn: 'Printed membership card delivery',
+    // M162: pickup at the HQ or delivery to the address.
+    title: request.method === 'pickup' ? 'استلام كارت العضوية المطبوع من المقر' : 'توصيل كارت العضوية المطبوع',
+    titleEn: request.method === 'pickup' ? 'Printed membership card pickup at the HQ' : 'Printed membership card delivery',
     status: request.status,
     createdAt: request.createdAt,
     updatedAt: request.doneAt,

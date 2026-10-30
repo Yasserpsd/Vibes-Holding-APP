@@ -283,9 +283,12 @@ export class Notifier {
   }
 
   /** M30: a member asked for his membership card printed and delivered (his own choice, no charge). */
-  cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string }): void {
+  cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string; method?: 'pickup' | 'delivery' }): void {
     this.dispatch(`طلب طباعة كارت العضوية: ${request.name}`, [
-      `طلب العضو نسخة مطبوعة من كارت عضويته تُوصَّل إلى عنوانه بدون رسوم (من ${APP_NAME}).`,
+      // M162: pickup at the HQ is free; delivery carries shipping fees by region (the management quotes them).
+      request.method === 'pickup'
+        ? `طلب العضو نسخة مطبوعة من كارت عضويته يستلمها من مقر النادي بدون رسوم (من ${APP_NAME}).`
+        : `طلب العضو نسخة مطبوعة من كارت عضويته تُوصَّل إلى عنوانه، ومصاريف الشحن حسب المنطقة تُحدَّد له قبل الإرسال (من ${APP_NAME}).`,
       '',
       ...personLines(request),
       `رقم العضوية: ${request.cardNumber}`,

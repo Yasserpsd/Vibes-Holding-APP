@@ -103,7 +103,7 @@ test('the member requests the printed card once; the management is mailed; a sec
   assert.equal(mailer.sent.length, before + 2);
   const mail = mailer.sent.at(-2);
   assert.match(mail?.subject ?? '', /طلب طباعة كارت العضوية/);
-  assert.match(mail?.text ?? '', /بدون رسوم/);
+  assert.match(mail?.text ?? '', /مصاريف الشحن حسب المنطقة/); // M162: delivery is no longer free
   assert.match(mail?.text ?? '', new RegExp(`I-${String(memberId).padStart(10, '0')}`));
   assert.match(mail?.text ?? '', /حي العليا/);
 
@@ -131,7 +131,13 @@ test('the dashboard lists the requests for admins alone and marks them delivered
   assert.equal(done.json().request.status, 'done');
   assert.ok(done.json().request.doneAt);
 
-  // Delivered: the member may ask for a new copy later.
-  const fresh = await send('POST', '/api/card/print', { city: 'جدة', address: 'حي الشاطئ، برج 3، شقة 14' }, memberToken);
+  // Delivered: the member may ask for a new copy later. M162: delivery still needs the address…
+  const noAddress = await send('POST', '/api/card/print', { method: 'delivery', city: 'جدة' }, memberToken);
+  assert.equal(noAddress.statusCode, 400);
+  // …while pickup at the HQ needs none and is stored where the dashboard expects a city and an address.
+  const fresh = await send('POST', '/api/card/print', { method: 'pickup' }, memberToken);
   assert.equal(fresh.statusCode, 201, fresh.body);
+  assert.equal(fresh.json().request.method, 'pickup');
+  assert.equal(fresh.json().request.address, 'استلام من مقر النادي (بدون رسوم)');
+  assert.ok(mailer.sent.at(-2)?.text.includes('يستلمها من مقر النادي'), mailer.sent.at(-2)?.text);
 });

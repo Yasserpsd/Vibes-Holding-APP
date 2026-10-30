@@ -28,6 +28,8 @@ export type CardPrintRequest = {
   email: string;
   personaLabel: string;
   jobTitle: string;
+  /** M162: picked up at the HQ (no fees) or delivered to the address below (shipping fees by region); old records = delivery. */
+  method?: CardDeliveryMethod;
   /** Where the printed card is delivered, exactly as the member wrote it. */
   city: string;
   address: string;
@@ -42,13 +44,19 @@ export type CardPrintRequest = {
 };
 
 /** What the member sees about his own request. */
-export type PublicCardRequest = Pick<CardPrintRequest, 'id' | 'status' | 'city' | 'address' | 'createdAt' | 'doneAt'>;
+export type CardDeliveryMethod = 'pickup' | 'delivery';
 
-export type CardRequestInput = { city: string; address: string; phone?: string; note?: string };
+export type PublicCardRequest = Pick<CardPrintRequest, 'id' | 'status' | 'city' | 'address' | 'createdAt' | 'doneAt'> & { method: CardDeliveryMethod };
+
+export type CardRequestInput = { method?: CardDeliveryMethod; city?: string; address?: string; phone?: string; note?: string };
+
+/** M162: what the pickup request stores where the dashboard expects a city and an address. */
+export const PICKUP_CITY = 'الرياض';
+export const PICKUP_ADDRESS = 'استلام من مقر النادي (بدون رسوم)';
 
 export function publicCardRequest(request: CardPrintRequest): PublicCardRequest {
-  const { id, status, city, address, createdAt, doneAt } = request;
-  return { id, status, city, address, createdAt, doneAt };
+  const { id, status, city, address, createdAt, doneAt, method } = request;
+  return { id, status, city, address, createdAt, doneAt, method: method ?? 'delivery' };
 }
 
 type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
@@ -93,6 +101,7 @@ export class CardService {
     if (me.membership.status !== 'active') {
       throw new RequestError('membership_required', 'طلب النسخة المطبوعة متاح بعد تفعيل العضوية السنوية', 403);
     }
+    const method: CardDeliveryMethod = input.method ?? 'delivery';
     const request: CardPrintRequest = {
       id: randomUUID(),
       contactId: me.id,
@@ -102,8 +111,9 @@ export class CardService {
       email: me.email,
       personaLabel: me.personaLabel,
       jobTitle: me.jobTitle,
-      city: input.city.trim(),
-      address: input.address.trim(),
+      method,
+      city: method === 'pickup' ? PICKUP_CITY : (input.city ?? '').trim(),
+      address: method === 'pickup' ? PICKUP_ADDRESS : (input.address ?? '').trim(),
       note: (input.note ?? '').trim(),
       status: 'pending',
       createdAt: now.toISOString(),
