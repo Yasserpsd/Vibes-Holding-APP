@@ -9,7 +9,7 @@ import { MOCK_MEMBERSHIP_PAY_URL, MOCK_MEMBERSHIP_URL, MOCK_SITE_URL } from '../
 import { SNAPSHOT_KEY } from '../projectsBank/service.js';
 import type { FeedSnapshot, PublicProject } from '../projectsBank/types.js';
 import { MemoryKV } from '../store.js';
-import { BlockList, stripUrls, toActions, type AdvisorAction } from './sanitize.js';
+import { BlockList, isSystemNoise, stripUrls, toActions, type AdvisorAction, type AdvisorMessage } from './sanitize.js';
 
 const kv = new MemoryKV();
 const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock' });
@@ -184,4 +184,14 @@ test('toActions keeps phone-friendly widgets only and drops web payment buttons 
     { type: 'card', title: 'بودكاست الملتقى', price: '2500 SAR', note: null, bullets: ['حلقة كاملة'], url: 'https://vcmem.com/studio/' },
     { type: 'link', label: 'المقر', url: 'https://vcmem.com/hq/' },
   ]);
+});
+
+test('M160: the hub’s sign-in bookkeeping rows never reach the app', () => {
+  const row = (role: AdvisorMessage['role'], text: string): AdvisorMessage => ({ id: 1, role, text, at: '', by: null, file: null, image: null, audio: null, actions: [] });
+  assert.equal(isSystemNoise(row('system', 'سجّل الدخول على vibes-holding-app-production.up.railway.app')), true);
+  assert.equal(isSystemNoise(row('system', 'سجل الدخول على vcmem.com')), true);
+  assert.equal(isSystemNoise(row('system', 'Signed in on api.vibesholdingsa.com')), true);
+  assert.equal(isSystemNoise(row('system', '   ')), true);
+  assert.equal(isSystemNoise(row('system', 'تم تحويل المحادثة إلى موظف')), false);
+  assert.equal(isSystemNoise(row('assistant', 'سجّل الدخول على vcmem.com')), false);
 });

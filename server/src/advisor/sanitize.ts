@@ -190,6 +190,19 @@ function toFile(raw: unknown): AdvisorFile | null {
   return { url, name: asString(raw.name, 160) || 'file.pdf', size: Number.isFinite(size) && size > 0 ? Math.round(size) : 0 };
 }
 
+/**
+ * M160 (owner, 2026-10-30: «مش عايز يظهر أبدًا كده»): the hub logs each sign-in into the conversation as a system row
+ * («سجّل الدخول على vibes-holding-app-production.up.railway.app»). That is website bookkeeping, not a chat line, and it
+ * leaks the server host — the app never shows it. A system row that names a sign-in, or any bare host, is dropped.
+ */
+const SIGN_IN_ROW = /(سج[َّ]?ل\s+الدخول|تسجيل\s+الدخول|signed\s+in|logged\s+in)/i;
+const BARE_HOST = /\b[a-z0-9-]+(\.[a-z0-9-]+)*\.(railway\.app|vibesholdingsa\.com|vcmem\.com|up\.railway\.app)\b/i;
+export function isSystemNoise(message: AdvisorMessage): boolean {
+  if (message.role !== 'system') return false;
+  const text = message.text.trim();
+  return text === '' || SIGN_IN_ROW.test(text) || BARE_HOST.test(text);
+}
+
 export function toMessage(message: HubMessage, block: BlockList): AdvisorMessage {
   const role = ROLES[message.role] ?? 'system';
   const content = asString(message.content, 12_000);

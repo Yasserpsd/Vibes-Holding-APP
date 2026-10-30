@@ -10,7 +10,7 @@ import type { ProjectsService } from '../projectsBank/service.js';
 import type { KV } from '../store.js';
 import type { VideosService } from '../videos/service.js';
 import { ContextResolver, type AdvisorContext } from './context.js';
-import { BlockList, blockListFromConfig, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
+import { BlockList, blockListFromConfig, isSystemNoise, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
 
 /** M151: a PDF the member attached, as base64 (checked by the route: magic bytes, ≤ 10 MB). */
 export type OutgoingFile = { name: string; base64: string };
@@ -57,7 +57,7 @@ export class AdvisorService {
     const settings = await this.settingsOf();
     const result = await this.deps.hub.call('history', { uuid: session.uuid });
     return {
-      messages: (result.messages ?? []).map((message) => toMessage(message, settings.block)),
+      messages: (result.messages ?? []).map((message) => toMessage(message, settings.block)).filter((message) => !isSystemNoise(message)),
       profile: { botName: settings.botName, welcome: settings.welcome, suggestions: settings.suggestions },
       me: meOf(result.contact),
     };
@@ -98,7 +98,7 @@ export class AdvisorService {
     const settings = await this.settingsOf();
     const result = await this.deps.hub.call('poll', { uuid: session.uuid, after });
     return {
-      messages: (result.messages ?? []).map((message) => toMessage(message, settings.block)),
+      messages: (result.messages ?? []).map((message) => toMessage(message, settings.block)).filter((message) => !isSystemNoise(message)),
       waiting: result.waiting === true,
       timeout: result.timeout === true,
       human: result.human === true,
