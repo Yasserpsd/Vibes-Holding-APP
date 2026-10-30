@@ -1241,6 +1241,8 @@
   "completeProfile.contactEmailWhy": "لماذا نحتاج بريدك؟ لأن كل فواتيرك، وتأكيد تفعيل عضويتك، وأي تواصل من إدارة النادي يصلك على هذا البريد فقط. اكتب بريدًا تفتحه فعلًا وتتابعه.",
   "completeProfile.save": "حفظ ودخول النادي",
   "completeProfile.saving": "جارٍ الحفظ…",
+  "completeProfile.loading": "جارٍ تحميل الحقول…",
+  "completeProfile.loadFailed": "تعذّر تحميل الحقول الآن. تأكد من الاتصال ثم أعد المحاولة، وسنحاول تلقائيًا.",
   "completeProfile.foot": "بياناتك محفوظة في حسابك على vcmem.com، وتقدر تعدّلها لاحقًا من «حسابي».",
   "completeProfile.error.company": "اكتب اسم الشركة.",
   "completeProfile.error.phone": "اكتب رقم جوال صحيح بعد اختيار دولتك.",

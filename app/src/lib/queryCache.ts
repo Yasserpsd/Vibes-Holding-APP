@@ -15,7 +15,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 const FILE = 'query-cache.v1.json';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const WRITE_DELAY_MS = 1000;
-const KEEP_ROOTS = new Set(['content', 'services', 'videos', 'partners', 'posts', 'people', 'agenda', 'projects', 'golden', 'meetups']);
+// M165: 'auth' holds only the public registration config (countries, personas): the completion gate and
+// the register screen draw their fields from the file at once and refresh behind.
+const KEEP_ROOTS = new Set(['content', 'services', 'videos', 'partners', 'posts', 'people', 'agenda', 'projects', 'golden', 'meetups', 'auth']);
 
 type Snapshot = { savedAt: number; state: ReturnType<typeof dehydrate> };
 

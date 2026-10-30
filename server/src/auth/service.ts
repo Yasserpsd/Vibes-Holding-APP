@@ -179,6 +179,10 @@ export class AuthError extends Error {
 }
 
 const ME_CACHE_MS = 60_000;
+/** M165: how long a cached account is still answered (with a background refresh) before the hub must be waited for. */
+const ME_STALE_MAX_MS = 24 * 60 * 60_000;
+/** M165: the hub `account` call gets less than the app's own 15-second patience. */
+const ME_HUB_TIMEOUT_MS = 10_000;
 
 function membershipOf(contact: HubContact): Membership {
   const status: MembershipStatus = contact.is_member ? 'active' : contact.member_expired ? 'expired' : 'unactivated';
@@ -223,6 +227,8 @@ type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: Fasti
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
+  /** M165: accounts whose stale copy is being refreshed from the hub right now. */
+  private readonly revalidating = new Set<string>();
 
   constructor(private readonly deps: Deps) {}
 
@@ -596,14 +602,44 @@ export class AuthService {
     }
   }
 
+  /**
+   * M165 (owner, 2026-10-31, «الأبلكيشن بطيء جدًا»): the hub answers `account` in 1.3 s at best and far
+   * slower under load, and every app open used to wait for it. A copy younger than a minute is final; an
+   * older one (up to a day) is answered at once while the hub is asked in the background, so the app opens
+   * on the last known account and the next request already sees the refreshed one. Only a session with no
+   * copy at all, or a caller that insists (`fresh`: after a purchase, a persona change), waits for the hub.
+   */
   async me(session: SessionRecord, fresh = false): Promise<Me> {
     const cached = this.meCache.get(session.uuid);
-    if (!fresh && cached && Date.now() - cached.at < ME_CACHE_MS) return cached.me;
-    const result = await this.deps.hub.call('account', { uuid: session.uuid });
+    const age = cached ? Date.now() - cached.at : Number.POSITIVE_INFINITY;
+    if (!fresh && cached && age < ME_CACHE_MS) return cached.me;
+    if (!fresh && cached && age < ME_STALE_MAX_MS) {
+      this.revalidate(session.uuid);
+      return cached.me;
+    }
+    return this.fetchMe(session.uuid);
+  }
+
+  private async fetchMe(uuid: string): Promise<Me> {
+    // The app gives up after 15 s: a hub that is slower than 10 s is treated as down, not waited for.
+    const result = await this.deps.hub.call('account', { uuid }, { timeoutMs: ME_HUB_TIMEOUT_MS });
     if (!result.contact || !result.contact.has_account) {
+      this.meCache.delete(uuid);
       throw new AuthError('session_expired', 'انتهت الجلسة، سجّل الدخول من جديد', 401);
     }
-    return this.remember(session.uuid, result.contact);
+    return this.remember(uuid, result.contact);
+  }
+
+  /** One background refresh per account at a time; a hub failure keeps the stale copy and is retried on the next call. */
+  private revalidate(uuid: string): void {
+    if (this.revalidating.has(uuid)) return;
+    this.revalidating.add(uuid);
+    void this.fetchMe(uuid)
+      .catch((error: unknown) => {
+        // A gone account drops its copy inside fetchMe; everything else is logged and left for the next call.
+        if (!(error instanceof AuthError)) this.deps.log.warn({ err: error }, 'account refresh failed');
+      })
+      .finally(() => this.revalidating.delete(uuid));
   }
 
   /** The hub's own view of the account, for server-side calls that need more than `Me` (Projects Bank wants the membership period). */

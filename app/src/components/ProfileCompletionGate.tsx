@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
@@ -45,9 +45,28 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
   const { me, setMe } = useAuth();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { data: config } = useAuthConfig();
+  const configQuery = useAuthConfig();
+  const config = configQuery.data;
   const interestsList = useInterests();
   const need = (key: string) => (missing ?? []).includes(key as never);
+  // M165 (owner, 2026-10-31): the country, phone, persona and interests fields are drawn from two server
+  // answers. Until both are here the member sees a spinner, never an empty card; a failure shows a
+  // retry button and retries by itself, so nobody has to close and reopen the app to get the fields.
+  const needsConfig = need('phone') || need('persona');
+  const needsInterests = need('interests');
+  const waiting = (needsConfig && !config) || (needsInterests && !interestsList.data);
+  const fetching = (needsConfig && configQuery.isFetching) || (needsInterests && interestsList.isFetching);
+  const failed = waiting && !fetching;
+  const retryFields = () => {
+    if (needsConfig && !config) void configQuery.refetch();
+    if (needsInterests && !interestsList.data) void interestsList.refetch();
+  };
+  useEffect(() => {
+    if (!failed) return;
+    const timer = setTimeout(retryFields, 15_000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- retryFields reads the latest queries when it fires
+  }, [failed]);
   const [name, setName] = useState(me?.name ?? '');
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const [phone, setPhone] = useState('');
@@ -137,6 +156,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
               jobTitle,
             }}
             country={countryCode}
+            disabled={waiting}
             onFill={(values) => {
               if (values.name) setName(values.name);
               if (values.company) setCompany(values.company);
@@ -232,9 +252,22 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
 
           {need('jobTitle') ? <FormField label={t('completeProfile.jobTitle')} value={jobTitle} onChangeText={setJobTitle} textContentType="jobTitle" /> : null}
 
+          {waiting && !failed ? (
+            <View style={styles.loading}>
+              <ActivityIndicator color={colors.gold} />
+              <Text style={styles.loadingText}>{t('completeProfile.loading')}</Text>
+            </View>
+          ) : null}
+          {failed ? (
+            <View style={styles.group}>
+              <Notice tone="warning" text={t('completeProfile.loadFailed')} />
+              <AppButton label={t('common.retry')} icon="refresh-outline" variant="outline" onPress={retryFields} />
+            </View>
+          ) : null}
+
           {error ? <Notice tone="warning" text={error} /> : null}
           </PaperCard>
-          <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} onPress={() => void submit()} />
+          <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} disabled={waiting} onPress={() => void submit()} />
           <Text style={styles.foot}>{t('completeProfile.foot')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -251,6 +284,8 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: NAVY, textAlign: 'center' },
   body: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 25, color: '#111827', textAlign: 'center' },
   group: { gap: spacing.xs },
+  loading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  loadingText: { ...typography.caption, color: '#374151' },
   label: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 14, color: '#111827', textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   foot: { ...typography.caption, color: '#374151', textAlign: 'center', borderRadius: radii.md },

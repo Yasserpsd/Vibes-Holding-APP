@@ -212,6 +212,8 @@ export function useAuthConfig() {
     queryKey: ['auth', 'config'],
     queryFn: () => apiGet<AuthConfig>('/api/auth/config'),
     staleTime: 10 * 60_000,
+    // M165: the registration fields depend on this answer; a slow network gets more than one more try.
+    retry: 3,
   });
 }
 

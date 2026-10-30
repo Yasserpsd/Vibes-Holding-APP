@@ -23,7 +23,7 @@ export const interestsApi = {
 };
 
 export function useInterests() {
-  return useQuery({ queryKey: ['interests'], queryFn: interestsApi.get, staleTime: 5 * 60_000 });
+  return useQuery({ queryKey: ['interests'], queryFn: interestsApi.get, staleTime: 5 * 60_000, retry: 3 });
 }
 
 export function useSaveInterests() {

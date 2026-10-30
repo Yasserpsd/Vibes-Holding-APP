@@ -1241,6 +1241,8 @@
   "completeProfile.contactEmailWhy": "Why do we need your e-mail? Every invoice, your membership activation confirmation and any message from the club team go to this address only. Enter an address you really open and follow.",
   "completeProfile.save": "Save and enter the club",
   "completeProfile.saving": "Saving…",
+  "completeProfile.loading": "Loading the fields…",
+  "completeProfile.loadFailed": "The fields could not be loaded. Check your connection and try again; we retry automatically.",
   "completeProfile.foot": "Your details live in your vcmem.com account; you can edit them later under «My account».",
   "completeProfile.error.company": "Enter the company name.",
   "completeProfile.error.phone": "Enter a valid mobile number after picking your country.",

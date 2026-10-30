@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+import compress from '@fastify/compress';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { advisorRoutes } from './advisor/routes.js';
@@ -154,6 +155,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     },
     trustProxy: true,
   });
+
+  // M165: JSON answers travel compressed (the registration config alone is 35 KB plain); phones ask for gzip by themselves.
+  await app.register(compress, { global: true, threshold: 1024, encodings: ['gzip', 'deflate'] });
 
   // API responses are never cached by CDNs or proxies (CLAUDE.md rule 8).
   app.addHook('onRequest', async (request, reply) => {

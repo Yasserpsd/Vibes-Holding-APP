@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { authApi, type Me } from '@/api/auth';
 import { ApiError, setAuthToken, setUnauthorizedHandler } from '@/api/client';
 import { pushApi } from '@/api/push';
-import { loadToken, saveToken } from '@/auth/storage';
+import { loadSavedAccount, loadToken, saveAccount, saveToken } from '@/auth/storage';
 import { currentPushToken } from '@/lib/notifications';
 import { resetPurchases } from '@/lib/purchases';
 
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHasSession(false);
     setStatus('guest');
     await saveToken(null);
+    void saveAccount(null);
     queryClient.removeQueries({ queryKey: ['me'] });
     // Interests belong to the account: the next member on this device must not inherit them.
     queryClient.removeQueries({ queryKey: ['news', 'prefs'] });
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const stored = await loadToken();
+      const [stored, saved] = await Promise.all([loadToken(), loadSavedAccount<Me>()]);
       if (cancelled) return;
       setHasSession(Boolean(stored));
       if (!stored) {
@@ -67,11 +68,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       tokenRef.current = stored;
       setAuthToken(stored);
+      // M165: the app opens on the last account the server sent; the server is asked behind the screen
+      // and replaces it (or signs the member out on a 401). Nobody waits for the hub to see the home.
+      if (saved && saved.id !== undefined) {
+        setMeState(saved);
+        setStatus('signedIn');
+      }
       try {
         const { me: account } = await authApi.me(stored);
         if (cancelled) return;
         setMeState(account);
         setStatus('signedIn');
+        void saveAccount(account);
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError && error.status === 401) {
@@ -102,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setHasSession(true);
       setStatus('signedIn');
       await saveToken(token);
+      void saveAccount(account);
       // The guest feed lacks the member's targeted messages (M29): fetch the inbox as him.
       queryClient.removeQueries({ queryKey: ['posts'] });
       queryClient.removeQueries({ queryKey: ['post'] });
@@ -137,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { me: account } = await authApi.me(token, true);
       setMeState(account);
       setStatus('signedIn');
+      void saveAccount(account);
       return account;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) await clearLocal();
@@ -144,7 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearLocal]);
 
-  const setMe = useCallback((account: Me) => setMeState(account), []);
+  const setMe = useCallback((account: Me) => {
+    setMeState(account);
+    void saveAccount(account);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({ status, me, hasSession, signIn, signOut, refresh, setMe }),
