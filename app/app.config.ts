@@ -37,7 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
     fallbackToCacheTimeout: 0,
   },
-  runtimeVersion: { policy: 'appVersion' },
+  // OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
+  runtimeVersion: process.env.OTA_RUNTIME_VERSION || { policy: 'appVersion' },
   ios: {
     bundleIdentifier: APP_ID,
     supportsTablet: false,
