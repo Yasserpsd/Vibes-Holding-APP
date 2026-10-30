@@ -27,8 +27,10 @@ type RequestOptions = {
 
 // React Native's Android HTTP client waits forever by itself: without a deadline one stalled connection keeps a
 // spinner, or a poller's "request in flight" flag, stuck until the app restarts. The server gives its own upstream
-// calls (hub, Projects Bank, Paymob) 30 seconds at most, so a healthy answer is never this late.
-const DEFAULT_TIMEOUT_MS = 60_000;
+// calls (hub, Projects Bank, Paymob) 30 seconds at most, so a healthy answer is never this late. Reads fail fast
+// (the cached home is already on screen); writes get longer because the hub mails and the gateways answer slowly.
+const READ_TIMEOUT_MS = 15_000;
+const WRITE_TIMEOUT_MS = 30_000;
 
 // The auth provider registers the current session token and a handler for rejected sessions.
 let currentToken: string | null = null;
@@ -64,7 +66,7 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
 
   // The deadline covers the body too: React Native's fetch resolves once the whole answer has arrived.
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const deadline = setTimeout(() => controller.abort(), options.timeoutMs ?? (method === 'GET' ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS));
   let response: Response;
   try {
     response = await fetch(buildUrl(path, options.params), {
@@ -75,7 +77,6 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     });
   } catch {
     // No connection, or no answer before the deadline.
-    reportProblem(t('errors.network'));
     throw new ApiError(t('errors.network'), 0, 'network');
   } finally {
     clearTimeout(deadline);
@@ -94,8 +95,6 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     // A rejected session token (expired or revoked) signs the user out everywhere.
     const expiredSession = response.status === 401 && token && token === currentToken && code !== 'bad_login';
     if (expiredSession) onUnauthorized?.();
-    // M161: every other failure offers the direct WhatsApp support line at once (a lapsed session just signs out).
-    if (!expiredSession) reportProblem(message);
     throw new ApiError(message, response.status, code);
   }
 
@@ -117,7 +116,23 @@ export async function apiGet<T>(path: string, params?: Params): Promise<T> {
   return apiRequest<T>('GET', path, { params });
 }
 
+/**
+ * The text a screen shows for a failure. M161 (owner): the direct WhatsApp support line slides in ONLY for a real
+ * breakdown the member can do nothing about — no connection or no answer in time, a server failure (5xx), or an
+ * unexpected error. An ordinary refusal (wrong password, a rejected name, locked content, a 4xx) is just shown.
+ * Deferred, because screens call this while rendering; background requests that fail quietly never show it.
+ */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  return t('errors.unexpected');
+  if (error instanceof ApiError) {
+    if (isBreakdown(error)) setTimeout(() => reportProblem(error.message), 0);
+    return error.message;
+  }
+  const message = t('errors.unexpected');
+  setTimeout(() => reportProblem(message), 0);
+  return message;
+}
+
+/** A failure the club has to fix, not the member: offline, timed out, or the server broke. */
+export function isBreakdown(error: ApiError): boolean {
+  return error.status === 0 || error.status >= 500;
 }

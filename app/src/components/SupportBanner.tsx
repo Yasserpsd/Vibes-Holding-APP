@@ -12,7 +12,8 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 const SHOW_MS = 12_000;
 
 /**
- * M161: slides in under the status bar the moment any request fails (the API client reports it), with one tap
+ * M161: slides in under the status bar only for a real breakdown (offline, timed out, server failure, unexpected error —
+ * see errorMessage in api/client.ts); hidden otherwise, with one tap
  * to the owner's direct WhatsApp support line. Mounted once in the root layout, above every screen.
  */
 export function SupportBanner() {
@@ -35,7 +36,7 @@ export function SupportBanner() {
   return (
     <Animated.View pointerEvents="box-none" style={[styles.wrap, { top: insets.top + spacing.sm, opacity }]}>
       <View style={styles.card}>
-        <PressScale style={styles.body} onPress={() => void openSupportWhatsApp(problem)} accessibilityLabel={t('support.banner')}>
+        <PressScale wrapStyle={styles.grow} style={styles.body} onPress={() => void openSupportWhatsApp(problem)} accessibilityLabel={t('support.banner')}>
           <Ionicons name="logo-whatsapp" size={22} color={colors.success} />
           <View style={styles.texts}>
             <Text style={styles.title}>{t('support.banner')}</Text>
@@ -50,18 +51,6 @@ export function SupportBanner() {
   );
 }
 
-/** A quiet one-line link to the same support chat, for screens where a member may be stuck (sign-in, the code, the profile). */
-export function SupportLink({ problem }: { problem?: string | null }) {
-  return (
-    <PressScale onPress={() => void openSupportWhatsApp(problem)} accessibilityRole="link" accessibilityLabel={t('support.link')}>
-      <View style={styles.linkRow}>
-        <Ionicons name="logo-whatsapp" size={16} color={colors.success} />
-        <Text style={styles.link}>{t('support.link')}</Text>
-        <Text style={styles.linkNumber}>{`‎${SUPPORT_WHATSAPP}`}</Text>
-      </View>
-    </PressScale>
-  );
-}
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 50, elevation: 50 },
@@ -76,11 +65,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  grow: { flex: 1 },
+  body: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   texts: { flex: 1, gap: 2 },
   title: { ...typography.caption, color: colors.textPrimary, fontFamily: fonts.semiBold, textAlign: textStart },
   number: { ...typography.caption, color: colors.success, textAlign: textStart },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
-  link: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
-  linkNumber: { ...typography.caption, color: colors.textMuted },
 });

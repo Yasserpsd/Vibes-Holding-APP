@@ -11,7 +11,6 @@ import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
-import { SupportLink } from '@/components/SupportBanner';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -171,7 +170,6 @@ export default function ProfileEditScreen() {
       {error ? (
         <FadeInView offset={6}>
           <Text style={styles.error}>{error}</Text>
-          <SupportLink problem={error} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(8)}>

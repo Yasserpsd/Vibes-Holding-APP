@@ -90,7 +90,7 @@ export type SpeakResult = { audio: string; mime: string; chars: number };
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 const postMessage = (text: string, context: AdvisorContext | null) =>
-  apiRequest<SendResult>('POST', '/api/advisor/message', { body: { text, context } });
+  apiRequest<SendResult>('POST', '/api/advisor/message', { body: { text, context }, timeoutMs: 60_000 });
 // M151: a PDF (base64, up to 10 MB) with an optional line; the server checks it and hands it to the hub.
 const postFile = (file: string, name: string, text: string, context: AdvisorContext | null) =>
   apiRequest<SendResult>('POST', '/api/advisor/file', { body: { file, name, text, context }, timeoutMs: 90_000 });
@@ -121,18 +121,18 @@ export const advisorApi = {
   },
   poll: (after: number) => apiGet<PollResult>('/api/advisor/poll', { after }),
   // M104: the recorded question (base64) comes back as text; the app then sends it as a message.
-  transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime } }),
+  transcribe: (audio: string, mime: string) => apiRequest<{ text: string }>('POST', '/api/advisor/transcribe', { body: { audio, mime }, timeoutMs: 60_000 }),
   // M148: a reply's text comes back as an MP3 clip (base64) in the member's language.
   speak: (text: string) => apiRequest<SpeakResult>('POST', '/api/advisor/speak', { body: { text }, timeoutMs: 60_000 }),
   // M145: is this line an app action? An older server answers 404 → treated as «no».
   intent: async (text: string, pending: HqProposal | null): Promise<IntentResult> => {
     try {
-      return await apiRequest<IntentResult>('POST', '/api/advisor/intent', { body: { text, pending } });
+      return await apiRequest<IntentResult>('POST', '/api/advisor/intent', { body: { text, pending }, timeoutMs: 60_000 });
     } catch (error) {
       if (error instanceof ApiError && (error.status === 404 || error.status === 429)) return { action: null, reply: null };
       throw error;
     }
   },
   // M142: one spoken message → the form's values; the server normalises phones, e-mails, dates and choices.
-  fillForm: (input: FillFormInput) => apiRequest<FillFormResult>('POST', '/api/advisor/fill-form', { body: input }),
+  fillForm: (input: FillFormInput) => apiRequest<FillFormResult>('POST', '/api/advisor/fill-form', { body: input, timeoutMs: 60_000 }),
 };
