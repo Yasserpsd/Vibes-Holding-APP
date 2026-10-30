@@ -100,6 +100,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'react-native-appsflyer',
     // M157: pins kotlin-stdlib for react-native-appsflyer (its 2.4.10 default breaks the EAS Android build).
     './plugins/withKotlinStdlibPin',
+    // M157: the locales' NSUserTrackingUsageDescription needs a default-locale twin or Android release lint fails (ExtraTranslation).
+    './plugins/withAndroidTrackingString',
     [
       'expo-tracking-transparency',
       { userTrackingPermission: 'This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.' },
