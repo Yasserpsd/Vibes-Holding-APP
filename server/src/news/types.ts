@@ -57,6 +57,10 @@ export const NEWS_TOPICS = [
   { key: 'tourism', label: 'السياحة والترفيه', labelEn: 'Tourism & Entertainment' },
   // M61 (owner, 2026-10-04): sports became a full section — «الناس تحب الأخبار الرياضية» — no longer business-angle-only.
   { key: 'sports', label: 'الرياضة', labelEn: 'Sports' },
+  // M166 (owner, 2026-10-31): the club's base sections — see CORE_TOPICS.
+  { key: 'crypto', label: 'العملات الرقمية', labelEn: 'Crypto' },
+  { key: 'metals', label: 'الذهب والفضة', labelEn: 'Gold & Silver' },
+  { key: 'oil', label: 'النفط والبترول', labelEn: 'Oil' },
 ] as const;
 
 export type TopicKey = (typeof NEWS_TOPICS)[number]['key'];
@@ -69,9 +73,16 @@ export function topicLabel(key: TopicKey, lang: NewsLang): string {
   return lang === 'en' ? TOPIC_LABELS_EN[key] : TOPIC_LABELS[key];
 }
 
-/** The interests list in one language, as the app shows it. */
+/**
+ * M166 (owner, 2026-10-31: «نادي المستثمرين… دول الأساس بدون ما المستخدم يختارهم، والباقي زيادة عليهم»):
+ * crypto, gold and silver, oil, markets and stocks are in every member's feed whatever he picked, and they
+ * are not offered as choices. What he picks only adds to them.
+ */
+export const CORE_TOPICS: readonly TopicKey[] = ['crypto', 'metals', 'oil', 'markets'];
+
+/** The interests list in one language, as the app shows it (the always-on base sections are not choices). */
 export function topicsFor(lang: NewsLang): { key: TopicKey; label: string }[] {
-  return NEWS_TOPICS.map((topic) => ({ key: topic.key, label: topicLabel(topic.key, lang) }));
+  return NEWS_TOPICS.filter((topic) => !CORE_TOPICS.includes(topic.key)).map((topic) => ({ key: topic.key, label: topicLabel(topic.key, lang) }));
 }
 
 export function isTopicKey(value: unknown): value is TopicKey {

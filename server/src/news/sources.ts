@@ -90,6 +90,21 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'almarssad-sports', name: 'المرصد', url: bing('site:al-marsd.com رياضة'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'المرصد — الرياضة السعودية والأندية' },
   { id: 'yallakora', name: 'يلا كورة', url: bing('site:yallakora.com'), tier: 'global', lang: 'ar', enabled: true, hint: 'يلا كورة — أخبار كرة القدم العربية والعالمية' },
   { id: 'filgoal', name: 'في الجول', url: bing('site:filgoal.com'), tier: 'global', lang: 'ar', enabled: true, hint: 'في الجول — أخبار كرة القدم العربية والعالمية' },
+  // M166 (owner, 2026-10-31, «كريبتو، ذهب، فضة، بترول، أسهم… دول الأساس»): global market sources, read in full
+  // (not saudiOnly). Probed 2026-10-31 from the dev machine; Cointelegraph عربي answers 410 and Kitco/Yahoo 404, so no rows.
+  { id: 'investing-ar', name: 'Investing.com عربي', url: 'https://sa.investing.com/rss/news.rss', tier: 'global', lang: 'ar', enabled: false, hint: 'Investing.com — أخبار الأسواق والأسهم والسلع — article pages refuse server requests (403)' },
+  { id: 'cnbcarabia-crypto', name: 'CNBC عربية', url: bing('site:cnbcarabia.com بيتكوين العملات الرقمية'), tier: 'global', lang: 'ar', enabled: true, hint: 'CNBC عربية — البيتكوين والعملات الرقمية' },
+  { id: 'cnbcarabia-metals-oil', name: 'CNBC عربية', url: bing('site:cnbcarabia.com الذهب النفط'), tier: 'global', lang: 'ar', enabled: true, hint: 'CNBC عربية — الذهب والفضة والنفط' },
+  { id: 'mubasher-markets', name: 'مباشر', url: bing('site:mubasher.info الذهب النفط الأسهم'), tier: 'global', lang: 'ar', enabled: true, hint: 'مباشر — الأسواق والأسهم والذهب والنفط' },
+  { id: 'cointelegraph-en', name: 'Cointelegraph', url: 'https://cointelegraph.com/rss', tier: 'global', lang: 'en', enabled: true, hint: 'Cointelegraph — crypto news' },
+  { id: 'coindesk-en', name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss', tier: 'global', lang: 'en', enabled: false, hint: 'CoinDesk — crypto news — article pages answered 429 when probed on 2026-10-31; re-probe before enabling' },
+  { id: 'decrypt-en', name: 'Decrypt', url: 'https://decrypt.co/feed', tier: 'global', lang: 'en', enabled: true, hint: 'Decrypt — crypto news' },
+  { id: 'oilprice-en', name: 'OilPrice', url: 'https://oilprice.com/rss/main', tier: 'global', lang: 'en', enabled: true, hint: 'OilPrice.com — oil and energy markets' },
+  { id: 'marketwatch-en', name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', tier: 'global', lang: 'en', enabled: false, hint: 'MarketWatch — markets, stocks, gold — article pages refuse server requests (401)' },
+  { id: 'cnbc-markets-en', name: 'CNBC', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664', tier: 'global', lang: 'en', enabled: true, hint: 'CNBC — markets' },
+  { id: 'investing-en', name: 'Investing.com', url: 'https://www.investing.com/rss/news.rss', tier: 'global', lang: 'en', enabled: false, hint: 'Investing.com — markets, stocks, commodities — article pages refuse server requests (403)' },
+  { id: 'bing-gold-silver-en', name: 'Gold & Silver', url: bing('gold silver price site:cnbc.com OR site:marketwatch.com OR site:investing.com', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Gold and silver prices and drivers — MarketWatch pages refuse server requests (401)' },
+  { id: 'cnbc-gold-en', name: 'CNBC', url: bing('gold silver prices site:cnbc.com', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'CNBC — gold and silver prices and drivers' },
 ];
 
 /**
@@ -102,8 +117,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  *     تمامًا وأنا لو حبيت أفعلها» — the rows stay for his dashboard toggle); BBC عربي، اليوم، الوطن، المدينة، مكة،
  *     البلد ومباشر kept but off («خليهم موجودين ولكن غير مفعلين اللي أحب أفعله أنا»); sports sources added.
  * 5 = M134 (owner, 2026-10-27, «نزود الأخبار الرياضية»): four more Arabic sports sources (probed the same day).
+ * 6 = M166 (owner, 2026-10-31): the base sections (crypto, gold and silver, oil, markets) — global market sources, Arabic and English.
  */
-export const NEWS_SEED_VERSION = 5;
+export const NEWS_SEED_VERSION = 6;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -158,6 +174,7 @@ const OUTLET_NAMES: Record<string, string> = {
   'al-madina.com': 'المدينة',
   'makkahnewspaper.com': 'مكة',
   'asharqbusiness.com': 'الشرق للأعمال',
+  'investing.com': 'Investing.com عربي',
   'independentarabia.com': 'اندبندنت عربية',
   'arriyadiyah.com': 'الرياضية',
   'kooora.com': 'كووورة',
@@ -195,6 +212,12 @@ const OUTLET_NAMES_EN: Record<string, string> = {
   'forbesmiddleeast.com': 'Forbes ME',
   'meed.com': 'MEED',
   'arabianbusiness.com': 'Arabian Business',
+  'cointelegraph.com': 'Cointelegraph',
+  'coindesk.com': 'CoinDesk',
+  'decrypt.co': 'Decrypt',
+  'oilprice.com': 'OilPrice',
+  'marketwatch.com': 'MarketWatch',
+  'investing.com': 'Investing.com',
 };
 
 export function outletNameFor(url: string, fallback: string, lang: NewsLang = 'ar'): string {

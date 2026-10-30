@@ -12,7 +12,7 @@ import { canonicalUrl, parseFeed } from './rss.js';
 import { NEWS_SOURCES_KEY } from './sources.js';
 import { newsIdOf } from './service.js';
 import { parseSpaList } from './spa.js';
-import type { NewsItem, NewsSourcesContent } from './types.js';
+import { CORE_TOPICS, topicsFor, type NewsItem, type NewsSourcesContent } from './types.js';
 
 const RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:News="https://www.bing.com/news/search">
@@ -238,4 +238,15 @@ test('interests need a session, personalize the feed and reach the advisor conte
   const message = await app.inject({ method: 'POST', url: '/api/advisor/message', headers, payload: { text: 'ما رأيك؟', context: { type: 'news', id } } });
   assert.equal(message.statusCode, 200);
   assert.equal((await app.inject({ method: 'POST', url: '/api/advisor/message', headers, payload: { text: 'x', context: { type: 'news', id: 'bad' } } })).statusCode, 400);
+});
+
+test('the base sections (crypto, gold and silver, oil, markets) are tagged and never offered as choices (M166)', async () => {
+  const input = (title: string) => ({ id: 'x', title, snippet: null, source: 'Test', tier: 'global' as const, lang: 'en' as const, hint: null });
+  assert.ok(classifyByKeywords(input('Binance hack: $6 billion in bitcoin stolen')).topics.includes('crypto'));
+  assert.ok(classifyByKeywords(input('Gold plunges to a one-year low as silver slides')).topics.includes('metals'));
+  assert.ok(classifyByKeywords(input('Brent crude climbs after OPEC cuts output')).topics.includes('oil'));
+  assert.ok(classifyByKeywords({ ...input('سعر الذهب يتراجع'), lang: 'ar' as const }).topics.includes('metals'));
+  const offered = topicsFor('ar').map((topic) => topic.key);
+  for (const key of CORE_TOPICS) assert.ok(!offered.includes(key), `${key} is not a choice`);
+  assert.ok(offered.includes('economy') && offered.includes('sports'));
 });

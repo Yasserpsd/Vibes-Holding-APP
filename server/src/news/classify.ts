@@ -39,6 +39,10 @@ function pattern(terms: string[]): RegExp {
 }
 
 const TOPIC_TERMS: Record<Exclude<TopicKey, 'sports'>, string[]> = {
+  // M166: the base sections come first so the three-topic cap never drops them.
+  crypto: ['بيتكوين', 'بتكوين', 'إيثريوم', 'الإيثيريوم', 'عملات رقمية', 'العملات الرقمية', 'عملة رقمية', 'عملات مشفرة', 'العملات المشفرة', 'كريبتو', 'بلوكتشين', 'بايننس', 'باينانس', 'تيذر', 'سولانا', 'bitcoin', 'btc', 'ethereum', 'crypto', 'cryptocurrency', 'blockchain', 'binance', 'coinbase', 'stablecoin', 'tether', 'solana', 'altcoin', 'token'],
+  metals: ['الذهب', 'ذهب', 'الفضة', 'فضة', 'سبائك', 'الأونصة', 'أونصة', 'المعادن الثمينة', 'gold', 'silver', 'bullion', 'precious metal', 'ounce', 'platinum'],
+  oil: ['النفط', 'نفط', 'البترول', 'بترول', 'برنت', 'خام', 'أوبك', 'أرامكو', 'الغاز الطبيعي', 'oil', 'crude', 'brent', 'wti', 'opec', 'petroleum', 'aramco', 'natural gas', 'barrel'],
   economy: ['اقتصاد', 'الناتج المحلي', 'تضخم', 'نمو اقتصادي', 'استثمار', 'مستثمر', 'ميزانية', 'صندوق الاستثمارات', 'رؤية 2030', 'تجارة', 'صادرات', 'واردات', 'غرفة تجارية', 'منشآت', 'قطاع خاص', 'شركات', 'economy', 'economic', 'gdp', 'inflation', 'invest', 'trade', 'budget'],
   markets: ['تداول', 'أسهم', 'سهم', 'سوق مالية', 'السوق المالية', 'مؤشر', 'تاسي', 'اكتتاب', 'طرح عام', 'صكوك', 'سندات', 'هيئة السوق', 'أرباح', 'توزيعات', 'سوق موازية', 'stock', 'shares', 'tadawul', 'tasi', 'ipo', 'index', 'sukuk', 'bond', 'dividend', 'listing', 'market'],
   finance: ['بنك', 'مصرف', 'تمويل', 'قرض', 'قروض', 'ساما', 'البنك المركزي', 'فائدة', 'تأمين', 'تقنية مالية', 'مدفوعات', 'محفظة رقمية', 'bank', 'loan', 'financ', 'sama', 'central bank', 'interest rate', 'insurance', 'fintech', 'payment'],

@@ -13,6 +13,7 @@ import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
 import { getNewsSources, outletNameFor } from './sources.js';
 import { fetchSpaSnippet } from './spa.js';
 import {
+  CORE_TOPICS,
   TOPIC_KEYS,
   tierLabel,
   topicLabel,
@@ -391,7 +392,8 @@ export class NewsService {
    */
   feed(query: ListQuery, audience: Audience): NewsPage {
     const interests = audience.prefs?.topics.length ? audience.prefs.topics : this.suggestedTopics(audience.persona);
-    const wanted = new Set(interests);
+    // M166: the base sections (crypto, gold and silver, oil, markets) ride along with whatever he picked.
+    const wanted = new Set<TopicKey>(interests.length ? [...interests, ...CORE_TOPICS] : []);
     const now = Date.now();
     const ranked = this.currentPicks(query.lang ?? 'ar', now)
       .map((pick) => ({ item: pick.item, score: scoreOf(pick.item, wanted, now) + (this.boosts.get(pick.item.sourceId) ?? 0) }))
@@ -510,7 +512,7 @@ export class NewsService {
         const pool = ranked[lang].length ? ranked[lang] : ranked.ar;
         if (!pool.length) return null;
         const chosen = (await topicsOf(device.contactId)) ?? this.suggestedTopics(device.persona ?? '');
-        const wanted = new Set(chosen);
+        const wanted = new Set<TopicKey>(chosen.length ? [...chosen, ...CORE_TOPICS] : []);
         const pick = (wanted.size ? pool.find((entry) => entry.item.topics.some((topic) => wanted.has(topic))) : undefined) ?? pool[0];
         if (!pick) return null;
         const item = pick.item;
