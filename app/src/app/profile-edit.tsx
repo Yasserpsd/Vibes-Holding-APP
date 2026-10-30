@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { authApi, type ProfilePatch } from '@/api/auth';
+import { authApi, useAuthConfig, type ProfilePatch } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -13,11 +14,19 @@ import { Screen } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { colors, typography } from '@/theme/tokens';
+import { phoneIssue } from '@/lib/validation';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function ProfileEditScreen() {
   const router = useRouter();
   const { me, setMe } = useAuth();
+  const { data: config } = useAuthConfig();
+  // The member changes the mobile number from here (owner, 2026-10-30); the e-mail stays the account's
+  // identity and only the club's admins change it. The number is sent only when it was actually edited.
+  const [phone, setPhone] = useState(me?.phone ?? '');
+  const [countryCode, setCountryCode] = useState('sa');
+  const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
+  const phoneChanged = phone.trim() !== (me?.phone ?? '').trim();
   const [form, setForm] = useState({
     name: me?.name ?? '',
     jobTitle: me?.jobTitle ?? '',
@@ -43,6 +52,10 @@ export default function ProfileEditScreen() {
       setError(t('profile.passwordShort'));
       return;
     }
+    if (phoneChanged && phoneIssue(phone, country) !== null) {
+      setError(t('profile.phoneInvalid'));
+      return;
+    }
     const patch: ProfilePatch = {
       name: form.name.trim(),
       jobTitle: form.jobTitle.trim(),
@@ -53,6 +66,10 @@ export default function ProfileEditScreen() {
       social: form.social.trim(),
     };
     if (form.password) patch.password = form.password;
+    if (phoneChanged) {
+      patch.phone = phone.trim();
+      patch.country = countryCode;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -93,6 +110,25 @@ export default function ProfileEditScreen() {
         <FormField label={t('profile.name')} value={form.name} onChangeText={set('name')} textContentType="name" />
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
+        <FormField label={t('profile.email')} latin editable={false} value={me.email} hint={t('profile.emailLocked')} />
+        {config ? (
+          <View style={styles.group}>
+            <Text style={styles.label}>{t('profile.country')}</Text>
+            <CountryPicker countries={config.countries} selected={countryCode} onSelect={setCountryCode} />
+          </View>
+        ) : null}
+        <FormField
+          label={t('profile.phone')}
+          latin
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder={country?.example ? country.example.replace(/^0+/, '') : undefined}
+          hint={t('profile.phoneHint')}
+        />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
@@ -127,4 +163,6 @@ export default function ProfileEditScreen() {
 
 const styles = StyleSheet.create({
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
+  group: { gap: spacing.xs, marginBottom: spacing.sm },
+  label: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 });
