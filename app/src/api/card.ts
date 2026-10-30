@@ -16,12 +16,17 @@ export type CardPrintRequest = {
   doneAt: string | null;
   /** An older server sends none: it only knew delivery. */
   method?: CardDeliveryMethod;
+  /** M163: a new copy after a delivered card; and the moment the member himself marked it received. */
+  replacement?: boolean;
+  memberConfirmedAt?: string | null;
 };
 
 export type CardRequestInput = { method: CardDeliveryMethod; city?: string; address?: string; phone?: string; note?: string };
 
 export const cardApi = {
   requestPrint: (input: CardRequestInput) => apiRequest<{ request: CardPrintRequest }>('POST', '/api/card/print', { body: input }),
+  /** M163: the member says he holds the card now (picked up at the HQ or delivered); the request closes as done. */
+  confirmReceived: (id: string) => apiRequest<{ request: CardPrintRequest }>('POST', `/api/card/print/${encodeURIComponent(id)}/received`),
 };
 
 /** The member's own print request, so the screen shows «قيد التنفيذ» instead of a second button. */

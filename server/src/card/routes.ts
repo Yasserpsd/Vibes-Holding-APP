@@ -57,6 +57,20 @@ export const cardRoutes: FastifyPluginAsync<CardRoutesOptions> = async (app, { s
     }),
   );
 
+  // M163 (owner): the member marks his printed card as received (picked up or delivered); the request closes as done.
+  app.post(
+    '/api/card/print/:id/received',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const confirmed = await service.confirmReceived(current.session.contactId, params.id);
+      if (!confirmed) return reply.code(404).send({ error: { code: 'not_found', message: 'الطلب غير موجود' } });
+      return { request: publicCardRequest(confirmed) };
+    }),
+  );
+
   app.get(
     '/api/admin/card-requests',
     guard(async (request, reply) => {

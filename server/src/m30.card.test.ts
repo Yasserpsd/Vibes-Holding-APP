@@ -140,4 +140,42 @@ test('the dashboard lists the requests for admins alone and marks them delivered
   assert.equal(fresh.json().request.method, 'pickup');
   assert.equal(fresh.json().request.address, 'استلام من مقر النادي (بدون رسوم)');
   assert.ok(mailer.sent.at(-2)?.text.includes('يستلمها من مقر النادي'), mailer.sent.at(-2)?.text);
+  // M163: a copy after a delivered card is a replacement; the first one was not.
+  assert.equal(fresh.json().request.replacement, true);
+  assert.equal(fresh.json().request.memberConfirmedAt, null);
+  assert.equal(done.json().request.replacement, false);
+});
+
+test('M163: the member marks his card as received himself; the request closes as delivered and the management is mailed', async () => {
+  const mine = (await get('/api/card/print', memberToken)).json().request as { id: string; status: string };
+  assert.equal(mine.status, 'pending');
+
+  // Not his request (a made-up id): 404. Signed out: 401.
+  assert.equal((await send('POST', '/api/card/print/00000000-0000-4000-8000-000000000000/received', undefined, memberToken)).statusCode, 404);
+  assert.equal((await send('POST', `/api/card/print/${mine.id}/received`, undefined)).statusCode, 401);
+
+  const before = mailer.sent.length;
+  const confirmed = await send('POST', `/api/card/print/${mine.id}/received`, undefined, memberToken);
+  assert.equal(confirmed.statusCode, 200, confirmed.body);
+  assert.equal(confirmed.json().request.status, 'done');
+  assert.ok(confirmed.json().request.memberConfirmedAt);
+  assert.ok(confirmed.json().request.doneAt);
+  assert.equal(mailer.sent.length, before + 1);
+  assert.match(mailer.sent.at(-1)?.subject ?? '', /أكد استلام كارت العضوية/);
+  assert.match(mailer.sent.at(-1)?.text ?? '', /من مقر النادي/);
+  assert.match(mailer.sent.at(-1)?.text ?? '', /نسخة بديلة/);
+
+  // Idempotent: a second tap changes nothing and mails nobody.
+  const twice = await send('POST', `/api/card/print/${mine.id}/received`, undefined, memberToken);
+  assert.equal(twice.statusCode, 200);
+  assert.equal(twice.json().request.memberConfirmedAt, confirmed.json().request.memberConfirmedAt);
+  assert.equal(mailer.sent.length, before + 1);
+
+  // The dashboard sees the member's mark and who closed it.
+  const row = ((await get('/api/admin/card-requests', unpaidToken)).json().requests as { id: string; status: string; doneBy: string; memberConfirmedAt: string | null; replacement: boolean }[]).find((entry) => entry.id === mine.id);
+  assert.ok(row);
+  assert.deepEqual([row.status, row.doneBy, row.replacement, Boolean(row.memberConfirmedAt)], ['done', 'العضو', true, true]);
+
+  // Delivered again, so a third copy may be asked for.
+  assert.equal((await send('POST', '/api/card/print', { method: 'pickup' }, memberToken)).statusCode, 201);
 });

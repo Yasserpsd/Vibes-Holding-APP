@@ -125,7 +125,7 @@ export default function CardScreen() {
           <GoldRule active={active} />
 
           <View style={styles.holder}>
-            <Text style={[styles.holderName, { color: metal.bright }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.holderName, { color: metal.bright }]} numberOfLines={2}>
               {holder.name}
             </Text>
             <View style={styles.holderMetaRow}>
@@ -235,7 +235,14 @@ function PrintBlock({ active }: { active: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  const pending = data?.request?.status === 'pending';
+  const [confirming, setConfirming] = useState(false);
+
+  // M163 (owner): the screen remembers the member's request — in flight, delivered (with his own receipt mark) or
+  // declined — instead of offering the button again as if nothing had happened.
+  const request = data?.request ?? null;
+  const inFlight = request?.status === 'pending' || request?.status === 'in_progress';
+  const delivered = request?.status === 'done';
+  const declined = request?.status === 'rejected';
 
   const submit = async () => {
     setError(null);
@@ -260,6 +267,21 @@ function PrintBlock({ active }: { active: boolean }) {
     }
   };
 
+  /** The member holds the card now (picked up at the HQ or delivered): the request closes from his side. */
+  const confirmReceived = async () => {
+    if (!request) return;
+    setError(null);
+    setConfirming(true);
+    try {
+      await cardApi.confirmReceived(request.id);
+      await queryClient.invalidateQueries({ queryKey: ['card'] });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   return (
     <GlassCard style={styles.print}>
       <Text style={styles.printTitle}>{t('card.printTitle')}</Text>
@@ -275,10 +297,23 @@ function PrintBlock({ active }: { active: boolean }) {
         <FadeInView offset={8}>
           <Notice tone="success" text={t(method === 'pickup' ? 'card.sentPickup' : 'card.sentDelivery')} />
         </FadeInView>
-      ) : pending ? (
-        <Notice tone="success" text={t(data?.request?.method === 'pickup' ? 'card.pendingPickup' : 'card.printPending')} />
+      ) : request && inFlight ? (
+        <View style={styles.statusBox}>
+          <View style={styles.statusHead}>
+            <Ionicons name={request.status === 'in_progress' ? 'print-outline' : 'time-outline'} size={18} color={colors.gold} />
+            <Text style={styles.statusTitle}>{t(request.status === 'in_progress' ? 'card.status.inProgress' : 'card.status.pending')}</Text>
+          </View>
+          <Text style={styles.statusLine}>
+            {t('card.status.requestedOn', { date: formatArabicDate(request.createdAt) })} · {t(request.method === 'pickup' ? 'card.status.pickup' : 'card.status.delivery')}
+          </Text>
+          <Text style={styles.statusLine}>{t(request.method === 'pickup' ? 'card.pendingPickup' : 'card.printPending')}</Text>
+          <Text style={styles.hint}>{t('card.receivedHint')}</Text>
+          {error ? <Notice tone="warning" text={error} /> : null}
+          <AppButton label={confirming ? t('card.sending') : t('card.receivedButton')} icon="checkmark-circle-outline" variant="outline" loading={confirming} onPress={() => (confirming ? null : void confirmReceived())} />
+        </View>
       ) : open ? (
         <FadeInView offset={12} style={styles.form}>
+          {delivered || declined ? <Text style={styles.methodNote}>{t('card.replacementNote')}</Text> : null}
           <View style={styles.methodRow} accessibilityRole="tablist">
             <Chip label={t('card.method.pickup')} selected={method === 'pickup'} onPress={() => setMethod('pickup')} />
             <Chip label={t('card.method.delivery')} selected={method === 'delivery'} onPress={() => setMethod('delivery')} />
@@ -310,6 +345,29 @@ function PrintBlock({ active }: { active: boolean }) {
           {error ? <Notice tone="warning" text={error} /> : null}
           <AppButton label={busy ? t('card.sending') : t('card.submit')} icon="paper-plane-outline" loading={busy} onPress={() => (busy ? null : void submit())} />
         </FadeInView>
+      ) : request && delivered ? (
+        <View style={styles.statusBox}>
+          <View style={styles.statusHead}>
+            <Ionicons name="checkmark-done-outline" size={18} color={colors.gold} />
+            <Text style={styles.statusTitle}>{t('card.status.done')}</Text>
+          </View>
+          <Text style={styles.statusLine}>
+            {t('card.status.deliveredOn', { date: formatArabicDate(request.doneAt ?? request.createdAt) })}
+            {request.memberConfirmedAt ? ` ${t('card.status.confirmedByYou')}` : ''}
+          </Text>
+          <Text style={styles.lostTitle}>{t('card.lostTitle')}</Text>
+          <Text style={styles.hint}>{t('card.lostText')}</Text>
+          <AppButton label={t('card.replacementButton')} icon="copy-outline" variant="outline" onPress={() => setOpen(true)} />
+        </View>
+      ) : request && declined ? (
+        <View style={styles.statusBox}>
+          <View style={styles.statusHead}>
+            <Ionicons name="close-circle-outline" size={18} color={colors.gold} />
+            <Text style={styles.statusTitle}>{t('card.status.rejected')}</Text>
+          </View>
+          <Text style={styles.statusLine}>{t('card.status.rejectedText')}</Text>
+          <AppButton label={t('card.printButton')} icon="print-outline" variant="outline" onPress={() => setOpen(true)} />
+        </View>
       ) : (
         <AppButton label={t('card.printButton')} icon="print-outline" onPress={() => (isLoading ? null : setOpen(true))} />
       )}
@@ -439,4 +497,10 @@ const styles = StyleSheet.create({
   form: { gap: spacing.sm },
   methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   methodNote: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  // M163: the member's request as it stands — in flight, delivered, declined — with his own receipt button.
+  statusBox: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.surfaceElevated },
+  statusHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  statusTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
+  statusLine: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  lostTitle: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, marginTop: spacing.xs },
 });

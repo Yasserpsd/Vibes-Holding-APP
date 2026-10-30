@@ -97,7 +97,7 @@ export function CardRequests() {
   return (
     <>
       <SectionHead title="طلبات الكروت" hint={state.data ? `قيد التنفيذ: ${formatNumber(pending)}` : undefined} onReload={state.reload} busy={state.loading} />
-      <p className="muted">كل طلب هنا اختاره العضو بنفسه من التطبيق: كارت عضويته مطبوعًا يصل إلى عنوانه بدون رسوم. اطبع الكارت، سلّمه، ثم علّم الطلب «تم التسليم».</p>
+      <p className="muted">كل طلب هنا اختاره العضو بنفسه من التطبيق: كارت عضويته مطبوعًا يستلمه من المقر بدون رسوم أو يصله إلى عنوانه بمصاريف شحن. اطبع الكارت، سلّمه، ثم علّم الطلب «تم» — أو يعلّمه العضو بنفسه من التطبيق («استلمت كارتي») فيظهر هنا «أكد العضو الاستلام». «نسخة بديلة» = كارت سبق تسليمه وطلب العضو غيره.</p>
       <Async state={state} rows={5} empty={() => (state.data?.requests.length ?? 0) === 0} emptyText="لا توجد طلبات طباعة بعد.">
         {() => (
           <DataTable<CardRequest>
@@ -108,7 +108,17 @@ export function CardRequests() {
               { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
               { key: 'number', label: 'رقم العضوية', cell: (row) => <bdi dir="ltr" className="num">{row.cardNumber}</bdi> },
               { key: 'persona', label: 'الفئة', cell: (row) => row.personaLabel || '—' },
-              { key: 'to', label: 'التوصيل', cell: (row) => `${row.city} · ${row.address}${row.note ? ` · ${row.note}` : ''}` },
+              {
+                key: 'to',
+                label: 'التوصيل',
+                cell: (row) => (
+                  <>
+                    {/* M163: a replacement copy is marked so the management knows the first card was already handed over. */}
+                    {row.replacement ? <Pill tone="gold">نسخة بديلة</Pill> : null} {row.city} · {row.address}
+                    {row.note ? ` · ${row.note}` : ''}
+                  </>
+                ),
+              },
               { key: 'phone', label: 'الجوال', cell: (row) => <bdi dir="ltr" className="num">{row.phone || '—'}</bdi> },
               { key: 'at', label: 'طُلب', cell: (row) => formatDateTime(row.createdAt) },
               {
@@ -116,7 +126,11 @@ export function CardRequests() {
                 label: 'الحالة',
                 cell: (row) =>
                   row.status === 'done' ? (
-                    <Pill tone="ok">سُلّم {row.doneAt ? formatDateTime(row.doneAt) : ''}</Pill>
+                    <>
+                      <Pill tone="ok">سُلّم {row.doneAt ? formatDateTime(row.doneAt) : ''}</Pill>
+                      {/* M163: the member closed it himself from the app («استلمت كارتي»). */}
+                      {row.memberConfirmedAt ? <Pill tone="gold">أكد العضو الاستلام</Pill> : null}
+                    </>
                   ) : (
                     <RequestStatusControl status={row.status} busy={busyId === row.id} onChange={(status, note) => void setStatus(row, status, note)} />
                   ),

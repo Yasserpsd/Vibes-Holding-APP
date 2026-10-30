@@ -120,6 +120,10 @@ export type CardRequest = {
   doneAt: string | null;
   doneBy: string | null;
   adminNote?: string | null;
+  /** M163: a new copy after a delivered card; the member's own receipt mark from the app. */
+  method?: 'pickup' | 'delivery';
+  replacement?: boolean;
+  memberConfirmedAt?: string | null;
 };
 
 /** M138: the status every member request moves through — mirrors server/src/requests/model.ts. */

@@ -119,6 +119,9 @@ export function fromCard(request: CardPrintRequest): MemberRequest {
       ...row('المدينة', 'City', request.city),
       ...row('العنوان', 'Address', request.address),
       ...row('ملاحظتك', 'Your note', request.note),
+      // M163: a new copy after a delivered card, and the member's own receipt mark.
+      ...row('نوع الطلب', 'Request type', request.replacement ? 'نسخة بديلة عن كارت سبق تسليمه' : ''),
+      ...row('تأكيد الاستلام', 'Receipt', request.memberConfirmedAt ? 'أكدت استلام الكارت بنفسك' : ''),
     ],
     note: request.adminNote ?? null,
     screen: '/card',

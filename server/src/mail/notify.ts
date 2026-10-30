@@ -283,6 +283,19 @@ export class Notifier {
   }
 
   /** M30: a member asked for his membership card printed and delivered (his own choice, no charge). */
+  /** M163: the member marked his printed card as received from the app; the dashboard shows the same mark. */
+  cardReceivedByMember(request: { name: string; phone: string; email: string; cardNumber: string; method?: 'pickup' | 'delivery'; replacement?: boolean }): void {
+    this.dispatch(`العضو أكد استلام كارت العضوية: ${request.name}`, [
+      request.method === 'pickup'
+        ? `أكد العضو من ${APP_NAME} أنه استلم كارت عضويته المطبوع من مقر النادي.`
+        : `أكد العضو من ${APP_NAME} أن كارت عضويته المطبوع وصل إليه.`,
+      request.replacement ? '(نسخة بديلة عن كارت سبق تسليمه)' : null,
+      '',
+      ...personLines(request),
+      `رقم العضوية: ${request.cardNumber}`,
+    ]);
+  }
+
   cardPrintRequested(request: { id: string; name: string; phone: string; email: string; cardNumber: string; personaLabel: string; city: string; address: string; note: string; method?: 'pickup' | 'delivery' }): void {
     this.dispatch(`طلب طباعة كارت العضوية: ${request.name}`, [
       // M162: pickup at the HQ is free; delivery carries shipping fees by region (the management quotes them).

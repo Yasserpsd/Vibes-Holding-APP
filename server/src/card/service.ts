@@ -41,12 +41,20 @@ export type CardPrintRequest = {
   /** M138: the dashboard's note on a decision and the member's app language (for his mails). */
   adminNote?: string | null;
   lang?: AppLang;
+  /** M163: a new copy asked for after an earlier card was delivered (lost, damaged). */
+  replacement?: boolean;
+  /** M163: the member himself marked the card as received (the dashboard may have been slower). */
+  memberConfirmedAt?: string | null;
 };
 
 /** What the member sees about his own request. */
 export type CardDeliveryMethod = 'pickup' | 'delivery';
 
-export type PublicCardRequest = Pick<CardPrintRequest, 'id' | 'status' | 'city' | 'address' | 'createdAt' | 'doneAt'> & { method: CardDeliveryMethod };
+export type PublicCardRequest = Pick<CardPrintRequest, 'id' | 'status' | 'city' | 'address' | 'createdAt' | 'doneAt'> & {
+  method: CardDeliveryMethod;
+  replacement: boolean;
+  memberConfirmedAt: string | null;
+};
 
 export type CardRequestInput = { method?: CardDeliveryMethod; city?: string; address?: string; phone?: string; note?: string };
 
@@ -55,8 +63,8 @@ export const PICKUP_CITY = 'الرياض';
 export const PICKUP_ADDRESS = 'استلام من مقر النادي (بدون رسوم)';
 
 export function publicCardRequest(request: CardPrintRequest): PublicCardRequest {
-  const { id, status, city, address, createdAt, doneAt, method } = request;
-  return { id, status, city, address, createdAt, doneAt, method: method ?? 'delivery' };
+  const { id, status, city, address, createdAt, doneAt, method, replacement, memberConfirmedAt } = request;
+  return { id, status, city, address, createdAt, doneAt, method: method ?? 'delivery', replacement: replacement === true, memberConfirmedAt: memberConfirmedAt ?? null };
 }
 
 type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
@@ -121,11 +129,16 @@ export class CardService {
       doneBy: null,
       adminNote: null,
       lang,
+      replacement: false,
+      memberConfirmedAt: null,
     };
     await this.mutate((requests) => {
-      if (requests.some((entry) => entry.contactId === me.id && entry.status === 'pending')) {
+      const mine = requests.filter((entry) => entry.contactId === me.id);
+      if (mine.some((entry) => entry.status === 'pending' || entry.status === 'in_progress')) {
         throw new RequestError('already_requested', 'طلبك السابق ما زال قيد التنفيذ لدى الإدارة', 409);
       }
+      // M163 (owner): a card already delivered once makes this a replacement — the dashboard says so.
+      request.replacement = mine.some((entry) => entry.status === 'done');
       requests.push(request);
     });
     this.deps.notifier.cardPrintRequested(request);
@@ -149,6 +162,27 @@ export class CardService {
       return { request, changed };
     });
     if (result?.changed) this.deps.notices?.changed(fromCard(result.request), { email: result.request.email, name: result.request.name, lang: result.request.lang });
+    return result?.request ?? null;
+  }
+
+  /**
+   * M163 (owner): the member says he holds the card (picked it up at the HQ or it arrived). The request closes as
+   * delivered with his own mark; the management is mailed, the member is not (he just did it himself).
+   */
+  async confirmReceived(contactId: number, id: string, now = new Date()): Promise<CardPrintRequest | null> {
+    const result = await this.mutate((requests) => {
+      const request = requests.find((entry) => entry.id === id && entry.contactId === contactId);
+      if (!request || request.status === 'rejected') return null;
+      const changed = !request.memberConfirmedAt;
+      request.memberConfirmedAt = request.memberConfirmedAt ?? now.toISOString();
+      if (request.status !== 'done') {
+        request.status = 'done';
+        request.doneAt = now.toISOString();
+        request.doneBy = 'العضو';
+      }
+      return { request, changed };
+    });
+    if (result?.changed) this.deps.notifier.cardReceivedByMember(result.request);
     return result?.request ?? null;
   }
 
