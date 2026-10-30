@@ -10,6 +10,7 @@ import { AppButton } from '@/components/AppButton';
 import { GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
+import { trackRegistration } from '@/lib/adsAttribution';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -41,6 +42,8 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
         return;
       }
       await signIn(signedIn.token, signedIn.me);
+      // M157: a first social sign-in is a registration for ads attribution (the server says `created`).
+      if (signedIn.created) trackRegistration(result.provider);
       if (router.canDismiss()) router.dismissAll();
       else router.replace('/account');
     } catch (cause) {

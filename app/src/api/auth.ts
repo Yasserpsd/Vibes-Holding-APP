@@ -116,7 +116,7 @@ export type RegisterInput = {
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
-export type SignedInResult = { pending: false; token: string; me: Me };
+export type SignedInResult = { pending: false; token: string; me: Me; /** M157: the social sign-in just created the account. */ created?: boolean };
 /** M140: the account switched «حماية إضافية» on — the sign-in ends with its authenticator code. */
 export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
 export type LoginResult = PendingResult | SignedInResult | TotpStepResult;

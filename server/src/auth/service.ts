@@ -154,7 +154,7 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
-export type SignedInResult = { pending: false; token: string; me: Me };
+export type SignedInResult = { pending: false; token: string; me: Me; /** M157: true when this social sign-in created the account (hub `created`). */ created?: boolean };
 export type LoginResult = PendingResult | SignedInResult;
 /** The dashboard's password was right; the session starts after the e-mailed code (M18). */
 export type OtpResult = { pending: false; otp: true; challengeToken: string; email: string; seconds: number; resendAfter: number };
@@ -375,7 +375,10 @@ export class AuthService {
     }
     const contact = requireContact(result);
     await this.gate(uuid, contact);
-    return this.signIn(uuid, contact);
+    // M157: tell the app when the hub created the account (first social sign-in), so it logs the registration event for ads attribution.
+    const created = result.created === 1 || result.created === '1' || result.created === true;
+    const signed = await this.signIn(uuid, contact);
+    return created && 'token' in signed ? { ...signed, created: true } : signed;
   }
 
   /** Dashboard sessions need the e-mailed code (M18). Off by default: the owner turns it on once the mail delay is known. */

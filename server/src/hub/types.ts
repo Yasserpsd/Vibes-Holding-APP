@@ -119,6 +119,8 @@ export type HubResponse = {
   /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
   referred_by?: number;
   referred_name?: string;
+  /** `social_login` (M157): 1 when the hub just created the account (first sign-in with Google/Apple). */
+  created?: 0 | 1 | boolean | string;
   /** `member_status` (M44): whether a contact matched the phone/e-mail. */
   found?: boolean;
   sent?: boolean;

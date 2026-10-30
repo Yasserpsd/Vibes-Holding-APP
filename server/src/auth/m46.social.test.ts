@@ -75,6 +75,7 @@ test('google sign-in creates a verified account and signs in instantly', async (
   assert.equal(res.statusCode, 200, res.body);
   const body = res.json();
   assert.equal(body.pending, false);
+  assert.equal(body.created, true); // M157: first social sign-in = registration (ads event in the app)
   assert.ok(body.token.length >= 32);
   assert.equal(body.me.email, 'new.member@gmail.com');
   assert.equal(body.me.name, 'عضو جوجل');
@@ -92,6 +93,8 @@ test('a second google sign-in finds the same account, never a duplicate', async 
   assert.equal(first.statusCode, 200);
   assert.equal(second.statusCode, 200);
   assert.equal(first.json().me.id, second.json().me.id);
+  assert.equal(first.json().created, true);
+  assert.equal(second.json().created, undefined);
 });
 
 test('apple sign-in works and takes the name from the request body (Apple sends none)', async () => {

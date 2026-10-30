@@ -291,11 +291,13 @@ export class MockHubClient implements HubClient {
       throw new HubError('invalid', 'بيانات الدخول غير مكتملة', 400);
     }
     let contact = [...this.contacts.values()].find((candidate) => candidate.email === email) ?? null;
+    let created = false;
     if (!contact) {
       if (body.allow_create !== 1 && body.allow_create !== '1') {
         throw new HubError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
       }
       contact = this.create();
+      created = true;
       // The random unusable password makes it a full account (has_account); a reset mail can replace it.
       Object.assign(contact, { name, email, verified: true, verifiedAt: Date.now(), passHash: hash(`social:${provider}:${sub}:${Date.now()}`) });
       this.admin.event(contact.id, 'registered');
@@ -310,7 +312,7 @@ export class MockHubClient implements HubClient {
     if (!contact.name) contact.name = name;
     contact.lastLoginAt = Date.now();
     this.visitors.set(this.uuid(body), contact.id);
-    return { ok: true, contact: this.publicContact(contact) };
+    return { ok: true, contact: this.publicContact(contact), created: created ? 1 : 0 };
   }
 
   private profile(body: HubBody): HubResponse {
