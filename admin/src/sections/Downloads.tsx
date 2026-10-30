@@ -138,18 +138,23 @@ export function DownloadsCard() {
         <StoreColumn mark={<AppleMark />} name="App Store" value={data.ios} caption={caption(data.stores.apple.installs)} />
       </div>
       <Trend series={data.series} />
+      {/* One quiet line under the card: where each store number comes from, and the signed-in devices beside it. */}
       <p className="store-foot">
         {stores ? (
           <>
-            أجهزة مسجّلة الآن: <bdi className="num">{formatNumber(data.devices.android)}</bdi> Android · <bdi className="num">{formatNumber(data.devices.ios)}</bdi> iPhone · حسابات <bdi className="num">{formatNumber(data.devices.accounts.total)}</bdi>
-            {data.stores.apple.since ? <> · App Store منذ {formatDay(data.stores.apple.since, 'short')}</> : null}
-            {data.stores.google.installs === null ? <> · رقم Google Play لم يصل بعد{data.stores.google.configured ? ' (المتجر لم يكتب تقرير الشهر أو الصلاحية ناقصة)' : ' (مفاتيح Railway غير مضبوطة)'}</> : null}
-            {data.stores.apple.installs === null ? <> · رقم App Store لم يصل بعد{data.stores.apple.configured ? ' (تقرير أمس لم يُكتب أو المفتاح بلا صلاحية Sales)' : ' (مفاتيح Railway غير مضبوطة)'}</> : null}
+            {data.stores.apple.installs !== null && data.stores.apple.since ? <span>App Store محسوب منذ {formatDay(data.stores.apple.since, 'short')}</span> : null}
+            {data.stores.apple.installs === null ? <span>{data.stores.apple.configured ? 'App Store قيد التفعيل، يظهر تلقائيًا خلال يوم' : 'App Store غير مضبوط بعد'}</span> : null}
+            {data.stores.google.installs === null ? <span>{data.stores.google.configured ? 'Google Play قيد التفعيل، يظهر تلقائيًا خلال يوم' : 'Google Play غير مضبوط بعد'}</span> : null}
+            <span>
+              الأجهزة المسجّلة الآن: <bdi className="num">{formatNumber(data.devices.android)}</bdi> Android · <bdi className="num">{formatNumber(data.devices.ios)}</bdi> iPhone
+            </span>
           </>
         ) : (
           <>
-            أجهزة سجّلت دخولها في التطبيق (ليست أرقام المتاجر): حسابات <bdi className="num">{formatNumber(data.devices.accounts.android)}</bdi> من Android و <bdi className="num">{formatNumber(data.devices.accounts.ios)}</bdi> من iPhone
-            {pending.length ? <> · أرقام المتاجر الحقيقية تظهر بعد ضبط مفاتيح {pending.join(' و')} على Railway</> : null}
+            <span>
+              أجهزة سجّلت دخولها في التطبيق، ليست أرقام المتاجر: حسابات <bdi className="num">{formatNumber(data.devices.accounts.android)}</bdi> من Android و <bdi className="num">{formatNumber(data.devices.accounts.ios)}</bdi> من iPhone
+            </span>
+            {pending.length ? <span>أرقام المتاجر تظهر بعد ضبط مفاتيح {pending.join(' و')}</span> : null}
           </>
         )}
       </p>

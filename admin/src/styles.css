@@ -451,7 +451,9 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .store-legend .swatch.total { background: var(--royal-gold); }
 .store-legend .swatch.android { background: #00c3ff; }
 .store-legend .swatch.ios { background: #fff; }
-.store-foot { margin: 0; color: rgba(246, 239, 226, 0.7); font-size: 0.8rem; }
+.store-foot { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 0; color: rgba(246, 239, 226, 0.7); font-size: 0.8rem; }
+.store-foot > span { display: inline-flex; align-items: center; gap: 6px; }
+.store-foot > span + span::before { content: ""; display: inline-block; inline-size: 5px; block-size: 5px; border-radius: 50%; background: var(--royal-gold); opacity: 0.8; margin-inline: 10px 6px; }
 @media (max-width: 560px) {
   .store-grid { grid-template-columns: 1fr 1fr; }
   .store-total { grid-column: 1 / -1; order: -1; }
