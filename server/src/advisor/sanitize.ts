@@ -1,4 +1,5 @@
 import type { HubContact, HubGate, HubMessage } from '../hub/types.js';
+import { APP_SCREENS, SCREEN_LABELS, type AppScreen } from './intents.js';
 
 /**
  * What the app may render from a hub reply. Web-only widgets (forms, scroll, hand-off, admin
@@ -11,7 +12,18 @@ export type AdvisorAction =
   | { type: 'video'; title: string; url: string }
   /** The hub offered the membership: the app points to its own membership screen instead. */
   | { type: 'membership' }
-  | { type: 'card'; title: string; price: string | null; note: string | null; bullets: string[]; url: string | null };
+  | { type: 'card'; title: string; price: string | null; note: string | null; bullets: string[]; url: string | null }
+  /** M150 phase 3: the brain names an app screen as `https://vcmem.com/app/<screen>`; the app opens the screen itself. */
+  | { type: 'screen'; screen: AppScreen; label: string };
+
+/** The brain's screen links (`APP_MAP` in the workflow's Build Context): the path is one of the server's screen keys. */
+const APP_SCREEN_LINK = /^https:\/\/(?:www\.)?vcmem\.com\/app\/([a-z_]+)\/?(?:[?#].*)?$/i;
+const isAppScreen = (value: string): value is AppScreen => (APP_SCREENS as readonly string[]).includes(value);
+export function appScreenOf(url: string): AppScreen | null {
+  const match = APP_SCREEN_LINK.exec(url.trim());
+  const key = match?.[1]?.toLowerCase() ?? '';
+  return isAppScreen(key) ? key : null;
+}
 
 export type AdvisorRole = 'user' | 'assistant' | 'staff' | 'system';
 
@@ -139,6 +151,12 @@ export function toActions(raw: unknown, block: BlockList): AdvisorAction[] {
       case 'open_page': {
         const url = asString(item.url, 2000);
         const label = asString(item.label, 80).replace(/\s*↗\s*$/, '');
+        const screen = url ? appScreenOf(url) : null;
+        if (screen) {
+          // One button per screen: the hub's auto-open may repeat the same link as `open_page`.
+          if (!out.some((action) => action.type === 'screen' && action.screen === screen)) out.push({ type: 'screen', screen, label: label || SCREEN_LABELS[screen].ar });
+          break;
+        }
         if (url && !block.blocks(url) && !PAY_LABEL.test(label)) out.push({ type: 'link', label: label || 'افتح الصفحة', url });
         break;
       }

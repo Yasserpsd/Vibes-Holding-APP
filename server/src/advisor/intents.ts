@@ -38,7 +38,7 @@ export const APP_SCREENS = [
 ] as const;
 export type AppScreen = (typeof APP_SCREENS)[number];
 
-const SCREEN_LABELS: Record<AppScreen, { ar: string; en: string; hint: string }> = {
+export const SCREEN_LABELS: Record<AppScreen, { ar: string; en: string; hint: string }> = {
   home: { ar: 'الرئيسية', en: 'Home', hint: 'home / start' },
   projects: { ar: 'بنك المشاريع', en: 'Projects Bank', hint: 'browse investment projects, startups, partnerships' },
   golden: { ar: 'المشاريع الذهبية', en: 'Golden projects', hint: 'golden companies, golden opportunity' },

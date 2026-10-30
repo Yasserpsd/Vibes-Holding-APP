@@ -1,0 +1,21 @@
+{
+ "exportedAt": "2026-10-30T12:30:00.000Z",
+ "note": "Backup of «Vibes Brain — Error & Alert» (id ASiYAbt8a54T4f8o) taken 2026-10-30 before M150 phase 3. No secrets: the hub key lives in the n8n credential «Vibes Hub Key» (httpHeaderAuth), referenced by name only in _credentialRefs.",
+ "workflow": {
+  "id": "ASiYAbt8a54T4f8o",
+  "name": "Vibes Brain — Error & Alert",
+  "active": true,
+  "versionId": "4faa873a-ccd0-414a-a373-39bd95d1ee37",
+  "settings": { "executionOrder": "v1", "availableInMCP": true },
+  "description": "Runs when the Vibes Web Agent fails: builds a short, key-free alert and posts it to the hub's alert tool (hub plugin 2.22+), which mails the admins. The X-VAI-Key credential is attached by the owner in n8n.",
+  "connections": {
+   "Error Trigger": { "main": [[{ "node": "Build Alert", "type": "main", "index": 0 }]] },
+   "Build Alert": { "main": [[{ "node": "Notify Hub (alert)", "type": "main", "index": 0 }]] }
+  },
+  "nodes": [
+   { "id": "f42ffbaf-e691-4dac-8f23-2bf48e123555", "name": "Error Trigger", "type": "n8n-nodes-base.errorTrigger", "typeVersion": 1, "position": [0, 0], "parameters": {} },
+   { "id": "325ef994-66ef-4021-9516-c45a908c8bb4", "name": "Build Alert", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [224, 0], "parameters": { "jsCode": "// Vibes Brain — Error & Alert: one short, key-free alert per failed execution\nconst e = $json || {};\nconst ex = e.execution || {};\nconst wf = e.workflow || {};\nconst err = ex.error || {};\nconst NL = String.fromCharCode(10);\nconst scrub = s => String(s || '').replace(/[A-Za-z0-9_-]{32,}/g, '[key]').slice(0, 600);\nconst when = new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh' });\nconst text = ['⚠️ خطأ في عقل n8n (' + String(wf.name || '') + ')', 'الوقت: ' + when, 'التنفيذ: ' + String(ex.id || '') + (ex.url ? ' — ' + ex.url : ''), 'آخر عقدة: ' + String(ex.lastNodeExecuted || ''), 'الخطأ: ' + scrub(err.message), 'الوضع: ' + String(ex.mode || '')].join(NL);\nreturn [{ json: { source: 'n8n', workflow: String(wf.name || ''), workflow_id: String(wf.id || ''), execution_id: String(ex.id || ''), node: String(ex.lastNodeExecuted || ''), message: scrub(err.message), text } }];\n" } },
+   { "id": "28787591-f651-455e-ade9-7288b6959d96", "name": "Notify Hub (alert)", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.4, "position": [448, 0], "parameters": { "method": "POST", "url": "https://vcmem.com/wp-json/vibes-ai/v1/hub/alert", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}", "options": { "timeout": 20000 }, "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth" }, "onError": "continueRegularOutput", "_credentialRefs": { "httpHeaderAuth": "Vibes Hub Key" } }
+  ]
+ }
+}

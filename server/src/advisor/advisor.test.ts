@@ -186,6 +186,26 @@ test('toActions keeps phone-friendly widgets only and drops web payment buttons 
   ]);
 });
 
+test('M150 phase 3: a brain link to https://vcmem.com/app/<screen> becomes a screen button, once per screen', () => {
+  const block = new BlockList([MOCK_MEMBERSHIP_URL]);
+  const actions = toActions(
+    [
+      { type: 'link', label: 'افتح بنك المشاريع', url: 'https://vcmem.com/app/projects' },
+      { type: 'open_page', url: 'https://vcmem.com/app/projects/' },
+      { type: 'link', label: 'Club HQ', url: 'https://www.vcmem.com/app/hq/' },
+      { type: 'link', label: 'غير معروف', url: 'https://vcmem.com/app/nowhere' },
+      { type: 'link', label: 'العضوية', url: 'https://vcmem.com/app/membership?x=1' },
+    ],
+    block,
+  );
+  assert.deepEqual(actions, [
+    { type: 'screen', screen: 'projects', label: 'افتح بنك المشاريع' },
+    { type: 'screen', screen: 'hq', label: 'Club HQ' },
+    { type: 'link', label: 'غير معروف', url: 'https://vcmem.com/app/nowhere' },
+    { type: 'screen', screen: 'membership', label: 'العضوية' },
+  ]);
+});
+
 test('M160: the hub’s sign-in bookkeeping rows never reach the app', () => {
   const row = (role: AdvisorMessage['role'], text: string): AdvisorMessage => ({ id: 1, role, text, at: '', by: null, file: null, image: null, audio: null, actions: [] });
   assert.equal(isSystemNoise(row('system', 'سجّل الدخول على vibes-holding-app-production.up.railway.app')), true);
