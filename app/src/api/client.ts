@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
+import { reportProblem } from '@/lib/support';
 
 export class ApiError extends Error {
   constructor(
@@ -74,6 +75,7 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     });
   } catch {
     // No connection, or no answer before the deadline.
+    reportProblem(t('errors.network'));
     throw new ApiError(t('errors.network'), 0, 'network');
   } finally {
     clearTimeout(deadline);
@@ -90,7 +92,10 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
       // Non-JSON error body: keep the generic message.
     }
     // A rejected session token (expired or revoked) signs the user out everywhere.
-    if (response.status === 401 && token && token === currentToken && code !== 'bad_login') onUnauthorized?.();
+    const expiredSession = response.status === 401 && token && token === currentToken && code !== 'bad_login';
+    if (expiredSession) onUnauthorized?.();
+    // M161: every other failure offers the direct WhatsApp support line at once (a lapsed session just signs out).
+    if (!expiredSession) reportProblem(message);
     throw new ApiError(message, response.status, code);
   }
 

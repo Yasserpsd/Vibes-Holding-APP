@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
+import { SupportLink } from '@/components/SupportBanner';
 import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -105,6 +106,7 @@ export default function LoginScreen() {
             <Text style={styles.link}>{t('auth.login.forgot')}</Text>
           </PressScale>
         </Link>
+        <SupportLink problem={error} />
       </FadeInView>
       {config?.registrationOpen === false ? null : (
         <FadeInView delay={entranceDelay(6)}>

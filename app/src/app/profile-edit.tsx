@@ -11,6 +11,7 @@ import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { SupportLink } from '@/components/SupportBanner';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -27,6 +28,9 @@ export default function ProfileEditScreen() {
   const [countryCode, setCountryCode] = useState('sa');
   const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
   const phoneChanged = phone.trim() !== (me?.phone ?? '').trim();
+  // M161 (owner): the contact e-mail (invoices, club mails) is the member's to change; the sign-in e-mail is not.
+  const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
+  const contactEmailChanged = contactEmail.trim().toLowerCase() !== (me?.contactEmail ?? '').trim().toLowerCase();
   const [form, setForm] = useState({
     name: me?.name ?? '',
     jobTitle: me?.jobTitle ?? '',
@@ -56,6 +60,10 @@ export default function ProfileEditScreen() {
       setError(t('profile.phoneInvalid'));
       return;
     }
+    if (contactEmailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactEmail.trim())) {
+      setError(t('profile.contactEmailInvalid'));
+      return;
+    }
     const patch: ProfilePatch = {
       name: form.name.trim(),
       jobTitle: form.jobTitle.trim(),
@@ -70,6 +78,7 @@ export default function ProfileEditScreen() {
       patch.phone = phone.trim();
       patch.country = countryCode;
     }
+    if (contactEmailChanged) patch.contactEmail = contactEmail.trim().toLowerCase();
     setBusy(true);
     setError(null);
     try {
@@ -111,6 +120,16 @@ export default function ProfileEditScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('profile.email')} latin editable={false} value={me.email} hint={t('profile.emailLocked')} />
+        <FormField
+          label={t('profile.contactEmail')}
+          latin
+          autoCapitalize="none"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          value={contactEmail}
+          onChangeText={setContactEmail}
+          hint={t('profile.contactEmailHint')}
+        />
         {config ? (
           <View style={styles.group}>
             <Text style={styles.label}>{t('profile.country')}</Text>
@@ -152,6 +171,7 @@ export default function ProfileEditScreen() {
       {error ? (
         <FadeInView offset={6}>
           <Text style={styles.error}>{error}</Text>
+          <SupportLink problem={error} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(8)}>

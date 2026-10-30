@@ -8,6 +8,7 @@ import { interestsApi } from '@/api/interests';
 import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { SupportLink } from '@/components/SupportBanner';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView, GrowBar } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -137,6 +138,7 @@ export default function VerifyScreen() {
               onPress={() => void resend()}
             />
             {cooldown > 0 ? <GrowBar percent={(cooldown / 60) * 100} height={4} /> : null}
+            <SupportLink problem={error} />
           </FadeInView>
         </>
       )}
