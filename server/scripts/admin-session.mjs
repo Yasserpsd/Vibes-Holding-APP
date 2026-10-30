@@ -82,3 +82,60 @@ export async function adminCall(path, options = {}, api = API) {
 }
 
 export { API, API_PROD };
+
+// ---- Dashboard session (M18 e-mail code). `adminCall` against /api/admin/* needs a session that
+// started with the mailed code: run `node server/scripts/admin-session.mjs dashboard [prod]` (the
+// code goes to the admin mailbox), then `node server/scripts/admin-session.mjs dashboard [prod] <code>`.
+const challengeFile = (api) => new URL(api === API_PROD ? '../.env.admin.challenge.prod.local' : '../.env.admin.challenge.local', import.meta.url);
+
+/** Step 1 (no code): asks the dashboard for the code and keeps the challenge. Step 2 (code): verifies it and caches the dashboard token. */
+export async function dashboardLogin(api = API, code = null, authCode = null) {
+  if (!code) {
+    const c = await creds();
+    const { response, body } = await raw('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ login: c.ADMIN_LOGIN, password: c.ADMIN_PASSWORD }) }, undefined, api);
+    if (!response.ok) throw new Error(`dashboard login failed: ${response.status} ${JSON.stringify(body?.error ?? '')}`);
+    if (body?.token) {
+      await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
+      return { done: true };
+    }
+    if (!body?.otp || !body.challengeToken) throw new Error(`unexpected dashboard login answer: ${JSON.stringify(Object.keys(body ?? {}))}`);
+    await writeFile(challengeFile(api), `${body.challengeToken}` + '\n', 'utf8');
+    return { done: false, email: body.email, seconds: body.seconds };
+  }
+  // Step 2: the mailed code; the account's authenticator (M140) answers from ADMIN_TOTP_SECRET when the
+  // file has it, else from `authCode` (the owner reads his app) — or the step is kept for `dashboard prod totp <code>`.
+  if (code === 'totp') return finishTotp(api, authCode);
+  const challengeToken = (await readFile(challengeFile(api), 'utf8')).trim();
+  const { response, body } = await raw('/api/admin/auth/verify', { method: 'POST', body: JSON.stringify({ challengeToken, code: String(code) }) }, undefined, api);
+  if (response.ok && body?.totp) {
+    await writeFile(stepFile(api), `${body.stepToken}` + '\n', 'utf8');
+    const c = await creds();
+    if (c.ADMIN_TOTP_SECRET) return finishTotp(api, totpCode(c.ADMIN_TOTP_SECRET));
+    if (authCode) return finishTotp(api, authCode);
+    return { done: false, totp: true, seconds: body.seconds };
+  }
+  if (!response.ok || !body?.token) throw new Error(`dashboard verify failed: ${response.status} ${JSON.stringify(body?.error ?? '')}`);
+  await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
+  return { done: true };
+}
+
+const stepFile = (api) => new URL(api === API_PROD ? '../.env.admin.step.prod.local' : '../.env.admin.step.local', import.meta.url);
+
+async function finishTotp(api, authCode) {
+  if (!authCode) throw new Error('the dashboard asks for the authenticator code: rerun with `dashboard prod totp <code>`');
+  const stepToken = (await readFile(stepFile(api), 'utf8')).trim();
+  const { response, body } = await raw('/api/admin/auth/totp/verify', { method: 'POST', body: JSON.stringify({ stepToken, code: String(authCode) }) }, undefined, api);
+  if (!response.ok || !body?.token) throw new Error(`authenticator step failed: ${response.status} ${JSON.stringify(body?.error ?? '')}`);
+  await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
+  return { done: true };
+}
+
+if ((process.argv[1] ?? "").endsWith("admin-session.mjs") && process.argv[2] === "dashboard") {
+  const args = process.argv.slice(3);
+  const api = args[0] === 'prod' ? API_PROD : API;
+  if (args[0] === 'prod' || args[0] === 'test') args.shift();
+  const code = args[0] && (args[0] === 'totp' || /^[0-9]+$/.test(args[0])) ? args[0] : null;
+  const authCode = args[1] && /^[0-9]+$/.test(args[1]) ? args[1] : null;
+  const result = await dashboardLogin(api, code, authCode);
+  console.log(result.done ? `dashboard session cached for ${api}` : result.totp ? `mailed code accepted; the authenticator code is next (${result.seconds}s): dashboard prod totp <code>` : `code mailed to ${result.email} (valid ${result.seconds}s); rerun with the code`);
+}

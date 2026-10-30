@@ -49,6 +49,8 @@ export type AgendaEvent = {
   onlineUrl: string;
   /** M77: the owner-uploaded hero image — the event page shows it BIG on top, all details below. */
   imageUrl?: string | null;
+  /** M167: the square card image — the cards OUTSIDE the event page (home, agenda list, inbox) show it; absent = the hero. */
+  coverUrl?: string | null;
   mode: AgendaMode;
   /** The attendance fee for accounts WITHOUT an active membership; 0 = بدون رسوم للجميع. */
   feeSar: number;
@@ -115,6 +117,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   onlineUrl: string | null;
   /** M77: the big hero image on top of the event page (null = none uploaded). */
   imageUrl: string | null;
+  /** M167: the square card image (null = the app falls back to the hero). */
+  coverUrl: string | null;
   /** M77: the event's last day has passed — the app keeps it listed, faded. */
   past: boolean;
   /** M107: the member price (0 = ضمن العضوية), what THIS viewer pays, and what the membership saves. */
@@ -223,6 +227,7 @@ export class AgendaService {
       mustPay: Boolean(me && myFeeSar > 0),
       onlineUrl: confirmedOnline && event.onlineUrl ? event.onlineUrl : null,
       imageUrl: event.imageUrl || null,
+      coverUrl: event.coverUrl || null,
       past,
     };
   }

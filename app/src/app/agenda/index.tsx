@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { useAgenda, type AgendaEvent } from '@/api/agenda';
+import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -71,8 +71,8 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, highlight && styles.cardGlow]}>
-        {event.imageUrl ? (
-          <Image source={{ uri: event.imageUrl }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+        {cardImageOf(event) ? (
+          <Image source={{ uri: cardImageOf(event) ?? undefined }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
         ) : (
           <View style={[styles.fallback, past && styles.photoPast]}>
             <Ionicons name="calendar-outline" size={52} color={colors.goldDark} />

@@ -286,6 +286,8 @@ export type AgendaEventInput = {
   onlineUrl: string;
   /** M77: the big hero image above the event details (uploaded here, shown in the app). */
   imageUrl?: string | null;
+  /** M167: the square card image — the cards outside the event page (home, agenda list, inbox); absent = the hero. */
+  coverUrl?: string | null;
   mode: AgendaMode;
   feeSar: number;
   /** M107: the ACTIVE member's price (0 = ضمن العضوية). */

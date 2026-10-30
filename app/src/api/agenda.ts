@@ -34,6 +34,8 @@ export type AgendaEvent = {
   onlineUrl: string | null;
   /** M77: the big hero image above the details; an older server sends none. */
   imageUrl?: string | null;
+  /** M167: the square card image for the cards outside the event page; an older server sends none. */
+  coverUrl?: string | null;
   /** M77: the event's last day has passed — listed faded; an older server sends none. */
   past?: boolean;
 };
@@ -102,4 +104,9 @@ export function useAgendaTicket(eventId: string | undefined, enabled: boolean) {
     enabled: Boolean(eventId) && enabled,
     staleTime: 60_000,
   });
+}
+
+/** M167: the picture a CARD shows (home strip, agenda list, inbox row): the square cover, else the wide hero. */
+export function cardImageOf(event: Pick<AgendaEvent, 'coverUrl' | 'imageUrl'>): string | null {
+  return event.coverUrl || event.imageUrl || null;
 }

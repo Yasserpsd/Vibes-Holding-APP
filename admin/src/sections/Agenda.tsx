@@ -7,7 +7,7 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 /** M41 «أجندة النادي»: events across the whole year, their registrations, and the members' push reminder. */
 
 const MODE_LABEL: Record<AgendaMode, string> = { hq: 'حضوري', online: 'أونلاين', both: 'حضوري وأونلاين' };
-const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, mode: 'both', feeSar: 0, memberFeeSar: 0, interests: [], open: true };
+const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, memberFeeSar: 0, interests: [], open: true };
 
 /** M107: the unified interests (mirrors server/src/interests/types.ts). */
 const INTEREST_OPTIONS: { key: string; label: string }[] = [
@@ -28,8 +28,9 @@ export function Agenda() {
   const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput; english: { title: string; blurb: string; place: string } } | null>(null);
   const [rows, setRows] = useState<{ event: AgendaEvent; registrations: AgendaRegistration[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
   const upcoming = state.data?.events.filter((event) => !pastOf(event)).length ?? 0;
 
   function fail(failure: unknown) {
@@ -104,18 +105,20 @@ export function Agenda() {
   const edit = (patch: Partial<AgendaEventInput>) => setEditor((current) => (current ? { ...current, input: { ...current.input, ...patch } } : current));
 
   // M77: the big event image — uploaded like the partners' logos, shown on top of the event page in the app.
-  async function pickImage(file: File | undefined) {
+  // M167: a second, square one for the cards outside the page (`coverUrl`); the app falls back to the hero without it.
+  async function pickImage(file: File | undefined, field: 'imageUrl' | 'coverUrl' = 'imageUrl') {
     if (!file || !editor || uploading) return;
-    setUploading(true);
+    setUploading(field);
     try {
       const uploaded = await uploadFile(file);
       if (uploaded.kind !== 'image') throw new Error('اختر صورة للفعالية.');
-      edit({ imageUrl: uploaded.url });
+      edit({ [field]: uploaded.url });
     } catch (failure) {
       fail(failure);
     } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
+      setUploading(null);
+      const input = field === 'coverUrl' ? coverRef.current : fileRef.current;
+      if (input) input.value = '';
     }
   }
 
@@ -174,7 +177,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, mode: row.mode, feeSar: row.feeSar, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -236,15 +239,28 @@ export function Agenda() {
               <input dir="ltr" value={editor.input.onlineUrl} maxLength={300} onChange={(event) => edit({ onlineUrl: event.target.value })} placeholder="https://…" />
             </label>
             <fieldset>
-              <legend>صورة الفعالية — تظهر كبيرة أعلى صفحة الفعالية في التطبيق</legend>
+              <legend>صورة الكرت (مربعة 1:1) — تظهر برا: في الرئيسية وقائمة الأجندة والإشعارات</legend>
+              {editor.input.coverUrl ? (
+                <div className="row-actions" style={{ alignItems: 'center' }}>
+                  <img src={editor.input.coverUrl} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} referrerPolicy="no-referrer" />
+                  <button type="button" className="ghost" onClick={() => edit({ coverUrl: null })}>إزالة الصورة</button>
+                </div>
+              ) : (
+                <p className="muted">بدون صورة مربعة، الكروت تعرض صورة الصفحة العرضية.</p>
+              )}
+              <input ref={coverRef} type="file" accept="image/*" disabled={uploading !== null} onChange={(event) => void pickImage(event.target.files?.[0], 'coverUrl')} />
+              {uploading === 'coverUrl' ? <p className="muted">جارٍ رفع الصورة…</p> : null}
+            </fieldset>
+            <fieldset>
+              <legend>صورة الصفحة (عرضية 16:9) — تظهر جوا: كبيرة أعلى صفحة الفعالية في التطبيق</legend>
               {editor.input.imageUrl ? (
                 <div className="row-actions" style={{ alignItems: 'center' }}>
                   <img src={editor.input.imageUrl} alt="" style={{ width: 120, height: 68, objectFit: 'cover', borderRadius: 8 }} referrerPolicy="no-referrer" />
                   <button type="button" className="ghost" onClick={() => edit({ imageUrl: null })}>إزالة الصورة</button>
                 </div>
               ) : null}
-              <input ref={fileRef} type="file" accept="image/*" disabled={uploading} onChange={(event) => void pickImage(event.target.files?.[0])} />
-              {uploading ? <p className="muted">جارٍ رفع الصورة…</p> : null}
+              <input ref={fileRef} type="file" accept="image/*" disabled={uploading !== null} onChange={(event) => void pickImage(event.target.files?.[0])} />
+              {uploading === 'imageUrl' ? <p className="muted">جارٍ رفع الصورة…</p> : null}
             </fieldset>
             <label>
               سعر غير الأعضاء بالريال (0 = بدون رسوم للجميع)

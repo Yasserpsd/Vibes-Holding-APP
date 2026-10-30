@@ -26,6 +26,8 @@ const eventSchema = z.object({
   onlineUrl: z.string().trim().url('اكتب رابطًا صحيحًا').max(300).or(z.literal('')).default(''),
   /** M77: the big hero image above the event details, uploaded from the dashboard. */
   imageUrl: z.string().trim().max(500).nullish(),
+  /** M167: the square card image shown outside the event page. */
+  coverUrl: z.string().trim().max(500).nullish(),
   mode: z.enum(['hq', 'online', 'both']),
   feeSar: z.number().int().min(0).max(100_000).default(0),
   /** M107: the ACTIVE member's price (0 = ضمن العضوية بدون رسوم إضافية). */

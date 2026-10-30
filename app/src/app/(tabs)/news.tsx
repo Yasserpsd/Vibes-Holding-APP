@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { useAgenda } from '@/api/agenda';
+import { cardImageOf, useAgenda } from '@/api/agenda';
 import { useNewsFeed } from '@/api/news';
 import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
@@ -68,8 +68,13 @@ export default function InboxScreen() {
       out.push({ id: `post:${post.id}`, kind: 'post', title: post.title, subtitle: post.body || null, time: post.publishedAt, image: post.images[0] ?? null, route: `/posts/${post.id}` as Href });
     }
     for (const event of (agenda.data?.events ?? []).filter((entry) => !entry.past).slice(0, 6)) {
-      out.push({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: event.blurb || null, time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: null, route: `/agenda/${event.id}` as Href });
+      out.push({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: event.blurb || null, time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: cardImageOf(event), route: `/agenda/${event.id}` as Href });
     }
+    // M167 (owner): the finished events stay reachable here too, last, marked «انتهت».
+    const finished: InboxItem[] = (agenda.data?.events ?? [])
+      .filter((entry) => entry.past)
+      .slice(0, 3)
+      .map((event) => ({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: t('agenda.ended'), time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: cardImageOf(event), route: `/agenda/${event.id}` as Href }));
     for (const item of (news.data?.pages[0]?.items ?? []).slice(0, 8)) {
       out.push({ id: `news:${item.id}`, kind: 'news', title: item.title, subtitle: item.source.name, time: item.publishedAt, image: item.image, route: { pathname: '/news/[id]', params: { id: item.id } } });
     }
@@ -82,7 +87,7 @@ export default function InboxScreen() {
     // Events sort by WHEN they happen (soonest of the upcoming first), everything else by newest.
     const events = out.filter((item) => item.kind === 'event');
     const rest = out.filter((item) => item.kind !== 'event').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
-    return [...events.slice(0, 2), ...rest, ...events.slice(2)];
+    return [...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
   }, [posts.data, agenda.data, news.data, projects.data, people.data]);
 
   const loading = posts.isLoading && agenda.isLoading && news.isPending;
