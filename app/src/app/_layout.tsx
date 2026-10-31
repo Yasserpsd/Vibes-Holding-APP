@@ -25,7 +25,6 @@ import { MembershipGateHost } from '@/components/MembershipGate';
 import { SplashFlash } from '@/components/SplashFlash';
 import { MembershipCelebration } from '@/components/wow';
 import { AskAdvisorProvider } from '@/components/advisor/AskAdvisor';
-import { SupportBanner } from '@/components/SupportBanner';
 import { AdsAttribution } from '@/components/AdsAttribution';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { ScreenTracker } from '@/components/ScreenTracker';
@@ -114,8 +113,6 @@ export default function RootLayout() {
             <LocaleProvider direction={isRTL() ? 'rtl' : 'ltr'}>
               {/* The Stack and the fixed bottom bar share the column: detail screens sit ABOVE the bar, never behind it. */}
               <View style={{ flex: 1 }}>
-                {/* M161: the direct WhatsApp support line, shown the moment a screen shows the member an error. */}
-                <SupportBanner />
                 <View style={{ flex: 1 }}>
                   <Stack
                 screenOptions={{

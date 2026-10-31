@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import { GATE_FIELDS } from '@/api/gateFields';
 import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
-import { reportProblem } from '@/lib/support';
 
 export class ApiError extends Error {
   constructor(
@@ -118,23 +117,7 @@ export async function apiGet<T>(path: string, params?: Params): Promise<T> {
   return apiRequest<T>('GET', path, { params });
 }
 
-/**
- * The text a screen shows for a failure. M161 (owner): the direct WhatsApp support line slides in ONLY for a real
- * breakdown the member can do nothing about — no connection or no answer in time, a server failure (5xx), or an
- * unexpected error. An ordinary refusal (wrong password, a rejected name, locked content, a 4xx) is just shown.
- * Deferred, because screens call this while rendering; background requests that fail quietly never show it.
- */
+/** The text a screen shows for a failure. */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (isBreakdown(error)) setTimeout(() => reportProblem(error.message), 0);
-    return error.message;
-  }
-  const message = t('errors.unexpected');
-  setTimeout(() => reportProblem(message), 0);
-  return message;
-}
-
-/** A failure the club has to fix, not the member: offline, timed out, or the server broke. */
-export function isBreakdown(error: ApiError): boolean {
-  return error.status === 0 || error.status >= 500;
+  return error instanceof ApiError ? error.message : t('errors.unexpected');
 }

@@ -18,6 +18,7 @@ import { StateView } from '@/components/StateView';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { openSupportWhatsApp, SUPPORT_WHATSAPP } from '@/lib/support';
 import { isEmail, phoneIssue } from '@/lib/validation';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -371,6 +372,16 @@ export default function RegisterScreen() {
       <FadeInView delay={entranceDelay(13)}>
         <Text style={styles.footnote}>{t('auth.register.footnote')}</Text>
       </FadeInView>
+      {/* The direct WhatsApp support line (owner, 2026-10-31): the ONLY place it appears — at the very bottom, and only after creating the account failed. */}
+      {submitError ? (
+        <FadeInView offset={8}>
+          <Pressable style={styles.support} onPress={() => void openSupportWhatsApp(submitError)} accessibilityRole="link" accessibilityLabel={t('support.link')}>
+            <Ionicons name="logo-whatsapp" size={18} color={colors.success} />
+            <Text style={styles.supportText}>{t('support.link')}</Text>
+            <Text style={styles.supportNumber}>{`\u200e${SUPPORT_WHATSAPP}`}</Text>
+          </Pressable>
+        </FadeInView>
+      ) : null}
     </Screen>
   );
 }
@@ -398,4 +409,7 @@ const styles = StyleSheet.create({
   personaTextSelected: { color: colors.goldLight },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  support: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: spacing.xs, paddingVertical: spacing.xs },
+  supportText: { ...typography.caption, color: colors.textSecondary },
+  supportNumber: { ...typography.caption, color: colors.success },
 });
