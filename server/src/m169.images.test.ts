@@ -28,7 +28,7 @@ before(async () => {
   root = await mkdtemp(join(tmpdir(), 'm169-'));
   store = new DiskMediaStore(root, 'http://localhost:3000');
   // A 2000×1200 photo-like gradient (noise keeps the encoder honest about size).
-  original = await sharp({ create: { width: 2000, height: 1200, channels: 3, noise: { type: 'gaussian', mean: 128, sigma: 40 } } })
+  original = await sharp({ create: { width: 2000, height: 1200, channels: 3, background: { r: 128, g: 128, b: 128 }, noise: { type: 'gaussian', mean: 128, sigma: 40 } } })
     .png()
     .toBuffer();
   await store.put(KEY, original, 'image/png');
