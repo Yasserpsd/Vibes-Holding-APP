@@ -1,7 +1,8 @@
 import { requireOptionalNativeModule } from 'expo';
-import { NativeModules, Platform, TurboModuleRegistry } from 'react-native';
+import { InteractionManager, NativeModules, Platform, TurboModuleRegistry } from 'react-native';
 
 import { env } from '@/config/env';
+import { loadSetting, saveSetting } from '@/lib/deviceStore';
 
 /**
  * M157: ads attribution through AppsFlyer, the one measurement partner every network the owner buys
@@ -66,25 +67,69 @@ async function askTrackingPermission(): Promise<void> {
 }
 
 /**
- * Starts the SDK once per launch: init, then the ATT prompt (so the advertising id is settled), then
- * start(). SDK 7's manual start model fires a session-ready event; the listener is registered BEFORE
- * init so the event is never missed, and isSessionReady() covers a native side that was ready already.
+ * M174 launch guard. iOS 1.3.0 (5) died inside the native SDK half a second into every launch, so the
+ * native start is marked «pending» right before it runs and «ok» once the app has survived it. A
+ * launch that finds «pending» knows the previous one crashed in the SDK and keeps it off for this
+ * app version: one crash at most per device, never a locked-out member. The marker is per version so
+ * a fixed binary gets a fresh try.
+ */
+const GUARD_KEY = 'adsAttribution.launchGuard';
+
+function guardValue(state: 'pending' | 'ok' | 'off'): string {
+  return `${env.appVersion}:${state}`;
+}
+
+async function launchGuardAllows(): Promise<boolean> {
+  let marker: string | null = null;
+  try {
+    marker = await loadSetting(GUARD_KEY);
+  } catch {
+    marker = null;
+  }
+  if (marker === guardValue('off')) return false;
+  if (marker === guardValue('pending')) {
+    await saveSetting(GUARD_KEY, guardValue('off')).catch(() => undefined);
+    return false;
+  }
+  if (marker !== guardValue('ok')) await saveSetting(GUARD_KEY, guardValue('pending')).catch(() => undefined);
+  return true;
+}
+
+function markLaunchOk(): void {
+  void saveSetting(GUARD_KEY, guardValue('ok')).catch(() => undefined);
+}
+
+/**
+ * Starts the SDK once per launch in the order the SDK 7 migration guide prescribes: the tracking
+ * prompt BEFORE init (the guide retired timeToWaitForATTUserAuthorization in favour of that), then
+ * init, then the session-ready listener registered right after init — not before it, not inside
+ * init().then() — and start() only from that callback (isSessionReady() covers a native side that was
+ * ready already). M174: the previous order (listener before init) is the one native difference between
+ * 1.2.0 and the 1.3.0 (5) launch crash; the SDK also only wakes up once the first screen has settled.
  */
 export function startAdsAttribution(): Promise<void> {
   if (starting) return starting;
   const current = loadSdk();
   if (!current) return Promise.resolve();
   starting = (async () => {
+    if (!(await launchGuardAllows())) return;
+    await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => setTimeout(resolve, 1500)));
+    // The app is still alive 15 s after the native calls = no launch crash, whatever the session did.
+    const survived = setTimeout(markLaunchOk, 15000);
     const begin = async () => {
       if (started) return;
       started = true;
-      await askTrackingPermission();
       await current.start();
+      clearTimeout(survived);
+      markLaunchOk();
     };
     try {
       if (!env.isProduction) await current.enableDebug({ enabled: true }).catch(() => undefined);
-      await current.registerSessionReadyListener(() => void begin().catch(warn));
-      await current.init({ devKey: env.appsflyerDevKey, appId: Platform.OS === 'ios' ? IOS_APP_ID : null });
+      await askTrackingPermission();
+      const initialized = current.init({ devKey: env.appsflyerDevKey, appId: Platform.OS === 'ios' ? IOS_APP_ID : null });
+      const listening = current.registerSessionReadyListener(() => void begin().catch(warn)).catch(warn);
+      await initialized;
+      await listening;
       if (await current.isSessionReady().catch(() => false)) await begin();
     } catch (error) {
       warn(error);
