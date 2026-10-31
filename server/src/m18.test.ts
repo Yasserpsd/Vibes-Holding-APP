@@ -260,6 +260,43 @@ test('a dashboard session asks for a new code after ADMIN_SESSION_HOURS', async 
   }
 });
 
+test('«تذكرني» keeps a dashboard session verified for ADMIN_REMEMBER_DAYS, not ADMIN_SESSION_HOURS', async () => {
+  const rememberMailer = new CaptureMailer();
+  const built = await buildApp({ config: loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', ADMIN_OTP: '1', ADMIN_SESSION_HOURS: '0.00001', ADMIN_REMEMBER_DAYS: '1' }), kv: new MemoryKV(), hub, mailer: rememberMailer });
+  try {
+    // The first sign-in on a device still needs the password and the e-mailed code.
+    const login = await post(built.app, '/api/admin/auth/login', { login: account.email, password: account.password, remember: true });
+    assert.equal(login.json().otp, true, 'the code is still required');
+    const signedIn = await post(built.app, '/api/admin/auth/verify', { challengeToken: login.json().challengeToken, code: rememberMailer.lastCode(), remember: true });
+    assert.equal(signedIn.statusCode, 200, signedIn.body);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const posts = await get(built.app, '/api/admin/posts', signedIn.json().token);
+    assert.equal(posts.statusCode, 200, 'the remembered session outlives the short window');
+    assert.match(String(posts.headers['cache-control']), /no-store/);
+    // Without the tick the same window ends the session.
+    const plain = await post(built.app, '/api/admin/auth/login', { login: account.email, password: account.password });
+    const plainIn = await post(built.app, '/api/admin/auth/verify', { challengeToken: plain.json().challengeToken, code: rememberMailer.lastCode() });
+    assert.equal(plainIn.statusCode, 200, plainIn.body);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal((await get(built.app, '/api/admin/posts', plainIn.json().token)).json().error.code, 'otp_required');
+  } finally {
+    await built.app.close();
+  }
+});
+
+test('a remembered dashboard session still ends after ADMIN_REMEMBER_DAYS', async () => {
+  const rememberMailer = new CaptureMailer();
+  const built = await buildApp({ config: loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', ADMIN_OTP: '1', ADMIN_REMEMBER_DAYS: '0.0000001' }), kv: new MemoryKV(), hub, mailer: rememberMailer });
+  try {
+    const login = await post(built.app, '/api/admin/auth/login', { login: account.email, password: account.password, remember: true });
+    const signedIn = await post(built.app, '/api/admin/auth/verify', { challengeToken: login.json().challengeToken, code: rememberMailer.lastCode(), remember: true });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal((await get(built.app, '/api/admin/posts', signedIn.json().token)).json().error.code, 'otp_required');
+  } finally {
+    await built.app.close();
+  }
+});
+
 test('a new sign-in ends the account\'s earlier challenge', async () => {
   const first = await challenge();
   const firstCode = mailer.lastCode();

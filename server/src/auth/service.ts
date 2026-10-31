@@ -432,11 +432,13 @@ export class AuthService {
   /** True while the session's e-mailed code is recent enough for the dashboard. */
   adminVerified(session: SessionRecord): boolean {
     if (!session.adminVerifiedAt) return false;
-    return Date.now() - Date.parse(session.adminVerifiedAt) < this.deps.config.ADMIN_SESSION_HOURS * 3_600_000;
+    const { ADMIN_SESSION_HOURS, ADMIN_REMEMBER_DAYS } = this.deps.config;
+    const windowMs = session.adminRemember ? ADMIN_REMEMBER_DAYS * 86_400_000 : ADMIN_SESSION_HOURS * 3_600_000;
+    return Date.now() - Date.parse(session.adminVerifiedAt) < windowMs;
   }
 
   /** Dashboard sign-in: the hub checks the password and the admin role (rule 2); with ADMIN_OTP a code goes to the account's e-mail. */
-  async adminLogin(login: string, password: string, ip: string): Promise<AdminLoginResult> {
+  async adminLogin(login: string, password: string, ip: string, remember = false): Promise<AdminLoginResult> {
     const uuid = newUuid();
     const result = await this.deps.hub.call('login', { uuid, ip, login: normLogin(login), password, page_url: 'app://dashboard' });
     const contact = requireContact(result);
@@ -450,7 +452,7 @@ export class AuthService {
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }
     const { otp } = this.deps;
-    if (!this.adminOtpEnabled || !otp) return this.adminSecondFactor(uuid, contact, false);
+    if (!this.adminOtpEnabled || !otp) return this.adminSecondFactor(uuid, contact, false, remember);
     if (this.adminOtpStatus === 'no_mail') {
       await this.dropVisitor(uuid);
       throw new AuthError('otp_mail_off', 'تعذر إرسال رمز الدخول: بريد الخادم غير مهيأ', 503);
@@ -477,7 +479,7 @@ export class AuthService {
     return { seconds: otp.seconds, resendAfter: OTP_RESEND_GAP_SECONDS };
   }
 
-  async adminVerify(challengeToken: string, code: string): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
+  async adminVerify(challengeToken: string, code: string, remember = false): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
     const result = await this.requireOtp().check(challengeToken, code);
     if (!result.ok) {
       if (result.reason === 'bad_code') throw new AuthError('otp_bad_code', `الرمز غير صحيح، باقي ${result.attemptsLeft} محاولات`, 400);
@@ -493,7 +495,7 @@ export class AuthService {
       await this.dropVisitor(uuid);
       throw new AuthError('forbidden', 'هذه اللوحة لإدارة النادي فقط', 403);
     }
-    return this.adminSecondFactor(uuid, contact, true);
+    return this.adminSecondFactor(uuid, contact, true, remember);
   }
 
   // ---- M140: authenticator app (TOTP) — mandatory for the dashboard with ADMIN_TOTP=1, optional for members.
@@ -503,9 +505,9 @@ export class AuthService {
   }
 
   /** After the password (and the e-mailed code): the authenticator code of an enrolled account, or the enrolment of a new one. */
-  private async adminSecondFactor(uuid: string, contact: HubContact, viaOtp: boolean): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
+  private async adminSecondFactor(uuid: string, contact: HubContact, viaOtp: boolean, remember: boolean): Promise<SignedInResult | TotpStepResult | TotpSetupResult> {
     const { totp } = this.deps;
-    if (!this.adminTotpEnabled || !totp) return this.issueSession(uuid, contact, viaOtp, false);
+    if (!this.adminTotpEnabled || !totp) return this.issueSession(uuid, contact, viaOtp, false, remember);
     if (await totp.enabled(contact.id)) {
       const stepToken = await totp.beginStep(contact.id, uuid, 'dashboard', viaOtp);
       return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
@@ -515,22 +517,22 @@ export class AuthService {
   }
 
   /** Dashboard: the authenticator code (or a backup code) of an enrolled account ends the sign-in. */
-  async adminTotpVerify(stepToken: string, code: string): Promise<SignedInResult> {
+  async adminTotpVerify(stepToken: string, code: string, remember = false): Promise<SignedInResult> {
     const result = await this.requireTotp().checkStep(stepToken, code);
     if (!result.ok) throw totpFailure(result.reason);
     if (result.audience !== 'dashboard') throw new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
     const contact = await this.dashboardContact(result.uuid);
-    return this.issueSession(result.uuid, contact, result.adminVerified, true);
+    return this.issueSession(result.uuid, contact, result.adminVerified, true, remember);
   }
 
   /** Dashboard: the first code of a fresh enrolment proves the app holds the secret; the session starts and the backup codes show once. */
-  async adminTotpEnroll(setupToken: string, code: string): Promise<EnrolledResult> {
+  async adminTotpEnroll(setupToken: string, code: string, remember = false): Promise<EnrolledResult> {
     const result = await this.requireTotp().completeSetup(setupToken, code);
     if (!result.ok) throw totpFailure(result.reason);
     if (result.audience !== 'dashboard' || !result.uuid) throw new AuthError('totp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
     const contact = await this.dashboardContact(result.uuid);
     this.notifyTotp(contact.email, 'enabled');
-    const signedIn = await this.issueSession(result.uuid, contact, result.adminVerified, true);
+    const signedIn = await this.issueSession(result.uuid, contact, result.adminVerified, true, remember);
     return { ...signedIn, backupCodes: result.backupCodes };
   }
 
@@ -823,8 +825,8 @@ export class AuthService {
     return this.issueSession(uuid, contact, false, false);
   }
 
-  private async issueSession(uuid: string, contact: HubContact, adminVerified: boolean, totpVerified: boolean): Promise<SignedInResult> {
-    const token = await this.deps.sessions.createSession(uuid, contact.id, adminVerified, totpVerified);
+  private async issueSession(uuid: string, contact: HubContact, adminVerified: boolean, totpVerified: boolean, remember = false): Promise<SignedInResult> {
+    const token = await this.deps.sessions.createSession(uuid, contact.id, adminVerified, totpVerified, remember);
     return { pending: false, token, me: this.remember(uuid, contact) };
   }
 

@@ -82,11 +82,16 @@ const socialSchema = z.object({
   name: z.string().trim().max(120).optional(),
 });
 const otpChallengeSchema = z.object({ challengeToken: pendingTokenSchema });
-const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema });
+// «تذكرني» on the dashboard sign-in: the admin client repeats the flag on every step, the last one issues the session.
+const rememberSchema = z.boolean().optional();
+const adminLoginSchema = loginSchema.extend({ remember: rememberSchema });
+const otpVerifySchema = otpChallengeSchema.extend({ code: codeSchema, remember: rememberSchema });
 // M140: a 6-digit authenticator code, or a backup code («XXXX-XXXX»).
 const totpCodeSchema = z.string().trim().min(6, 'أدخل الرمز').max(12);
 const totpStepSchema = z.object({ stepToken: pendingTokenSchema, code: totpCodeSchema });
 const totpSetupSchema = z.object({ setupToken: pendingTokenSchema, code: totpCodeSchema });
+const adminTotpStepSchema = totpStepSchema.extend({ remember: rememberSchema });
+const adminTotpSetupSchema = totpSetupSchema.extend({ remember: rememberSchema });
 const totpCodeBodySchema = z.object({ code: totpCodeSchema });
 const totpSetupStartSchema = z.object({ code: totpCodeSchema.optional() });
 const resetRequestSchema = z.object({ login: loginFieldSchema, country: countrySchema });
@@ -225,9 +230,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     '/api/admin/auth/login',
     guard(async (request, reply) => {
       if (limited('admin-login', 10, request, reply)) return;
-      const body = parse(loginSchema, request.body, reply);
+      const body = parse(adminLoginSchema, request.body, reply);
       if (!body) return;
-      return service.adminLogin(body.login, body.password, request.ip);
+      return service.adminLogin(body.login, body.password, request.ip, body.remember);
     }),
   );
 
@@ -237,7 +242,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('admin-otp', 20, request, reply)) return;
       const body = parse(otpVerifySchema, request.body, reply);
       if (!body) return;
-      return service.adminVerify(body.challengeToken, body.code);
+      return service.adminVerify(body.challengeToken, body.code, body.remember);
     }),
   );
 
@@ -268,9 +273,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     '/api/admin/auth/totp/verify',
     guard(async (request, reply) => {
       if (limited('admin-totp', 20, request, reply)) return;
-      const body = parse(totpStepSchema, request.body, reply);
+      const body = parse(adminTotpStepSchema, request.body, reply);
       if (!body) return;
-      return service.adminTotpVerify(body.stepToken, body.code);
+      return service.adminTotpVerify(body.stepToken, body.code, body.remember);
     }),
   );
 
@@ -278,9 +283,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     '/api/admin/auth/totp/enroll',
     guard(async (request, reply) => {
       if (limited('admin-totp', 20, request, reply)) return;
-      const body = parse(totpSetupSchema, request.body, reply);
+      const body = parse(adminTotpSetupSchema, request.body, reply);
       if (!body) return;
-      return service.adminTotpEnroll(body.setupToken, body.code);
+      return service.adminTotpEnroll(body.setupToken, body.code, body.remember);
     }),
   );
 

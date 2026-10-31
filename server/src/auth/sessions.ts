@@ -11,6 +11,8 @@ export type SessionRecord = {
   lastSeenAt: string;
   /** Set when the session started with the dashboard's e-mailed code (M18). */
   adminVerifiedAt?: string;
+  /** Set when the dashboard sign-in ticked «تذكرني»: the e-mailed code stays valid for ADMIN_REMEMBER_DAYS instead of ADMIN_SESSION_HOURS. */
+  adminRemember?: boolean;
   /** M140: set when the session started with the account's authenticator code (or its enrolment). */
   totpVerifiedAt?: string;
 };
@@ -42,7 +44,7 @@ export class SessionStore {
     private readonly sessionDays: number,
   ) {}
 
-  async createSession(uuid: string, contactId: number, adminVerified = false, totpVerified = false): Promise<string> {
+  async createSession(uuid: string, contactId: number, adminVerified = false, totpVerified = false, remember = false): Promise<string> {
     const token = newToken();
     const now = new Date();
     const record: SessionRecord = {
@@ -52,6 +54,7 @@ export class SessionStore {
       expiresAt: new Date(now.getTime() + this.sessionDays * 86_400_000).toISOString(),
       lastSeenAt: now.toISOString(),
       ...(adminVerified ? { adminVerifiedAt: now.toISOString() } : {}),
+      ...(adminVerified && remember ? { adminRemember: true } : {}),
       ...(totpVerified ? { totpVerifiedAt: now.toISOString() } : {}),
     };
     await this.kv.set(keyFor('session', token), record);

@@ -29,6 +29,7 @@ export function Login({ onSignedIn }: Props) {
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [enrolled, setEnrolled] = useState<Enrolled | null>(null);
   const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -99,21 +100,21 @@ export function Login({ onSignedIn }: Props) {
     try {
       if (enrolled) finish(enrolled.token, enrolled.me);
       else if (setup) {
-        const result = await api.totpEnroll(setup.token, code.trim());
+        const result = await api.totpEnroll(setup.token, code.trim(), remember);
         if (result.pending || !('token' in result)) throw new ApiError('حدث خطأ غير متوقع', 0, 'error');
         setSetup(null);
         setCode('');
         setEnrolled({ token: result.token, me: result.me, codes: result.backupCodes });
-      } else if (totp) accept(await api.totpVerify(totp.token, code.trim()));
-      else if (otp) accept(await api.otpVerify(otp.token, code.trim()));
+      } else if (totp) accept(await api.totpVerify(totp.token, code.trim(), remember));
+      else if (otp) accept(await api.otpVerify(otp.token, code.trim(), remember));
       else if (pending) {
         // The hub e-mail is confirmed now, but that session is a member sign-in: drop it and sign in through the dashboard's route, which asks for the e-mailed code when the server wants one.
         const verified = await api.verify(pending.token, code.trim());
         if (!verified.pending) await api.logout(verified.token).catch(() => undefined);
         setPending(null);
         setCode('');
-        accept(await api.login(login.trim(), password));
-      } else accept(await api.login(login.trim(), password));
+        accept(await api.login(login.trim(), password, remember));
+      } else accept(await api.login(login.trim(), password, remember));
     } catch (failure) {
       fail(failure);
     } finally {
@@ -209,6 +210,10 @@ export function Login({ onSignedIn }: Props) {
             <label>
               كلمة المرور
               <input type="password" dir="ltr" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              تذكرني على هذا الجهاز
             </label>
           </>
         )}

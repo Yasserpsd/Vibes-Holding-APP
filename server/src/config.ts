@@ -37,6 +37,8 @@ const envSchema = z.object({
   ADMIN_TOTP: z.enum(['0', '1']).default('0'),
   ADMIN_OTP_SECONDS: z.coerce.number().int().min(30).max(600).default(60),
   ADMIN_SESSION_HOURS: z.coerce.number().positive().max(720).default(12),
+  // «تذكرني» on the dashboard sign-in: that session keeps its verification this many days (capped by SESSION_DAYS).
+  ADMIN_REMEMBER_DAYS: z.coerce.number().positive().max(180).default(30),
   // Golden offer pages: pulled from each company's WordPress /offer/ page on this schedule. 0 disables polling (tests).
   GOLDEN_REFRESH_MINUTES: z.coerce.number().nonnegative().default(360),
   // News engine: 0 disables polling (tests); items older than NEWS_MAX_AGE_DAYS are dropped.

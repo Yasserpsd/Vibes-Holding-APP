@@ -501,9 +501,10 @@ export function newRequestId(): string {
 }
 
 export const api = {
-  login: async (login: string, password: string): Promise<AdminLoginResult> => {
+  // `remember` («تذكرني») rides on every step of the sign-in; the step that opens the session decides the e-mailed code's lifetime.
+  login: async (login: string, password: string, remember = false): Promise<AdminLoginResult> => {
     try {
-      return await call<AdminLoginResult>('POST', '/api/admin/auth/login', { login, password }, null);
+      return await call<AdminLoginResult>('POST', '/api/admin/auth/login', { login, password, remember }, null);
     } catch (failure) {
       // A server from before M18 has no such route (and no e-mailed code): sign in the old way.
       // A server that has the route never answers not_found here, so this cannot skip the code.
@@ -513,11 +514,11 @@ export const api = {
       throw failure;
     }
   },
-  otpVerify: (challengeToken: string, code: string) => call<LoginResult>('POST', '/api/admin/auth/verify', { challengeToken, code }, null),
+  otpVerify: (challengeToken: string, code: string, remember = false) => call<LoginResult>('POST', '/api/admin/auth/verify', { challengeToken, code, remember }, null),
   otpResend: (challengeToken: string) => call<{ seconds: number; resendAfter: number }>('POST', '/api/admin/auth/resend', { challengeToken }, null),
   // M140: the authenticator step of the dashboard sign-in, and the account's own authenticator settings.
-  totpVerify: (stepToken: string, code: string) => call<LoginResult>('POST', '/api/admin/auth/totp/verify', { stepToken, code }, null),
-  totpEnroll: (setupToken: string, code: string) => call<LoginResult & { backupCodes: string[] }>('POST', '/api/admin/auth/totp/enroll', { setupToken, code }, null),
+  totpVerify: (stepToken: string, code: string, remember = false) => call<LoginResult>('POST', '/api/admin/auth/totp/verify', { stepToken, code, remember }, null),
+  totpEnroll: (setupToken: string, code: string, remember = false) => call<LoginResult & { backupCodes: string[] }>('POST', '/api/admin/auth/totp/enroll', { setupToken, code, remember }, null),
   totpStatus: () => call<TotpStatus>('GET', '/api/me/totp'),
   totpSetup: (code?: string) => call<TotpSetup>('POST', '/api/me/totp/setup', code ? { code } : {}),
   totpConfirm: (setupToken: string, code: string) => call<{ backupCodes: string[] }>('POST', '/api/me/totp/confirm', { setupToken, code }),
