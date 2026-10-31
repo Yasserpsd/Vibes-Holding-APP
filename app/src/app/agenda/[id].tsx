@@ -9,11 +9,13 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
+import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { StructuredText } from '@/components/StructuredText';
 import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -95,9 +97,10 @@ export default function AgendaEventScreen() {
             </View>
           </FadeInView>
 
+          {/* M173 (owner): the owner's prose as tidy blocks — fact rows, bullets, golden figures — never one grey wall. */}
           {event.blurb ? (
             <FadeInView delay={100}>
-              <Text style={styles.blurb}>{event.blurb}</Text>
+              <StructuredText text={event.blurb} />
             </FadeInView>
           ) : null}
 
@@ -135,6 +138,25 @@ export default function AgendaEventScreen() {
               ) : null}
             </GlassCard>
           </FadeInView>
+
+          {/* M173 (owner: «لازم يكون في CTA مباشر يعرفني إن لو دفعت العضوية دلوقتي الحضور بدون أي رسوم»): a signed-in
+              non-member who would pay sees the membership door right under the prices — one tap opens the store popup. */}
+          {signedIn && event.mustPay && (event.savingsSar ?? 0) > 0 && !event.mine?.paid ? (
+            <FadeInView delay={200}>
+              <GlassCard golden style={styles.memberCta}>
+                <View style={styles.memberCtaHead}>
+                  <Ionicons name="ribbon-outline" size={22} color={colors.goldLight} />
+                  <Text style={styles.memberCtaTitle}>
+                    {(event.memberFeeSar ?? 0) > 0
+                      ? t('agenda.memberCtaTitleFee', { fee: String(event.memberFeeSar), full: String(event.feeSar) })
+                      : t('agenda.memberCtaTitle')}
+                  </Text>
+                </View>
+                <Text style={styles.memberCtaText}>{t('agenda.memberCtaText', { amount: String(event.savingsSar) })}</Text>
+                <AppButton label={t('agenda.memberCtaButton')} icon="sparkles-outline" onPress={showMembershipGate} />
+              </GlassCard>
+            </FadeInView>
+          ) : null}
 
           {event.mine?.paid ? (
             <>
@@ -208,7 +230,11 @@ const styles = StyleSheet.create({
   headText: { flex: 1, gap: 4 },
   title: { ...typography.title, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-  blurb: { ...typography.body, color: colors.textSecondary, textAlign: textStart, lineHeight: 26 },
+  // M173: the membership door under the prices — golden, one sentence, one button.
+  memberCta: { gap: spacing.sm, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
+  memberCtaHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  memberCtaTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 26, color: colors.goldLight, flex: 1, textAlign: textStart },
+  memberCtaText: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   infoCard: {
     gap: spacing.sm,
     padding: spacing.md,

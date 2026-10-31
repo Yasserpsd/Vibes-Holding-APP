@@ -4,18 +4,16 @@ import { useCallback, useMemo } from 'react';
 import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda } from '@/api/agenda';
-import { useNewsFeed } from '@/api/news';
 import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
 import { useProjectsList } from '@/api/queries';
-import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t, type StringKey } from '@/i18n';
-import { chevronForward, textStart } from '@/i18n/direction';
+import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { countNew, markSeen, useSeenMarks } from '@/lib/seen';
@@ -23,12 +21,13 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 
 /**
  * M75 «الإشعارات» (owner): ONE fixed center for every persona — admin messages, workshops and
- * events, the news itself, new bank projects and new «شخصية ومسيرة» profiles, merged newest
- * first. Opening the tab clears its badge; every row leads to the real thing.
+ * events, new bank projects and new «شخصية ومسيرة» profiles, merged newest first. Opening the
+ * tab clears its badge; every row leads to the real thing. M173 (owner: «الإشعارات توديني على كل
+ * الإشعارات مش على الأخبار خالص»): the news left this center — its door sits on the home.
  */
 type InboxItem = {
   id: string;
-  kind: 'post' | 'event' | 'news' | 'project' | 'person';
+  kind: 'post' | 'event' | 'project' | 'person';
   title: string;
   subtitle: string | null;
   time: string | null;
@@ -39,17 +38,14 @@ type InboxItem = {
 const KIND_META: Record<InboxItem['kind'], { icon: IoniconName; label: StringKey }> = {
   post: { icon: 'megaphone-outline', label: 'inbox.kind.post' },
   event: { icon: 'calendar-outline', label: 'inbox.kind.event' },
-  news: { icon: 'newspaper-outline', label: 'inbox.kind.news' },
   project: { icon: 'briefcase-outline', label: 'inbox.kind.project' },
   person: { icon: 'sparkles-outline', label: 'inbox.kind.person' },
 };
 
 export default function InboxScreen() {
   const router = useRouter();
-  const { status, me } = useAuth();
   const posts = useLatestPosts(10);
   const agenda = useAgenda();
-  const news = useNewsFeed(undefined, status === 'signedIn' ? `inbox:${me?.id ?? 'me'}` : 'inbox:guest');
   const projects = useProjectsList({ q: '', sort: 'latest' });
   const people = usePeople();
   const seen = useSeenMarks();
@@ -75,9 +71,6 @@ export default function InboxScreen() {
       .filter((entry) => entry.past)
       .slice(0, 3)
       .map((event) => ({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: t('agenda.ended'), time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: cardImageOf(event), route: `/agenda/${event.id}` as Href }));
-    for (const item of (news.data?.pages[0]?.items ?? []).slice(0, 8)) {
-      out.push({ id: `news:${item.id}`, kind: 'news', title: item.title, subtitle: item.source.name, time: item.publishedAt, image: item.image, route: { pathname: '/news/[id]', params: { id: item.id } } });
-    }
     for (const project of (projects.data?.pages[0]?.items ?? []).slice(0, 6)) {
       out.push({ id: `project:${project.id}`, kind: 'project', title: project.title, subtitle: project.sector?.name ?? null, time: project.modifiedAt, image: project.image, route: { pathname: '/project/[id]', params: { id: String(project.id) } } });
     }
@@ -88,13 +81,13 @@ export default function InboxScreen() {
     const events = out.filter((item) => item.kind === 'event');
     const rest = out.filter((item) => item.kind !== 'event').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
     return [...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
-  }, [posts.data, agenda.data, news.data, projects.data, people.data]);
+  }, [posts.data, agenda.data, projects.data, people.data]);
 
-  const loading = posts.isLoading && agenda.isLoading && news.isPending;
+  const loading = posts.isLoading && agenda.isLoading;
   const unreadPosts = countNew((posts.data?.posts ?? []).map((post) => post.publishedAt), seen.posts);
 
   const onRefresh = async () => {
-    await Promise.all([posts.refetch(), agenda.refetch(), news.refetch(), projects.refetch(), people.refetch()]);
+    await Promise.all([posts.refetch(), agenda.refetch(), projects.refetch(), people.refetch()]);
   };
 
   return (
@@ -119,15 +112,6 @@ export default function InboxScreen() {
           </FadeInView>
         ))
       )}
-      <FadeInView delay={200}>
-        <PressScale onPress={() => router.push('/news' as Href)} glow glowRadius={radii.lg}>
-          <GlassCard style={styles.allNews}>
-            <Ionicons name="newspaper-outline" size={20} color={colors.gold} />
-            <Text style={styles.allNewsText}>{t('inbox.allNews')}</Text>
-            <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
-          </GlassCard>
-        </PressScale>
-      </FadeInView>
     </Screen>
   );
 }
@@ -184,6 +168,4 @@ const styles = StyleSheet.create({
   title: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   thumb: { width: 54, height: 54, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
-  allNews: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, marginTop: spacing.sm },
-  allNewsText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
 });

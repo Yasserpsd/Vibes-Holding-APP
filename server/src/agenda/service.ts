@@ -250,6 +250,12 @@ export class AgendaService {
     return [...upcoming, ...past];
   }
 
+  /** M173: the open events whose last day has not passed (Riyadh), soonest first — the 12-hour nudges rotate through them. */
+  async upcomingOpen(now = Date.now()): Promise<AgendaEvent[]> {
+    const today = riyadhDay(now);
+    return (await this.loadEvents()).filter((event) => event.open && lastDay(event) >= today);
+  }
+
   /** M75: when each currently-listed upcoming event was created — the home badge counts the fresh ones. */
   async createdTimes(now = Date.now()): Promise<string[]> {
     const today = riyadhDay(now);

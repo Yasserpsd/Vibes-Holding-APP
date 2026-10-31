@@ -6,9 +6,10 @@ import type { AuthService } from '../auth/service.js';
 import { INTEREST_KEYS } from '../interests/types.js';
 import { langOf } from '../lang.js';
 import type { Translator } from '../translate.js';
+import type { WorkshopNudgeService } from './nudges.js';
 import type { AgendaEvent, AgendaService } from './service.js';
 
-export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator };
+export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator; nudges?: WorkshopNudgeService };
 
 const registerSchema = z.object({ attendance: z.enum(['hq', 'online']), discountCode: z.string().trim().max(30).optional() });
 const discountSchema = z.object({ code: z.string().trim().min(1).max(30) });
@@ -42,7 +43,7 @@ const eventSchema = z.object({
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M41 «أجندة النادي»: the public agenda, the one-tap registration, and the dashboard's event management. */
-export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator }) => {
+export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator, nudges }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   const requireAppAdmin = adminGuard(auth);
@@ -223,4 +224,35 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       return { ok: true, ...(await service.notify(params.id)) };
     }),
   );
+  // M173: the 12-hour workshop nudges — the state, the switch, and «ابعت التذكير دلوقتي» (no dashboard UI yet; admin-session.mjs probes).
+  if (nudges) {
+    app.get(
+      '/api/admin/agenda/nudges',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        return nudges.load();
+      }),
+    );
+    app.put(
+      '/api/admin/agenda/nudges',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        const body = parse(z.object({ enabled: z.boolean() }), request.body, reply);
+        if (!body) return;
+        return nudges.setEnabled(body.enabled);
+      }),
+    );
+    app.post(
+      '/api/admin/agenda/nudges/push',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        const result = await nudges.sendNow();
+        if (!result) return reply.code(409).send({ error: { code: 'no_event', message: 'لا توجد ورشة مفتوحة قادمة أو هناك إرسال جارٍ — حاول بعد قليل' } });
+        return { ok: true, ...result };
+      }),
+    );
+  }
 };

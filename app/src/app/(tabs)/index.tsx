@@ -353,6 +353,9 @@ export default function HomeScreen() {
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
       <HqBanner />
 
+      {/* M173 (owner): the news left the «الإشعارات» center — its fixed door sits here, at the very top of the home. */}
+      <NewsDoor />
+
       {/* M120 (owner's TestFlight feedback): the subscribe door, high on every non-member's home. */}
       <MembershipHomeCard />
 
@@ -372,6 +375,29 @@ export default function HomeScreen() {
 }
 
 /** M102: the home's top image — the real HQ, opening the HQ screen; the banner slot is the fallback. */
+/** M173: the one fixed door to every news item (the inbox no longer lists them). */
+function NewsDoor() {
+  const router = useRouter();
+  return (
+    <FadeInView delay={160}>
+      <PressScale onPress={() => router.push('/news' as Href)} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={t('home.newsDoor')}>
+        <GlassCard style={styles.newsDoor}>
+          <View style={styles.newsDoorIcon}>
+            <Ionicons name="newspaper-outline" size={20} color={colors.gold} />
+          </View>
+          <View style={styles.newsDoorTexts}>
+            <Text style={styles.newsDoorTitle}>{t('home.newsDoor')}</Text>
+            <Text style={styles.newsDoorSub} numberOfLines={1}>
+              {t('home.newsDoorSub')}
+            </Text>
+          </View>
+          <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
+        </GlassCard>
+      </PressScale>
+    </FadeInView>
+  );
+}
+
 function HqBanner() {
   const router = useRouter();
   const photos = useHq().data?.photos ?? [];
@@ -594,6 +620,12 @@ const styles = StyleSheet.create({
   heroDivider: { width: 72, marginTop: spacing.xs, alignSelf: 'center' },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  // M173: the news door right under the HQ photo.
+  newsDoor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 4, padding: spacing.sm + 4 },
+  newsDoorIcon: { width: 40, height: 40, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldSoft },
+  newsDoorTexts: { flex: 1, gap: 1 },
+  newsDoorTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
+  newsDoorSub: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   // M102: the HQ photo crowning the home.
   hqBanner: {
     width: '100%',

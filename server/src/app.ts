@@ -77,6 +77,7 @@ import { ProjectAccessService } from './projectsBank/access.js';
 import { BriefService } from './projectsBank/brief.js';
 import { LivePbBridge, MockPbBridge, OffPbBridge, type PbBridge } from './projectsBank/bridge.js';
 import { DailyProjectService } from './projectsBank/daily.js';
+import { WorkshopNudgeService } from './agenda/nudges.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import { ImageVariants } from './media/images.js';
@@ -391,6 +392,13 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices });
   // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).
   if (autoPush) agenda.startReminders();
+  // M173: the 12-hour workshop nudges (09:00 + 21:00 Riyadh) to every device without a confirmed seat; same switch.
+  const nudges = new WorkshopNudgeService({ kv, log: app.log, agenda, push });
+  if (autoPush) {
+    const nudgeTimer = setInterval(() => void nudges.run(), 5 * 60_000);
+    nudgeTimer.unref();
+    app.addHook('onClose', async () => clearInterval(nudgeTimer));
+  }
   // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
   const partners = new PartnersService({ kv, onChange: () => moved('content') });
   // M87: the advisor's daily persona push — templates over live data, zero AI cost at send time.
@@ -550,7 +558,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
-  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator });
+  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges });
   await app.register(badgesRoutes, { auth, agenda, profiles, payments });
   await app.register(companionRoutes, { service: companion, auth });
   await app.register(payLinksRoutes, { service: paylinks, auth });
