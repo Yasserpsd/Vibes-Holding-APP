@@ -3,8 +3,7 @@ import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { useAgendaDiscount, useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaDiscount, type AgendaEvent } from '@/api/agenda';
-import { errorMessage } from '@/api/client';
+import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -33,41 +32,22 @@ export default function AgendaEventScreen() {
   const signedIn = status === 'signedIn';
   const query = useAgendaEvent(typeof id === 'string' ? id : undefined);
   const register = useRegisterAgenda();
-  const checkDiscount = useAgendaDiscount();
   const [error, setError] = useState<string | null>(null);
   const [gated, setGated] = useState(false);
-  // M107: the discount code the member typed, and what the server said it is worth here.
+  // M107: the discount code the member typed; M172b (owner): no «تحقق» button — the code goes with the confirm tap and the server applies it.
   const [code, setCode] = useState('');
-  const [applied, setApplied] = useState<AgendaDiscount | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
   // M172 (owner): ONE button. A «both» event asks how he attends with two pills above it (in person first).
   const [chosen, setChosen] = useState<AgendaAttendance>('hq');
   const event = query.data?.event;
   const myFee = event ? (event.myFeeSar ?? event.feeSar) : 0;
-  const dueNow = applied ? applied.amountAfter : myFee;
   const attendance: AgendaAttendance = event?.mode === 'online' ? 'online' : event?.mode === 'hq' ? 'hq' : chosen;
-
-  const tryCode = () => {
-    if (!event || !code.trim() || checkDiscount.isPending) return;
-    setCodeError(null);
-    checkDiscount.mutate(
-      { eventId: event.id, code: code.trim() },
-      {
-        onSuccess: (answer) => setApplied(answer),
-        onError: (cause) => {
-          setApplied(null);
-          setCodeError(errorMessage(cause));
-        },
-      },
-    );
-  };
 
   const tap = (attendance: AgendaAttendance) => {
     if (!event || register.isPending) return;
     setError(null);
     setGated(false);
     register.mutate(
-      { eventId: event.id, attendance, discountCode: applied ? applied.code : code.trim() || undefined },
+      { eventId: event.id, attendance, discountCode: code.trim() || undefined },
       {
         onSuccess: async (answer) => {
           // M111: the checkout renders embedded inside the app. A 100% code settles on the spot.
@@ -91,7 +71,7 @@ export default function AgendaEventScreen() {
   };
 
   // The one button: «تأكيد الحضور» for a member (or a no-fee event), the same words with the fee for everyone else.
-  const confirmLabel = event && event.mustPay && dueNow > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(dueNow) }) : t('agenda.confirmAttendance');
+  const confirmLabel = event && event.mustPay && myFee > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(myFee) }) : t('agenda.confirmAttendance');
 
   return (
     <Screen>
@@ -176,34 +156,19 @@ export default function AgendaEventScreen() {
             <>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}
               {event.mustPay ? <Notice tone="info" text={t('agenda.payNote')} /> : null}
-              {/* M107: the discount-code box — a 100% code confirms the attendance with no checkout. */}
+              {/* M107: the discount-code box — a 100% code confirms the attendance with no checkout.
+                  M172b (owner): the code is simply typed; it is applied when he confirms (no separate «تحقق» step). */}
               {event.mustPay ? (
                 <View style={styles.codeBox}>
-                  <View style={styles.codeRow}>
-                    <View style={styles.codeField}>
-                      <FormField
-                        label={t('agenda.discountLabel')}
-                        latin
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                        value={code}
-                        onChangeText={(value) => {
-                          setCode(value.toUpperCase());
-                          setApplied(null);
-                          setCodeError(null);
-                        }}
-                        placeholder="CODE"
-                      />
-                    </View>
-                    <AppButton label={t('agenda.discountCheck')} variant="outline" icon="checkmark-outline" loading={checkDiscount.isPending} onPress={tryCode} />
-                  </View>
-                  {applied ? (
-                    <Notice
-                      tone="success"
-                      text={applied.amountAfter === 0 ? t('agenda.discountFree') : t('agenda.discountApplied', { percent: String(applied.percent), amount: String(applied.amountAfter) })}
-                    />
-                  ) : null}
-                  {codeError ? <Notice tone="warning" text={codeError} /> : null}
+                  <FormField
+                    label={t('agenda.discountLabel')}
+                    latin
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    value={code}
+                    onChangeText={(value) => setCode(value.toUpperCase())}
+                    placeholder="CODE"
+                  />
                 </View>
               ) : null}
               {error ? (
@@ -259,8 +224,6 @@ const styles = StyleSheet.create({
   attendanceRow: { gap: spacing.xs },
   attendanceLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   attendanceChips: { flexDirection: 'row', gap: spacing.sm },
-  codeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-  codeField: { flex: 1 },
   // The fee reads as a golden pill, not a plain line.
   feePill: {
     paddingVertical: spacing.xs,
