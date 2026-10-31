@@ -43,6 +43,8 @@ function fakeMedia(objects: Array<{ key: string; body: string; modifiedAt: Date 
     durable: false,
     async ticket() { throw new Error('unused'); },
     async head() { return null; },
+    async read() { return null; },
+    async put() {},
     async locate(key) {
       const found = objects.find((object) => object.key === key);
       if (!found) return null;

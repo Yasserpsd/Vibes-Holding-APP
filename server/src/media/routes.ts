@@ -3,12 +3,15 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
-import { uploadInputSchema, type MediaService } from './service.js';
+import { ImageVariants, pickWidth } from './images.js';
+import { isMediaKey, uploadInputSchema, type MediaService } from './service.js';
 import { DiskMediaStore, UploadTokenError, UploadTooLargeError } from './store.js';
 
-export type MediaRoutesOptions = { service: MediaService; auth: AuthService };
+/** M169: `variants` resizes pictures on the way out; absent (sharp unavailable, old tests) the originals answer as before. */
+export type MediaRoutesOptions = { service: MediaService; auth: AuthService; variants?: ImageVariants | null };
 
 const NOT_FOUND = { error: { code: 'not_found', message: 'الملف غير موجود' } };
+const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 /** `bytes=start-end` for one range; null when the header is absent, malformed or cannot be satisfied. */
 function parseRange(header: string | undefined, size: number): { start: number; end: number } | null {
@@ -20,7 +23,7 @@ function parseRange(header: string | undefined, size: number): { start: number; 
 }
 
 /** Uploaded media (M15): tickets for the dashboard and the public `/media/<key>` links the posts carry. */
-export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, { service, auth }) => {
+export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, { service, auth, variants }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const store = service.store;
 
@@ -71,6 +74,17 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, {
 
   app.get('/media/*', async (request, reply) => {
     const key = (request.params as { '*': string })['*'];
+    const query = request.query as { w?: unknown; raw?: unknown };
+    // M169: a picture leaves as a small WebP at the width the screen asked for (`?w=`), from this server,
+    // cacheable for a year. `raw=1` (the dashboard's download) and videos keep the original path below.
+    if (variants && isMediaKey(key) && ImageVariants.resizable(key) && query.raw !== '1') {
+      const variant = await variants.get(key, pickWidth(query.w));
+      if (variant) {
+        reply.header('etag', variant.etag).header('cache-control', IMMUTABLE).header('x-content-type-options', 'nosniff');
+        if (request.headers['if-none-match'] === variant.etag) return reply.code(304).send();
+        return reply.header('content-type', variant.contentType).header('content-length', variant.body.length).send(variant.body);
+      }
+    }
     const location = await service.locate(key);
     if (!location) return reply.code(404).send(NOT_FOUND);
     // The presigned link lives for an hour; the redirect may be reused for ten minutes of it.

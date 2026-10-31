@@ -19,6 +19,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatNumber, weekdayName, weekdayOf } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -70,11 +71,11 @@ export default function HqScreen() {
       {/* M81: the owner's real HQ photos, employed where they belong — the first photo leads wide. */}
       {photos.length ? (
         <FadeInView delay={entranceDelay(0)}>
-          <Image source={{ uri: photos[0] }} style={styles.heroPhoto} resizeMode="cover" accessibilityLabel={content.title} />
+          <Image source={{ uri: sized(photos[0], 360) }} style={styles.heroPhoto} resizeMode="cover" accessibilityLabel={content.title} />
           {photos.length > 1 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
               {photos.slice(1).map((photo) => (
-                <Image key={photo} source={{ uri: photo }} style={styles.photo} resizeMode="cover" accessibilityLabel={content.title} />
+                <Image key={photo} source={{ uri: sized(photo, 240) }} style={styles.photo} resizeMode="cover" accessibilityLabel={content.title} />
               ))}
             </ScrollView>
           ) : null}

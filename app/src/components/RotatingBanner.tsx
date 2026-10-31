@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { sized } from '@/lib/imageUrl';
 import { colors, radii } from '@/theme/tokens';
 
 const ROTATE_MS = 5000;
@@ -75,7 +76,7 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
     <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
         <Image
-          source={{ uri: url }}
+          source={{ uri: sized(url, 360) }}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           resizeMethod="resize"

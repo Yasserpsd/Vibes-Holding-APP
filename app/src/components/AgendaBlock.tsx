@@ -10,6 +10,7 @@ import { FlipCountdown } from '@/components/wow';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatDayCount } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 200;
@@ -67,7 +68,7 @@ function MiniEvent({ event, nearest, countdownMs, onPress }: { event: AgendaEven
     <PressScale onPress={onPress} glow={!past} glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, nearest && styles.cardNearest]}>
         {photo ? (
-          <Image source={{ uri: photo }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+          <Image source={{ uri: sized(photo, 260) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
         ) : (
           <View style={[styles.fallback, past && styles.photoPast]}>
             <Ionicons name="calendar-outline" size={46} color={colors.goldDark} />

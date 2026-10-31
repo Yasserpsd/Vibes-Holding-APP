@@ -10,6 +10,7 @@ import { FlipCountdown } from '@/components/wow';
 import { getLang, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDays } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -72,7 +73,7 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, highlight && styles.cardGlow]}>
         {cardImageOf(event) ? (
-          <Image source={{ uri: cardImageOf(event) ?? undefined }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+          <Image source={{ uri: sized(cardImageOf(event), 360) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
         ) : (
           <View style={[styles.fallback, past && styles.photoPast]}>
             <Ionicons name="calendar-outline" size={52} color={colors.goldDark} />

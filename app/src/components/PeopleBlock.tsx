@@ -7,6 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { FadeInView, PressScale, entranceDelay } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
+import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -51,7 +52,7 @@ export function PersonAvatar({ person, size }: { person: Person; size: number })
   return (
     <View style={[styles.avatarRing, { width: size, height: size, borderRadius: size / 2 }]}>
       {person.photo ? (
-        <Image source={{ uri: person.photo }} style={styles.avatarPhoto} resizeMode="cover" />
+        <Image source={{ uri: sized(person.photo, size) }} style={styles.avatarPhoto} resizeMode="cover" />
       ) : (
         <Text style={[styles.initial, { fontSize: size * 0.38 }]}>{person.name.trim().charAt(0) || '•'}</Text>
       )}

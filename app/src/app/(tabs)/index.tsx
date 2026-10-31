@@ -34,6 +34,7 @@ import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
+import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -380,7 +381,7 @@ function HqBanner() {
   return (
     <FadeInView delay={140}>
       <PressScale onPress={() => router.push('/hq')} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('nav.hq')}>
-        <Image source={{ uri: photo }} style={styles.hqBanner} resizeMode="cover" resizeMethod="resize" accessibilityLabel={t('nav.hq')} />
+        <Image source={{ uri: sized(photo, 360) }} style={styles.hqBanner} resizeMode="cover" resizeMethod="resize" accessibilityLabel={t('nav.hq')} />
       </PressScale>
     </FadeInView>
   );

@@ -5,6 +5,7 @@ import { useHq } from '@/api/hq';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
+import { sized } from '@/lib/imageUrl';
 import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
 const PHOTO_WIDTH = 240;
@@ -33,7 +34,7 @@ export function ClubTourStrip() {
         {photos.map((url, index) => (
           <FadeInView key={url} delay={entranceDelay(index)}>
             <PressScale onPress={open} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('home.tourTitle')}>
-              <Image source={{ uri: url }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
+              <Image source={{ uri: sized(url, PHOTO_WIDTH) }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
             </PressScale>
           </FadeInView>
         ))}

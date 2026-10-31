@@ -8,6 +8,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
+import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, serviceAccents, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { service: Service; onPress: () => void };
@@ -29,7 +30,7 @@ export function ServiceTile({ service, onPress }: Props) {
       <View style={[styles.card, locked && styles.lockedCard]}>
         {photo && !locked ? (
           <>
-            <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
+            <Image source={{ uri: sized(photo, 200) }} style={styles.photo} resizeMode="cover" resizeMethod="resize" />
             <View style={styles.wash} pointerEvents="none" />
           </>
         ) : null}

@@ -78,6 +78,7 @@ import { BriefService } from './projectsBank/brief.js';
 import { LivePbBridge, MockPbBridge, OffPbBridge, type PbBridge } from './projectsBank/bridge.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
+import { ImageVariants } from './media/images.js';
 import { mediaRoutes } from './media/routes.js';
 import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
@@ -554,7 +555,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme, smtpHost: config.SMTP_HOST ?? null, smtpPort: config.SMTP_PORT });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
-  await app.register(mediaRoutes, { service: media, auth });
+  // M169: pictures leave resized and cacheable; without sharp the originals answer as before.
+  const imageVariants = await ImageVariants.create(mediaStore, app.log);
+  await app.register(mediaRoutes, { service: media, auth, variants: imageVariants });
   await app.register(backupRoutes, { service: backup, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests });

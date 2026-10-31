@@ -9,6 +9,7 @@ import { PaperCard } from '@/components/paper';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export const HOME_POSTS_LIMIT = 3;
@@ -121,13 +122,13 @@ export function PostCard({ post }: { post: Post }) {
       {paper ? (
         // The golden pin head and the hair of tilt come from PaperCard itself.
         <PaperCard pinned style={styles.paperCard}>
-          {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.paperBanner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
+          {thumbnail ? <Image source={{ uri: sized(thumbnail, 360) }} style={styles.paperBanner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
           {body}
         </PaperCard>
       ) : (
         // M76 (owner): a post WITH media leads with a big banner image — visual cards, not a wall of text.
         <GlassCard radius={radii.lg} style={[styles.card, thumbnail ? styles.cardMedia : null]}>
-          {thumbnail ? <Image source={{ uri: thumbnail }} style={styles.banner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
+          {thumbnail ? <Image source={{ uri: sized(thumbnail, 360) }} style={styles.banner} resizeMode="cover" accessibilityLabel={post.title} /> : null}
           {body}
         </GlassCard>
       )}

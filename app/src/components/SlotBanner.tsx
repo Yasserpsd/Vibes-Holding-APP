@@ -2,6 +2,7 @@ import { Image, StyleSheet } from 'react-native';
 
 import { useAppImages } from '@/api/images';
 import { FadeInView } from '@/components/motion';
+import { sized } from '@/lib/imageUrl';
 import { colors, radii, shadows } from '@/theme/tokens';
 
 /**
@@ -13,7 +14,7 @@ export function SlotBanner({ slot }: { slot: string }) {
   if (!url) return null;
   return (
     <FadeInView offset={8}>
-      <Image source={{ uri: url }} style={styles.banner} resizeMode="cover" accessibilityIgnoresInvertColors />
+      <Image source={{ uri: sized(url, 360) }} style={styles.banner} resizeMode="cover" accessibilityIgnoresInvertColors />
     </FadeInView>
   );
 }

@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutBucketCorsCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutBucketCorsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { FastifyBaseLogger } from 'fastify';
@@ -90,6 +90,22 @@ export class S3MediaStore implements MediaStore {
   async locate(key: string): Promise<MediaLocation | null> {
     const redirect = await getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.options.bucket, Key: key }), { expiresIn: LINK_SECONDS });
     return { redirect };
+  }
+
+  async read(key: string): Promise<{ body: Buffer; contentType: string } | null> {
+    try {
+      const object = await this.client.send(new GetObjectCommand({ Bucket: this.options.bucket, Key: key }));
+      const bytes = await object.Body?.transformToByteArray();
+      if (!bytes) return null;
+      return { body: Buffer.from(bytes), contentType: object.ContentType ?? 'application/octet-stream' };
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(new PutObjectCommand({ Bucket: this.options.bucket, Key: key, Body: body, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
   }
 
   async remove(key: string): Promise<void> {

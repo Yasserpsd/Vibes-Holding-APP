@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -25,6 +25,10 @@ export interface MediaStore {
   ticket(key: string, contentType: string, maxBytes: number): Promise<UploadTicket>;
   head(key: string): Promise<MediaInfo | null>;
   locate(key: string): Promise<MediaLocation | null>;
+  /** M169: the whole object in memory (resized variants are made from it); null when it does not exist. */
+  read(key: string): Promise<{ body: Buffer; contentType: string } | null>;
+  /** M169: writes a derived file (a resized variant) next to the originals. */
+  put(key: string, body: Buffer, contentType: string): Promise<void>;
   remove(key: string): Promise<void>;
   list(prefix: string): Promise<MediaObject[]>;
   status(): Record<string, unknown>;
@@ -148,6 +152,18 @@ export class DiskMediaStore implements MediaStore {
 
   open(path: string, range?: { start: number; end: number }): Readable {
     return createReadStream(path, range);
+  }
+
+  async read(key: string): Promise<{ body: Buffer; contentType: string } | null> {
+    const info = await this.head(key);
+    if (!info) return null;
+    return { body: await readFile(this.file(key)), contentType: info.contentType };
+  }
+
+  async put(key: string, body: Buffer, _contentType: string): Promise<void> {
+    const target = this.file(key);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, body);
   }
 
   status(): Record<string, unknown> {
