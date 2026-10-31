@@ -1,0 +1,94 @@
+import type { FastifyBaseLogger } from 'fastify';
+
+export const GRAPH_VERSION = 'v24.0';
+
+export type WaComponent = { type: string; format?: string; text?: string; buttons?: { type: string; url?: string; text?: string }[] };
+export type WaTemplate = {
+  id?: string;
+  name: string;
+  language: string;
+  status: string;
+  category?: string;
+  parameter_format?: string;
+  components: WaComponent[];
+};
+
+/** A Graph API refusal. The message is Meta's own text and never carries the token. */
+export class WhatsappError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: number | null,
+  ) {
+    super(message);
+    this.name = 'WhatsappError';
+  }
+}
+
+export type WhatsappClientOptions = {
+  token: string;
+  phoneId: string;
+  wabaId: string;
+  log?: Pick<FastifyBaseLogger, 'warn' | 'info'>;
+  fetchImpl?: typeof fetch;
+};
+
+type GraphErrorBody = { error?: { message?: string; code?: number; error_data?: { details?: string } } };
+
+/** Thin Graph API v24 client: template messages and the template list. Credentials from the environment only. */
+export class WhatsappClient {
+  constructor(private readonly options: WhatsappClientOptions) {}
+
+  private async graph<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+    const fetchImpl = this.options.fetchImpl ?? fetch;
+    let response: Response;
+    try {
+      response = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${path}`, {
+        method,
+        headers: { authorization: `Bearer ${this.options.token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      throw new WhatsappError(`network: ${error instanceof Error ? error.name : 'error'}`, 0, null);
+    }
+    const text = await response.text();
+    let json: unknown = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+    if (!response.ok) {
+      const failure = (json as GraphErrorBody | null)?.error;
+      const detail = failure?.error_data?.details ? ` (${failure.error_data.details})` : '';
+      throw new WhatsappError(`${failure?.message ?? `http ${response.status}`}${detail}`.slice(0, 300), response.status, failure?.code ?? null);
+    }
+    return json as T;
+  }
+
+  /** Sends one approved template; `bodyParams` fill {{1}}, {{2}}… of the body in order. Returns Meta's message id. */
+  async sendTemplate(input: { to: string; template: string; language: string; bodyParams: string[] }): Promise<string> {
+    const answer = await this.graph<{ messages?: { id?: string }[] }>('POST', `${encodeURIComponent(this.options.phoneId)}/messages`, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: input.to,
+      type: 'template',
+      template: {
+        name: input.template,
+        language: { code: input.language },
+        ...(input.bodyParams.length ? { components: [{ type: 'body', parameters: input.bodyParams.map((text) => ({ type: 'text', text })) }] } : {}),
+      },
+    });
+    const id = answer.messages?.[0]?.id;
+    if (!id) throw new WhatsappError('no message id in the answer', 200, null);
+    return id;
+  }
+
+  /** The WABA's templates called `name` (every language) with their real components. */
+  async listTemplates(name: string): Promise<WaTemplate[]> {
+    const query = new URLSearchParams({ name, fields: 'id,name,language,status,category,parameter_format,components', limit: '50' });
+    const answer = await this.graph<{ data?: WaTemplate[] }>('GET', `${encodeURIComponent(this.options.wabaId)}/message_templates?${query.toString()}`);
+    return (answer.data ?? []).filter((template) => template.name === name);
+  }
+}

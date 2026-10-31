@@ -112,6 +112,9 @@ import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './vide
 import { videosRoutes } from './videos/routes.js';
 import { VideosService } from './videos/service.js';
 import { webhookRoutes } from './webhooks/routes.js';
+import { WhatsappClient } from './whatsapp/client.js';
+import { whatsappAdminRoutes, whatsappWebhookRoutes } from './whatsapp/routes.js';
+import { WhatsappService } from './whatsapp/service.js';
 import { workshopsRoutes } from './workshops/routes.js';
 import { WorkshopsService } from './workshops/service.js';
 
@@ -266,6 +269,16 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // Dashboard sign-in code (M18). On the mock hub without SMTP the code is the mock's public test code.
   const otp = new AdminOtpStore(kv, config.ADMIN_OTP_SECONDS, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const notifier = new Notifier({ mailer: mail, recipients: parseRecipients(config.NOTIFY_EMAIL), log: app.log, appEnv: config.APP_ENV, publicUrl: config.PUBLIC_URL });
+  // M174: welcome and receipt on WhatsApp (templates), e-mail as the fallback; no token = off.
+  const whatsapp = new WhatsappService({
+    kv,
+    log: app.log,
+    mailer: mail,
+    enabled: config.WHATSAPP_ENABLED !== '0' && Boolean(config.WHATSAPP_TOKEN),
+    client: config.WHATSAPP_TOKEN
+      ? new WhatsappClient({ token: config.WHATSAPP_TOKEN, phoneId: config.WHATSAPP_PHONE_ID, wabaId: config.WHATSAPP_WABA_ID, log: app.log, fetchImpl })
+      : null,
+  });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
@@ -353,6 +366,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     gateway: paymentGateway,
     notifier,
     push,
+    whatsapp,
     // With Moyasar live the Paymob webhook route stays mounted but unforgeable (random secret).
     hmacSecret:
       paymentGateway.mode === 'live'
@@ -595,7 +609,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(downloadsRoutes, { service: downloads, auth });
   await app.register(analyticsRoutes, { service: analytics, auth, dashboard });
   await app.register(syncRoutes, { service: sync, feed });
-  await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync, hub: hubClient, payments });
+  await app.register(webhookRoutes, { hubSecret: config.HUB_WEBHOOK_SECRET, pbSecret: config.PB_BRIDGE_KEY, auth, advisor, dashboard, projects, push, feed, sync, hub: hubClient, payments, whatsapp });
+  await app.register(whatsappWebhookRoutes, { service: whatsapp, verifyToken: config.WHATSAPP_VERIFY_TOKEN, appSecret: config.WHATSAPP_APP_SECRET });
+  await app.register(whatsappAdminRoutes, { service: whatsapp, auth });
 
   app.setNotFoundHandler((_request, reply) => {
     void reply.code(404).send({ error: { code: 'not_found', message: 'المسار غير موجود' } });

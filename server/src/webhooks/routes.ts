@@ -10,6 +10,8 @@ import type { ProjectsService } from '../projectsBank/service.js';
 import type { PushService } from '../push/service.js';
 import type { FeedService } from '../sync/feed.js';
 import type { SyncService } from '../sync/service.js';
+import { runSend, sendSchema } from '../whatsapp/routes.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 import { checkSignature, WINDOW_SECONDS } from './signature.js';
 
 export type WebhookRoutesOptions = {
@@ -25,6 +27,8 @@ export type WebhookRoutesOptions = {
   /** M132a: a successful site payment is fetched from the hub (`payment_get`) and gets the app's numbered invoice. */
   hub?: HubClient;
   payments?: PaymentsService;
+  /** M174: the `whatsapp.send` event. */
+  whatsapp?: WhatsappService;
 };
 
 const eventSchema = z.object({ event: z.string().min(1).max(60), at: z.union([z.string(), z.number()]).optional(), data: z.record(z.string(), z.unknown()).default({}) });
@@ -123,6 +127,14 @@ export const webhookRoutes: FastifyPluginAsync<WebhookRoutesOptions> = async (ap
           }
         }
         break;
+      case 'whatsapp.send': {
+        // M174: the hub hands a member message to the WhatsApp sender (e-mail fallback inside). Unlike the id-only events, the
+        // body carries the number (signed, over TLS). The answer says which channel was used so the hub can skip its own mail.
+        if (!options.whatsapp) return reply.code(503).send({ error: { code: 'not_configured', message: 'whatsapp sender is not available' } });
+        const body = sendSchema.safeParse(data);
+        if (!body.success) return reply.code(400).send({ error: { code: 'invalid', message: body.error.issues[0]?.message ?? 'invalid whatsapp.send body' } });
+        return { ok: true, ...(await runSend(options.whatsapp, body.data)) };
+      }
       case 'config.changed':
         options.advisor.resetSettings();
         await options.sync.bump('content');

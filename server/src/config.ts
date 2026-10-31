@@ -81,6 +81,15 @@ const envSchema = z.object({
   SMTP_PASS: z.string().min(1).optional(),
   // M112: the hosting's mail server shows a self-signed «cloud-panel» certificate; '1' accepts it on that hop.
   SMTP_TLS_RELAXED: z.enum(['0', '1']).optional(),
+  // M174: member messages on WhatsApp (Meta Cloud API, Graph v24). Without WHATSAPP_TOKEN everything falls back to e-mail.
+  WHATSAPP_TOKEN: z.string().min(20).optional(),
+  WHATSAPP_PHONE_ID: z.string().min(5).default('1260740487121111'),
+  WHATSAPP_WABA_ID: z.string().min(5).default('1371070605091256'),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(8).optional(),
+  // Optional: the Meta app secret; with it the callback POST is only accepted when X-Hub-Signature-256 matches.
+  WHATSAPP_APP_SECRET: z.string().min(8).optional(),
+  // '0' switches WhatsApp off even with a token.
+  WHATSAPP_ENABLED: z.enum(['0', '1']).optional(),
   MAIL_FROM: z.string().min(3).optional(),
   NOTIFY_EMAIL: z.string().min(3).optional(),
   // Web dashboard origins allowed to call the API from a browser, comma separated (e.g. https://dashboard.example.com).

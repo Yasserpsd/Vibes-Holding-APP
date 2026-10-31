@@ -13,6 +13,7 @@ import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
 import type { AppLang } from '../lang.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 import { invoiceHtml, invoiceSubject, invoiceText } from './invoice.js';
 import type { MoyasarConfirmer } from './moyasar.js';
 import type { PaymobGateway } from './paymob.js';
@@ -108,7 +109,18 @@ export type PaymentStats = { series: ({ day: string } & PaymentTotals)[]; today:
 
 export type RedirectResult = { payment: PublicPayment | null; verified: boolean; gatewaySuccess: boolean | null };
 
-type Deps = { kv: KV; log: FastifyBaseLogger; gateway: PaymobGateway & Partial<MoyasarConfirmer>; notifier: Notifier; push: PushService; hmacSecret: string; publicUrl: string; discounts?: DiscountsService };
+type Deps = {
+  kv: KV;
+  log: FastifyBaseLogger;
+  gateway: PaymobGateway & Partial<MoyasarConfirmer>;
+  notifier: Notifier;
+  push: PushService;
+  hmacSecret: string;
+  publicUrl: string;
+  discounts?: DiscountsService;
+  /** M174: the member's receipt also goes on WhatsApp (the invoice mail stays: it is the numbered document and the admins' copy). */
+  whatsapp?: WhatsappService;
+};
 
 function isoDaysAgo(now: number, days: number): string {
   return new Date(now - days * 86_400_000).toISOString();
@@ -589,6 +601,10 @@ export class PaymentsService {
           text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
           html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
         });
+        // M174: never delays or fails the settle (the service swallows its own errors); `ref` makes a repeated gateway callback send once.
+        if (this.deps.whatsapp && payment.phone.trim()) {
+          void this.deps.whatsapp.sendReceipt({ phone: payment.phone, lang, amount: payment.amount, service: payment.serviceTitle, invoiceNo, ref: `payment:${payment.id}` });
+        }
       }
     }
     // M44: a payment-link sale gets its own richer mail from the links listener instead of the generic one.
