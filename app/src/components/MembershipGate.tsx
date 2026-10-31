@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter, useSegments } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 
 import { membershipApi, useStoreConfig } from '@/api/membership';
@@ -11,8 +11,6 @@ import { Floating, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { loadSetting } from '@/lib/deviceStore';
-import { claimWeeklyMembershipPrompt } from '@/lib/popupGate';
 import {
   fetchMembershipOffer,
   hasStorePurchases,
@@ -28,13 +26,11 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
  * M120 (owner's TestFlight feedback, 2026-10-23): the subscribe path. One popup, opened the moment
  * a non-member taps anything members-only — short title, one line, the store price and a direct
  * subscribe button (CLAUDE.md rule 3: the store sheet, activation only from the server).
- * M122b (owner, same week: «عايز pop up تظهر فورًا… ولما أروح أفعّل العضوية أتحول على الدفع مباشر»):
- * it now opens by itself for every signed-in non-member — a few seconds after the
- * home settles (and after the intro video when that shows) — and the subscribe button goes straight
- * to the store's payment sheet, fetching the offer on the spot when it is not cached yet.
- * M164 (owner, 2026-10-30, member complaints): the self-opening is ONCE A WEEK per device, shared
- * with every other automatic membership pitch (popupGate.claimWeeklyMembershipPrompt). Every other
- * appearance is the member's own tap on something members-only.
+ * M122b (owner, same week: «ولما أروح أفعّل العضوية أتحول على الدفع مباشر»): the subscribe button
+ * goes straight to the store's payment sheet, fetching the offer on the spot when it is not cached yet.
+ * M170 (owner, 2026-10-31, final word after the M122b launch nudge and the M164 weekly slot: «مش عايزها
+ * تظهر خالص إلا لو العضو ضغط على خدمة مقفولة»): the popup NEVER opens by itself — no launch nudge,
+ * no weekly timer. Every appearance is the member's own tap on something members-only.
  */
 
 let openGate: (() => void) | null = null;
@@ -43,18 +39,6 @@ let openGate: (() => void) | null = null;
 export function showMembershipGate(): void {
   openGate?.();
 }
-
-// The one-time nudge waits for the intro-video popup to leave (IntroVideoPopup reports it here).
-let introClosedNow = false;
-let introWaiter: (() => void) | null = null;
-export function noteIntroClosed(): void {
-  introClosedNow = true;
-  introWaiter?.();
-  introWaiter = null;
-}
-
-const INTRO_SEEN_KEY = 'investorsclub.introSeen.v2'; // IntroVideoPopup's own key, read-only here.
-const NUDGE_DELAY_MS = 5000;
 
 const SETTLE_ATTEMPTS = 8;
 const SETTLE_DELAY_MS = 3000;
@@ -68,19 +52,14 @@ type Phase = 'idle' | 'busy' | 'activating' | 'done' | 'pending';
 /** The members-only popup + the one-time post-registration nudge. Rendered once in the root layout. */
 export function MembershipGateHost() {
   const router = useRouter();
-  const segments = useSegments();
   const { status, me, setMe } = useAuth();
   const [visible, setVisible] = useState(false);
   const { data: config } = useStoreConfig(Boolean(me) && visible);
   const [offer, setOffer] = useState<StoreOffer | null>(cachedOffer);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
-  const nudged = useRef(false);
 
   const signedIn = status === 'signedIn' && me !== null;
-  const member = me?.membership.status === 'active';
-  const first = segments[0];
-  const atGate = first === 'welcome' || first === 'auth';
 
   useEffect(() => {
     openGate = () => {
@@ -105,33 +84,6 @@ export function MembershipGateHost() {
       alive = false;
     };
   }, [visible, signedIn, config, me]);
-
-  // M122b: ONCE PER LAUNCH, by itself — a few seconds after the intro video (or right after the
-  // home settles when the intro is already seen), for every signed-in non-member.
-  useEffect(() => {
-    if (!signedIn || member || atGate || nudged.current) return;
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const fire = () => {
-      timer = setTimeout(() => {
-        if (!alive || nudged.current) return;
-        nudged.current = true;
-        void claimWeeklyMembershipPrompt().then((allowed) => {
-          if (allowed && alive) openGate?.();
-        });
-      }, NUDGE_DELAY_MS);
-    };
-    void (async () => {
-      if (!alive) return;
-      if (introClosedNow || (await loadSetting(INTRO_SEEN_KEY))) fire();
-      else introWaiter = fire;
-    })();
-    return () => {
-      alive = false;
-      if (timer) clearTimeout(timer);
-      if (introWaiter) introWaiter = null;
-    };
-  }, [signedIn, member, atGate]);
 
   const dismiss = () => {
     if (phase === 'busy' || phase === 'activating') return;

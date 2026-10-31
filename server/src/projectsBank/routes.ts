@@ -1,20 +1,23 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-import { guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
+import { dashboardGuard, guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
 import type { InterestsService } from '../interests/service.js';
 import { langOf } from '../lang.js';
 import type { ProjectAccessService } from './access.js';
 import type { BriefService } from './brief.js';
+import type { DailyProjectService } from './daily.js';
 import { PbImageProxy } from './images.js';
 import { localizeFilters, localizePage, localizeProject } from './lang.js';
 import type { RatingsService } from '../ratings/service.js';
 import type { ProjectsService } from './service.js';
 import { PROJECT_SORTS, type ProjectsPage, type PublicProject } from './types.js';
 
-export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; ratings?: RatingsService; publicUrl?: string; fetchImpl?: typeof fetch };
+export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; ratings?: RatingsService; publicUrl?: string; fetchImpl?: typeof fetch; daily?: DailyProjectService };
+
+const dailySchema = z.object({ enabled: z.boolean() });
 
 const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -34,7 +37,7 @@ function badRequest(reply: FastifyReply, message: string): FastifyReply {
   return reply.code(400).send({ error: { code: 'bad_request', message } });
 }
 
-export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief, interests, ratings, publicUrl, fetchImpl }) => {
+export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (app, { service, auth, access, brief, interests, ratings, publicUrl, fetchImpl, daily }) => {
   const requireSession = sessionGuard(auth);
   const whoIs = optionalSession(auth);
   const limiter = new RateLimiter();
@@ -170,4 +173,38 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
       return access.unlock(current.session, params.id);
     }),
   );
+
+  // M170 «مشروع اليوم»: the dashboard reads the state, flips the switch and sends today's project by hand (like the news push).
+  if (daily) {
+    const requireAdmin = dashboardGuard(auth);
+    app.get(
+      '/api/admin/projects/daily',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        const state = await daily.load();
+        return { ...state, project: state.projectId ? (service.get(state.projectId)?.title ?? null) : null };
+      }),
+    );
+    app.put(
+      '/api/admin/projects/daily',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        const body = parse(dailySchema, request.body, reply);
+        if (!body) return;
+        return daily.setEnabled(body.enabled);
+      }),
+    );
+    app.post(
+      '/api/admin/projects/push',
+      guard(async (request, reply) => {
+        const admin = await requireAdmin(request, reply);
+        if (!admin) return;
+        const result = await daily.sendNow();
+        if (!result) return reply.code(409).send({ error: { code: 'no_project', message: 'بنك المشاريع فارغ حاليًا أو هناك إرسال جارٍ — حاول بعد قليل' } });
+        return { ok: true, ...result };
+      }),
+    );
+  }
 };

@@ -76,6 +76,7 @@ import { PayLinksService } from './paylinks/service.js';
 import { ProjectAccessService } from './projectsBank/access.js';
 import { BriefService } from './projectsBank/brief.js';
 import { LivePbBridge, MockPbBridge, OffPbBridge, type PbBridge } from './projectsBank/bridge.js';
+import { DailyProjectService } from './projectsBank/daily.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import { ImageVariants } from './media/images.js';
@@ -404,6 +405,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log });
   const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
   const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
+  // M170 «مشروع اليوم»: one AI-chosen project a day to every device, at/after 12:00 Riyadh; the tick retries until it goes out.
+  const dailyProject = new DailyProjectService({ kv, log: app.log, projects, push, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
+  const dailyProjectTimer = setInterval(() => void dailyProject.run(), 10 * 60_000);
+  dailyProjectTimer.unref();
+  app.addHook('onClose', async () => clearInterval(dailyProjectTimer));
   const feed = new FeedService({ hub: hubClient, log: app.log });
   const postsHub = new PostsHubSync({
     hub: hubClient,
@@ -491,7 +497,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M138 «متابعة طلباتي»: one timeline over every store, and the ledger of service requests + golden interests.
   const requests = new RequestsService({ kv, log: app.log, notices, sources: { card, hq, forms, workshops, agenda, persona: personaRequests, profiles, payments, deletion } });
   await app.register(requestsRoutes, { service: requests, auth });
-  await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl });
+  await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl, daily: dailyProject });
   await app.register(ratingsRoutes, { service: ratings, auth, projects });
   await app.register(interestsRoutes, { service: interests, auth });
   await app.register(discountsRoutes, { service: discounts, auth });

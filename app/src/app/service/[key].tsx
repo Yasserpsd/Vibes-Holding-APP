@@ -13,7 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
-import { UpsellCard, UpsellPopup } from '@/components/MembershipUpsell';
+import { UpsellCard } from '@/components/MembershipUpsell';
 import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -204,7 +204,6 @@ export default function ServiceScreen() {
         </FadeInView>
       ) : null}
 
-      {showUpsell && data.upsell && status === 'signedIn' ? <UpsellPopup upsell={data.upsell} /> : null}
     </Screen>
   );
 }

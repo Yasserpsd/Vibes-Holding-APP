@@ -1,16 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { ServicesUpsell } from '@/api/content';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
-import { FadeInView, PopIn, PressScale } from '@/components/motion';
+import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { claimWeeklyMembershipPrompt } from '@/lib/popupGate';
-import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
  * Owner (2026-10-25): «ليه تدفع المبلغ ده؟ اشترك بس في العضوية وهتاخد خصم 50%» — the membership
@@ -28,57 +27,8 @@ function nextLine(upsell: ServicesUpsell): string {
   return upsell.variants[rotation % upsell.variants.length] ?? '';
 }
 
-const POPUP_DELAY_MS = 1200;
-
-/**
- * The popup over a service page: one rotated line and the direct subscribe door.
- * M164 (owner): it opens by itself only inside the device's ONE automatic membership pitch a week
- * (shared with the launch nudge and the after-form nudge); the card below stays in sight anyway.
- */
-export function UpsellPopup({ upsell }: { upsell: ServicesUpsell }) {
-  const [line] = useState(() => nextLine(upsell));
-  const [visible, setVisible] = useState(false);
-
-  // A breath after the page settles, so the service shows itself before the pitch does —
-  // and only if this week has not had its one appearance yet.
-  useEffect(() => {
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      void claimWeeklyMembershipPrompt().then((allowed) => {
-        if (allowed && !cancelled) setVisible(true);
-      });
-    }, POPUP_DELAY_MS);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, []);
-
-  if (!line || !visible) return null;
-  const subscribe = () => {
-    setVisible(false);
-    showMembershipGate();
-  };
-  return (
-    <Modal transparent animationType="fade" visible onRequestClose={() => setVisible(false)}>
-      <View style={styles.backdrop}>
-        <PopIn style={styles.popWrap}>
-          <GlassCard golden radius={radii.xxl} style={styles.popCard}>
-            <View style={styles.ring}>
-              <Ionicons name="pricetags" size={24} color={colors.goldInk} />
-            </View>
-            <Text style={styles.popTitle}>{upsell.title}</Text>
-            <Text style={styles.popText}>{line}</Text>
-            <AppButton label={t('store.subscribe')} icon="ribbon-outline" onPress={subscribe} />
-            <PressScale onPress={() => setVisible(false)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('gate.later')}>
-              <Text style={styles.later}>{t('gate.later')}</Text>
-            </PressScale>
-          </GlassCard>
-        </PopIn>
-      </View>
-    </Modal>
-  );
-}
+// M170 (owner, 2026-10-31): the self-opening UpsellPopup is gone — no membership pitch opens by itself any
+// more; the card below keeps the subscribe door in sight and the member opens the store popup himself.
 
 /** The always-there card on the page itself: the owner wants the subscribe door in sight, not only in a popup. */
 export function UpsellCard({ upsell }: { upsell: ServicesUpsell }) {
@@ -103,23 +53,6 @@ export function UpsellCard({ upsell }: { upsell: ServicesUpsell }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  popWrap: { alignSelf: 'stretch' },
-  popCard: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
-  ring: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.pill,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.gold,
-    boxShadow: shadows.glowGold,
-  },
-  popTitle: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
-  popText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-  later: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },
-
   card: { gap: spacing.md, padding: spacing.md },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   cardIcon: {

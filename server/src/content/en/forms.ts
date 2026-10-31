@@ -15,6 +15,8 @@ export const FORMS_EN: Translation<FormsContent> = {
         'We received your Success Partners registration; the programme committee will review it and the management will contact you. If you have a pitch deck or extra files, you will be asked to send them when we call back.',
       memberNudge:
         'Note: your venture will not be published in the Projects Bank and will not be presented to any potential partners until you subscribe to the annual membership. Activate your membership now so your venture enters the circle shown to the club’s investors.',
+      nonMemberNotice:
+        'It looks like you do not hold an active annual membership: your registration will be reviewed at no charge, but your venture will not be published or presented to potential partners in the Projects Bank until the annual membership is activated.',
       fields: [
         { key: 'firstName', label: 'First name' },
         { key: 'lastName', label: 'Last name' },

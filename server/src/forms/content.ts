@@ -44,6 +44,11 @@ export type FormDef = {
    * «لن يُنشر مشروعك… إلا بالاشتراك» with the subscribe button. Empty/absent = no popup.
    */
   memberNudge?: string;
+  /**
+   * M170 (owner, 2026-10-31): shown to a signed-in NON-MEMBER above the form, before he fills it —
+   * the page stays open to everyone, the project waits for the membership. Empty/absent = nothing.
+   */
+  nonMemberNotice?: string;
   fields: FormFieldDef[];
   order: number;
 };
@@ -73,6 +78,8 @@ export const FORMS_SEED: FormsContent = {
         'استلمنا تسجيل مشروعك في شركاء النجاح، وستراجعه لجنة البرنامج وتتواصل معك الإدارة. إن كان لديك ملخص جدوى أو ملفات إضافية فسيُطلب منك إرسالها عند التواصل.',
       memberNudge:
         'انتبه: لن يُنشر مشروعك في بنك المشاريع ولن يُعرض على أي من الشركاء المحتملين إلا بعد اشتراكك في العضوية السنوية. فعّل عضويتك الآن ليدخل مشروعك دائرة العرض على مستثمري النادي.',
+      nonMemberNotice:
+        'يبدو أنك غير عضو مفعّل بعضوية سنوية: سيُراجَع تسجيلك بدون رسوم، لكن لن يُنشر مشروعك ولن يُعرض في بنك المشاريع على الشركاء المحتملين إلا بعد تفعيل العضوية السنوية.',
       fields: [
         { key: 'firstName', label: 'الاسم الأول', type: 'text', required: true, prefill: 'firstName' },
         { key: 'lastName', label: 'الاسم الأخير', type: 'text', required: true, prefill: 'lastName' },
@@ -299,8 +306,9 @@ export const FORMS_SEED: FormsContent = {
     },
   ],
   // v7 (owner, 2026-10-26): «نشر تطبيقك على Android و iOS» replaces «على المتجرين».
-  version: 7,
-  updatedAt: '2026-10-26T00:00:00.000Z',
+  // v8 (M170, 2026-10-31): the non-member notice above the شركاء النجاح form.
+  version: 8,
+  updatedAt: '2026-10-31T00:00:00.000Z',
 };
 
 /** Writes the seed when no forms content exists yet, or when the stored seed is older than this one. */
