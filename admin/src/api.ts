@@ -457,6 +457,9 @@ export const session = {
   },
 };
 
+/** M170: the daily project push as the server keeps it (`projectsBank/daily.ts`); `project` = today's pick title. */
+export type DailyProjectState = { day: string | null; projectId: number | null; project?: string | null; pushedAt: string | null; reason: string | null; recentIds: number[]; enabled: boolean };
+
 async function call<T>(method: string, path: string, body?: unknown, token: string | null = session.get()): Promise<T> {
   let response: Response;
   try {
@@ -568,6 +571,10 @@ export const api = {
   newsSources: () => call<NewsSourcesResult>('GET', '/api/admin/news/sources'),
   toggleNewsSource: (id: string, enabled: boolean) => call<{ ok: true; source: NewsSourceRow }>('POST', `/api/admin/news/sources/${id}`, { enabled }),
   refreshNews: () => call<{ ok: true; running: boolean }>('POST', '/api/admin/news/refresh', {}),
+  // M170 «مشروع اليوم»: the day's AI-picked project push — state, the switch, send now.
+  dailyProject: () => call<DailyProjectState>('GET', '/api/admin/projects/daily'),
+  setDailyProject: (enabled: boolean) => call<DailyProjectState>('PUT', '/api/admin/projects/daily', { enabled }),
+  pushDailyProject: () => call<{ ok: true; projectId: number; title: string; reason: string | null; sent: number; failed: number }>('POST', '/api/admin/projects/push', {}),
   contentValues: () => call<ContentValues>('GET', '/api/admin/content/values'),
   /** `value: null` goes back to the seed's own value. */
   saveContentValue: (input: { block: string; path: string; value: number | string | boolean | null }) =>

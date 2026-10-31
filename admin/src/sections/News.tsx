@@ -56,6 +56,84 @@ function SourceRow({ source, busy, onToggle }: { source: NewsSourceRow; busy: bo
 }
 
 /**
+ * M170 «مشروع اليوم»: the daily project push — today's pick, the switch, and «ابعت دلوقتي». The AI only
+ * chooses the project; the push shows the project's own public fields (rule 4 enforced on the server).
+ */
+function DailyProjectCard() {
+  const { notify } = useShell();
+  const state = useLoad(() => api.dailyProject(), []);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (next: boolean) => {
+    setBusy(true);
+    try {
+      await api.setDailyProject(next);
+      notify('ok', next ? 'تم تشغيل «مشروع اليوم»: مشروع واحد كل يوم الساعة 12 ظهرًا بتوقيت الرياض لكل الأجهزة.' : 'تم إيقاف «مشروع اليوم». لا يُرسل شيء حتى تشغّله من جديد.');
+      state.reload();
+    } catch (failure) {
+      notify('error', messageOf(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendNow = async () => {
+    if (!window.confirm('إرسال مشروع اليوم الآن لكل الأجهزة المسجلة؟ (يختار الذكاء الاصطناعي مشروعًا لم يُعرض مؤخرًا)')) return;
+    setBusy(true);
+    try {
+      const result = await api.pushDailyProject();
+      notify('ok', `أُرسل «${result.title}» إلى ${formatNumber(result.sent)} جهاز${result.failed ? ` (تعذّر ${formatNumber(result.failed)})` : ''}.`);
+      state.reload();
+    } catch (failure) {
+      notify('error', messageOf(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card">
+      <div className="row">
+        <div className="source-main">
+          <div className="row">
+            <strong>مشروع اليوم من بنك المشاريع</strong>
+            <span className="pills">
+              <Pill tone={state.data?.enabled === false ? 'muted' : 'ok'}>{state.data?.enabled === false ? 'متوقف' : 'يعمل يوميًا 12 ظهرًا'}</Pill>
+            </span>
+          </div>
+          <span className="muted hint">كل يوم يختار الذكاء الاصطناعي مشروعًا واحدًا (لا يتكرر خلال 60 اختيارًا) ويصل إشعاره لكل الأعضاء: محايد ورائد أعمال ومستثمر. الإشعار يفتح صفحة المشروع، وبيانات تواصل المؤسس لا تخرج أبدًا.</span>
+          {state.data ? (
+            <span className="muted hint num">
+              {state.data.project ? `آخر مشروع: «${state.data.project}»` : 'لم يُرسل مشروع بعد.'}
+              {state.data.pushedAt ? ` · أُرسل ${formatRelative(state.data.pushedAt)}` : state.data.day ? ' · لم يصل لأي جهاز بعد، تُعاد المحاولة' : ''}
+              {state.data.reason ? ` · سبب الاختيار: ${state.data.reason}` : ''}
+            </span>
+          ) : state.error ? (
+            <span className="error hint">{messageOf(state.error)}</span>
+          ) : null}
+        </div>
+        <div className="pills">
+          <button type="button" className="pick" onClick={() => void sendNow()} disabled={busy || state.loading}>
+            إرسال مشروع اليوم الآن
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={state.data?.enabled !== false}
+            aria-label={state.data?.enabled === false ? 'تشغيل مشروع اليوم' : 'إيقاف مشروع اليوم'}
+            className={state.data?.enabled === false ? 'switch' : 'switch on'}
+            disabled={busy || state.loading}
+            onClick={() => void toggle(state.data?.enabled === false)}
+          >
+            <i aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
  * M34 «مصادر الأخبار»: the owner turns sources on and off; the list shows each source's last-poll health.
  * Rule 7 untouched: a source only lets its own fetched pages in — nothing here writes a word of news.
  */
@@ -102,6 +180,7 @@ export function News() {
           const on = rows.filter((source) => source.enabled).length;
           return (
             <div className="stack">
+              <DailyProjectCard />
               <section className="card">
                 <div className="row">
                   <dl className="strip three">
