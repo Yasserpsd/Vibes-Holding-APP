@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import { GATE_FIELDS } from '@/api/gateFields';
 import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
 import { reportProblem } from '@/lib/support';
@@ -60,7 +61,8 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   const token = options.token === undefined ? currentToken : options.token;
   // The server answers in the app's language where it has both (news feeds, topics, content).
   // M146: the platform rides along so the hub's «عضو جديد» mail says iPhone / Android.
-  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS };
+  // M168: the completion-gate fields this bundle draws — the server's wall names only these.
+  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS, 'x-app-gate': GATE_FIELDS.join(',') };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 

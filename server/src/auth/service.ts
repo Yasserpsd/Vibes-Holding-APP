@@ -91,6 +91,37 @@ export type Me = {
 
 export type ProfileMissing = 'name' | 'memberType' | 'phone' | 'persona' | 'bio' | 'jobTitle' | 'interests' | 'company' | 'contactEmail';
 
+export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'memberType', 'phone', 'persona', 'bio', 'jobTitle', 'interests', 'company', 'contactEmail'];
+
+/**
+ * M168 (owner, 2026-10-31, «كمية العملاء اللي بتشتكي مش عارفة تسجل غير طبيعي»): the fields EVERY
+ * app bundle that has the completion gate can draw (M147b, 2026-10-28). M156 added `name`, `jobTitle`
+ * and `contactEmail` to the wall a day later — and a phone on an older bundle (the embedded JS of a fresh
+ * store install until its first OTA lands, or runtime 1.1.0 for good) was told «jobTitle missing», drew an
+ * EMPTY card (no field for it), voice-fill sent an empty field list (400 «البيانات غير مكتملة») and the
+ * member was locked out with no way through. The wall must never name a field the bundle cannot show.
+ */
+export const LEGACY_GATE_FIELDS: readonly ProfileMissing[] = ['memberType', 'phone', 'persona', 'bio', 'interests', 'company'];
+
+/**
+ * The gate fields the calling bundle renders: the `x-app-gate` header (a comma list, sent since M168)
+ * when present, else the legacy set. Unknown names are ignored; an empty or garbled header means legacy.
+ */
+export function gateFieldsOf(header: unknown): Set<ProfileMissing> {
+  const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
+  const named = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item): item is ProfileMissing => (PROFILE_FIELDS as readonly string[]).includes(item));
+  return new Set(named.length ? named : LEGACY_GATE_FIELDS);
+}
+
+/** The account answer shaped for one bundle: the wall lists only what that bundle can ask for. */
+export function forBundle<T extends { profileMissing: ProfileMissing[] }>(me: T, fields: Set<ProfileMissing>): T {
+  const kept = me.profileMissing.filter((key) => fields.has(key));
+  return kept.length === me.profileMissing.length ? me : { ...me, profileMissing: kept };
+}
+
 /** Apple «Hide My Email» addresses forward to the real inbox but hide it from us. */
 export function isRelayEmail(email: string): boolean {
   return /@privaterelay\.appleid\.com$/i.test(String(email ?? '').trim());

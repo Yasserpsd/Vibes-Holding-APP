@@ -17,7 +17,7 @@ import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService 
 import { fromDeletion, fromPersona } from '../requests/model.js';
 import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
-import { PERSONAS, type AuthService } from './service.js';
+import { forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
@@ -123,7 +123,10 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
 
   // M109e: the English app gets the member's own data in English too; a failed translation
   // never breaks the account answer — the registered data stands in.
-  const withEnglish = async (request: FastifyRequest, me: Awaited<ReturnType<AuthService['me']>>) => {
+  // M168: every account answer is shaped for the bundle that asked — the completion wall never names a
+  // field that bundle cannot draw (an older bundle used to see an empty card and stay locked out).
+  const withEnglish = async (request: FastifyRequest, account: Awaited<ReturnType<AuthService['me']>>) => {
+    const me = forBundle(account, gateFieldsOf(request.headers['x-app-gate']));
     if (!meLocalizer) return me;
     const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
     return en ? { ...me, en } : me;

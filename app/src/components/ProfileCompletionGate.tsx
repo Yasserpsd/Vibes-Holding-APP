@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
+import { GATE_FIELDS } from '@/api/gateFields';
 import { errorMessage } from '@/api/client';
 import { interestsApi, useInterests } from '@/api/interests';
 import { useAuth } from '@/auth/AuthProvider';
@@ -37,8 +38,10 @@ const twoWords = (value: string) => value.trim().split(/\s+/).filter((word) => w
  */
 export function ProfileCompletionGate() {
   const { status, me } = useAuth();
-  if (status !== 'signedIn' || !me || me.isAdmin || !me.profileMissing?.length) return null;
-  return <CompletionForm missing={me.profileMissing} />;
+  // M168: a newer server may name a field this bundle has no input for — never wall the member behind it.
+  const missing = (me?.profileMissing ?? []).filter((key) => (GATE_FIELDS as readonly string[]).includes(key));
+  if (status !== 'signedIn' || !me || me.isAdmin || !missing.length) return null;
+  return <CompletionForm missing={missing} />;
 }
 
 function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof useAuth>['me']>['profileMissing'] }) {

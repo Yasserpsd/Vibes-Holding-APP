@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getLang } from '@/i18n';
 
 import { apiGet, apiRequest } from './client';
+import type { GateField } from './gateFields';
 
 // Mirrors server/src/auth/service.ts and server/src/auth/routes.ts.
 export type Persona = 'neutral' | 'entrepreneur' | 'investor';
@@ -124,7 +125,7 @@ export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLef
 export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
 /** M156 adds `name` (a kunya or a made-up name), `jobTitle` and `contactEmail` (an Apple-relay account's real address). */
-export type ProfileMissing = 'name' | 'memberType' | 'phone' | 'persona' | 'bio' | 'jobTitle' | 'interests' | 'company' | 'contactEmail';
+export type ProfileMissing = GateField;
 
 export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
