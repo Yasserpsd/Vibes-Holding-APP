@@ -25,6 +25,14 @@ export const sendSchema = z
 
 export type SendBody = z.infer<typeof sendSchema>;
 
+const probeSchema = z.object({
+  phone: z.string().trim().min(5).max(30),
+  template: z.string().trim().regex(/^[a-z0-9_]{1,80}$/, 'اسم القالب غير صحيح'),
+  language: z.string().trim().regex(/^[a-z]{2}(_[A-Z]{2})?$/, 'رمز اللغة غير صحيح').default('ar'),
+  params: z.array(z.string().trim().min(1).max(200)).max(5).default([]),
+  confirm: z.literal(true, { error: 'أكّد التكلفة بـ confirm: true' }),
+});
+
 export function runSend(service: WhatsappService, body: SendBody): Promise<WaResult> {
   const common = { phone: body.phone, lang: body.lang, email: body.email, ref: body.ref };
   return body.kind === 'welcome'
@@ -98,6 +106,18 @@ export const whatsappAdminRoutes: FastifyPluginAsync<WhatsappAdminOptions> = asy
         }
       }
       return { enabled: service.enabled, templates, templatesError, recent: await service.recent(20) };
+    }),
+  );
+
+  // One named template to one number; `confirm: true` because Meta bills every template message.
+  app.post(
+    '/api/admin/whatsapp/probe',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(probeSchema, request.body, reply);
+      if (!body) return;
+      return service.sendProbe(body);
     }),
   );
 

@@ -83,6 +83,20 @@ export class WhatsappService {
     }
   }
 
+  /**
+   * Dashboard probe: sends one named template (any approved one, e.g. a Marketing template while the club_* ones are in
+   * review) to ONE number, to prove the token, the phone id and the delivery webhook end to end. Admin route only; it is
+   * billed by Meta like any template message. Never throws.
+   */
+  async sendProbe(input: { phone: string; template: string; language: string; params: string[] }): Promise<WaResult> {
+    const client = this.deps.client;
+    const phone = normalizePhone(input.phone);
+    if (!this.enabled || !client) return { channel: 'none', error: 'whatsapp_disabled' };
+    if (!phone) return { channel: 'none', error: 'no_phone' };
+    const sent = await this.sendPlanned({ use: 'whatsapp', template: input.template, language: input.language, params: input.params }, { phone, kind: 'welcome', lang: toLang(input.language), ref: null });
+    return sent.messageId ? { channel: 'whatsapp', messageId: sent.messageId } : { channel: 'none', error: sent.error };
+  }
+
   /** Dashboard view: both kinds with their live status and body text. Always asks Meta. */
   async templateOverview(): Promise<{ name: string; language: string; status: string; category: string | null; body: string }[]> {
     const rows: { name: string; language: string; status: string; category: string | null; body: string }[] = [];
