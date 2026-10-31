@@ -18,9 +18,11 @@ export const PROFILE_GATE_MESSAGE =
   'كمّل بياناتك أولًا لإتمام هذا الطلب: الوظيفة والشركة والمدينة والنبذة والموقع وحسابات التواصل — من «حسابي» ← «تعديل الملف الشخصي».';
 
 /** The booking/registration starters; reads and status polls stay open. */
+// M172 (owner, 2026-10-31, members could not book the AI workshop: «لو أنا عضو أضغط بس على زرار تأكيد
+// الحضور بس كده مش أكتر»): the workshop/event registration is NOT gated any more — nobody has a website
+// or social link to type before a seat; the M156 completion wall already holds the identity fields.
 const GATED_ROUTES = new Set([
   'POST /api/payments',
-  'POST /api/agenda/:id/register',
   'POST /api/hq/visits',
   'POST /api/projects/:id/unlock',
   // M116 (owner: «نربط تكملة البروفايل بأنه يعمل أي حاجة»): rating a project needs a complete profile too.

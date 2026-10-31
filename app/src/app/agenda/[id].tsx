@@ -7,6 +7,7 @@ import { useAgendaDiscount, useAgendaEvent, useRegisterAgenda, type AgendaAttend
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn } from '@/components/motion';
@@ -39,9 +40,12 @@ export default function AgendaEventScreen() {
   const [code, setCode] = useState('');
   const [applied, setApplied] = useState<AgendaDiscount | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // M172 (owner): ONE button. A «both» event asks how he attends with two pills above it (in person first).
+  const [chosen, setChosen] = useState<AgendaAttendance>('hq');
   const event = query.data?.event;
   const myFee = event ? (event.myFeeSar ?? event.feeSar) : 0;
   const dueNow = applied ? applied.amountAfter : myFee;
+  const attendance: AgendaAttendance = event?.mode === 'online' ? 'online' : event?.mode === 'hq' ? 'hq' : chosen;
 
   const tryCode = () => {
     if (!event || !code.trim() || checkDiscount.isPending) return;
@@ -86,7 +90,8 @@ export default function AgendaEventScreen() {
     return item.time ? `${LRM}${item.time}` : '';
   };
 
-  const registerLabel = (base: string): string => (event && event.mustPay && dueNow > 0 ? t('agenda.withFee', { label: base, fee: String(dueNow) }) : base);
+  // The one button: «تأكيد الحضور» for a member (or a no-fee event), the same words with the fee for everyone else.
+  const confirmLabel = event && event.mustPay && dueNow > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(dueNow) }) : t('agenda.confirmAttendance');
 
   return (
     <Screen>
@@ -124,21 +129,26 @@ export default function AgendaEventScreen() {
                   <Text style={styles.infoText}>{`${t('agenda.place')}: ${event.place}`}</Text>
                 </View>
               ) : null}
-              {/* M107: both prices side by side, with the membership saving for a non-member viewer. */}
+              {/* M107: both prices side by side, with the membership saving for a non-member viewer.
+                  M172 (owner: «لو أنا عضو… بس كده مش أكتر»): a member whose seat is included sees ONE line, no prices. */}
               <View style={styles.infoRow}>
                 <Ionicons name="pricetag-outline" size={18} color={colors.gold} />
-                <View style={styles.prices}>
-                  <View style={styles.feePill}>
-                    <Text style={styles.feeText} numberOfLines={1}>
-                      {event.feeSar > 0 ? t('agenda.nonMemberPrice', { fee: String(event.feeSar) }) : t('agenda.free')}
-                    </Text>
+                {signedIn && !event.mustPay && event.feeSar > 0 ? (
+                  <Text style={styles.infoText}>{t('agenda.memberIncluded')}</Text>
+                ) : (
+                  <View style={styles.prices}>
+                    <View style={styles.feePill}>
+                      <Text style={styles.feeText} numberOfLines={1}>
+                        {event.feeSar > 0 ? t('agenda.nonMemberPrice', { fee: String(event.feeSar) }) : t('agenda.free')}
+                      </Text>
+                    </View>
+                    <View style={[styles.feePill, styles.memberPill]}>
+                      <Text style={styles.feeText} numberOfLines={1}>
+                        {(event.memberFeeSar ?? 0) > 0 ? t('agenda.memberPrice', { fee: String(event.memberFeeSar) }) : t('agenda.included')}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={[styles.feePill, styles.memberPill]}>
-                    <Text style={styles.feeText} numberOfLines={1}>
-                      {(event.memberFeeSar ?? 0) > 0 ? t('agenda.memberPrice', { fee: String(event.memberFeeSar) }) : t('agenda.included')}
-                    </Text>
-                  </View>
-                </View>
+                )}
               </View>
               {(event.savingsSar ?? 0) > 0 ? (
                 <Text style={styles.savings}>{t('agenda.save', { amount: String(event.savingsSar) })}</Text>
@@ -202,18 +212,22 @@ export default function AgendaEventScreen() {
                   {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} />}
                 </FadeInView>
               ) : null}
-              {event.mode !== 'online' ? (
-                <AppButton label={registerLabel(t('agenda.registerHq'))} icon="business-outline" loading={register.isPending} onPress={() => tap('hq')} />
+              {/* M172 (owner): one «تأكيد الحضور» button; a «both» event asks how he attends with two pills. */}
+              {event.mode === 'both' ? (
+                <View style={styles.attendanceRow}>
+                  <Text style={styles.attendanceLabel}>{t('agenda.chooseAttendance')}</Text>
+                  <View style={styles.attendanceChips}>
+                    <Chip label={t('agenda.attHq')} selected={chosen === 'hq'} dimmed={chosen !== 'hq'} onPress={() => setChosen('hq')} />
+                    <Chip label={t('agenda.attOnline')} selected={chosen === 'online'} dimmed={chosen !== 'online'} onPress={() => setChosen('online')} />
+                  </View>
+                </View>
               ) : null}
-              {event.mode !== 'hq' ? (
-                <AppButton
-                  label={registerLabel(t('agenda.registerOnline'))}
-                  icon="videocam-outline"
-                  variant={event.mode === 'online' ? 'primary' : 'outline'}
-                  loading={register.isPending}
-                  onPress={() => tap('online')}
-                />
-              ) : null}
+              <AppButton
+                label={confirmLabel}
+                icon={attendance === 'online' ? 'videocam-outline' : 'checkmark-circle-outline'}
+                loading={register.isPending}
+                onPress={() => tap(attendance)}
+              />
             </>
           )}
         </>
@@ -241,6 +255,10 @@ const styles = StyleSheet.create({
   memberPill: { backgroundColor: colors.surfaceElevated },
   savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
   codeBox: { gap: spacing.sm },
+  // M172: how he attends — two pills above the one button.
+  attendanceRow: { gap: spacing.xs },
+  attendanceLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  attendanceChips: { flexDirection: 'row', gap: spacing.sm },
   codeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   codeField: { flex: 1 },
   // The fee reads as a golden pill, not a plain line.
