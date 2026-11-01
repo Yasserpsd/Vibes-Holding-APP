@@ -8,7 +8,7 @@ import { guard } from '../auth/guard.js';
  * once per CACHE_MS for everyone; a failed read keeps the last good quotes, and with none the app
  * simply hides the strip. Gold also shows the Saudi 24k gram (ounce × 3.75 ÷ 31.1035).
  * M178 (owner, 2026-11-01, «السوق السعودي في البداية خالص … وRate فوري»): SYMBOLS order is the app's
- * order (TASI, gold, dollar first, `featured` on the home strip, the rest behind «مشاهدة الكل»),
+ * order (TASI, gold, Bitcoin first, `featured` on the home strip, the rest behind «مشاهدة الكل»),
  * one batched spark read every 30 s, and TASI carries Tadawul's 15-minute delay for free data.
  */
 const CACHE_MS = 30_000;
@@ -25,8 +25,10 @@ const crypto = (key: string, symbol: string, label: string, labelEn: string): Sy
 const SYMBOLS: Symbol[] = [
   { key: 'tasi', symbol: '^TASI.SR', group: 'stocks', label: 'السوق السعودي', labelEn: 'Saudi Market', unit: 'تاسي · نقطة', unitEn: 'TASI · pts', featured: true, delayedMin: 15 },
   { key: 'gold', symbol: 'GC=F', group: 'metals', label: 'الذهب', labelEn: 'Gold', unit: 'دولار/أونصة', unitEn: 'USD/oz', featured: true },
+  // M178 (owner, 2026-11-01, «بدل الدولار الأمريكي بيتكوين»): Bitcoin takes the dollar's home slot.
+  { ...crypto('btc', 'BTC-USD', 'بيتكوين', 'Bitcoin'), featured: true },
   // M177 (owner, 2026-11-01, «زود عملات مهمة زي الدولار والدرهم»): one unit of each currency in riyals.
-  { key: 'usd', symbol: 'SAR=X', group: 'fx', label: 'الدولار الأمريكي', labelEn: 'US Dollar', unit: 'ريال', unitEn: 'SAR', featured: true },
+  { key: 'usd', symbol: 'SAR=X', group: 'fx', label: 'الدولار الأمريكي', labelEn: 'US Dollar', unit: 'ريال', unitEn: 'SAR' },
   { key: 'silver', symbol: 'SI=F', group: 'metals', label: 'الفضة', labelEn: 'Silver', unit: 'دولار/أونصة', unitEn: 'USD/oz' },
   { key: 'brent', symbol: 'BZ=F', group: 'oil', label: 'برنت', labelEn: 'Brent', unit: 'دولار/برميل', unitEn: 'USD/bbl' },
   { key: 'wti', symbol: 'CL=F', group: 'oil', label: 'النفط الأمريكي', labelEn: 'WTI', unit: 'دولار/برميل', unitEn: 'USD/bbl' },
@@ -34,7 +36,6 @@ const SYMBOLS: Symbol[] = [
   { key: 'eur', symbol: 'EURSAR=X', group: 'fx', label: 'اليورو', labelEn: 'Euro', unit: 'ريال', unitEn: 'SAR' },
   { key: 'gbp', symbol: 'GBPSAR=X', group: 'fx', label: 'الجنيه الإسترليني', labelEn: 'British Pound', unit: 'ريال', unitEn: 'SAR' },
   // M178: the owner's list, in his order.
-  crypto('btc', 'BTC-USD', 'بيتكوين', 'Bitcoin'),
   crypto('eth', 'ETH-USD', 'إيثريوم', 'Ethereum'),
   crypto('usdt', 'USDT-USD', 'تيثر', 'Tether'),
   crypto('bnb', 'BNB-USD', 'BNB', 'BNB'),

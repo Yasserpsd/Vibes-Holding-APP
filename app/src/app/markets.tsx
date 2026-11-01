@@ -14,7 +14,6 @@ import { formatNumber, formatRelativeTime } from '@/lib/format';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
-const GROUPS: MarketGroup[] = ['stocks', 'metals', 'fx', 'oil', 'crypto'];
 
 /**
  * M178 (owner, 2026-11-01, «مكان واحد تدخل عليه تلاقي كل ده … Rate فوري»): every quote the server
@@ -36,7 +35,9 @@ export default function MarketsScreen() {
     );
   }
 
-  const groups = GROUPS.map((group) => ({ group, items: quotes.filter((quote) => quote.group === group) })).filter((entry) => entry.items.length);
+  // Sections follow the server's order (each group where its first quote sits), so a reorder needs no OTA.
+  const order = [...new Set<MarketGroup>(quotes.map((quote) => quote.group))];
+  const groups = order.map((group) => ({ group, items: quotes.filter((quote) => quote.group === group) }));
   return (
     <Screen>
       <Pressable style={styles.ask} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
