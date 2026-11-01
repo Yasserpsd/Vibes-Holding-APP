@@ -1,4 +1,5 @@
 import type { AppLang } from '../lang.js';
+import type { ProjectEnglish } from './english.js';
 import { ESTIMATED_MARK, type StageKey } from './stage.js';
 import type { FilterOption, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject, StageTerm, Term } from './types.js';
 
@@ -47,7 +48,7 @@ const isStageKey = (slug: string): slug is StageKey => slug in STAGE_EN;
 /** The sector's name in the app's language: the site's Arabic term, or its English name from the list above. */
 export function sectorName(term: Term | null, lang: AppLang): string | null {
   if (!term) return null;
-  return lang === 'en' ? (SECTOR_EN[term.name] ?? term.name) : term.name;
+  return lang === 'en' ? (SECTOR_EN[term.name] ?? aiEnglish?.sector(term.name) ?? term.name) : term.name;
 }
 
 /** The stage's name in the app's language: one of the five steps, marked when the adviser estimated it. */
@@ -60,23 +61,35 @@ export function stageName(term: StageTerm | null, lang: AppLang): string | null 
 /** The English mark of an estimated stage, as `stageName` writes it, for texts that quote the Arabic one. */
 export const estimatedMark = (lang: AppLang): string => (lang === 'en' ? ESTIMATED_MARK_EN : ESTIMATED_MARK);
 
+type AiEnglish = { lookup(project: PublicProject): ProjectEnglish | null; sector(name: string): string | null };
+let aiEnglish: AiEnglish | null = null;
+
+/** M180: where the founder left a field without English (or a sector is new), the AI English (projectsBank/english.ts) fills it. */
+export function useProjectsEnglish(source: AiEnglish | null): void {
+  aiEnglish = source;
+}
+
 /**
  * A project as the app of one language reads it. In English the founder's English fields take the place of the Arabic
  * ones (and are not repeated), the Arabic stays where there is no English, and the terms get their English names.
  */
 export function localizeProject(project: PublicProject, lang: AppLang): PublicProject {
   if (lang !== 'en') return project;
-  const pick = (english: string | null, arabic: string | null): [string | null, string | null] => (english ? [english, null] : [arabic, null]);
-  const [title, titleEn] = pick(project.titleEn, project.title);
-  const [companyName, companyNameEn] = pick(project.companyNameEn, project.companyName);
-  const [excerpt, excerptEn] = pick(project.excerptEn, project.excerpt);
-  const [details, detailsEn] = pick(project.detailsEn, project.details);
+  const ai = aiEnglish?.lookup(project) ?? {};
+  const pick = (english: string | null, arabic: string | null, auto?: string): [string | null, string | null] => [english || auto || arabic, null];
+  const [title, titleEn] = pick(project.titleEn, project.title, ai.title);
+  const [companyName, companyNameEn] = pick(project.companyNameEn, project.companyName, ai.companyName);
+  const [founderName, founderNameEn] = pick(project.founderNameEn, project.founderName, ai.founderName);
+  const [excerpt, excerptEn] = pick(project.excerptEn, project.excerpt, ai.excerpt);
+  const [details, detailsEn] = pick(project.detailsEn, project.details, ai.details);
   return {
     ...project,
     title: title ?? project.title,
     titleEn,
     companyName,
     companyNameEn,
+    founderName,
+    founderNameEn,
     excerpt,
     excerptEn,
     details,

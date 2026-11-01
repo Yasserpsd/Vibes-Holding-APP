@@ -5,15 +5,15 @@ import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../au
 import { PERSONAS, type AuthService } from '../auth/service.js';
 import { hubCall, type HubClient } from '../hub/types.js';
 import { langOf, type AppLang } from '../lang.js';
-import type { Translator } from '../translate.js';
 import { MediaService } from '../media/service.js';
-import type { PollsService } from '../polls/service.js';
+import type { PollsService, PollView } from '../polls/service.js';
 import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
+import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
 import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; translator?: Translator };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -33,7 +33,7 @@ function publicPost(post: Post, lang: AppLang = 'ar') {
     id,
     title: en?.title || post.title,
     body: en?.body || post.body,
-    links,
+    links: en?.links ? links.map((link, index) => ({ ...link, label: en.links?.[index] || link.label })) : links,
     images,
     youtubeId,
     video: post.video ?? null,
@@ -43,6 +43,12 @@ function publicPost(post: Post, lang: AppLang = 'ar') {
     event,
     audience: audienceOf(post).type,
   };
+}
+
+/** M180: the poll's option labels in the reader's language (ids and counts stay). */
+function localPoll(post: Post, poll: PollView | null, lang: AppLang): PollView | null {
+  const labels = lang === 'en' ? post.en?.options : undefined;
+  return poll && labels ? { ...poll, options: poll.options.map((option, index) => ({ ...option, label: labels[index] || option.label })) } : poll;
 }
 
 /** M29: the app's admin composer sends a plain targeted message (no media) and its notification in one act. */
@@ -56,7 +62,7 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, translator }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -69,7 +75,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   /** M31: the post as the app reads it, with the poll block as THIS viewer may see it. */
   const viewerPost = async (post: Post, viewer: PostViewer, lang: AppLang = 'ar') => ({
     ...publicPost(post, lang),
-    ...(post.kind === 'poll' ? { poll: await polls.view(post, viewer?.contactId ?? null) } : {}),
+    ...(post.kind === 'poll' ? { poll: localPoll(post, await polls.view(post, viewer?.contactId ?? null), lang) } : {}),
   });
 
   /** How many registered devices the post's audience holds right now. */
@@ -82,15 +88,23 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
 
   /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
   const pushPost = async (post: Post) => {
-    const text = post.body.replace(/\s+/g, ' ').trim();
-    const message = {
-      title: post.title,
-      body: text.length > 140 ? `${text.slice(0, 139)}…` : text || 'رسالة جديدة من إدارة النادي',
-      data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
+    // M180: an English app hears the message in English (the stored English; the Arabic only until it exists).
+    const messageIn = (lang: AppLang) => {
+      const en = lang === 'en' ? post.en : null;
+      const text = (en?.body || post.body).replace(/\s+/g, ' ').trim();
+      const fallback = lang === 'en' ? 'A new message from the club management' : 'رسالة جديدة من إدارة النادي';
+      return {
+        title: en?.title || post.title,
+        body: text.length > 140 ? `${text.slice(0, 139)}…` : text || fallback,
+        data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
+      };
     };
     const audience = audienceOf(post);
-    const outcome =
-      audience.type === 'all' ? await push.broadcast(message) : audience.type === 'persona' ? await push.broadcastPersona(audience.persona, message) : await push.send(audience.contactId, message);
+    const outcome = await push.broadcastEach((device) => {
+      if (audience.type === 'persona' && device.persona !== audience.persona) return null;
+      if (audience.type === 'member' && device.contactId !== audience.contactId) return null;
+      return messageIn(device.lang === 'en' ? 'en' : 'ar');
+    });
     if (outcome.sent > 0) await service.markNotified(post.id);
     return outcome;
   };
@@ -150,7 +164,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const post = await service.get(params.id);
       if (!post || post.status !== 'published' || !canSee(post, viewer)) return reply.code(404).send(NOT_FOUND);
       await polls.vote(post, viewer.contactId, input.optionId);
-      return { poll: await polls.view(post, viewer.contactId) };
+      return { poll: localPoll(post, await polls.view(post, viewer.contactId), langOf(request)) };
     }),
   );
 
@@ -202,21 +216,16 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         await sync.bump('posts');
         // M43: the English of the owner's words — his own wording from the editor wins for good;
         // otherwise AI writes it once and rewrites it only while the Arabic changes and he never edited it.
+        // M180: links, place and poll options always follow by AI, even under his own title/body.
         const manual = input.english && (input.english.title.trim() !== '' || input.english.body.trim() !== '') ? input.english : null;
         if (manual && (manual.title !== (post.en?.title ?? '') || manual.body !== (post.en?.body ?? ''))) {
-          await service.setEnglish(post.id, { title: manual.title, body: manual.body, place: post.en?.place ?? null }, false);
-        } else if (translator && translator.mode !== 'off') {
-          const place = post.event?.place ?? '';
-          const arabicChanged = !previous || previous.title !== post.title || previous.body !== post.body || (previous.event?.place ?? '') !== place;
-          if (post.en == null || (post.enAuto !== false && arabicChanged)) {
-            const out = await translator.translate([post.title, post.body, place]);
-            if (out) await service.setEnglish(post.id, { title: out[0] || post.title, body: out[1] || post.body, place: place ? out[2] || place : null }, true);
-          }
+          await service.setEnglish(post.id, { title: manual.title, body: manual.body, place: post.en?.place ?? null, links: post.en?.links, options: post.en?.options }, false);
         }
+        await english?.ensure(post.id);
         // M42 (owner: «بمجرد ما انشر اي رسالة كل الناس يجيلها اشعار فورا»): the FIRST publish notifies
         // its audience by itself; edits never re-notify, and the manual button stays for reminders.
         if (autoPush && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
-          void pushPost(post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
+          void pushPost((await service.get(post.id)) ?? post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
         }
         return await reply.code(mode === 'create' ? 201 : 200).send({ post: (await service.get(post.id)) ?? post });
       } catch (error) {
@@ -307,9 +316,11 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       );
       // A message for everyone reaches the websites and the assistant like any dashboard post; a targeted one never does.
       await hubSync.saved(post, admin.session.uuid);
+      // M180: the in-app composer gets its English before the push, like a dashboard post.
+      await english?.ensure(post.id);
       await sync.bump('posts');
       const devices = await audienceDevices(post);
-      const outcome = devices > 0 ? await pushPost(post) : null;
+      const outcome = devices > 0 ? await pushPost((await service.get(post.id)) ?? post) : null;
       return reply.code(201).send({ post: (await service.get(post.id)) ?? post, devices, push: outcome });
     }),
   );

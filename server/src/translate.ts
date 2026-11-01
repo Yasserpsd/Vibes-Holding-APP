@@ -21,7 +21,7 @@ export class OffTranslator implements Translator {
 type Deps = { apiKey: string; model?: string; log: FastifyBaseLogger; fetchImpl?: typeof fetch; system?: string };
 
 const DEFAULT_SYSTEM =
-  'You translate an Arabic investors-club app\'s own content into natural, polished English. Keep names, numbers, dates, times, currencies and URLs exactly as they are. Never add, drop or embellish information. Never write "free"; use "at no charge". Reply ONLY with JSON {"texts": string[]} of the same length and order as the input; empty strings stay empty.';
+  'You translate an Arabic investors-club app\'s own content into natural, polished English. Transliterate Arabic personal, company and place names into their standard Latin spelling (the English text must hold no Arabic letters); keep numbers, dates, times, currencies and URLs exactly as they are. Never add, drop or embellish information. Never write "free"; use "at no charge". Reply ONLY with JSON {"texts": string[]} of the same length and order as the input; empty strings stay empty.';
 
 export class OpenAITranslator implements Translator {
   readonly mode = 'openai' as const;

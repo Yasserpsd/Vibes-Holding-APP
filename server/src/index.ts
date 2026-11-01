@@ -31,12 +31,14 @@ const seeded = {
   newsSources: await ensureNewsSourcesSeed(kv),
   partners: await ensurePartnersSeed(kv),
 };
-const { app, projects, golden, news, videos, media, sync, analytics, companion, marketAlerts, englishSweep } = await buildApp({ config, kv });
+const { app, projects, golden, news, videos, media, sync, analytics, companion, marketAlerts, englishSweep, postsEnglish, projectsEnglish } = await buildApp({ config, kv });
 // A newer seed (for example the membership copy) is content the app should fetch again.
 if (Object.values(seeded).some(Boolean)) await sync.bump('content');
 
 app.log.info({ storage: config.DATABASE_URL ? 'postgres' : 'memory', seeded, hub: config.HUB_MODE }, 'storage ready');
 await projects.start();
+await projectsEnglish.start();
+void projectsEnglish.run();
 await golden.start();
 await news.start();
 await videos.start();
@@ -45,6 +47,7 @@ analytics.start();
 companion.start();
 marketAlerts.start();
 englishSweep.start();
+postsEnglish.start();
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutting down');
@@ -56,6 +59,8 @@ const shutdown = async (signal: string): Promise<void> => {
   companion.stop();
   marketAlerts.stop();
   englishSweep.stop();
+  postsEnglish.stop();
+  projectsEnglish.stop();
   // The last seconds of counts reach the store before the pool closes.
   await analytics.stop();
   await app.close();

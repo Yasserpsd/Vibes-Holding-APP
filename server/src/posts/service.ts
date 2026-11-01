@@ -98,7 +98,8 @@ export type Post = {
   enAuto?: boolean;
 };
 
-export type PostEnglish = { title: string; body: string; place: string | null };
+/** M180: `links`/`options` follow the post's link and poll-option order; `hash` = the Arabic they were written from. */
+export type PostEnglish = { title: string; body: string; place: string | null; links?: string[]; options?: string[]; hash?: string };
 
 export type PostKind = 'post' | 'event' | 'poll';
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };

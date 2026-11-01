@@ -37,6 +37,7 @@ import { appLinkRoutes } from './legal/applink.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { EnglishSweep } from './content/englishSweep.js';
+import { PostsEnglish } from './posts/english.js';
 import { contentRoutes } from './content/routes.js';
 import { discountsRoutes } from './discounts/routes.js';
 import { DiscountsService } from './discounts/service.js';
@@ -90,6 +91,8 @@ import { MediaService } from './media/service.js';
 import { DiskMediaStore, type MediaStore } from './media/store.js';
 import { PollsService } from './polls/service.js';
 import { PEOPLE_TRANSLATE_SYSTEM, PersonLocalizer } from './profiles/english.js';
+import { PROJECTS_TRANSLATE_SYSTEM, ProjectsEnglish } from './projectsBank/english.js';
+import { useProjectsEnglish } from './projectsBank/lang.js';
 import { registerProfileGate } from './profiles/gate.js';
 import { profilesRoutes } from './profiles/routes.js';
 import { ProfilesService } from './profiles/service.js';
@@ -152,7 +155,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; englishSweep: EnglishSweep };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; englishSweep: EnglishSweep; postsEnglish: PostsEnglish; projectsEnglish: ProjectsEnglish };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -210,7 +213,27 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M116 «تقييمات المشاريع»: stars + comments; one kv read at boot fills the sync summary cache.
   const ratings = new RatingsService({ kv });
   await ratings.start();
-  const projects = new ProjectsService({ kv, config, log: app.log, onChange: () => moved('projects'), ratingOf: (id) => ratings.summary(id) });
+  const projects = new ProjectsService({
+    kv,
+    config,
+    log: app.log,
+    onChange: () => {
+      moved('projects');
+      void projectsEnglish.run();
+    },
+    ratingOf: (id) => ratings.summary(id),
+  });
+  // M180: the English app reads every project in English; AI fills what the founder left without English.
+  const projectsEnglish = new ProjectsEnglish({
+    kv,
+    log: app.log,
+    all: () => projects.all(),
+    onTranslated: () => moved('projects'),
+    translator: config.OPENAI_API_KEY
+      ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: PROJECTS_TRANSLATE_SYSTEM })
+      : new OffTranslator(),
+  });
+  useProjectsEnglish(projectsEnglish);
   // Native golden offer pages, pulled from each company's web /offer/ page (PROJECT_BRIEF §5.1).
   const golden = new GoldenOffersService({ kv, config, log: app.log, fetchImpl, onChange: () => moved('content') });
   // The server's own mock hub comes with a demo club, so the dashboard can be checked locally.
@@ -252,6 +275,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const englishSweep = new EnglishSweep({ kv, translator, log: app.log, bump: () => sync.bump('content') });
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
   const posts = new PostsService(kv);
+  // M180: every admin message in English (title, body, links, poll options), whichever way it was written.
+  const postsEnglish = new PostsEnglish({ service: posts, translator, log: app.log });
   const polls = new PollsService(kv);
   const markets = new MarketsService({ log: app.log, fetchImpl });
   const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos, markets });
@@ -598,7 +623,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const imageVariants = await ImageVariants.create(mediaStore, app.log);
   await app.register(mediaRoutes, { service: media, auth, variants: imageVariants });
   await app.register(backupRoutes, { service: backup, auth });
-  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, translator });
+  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
   const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER
@@ -639,5 +664,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, marketAlerts, englishSweep };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, marketAlerts, englishSweep, postsEnglish, projectsEnglish };
 }
