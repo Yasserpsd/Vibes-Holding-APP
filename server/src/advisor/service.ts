@@ -8,6 +8,7 @@ import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import type { ProjectsService } from '../projectsBank/service.js';
 import type { KV } from '../store.js';
+import type { MarketsService } from '../markets/service.js';
 import type { VideosService } from '../videos/service.js';
 import { ContextResolver, type AdvisorContext } from './context.js';
 import { BlockList, blockListFromConfig, isSystemNoise, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
@@ -29,7 +30,7 @@ export type SendResult = { messageId: number | null; waiting: boolean; human: bo
 export type PollResult = { messages: AdvisorMessage[]; waiting: boolean; timeout: boolean; human: boolean; me: Me | null };
 
 type Settings = AdvisorProfile & { block: BlockList };
-type Deps = { hub: HubClient; projects: ProjectsService; news: NewsService; kv: KV; log: FastifyBaseLogger; posts?: PostsService; videos?: VideosService };
+type Deps = { hub: HubClient; projects: ProjectsService; news: NewsService; kv: KV; log: FastifyBaseLogger; posts?: PostsService; videos?: VideosService; markets?: MarketsService };
 
 const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const meOf = (contact: HubContact | null | undefined): Me | null => (contact && contact.has_account ? toMe(contact) : null);

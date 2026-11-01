@@ -64,6 +64,7 @@ import { MembershipService } from './membership/service.js';
 import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { workshopAdRoutes, WorkshopAdService } from './agenda/ad.js';
+import { MarketAlertsService, marketAlertRoutes } from './markets/alerts.js';
 import { marketsRoutes, MarketsService } from './markets/service.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
@@ -151,7 +152,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; englishSweep: EnglishSweep };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; englishSweep: EnglishSweep };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -252,7 +253,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
   const posts = new PostsService(kv);
   const polls = new PollsService(kv);
-  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos });
+  const markets = new MarketsService({ log: app.log, fetchImpl });
+  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos, markets });
   // Management notifications: the hosting mailbox (SMTP) with the hub's HTTPS wp_mail channel as
   // the automatic fallback (M112) — a blocked port or a TLS hiccup never loses a mail.
   const smtpMail: Mailer | null = config.SMTP_HOST
@@ -419,6 +421,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const partners = new PartnersService({ kv, onChange: () => moved('content') });
   // M87: the advisor's daily persona push — templates over live data, zero AI cost at send time.
   const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda, discounts });
+  // M179: the advisor's market-move alerts — owner thresholds, once per quote a day, skips members who muted him.
+  const marketAlerts = new MarketAlertsService({ kv, log: app.log, markets, push, muted: () => companion.mutedIds(), enabled: config.MARKET_ALERTS === '1' });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
   const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL });
@@ -563,7 +567,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents, speech });
   await app.register(newsRoutes, { service: news, auth, kv, interests });
   // M176: the home's live price strip (gold, silver, oil, Bitcoin) — real quotes, shared 10-minute cache.
-  await app.register(marketsRoutes, { service: new MarketsService({ log: app.log, fetchImpl }) });
+  await app.register(marketsRoutes, { service: markets });
+  await app.register(marketAlertRoutes, { service: marketAlerts, markets, push, auth });
   // M177: the daily AI-written ad for the next open workshop — the app's once-a-day opening popup.
   await app.register(workshopAdRoutes, { service: new WorkshopAdService({ kv, log: app.log, agenda, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl }) });
   await app.register(videosRoutes, { service: videos });
@@ -634,5 +639,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, englishSweep };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, marketAlerts, englishSweep };
 }

@@ -640,6 +640,10 @@ export const api = {
   companion: () => call<CompanionData>('GET', '/api/admin/companion'),
   saveCompanion: (templates: CompanionTemplates) => call<CompanionData & { ok: true }>('PUT', '/api/admin/companion', templates),
   resetCompanion: () => call<CompanionData & { ok: true }>('DELETE', '/api/admin/companion'),
+  // M179: the advisor's market-move alerts — thresholds, cap, quiet hours, a test push to the admin.
+  marketAlerts: () => call<MarketAlertsData>('GET', '/api/admin/market-alerts'),
+  saveMarketAlerts: (settings: MarketAlertSettings) => call<{ ok: true; settings: MarketAlertSettings }>('PUT', '/api/admin/market-alerts', settings),
+  testMarketAlert: () => call<{ ok: true; sent: number; message: { title: string; body: string } }>('POST', '/api/admin/market-alerts/test'),
   // M81 «صور التطبيق»: code-defined image slots the owner fills with uploads.
   contentImages: () => call<{ slots: ImageSlot[] }>('GET', '/api/admin/content/images'),
   saveContentImage: (key: string, url: string | null) => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url }),
@@ -666,6 +670,17 @@ export type CompanionData = {
   mutedCount: number;
   preview: Record<CompanionPersona, CompanionTemplate>;
   placeholders: { key: string; label: string }[];
+};
+
+/** M179 — mirrors server/src/markets/alerts.ts. */
+export type MarketGroup = 'stocks' | 'metals' | 'oil' | 'fx' | 'crypto';
+export type MarketAlertSettings = { enabled: boolean; thresholds: Record<MarketGroup, number>; dailyCap: number; quietFrom: number; quietTo: number };
+export type MarketAlertsData = {
+  settings: MarketAlertSettings;
+  defaults: MarketAlertSettings;
+  enabled: boolean;
+  sentToday: string[];
+  watching: { key: string; label: string; group: MarketGroup; changePct: number; threshold: number; delayedMin: number | null; crossed: boolean }[];
 };
 
 /** M68 «شركاؤنا» — mirrors server/src/partners/service.ts. */

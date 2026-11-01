@@ -10,6 +10,7 @@ import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
 import { stripContacts } from '../projectsBank/redact.js';
 import type { ProjectsService } from '../projectsBank/service.js';
+import type { MarketsService } from '../markets/service.js';
 import type { KV } from '../store.js';
 import type { VideosService } from '../videos/service.js';
 
@@ -75,7 +76,7 @@ function inEnglish(found: ResolvedContext): ResolvedContext {
 const clip = (value: string, max: number): string => value.replace(/[ \t]+/g, ' ').trim().slice(0, max);
 const lines = (rows: (string | null | undefined | false)[]): string => rows.filter((row): row is string => Boolean(row)).join('\n');
 
-type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: PostsService; videos?: VideosService };
+type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: PostsService; videos?: VideosService; markets?: MarketsService };
 
 export class ContextResolver {
   constructor(private readonly deps: Deps) {}
@@ -167,6 +168,13 @@ export class ContextResolver {
       case 'hq': {
         const content = await getHqContent(kv);
         return done(content.title, lines([content.intro, content.address, `ساعات الاستقبال: من ${content.hours.open} إلى ${content.hours.close}`, ...content.facilities.map((entry) => `• ${entry}`), ...content.rules.map((entry) => `• ${entry}`)]));
+      }
+      case 'markets': {
+        // M179: the live quotes the member sees, with the feed's own numbers and its delay — facts only, no forecasts.
+        const answer = await this.deps.markets?.quotes();
+        if (!answer?.quotes.length) return done('الأسواق', 'شاشة الأسواق: أسعار الأسهم السعودية والذهب والفضة والنفط والعملات والعملات الرقمية. الأسعار غير متاحة لحظيًا.');
+        const rows = answer.quotes.map((quote) => `• ${quote.label}: ${quote.price} ${quote.unit} (${quote.changePct >= 0 ? '+' : ''}${quote.changePct}% عن الإغلاق السابق)${quote.delayedMin ? ` — البيانات متأخرة ${quote.delayedMin} دقيقة` : ''}`);
+        return done('الأسواق', lines([`شاشة الأسواق: الأسعار الحية من ${answer.source}، تتجدد كل 30 ثانية. اشرح الحركة بأرقام الشاشة فقط، بلا توقعات ولا توصيات ولا وعود بعوائد، واذكر أن المعلومات للاطلاع فقط وليست توصية استثمارية.`, ...rows]));
       }
       case 'about': {
         const content = await getAboutContent(kv);

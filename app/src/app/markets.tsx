@@ -1,6 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useMarkets, type MarketGroup, type MarketQuote } from '@/api/markets';
+import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
 import { ChangeText, priceText } from '@/components/MarketsStrip';
 import { entranceDelay, FadeInView } from '@/components/motion';
@@ -22,6 +24,9 @@ const GROUPS: MarketGroup[] = ['stocks', 'metals', 'fx', 'oil', 'crypto'];
 export default function MarketsScreen() {
   const { data, isLoading, error, refetch } = useMarkets();
   const quotes = data?.quotes ?? [];
+  const ask = useAskAdvisor();
+  // M179: the floating advisor button opens the chat on this screen; the server builds the context from the live quotes.
+  useAdvisorScreen(quotes.length ? { type: 'screen', id: 'markets', title: t('nav.markets') } : null);
 
   if (!quotes.length) {
     return (
@@ -34,13 +39,17 @@ export default function MarketsScreen() {
   const groups = GROUPS.map((group) => ({ group, items: quotes.filter((quote) => quote.group === group) })).filter((entry) => entry.items.length);
   return (
     <Screen>
+      <Pressable style={styles.ask} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
+        <Ionicons name="sparkles" size={16} color={colors.gold} />
+        <Text style={styles.askText}>{t('markets.askAdvisor')}</Text>
+      </Pressable>
       <Text style={styles.live}>{t('markets.live', { time: data?.updatedAt ? formatRelativeTime(data.updatedAt) : '' })}</Text>
       {groups.map((entry, index) => (
         <FadeInView key={entry.group} delay={entranceDelay(index, 60)}>
           <Text style={styles.groupTitle}>{t(`markets.group.${entry.group}`)}</Text>
           <GlassCard style={styles.card}>
             {entry.items.map((quote, row) => (
-              <QuoteRow key={quote.key} quote={quote} last={row === entry.items.length - 1} />
+              <QuoteRow key={quote.key} quote={quote} last={row === entry.items.length - 1} onAsk={(label) => ask({ type: 'screen', id: 'markets', title: t('nav.markets') }, t('markets.askPrompt', { label }))} />
             ))}
           </GlassCard>
         </FadeInView>
@@ -50,8 +59,9 @@ export default function MarketsScreen() {
   );
 }
 
-function QuoteRow({ quote, last }: { quote: MarketQuote; last: boolean }) {
+function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; onAsk: (label: string) => void }) {
   const english = getLang() === 'en';
+  const label = english ? quote.labelEn : quote.label;
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={styles.start}>
@@ -62,6 +72,9 @@ function QuoteRow({ quote, last }: { quote: MarketQuote; last: boolean }) {
           {quote.delayedMin ? `${formatRelativeTime(quote.at)} · ${t('markets.delayed', { min: quote.delayedMin })}` : formatRelativeTime(quote.at)}
         </Text>
       </View>
+      <Pressable style={styles.rowAsk} hitSlop={8} onPress={() => onAsk(label)} accessibilityRole="button" accessibilityLabel={t('markets.askAbout', { label })}>
+        <Ionicons name="sparkles-outline" size={16} color={colors.gold} />
+      </Pressable>
       <View style={styles.end}>
         <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
         <ChangeText quote={quote} />
@@ -71,6 +84,9 @@ function QuoteRow({ quote, last }: { quote: MarketQuote; last: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  ask: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: spacing.xs, paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGold, marginBottom: spacing.sm },
+  askText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  rowAsk: { padding: spacing.xs },
   live: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginBottom: spacing.sm },
   groupTitle: { ...typography.subtitle, fontSize: 16, color: colors.goldLight, textAlign: textStart, marginTop: spacing.md, marginBottom: spacing.xs },
   card: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radii.lg },

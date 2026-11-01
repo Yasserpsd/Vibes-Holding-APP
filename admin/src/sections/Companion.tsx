@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { MarketAlerts } from './MarketAlerts';
 import { api, type CompanionPersona, type CompanionTemplate, type CompanionTemplates } from '../api';
 import { formatNumber } from '../format';
 import { Async, Pill, SectionHead, messageOf, sessionOver, useLoad, useShell } from '../ui';
@@ -83,6 +84,7 @@ export function Companion() {
         onReload={state.reload}
         busy={state.loading}
       />
+      <MarketAlerts />
       <Async state={state} rows={4} empty={() => !state.data} emptyText="تعذر تحميل القوالب.">
         {(data) => (
           <>

@@ -144,6 +144,11 @@ export class CompanionService {
 
   // ── mute (M87b: per-member opt-out) ────────────────────────────────────────
 
+  /** M179: the members who muted the advisor's messages (the market alerts skip them too). */
+  async mutedIds(): Promise<Set<number>> {
+    return new Set(await this.mutedList());
+  }
+
   private async mutedList(): Promise<number[]> {
     return (await this.deps.kv.get<{ ids: number[] }>(MUTED_KEY))?.ids ?? [];
   }

@@ -29,7 +29,7 @@ export const CONTEXT_ICONS: Record<ChatContext['type'], IoniconName> = {
   screen: 'phone-portrait-outline',
 };
 
-const SCREEN_KEYS: ScreenKey[] = ['home', 'projects', 'golden', 'membership', 'services', 'hq', 'news', 'videos', 'posts', 'advisor', 'account', 'about'];
+const SCREEN_KEYS: ScreenKey[] = ['home', 'projects', 'golden', 'membership', 'services', 'hq', 'news', 'videos', 'posts', 'advisor', 'account', 'about', 'markets'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The server takes only type and id and builds the text from its own public data. */
@@ -116,6 +116,7 @@ const STARTER_LISTS = {
   'screen.videos': 3,
   'screen.posts': 3,
   'screen.about': 3,
+  'screen.markets': 3,
   'screen.other': 3,
   project: 4,
   news: 4,
@@ -141,6 +142,7 @@ const SCREEN_LISTS: Partial<Record<ScreenKey, StarterList>> = {
   videos: 'screen.videos',
   posts: 'screen.posts',
   about: 'screen.about',
+  markets: 'screen.markets',
 };
 
 /** Three or four first questions that fit what the member is looking at. */
