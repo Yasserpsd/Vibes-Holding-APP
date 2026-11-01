@@ -63,6 +63,7 @@ import { membershipRoutes } from './membership/routes.js';
 import { MembershipService } from './membership/service.js';
 import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
+import { marketsRoutes, MarketsService } from './markets/service.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
 import { LiveMoyasar, moyasarKeyMode, type MoyasarConfirmer } from './payments/moyasar.js';
@@ -416,7 +417,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M68 «شركاؤنا»: the partners program and the members' personal promo codes.
   const partners = new PartnersService({ kv, onChange: () => moved('content') });
   // M87: the advisor's daily persona push — templates over live data, zero AI cost at send time.
-  const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda });
+  const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda, discounts });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
   const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL });
@@ -560,6 +561,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const speech = config.OPENAI_API_KEY ? new SpeechSynthesizer({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents, speech });
   await app.register(newsRoutes, { service: news, auth, kv, interests });
+  // M176: the home's live price strip (gold, silver, oil, Bitcoin) — real quotes, shared 10-minute cache.
+  await app.register(marketsRoutes, { service: new MarketsService({ log: app.log, fetchImpl }) });
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth });
   await app.register(cardRoutes, { service: card, auth });

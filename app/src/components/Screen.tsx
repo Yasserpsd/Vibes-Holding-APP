@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement, ReactNode, RefObject } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, type RefreshControlProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,10 +20,12 @@ type Props = {
   aboveTabBar?: boolean;
   /** V2: ghost the club emblem behind the heading — for the screens that deserve a signature. */
   watermark?: boolean;
+  /** M176: lets a screen scroll itself (the top «اشترك الآن» button jumps to the booking card). */
+  scrollRef?: RefObject<ScrollView | null>;
 };
 
 /** Scrollable screen with keyboard handling, used by forms and detail pages. */
-export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false }: Props) {
+export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef }: Props) {
   // The bottom padding keeps the last element clear of the floating «اسأل المستشار» button. Without a tab bar or
   // a bottom safe-area edge under it, the scroll view runs to the physical bottom edge and the inset counts too.
   const clearance = useAskAdvisorClearance(aboveTabBar || edges.includes('bottom'));
@@ -32,6 +34,7 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
       {watermark ? <EmblemWatermark /> : null}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingBottom: clearance }]}
           keyboardShouldPersistTaps="handled"
           refreshControl={refreshControl}

@@ -11,6 +11,7 @@ import type { KV } from '../store.js';
  */
 export const DISCOUNT_CODES_KEY = 'discounts:codes';
 export const DISCOUNT_USES_KEY = 'discounts:uses';
+export const DISCOUNT_MONTHLY_KEY = 'discounts:monthly';
 const MAX_USES_KEPT = 20_000;
 const CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,29}$/;
 
@@ -43,6 +44,26 @@ export type DiscountUse = {
 };
 
 export type AdminDiscountCode = DiscountCode & { used: number };
+
+/**
+ * M176 (owner, 2026-11-01): one automatic code that is always active and renames itself every
+ * Riyadh month — NOVDEAL in November, DECDEAL in December. Priced screens show it already applied,
+ * so the member feels the saving without typing anything. The owner sets the percent (or turns it
+ * off) from the dashboard; it has no usage cap and lives only inside its month.
+ */
+export type MonthlyDiscountSettings = { enabled: boolean; percent: number; suffix: string };
+export const MONTHLY_DEFAULTS: MonthlyDiscountSettings = { enabled: true, percent: 10, suffix: 'DEAL' };
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** The Riyadh month's code (`NOVDEAL`) and its last day. */
+export function monthlyCode(suffix: string, now = Date.now()): { code: string; endsAt: string } {
+  const [year, month] = riyadhDay(now).split('-').map(Number) as [number, number];
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const mm = String(month).padStart(2, '0');
+  return { code: `${MONTHS[month - 1]}${suffix}`, endsAt: `${year}-${mm}-${String(lastDay).padStart(2, '0')}` };
+}
+
+export type ActiveMonthlyDiscount = { code: string; percent: number; endsAt: string };
 
 /** What a validated code means for one amount. */
 export type AppliedDiscount = { code: string; percent: number; amountBefore: number; amountAfter: number };
@@ -147,10 +168,35 @@ export class DiscountsService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async monthlySettings(): Promise<MonthlyDiscountSettings> {
+    return { ...MONTHLY_DEFAULTS, ...(await this.deps.kv.get<Partial<MonthlyDiscountSettings>>(DISCOUNT_MONTHLY_KEY)) };
+  }
+
+  async setMonthlySettings(patch: Partial<MonthlyDiscountSettings>): Promise<MonthlyDiscountSettings> {
+    const next = { ...(await this.monthlySettings()), ...patch };
+    if (!Number.isInteger(next.percent) || next.percent < 1 || next.percent > 90) throw new RequestError('invalid', 'نسبة الخصم الشهري من 1 إلى 90');
+    next.suffix = normalizeCode(next.suffix);
+    if (!/^[A-Z]{2,12}$/.test(next.suffix)) throw new RequestError('invalid', 'نهاية الكود من 2 إلى 12 حرفًا لاتينيًا');
+    await this.deps.kv.set(DISCOUNT_MONTHLY_KEY, next);
+    return next;
+  }
+
+  /** This month's automatic code, or null when the owner turned it off. */
+  async activeMonthly(now = Date.now()): Promise<ActiveMonthlyDiscount | null> {
+    const settings = await this.monthlySettings();
+    if (!settings.enabled) return null;
+    return { ...monthlyCode(settings.suffix, now), percent: settings.percent };
+  }
+
   /** The code when it is usable right now; a clear Arabic error otherwise. */
   async check(raw: string, now = Date.now()): Promise<DiscountCode> {
     const key = normalizeCode(raw);
     if (!key) throw new RequestError('invalid', 'اكتب كود الخصم');
+    const monthly = await this.activeMonthly(now);
+    if (monthly && monthly.code === key) {
+      const stamp = new Date(now).toISOString();
+      return { code: key, percent: monthly.percent, maxUses: Number.MAX_SAFE_INTEGER, startsAt: '', endsAt: monthly.endsAt, enabled: true, note: 'monthly', createdAt: stamp, updatedAt: stamp };
+    }
     const row = (await this.loadCodes()).find((entry) => entry.code === key);
     if (!row || !row.enabled) throw new RequestError('not_found', 'كود الخصم غير صحيح', 404);
     const today = riyadhDay(now);

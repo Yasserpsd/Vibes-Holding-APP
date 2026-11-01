@@ -9,11 +9,13 @@ import { eventOf, pollsApi, usePost, type Poll, type PostEvent } from '@/api/pos
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { GlassCard } from '@/components/lux';
+import { GlassCard, GoldHairline } from '@/components/lux';
 import { entranceDelay, FadeInView, GrowBar, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { PaperCard } from '@/components/paper';
 import { audienceBadge } from '@/components/PostsBlock';
 import { StateView } from '@/components/StateView';
+import { StructuredText } from '@/components/StructuredText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
@@ -53,17 +55,19 @@ export default function PostScreen() {
             ) : null}
             {post.publishedAt ? <Text style={styles.time}>{formatRelativeTime(post.publishedAt)}</Text> : null}
           </View>
+          {/* M176 (owner: «رسائل الإدارة توصل وراها خلفية بيضاء ومرتبة ومنسقة»): the message reads as a letter on a white
+              sheet — the title in ink, a golden rule, then the body as tidy blocks (sub-headings, bullets, figures in gold). */}
           <FadeInView delay={entranceDelay(1)}>
-            <Text style={styles.title}>{post.title}</Text>
+            <PaperCard style={styles.letter}>
+              <Text style={styles.letterTitle}>{post.title}</Text>
+              <GoldHairline style={styles.letterRule} />
+              {post.body ? <StructuredText text={post.body} variant="paper" /> : null}
+              {!event && !isPoll ? <Text style={styles.letterSign}>{t('posts.signature')}</Text> : null}
+            </PaperCard>
           </FadeInView>
           {event ? (
             <FadeInView delay={entranceDelay(2)}>
               <EventCard event={event} />
-            </FadeInView>
-          ) : null}
-          {post.body ? (
-            <FadeInView delay={entranceDelay(3)}>
-              <Text style={styles.body}>{post.body}</Text>
             </FadeInView>
           ) : null}
           {post.kind === 'poll' && post.poll ? (
@@ -257,8 +261,11 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
   time: { ...typography.caption, color: colors.textMuted },
-  title: { ...typography.title, color: colors.textPrimary },
-  body: { ...typography.body, color: colors.textSecondary },
+  // M176: the admin message as a white letter.
+  letter: { backgroundColor: colors.paperCard, gap: spacing.sm, padding: spacing.lg },
+  letterTitle: { ...typography.title, fontSize: 22, lineHeight: 36, color: colors.paperInk, textAlign: textStart },
+  letterRule: { width: 64, alignSelf: 'flex-start', marginVertical: spacing.xs },
+  letterSign: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.paperGold, textAlign: textStart, marginTop: spacing.sm },
   poll: { gap: spacing.sm },
   option: {
     borderRadius: radii.lg,

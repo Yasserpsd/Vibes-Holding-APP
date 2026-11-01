@@ -1255,7 +1255,20 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "completeProfile.error.memberType": "اختر: فرد أم شركة.",
     "completeProfile.error.name": "اكتب اسمك الأول واسم العائلة.",
     "completeProfile.error.jobTitle": "اكتب وظيفتك.",
-    "completeProfile.error.contactEmail": "اكتب بريدًا إلكترونيًا صحيحًا."
+    "completeProfile.error.contactEmail": "اكتب بريدًا إلكترونيًا صحيحًا.",
+    "deal.active": "كود الخصم مفعّل تلقائيًا",
+    "deal.percent": "خصم {percent}% يُطبَّق على طلبك مباشرة",
+    "deal.hint": "لا تحتاج لكتابة شيء — الخصم محسوب عند الدفع.",
+    "deal.sar": "ريال",
+    "deal.otherCode": "عندك كود آخر؟ اكتبه هنا",
+    "deal.ctaBook": "احجز مقعدك الآن",
+    "deal.ctaOrder": "اطلب الخدمة الآن",
+    "home.newsAll": "كل الأخبار",
+    "markets.gram": "جرام 24: {price} ريال",
+    "markets.source": "أسعار تقريبية · المصدر: {source}",
+    "inbox.kind.tip": "مقترح لك",
+    "inbox.tipToday": "مقترح مستشارك لك اليوم",
+    "posts.signature": "— إدارة النادي"
   },
   "en": {
     "tabs.home": "Home",
@@ -2512,7 +2525,20 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "completeProfile.error.memberType": "Pick: individual or company.",
     "completeProfile.error.name": "Enter your first and family name.",
     "completeProfile.error.jobTitle": "Enter your job title.",
-    "completeProfile.error.contactEmail": "Enter a valid e-mail address."
+    "completeProfile.error.contactEmail": "Enter a valid e-mail address.",
+    "deal.active": "Discount code applied automatically",
+    "deal.percent": "{percent}% off, applied to your order right away",
+    "deal.hint": "Nothing to type — the discount is counted at checkout.",
+    "deal.sar": "SAR",
+    "deal.otherCode": "Have another code? Type it here",
+    "deal.ctaBook": "Book your seat now",
+    "deal.ctaOrder": "Order this service now",
+    "home.newsAll": "All news",
+    "markets.gram": "24k gram: {price} SAR",
+    "markets.source": "Indicative prices · Source: {source}",
+    "inbox.kind.tip": "For you",
+    "inbox.tipToday": "Your advisor's pick for you today",
+    "posts.signature": "— The club management"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2584,6 +2610,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "rateUs": "دعوة تقييم التطبيق على المتجر",
     "voiceFill": "التعبئة الصوتية للنماذج",
     "completeProfile": "إكمال الملف بعد الدخول",
-    "support": "الدعم المباشر (واتساب)"
+    "support": "الدعم المباشر (واتساب)",
+    "deal": "الكود الشهري التلقائي وأزرار الحجز السريع",
+    "markets": "شريط أسعار الذهب والفضة والنفط"
   }
 };

@@ -13,7 +13,14 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
  * anything else into a paragraph with a golden rail; figures and currency light up in gold. Pure
  * presentation — the words stay exactly the owner's.
  */
-type Block = { kind: 'fact'; label: string; text: string; icon: IoniconName } | { kind: 'bullet'; text: string } | { kind: 'paragraph'; text: string };
+type Block =
+  | { kind: 'fact'; label: string; text: string; icon: IoniconName }
+  | { kind: 'bullet'; text: string }
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'heading'; text: string };
+
+/** M176: a short line that asks or announces («لماذا لم نحضر؟», «والسبب بسيط:») reads as a sub-heading. */
+const HEADING_MAX = 60;
 
 const LABEL_MAX = 40;
 const NUMBER = /(\d[\d,.٫٬]*\s?(?:%|٪|ريال|SAR|مقعدًا|مقعد)?)/u;
@@ -47,27 +54,36 @@ export function parseBlocks(text: string): Block[] {
       blocks.push({ kind: 'fact', label: fact[1].trim(), text: fact[2].trim(), icon: iconFor(fact[1]) });
       continue;
     }
+    if (line.length <= HEADING_MAX && /[؟?:：]$/u.test(line)) {
+      blocks.push({ kind: 'heading', text: line.replace(/[:：]$/u, '').trim() });
+      continue;
+    }
     blocks.push({ kind: 'paragraph', text: line });
   }
   return blocks;
 }
 
 /** Figures glow gold inside the owner's sentence. */
-function Lit({ text, style }: { text: string; style: object }) {
+function Lit({ text, style, paper = false }: { text: string; style: object; paper?: boolean }) {
   const parts = text.split(NUMBER);
   return (
     <Text style={style}>
-      {parts.map((part, index) => (index % 2 === 1 ? <Text key={index} style={styles.lit}>{part}</Text> : part))}
+      {parts.map((part, index) => (index % 2 === 1 ? <Text key={index} style={paper ? styles.litPaper : styles.lit}>{part}</Text> : part))}
     </Text>
   );
 }
 
-export function StructuredText({ text }: { text: string }) {
+/** M176: `paper` = ink on a white sheet (admin messages); the default is the dark glass card. */
+export function StructuredText({ text, variant = 'dark' }: { text: string; variant?: 'dark' | 'paper' }) {
   const blocks = parseBlocks(text);
   if (blocks.length === 0) return null;
+  if (variant === 'paper') return <PaperBlocks blocks={blocks} />;
   return (
     <GlassCard style={styles.card}>
       {blocks.map((block, index) => {
+        if (block.kind === 'heading') {
+          return <Text key={index} style={styles.heading}>{block.text}</Text>;
+        }
         if (block.kind === 'fact') {
           return (
             <View key={index} style={styles.fact}>
@@ -100,7 +116,58 @@ export function StructuredText({ text }: { text: string }) {
   );
 }
 
+function PaperBlocks({ blocks }: { blocks: Block[] }) {
+  return (
+    <View style={styles.paperBody}>
+      {blocks.map((block, index) => {
+        if (block.kind === 'heading') {
+          return (
+            <View key={index} style={[styles.paperHeadingRow, index > 0 && styles.paperHeadingGap]}>
+              <View style={styles.paperHeadingBar} />
+              <Text style={styles.paperHeading}>{block.text}</Text>
+            </View>
+          );
+        }
+        if (block.kind === 'fact') {
+          return (
+            <View key={index} style={styles.paperFact}>
+              <Ionicons name={block.icon} size={16} color={colors.paperGold} style={styles.paperFactIcon} />
+              <View style={styles.factTexts}>
+                <Text style={styles.paperFactLabel}>{block.label}</Text>
+                <Lit text={block.text} style={styles.paperText} paper />
+              </View>
+            </View>
+          );
+        }
+        if (block.kind === 'bullet') {
+          return (
+            <View key={index} style={styles.bullet}>
+              <Text style={styles.paperDiamond}>◆</Text>
+              <Lit text={block.text} style={[styles.paperText, styles.flex]} paper />
+            </View>
+          );
+        }
+        return <Lit key={index} text={block.text} style={styles.paperText} paper />;
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  heading: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 26, color: colors.goldLight, textAlign: textStart },
+  // M176: the white-sheet palette — ink text, dark gold accents, air between the thoughts.
+  paperBody: { gap: spacing.sm + 2 },
+  paperHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  paperHeadingGap: { marginTop: spacing.sm },
+  paperHeadingBar: { width: 4, height: 20, borderRadius: 2, backgroundColor: colors.gold },
+  paperHeading: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 28, color: colors.paperInk, flex: 1, textAlign: textStart },
+  paperText: { ...typography.body, fontSize: 16, lineHeight: 29, color: colors.paperInkSoft, textAlign: textStart },
+  paperFact: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  paperFactIcon: { marginTop: 4 },
+  paperFactLabel: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.paperGold, textAlign: textStart },
+  paperDiamond: { color: colors.paperGold, fontSize: 9, lineHeight: 29 },
+  litPaper: { fontFamily: fonts.semiBold, color: colors.paperGold },
+  flex: { flex: 1 },
   card: { gap: spacing.sm + 2, padding: spacing.md },
   paragraph: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
   rail: { width: 3, borderRadius: 2, backgroundColor: colors.borderGold, marginVertical: 3 },

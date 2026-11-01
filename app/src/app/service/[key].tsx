@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
-import { amountLabel, paymentsApi } from '@/api/payments';
+import { amountLabel, paymentsApi, useMonthlyDeal } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
@@ -14,6 +14,7 @@ import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
 import { UpsellCard } from '@/components/MembershipUpsell';
+import { MonthlyDealBadge } from '@/components/MonthlyDeal';
 import { PaperCard, usePaper } from '@/components/paper';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -21,6 +22,7 @@ import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { StructuredText } from '@/components/StructuredText';
 import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
@@ -44,6 +46,10 @@ export default function ServiceScreen() {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [payGated, setPayGated] = useState(false);
+  // M176 (owner): the month's code (NOVDEAL…) rides along with the payment; a top button jumps to the order card.
+  const deal = useMonthlyDeal();
+  const scrollRef = useRef<ScrollView>(null);
+  const [actionY, setActionY] = useState(0);
   const openAdvisor = useAskAdvisor();
   const advisorContext = data ? ({ type: 'service', id: data.service.key, title: data.service.title } as const) : null;
   useAdvisorScreen(advisorContext);
@@ -87,7 +93,8 @@ export default function ServiceScreen() {
     setPayGated(false);
     try {
       // M128 (owner): the discount-code box left the pay card («مش فاهم ايه قيمتها») — no code rides along.
-      const { payment } = await paymentsApi.start(service.key, answers);
+      // M176: the month's automatic code is applied by the server — the member types nothing.
+      const { payment } = await paymentsApi.start(service.key, answers, deal?.code);
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
       // M111: the checkout renders EMBEDDED inside the app («الدفع جوا نفس الصفحة», owner).
       // M107: a 100% code settles on the spot — straight to the confirmation, no checkout.
@@ -104,8 +111,11 @@ export default function ServiceScreen() {
     }
   };
 
+  const ordering = !service.locked && (service.action?.type === 'paymob' || service.action?.type === 'whatsapp' || service.action?.type === 'form');
+  const toAction = () => scrollRef.current?.scrollTo({ y: Math.max(0, actionY - 16), animated: true });
+
   return (
-    <Screen>
+    <Screen scrollRef={scrollRef}>
       {/* M130 (owner): a service with its own film opens on the film — the photo banner steps aside.
           M81 + M105 otherwise: the owner's photos of this service lead the page — several rotate on their own. */}
       {service.videoUrl ? (
@@ -144,22 +154,21 @@ export default function ServiceScreen() {
           </View>
         </View>
       </FadeInView>
+      {/* M176 (owner): the first CTA right under the title — straight to the order card. */}
+      {ordering ? (
+        <FadeInView delay={entranceDelay(1)}>
+          <AppButton label={t('deal.ctaOrder')} icon="flash-outline" onPress={toAction} />
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(1)}>
         <Text style={styles.summary}>{service.summary}</Text>
       </FadeInView>
-      {service.detail
-        ? service.detail
-            .split('\n')
-            .map((paragraph) => paragraph.trim())
-            // Blank lines in the server text used to render as empty paragraphs — a tall dead gap
-            // above the payment panel (owner, 2026-10-20: «مساحة كبيرة جدًا فاضية»).
-            .filter((paragraph) => paragraph.length > 0)
-            .map((paragraph, index) => (
-              <FadeInView key={index} delay={entranceDelay(index + 2)}>
-                <Text style={styles.paragraph}>{paragraph}</Text>
-              </FadeInView>
-            ))
-        : null}
+      {/* M176 (owner: «بعض الأماكن الكلام Bulk»): the description as tidy blocks — sub-headings, fact rows, bullets. */}
+      {service.detail ? (
+        <FadeInView delay={entranceDelay(2)}>
+          <StructuredText text={service.detail} />
+        </FadeInView>
+      ) : null}
 
       {showUpsell && data.upsell ? <UpsellCard upsell={data.upsell} /> : null}
 
@@ -167,7 +176,11 @@ export default function ServiceScreen() {
         // LockedNotice animates its own entrance; wrapping it again double-animates.
         <LockedNotice text={lockedText} guest={status !== 'signedIn'} />
       ) : (
-        <FadeInView delay={entranceDelay(3)}>
+        <View onLayout={(layout) => setActionY(layout.nativeEvent.layout.y)}>
+        <FadeInView delay={entranceDelay(3)} style={styles.actionArea}>
+          {service.action.type === 'paymob' && service.price && service.price.amount > 0 ? (
+            <MonthlyDealBadge amount={service.price.amount} currency={service.price.currency} />
+          ) : null}
           <ActionPanel
             action={service.action}
             price={service.price}
@@ -185,6 +198,7 @@ export default function ServiceScreen() {
             onRoute={(path) => router.push(path as Href)}
           />
         </FadeInView>
+        </View>
       )}
       {payError ? (
         <FadeInView offset={8}>
@@ -324,6 +338,7 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
 }
 
 const styles = StyleSheet.create({
+  actionArea: { gap: spacing.md },
   // M81: the service's real photo, big on top.
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconBox: {

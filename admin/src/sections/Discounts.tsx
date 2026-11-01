@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { api, type DiscountCode, type DiscountCodeInput, type DiscountUse } from '../api';
+import { api, type MonthlyDiscountSettings, type DiscountCode, type DiscountCodeInput, type DiscountUse } from '../api';
 import { formatDateTime, formatNumber } from '../format';
 import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver, Sheet, useLoad, useShell } from '../ui';
 
@@ -10,6 +10,57 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
  */
 
 const EMPTY: DiscountCodeInput = { code: '', percent: 10, maxUses: 50, startsAt: '', endsAt: '', enabled: true, note: '' };
+
+/** M176: the always-on code that renames itself each month (NOVDEAL, DECDEAL…). */
+function MonthlyCode() {
+  const { signOut, notify } = useShell();
+  const state = useLoad(() => api.discountMonthly(), []);
+  const [draft, setDraft] = useState<MonthlyDiscountSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  const settings = draft ?? state.data?.settings ?? null;
+
+  async function save() {
+    if (!draft || busy) return;
+    setBusy(true);
+    try {
+      await api.saveDiscountMonthly(draft);
+      notify('ok', 'حُفظ الكود الشهري.');
+      setDraft(null);
+      state.reload();
+    } catch (failure) {
+      if (sessionOver(failure)) signOut();
+      notify('error', messageOf(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!settings) return null;
+  const change = (patch: Partial<MonthlyDiscountSettings>) => setDraft({ ...settings, ...patch });
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0 }}>الكود الشهري التلقائي</h3>
+      <p className="muted">
+        يظهر مفعّلًا تلقائيًا على كل شاشة فيها سعر (الورش والخدمات والفعاليات) ويتغير اسمه أول كل شهر.
+        كود هذا الشهر: <bdi dir="ltr" className="num">{state.data?.active?.code ?? '—'}</bdi>
+      </p>
+      <div className="row-actions">
+        <label>
+          <input type="checkbox" checked={settings.enabled} onChange={(event) => change({ enabled: event.target.checked })} /> مفعّل
+        </label>
+        <label>
+          نسبة الخصم %
+          <input type="number" min={1} max={90} value={settings.percent} onChange={(event) => change({ percent: Number(event.target.value) })} style={{ width: 80 }} />
+        </label>
+        <label>
+          نهاية الكود
+          <input dir="ltr" value={settings.suffix} onChange={(event) => change({ suffix: event.target.value.toUpperCase() })} style={{ width: 110 }} />
+        </label>
+        <button type="button" disabled={!draft || busy} onClick={() => void save()}>حفظ</button>
+      </div>
+    </div>
+  );
+}
 
 export function Discounts() {
   const { signOut, notify } = useShell();
@@ -80,6 +131,7 @@ export function Discounts() {
         كل نشاط له سعر معلن، ومن تريده أن يحضر بدون دفع أعطه كود خصم 100%. الكود يعمل في حجز الفعاليات ودفع الخدمات داخل التطبيق،
         ويُحتسب الاستخدام فقط عند تأكيد الحجز أو نجاح الدفع.
       </p>
+      <MonthlyCode />
       <div className="row-actions" style={{ marginBottom: 12 }}>
         <button type="button" onClick={() => setEditor({ row: null, input: { ...EMPTY } })}>+ كود جديد</button>
       </div>

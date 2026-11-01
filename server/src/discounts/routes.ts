@@ -25,6 +25,12 @@ const codeSchema = z.object({
   note: z.string().trim().max(200).default(''),
 });
 
+const monthlySchema = z.object({
+  enabled: z.boolean(),
+  percent: z.number().int().min(1).max(90),
+  suffix: z.string().trim().min(2).max(12),
+}).partial();
+
 const codeParamSchema = z.object({ code: z.string().trim().min(1).max(30) });
 
 /** M107 «أكواد الخصم»: the member checks a code before paying; the dashboard creates and tracks them. */
@@ -45,6 +51,32 @@ export const discountsRoutes: FastifyPluginAsync<DiscountsRoutesOptions> = async
         return reply.code(429).send({ error: { code: 'rate', message: 'محاولات كثيرة، حاول بعد قليل' } });
       }
       return service.apply(body.code, body.amount);
+    }),
+  );
+
+  // M176: this month's automatic code (NOVDEAL…) that every priced screen shows already applied.
+  app.get(
+    '/api/discounts/active',
+    guard(async () => ({ monthly: await service.activeMonthly() })),
+  );
+
+  app.get(
+    '/api/admin/discount-monthly',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return { settings: await service.monthlySettings(), active: await service.activeMonthly() };
+    }),
+  );
+
+  app.put(
+    '/api/admin/discount-monthly',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(monthlySchema, request.body, reply);
+      if (!body) return;
+      return { settings: await service.setMonthlySettings(body), active: await service.activeMonthly() };
     }),
   );
 

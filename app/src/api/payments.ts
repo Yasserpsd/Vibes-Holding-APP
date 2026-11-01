@@ -42,6 +42,18 @@ export const paymentsApi = {
     apiRequest<{ code: string; percent: number; amountBefore: number; amountAfter: number }>('POST', '/api/discounts/check', { body: { code, amount } }),
 };
 
+/** M176: this month's automatic code (NOVDEAL…), shown already applied on every priced screen. */
+export type MonthlyDeal = { code: string; percent: number; endsAt: string };
+
+export function useMonthlyDeal(): MonthlyDeal | null {
+  const query = useQuery({
+    queryKey: ['discounts', 'active'],
+    queryFn: () => apiGet<{ monthly: MonthlyDeal | null }>('/api/discounts/active'),
+    staleTime: 60 * 60_000,
+  });
+  return query.data?.monthly ?? null;
+}
+
 /** One payment; polls every few seconds while the gateway's callback is still awaited. */
 export function usePayment(id: string | undefined) {
   return useQuery({

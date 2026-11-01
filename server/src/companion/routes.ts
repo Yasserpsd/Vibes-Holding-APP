@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { isActiveMember } from '../content/services.js';
+import { langOf } from '../lang.js';
 import { contentProblem } from '../content/edits.js';
 import { COMPANION_PLACEHOLDERS, type CompanionService, type CompanionTemplates } from './service.js';
 
@@ -28,6 +30,19 @@ export const companionRoutes: FastifyPluginAsync<CompanionRoutesOptions> = async
       if (!current) return;
       void reply.header('cache-control', 'no-store');
       return { muted: await service.isMuted(current.session.contactId) };
+    }),
+  );
+
+  // M176: the member's personal daily suggestions (by name, persona and membership) for the notifications tab.
+  app.get(
+    '/api/companion/tips',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      void reply.header('cache-control', 'no-store');
+      const me = await auth.me(current.session);
+      const tips = await service.tipsFor({ id: me.id, name: me.name, nameEn: me.en?.name ?? null, persona: me.persona || null, member: isActiveMember(me) }, langOf(request));
+      return { tips };
     }),
   );
 

@@ -2,11 +2,13 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { AgendaService } from '../agenda/service.js';
 import type { Config } from '../config.js';
+import type { DiscountsService } from '../discounts/service.js';
 import { getGoldenContent } from '../content/golden.js';
 import type { ProjectsService } from '../projectsBank/service.js';
-import type { PushService } from '../push/service.js';
+import type { PushMessage, PushService } from '../push/service.js';
 import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
+import { firstName, tipDayIndex, tipFor, type Tip } from './tips.js';
 
 /**
  * M87 «المستشار عضو أساسي» (owner): ONE personal push from the advisor to every member, every
@@ -81,6 +83,8 @@ type Deps = {
   push: PushService;
   projects: ProjectsService;
   agenda: AgendaService;
+  /** M176: the month's automatic code, offered in the personal tips. */
+  discounts?: DiscountsService;
 };
 
 type Draft = { title: string; body: string };
@@ -177,13 +181,54 @@ export class CompanionService {
     // The mark lands BEFORE the sends: a crash mid-way never double-messages the members.
     await this.deps.kv.set(SENT_KEY, { day: today });
     const drafts = await this.drafts(now);
-    // M87b: members who muted the daily message are skipped, one set for the three waves.
+    const context = await this.context(now);
+    const day = tipDayIndex(now);
+    // M87b: members who muted the daily message are skipped.
     const muted = new Set(await this.mutedList());
-    for (const [persona, draft] of Object.entries(drafts)) {
-      const outcome = await this.deps.push.broadcastPersona(persona, { title: draft.title, body: draft.body, data: { screen: '/advisor', type: 'companion' } }, muted);
-      this.deps.log.info({ persona, ...outcome }, 'companion daily push');
-    }
+    // M176 (owner): ONE personal message per member, by name — the day's tip from the club's services, persona and
+    // membership aware. Every fifth day (per member) the owner's dashboard template for his persona takes the slot.
+    const outcome = await this.deps.push.broadcastEach((device): PushMessage | null => {
+      if (muted.has(device.contactId)) return null;
+      const lang = device.lang ?? 'ar';
+      const name = (lang === 'en' ? device.nameEn : device.name) ?? '';
+      const persona = (COMPANION_PERSONAS as readonly string[]).includes(device.persona ?? '') ? (device.persona as CompanionPersona) : 'neutral';
+      if (lang === 'ar' && (day + device.contactId) % 5 === 0) {
+        const draft = drafts[persona];
+        return { title: name ? `${name}، ${draft.title}` : draft.title, body: draft.body, data: { screen: '/advisor', type: 'companion' } };
+      }
+      const tip = tipFor({ persona, member: Boolean(device.member), name, lang, seed: device.contactId }, day, context);
+      if (!tip) return null;
+      return { title: tip.title, body: tip.body, data: { screen: tip.route, type: 'companion', tip: tip.key } };
+    });
+    this.deps.log.info(outcome, 'companion daily push (personal)');
     return true;
+  }
+
+  /** The live values the tips may name: the day's bank pick and this month's automatic code. */
+  private async context(now: number): Promise<Record<string, string | null>> {
+    const index = dayIndex(now);
+    const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12 });
+    const bankPick = bank.items.length ? bank.items[index % bank.items.length] : null;
+    const deal = this.deps.discounts ? await this.deps.discounts.activeMonthly(now).catch(() => null) : null;
+    return {
+      project: bankPick?.title ?? null,
+      sector: bankPick?.sector?.name ?? null,
+      deal: deal?.code ?? null,
+      percent: deal ? String(deal.percent) : null,
+    };
+  }
+
+  /** M176: the member's tips of the last days, newest first — the «مقترح لك» rows of the notifications tab. */
+  async tipsFor(me: { id: number; name: string; persona: string | null; member: boolean; nameEn?: string | null }, lang: 'ar' | 'en', days = 5, now = Date.now()): Promise<(Tip & { id: string; day: string })[]> {
+    const context = await this.context(now);
+    const today = tipDayIndex(now);
+    const name = firstName(lang === 'en' ? (me.nameEn ?? '') : me.name);
+    const out: (Tip & { id: string; day: string })[] = [];
+    for (let back = 0; back < days; back += 1) {
+      const tip = tipFor({ persona: me.persona, member: me.member, name, lang, seed: me.id }, today - back, context);
+      if (tip) out.push({ ...tip, id: `tip:${today - back}`, day: riyadhDay(now - back * 86_400_000) });
+    }
+    return out;
   }
 
   /** Today's three messages — the day's template, filled from live data; a template missing its data falls to the next. */

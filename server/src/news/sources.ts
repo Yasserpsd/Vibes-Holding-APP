@@ -105,6 +105,17 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
   { id: 'investing-en', name: 'Investing.com', url: 'https://www.investing.com/rss/news.rss', tier: 'global', lang: 'en', enabled: false, hint: 'Investing.com — markets, stocks, commodities — article pages refuse server requests (403)' },
   { id: 'bing-gold-silver-en', name: 'Gold & Silver', url: bing('gold silver price site:cnbc.com OR site:marketwatch.com OR site:investing.com', 'en'), tier: 'global', lang: 'en', enabled: false, hint: 'Gold and silver prices and drivers — MarketWatch pages refuse server requests (401)' },
   { id: 'cnbc-gold-en', name: 'CNBC', url: bing('gold silver prices site:cnbc.com', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'CNBC — gold and silver prices and drivers' },
+  // M176 (owner, 2026-11-01, «ركز اوي على أخبار الاقتصاد والمال والأعمال وأسعار الذهب والفضة والبترول»): more Arabic
+  // economy, gold and oil feeds. Probed 2026-11-01 with news:probe — feed + 3 article pages OK each.
+  { id: 'asharq-gold-oil', name: 'الشرق للأعمال', url: bing('site:asharqbusiness.com الذهب النفط'), tier: 'saudi', lang: 'ar', enabled: true, boost: 15, hint: 'الشرق للأعمال — الذهب والنفط' },
+  { id: 'aleqt-gold-oil', name: 'الاقتصادية', url: bing('site:aleqt.com الذهب النفط'), tier: 'saudi', lang: 'ar', enabled: true, boost: 15, hint: 'الاقتصادية — الذهب والنفط والأسواق' },
+  { id: 'argaam-commodities', name: 'أرقام', url: bing('أرقام الذهب النفط site:argaam.com'), tier: 'saudi', lang: 'ar', enabled: true, boost: 20, hint: 'أرقام — السلع والذهب والنفط' },
+  { id: 'okaz-gold', name: 'عكاظ', url: bing('site:okaz.com.sa أسعار الذهب'), tier: 'saudi', lang: 'ar', enabled: true, boost: 10, hint: 'عكاظ — أسعار الذهب' },
+  { id: 'cnbcarabia-economy', name: 'CNBC عربية', url: bing('site:cnbcarabia.com الاقتصاد السعودي'), tier: 'saudi', lang: 'ar', enabled: true, boost: 15, hint: 'CNBC عربية — الاقتصاد السعودي وتاسي' },
+  { id: 'alriyadh-economy', name: 'الرياض', url: bing('site:alriyadh.com اقتصاد'), tier: 'saudi', lang: 'ar', enabled: true, hint: 'صحيفة الرياض — الاقتصاد' },
+  { id: 'skynewsarabia-economy', name: 'سكاي نيوز عربية', url: bing('site:skynewsarabia.com اقتصاد'), tier: 'global', lang: 'ar', enabled: true, hint: 'سكاي نيوز عربية — الاقتصاد' },
+  { id: 'aljazeera-economy', name: 'الجزيرة نت', url: bing('site:aljazeera.net اقتصاد'), tier: 'global', lang: 'ar', enabled: true, hint: 'الجزيرة نت — الاقتصاد' },
+  { id: 'cnbc-oil-en', name: 'CNBC', url: bing('oil prices Brent site:cnbc.com', 'en'), tier: 'global', lang: 'en', enabled: true, hint: 'CNBC — oil prices (Brent, WTI, OPEC+)' },
 ];
 
 /**
@@ -118,8 +129,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  *     البلد ومباشر kept but off («خليهم موجودين ولكن غير مفعلين اللي أحب أفعله أنا»); sports sources added.
  * 5 = M134 (owner, 2026-10-27, «نزود الأخبار الرياضية»): four more Arabic sports sources (probed the same day).
  * 6 = M166 (owner, 2026-10-31): the base sections (crypto, gold and silver, oil, markets) — global market sources, Arabic and English.
+ * 7 = M176 (owner, 2026-11-01): nine more economy, gold and oil feeds (mostly Arabic), probed the same day.
  */
-export const NEWS_SEED_VERSION = 6;
+export const NEWS_SEED_VERSION = 7;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },

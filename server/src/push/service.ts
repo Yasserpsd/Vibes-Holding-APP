@@ -27,6 +27,10 @@ export type PushToken = {
   persona?: string | null;
   /** M122: the app language at the last registration — the member pushes of this device follow it. */
   lang?: AppLang | null;
+  /** M176: the account's first name (Arabic / English) and annual-membership state, for the personal daily tip. */
+  name?: string | null;
+  nameEn?: string | null;
+  member?: boolean | null;
   platform: string;
   deviceName: string | null;
   appVersion: string | null;
@@ -92,6 +96,7 @@ export class PushService {
     persona: string | null = null,
     lang: AppLang | null = null,
     now = Date.now(),
+    profile: { name?: string | null; nameEn?: string | null; member?: boolean | null } | null = null,
   ): Promise<{ tokens: number }> {
     const token = input.token.trim();
     if (!isExpoPushToken(token)) throw new RequestError('invalid', 'رمز الإشعارات غير صالح');
@@ -106,13 +111,18 @@ export class PushService {
         existing.persona = persona ?? (existing.contactId === contactId ? (existing.persona ?? null) : null);
         // M122: every registration carries the app language, so a language switch updates it on the next launch.
         existing.lang = lang ?? (existing.contactId === contactId ? (existing.lang ?? null) : null);
+        if (profile || existing.contactId !== contactId) {
+          existing.name = profile?.name ?? null;
+          existing.nameEn = profile?.nameEn ?? null;
+          existing.member = profile?.member ?? null;
+        }
         existing.contactId = contactId;
         existing.platform = platform;
         existing.deviceName = deviceName ?? existing.deviceName;
         existing.appVersion = appVersion ?? existing.appVersion;
         existing.updatedAt = stamp;
       } else {
-        tokens.push({ token, contactId, persona, lang, platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
+        tokens.push({ token, contactId, persona, lang, ...(profile ? { name: profile.name ?? null, nameEn: profile.nameEn ?? null, member: profile.member ?? null } : {}), platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
       }
     });
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId).length;
@@ -203,11 +213,13 @@ export class PushService {
   }
 
   /** M136: one message per device, chosen by its account (interest targeting); devices that get the same message go out in one batch. */
-  async broadcastEach(choose: (device: { contactId: number; persona: string | null; lang: AppLang | null }) => Promise<PushMessage | null> | PushMessage | null): Promise<PushOutcome> {
+  async broadcastEach(
+    choose: (device: { contactId: number; persona: string | null; lang: AppLang | null; name: string | null; nameEn: string | null; member: boolean | null }) => Promise<PushMessage | null> | PushMessage | null,
+  ): Promise<PushOutcome> {
     const tokens = await this.load();
     const groups = new Map<string, { message: PushMessage; tokens: string[] }>();
     for (const entry of tokens) {
-      const message = await choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null });
+      const message = await choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null, name: entry.name ?? null, nameEn: entry.nameEn ?? null, member: entry.member ?? null });
       if (!message) continue;
       const key = JSON.stringify(message);
       const group = groups.get(key) ?? { message, tokens: [] };

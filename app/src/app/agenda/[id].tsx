@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
+import { useMonthlyDeal } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
+import { dealAmount, MonthlyDealBadge } from '@/components/MonthlyDeal';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
@@ -40,6 +42,10 @@ export default function AgendaEventScreen() {
   const [code, setCode] = useState('');
   // M172 (owner): ONE button. A «both» event asks how he attends with two pills above it (in person first).
   const [chosen, setChosen] = useState<AgendaAttendance>('hq');
+  // M176 (owner): the month's code rides along on its own unless he typed another; a top button jumps straight to booking.
+  const deal = useMonthlyDeal();
+  const scrollRef = useRef<ScrollView>(null);
+  const [bookingY, setBookingY] = useState(0);
   const event = query.data?.event;
   const myFee = event ? (event.myFeeSar ?? event.feeSar) : 0;
   const attendance: AgendaAttendance = event?.mode === 'online' ? 'online' : event?.mode === 'hq' ? 'hq' : chosen;
@@ -49,7 +55,7 @@ export default function AgendaEventScreen() {
     setError(null);
     setGated(false);
     register.mutate(
-      { eventId: event.id, attendance, discountCode: code.trim() || undefined },
+      { eventId: event.id, attendance, discountCode: code.trim() || deal?.code || undefined },
       {
         onSuccess: async (answer) => {
           // M111: the checkout renders embedded inside the app. A 100% code settles on the spot.
@@ -73,10 +79,20 @@ export default function AgendaEventScreen() {
   };
 
   // The one button: «تأكيد الحضور» for a member (or a no-fee event), the same words with the fee for everyone else.
-  const confirmLabel = event && event.mustPay && myFee > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(myFee) }) : t('agenda.confirmAttendance');
+  const dealOn = Boolean(event?.mustPay && myFee > 0 && deal && !code.trim());
+  const payFee = dealOn && deal ? dealAmount(myFee, deal.percent) : myFee;
+  const confirmLabel = event && event.mustPay && myFee > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(payFee) }) : t('agenda.confirmAttendance');
+  const canBook = Boolean(event && signedIn && event.open && !event.mine?.paid);
+  // The top button books at once; a «both» event first needs his in-person/online choice, so it scrolls there.
+  const topCta = () => {
+    if (!event) return;
+    if (!signedIn) router.push('/auth/login');
+    else if (event.mode === 'both') scrollRef.current?.scrollTo({ y: Math.max(0, bookingY - 16), animated: true });
+    else tap(attendance);
+  };
 
   return (
-    <Screen>
+    <Screen scrollRef={scrollRef}>
       <Stack.Screen options={{ title: t('nav.agendaEvent') }} />
       {!event ? (
         <StateView loading={query.isLoading} error={query.error} onRetry={() => void query.refetch()} />
@@ -96,6 +112,13 @@ export default function AgendaEventScreen() {
               <Text style={styles.meta}>{t(MODE_KEY[event.mode])}</Text>
             </View>
           </FadeInView>
+
+          {/* M176 (owner): the first CTA sits right under the title — book on the spot, no scrolling. */}
+          {canBook || (!signedIn && event.open) ? (
+            <FadeInView delay={60}>
+              <AppButton label={signedIn ? t('deal.ctaBook') : t('agenda.signIn')} icon={signedIn ? 'flash-outline' : 'log-in-outline'} loading={register.isPending} onPress={topCta} />
+            </FadeInView>
+          ) : null}
 
           {/* M173 (owner): the owner's prose as tidy blocks — fact rows, bullets, golden figures — never one grey wall. */}
           {event.blurb ? (
@@ -175,15 +198,17 @@ export default function AgendaEventScreen() {
           ) : !event.open ? (
             <Notice tone="info" text={t('agenda.closed')} />
           ) : (
-            <>
+            <View style={styles.booking} onLayout={(layout) => setBookingY(layout.nativeEvent.layout.y)}>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}
               {event.mustPay ? <Notice tone="info" text={t('agenda.payNote')} /> : null}
               {/* M107: the discount-code box — a 100% code confirms the attendance with no checkout.
                   M172b (owner): the code is simply typed; it is applied when he confirms (no separate «تحقق» step). */}
+              {/* M176: the month's code already applied; the field below stays for another code. */}
+              {dealOn ? <MonthlyDealBadge amount={myFee} /> : null}
               {event.mustPay ? (
                 <View style={styles.codeBox}>
                   <FormField
-                    label={t('agenda.discountLabel')}
+                    label={deal ? t('deal.otherCode') : t('agenda.discountLabel')}
                     latin
                     autoCapitalize="characters"
                     autoCorrect={false}
@@ -215,7 +240,7 @@ export default function AgendaEventScreen() {
                 loading={register.isPending}
                 onPress={() => tap(attendance)}
               />
-            </>
+            </View>
           )}
         </>
       )}
@@ -246,6 +271,7 @@ const styles = StyleSheet.create({
   memberPill: { backgroundColor: colors.surfaceElevated },
   savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
   codeBox: { gap: spacing.sm },
+  booking: { gap: spacing.md },
   // M172: how he attends — two pills above the one button.
   attendanceRow: { gap: spacing.xs },
   attendanceLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

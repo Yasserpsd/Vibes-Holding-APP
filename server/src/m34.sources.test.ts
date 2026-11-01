@@ -63,8 +63,10 @@ test('the seed carries the wider lists: enabled Arabic and English sources on bo
   const enabled = NEWS_SOURCES_SEED.filter((source) => source.enabled);
   assert.ok(enabled.filter((source) => source.lang === 'ar').length >= 20, 'twenty Arabic sources or more');
   assert.ok(enabled.filter((source) => source.lang === 'en').length >= 18, 'eighteen English sources or more');
-  // Every English source reads for Saudi stories only (rule 7 + the owner's English-feed rule).
-  assert.ok(NEWS_SOURCES_SEED.filter((source) => source.lang === 'en' && source.tier !== 'official').every((source) => source.saudiOnly === true));
+  // Every English source reads for Saudi stories only (rule 7 + the owner's English-feed rule) — except the global
+  // market feeds (M166/M176: crypto, gold and silver, oil, markets), which the owner wants read in full.
+  const markets = new Set(['cointelegraph-en', 'coindesk-en', 'decrypt-en', 'oilprice-en', 'marketwatch-en', 'cnbc-markets-en', 'investing-en', 'bing-gold-silver-en', 'cnbc-gold-en', 'cnbc-oil-en']);
+  assert.ok(NEWS_SOURCES_SEED.filter((source) => source.lang === 'en' && source.tier !== 'official' && !markets.has(source.id)).every((source) => source.saudiOnly === true));
   const ids = NEWS_SOURCES_SEED.map((source) => source.id);
   assert.equal(new Set(ids).size, ids.length, 'no duplicate ids');
 });

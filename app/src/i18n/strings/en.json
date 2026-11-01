@@ -1253,5 +1253,18 @@
   "completeProfile.error.memberType": "Pick: individual or company.",
   "completeProfile.error.name": "Enter your first and family name.",
   "completeProfile.error.jobTitle": "Enter your job title.",
-  "completeProfile.error.contactEmail": "Enter a valid e-mail address."
+  "completeProfile.error.contactEmail": "Enter a valid e-mail address.",
+  "deal.active": "Discount code applied automatically",
+  "deal.percent": "{percent}% off, applied to your order right away",
+  "deal.hint": "Nothing to type — the discount is counted at checkout.",
+  "deal.sar": "SAR",
+  "deal.otherCode": "Have another code? Type it here",
+  "deal.ctaBook": "Book your seat now",
+  "deal.ctaOrder": "Order this service now",
+  "home.newsAll": "All news",
+  "markets.gram": "24k gram: {price} SAR",
+  "markets.source": "Indicative prices · Source: {source}",
+  "inbox.kind.tip": "For you",
+  "inbox.tipToday": "Your advisor's pick for you today",
+  "posts.signature": "— The club management"
 }

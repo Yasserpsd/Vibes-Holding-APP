@@ -324,6 +324,10 @@ export type AgendaRegistration = {
   amountSar?: number;
 };
 
+/** M176: the automatic monthly code (NOVDEAL…) — mirrors server/src/discounts/service.ts. */
+export type MonthlyDiscountSettings = { enabled: boolean; percent: number; suffix: string };
+export type ActiveMonthlyDiscount = { code: string; percent: number; endsAt: string };
+
 /** M107 «أكواد الخصم» — mirrors server/src/discounts/service.ts. */
 export type DiscountCode = {
   code: string;
@@ -615,6 +619,9 @@ export const api = {
   notifyAgendaEvent: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/agenda/${id}/notify`, {}),
   // M107 «أكواد الخصم» والاهتمامات.
   discounts: () => call<{ codes: DiscountCode[] }>('GET', '/api/admin/discounts'),
+  discountMonthly: () => call<{ settings: MonthlyDiscountSettings; active: ActiveMonthlyDiscount | null }>('GET', '/api/admin/discount-monthly'),
+  saveDiscountMonthly: (patch: Partial<MonthlyDiscountSettings>) =>
+    call<{ settings: MonthlyDiscountSettings; active: ActiveMonthlyDiscount | null }>('PUT', '/api/admin/discount-monthly', patch),
   createDiscount: (input: DiscountCodeInput) => call<{ code: DiscountCode }>('POST', '/api/admin/discounts', input),
   updateDiscount: (code: string, patch: Partial<DiscountCodeInput>) => call<{ code: DiscountCode }>('PUT', `/api/admin/discounts/${encodeURIComponent(code)}`, patch),
   deleteDiscount: (code: string) => call<{ ok: true }>('DELETE', `/api/admin/discounts/${encodeURIComponent(code)}`),

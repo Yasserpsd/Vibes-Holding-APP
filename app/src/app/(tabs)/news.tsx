@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -6,7 +7,9 @@ import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { cardImageOf, useAgenda } from '@/api/agenda';
 import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
+import { companionApi } from '@/api/push';
 import { useProjectsList } from '@/api/queries';
+import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
@@ -27,7 +30,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
  */
 type InboxItem = {
   id: string;
-  kind: 'post' | 'event' | 'project' | 'person';
+  kind: 'post' | 'event' | 'project' | 'person' | 'tip';
   title: string;
   subtitle: string | null;
   time: string | null;
@@ -40,6 +43,7 @@ const KIND_META: Record<InboxItem['kind'], { icon: IoniconName; label: StringKey
   event: { icon: 'calendar-outline', label: 'inbox.kind.event' },
   project: { icon: 'briefcase-outline', label: 'inbox.kind.project' },
   person: { icon: 'sparkles-outline', label: 'inbox.kind.person' },
+  tip: { icon: 'bulb-outline', label: 'inbox.kind.tip' },
 };
 
 export default function InboxScreen() {
@@ -49,6 +53,10 @@ export default function InboxScreen() {
   const projects = useProjectsList({ q: '', sort: 'latest' });
   const people = usePeople();
   const seen = useSeenMarks();
+  // M176 (owner): the advisor's personal daily suggestion, by name — today's leads the tab, the earlier ones stay as rows.
+  const { status, me } = useAuth();
+  const tips = useQuery({ queryKey: ['companion', 'tips', me?.id ?? 0], queryFn: companionApi.tips, enabled: status === 'signedIn', staleTime: 30 * 60_000 });
+  const todayTip = tips.data?.tips[0] ?? null;
   useAdvisorScreen({ type: 'screen', id: 'news', title: t('tabs.inbox') }, true);
 
   // Entering the center is the acknowledgement: the tab badge resets here.
@@ -77,17 +85,20 @@ export default function InboxScreen() {
     for (const person of (people.data?.people ?? []).slice(0, 4)) {
       out.push({ id: `person:${person.id}`, kind: 'person', title: person.name, subtitle: person.title || null, time: null, image: person.photo, route: { pathname: '/people/[id]', params: { id: String(person.id) } } });
     }
+    for (const tip of (tips.data?.tips ?? []).slice(1)) {
+      out.push({ id: tip.id, kind: 'tip', title: tip.title, subtitle: tip.body, time: `${tip.day}T11:00:00+03:00`, image: null, route: tip.route as Href });
+    }
     // Events sort by WHEN they happen (soonest of the upcoming first), everything else by newest.
     const events = out.filter((item) => item.kind === 'event');
     const rest = out.filter((item) => item.kind !== 'event').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
     return [...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
-  }, [posts.data, agenda.data, projects.data, people.data]);
+  }, [posts.data, agenda.data, projects.data, people.data, tips.data]);
 
   const loading = posts.isLoading && agenda.isLoading;
   const unreadPosts = countNew((posts.data?.posts ?? []).map((post) => post.publishedAt), seen.posts);
 
   const onRefresh = async () => {
-    await Promise.all([posts.refetch(), agenda.refetch(), projects.refetch(), people.refetch()]);
+    await Promise.all([posts.refetch(), agenda.refetch(), projects.refetch(), people.refetch(), tips.refetch()]);
   };
 
   return (
@@ -97,6 +108,20 @@ export default function InboxScreen() {
       subtitle={t('inbox.subtitle')}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
     >
+      {todayTip ? (
+        <PopIn>
+          <PressScale onPress={() => router.push(todayTip.route as Href)} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={todayTip.title}>
+            <GlassCard golden style={styles.tipCard}>
+              <View style={styles.tipHead}>
+                <Ionicons name="bulb" size={18} color={colors.goldLight} />
+                <Text style={styles.tipEyebrow}>{t('inbox.tipToday')}</Text>
+              </View>
+              <Text style={styles.tipTitle}>{todayTip.title}</Text>
+              <Text style={styles.tipBody}>{todayTip.body}</Text>
+            </GlassCard>
+          </PressScale>
+        </PopIn>
+      ) : null}
       {/* M75c (owner): the unread count sits right beside «رسائل الإدارة». */}
       <FadeInView>
         <SectionHeader title={t('nav.posts')} badge={unreadPosts} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
@@ -149,6 +174,12 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
 }
 
 const styles = StyleSheet.create({
+  // M176: today's personal suggestion — golden, on top of the tab.
+  tipCard: { gap: spacing.xs, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
+  tipHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  tipEyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight, textAlign: textStart },
+  tipTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 27, color: colors.textPrimary, textAlign: textStart },
+  tipBody: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm + 4 },
   iconBox: {

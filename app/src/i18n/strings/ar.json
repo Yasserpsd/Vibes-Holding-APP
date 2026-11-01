@@ -1253,5 +1253,18 @@
   "completeProfile.error.memberType": "اختر: فرد أم شركة.",
   "completeProfile.error.name": "اكتب اسمك الأول واسم العائلة.",
   "completeProfile.error.jobTitle": "اكتب وظيفتك.",
-  "completeProfile.error.contactEmail": "اكتب بريدًا إلكترونيًا صحيحًا."
+  "completeProfile.error.contactEmail": "اكتب بريدًا إلكترونيًا صحيحًا.",
+  "deal.active": "كود الخصم مفعّل تلقائيًا",
+  "deal.percent": "خصم {percent}% يُطبَّق على طلبك مباشرة",
+  "deal.hint": "لا تحتاج لكتابة شيء — الخصم محسوب عند الدفع.",
+  "deal.sar": "ريال",
+  "deal.otherCode": "عندك كود آخر؟ اكتبه هنا",
+  "deal.ctaBook": "احجز مقعدك الآن",
+  "deal.ctaOrder": "اطلب الخدمة الآن",
+  "home.newsAll": "كل الأخبار",
+  "markets.gram": "جرام 24: {price} ريال",
+  "markets.source": "أسعار تقريبية · المصدر: {source}",
+  "inbox.kind.tip": "مقترح لك",
+  "inbox.tipToday": "مقترح مستشارك لك اليوم",
+  "posts.signature": "— إدارة النادي"
 }

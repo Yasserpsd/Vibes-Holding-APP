@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { firstName } from '../companion/tips.js';
+import { isActiveMember } from '../content/services.js';
 import { langOf } from '../lang.js';
 import type { PushService } from './service.js';
 
@@ -35,9 +37,12 @@ export const pushRoutes: FastifyPluginAsync<PushRoutesOptions> = async (app, { s
       if (!input) return;
       // M29: the persona rides on the token so category messages know their devices. The hub being
       // unreachable never blocks the registration; the next app launch fills the persona in.
-      const persona = await auth.me(current.session).then((me) => me.persona || null, () => null);
+      const me = await auth.me(current.session).catch(() => null);
+      const persona = me?.persona || null;
+      // M176: the first name and membership ride on the token for the personal daily tip.
+      const profile = me ? { name: firstName(me.name) || null, nameEn: firstName(me.en?.name) || null, member: isActiveMember(me) } : null;
       // M122: the device's app language rides on the token, so member pushes speak it.
-      const result = await service.register(current.session.contactId, input, persona, langOf(request));
+      const result = await service.register(current.session.contactId, input, persona, langOf(request), Date.now(), profile);
       return { ok: true, ...result };
     }),
   );

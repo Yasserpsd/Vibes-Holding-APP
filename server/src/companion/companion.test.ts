@@ -12,7 +12,13 @@ import { MemoryKV } from '../store.js';
 const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', NOTIFY_EMAIL: 'admin@vcmem.com' });
 
 let built: BuiltApp;
-const pushes: { persona: string; title: string; body: string; data: Record<string, unknown> }[] = [];
+const pushes: { contactId: number; title: string; body: string; data: Record<string, unknown> }[] = [];
+// M176: the wave is personal now — one message per device, by name, persona and membership.
+const DEVICES = [
+  { contactId: 11, persona: 'investor', lang: 'ar' as const, name: 'فهد', nameEn: null, member: true },
+  { contactId: 12, persona: 'entrepreneur', lang: 'ar' as const, name: 'سارة', nameEn: null, member: false },
+  { contactId: 13, persona: 'neutral', lang: 'en' as const, name: null, nameEn: 'Omar', member: false },
+];
 
 // 2026-10-18 08:30 UTC = 11:30 Riyadh — inside the send hour.
 const IN_HOUR = Date.parse('2026-10-18T08:30:00Z');
@@ -20,9 +26,12 @@ const OUT_OF_HOUR = Date.parse('2026-10-18T18:30:00Z');
 
 before(async () => {
   built = await buildApp({ config, kv: new MemoryKV(), hub: new MockHubClient(), mailer: new LogMailer() });
-  built.push.broadcastPersona = async (persona, message) => {
-    pushes.push({ persona, title: message.title, body: message.body, data: message.data ?? {} });
-    return { sent: 1, failed: 0, dropped: 0 };
+  built.push.broadcastEach = async (choose) => {
+    for (const device of DEVICES) {
+      const message = await choose(device);
+      if (message) pushes.push({ contactId: device.contactId, title: message.title, body: message.body, data: message.data ?? {} });
+    }
+    return { sent: DEVICES.length, failed: 0, dropped: 0 };
   };
 });
 
@@ -40,12 +49,13 @@ test('drafts speak to each persona from live data and never use banned wording',
   assert.equal(new Set(Object.values(drafts).map((draft) => draft.body)).size, 3);
 });
 
-test('the daily wave fires once inside the send hour, taps open the advisor, and the next day fires again', async () => {
+test('the daily wave fires once inside the send hour, each member by name, and the next day fires again', async () => {
   assert.equal(await built.companion.tick(OUT_OF_HOUR), false, 'outside the hour nothing goes out');
   assert.equal(await built.companion.tick(IN_HOUR), true);
   assert.equal(pushes.length, 3);
-  assert.deepEqual(new Set(pushes.map((entry) => entry.persona)), new Set(['investor', 'entrepreneur', 'neutral']));
-  assert.ok(pushes.every((entry) => entry.data.screen === '/advisor'));
+  assert.ok(pushes[0]?.title.startsWith('فهد') && pushes[1]?.title.startsWith('سارة') && pushes[2]?.title.startsWith('Omar'), JSON.stringify(pushes.map((entry) => entry.title)));
+  assert.ok(pushes.every((entry) => entry.data.type === 'companion' && String(entry.data.screen).startsWith('/')));
+  assert.ok(pushes.every((entry) => !/مجان/u.test(entry.title + entry.body)));
 
   // The same day never double-sends, whatever the tick cadence.
   assert.equal(await built.companion.tick(IN_HOUR + 20 * 60_000), false);
@@ -98,14 +108,20 @@ test('owner templates replace the seed, placeholders fill from live data, and th
   const me = verified.json().me.id as number;
   assert.equal(await built.companion.isMuted(me), true);
 
-  const excludes: (Set<number> | undefined)[] = [];
-  built.push.broadcastPersona = async (_persona, _message, exclude) => {
-    excludes.push(exclude);
-    return { sent: 1, failed: 0, dropped: 0 };
+  const chosen: (unknown | null)[] = [];
+  built.push.broadcastEach = async (choose) => {
+    chosen.push(await choose({ contactId: me, persona: 'investor', lang: 'ar', name: 'طارق', nameEn: null, member: false }));
+    return { sent: 0, failed: 0, dropped: 0 };
   };
   assert.equal(await built.companion.tick(IN_HOUR + 2 * 24 * 3_600_000), true);
-  assert.equal(excludes.length, 3);
-  assert.ok(excludes.every((exclude) => exclude?.has(me)), 'the muted member is excluded from every wave');
+  assert.deepEqual(chosen, [null], 'the muted member is skipped');
+
+  // M176: his personal suggestions for the notifications tab, by name, newest first.
+  const tips = await built.app.inject({ method: 'GET', url: '/api/companion/tips', headers: auth });
+  assert.equal(tips.statusCode, 200, tips.body);
+  assert.equal(tips.headers['cache-control'], 'no-store');
+  assert.ok(tips.json().tips.length >= 3);
+  assert.ok(tips.json().tips.every((tip: { title: string; route: string }) => tip.title.startsWith('طارق') && tip.route.startsWith('/')));
 
   assert.equal((await built.app.inject({ method: 'PUT', url: '/api/companion/me', payload: { muted: false }, headers: auth })).json().muted, false);
   assert.equal(await built.companion.isMuted(me), false);
