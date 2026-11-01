@@ -115,9 +115,9 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
   const first = pushBatches.slice(before).flat();
   assert.equal(first.filter((message) => message.to === ARABIC).length, 1, JSON.stringify(first));
   assert.equal(first.filter((message) => message.to === ENGLISH).length, 1, JSON.stringify(first));
+  // M166: the base sections (markets…) ride along with his sports pick, so the edition's best match wins.
   const arabicPush = first.find((message) => message.to === ARABIC)!;
-  assert.equal(arabicPush.body, 'الهلال يحسم ديربي الرياض', 'the member follows sports, so the sports pick is his push');
-  assert.ok(arabicPush.title.includes('أخبار الرياضة اليوم'), arabicPush.title);
+  assert.equal(arabicPush.body, 'أرباح الشركات السعودية ترتفع في الربع الثالث', 'sports + the base sections: the best pick among them');
   const englishPush = first.find((message) => message.to === ENGLISH)!;
   assert.equal(englishPush.body, 'Saudi market closes higher', 'no English sports story: the edition\'s best English story instead');
   assert.ok(englishPush.title.includes('Top business story'), englishPush.title);
@@ -128,7 +128,7 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
   assert.deepEqual(urls(guest.json()).sort(), ['eco-1', 'eco-2', 'sports-1'], 'eco-3 is the third economy/markets story: not today');
   assert.equal(guest.json().total, 3);
   const mine = await app.inject({ method: 'GET', url: '/api/news/feed', headers: { authorization: `Bearer ${token}` } });
-  assert.deepEqual(urls(mine.json()), ['sports-1']);
+  assert.deepEqual(urls(mine.json()).sort(), ['eco-1', 'eco-2', 'sports-1'], 'his sports pick plus the base sections (M166)');
   assert.equal(mine.json().personalized, true);
   const markets = await app.inject({ method: 'GET', url: '/api/news/feed?topic=markets' });
   assert.deepEqual(urls(markets.json()).sort(), ['eco-1', 'eco-2'], 'a topic chip shows the picks of the day that carry it, two at most');
