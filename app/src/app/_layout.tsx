@@ -130,6 +130,7 @@ export default function RootLayout() {
                 <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: t('nav.newsItem') }} />
                 <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: t('nav.decisions') }} />
                 <Stack.Screen name="news/interests" options={{ ...detailHeader, title: t('nav.interests') }} />
+                <Stack.Screen name="markets" options={{ ...detailHeader, title: t('nav.markets') }} />
                 <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: t('nav.entrepreneurs') }} />
                 <Stack.Screen name="services/index" options={{ ...detailHeader, title: t('nav.services') }} />
                 <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: t('nav.service') }} />

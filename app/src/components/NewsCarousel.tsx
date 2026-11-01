@@ -1,29 +1,26 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, I18nManager, Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, I18nManager, Image, PanResponder, StyleSheet, Text, View } from 'react-native';
 
-import { apiGet } from '@/api/client';
 import { useNewsFeed, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
+import { MarketsStrip } from '@/components/MarketsStrip';
 import { FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
-import { getLang, t } from '@/i18n';
+import { t } from '@/i18n';
 import { textDir, textStart } from '@/i18n/direction';
-import { formatNumber, formatRelativeTime } from '@/lib/format';
+import { formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const ROTATE_MS = 4500;
 const SLIDES = 8;
-const LRM = '‎';
 
 /**
  * M176 (owner, 2026-11-01, «خلي الأخبار تحت شوية وتتحرك كاروسيل… تشد أكتر»): the news door became a
  * moving carousel of the latest real items (rule 7: original title, source, time, snippet — tap opens
  * the item with its «اقرأ من المصدر»). One card at a time, auto-advancing, swipeable; the live price
- * strip (gold, silver, oil, Bitcoin) sits right above it.
+ * strip (TASI, gold, dollar, then «مشاهدة الكل») sits right above it.
  */
 export function NewsCarousel({ who }: { who: string }) {
   const router = useRouter();
@@ -100,47 +97,6 @@ export function NewsCarousel({ who }: { who: string }) {
   );
 }
 
-/** Big prices as whole numbers with separators; small ones (currencies, silver) keep two decimals. */
-function priceText(price: number): string {
-  return price >= 1000 ? formatNumber(price) : price.toFixed(2);
-}
-
-type MarketQuote = { key: string; label: string; labelEn: string; unit: string; unitEn: string; price: number; changePct: number; gramSar?: number; at: string };
-
-/** M176: real market quotes from the server's shared cache; hidden when none are available. */
-function MarketsStrip() {
-  const query = useQuery({
-    queryKey: ['markets'],
-    queryFn: () => apiGet<{ quotes: MarketQuote[]; source: string; updatedAt: string | null }>('/api/markets'),
-    staleTime: 5 * 60_000,
-    refetchInterval: 10 * 60_000,
-  });
-  const quotes = query.data?.quotes ?? [];
-  if (!quotes.length) return null;
-  const english = getLang() === 'en';
-  return (
-    <View style={styles.markets}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.marketsRow}>
-        {quotes.map((quote) => {
-          const up = quote.changePct >= 0;
-          return (
-            <View key={quote.key} style={styles.quote}>
-              <Text style={styles.quoteLabel} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
-              <Text style={styles.quotePrice} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
-              <View style={styles.quoteChange}>
-                <Ionicons name={up ? 'caret-up' : 'caret-down'} size={11} color={up ? colors.success : colors.danger} />
-                <Text style={[styles.quotePct, { color: up ? colors.success : colors.danger }]} numberOfLines={1}>{`${LRM}${Math.abs(quote.changePct)}%`}</Text>
-              </View>
-              <Text style={styles.quoteUnit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
-              {quote.gramSar ? <Text style={styles.quoteGram} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   card: { padding: 0, overflow: 'hidden' },
   image: { width: '100%', height: 150, backgroundColor: colors.surfaceElevated },
@@ -154,13 +110,4 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderGoldSoft },
   dotOn: { width: 18, backgroundColor: colors.gold },
-  markets: { gap: 4, marginBottom: spacing.sm },
-  marketsRow: { gap: spacing.sm },
-  quote: { minWidth: 104, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 1 },
-  quoteLabel: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
-  quotePrice: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
-  quoteChange: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  quotePct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
-  quoteUnit: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
-  quoteGram: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
 });
