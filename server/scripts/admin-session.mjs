@@ -7,6 +7,9 @@ const API = 'https://vibes-holding-app-production.up.railway.app';
 /** The production server (same hub account signs in on both). */
 const API_PROD = 'https://club-api-prod-production.up.railway.app';
 const ENV_FILE = new URL('../.env.admin.local', import.meta.url);
+// M176 (owner, 2026-11-01: «احفظ طريقة الدخول بحيث لما اطلب حاجة تتنفذ فورا»): every dashboard sign-in ticks «تذكرني», so the
+// cached token keeps its mailed-code + authenticator verification ADMIN_REMEMBER_DAYS (30 by default) instead of 12 hours.
+const REMEMBER = true;
 const tokenFile = (api) => new URL(api === API_PROD ? '../.env.admin.session.prod.local' : '../.env.admin.session.local', import.meta.url);
 
 async function creds() {
@@ -35,7 +38,7 @@ async function login(api = API) {
   let { response, body } = await raw('/api/auth/login', { method: 'POST', body: JSON.stringify({ login: c.ADMIN_LOGIN, password: c.ADMIN_PASSWORD }) }, undefined, api);
   // M140: the account has an authenticator app — answer its step from ADMIN_TOTP_SECRET (the base32 key shown at enrolment).
   if (response.ok && body?.totp) {
-    if (!c.ADMIN_TOTP_SECRET) throw new Error('the account asks for an authenticator code: add ADMIN_TOTP_SECRET to .env.admin.local');
+    if (!c.ADMIN_TOTP_SECRET) throw new Error('the dashboard session expired: the owner runs `node scripts/admin-session.mjs dashboard-ask prod` once (it is remembered ADMIN_REMEMBER_DAYS)');
     ({ response, body } = await raw('/api/auth/totp', { method: 'POST', body: JSON.stringify({ stepToken: body.stepToken, code: totpCode(c.ADMIN_TOTP_SECRET) }) }, undefined, api));
   }
   if (!response.ok || !body?.token) throw new Error(`login failed: ${response.status}`);
@@ -92,7 +95,7 @@ const challengeFile = (api) => new URL(api === API_PROD ? '../.env.admin.challen
 export async function dashboardLogin(api = API, code = null, authCode = null) {
   if (!code) {
     const c = await creds();
-    const { response, body } = await raw('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ login: c.ADMIN_LOGIN, password: c.ADMIN_PASSWORD }) }, undefined, api);
+    const { response, body } = await raw('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ login: c.ADMIN_LOGIN, password: c.ADMIN_PASSWORD, remember: REMEMBER }) }, undefined, api);
     if (!response.ok) throw new Error(`dashboard login failed: ${response.status} ${JSON.stringify(body?.error ?? '')}`);
     if (body?.token) {
       await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
@@ -107,7 +110,7 @@ export async function dashboardLogin(api = API, code = null, authCode = null) {
   if (code === 'totp') return finishTotp(api, authCode);
   if (code === 'enrol') return finishEnrol(api, authCode);
   const challengeToken = (await readFile(challengeFile(api), 'utf8')).trim();
-  const { response, body } = await raw('/api/admin/auth/verify', { method: 'POST', body: JSON.stringify({ challengeToken, code: String(code) }) }, undefined, api);
+  const { response, body } = await raw('/api/admin/auth/verify', { method: 'POST', body: JSON.stringify({ challengeToken, code: String(code), remember: REMEMBER }) }, undefined, api);
   if (response.ok && body?.totp) {
     await writeFile(stepFile(api), `${body.stepToken}` + '\n', 'utf8');
     const c = await creds();
@@ -138,7 +141,7 @@ const setupFile = (api) => new URL(api === API_PROD ? '../.env.admin.setup.prod.
 async function finishEnrol(api, authCode) {
   if (!authCode) throw new Error('rerun with `dashboard test enrol <6-digit code from your authenticator>`');
   const setupToken = (await readFile(setupFile(api), 'utf8')).trim();
-  const { response, body } = await raw('/api/admin/auth/totp/enroll', { method: 'POST', body: JSON.stringify({ setupToken, code: String(authCode) }) }, undefined, api);
+  const { response, body } = await raw('/api/admin/auth/totp/enroll', { method: 'POST', body: JSON.stringify({ setupToken, code: String(authCode), remember: REMEMBER }) }, undefined, api);
   if (!response.ok || !body?.token) throw new Error(`enrolment failed: ${response.status} ${JSON.stringify(body?.error ?? Object.keys(body ?? {}))}`);
   await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
   console.log('BACKUP CODES (shown once, keep them):', (body.backupCodes ?? []).join('  '));
@@ -148,7 +151,7 @@ async function finishEnrol(api, authCode) {
 async function finishTotp(api, authCode) {
   if (!authCode) throw new Error('the dashboard asks for the authenticator code: rerun with `dashboard prod totp <code>`');
   const stepToken = (await readFile(stepFile(api), 'utf8')).trim();
-  const { response, body } = await raw('/api/admin/auth/totp/verify', { method: 'POST', body: JSON.stringify({ stepToken, code: String(authCode) }) }, undefined, api);
+  const { response, body } = await raw('/api/admin/auth/totp/verify', { method: 'POST', body: JSON.stringify({ stepToken, code: String(authCode), remember: REMEMBER }) }, undefined, api);
   if (!response.ok || !body?.token) throw new Error(`authenticator step failed: ${response.status} ${JSON.stringify(body?.error ?? '')}`);
   await writeFile(tokenFile(api), `${body.token}` + '\n', 'utf8');
   return { done: true };
