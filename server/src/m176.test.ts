@@ -51,3 +51,30 @@ test('M176: the daily tip greets by first name and follows membership and person
   assert.ok(guest && !guest.title.startsWith(','));
   assert.equal(guest.title.charAt(0), guest.title.charAt(0).toUpperCase());
 });
+
+test('M177: the daily workshop ad names the next open workshop, keeps the copy rules, and is written once a day', async () => {
+  const { WorkshopAdService } = await import('./agenda/ad.js');
+  const kv = new MemoryKV();
+  const event = { id: 'w1', title: 'ورشة الذكاء الاصطناعي', blurb: 'ورشة عملية.', date: '2026-11-17', dates: ['2026-11-17'], time: '19:00', endTime: '', place: '', imageUrl: null, coverUrl: null, mode: 'hq', feeSar: 290, memberFeeSar: 0, open: true };
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ headline: 'مقعد مجاني ينتظرك', body: 'ورشة من 3-5 ساعات تخرج منها بأدوات عملية تطبّقها فورًا.', cta: 'احجز الآن' }) } }] }), { status: 200 });
+  }) as typeof fetch;
+  const agenda = { upcomingOpen: async () => [event] } as never;
+  const service = new WorkshopAdService({ kv, log: { warn: () => undefined } as never, agenda, apiKey: 'sk-test-key-123456789012', model: 'gpt-test', fetchImpl });
+  const ad = await service.today('ar', NOV);
+  assert.ok(ad);
+  assert.equal(ad.eventId, 'w1');
+  assert.ok(!/مجان/u.test(ad.headline + ad.body), 'never «مجاني»');
+  assert.ok(ad.body.includes('3–5'), 'no hyphen between two numbers');
+  await service.today('ar', NOV + 60_000);
+  assert.equal(calls, 1, 'one generation per day and language');
+  await service.today('ar', NOV + 86_400_000);
+  assert.equal(calls, 2, 'a new day writes a new ad');
+
+  const none = new WorkshopAdService({ kv: new MemoryKV(), log: { warn: () => undefined } as never, agenda: { upcomingOpen: async () => [] } as never, model: 'x' });
+  assert.equal(await none.today('ar', NOV), null);
+  const noKey = new WorkshopAdService({ kv: new MemoryKV(), log: { warn: () => undefined } as never, agenda, model: 'x' });
+  assert.ok((await noKey.today('en', NOV))?.headline.includes('ورشة'), 'the template names the workshop without a key');
+});

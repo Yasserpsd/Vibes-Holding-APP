@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { getLang, t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { textDir, textStart } from '@/i18n/direction';
 import { formatNumber, formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -84,8 +84,8 @@ export function NewsCarousel({ who }: { who: string }) {
                   </View>
                   <Text style={styles.time} numberOfLines={1}>{formatRelativeTime(item.publishedAt)}</Text>
                 </View>
-                <Text style={styles.title} numberOfLines={3}>{item.title}</Text>
-                {item.snippet ? <Text style={styles.snippet} numberOfLines={2}>{item.snippet}</Text> : null}
+                <Text style={[styles.title, textDir(item.title)]} numberOfLines={3}>{item.title}</Text>
+                {item.snippet ? <Text style={[styles.snippet, textDir(item.snippet)]} numberOfLines={2}>{item.snippet}</Text> : null}
               </View>
             </GlassCard>
           </Animated.View>
@@ -98,6 +98,11 @@ export function NewsCarousel({ who }: { who: string }) {
       </View>
     </FadeInView>
   );
+}
+
+/** Big prices as whole numbers with separators; small ones (currencies, silver) keep two decimals. */
+function priceText(price: number): string {
+  return price >= 1000 ? formatNumber(price) : price.toFixed(2);
 }
 
 type MarketQuote = { key: string; label: string; labelEn: string; unit: string; unitEn: string; price: number; changePct: number; gramSar?: number; at: string };
@@ -121,7 +126,7 @@ function MarketsStrip() {
           return (
             <View key={quote.key} style={styles.quote}>
               <Text style={styles.quoteLabel} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
-              <Text style={styles.quotePrice} numberOfLines={1}>{`${LRM}${formatNumber(quote.price)}`}</Text>
+              <Text style={styles.quotePrice} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
               <View style={styles.quoteChange}>
                 <Ionicons name={up ? 'caret-up' : 'caret-down'} size={11} color={up ? colors.success : colors.danger} />
                 <Text style={[styles.quotePct, { color: up ? colors.success : colors.danger }]} numberOfLines={1}>{`${LRM}${Math.abs(quote.changePct)}%`}</Text>
@@ -132,7 +137,6 @@ function MarketsStrip() {
           );
         })}
       </ScrollView>
-      <Text style={styles.marketsSource}>{t('markets.source', { source: query.data?.source ?? '' })}</Text>
     </View>
   );
 }
@@ -159,5 +163,4 @@ const styles = StyleSheet.create({
   quotePct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   quoteUnit: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
   quoteGram: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
-  marketsSource: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
 });

@@ -11,6 +11,7 @@ import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { withoutMediaLines } from '@/components/StructuredText';
 
 export const HOME_POSTS_LIMIT = 3;
 
@@ -108,7 +109,7 @@ export function PostCard({ post }: { post: Post }) {
           ) : null}
           {post.body ? (
             <Text style={[styles.body, paper && styles.inkSoftPaper]} numberOfLines={2}>
-              {post.body}
+              {withoutMediaLines(post.body)}
             </Text>
           ) : null}
           <View style={styles.metaRow}>

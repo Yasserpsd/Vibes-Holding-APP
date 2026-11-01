@@ -30,6 +30,19 @@ export const textStart = 'left' as const;
 /** The far edge of a line of text (times, amounts): see `textStart`. */
 export const textEnd = 'right' as const;
 
+const ARABIC_LETTER = /[\u0600-\u06FF]/u;
+
+/**
+ * M177 (owner: «في الأخبار حاجات جاية من الشمال لليمين مع إني فاتح عربي»): a Text with no alignment follows its
+ * FIRST character, so a headline opening with a number, a quote or a Latin name drew from the left. Content
+ * text takes its direction from its own letters instead: Arabic reads right-to-left, anything else left-to-right.
+ */
+export function textDir(text: string | null | undefined): { textAlign: 'left' | 'right'; writingDirection: 'rtl' | 'ltr' } {
+  const arabic = ARABIC_LETTER.test(text ?? '');
+  if (isRTL()) return arabic ? { textAlign: textStart, writingDirection: 'rtl' } : { textAlign: textEnd, writingDirection: 'ltr' };
+  return arabic ? { textAlign: textEnd, writingDirection: 'rtl' } : { textAlign: textStart, writingDirection: 'ltr' };
+}
+
 /** A TextInput reads `left` and `right` as the physical sides, so its start follows the language. */
 export function inputStart(): 'left' | 'right' {
   return isRTL() ? 'right' : 'left';

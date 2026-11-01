@@ -1260,15 +1260,18 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "deal.percent": "خصم {percent}% يُطبَّق على طلبك مباشرة",
     "deal.hint": "لا تحتاج لكتابة شيء — الخصم محسوب عند الدفع.",
     "deal.sar": "ريال",
-    "deal.otherCode": "عندك كود آخر؟ اكتبه هنا",
     "deal.ctaBook": "احجز مقعدك الآن",
     "deal.ctaOrder": "اطلب الخدمة الآن",
     "home.newsAll": "كل الأخبار",
     "markets.gram": "جرام 24: {price} ريال",
-    "markets.source": "أسعار تقريبية · المصدر: {source}",
     "inbox.kind.tip": "مقترح لك",
     "inbox.tipToday": "مقترح مستشارك لك اليوم",
-    "posts.signature": "— إدارة النادي"
+    "posts.signature": "— إدارة النادي",
+    "workshopAd.badge": "ورشة العمل",
+    "workshopAd.close": "إغلاق",
+    "workshopAd.later": "لاحقًا",
+    "workshopAd.feeBoth": "لغير الأعضاء {fee} ريال · للأعضاء {member} ريال",
+    "workshopAd.feeMemberIncluded": "لغير الأعضاء {fee} ريال · بدون رسوم للأعضاء"
   },
   "en": {
     "tabs.home": "Home",
@@ -2530,15 +2533,18 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "deal.percent": "{percent}% off, applied to your order right away",
     "deal.hint": "Nothing to type — the discount is counted at checkout.",
     "deal.sar": "SAR",
-    "deal.otherCode": "Have another code? Type it here",
     "deal.ctaBook": "Book your seat now",
     "deal.ctaOrder": "Order this service now",
     "home.newsAll": "All news",
     "markets.gram": "24k gram: {price} SAR",
-    "markets.source": "Indicative prices · Source: {source}",
     "inbox.kind.tip": "For you",
     "inbox.tipToday": "Your advisor's pick for you today",
-    "posts.signature": "— The club management"
+    "posts.signature": "— The club management",
+    "workshopAd.badge": "Workshop",
+    "workshopAd.close": "Close",
+    "workshopAd.later": "Later",
+    "workshopAd.feeBoth": "Non-members {fee} SAR · members {member} SAR",
+    "workshopAd.feeMemberIncluded": "Non-members {fee} SAR · included for members"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -2612,6 +2618,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "completeProfile": "إكمال الملف بعد الدخول",
     "support": "الدعم المباشر (واتساب)",
     "deal": "الكود الشهري التلقائي وأزرار الحجز السريع",
-    "markets": "شريط أسعار الذهب والفضة والنفط"
+    "markets": "شريط أسعار الذهب والفضة والنفط",
+    "workshopAd": "إعلان الورشة اليومي (نافذة الافتتاح)"
   }
 };

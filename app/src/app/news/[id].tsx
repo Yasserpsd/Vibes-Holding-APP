@@ -9,7 +9,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { isRTL } from '@/i18n/direction';
+import { textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -25,8 +25,6 @@ export default function NewsItemScreen() {
   useAdvisorScreen(advisorContext);
   // Keeps the note at the end clear of the floating «اسأل المستشار» button.
   const clearance = useAskAdvisorClearance();
-  // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
-  const latin = item?.lang === 'en' && isRTL();
 
   return (
     <View style={styles.screen}>
@@ -60,11 +58,17 @@ export default function NewsItemScreen() {
             </PopIn>
           ) : null}
           <FadeInView delay={entranceDelay(3)}>
-            <Text style={[styles.title, latin && styles.latin]}>{item.title}</Text>
+            {/* M177 (owner): the headline on its own golden panel, the source's words on a second one — each in its own direction. */}
+            <View style={styles.titlePanel}>
+              <Text style={[styles.title, textDir(item.title)]}>{item.title}</Text>
+            </View>
           </FadeInView>
           {item.snippet ? (
             <FadeInView delay={entranceDelay(4)}>
-              <Text style={[styles.body, latin && styles.latin]}>{item.snippet}</Text>
+              <View style={styles.bodyPanel}>
+                <View style={styles.bodyRail} />
+                <Text style={[styles.body, textDir(item.snippet)]}>{item.snippet}</Text>
+              </View>
             </FadeInView>
           ) : null}
           {item.topics.length > 0 ? (
@@ -120,9 +124,11 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
+  titlePanel: { padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.goldSoft, boxShadow: shadows.glowGoldFaint },
   title: { ...typography.title, color: colors.textPrimary },
-  body: { ...typography.body, color: colors.textSecondary },
-  latin: { textAlign: 'left', writingDirection: 'ltr' },
+  bodyPanel: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surfaceElevated },
+  bodyRail: { width: 3, borderRadius: 2, backgroundColor: colors.gold },
+  body: { ...typography.body, lineHeight: 28, color: colors.textPrimary, flex: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: {
     ...typography.caption,

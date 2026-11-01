@@ -6,7 +6,7 @@ import type { NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { isRTL } from '@/i18n/direction';
+import { textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -21,7 +21,6 @@ type Props = {
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
 export function NewsCard({ item, onPress, compact = false }: Props) {
   // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
-  const latin = item.lang === 'en' && isRTL();
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>
       <GlassCard radius={radii.xl} style={[styles.card, compact && styles.compact]}>
@@ -39,11 +38,11 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         </View>
         <View style={styles.body}>
           <View style={styles.text}>
-            <Text style={[styles.title, latin && styles.latin]} numberOfLines={compact ? 3 : 3}>
+            <Text style={[styles.title, textDir(item.title)]} numberOfLines={compact ? 3 : 3}>
               {item.title}
             </Text>
             {!compact && item.snippet ? (
-              <Text style={[styles.snippet, latin && styles.latin]} numberOfLines={2}>
+              <Text style={[styles.snippet, textDir(item.snippet)]} numberOfLines={2}>
                 {item.snippet}
               </Text>
             ) : null}
@@ -133,7 +132,6 @@ const styles = StyleSheet.create({
   text: { flex: 1, gap: spacing.xs },
   title: { ...typography.subtitle, color: colors.textPrimary },
   snippet: { ...typography.caption, color: colors.textSecondary },
-  latin: { textAlign: 'left', writingDirection: 'ltr' },
   image: { width: 92, height: 92, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden' },
   imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldFaint, borderWidth: 1, borderColor: colors.borderGoldSoft },
   imageFill: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 },

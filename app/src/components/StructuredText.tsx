@@ -1,9 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { GlassCard } from '@/components/lux';
+import { PressScale } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
+import { sized } from '@/lib/imageUrl';
+import { playVideo, youtubeIdOf } from '@/lib/player';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -17,7 +22,23 @@ type Block =
   | { kind: 'fact'; label: string; text: string; icon: IoniconName }
   | { kind: 'bullet'; text: string }
   | { kind: 'paragraph'; text: string }
-  | { kind: 'heading'; text: string };
+  | { kind: 'heading'; text: string }
+  | { kind: 'image'; url: string }
+  | { kind: 'video'; url: string };
+
+/** M177 (owner: «أضيف صورة وبعدين أكمل كلام»): a line that is only a photo or video link shows that media in place. */
+const URL_LINE = /^https?:\/\/\S+$/u;
+const IMAGE_URL = /\.(?:jpe?g|png|webp|gif|heic)(?:\?\S*)?$/iu;
+const VIDEO_URL = /\.(?:mp4|mov|m4v|webm)(?:\?\S*)?$/iu;
+
+/** The text without its media lines — for one-line previews (inbox rows, the home list). */
+export function withoutMediaLines(text: string): string {
+  return text
+    .split(/\r?\n/u)
+    .filter((line) => !(URL_LINE.test(line.trim()) && (IMAGE_URL.test(line.trim()) || VIDEO_URL.test(line.trim()) || youtubeIdOf(line.trim()))))
+    .join('\n')
+    .trim();
+}
 
 /** M176: a short line that asks or announces («لماذا لم نحضر؟», «والسبب بسيط:») reads as a sub-heading. */
 const HEADING_MAX = 60;
@@ -43,6 +64,16 @@ export function parseBlocks(text: string): Block[] {
   for (const raw of text.split(/\r?\n/u)) {
     const line = raw.trim();
     if (!line) continue;
+    if (URL_LINE.test(line)) {
+      if (IMAGE_URL.test(line)) {
+        blocks.push({ kind: 'image', url: line });
+        continue;
+      }
+      if (VIDEO_URL.test(line) || youtubeIdOf(line)) {
+        blocks.push({ kind: 'video', url: line });
+        continue;
+      }
+    }
     const bullet = line.match(/^[-•◆*]\s+(.+)$/u);
     if (bullet?.[1]) {
       blocks.push({ kind: 'bullet', text: bullet[1] });
@@ -84,6 +115,7 @@ export function StructuredText({ text, variant = 'dark' }: { text: string; varia
         if (block.kind === 'heading') {
           return <Text key={index} style={styles.heading}>{block.text}</Text>;
         }
+        if (block.kind === 'image' || block.kind === 'video') return <MediaBlock key={index} block={block} />;
         if (block.kind === 'fact') {
           return (
             <View key={index} style={styles.fact}>
@@ -116,10 +148,35 @@ export function StructuredText({ text, variant = 'dark' }: { text: string; varia
   );
 }
 
+/** A photo at its own shape (capped), or a video tile that opens the in-app player. */
+function MediaBlock({ block }: { block: { kind: 'image' | 'video'; url: string } }) {
+  const router = useRouter();
+  const [ratio, setRatio] = useState(16 / 9);
+  useEffect(() => {
+    if (block.kind !== 'image') return;
+    Image.getSize(block.url, (w, h) => (w > 0 && h > 0 ? setRatio(Math.max(0.6, w / h)) : undefined), () => undefined);
+  }, [block]);
+  if (block.kind === 'image') {
+    return <Image source={{ uri: sized(block.url, 720) }} style={[styles.media, { aspectRatio: ratio }]} resizeMode="cover" />;
+  }
+  const youtube = youtubeIdOf(block.url);
+  return (
+    <PressScale onPress={() => playVideo(router, { url: block.url, title: '', poster: youtube ? `https://img.youtube.com/vi/${youtube}/hqdefault.jpg` : null })} accessibilityRole="button" glow glowRadius={radii.lg}>
+      <View style={[styles.media, styles.videoTile]}>
+        {youtube ? <Image source={{ uri: `https://img.youtube.com/vi/${youtube}/hqdefault.jpg` }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+        <View style={styles.play}>
+          <Ionicons name="play" size={26} color={colors.goldInk} />
+        </View>
+      </View>
+    </PressScale>
+  );
+}
+
 function PaperBlocks({ blocks }: { blocks: Block[] }) {
   return (
     <View style={styles.paperBody}>
       {blocks.map((block, index) => {
+        if (block.kind === 'image' || block.kind === 'video') return <MediaBlock key={index} block={block} />;
         if (block.kind === 'heading') {
           return (
             <View key={index} style={[styles.paperHeadingRow, index > 0 && styles.paperHeadingGap]}>
@@ -154,6 +211,9 @@ function PaperBlocks({ blocks }: { blocks: Block[] }) {
 }
 
 const styles = StyleSheet.create({
+  media: { width: '100%', borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden', marginVertical: spacing.xs },
+  videoTile: { aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B0B0D' },
+  play: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
   heading: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 26, color: colors.goldLight, textAlign: textStart },
   // M176: the white-sheet palette — ink text, dark gold accents, air between the thoughts.
   paperBody: { gap: spacing.sm + 2 },

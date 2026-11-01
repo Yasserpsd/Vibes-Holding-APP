@@ -21,6 +21,7 @@ import { formatRelativeTime } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { countNew, markSeen, useSeenMarks } from '@/lib/seen';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { withoutMediaLines } from '@/components/StructuredText';
 
 /**
  * M75 «الإشعارات» (owner): ONE fixed center for every persona — admin messages, workshops and
@@ -69,7 +70,7 @@ export default function InboxScreen() {
   const items = useMemo<InboxItem[]>(() => {
     const out: InboxItem[] = [];
     for (const post of posts.data?.posts ?? []) {
-      out.push({ id: `post:${post.id}`, kind: 'post', title: post.title, subtitle: post.body || null, time: post.publishedAt, image: post.images[0] ?? null, route: `/posts/${post.id}` as Href });
+      out.push({ id: `post:${post.id}`, kind: 'post', title: post.title, subtitle: withoutMediaLines(post.body) || null, time: post.publishedAt, image: post.images[0] ?? null, route: `/posts/${post.id}` as Href });
     }
     for (const event of (agenda.data?.events ?? []).filter((entry) => !entry.past).slice(0, 6)) {
       out.push({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: event.blurb || null, time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: cardImageOf(event), route: `/agenda/${event.id}` as Href });

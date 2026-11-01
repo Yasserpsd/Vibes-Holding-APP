@@ -8,7 +8,6 @@ import { useMonthlyDeal } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
-import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { dealAmount, MonthlyDealBadge } from '@/components/MonthlyDeal';
@@ -38,11 +37,9 @@ export default function AgendaEventScreen() {
   const register = useRegisterAgenda();
   const [error, setError] = useState<string | null>(null);
   const [gated, setGated] = useState(false);
-  // M107: the discount code the member typed; M172b (owner): no «تحقق» button — the code goes with the confirm tap and the server applies it.
-  const [code, setCode] = useState('');
   // M172 (owner): ONE button. A «both» event asks how he attends with two pills above it (in person first).
   const [chosen, setChosen] = useState<AgendaAttendance>('hq');
-  // M176 (owner): the month's code rides along on its own unless he typed another; a top button jumps straight to booking.
+  // M176 (owner): the month's code rides along on its own; a top button jumps straight to booking.
   const deal = useMonthlyDeal();
   const scrollRef = useRef<ScrollView>(null);
   const [bookingY, setBookingY] = useState(0);
@@ -55,7 +52,7 @@ export default function AgendaEventScreen() {
     setError(null);
     setGated(false);
     register.mutate(
-      { eventId: event.id, attendance, discountCode: code.trim() || deal?.code || undefined },
+      { eventId: event.id, attendance, discountCode: deal?.code || undefined },
       {
         onSuccess: async (answer) => {
           // M111: the checkout renders embedded inside the app. A 100% code settles on the spot.
@@ -79,7 +76,7 @@ export default function AgendaEventScreen() {
   };
 
   // The one button: «تأكيد الحضور» for a member (or a no-fee event), the same words with the fee for everyone else.
-  const dealOn = Boolean(event?.mustPay && myFee > 0 && deal && !code.trim());
+  const dealOn = Boolean(event?.mustPay && myFee > 0 && deal);
   const payFee = dealOn && deal ? dealAmount(myFee, deal.percent) : myFee;
   const confirmLabel = event && event.mustPay && myFee > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(payFee) }) : t('agenda.confirmAttendance');
   const canBook = Boolean(event && signedIn && event.open && !event.mine?.paid);
@@ -201,23 +198,8 @@ export default function AgendaEventScreen() {
             <View style={styles.booking} onLayout={(layout) => setBookingY(layout.nativeEvent.layout.y)}>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}
               {event.mustPay ? <Notice tone="info" text={t('agenda.payNote')} /> : null}
-              {/* M107: the discount-code box — a 100% code confirms the attendance with no checkout.
-                  M172b (owner): the code is simply typed; it is applied when he confirms (no separate «تحقق» step). */}
-              {/* M176: the month's code already applied; the field below stays for another code. */}
+              {/* M176/M177 (owner): the month's code already applied — no field for another code. */}
               {dealOn ? <MonthlyDealBadge amount={myFee} /> : null}
-              {event.mustPay ? (
-                <View style={styles.codeBox}>
-                  <FormField
-                    label={deal ? t('deal.otherCode') : t('agenda.discountLabel')}
-                    latin
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    value={code}
-                    onChangeText={(value) => setCode(value.toUpperCase())}
-                    placeholder="CODE"
-                  />
-                </View>
-              ) : null}
               {error ? (
                 <FadeInView offset={8}>
                   {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
@@ -270,7 +252,6 @@ const styles = StyleSheet.create({
   prices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, flex: 1 },
   memberPill: { backgroundColor: colors.surfaceElevated },
   savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
-  codeBox: { gap: spacing.sm },
   booking: { gap: spacing.md },
   // M172: how he attends — two pills above the one button.
   attendanceRow: { gap: spacing.xs },

@@ -20,6 +20,11 @@ const SYMBOLS: Symbol[] = [
   { key: 'silver', symbol: 'SI=F', label: 'الفضة', labelEn: 'Silver', unit: 'دولار/أونصة', unitEn: 'USD/oz' },
   { key: 'brent', symbol: 'BZ=F', label: 'برنت', labelEn: 'Brent', unit: 'دولار/برميل', unitEn: 'USD/bbl' },
   { key: 'wti', symbol: 'CL=F', label: 'النفط الأمريكي', labelEn: 'WTI', unit: 'دولار/برميل', unitEn: 'USD/bbl' },
+  // M177 (owner, 2026-11-01, «زود عملات مهمة زي الدولار والدرهم»): one unit of each currency in riyals.
+  { key: 'usd', symbol: 'SAR=X', label: 'الدولار الأمريكي', labelEn: 'US Dollar', unit: 'ريال', unitEn: 'SAR' },
+  { key: 'aed', symbol: 'AEDSAR=X', label: 'الدرهم الإماراتي', labelEn: 'UAE Dirham', unit: 'ريال', unitEn: 'SAR' },
+  { key: 'eur', symbol: 'EURSAR=X', label: 'اليورو', labelEn: 'Euro', unit: 'ريال', unitEn: 'SAR' },
+  { key: 'gbp', symbol: 'GBPSAR=X', label: 'الجنيه الإسترليني', labelEn: 'British Pound', unit: 'ريال', unitEn: 'SAR' },
   { key: 'btc', symbol: 'BTC-USD', label: 'بيتكوين', labelEn: 'Bitcoin', unit: 'دولار', unitEn: 'USD' },
 ];
 
@@ -79,7 +84,7 @@ export class MarketsService {
     const { symbol: _symbol, ...labels } = entry;
     return {
       ...labels,
-      price: Math.round(price * 100) / 100,
+      price: price < 10 ? Math.round(price * 10_000) / 10_000 : Math.round(price * 100) / 100,
       changePct,
       ...(entry.key === 'gold' ? { gramSar: Math.round(((price * SAR_PER_USD) / GRAMS_PER_OUNCE) * 100) / 100 } : {}),
       at: new Date((meta?.regularMarketTime ?? Date.now() / 1000) * 1000).toISOString(),

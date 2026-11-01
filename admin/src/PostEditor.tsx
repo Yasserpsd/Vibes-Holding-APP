@@ -167,6 +167,10 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [linkDraft, setLinkDraft] = useState<string | null>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
+  // M177 (owner): a photo or video dropped INTO the text — its link sits on its own line where the cursor was.
+  const bodyInput = useRef<HTMLTextAreaElement>(null);
+  const inlineInput = useRef<HTMLInputElement>(null);
+  const [inlineNote, setInlineNote] = useState<string | null>(null);
   const controllers = useRef(new Map<number, AbortController>());
   const nextId = useRef(1);
   // Every batch of picked images waits for the one before it, so images land in the order they were picked.
@@ -254,6 +258,26 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     const poster = frame ? await sendPoster(frame, signal) : null;
     dropUpload(id);
     if (!signal.aborted) setVideoFile({ url: done.url, poster });
+  }
+
+  /** M177: uploads one photo or video and puts its link on its own line at the cursor; the app shows it right there. */
+  async function addInline(picked: File) {
+    const file = typedFile(picked);
+    const isVideo = file.type.startsWith('video/');
+    const problem = fileProblem(file, isVideo ? config.videos : config.images);
+    setInlineNote(problem);
+    if (problem) return;
+    const at = bodyInput.current?.selectionStart ?? body.length;
+    const { id, signal } = enqueue(file, isVideo ? 'video' : 'image');
+    const done = await send(id, file, signal);
+    if (!done) return;
+    dropUpload(id);
+    setBody((current) => {
+      const cut = Math.min(at, current.length);
+      const before = current.slice(0, cut).replace(/[ \t]*$/, '');
+      const after = current.slice(cut).replace(/^[ \t]*/, '');
+      return `${before}${before && !before.endsWith('\n') ? '\n' : ''}${done.url}\n${after}`;
+    });
   }
 
   function addImageLink() {
@@ -462,8 +486,15 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
           </label>
           <label>
             نص الرسالة
-            <textarea value={body} rows={8} maxLength={6000} onChange={(e) => setBody(e.target.value)} />
+            <textarea ref={bodyInput} value={body} rows={8} maxLength={6000} onChange={(e) => setBody(e.target.value)} />
           </label>
+          {/* M177 (owner: «أضيف صورة وبعدين أكمل كلام»): photos and videos inside the text itself. */}
+          <div className="row-actions">
+            <button type="button" onClick={() => inlineInput.current?.click()}>+ صورة أو فيديو داخل النص</button>
+            <input ref={inlineInput} type="file" accept="image/*,video/*" hidden onChange={(e) => { const picked = e.target.files?.[0]; e.target.value = ''; if (picked) void addInline(picked); }} />
+          </div>
+          <p className="muted hint">ضع المؤشر في المكان المطلوب ثم أضف الصورة أو الفيديو — يظهر في التطبيق في نفس المكان وسط الكلام. يمكنك أيضًا لصق رابط يوتيوب في سطر مستقل.</p>
+          {inlineNote ? <p className="error">{inlineNote}</p> : null}
 
           <fieldset>
             <legend>الإنجليزية — تُكتب تلقائيًا عند الحفظ، وتعديلك لها يثبّتها</legend>
