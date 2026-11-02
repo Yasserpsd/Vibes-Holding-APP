@@ -6,6 +6,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { requireOptionalNativeModule } from 'expo';
 import { LocaleProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -91,6 +92,22 @@ export default function RootLayout() {
     });
     return () => unsubscribe?.();
   }, [i18nReady]);
+
+  // M182d (owner, 2026-11-02, «عملت كل شيء ومفيش فايدة»): a published update applies itself on the
+  // FIRST open — check, fetch, reload — instead of the close-twice dance expo-updates asks for by
+  // default. Early in the launch only (the effect runs once), gated on the native module (M92
+  // pattern) so development builds and a binary without updates never crash. Every error is
+  // swallowed: the default next-launch path still stands behind it.
+  useEffect(() => {
+    if (!requireOptionalNativeModule('ExpoUpdates')) return;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const updates = require('expo-updates') as typeof import('expo-updates');
+    void updates
+      .checkForUpdateAsync()
+      .then((check) => (check.isAvailable ? updates.fetchUpdateAsync() : null))
+      .then((fetched) => (fetched?.isNew ? updates.reloadAsync() : undefined))
+      .catch(() => undefined);
+  }, []);
 
   const ready = (fontsLoaded || fontError !== null) && i18nReady && cacheReady;
   useEffect(() => {
