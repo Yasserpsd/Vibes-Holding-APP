@@ -31,6 +31,8 @@ const eventSchema = z.object({
   coverUrl: z.string().trim().max(500).nullish(),
   mode: z.enum(['hq', 'online', 'both']),
   feeSar: z.number().int().min(0).max(100_000).default(0),
+  /** M182e: the pre-support list price, struck through in the app; 0 = hidden. */
+  originalFeeSar: z.number().int().min(0).max(100_000).default(0),
   /** M107: the ACTIVE member's price (0 = ضمن العضوية بدون رسوم إضافية). */
   memberFeeSar: z.number().int().min(0).max(100_000).default(0),
   /** M107: the unified interest keys this event suits (targets the push, badges the agenda). */

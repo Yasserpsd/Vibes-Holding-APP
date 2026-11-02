@@ -7,7 +7,7 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 /** M41 «أجندة النادي»: events across the whole year, their registrations, and the members' push reminder. */
 
 const MODE_LABEL: Record<AgendaMode, string> = { hq: 'حضوري', online: 'أونلاين', both: 'حضوري وأونلاين' };
-const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, memberFeeSar: 0, interests: [], open: true };
+const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, originalFeeSar: 0, memberFeeSar: 0, interests: [], open: true };
 
 /** M107: the unified interests (mirrors server/src/interests/types.ts). */
 const INTEREST_OPTIONS: { key: string; label: string }[] = [
@@ -177,7 +177,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, originalFeeSar: row.originalFeeSar ?? 0, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -265,6 +265,10 @@ export function Agenda() {
             <label>
               سعر غير الأعضاء بالريال (0 = بدون رسوم للجميع)
               <input type="number" min={0} max={100000} value={editor.input.feeSar} onChange={(event) => edit({ feeSar: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
+            </label>
+            <label>
+              السعر الأصلي قبل دعم النادي بالريال (0 = لا يظهر؛ يظهر مشطوبًا مع نسبة الخصم)
+              <input type="number" min={0} max={100000} value={editor.input.originalFeeSar ?? 0} onChange={(event) => edit({ originalFeeSar: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
             </label>
             <label>
               سعر الأعضاء بالريال (0 = ضمن العضوية بدون رسوم إضافية)

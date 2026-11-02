@@ -46,6 +46,8 @@ export type Service = {
   group: ServiceGroupKey;
   /** List price of a real-world service; never a membership price. */
   priceLabel: string | null;
+  /** M182e: the pre-support list price, shown struck through before `priceLabel`; absent/null = none. */
+  priceWasLabel?: string | null;
   memberLabel: string | null;
   access: 'everyone' | 'member';
   action: ServiceAction;
@@ -239,9 +241,10 @@ export const SERVICES_SEED: ServicesContent = {
       detail: 'ثلاثة أيام عملية تنقل مشروعك من الفكرة إلى خطة تنفيذ واضحة، بحضور خبراء النادي.',
       icon: 'school',
       group: 'entrepreneur',
-      // Owner (2026-11-02): the workshop price is plainly 290 — the discount is already inside it.
+      // Owner (2026-11-02): list 990 struck through, the support discount computed, the real price plainly 290.
       priceLabel: '290 ريال',
-      memberLabel: 'خصم 50% للأعضاء',
+      priceWasLabel: '990 ريال',
+      memberLabel: 'خصم 71% — دعم من النادي',
       access: 'everyone',
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },
       infoUrl: 'https://vcmem.com/workshop/',
@@ -411,7 +414,8 @@ export const SERVICES_SEED: ServicesContent = {
   // v16 (owner, 2026-10-26): every service carries its own film (`videoUrl`, dashboard-edited; «اصنع ملتقاك» seeded).
   // v17 (owner, 2026-11-02): Momentum opens to everyone with on-request marketing packages, 50% off
   // every Momentum service for members, and requests go to Momentum's own WhatsApp.
-  version: 17,
+  // v18 (owner, 2026-11-02): workshop price = plainly 290, list 990 struck with «دعم من النادي».
+  version: 18,
   updatedAt: '2026-11-02T12:00:00.000Z',
 };
 

@@ -27,6 +27,8 @@ export type WorkshopAd = WorkshopAdCopy & {
   time: string;
   imageUrl: string | null;
   feeSar: number;
+  /** M182e: the struck-through list price (0 = none) — the club's support covers the difference. */
+  originalFeeSar: number;
   memberFeeSar: number;
   day: string;
 };
@@ -103,6 +105,7 @@ export class WorkshopAdService {
       time: event.time,
       imageUrl: event.imageUrl || event.coverUrl || null,
       feeSar: event.feeSar,
+      originalFeeSar: event.originalFeeSar && event.originalFeeSar > event.feeSar ? event.originalFeeSar : 0,
       memberFeeSar: event.memberFeeSar ?? 0,
       day,
     };
@@ -116,6 +119,7 @@ export class WorkshopAdService {
       time: event.time,
       mode: event.mode,
       feeSar: event.feeSar,
+      originalFeeSar: event.originalFeeSar ?? 0,
       memberFeeSar: event.memberFeeSar ?? 0,
       about: event.blurb.slice(0, 700),
     };

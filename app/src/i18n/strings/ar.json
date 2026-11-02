@@ -1013,6 +1013,8 @@
   "agenda.withFee": "{label} — {fee} ريال",
   "agenda.feeTag": "رسوم لغير الأعضاء",
   "agenda.nonMemberPrice": "غير الأعضاء: {fee} ريال",
+  "agenda.wasPrice": "{fee} ريال",
+  "agenda.clubSupport": "خصم {percent}% — دعم من النادي",
   "agenda.memberPrice": "الأعضاء: {fee} ريال",
   "agenda.included": "ضمن العضوية للأعضاء",
   "agenda.save": "وفّر {amount} ريال بالعضوية",

@@ -26,6 +26,8 @@ type WorkshopAd = {
   time: string;
   imageUrl: string | null;
   feeSar: number;
+  /** M182e: the pre-support list price (0 or absent on an older server = hidden). */
+  originalFeeSar?: number;
   memberFeeSar: number;
   headline: string;
   body: string;
@@ -96,6 +98,17 @@ export function WorkshopAdPopup() {
             <View style={styles.facts}>
               <Text style={styles.title} numberOfLines={2}>{ad.title}</Text>
               <Text style={styles.when}>{when}</Text>
+              {/* M182e (owner): the list price struck beside the club-support discount, then the real fee line. */}
+              {ad.feeSar > 0 && (ad.originalFeeSar ?? 0) > 0 ? (
+                <View style={styles.supportRow}>
+                  <SarText style={styles.wasPrice} numberOfLines={1}>{t('agenda.wasPrice', { fee: formatNumber(ad.originalFeeSar ?? 0) })}</SarText>
+                  <View style={styles.supportPill}>
+                    <Text style={styles.supportText} numberOfLines={1}>
+                      {t('agenda.clubSupport', { percent: String(Math.round((1 - ad.feeSar / (ad.originalFeeSar ?? ad.feeSar)) * 100)) })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
               {ad.feeSar > 0 ? (
                 <SarText style={styles.fee}>
                   {ad.memberFeeSar > 0
@@ -140,4 +153,16 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.goldLight, textAlign: textStart },
   when: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   fee: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
+  // M182e: the struck list price beside the club-support discount pill.
+  supportRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap', marginTop: 2 },
+  wasPrice: { ...typography.caption, fontSize: 14, color: colors.textMuted, textDecorationLine: 'line-through' },
+  supportPill: {
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  supportText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
 });

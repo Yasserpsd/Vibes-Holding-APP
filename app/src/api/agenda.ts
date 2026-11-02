@@ -19,6 +19,8 @@ export type AgendaEvent = {
   place: string;
   mode: AgendaMode;
   feeSar: number;
+  /** M182e: the pre-support list price (struck through in the UI); 0/absent = none. */
+  originalFeeSar?: number;
   /** M107: the member price (0 = ضمن العضوية), what THIS viewer pays, and the membership saving. */
   memberFeeSar?: number;
   myFeeSar?: number;

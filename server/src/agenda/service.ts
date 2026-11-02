@@ -54,6 +54,8 @@ export type AgendaEvent = {
   mode: AgendaMode;
   /** The attendance fee for accounts WITHOUT an active membership; 0 = بدون رسوم للجميع. */
   feeSar: number;
+  /** M182e (owner: «ضيف السعر الاصلي 990 مشطوب … دعم من النادي»): the pre-support list price, shown struck through; 0/absent = none. */
+  originalFeeSar?: number;
   /**
    * M107: the attendance fee for ACTIVE members. 0 or absent = included in the membership.
    * Whoever should attend without paying gets a 100% discount code — never a free price tag.
@@ -121,6 +123,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   coverUrl: string | null;
   /** M77: the event's last day has passed — the app keeps it listed, faded. */
   past: boolean;
+  /** M182e: the struck-through list price (club support covers the difference); 0 = none to show. */
+  originalFeeSar: number;
   /** M107: the member price (0 = ضمن العضوية), what THIS viewer pays, and what the membership saves. */
   memberFeeSar: number;
   myFeeSar: number;
@@ -216,6 +220,8 @@ export class AgendaService {
       place: en?.place || event.place,
       mode,
       feeSar,
+      // Only an original price ABOVE the fee reads as a real strike-through discount.
+      originalFeeSar: event.originalFeeSar && event.originalFeeSar > feeSar ? event.originalFeeSar : 0,
       memberFeeSar,
       myFeeSar,
       // M107 «وفّر بالعضوية»: what the membership shaves off this event for a non-member viewer.

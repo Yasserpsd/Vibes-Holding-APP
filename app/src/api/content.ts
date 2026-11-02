@@ -108,6 +108,8 @@ export type Service = {
   icon: string;
   group: ServiceGroupKey;
   priceLabel: string | null;
+  /** M182e: the pre-support list price, struck through before the price; absent = none. */
+  priceWasLabel?: string | null;
   memberLabel: string | null;
   access: 'everyone' | 'member';
   locked: boolean;

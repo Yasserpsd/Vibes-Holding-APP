@@ -139,6 +139,8 @@ export default function ServiceScreen() {
             <Text style={styles.title}>{service.title}</Text>
             {service.priceLabel || service.memberLabel ? (
               <View style={styles.labels}>
+                {/* M182e: the struck list price reads first, the real price after it. */}
+                {service.priceWasLabel ? <SarText style={styles.wasPrice}>{service.priceWasLabel}</SarText> : null}
                 {service.priceLabel ? <SarText style={styles.price}>{service.priceLabel}</SarText> : null}
                 {service.memberLabel ? <SarText style={styles.member}>{service.memberLabel}</SarText> : null}
               </View>
@@ -370,6 +372,8 @@ const styles = StyleSheet.create({
   },
   savingsText: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
   price: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textPrimary },
+  // M182e: the pre-support list price, struck.
+  wasPrice: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textMuted, textDecorationLine: 'line-through' },
   member: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLight },
   summary: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   paragraph: { ...typography.body, color: colors.textSecondary, textAlign: textStart },

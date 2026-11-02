@@ -21,9 +21,9 @@ import { StructuredText } from '@/components/StructuredText';
 import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { formatEventDays } from '@/lib/format';
+import { formatEventDays, formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
-import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
 const MODE_KEY: Record<AgendaEvent['mode'], StringKey> = { hq: 'agenda.modeHq', online: 'agenda.modeOnline', both: 'agenda.modeBoth' };
@@ -154,6 +154,17 @@ export default function AgendaEventScreen() {
                   </View>
                 )}
               </View>
+              {/* M182e (owner: «السعر الاصلي 990 مشطوب … دعم من النادي»): the list price struck, the support pill carries the computed discount. */}
+              {(event.originalFeeSar ?? 0) > 0 && event.feeSar > 0 && !(signedIn && !event.mustPay) ? (
+                <View style={styles.supportRow}>
+                  <SarText style={styles.wasPrice} numberOfLines={1}>{t('agenda.wasPrice', { fee: formatNumber(event.originalFeeSar ?? 0) })}</SarText>
+                  <View style={styles.supportPill}>
+                    <Text style={styles.supportText} numberOfLines={1}>
+                      {t('agenda.clubSupport', { percent: String(Math.round((1 - event.feeSar / (event.originalFeeSar ?? event.feeSar)) * 100)) })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
               {(event.savingsSar ?? 0) > 0 ? (
                 <SarText style={styles.savings}>{t('agenda.save', { amount: String(event.savingsSar) })}</SarText>
               ) : null}
@@ -253,6 +264,18 @@ const styles = StyleSheet.create({
   prices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, flex: 1 },
   memberPill: { backgroundColor: colors.surfaceElevated },
   savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  // M182e: the struck list price beside the club-support discount pill.
+  supportRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  wasPrice: { ...typography.caption, fontSize: 14, color: colors.textMuted, textDecorationLine: 'line-through' },
+  supportPill: {
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGoldFaint,
+  },
+  supportText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
   booking: { gap: spacing.md },
   // M172: how he attends — two pills above the one button.
   attendanceRow: { gap: spacing.xs },

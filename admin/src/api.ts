@@ -290,6 +290,8 @@ export type AgendaEventInput = {
   coverUrl?: string | null;
   mode: AgendaMode;
   feeSar: number;
+  /** M182e: the pre-support list price, struck through in the app (0 = hidden). */
+  originalFeeSar?: number;
   /** M107: the ACTIVE member's price (0 = ضمن العضوية). */
   memberFeeSar?: number;
   /** M107: the unified interest keys this event suits. */

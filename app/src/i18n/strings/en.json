@@ -1013,6 +1013,8 @@
   "agenda.withFee": "{label} — {fee} SAR",
   "agenda.feeTag": "Fee for non-members",
   "agenda.nonMemberPrice": "Non-members: {fee} SAR",
+  "agenda.wasPrice": "{fee} SAR",
+  "agenda.clubSupport": "{percent}% off — club support",
   "agenda.memberPrice": "Members: {fee} SAR",
   "agenda.included": "Included in the membership",
   "agenda.save": "Save {amount} SAR with the membership",
