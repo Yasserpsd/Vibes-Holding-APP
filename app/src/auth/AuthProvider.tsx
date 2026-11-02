@@ -44,16 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('guest');
     await saveToken(null);
     void saveAccount(null);
-    queryClient.removeQueries({ queryKey: ['me'] });
-    // Interests belong to the account: the next member on this device must not inherit them.
-    queryClient.removeQueries({ queryKey: ['news', 'prefs'] });
-    // Founder contact data a member unlocked never outlives his session (CLAUDE.md rule 4).
-    queryClient.removeQueries({ queryKey: ['project-access'] });
-    // «رسائل الإدارة» is the member's inbox (M29): targeted messages never outlive his session.
-    queryClient.removeQueries({ queryKey: ['posts'] });
-    queryClient.removeQueries({ queryKey: ['post'] });
-    // The membership card and its print request belong to the account too (M30).
-    queryClient.removeQueries({ queryKey: ['card'] });
+    // Owner (2026-11-02): a signed-out member kept seeing member screens from the cache — person
+    // details with unlocked contacts (CLAUDE.md rule 4), his inbox, card, unlocked services. The
+    // enumerated removals missed keys, so the WHOLE cache goes: every screen refetches as a guest
+    // and shows the locked view; the persisted snapshot is rewritten empty by the cache subscriber.
+    void queryClient.cancelQueries();
+    queryClient.clear();
   }, [queryClient]);
 
   useEffect(() => {
@@ -132,7 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearLocal();
     if (token) {
       try {
-        await authApi.logout();
+        // With the explicit token: clearLocal already emptied the module token, and a logout
+        // without it never reached the server, leaving the session alive (owner bug, 2026-11-02).
+        await authApi.logout(token);
       } catch {
         // The local session is already gone; the server session expires on its own.
       }

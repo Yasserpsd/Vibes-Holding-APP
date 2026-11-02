@@ -189,7 +189,8 @@ export const authApi = {
     apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password, ...(country ? { country } : {}) }, token: null }),
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),
   updateMe: (patch: ProfilePatch) => apiRequest<{ me: Me }>('PATCH', '/api/me', { body: patch }),
-  logout: () => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {} }),
+  // The token travels explicitly: sign-out clears the module token before this call goes out.
+  logout: (token: string) => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {}, token }),
   // M101 «تغيير التوجه»: the e-mailed code applies the change at the hub, once every 30 days (admins patch directly).
   personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
   personaConfirm: (code: string) => apiRequest<{ me: Me }>('POST', '/api/me/persona/confirm', { body: { code } }),
