@@ -29,6 +29,8 @@ export type AffiliateReferral = { name: string; at: string; paid: boolean };
 
 export type AffiliateBalance = {
   commission: number;
+  /** Paid referrals required before a payout may be requested; an older server sends none. */
+  minPaid?: number;
   referrals: number;
   paid: number;
   unpaid: number;

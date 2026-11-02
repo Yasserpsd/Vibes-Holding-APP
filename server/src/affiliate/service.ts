@@ -68,10 +68,14 @@ export type PayoutRecord = {
 export type AffiliateConfig = {
   /** SAR per referred member who registered with the code AND paid the membership. */
   commission: number;
-  /** The full agreement (dashboard-editable); {commission} becomes the current amount. */
+  /** Paid referrals required before «سحب الأرباح» opens (owner, 2026-11-02: «حد أدنى 5 أعضاء»). */
+  minPayoutPaid: number;
+  /** The full agreement (dashboard-editable); {commission} and {minPayout} become the current values. */
   agreementText: string;
   /** The program pitch shown in the app before applying. */
   introText: string;
+  /** The same pitch for the English app (owner, 2026-11-02: «Club Affiliates Program»). */
+  introTextEn: string;
   /** What the affiliate shares; {link} and {code} are filled per affiliate. */
   shareText: string;
   /** «كيف تعرّفت على نادي المستثمرين؟» options (owner: formal Arabic, many choices). */
@@ -117,6 +121,7 @@ export const DEFAULT_AGREEMENT = [
   '1. يستحق الممثل عمولة قدرها {commission} عن كل عضو سجّل عبر رمز الإحالة الخاص به وسدّد رسوم العضوية السنوية فعليًا. ولا تُستحق أي عمولة عن التسجيل وحده دون سداد.',
   '2. تُحتسب العمولات وفق سجلات النادي وأنظمته الإلكترونية، وهي المرجع الوحيد المعتمد في ذلك.',
   '3. تُصرف العمولات بناءً على طلب سحب يقدّمه الممثل من التطبيق، وتُحوَّل إلى حسابه البنكي المسجّل بعد مراجعة الطلب واعتماده من الإدارة.',
+  '4. لا يُقدَّم طلب سحب للعمولات إلا بعد اكتمال {minPayout} أعضاء مسدّدين لرسوم العضوية عبر رمز الإحالة الخاص بالممثل.',
   '',
   'سادسًا — مدة الاتفاقية وإنهاؤها:',
   'للنادي قبول أي طلب انضمام أو رفضه دون إبداء الأسباب، وله إيقاف أي ممثل أو تعديل قيمة العمولة أو إنهاء البرنامج في أي وقت، مع حفظ حق الممثل في العمولات المستحقة له قبل الإنهاء.',
@@ -127,9 +132,13 @@ export const DEFAULT_AGREEMENT = [
 
 export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
   commission: 250,
+  minPayoutPaid: 5,
   agreementText: DEFAULT_AGREEMENT,
+  // The owner's wording (2026-11-02), with the amounts dashboard-driven.
   introText:
-    'انضم إلى برنامج ممثلي نادي المستثمرين: عرّف بعضوية النادي ومزاياها، وادعُ المهتمين إلى التسجيل عبر رابطك الشخصي، واحصل على عمولة قدرها {commission} عن كل عضو سجّل عبر رمزك وسدّد رسوم العضوية السنوية. يخضع الانضمام لموافقة إدارة النادي بعد قبول الاتفاقية.',
+    'انضم إلى برنامج ممثلي نادي المستثمرين: عرّف بعضوية النادي ومزاياها، ووظّف شبكة علاقاتك ومحيط معارفك، وادعُ المهتمين منهم إلى التسجيل عبر رابط مخصص لك، واحصل على عائد قدره {commission} عن كل عضو سجّل عبر رابطك وسدّد رسوم العضوية السنوية من خلاله. يخضع الانضمام لموافقة إدارة النادي بعد قبول الاتفاقية، ويتاح سحب العائد بعد اكتمال {minPayout} أعضاء مسدّدين.',
+  introTextEn:
+    "Join the Investors Club Affiliates Program and introduce others to the Club's membership and exclusive benefits. Leverage your professional network and personal connections to invite interested individuals to register through your unique referral link, and earn {commission} for every new member who registers through your link and pays the annual membership fee. Participation is subject to approval by the Club management following acceptance of the program agreement, and withdrawals unlock once {minPayout} referred members have paid.",
   shareText: [
     'أدعوك للانضمام إلى نادي المستثمرين Investors Club — مجتمع أعمال وشراكات وخدمات لروّاد الأعمال والمستثمرين.',
     'سجّل عبر رابطي الشخصي: {link}',
@@ -143,6 +152,8 @@ export type AffiliateReferral = { name: string; at: string; paid: boolean };
 
 export type AffiliateBalance = {
   commission: number;
+  /** Paid referrals required before a payout may be requested (0 = no minimum). */
+  minPaid: number;
   referrals: number;
   paid: number;
   unpaid: number;
@@ -187,8 +198,10 @@ export class AffiliateService {
     const options = (stored?.heardOptions ?? []).map((option) => option.trim()).filter(Boolean);
     return {
       commission: typeof stored?.commission === 'number' && stored.commission > 0 ? Math.round(stored.commission) : DEFAULT_AFFILIATE_CONFIG.commission,
+      minPayoutPaid: typeof stored?.minPayoutPaid === 'number' && stored.minPayoutPaid >= 0 ? Math.round(stored.minPayoutPaid) : DEFAULT_AFFILIATE_CONFIG.minPayoutPaid,
       agreementText: stored?.agreementText?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
       introText: stored?.introText?.trim() || DEFAULT_AFFILIATE_CONFIG.introText,
+      introTextEn: stored?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: stored?.shareText?.trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: options.length ? options : DEFAULT_AFFILIATE_CONFIG.heardOptions,
     };
@@ -198,8 +211,10 @@ export class AffiliateService {
     const current = await this.config();
     const next: AffiliateConfig = {
       commission: input.commission !== undefined ? Math.round(input.commission) : current.commission,
+      minPayoutPaid: input.minPayoutPaid !== undefined ? Math.max(0, Math.round(input.minPayoutPaid)) : current.minPayoutPaid,
       agreementText: (input.agreementText ?? current.agreementText).trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
       introText: (input.introText ?? current.introText).trim() || DEFAULT_AFFILIATE_CONFIG.introText,
+      introTextEn: (input.introTextEn ?? current.introTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: (input.shareText ?? current.shareText).trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: (input.heardOptions ?? current.heardOptions).map((option) => option.trim()).filter(Boolean),
     };
@@ -211,6 +226,11 @@ export class AffiliateService {
   /** The amount in words the texts carry («250 ريال سعودي»). */
   static commissionLabel(commission: number): string {
     return `${commission} ريال سعودي`;
+  }
+
+  /** The same amount for the English app («SAR 250»). */
+  static commissionLabelEn(commission: number): string {
+    return `SAR ${commission}`;
   }
 
   referralLink(code: string): string {
@@ -264,7 +284,8 @@ export class AffiliateService {
       affiliates.push(next);
       return next;
     });
-    this.deps.notifier.affiliateAgreement(record, config.agreementText, AffiliateService.commissionLabel(config.commission));
+    // The mail fills {commission}; {minPayout} is filled here so the mailed agreement reads whole.
+    this.deps.notifier.affiliateAgreement(record, config.agreementText.replaceAll('{minPayout}', String(config.minPayoutPaid)), AffiliateService.commissionLabel(config.commission));
     return record;
   }
 
@@ -317,6 +338,7 @@ export class AffiliateService {
     const earned = paid * config.commission;
     return {
       commission: config.commission,
+      minPaid: config.minPayoutPaid,
       referrals: referrals.length,
       paid,
       unpaid: referrals.length - paid,
@@ -338,6 +360,10 @@ export class AffiliateService {
       if (!affiliate || affiliate.status !== 'approved') throw new RequestError('not_affiliate', 'هذه الخدمة لممثلي النادي المعتمدين', 403);
       if (payouts.some((entry) => entry.contactId === contactId && entry.status === 'requested')) {
         throw new RequestError('payout_open', 'لديك طلب سحب قيد المراجعة بالفعل', 400);
+      }
+      // Owner (2026-11-02): «حد أدنى للسحب 5 أعضاء» — paid members, dashboard-adjustable.
+      if (balance.paid < balance.minPaid) {
+        throw new RequestError('payout_min', `يتاح سحب الأرباح بعد اكتمال ${balance.minPaid} أعضاء مسدّدين لرسوم العضوية عبر رمزك، وعدد المسدّدين لديك الآن ${balance.paid}`, 400);
       }
       if (balance.available <= 0) throw new RequestError('no_balance', 'لا يوجد رصيد متاح للسحب حاليًا', 400);
       // The payout form is the freshest bank data — keep the affiliate record in step for the dashboard.

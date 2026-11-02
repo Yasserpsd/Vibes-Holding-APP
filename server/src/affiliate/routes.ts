@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { langOf } from '../lang.js';
 import { APP_STORE_BADGE, PLAY_STORE_BADGE } from '../legal/badges.js';
 import { APP_STORE_URL, PLAY_STORE_URL } from '../legal/applink.js';
 import { AffiliateService, type AffiliateRecord } from './service.js';
@@ -18,7 +19,13 @@ const ibanSchema = z
 
 const bankSchema = {
   bankName: z.string().trim().min(2, 'اكتب اسم البنك').max(80),
-  accountName: z.string().trim().min(2, 'اكتب اسم صاحب الحساب كما هو مسجّل في البنك').max(120),
+  // Owner (2026-11-02): the bank account details are English — the rest of the form takes Arabic freely.
+  accountName: z
+    .string()
+    .trim()
+    .min(2, 'اكتب اسم صاحب الحساب كما هو مسجّل في البنك')
+    .max(120)
+    .regex(/^[A-Za-z0-9\s.,'&()/-]+$/, 'اكتب اسم صاحب الحساب بالأحرف الإنجليزية كما هو مسجّل لدى البنك'),
   iban: ibanSchema,
 };
 
@@ -47,8 +54,10 @@ const payoutDecisionSchema = z.object({
 const configSchema = z
   .object({
     commission: z.number().int().min(1, 'العمولة بالريال السعودي').max(100000),
+    minPayoutPaid: z.number().int().min(0, 'الحد الأدنى للسحب بعدد الأعضاء المسدّدين').max(1000),
     agreementText: z.string().trim().min(100, 'نص الاتفاقية قصير جدًا').max(20000),
     introText: z.string().trim().min(20, 'اكتب تعريف البرنامج').max(2000),
+    introTextEn: z.string().trim().min(20, 'Write the program pitch in English').max(2000),
     shareText: z.string().trim().min(10, 'اكتب نص المشاركة').max(1000),
     heardOptions: z.array(z.string().trim().min(1).max(60)).min(2).max(30),
   })
@@ -92,12 +101,16 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       if (!current) return;
       const me = await auth.me(current.session);
       const [config, record] = await Promise.all([service.config(), service.find(me.id)]);
+      // The pitch follows the app's language; the agreement stays the Arabic legal text.
+      const lang = langOf(request);
       const commissionLabel = AffiliateService.commissionLabel(config.commission);
+      const fill = (text: string, label: string) => text.replaceAll('{commission}', label).replaceAll('{minPayout}', String(config.minPayoutPaid));
       const base = {
         status: record?.status ?? ('none' as const),
         commission: config.commission,
-        introText: config.introText.replaceAll('{commission}', commissionLabel),
-        agreementText: config.agreementText.replaceAll('{commission}', commissionLabel),
+        minPayoutPaid: config.minPayoutPaid,
+        introText: lang === 'en' ? fill(config.introTextEn, AffiliateService.commissionLabelEn(config.commission)) : fill(config.introText, commissionLabel),
+        agreementText: fill(config.agreementText, commissionLabel),
         heardOptions: config.heardOptions,
         application: record ? ownApplication(record) : null,
       };

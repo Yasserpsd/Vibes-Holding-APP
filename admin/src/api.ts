@@ -221,8 +221,10 @@ export type AffiliatePayoutRow = {
 
 export type AffiliateConfig = {
   commission: number;
+  minPayoutPaid: number;
   agreementText: string;
   introText: string;
+  introTextEn: string;
   shareText: string;
   heardOptions: string[];
 };

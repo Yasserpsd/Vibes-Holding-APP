@@ -109,12 +109,19 @@ export default function AffiliateScreen() {
               label={t('affiliate.payout')}
               icon="cash-outline"
               variant="outline"
-              disabled={data.balance.available <= 0 || (data.payouts ?? []).some((payout) => payout.status === 'requested')}
+              disabled={
+                data.balance.available <= 0 ||
+                data.balance.paid < (data.balance.minPaid ?? 0) ||
+                (data.payouts ?? []).some((payout) => payout.status === 'requested')
+              }
               onPress={() => router.push('/affiliate/payout' as Href)}
             />
           </FadeInView>
           {(data.payouts ?? []).some((payout) => payout.status === 'requested') ? (
             <Notice tone="info" text={t('affiliate.payoutOpen')} />
+          ) : data.balance.paid < (data.balance.minPaid ?? 0) ? (
+            // Owner (2026-11-02): «حد أدنى للسحب 5 أعضاء» — the member sees why the door is shut.
+            <Notice tone="info" text={t('affiliate.payoutMin', { count: formatNumber(data.balance.minPaid ?? 0) })} />
           ) : null}
 
           {(data.payouts ?? []).length > 0 ? (

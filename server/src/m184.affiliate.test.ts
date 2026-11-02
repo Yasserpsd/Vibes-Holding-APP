@@ -66,7 +66,8 @@ async function signUp(email: string, extra: Record<string, unknown> = {}): Promi
 const APPLY = {
   entityType: 'individual' as const,
   bankName: 'البنك الأهلي السعودي',
-  accountName: 'ممثل النادي التجريبي',
+  // Owner (2026-11-02): the bank account is English; the rest of the form takes Arabic freely.
+  accountName: 'Mumathil Al Nadi',
   iban: 'SA44 2000 0001 2345 6789 1234',
   city: 'الرياض',
   address: 'حي العليا، شارع الأمير محمد بن عبدالعزيز',
@@ -97,8 +98,16 @@ test('every signed-in account sees the program pitch, the agreement and the opti
   assert.equal(mine.json().status, 'none');
   assert.match(mine.json().agreementText as string, /250 ريال سعودي/);
   assert.match(mine.json().introText as string, /250 ريال سعودي/);
+  // Owner (2026-11-02): the minimum payout (5 paid members) is named in the texts.
+  assert.match(mine.json().introText as string, /5 أعضاء/);
+  assert.match(mine.json().agreementText as string, /5 أعضاء/);
   assert.ok((mine.json().heardOptions as string[]).includes('عن طريق صديق'));
   assert.equal(mine.json().code, undefined);
+
+  // The English app reads the English pitch («Club Affiliates Program», SAR amounts).
+  const english = await app.inject({ method: 'GET', url: '/api/affiliate', headers: { ...bearer(memberToken), 'x-app-lang': 'en' } });
+  assert.match(english.json().introText as string, /Affiliates Program/);
+  assert.match(english.json().introText as string, /SAR 250/);
 });
 
 test('the application needs the full form, and the agreement is mailed to the applicant', async () => {
@@ -111,6 +120,11 @@ test('the application needs the full form, and the agreement is mailed to the ap
   const badSource = await send('POST', '/api/affiliate/apply', { ...APPLY, heardFrom: 'مصدر غير موجود' }, memberToken);
   assert.equal(badSource.statusCode, 400, badSource.body);
   assert.equal(badSource.json().error.code, 'heard_from');
+
+  // The account holder name is English only (owner, 2026-11-02); the Arabic fields stay Arabic.
+  const arabicAccount = await send('POST', '/api/affiliate/apply', { ...APPLY, accountName: 'ممثل النادي التجريبي' }, memberToken);
+  assert.equal(arabicAccount.statusCode, 400, arabicAccount.body);
+  assert.match(arabicAccount.json().error.message as string, /الإنجليزية/);
 
   const before = mailer.sent.length;
   const applied = await send('POST', '/api/affiliate/apply', APPLY, memberToken);
@@ -155,7 +169,7 @@ test('accepting the agreement sends the request to the administration — nothin
   const mine = await get('/api/affiliate', memberToken);
   assert.equal(mine.json().status, 'pending');
   assert.equal(mine.json().code, undefined);
-  assert.equal((await send('POST', '/api/affiliate/payout', { bankName: 'بنك', accountName: 'اسم صاحب الحساب', iban: 'SA4420000001234567891234' }, memberToken)).statusCode, 403);
+  assert.equal((await send('POST', '/api/affiliate/payout', { bankName: 'بنك', accountName: 'Account Holder', iban: 'SA4420000001234567891234' }, memberToken)).statusCode, 403);
 });
 
 test('the dashboard approval activates the affiliate and hands him his link', async () => {
@@ -180,10 +194,11 @@ test('the dashboard approval activates the affiliate and hands him his link', as
   assert.equal(mine.json().balance.available, 0);
   assert.equal(mine.json().balance.commission, 250);
 
-  // No balance yet: the payout door stays shut.
-  const payout = await send('POST', '/api/affiliate/payout', { bankName: 'بنك', accountName: 'اسم صاحب الحساب', iban: 'SA4420000001234567891234' }, memberToken);
+  // No paid members yet: the minimum (5 paid) shuts the payout door first.
+  const payout = await send('POST', '/api/affiliate/payout', { bankName: 'بنك', accountName: 'Account Holder', iban: 'SA4420000001234567891234' }, memberToken);
   assert.equal(payout.statusCode, 400, payout.body);
-  assert.equal(payout.json().error.code, 'no_balance');
+  assert.equal(payout.json().error.code, 'payout_min');
+  assert.equal(mine.json().balance.minPaid, 5);
 });
 
 test('the referral link page shows the code; an unknown code falls back to /app', async () => {
@@ -255,6 +270,8 @@ test('a paid referral earns the commission and the payout runs its manual course
   await service.apply(member, { ...APPLY, iban: 'SA4420000001234567891234' });
   await service.acceptAgreement(70);
   await service.decide(70, 'approved', '', 'الإدارة');
+  // The default minimum (5 paid members) blocks the payout; the owner may lower it from the dashboard.
+  await service.saveConfig({ minPayoutPaid: 1 });
 
   // Two hub-verified registrations through his code; one went on and PAID (server-confirmed activation).
   const invitee = (id: number, name: string) => ({ id, name, phone: '055', email: `${id}@gmail.com` }) as unknown as HubContact;
@@ -270,8 +287,13 @@ test('a paid referral earns the commission and the payout runs its manual course
   const referrals = await service.referrals(70);
   assert.deepEqual(referrals.map((person) => person.paid).sort(), [false, true]);
 
+  // Below the minimum the request is refused with the counts named.
+  await service.saveConfig({ minPayoutPaid: 5 });
+  await assert.rejects(service.requestPayout(70, { bankName: 'البنك الأهلي', accountName: 'Mumathil Mustaqil', iban: 'SA4420000001234567891234' }), /أعضاء مسدّدين/);
+  await service.saveConfig({ minPayoutPaid: 1 });
+
   // «سحب الأرباح»: the full balance, one open request at a time, the administration mailed.
-  const payout = await service.requestPayout(70, { bankName: 'البنك الأهلي', accountName: 'ممثل مستقل', iban: 'SA4420000001234567891234' });
+  const payout = await service.requestPayout(70, { bankName: 'البنك الأهلي', accountName: 'Mumathil Mustaqil', iban: 'SA4420000001234567891234' });
   assert.equal(payout.amount, 250);
   assert.match(payoutMailer.sent.at(-1)?.subject ?? '', /طلب سحب أرباح/);
   await assert.rejects(service.requestPayout(70, { bankName: 'ب', accountName: 'ا', iban: 'SA1' }), /قيد المراجعة/);

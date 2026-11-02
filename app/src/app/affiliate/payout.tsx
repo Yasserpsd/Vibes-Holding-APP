@@ -77,7 +77,8 @@ function PayoutForm({ data }: { data: AffiliateOverview }) {
         <FormField label={t('affiliate.bankName')} value={bankName} onChangeText={setBankName} maxLength={80} />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
-        <FormField label={t('affiliate.accountName')} hint={t('affiliate.accountNameHint')} value={accountName} onChangeText={setAccountName} maxLength={120} />
+        {/* Owner (2026-11-02): the bank account is English (name + IBAN). */}
+        <FormField label={t('affiliate.accountName')} hint={t('affiliate.accountNameHint')} value={accountName} onChangeText={setAccountName} latin autoCapitalize="words" autoCorrect={false} maxLength={120} />
       </FadeInView>
       <FadeInView delay={entranceDelay(3)}>
         <FormField

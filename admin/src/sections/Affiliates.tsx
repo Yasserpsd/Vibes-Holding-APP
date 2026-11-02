@@ -231,8 +231,22 @@ export function Affiliates() {
                   />
                 </label>
                 <label>
-                  تعريف البرنامج (أعلى شاشة الانضمام؛ {'{commission}'} تصير قيمة العمولة)
+                  الحد الأدنى لطلب السحب (عدد الأعضاء المسدّدين؛ 0 = بدون حد)
+                  <input
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={config.minPayoutPaid}
+                    onChange={(event) => setConfig({ ...config, minPayoutPaid: Math.max(0, Number(event.target.value) || 0) })}
+                  />
+                </label>
+                <label>
+                  تعريف البرنامج (أعلى شاشة الانضمام؛ {'{commission}'} تصير قيمة العمولة و{'{minPayout}'} الحد الأدنى للسحب)
                   <textarea rows={3} maxLength={2000} value={config.introText} onChange={(event) => setConfig({ ...config, introText: event.target.value })} />
+                </label>
+                <label>
+                  تعريف البرنامج بالإنجليزية (للتطبيق بالوضع الإنجليزي؛ نفس الرموز)
+                  <textarea rows={3} maxLength={2000} dir="ltr" value={config.introTextEn} onChange={(event) => setConfig({ ...config, introTextEn: event.target.value })} />
                 </label>
                 <label>
                   نص المشاركة الذي يرسله الممثل ({'{link}'} رابطه و{'{code}'} رمزه)
@@ -247,7 +261,7 @@ export function Affiliates() {
                   />
                 </label>
                 <label>
-                  نص الاتفاقية الكامل ({'{commission}'} تصير قيمة العمولة)
+                  نص الاتفاقية الكامل ({'{commission}'} تصير قيمة العمولة و{'{minPayout}'} الحد الأدنى للسحب)
                   <textarea rows={18} maxLength={20000} value={config.agreementText} onChange={(event) => setConfig({ ...config, agreementText: event.target.value })} />
                 </label>
                 <div>
