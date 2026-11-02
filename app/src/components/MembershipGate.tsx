@@ -9,6 +9,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { Floating, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import {
@@ -16,6 +17,7 @@ import {
   hasStorePurchases,
   identifyPurchases,
   purchaseMembership,
+  riyalPrice,
   storeKeyFor,
   storeName,
   type StoreOffer,
@@ -166,7 +168,7 @@ export function MembershipGateHost() {
               <>
                 {signedIn && offer ? (
                   <View style={styles.priceRow}>
-                    <Text style={styles.price}>{offer.product.priceString}</Text>
+                    <SarText style={styles.price}>{riyalPrice(offer.product.priceString)}</SarText>
                     <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
                   </View>
                 ) : null}
@@ -241,7 +243,8 @@ export function MembershipHomeCard() {
           <Text style={styles.homeSubtitle}>{t('gate.homeText')}</Text>
           {offer ? (
             <Text style={styles.homePrice}>
-              {offer.product.priceString} <Text style={styles.homePeriod}>{t('store.period', { store: storeName() })}</Text>
+              <SarText style={styles.homePrice}>{riyalPrice(offer.product.priceString)}</SarText>
+              <Text style={styles.homePeriod}>{` ${t('store.period', { store: storeName() })}`}</Text>
             </Text>
           ) : null}
         </View>

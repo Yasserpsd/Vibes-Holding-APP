@@ -9,6 +9,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn, PressScale, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
@@ -19,6 +20,7 @@ import {
   identifyPurchases,
   purchaseMembership,
   restoreMembership,
+  riyalPrice,
   storeKeyFor,
   storeName,
   type StoreOffer,
@@ -175,7 +177,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
           {phase === 'ready' && offer ? (
             <>
               <PopIn style={styles.priceRow}>
-                <Text style={styles.price}>{offer.product.priceString}</Text>
+                <SarText style={styles.price}>{riyalPrice(offer.product.priceString)}</SarText>
                 <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
               </PopIn>
               <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />

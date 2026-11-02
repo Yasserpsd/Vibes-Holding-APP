@@ -40,6 +40,20 @@ export function storeName(): string {
   return Platform.OS === 'ios' ? 'App Store' : 'Google Play';
 }
 
+/**
+ * M182e (owner: «مكتوب SAR برده … والعلامة قبل الرقم مش بعده»): the store formats its price
+ * symbol-first («SAR 1,900.00» / «ر.س ١٬٩٠٠»). Riyal prices become «1,900 ريال» — number first,
+ * whole .00 dropped — so SarText draws the symbol AFTER the number; other currencies pass through.
+ */
+export function riyalPrice(priceString: string): string {
+  const CURRENCY = /(?:SAR|ر\.س\.?|ريال)/u;
+  const AMOUNT = /[0-9٠-٩][0-9٠-٩.,٬٫،\s]*/u;
+  const lead = priceString.match(new RegExp(`^\\s*${CURRENCY.source}\\s*(${AMOUNT.source})$`, 'u'));
+  const trail = priceString.match(new RegExp(`^\\s*(${AMOUNT.source})\\s*${CURRENCY.source}\\s*$`, 'u'));
+  const amount = (lead?.[1] ?? trail?.[1])?.trim().replace(/[.,٫][0٠]{2}$/u, '');
+  return amount ? `${amount} ريال` : priceString;
+}
+
 let configuredKey: string | null = null;
 let configuredUser: string | null = null;
 

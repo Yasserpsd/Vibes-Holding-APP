@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 
@@ -110,7 +110,7 @@ export default function AffiliateScreen() {
               icon="cash-outline"
               variant="outline"
               disabled={data.balance.available <= 0 || (data.payouts ?? []).some((payout) => payout.status === 'requested')}
-              onPress={() => router.push('/affiliate/payout')}
+              onPress={() => router.push('/affiliate/payout' as Href)}
             />
           </FadeInView>
           {(data.payouts ?? []).some((payout) => payout.status === 'requested') ? (
@@ -153,7 +153,7 @@ export default function AffiliateScreen() {
           </FadeInView>
           {actionError ? <Notice tone="warning" text={actionError} /> : null}
           <AppButton label={t('affiliate.accept')} icon="checkmark-circle-outline" loading={busy} onPress={() => void acceptAgreement()} />
-          <AppButton label={t('affiliate.editApplication')} variant="ghost" onPress={() => router.push('/affiliate/apply')} />
+          <AppButton label={t('affiliate.editApplication')} variant="ghost" onPress={() => router.push('/affiliate/apply' as Href)} />
         </>
       ) : data.status === 'pending' ? (
         <Notice tone="info" text={t('affiliate.pending')} />
@@ -170,7 +170,7 @@ export default function AffiliateScreen() {
             <Text style={styles.intro}>{data.introText}</Text>
           </FadeInView>
           <FadeInView delay={entranceDelay(1)}>
-            <AppButton label={t(data.status === 'rejected' ? 'affiliate.reapply' : 'affiliate.apply')} icon="megaphone-outline" onPress={() => router.push('/affiliate/apply')} />
+            <AppButton label={t(data.status === 'rejected' ? 'affiliate.reapply' : 'affiliate.apply')} icon="megaphone-outline" onPress={() => router.push('/affiliate/apply' as Href)} />
           </FadeInView>
           <FadeInView delay={entranceDelay(2)}>
             <GlassCard radius={radii.md} style={styles.agreementCard}>
