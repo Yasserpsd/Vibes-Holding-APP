@@ -266,6 +266,113 @@ export class Notifier {
     ]);
   }
 
+  /** M184: the program agreement, mailed to the applicant the moment the application lands. */
+  affiliateAgreement(record: { name: string; email: string }, agreementText: string, commissionLabel: string): void {
+    const paragraphs = agreementText.replaceAll('{commission}', commissionLabel).split('\n').map((line) => line.trim()).filter(Boolean);
+    this.sendRoyal(
+      record.email,
+      'اتفاقية برنامج ممثلي نادي المستثمرين',
+      {
+        lang: 'ar',
+        title: 'اتفاقية برنامج ممثلي النادي',
+        subtitle: 'تصلك هذه الاتفاقية قبل تفعيل انضمامك',
+        greeting: `أهلًا بك يا ${record.name}`,
+        lead: [
+          'وصل طلب انضمامك إلى برنامج ممثلي نادي المستثمرين. نرفق لك نص الاتفاقية كاملًا، وللمتابعة افتح التطبيق: حسابي ← ممثلو النادي، ثم اضغط «أوافق على الاتفاقية».',
+          ...paragraphs,
+        ],
+        note: 'يُعرض الطلب على إدارة النادي بعد موافقتك على الاتفاقية، ولا يُفعَّل الانضمام إلا باعتماد الإدارة.',
+      },
+      'affiliate agreement',
+    );
+  }
+
+  /** M184: the applicant accepted the agreement — the decision is the dashboard's. */
+  affiliateApplied(record: { name: string; phone: string; email: string; code: string; entityType: string; bankName: string; iban: string; city: string; address: string; heardFrom: string; heardFromNote: string }): void {
+    this.dispatch(`طلب انضمام لبرنامج ممثلي النادي: ${record.name}`, [
+      `قدّم أحد الأعضاء طلب انضمام لبرنامج ممثلي النادي من ${APP_NAME} ووافق على الاتفاقية.`,
+      '',
+      `الاسم: ${record.name || '—'}`,
+      `صفة مقدّم الطلب: ${record.entityType === 'company' ? 'شركة' : 'فرد'}`,
+      `الجوال: ${record.phone || '—'}`,
+      `البريد: ${record.email || '—'}`,
+      `رقم العضوية: ${record.code}`,
+      `البنك: ${record.bankName}`,
+      `الآيبان: ${record.iban}`,
+      `المدينة: ${record.city}`,
+      `العنوان: ${record.address}`,
+      `كيف تعرّف على النادي: ${record.heardFrom}${record.heardFromNote ? ` — ${record.heardFromNote}` : ''}`,
+      '',
+      'القبول أو الرفض من لوحة الإدارة: قسم «ممثلو النادي». لا يُفعَّل الممثل إلا بقراركم.',
+    ]);
+  }
+
+  /** M184: the dashboard decided — the applicant hears it in a royal mail. */
+  affiliateDecided(record: { name: string; email: string; code: string; status: string; adminNote: string | null }, link: string): void {
+    const approved = record.status === 'approved';
+    this.sendRoyal(
+      record.email,
+      approved ? 'اعتماد انضمامك لبرنامج ممثلي النادي' : 'قرار بشأن طلب انضمامك لبرنامج ممثلي النادي',
+      {
+        lang: 'ar',
+        title: approved ? 'تم اعتماد انضمامك' : 'قرار الإدارة بشأن طلبك',
+        greeting: `أهلًا بك يا ${record.name}`,
+        lead: approved
+          ? [
+              'اعتمدت إدارة النادي انضمامك إلى برنامج ممثلي نادي المستثمرين. تجد رابط الإحالة الخاص بك ولوحة المتابعة في التطبيق: حسابي ← ممثلو النادي.',
+              'تذكير: تُستحق العمولة عن كل عضو سجّل عبر رمزك وسدّد رسوم العضوية السنوية فعليًا.',
+            ]
+          : ['نشكر لك اهتمامك بالانضمام إلى برنامج ممثلي النادي. بعد المراجعة لم تعتمد الإدارة الطلب في الوقت الحالي، ويمكنك التقديم مجددًا لاحقًا.'],
+        rows: approved
+          ? [
+              { label: 'رمز الإحالة', value: record.code },
+              ...(link ? [{ label: 'رابط الإحالة', value: link }] : []),
+            ]
+          : record.adminNote
+            ? [{ label: 'ملاحظة الإدارة', value: record.adminNote }]
+            : [],
+      },
+      'affiliate decision',
+    );
+  }
+
+  /** M184: «سحب الأرباح» — the manual bank transfer is the administration's work. */
+  affiliatePayoutRequested(payout: { id: string; name: string; amount: number; bankName: string; accountName: string; iban: string }): void {
+    this.dispatch(`طلب سحب أرباح من ممثل النادي: ${payout.name}`, [
+      `قدّم أحد ممثلي النادي طلب سحب أرباحه من ${APP_NAME}. التحويل يدوي من الإدارة، ثم يُعلَّم الطلب «تم الدفع» من لوحة الإدارة: قسم «ممثلو النادي».`,
+      '',
+      `الممثل: ${payout.name}`,
+      `المبلغ: ${payout.amount} ريال سعودي`,
+      `اسم صاحب الحساب: ${payout.accountName}`,
+      `البنك: ${payout.bankName}`,
+      `الآيبان: ${payout.iban}`,
+      `رقم الطلب: ${payout.id}`,
+    ]);
+  }
+
+  /** M184: the transfer decision reaches the affiliate. */
+  affiliatePayoutDecided(payout: { name: string; amount: number; status: string; adminNote: string | null; iban: string }, email: string): void {
+    const paid = payout.status === 'paid';
+    this.sendRoyal(
+      email,
+      paid ? 'تم تحويل أرباحك — برنامج ممثلي النادي' : 'قرار بشأن طلب سحب الأرباح',
+      {
+        lang: 'ar',
+        title: paid ? 'تم تحويل أرباحك' : 'قرار بشأن طلب السحب',
+        greeting: `أهلًا بك يا ${payout.name}`,
+        lead: paid
+          ? ['حوّلت إدارة النادي مبلغ أرباحك إلى حسابك البنكي المسجّل. شكرًا لجهدك في التعريف بالنادي.']
+          : ['راجعت الإدارة طلب سحب الأرباح ولم يُعتمد في صورته الحالية. رصيدك يبقى محفوظًا في حسابك، ويمكنك تقديم طلب جديد.'],
+        rows: [
+          { label: 'المبلغ', value: `${payout.amount} ريال سعودي` },
+          { label: 'الآيبان', value: payout.iban },
+          ...(payout.adminNote ? [{ label: 'ملاحظة الإدارة', value: payout.adminNote }] : []),
+        ],
+      },
+      'affiliate payout',
+    );
+  }
+
   /** M8: the web deletion page (legal/) — the deletion itself stays a verified manual step, never automatic. */
   accountDeletionRequested(request: { email: string; name: string; phone: string; note: string; ip: string }): void {
     this.dispatch(`طلب حذف حساب من صفحة الويب: ${request.email}`, [

@@ -115,6 +115,8 @@ export default function AccountScreen() {
           {/* M138: every operation the member started, with its status. */}
           <MenuRow icon="list-outline" label={t('account.menu.requests')} onPress={() => router.push('/requests' as Href)} />
           <MenuRow icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} />
+          {/* M184: join (or run) the affiliate program — the screen itself walks the states. */}
+          <MenuRow icon="megaphone-outline" label={t('account.menu.affiliate')} onPress={() => router.push('/affiliate' as Href)} />
         </MenuGroup>
       </FadeInView>
 

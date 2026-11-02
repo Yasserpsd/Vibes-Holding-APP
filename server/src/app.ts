@@ -32,6 +32,8 @@ import { cardRoutes } from './card/routes.js';
 import { CardService } from './card/service.js';
 import { contactRoutes } from './contact/routes.js';
 import { ContactService } from './contact/service.js';
+import { affiliateRoutes } from './affiliate/routes.js';
+import { AffiliateService } from './affiliate/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { appLinkRoutes } from './legal/applink.js';
 import { legalRoutes } from './legal/routes.js';
@@ -311,6 +313,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
+  // «برنامج ممثلي النادي» (M184): applications, agreement mail, dashboard approval, referrals and payouts.
+  const affiliate = new AffiliateService({ kv, invites, notifier, log: app.log, publicUrl: config.PUBLIC_URL });
   // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
   const totp = new TotpStore(kv);
   // M156: the AI pass on display names (rules run without it); fails open on any model trouble.
@@ -620,6 +624,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
   await app.register(invitesRoutes, { service: invites, auth });
+  await app.register(affiliateRoutes, { service: affiliate, auth });
   await app.register(legalRoutes, { notifier });
   await app.register(appLinkRoutes);
   await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme, smtpHost: config.SMTP_HOST ?? null, smtpPort: config.SMTP_PORT });
