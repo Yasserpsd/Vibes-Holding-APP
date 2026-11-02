@@ -174,7 +174,7 @@ export default function SecurityTotpScreen() {
                 style={styles.code}
               />
             ) : null}
-            {error ? <Notice tone="warning" text={error} /> : null}
+            {error ? <Notice tone="warning" text={error} support /> : null}
             <AppButton
               label={setup ? t('security.totpConfirm') : mode === 'enable' ? t('security.totpStart') : t('auth.totp.submit')}
               icon={setup ? 'checkmark-circle-outline' : 'arrow-forward-outline'}

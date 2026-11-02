@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView, PopIn, useCountUp } from '@/components/motio
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -95,6 +96,7 @@ export default function InterestsScreen() {
       {save.error ? (
         <FadeInView offset={6} duration={300}>
           <Text style={styles.error}>{errorMessage(save.error)}</Text>
+          <SupportLink problem={errorMessage(save.error)} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(5)}>

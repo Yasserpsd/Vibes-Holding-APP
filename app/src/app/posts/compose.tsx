@@ -174,7 +174,7 @@ export default function ComposeScreen() {
 
       {error ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={error} />
+          <Notice tone="warning" text={error} support />
         </FadeInView>
       ) : null}
       {done ? (

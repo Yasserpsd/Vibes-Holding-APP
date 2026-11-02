@@ -93,7 +93,7 @@ function PayoutForm({ data }: { data: AffiliateOverview }) {
         />
       </FadeInView>
 
-      {submitError ? <Notice tone="warning" text={submitError} /> : null}
+      {submitError ? <Notice tone="warning" text={submitError} support /> : null}
       <Notice tone="info" text={t('affiliate.payoutNote')} />
       <AppButton label={t('affiliate.payoutSubmit')} icon="send-outline" loading={busy} onPress={() => void submit()} />
     </>

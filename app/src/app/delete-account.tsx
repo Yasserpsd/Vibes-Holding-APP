@@ -132,7 +132,7 @@ export default function DeleteAccountScreen() {
               <Text style={styles.word}>{word}</Text>
             </View>
             <FormField label={t('deleteAccount.wordField')} value={typedWord} onChangeText={setTypedWord} maxLength={40} placeholder={word} />
-            {error ? <Notice tone="warning" text={error} /> : null}
+            {error ? <Notice tone="warning" text={error} support /> : null}
             <AppButton label={t('deleteAccount.confirmFinal')} icon="trash-outline" disabled={code.trim().length < 4 || !typedWord.trim()} loading={busy} onPress={() => void confirm()} />
             <Text style={styles.hint}>{t('deleteAccount.graceHint')}</Text>
           </GlassCard>

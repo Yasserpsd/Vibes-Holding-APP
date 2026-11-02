@@ -34,6 +34,8 @@ export const colors = {
   overlay: 'rgba(5, 5, 6, 0.74)',
 
   success: '#34B27B',
+  // WhatsApp's own brand green: the support line wears the real logo colours.
+  whatsapp: '#25D366',
   warning: '#D9A21B',
   danger: '#E05252',
 

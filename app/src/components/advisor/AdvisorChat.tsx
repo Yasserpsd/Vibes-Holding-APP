@@ -19,6 +19,7 @@ import { GlassCard, GoldHairline } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, SkeletonCards, usePulse } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { isProfileGate } from '@/components/ProfileGate';
+import { SupportLink } from '@/components/SupportLink';
 import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { showAdvisorBalance } from '@/lib/advisorBalance';
@@ -213,6 +214,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
           <FadeInView style={styles.center}>
             <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
             <Text style={styles.errorText}>{chat.loadError ?? t('advisor.loadFailed')}</Text>
+            <SupportLink problem={chat.loadError ?? t('advisor.loadFailed')} />
             <AppButton label={t('common.retry')} variant="outline" icon="refresh-outline" onPress={() => void chat.load()} />
           </FadeInView>
         ) : (
@@ -249,7 +251,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
         {chat.sendError ? (
           <FadeInView offset={8} duration={220}>
             <Pressable onPress={chat.dismissError} style={styles.notice}>
-              <Notice text={chat.sendError} tone="warning" />
+              <Notice text={chat.sendError} tone="warning" support />
             </Pressable>
           </FadeInView>
         ) : null}

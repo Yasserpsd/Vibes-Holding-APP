@@ -114,7 +114,7 @@ function WorkshopCard({
         <FadeInView style={styles.form} offset={10}>
           <VoiceFill fields={[{ key: 'note', label: t('guide.noteField'), type: 'textarea' }]} values={{ note }} onFill={(values) => setNote(values.note ?? note)} />
           <FormField label={t('guide.noteField')} value={note} onChangeText={setNote} maxLength={300} multiline />
-          {register.error ? <Notice tone="warning" text={register.error.message} /> : null}
+          {register.error ? <Notice tone="warning" text={register.error.message} support /> : null}
           <AppButton label={t('guide.send')} icon="paper-plane-outline" loading={register.isPending} onPress={send} />
         </FadeInView>
       ) : (

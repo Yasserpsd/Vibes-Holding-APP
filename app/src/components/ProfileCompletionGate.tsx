@@ -263,12 +263,12 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           ) : null}
           {failed ? (
             <View style={styles.group}>
-              <Notice tone="warning" text={t('completeProfile.loadFailed')} />
+              <Notice tone="warning" text={t('completeProfile.loadFailed')} support />
               <AppButton label={t('common.retry')} icon="refresh-outline" variant="outline" onPress={retryFields} />
             </View>
           ) : null}
 
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           </PaperCard>
           <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} disabled={waiting} onPress={() => void submit()} />
           <Text style={styles.foot}>{t('completeProfile.foot')}</Text>

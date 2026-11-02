@@ -381,6 +381,8 @@
   "support.link": "الدعم المباشر على واتساب",
   "support.whatsappOpener": "السلام عليكم، أواجه مشكلة في تطبيق Investors Club.",
   "support.problemLine": "المشكلة: {problem}",
+  "support.official": "الرقم المعتمد الوحيد للتواصل مع إدارة النادي — من أي دولة",
+  "support.contactOpener": "السلام عليكم، أتواصل مع إدارة Investors Club من التطبيق.",
   "profile.contactEmail": "بريد التواصل",
   "profile.contactEmailHint": "تصلك عليه الفواتير وكل رسائل النادي، ويمكنك تغييره متى شئت. بريد الدخول نفسه لا يتغيّر.",
   "profile.contactEmailInvalid": "اكتب بريدًا إلكترونيًا صحيحًا لبريد التواصل.",

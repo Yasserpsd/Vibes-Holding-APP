@@ -112,7 +112,7 @@ export function RateProjectModal({ projectId, visible, onClose }: { projectId: s
               {isProfileGate(error) ? (
                 <ProfileGateNotice text={error instanceof ApiError ? error.message : ''} />
               ) : error ? (
-                <Notice tone="warning" text={error instanceof ApiError ? error.message : t('errors.generic')} />
+                <Notice tone="warning" text={error instanceof ApiError ? error.message : t('errors.generic')} support />
               ) : null}
               <AppButton
                 label={myReview ? t('ratings.update') : t('ratings.submit')}

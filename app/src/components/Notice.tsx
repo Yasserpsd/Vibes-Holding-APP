@@ -2,13 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FadeInView, PopIn, Wiggle } from '@/components/motion';
+import { SupportLink } from '@/components/SupportLink';
 import { textStart } from '@/i18n/direction';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
-type Props = { text: string; tone?: 'info' | 'warning' | 'success' };
+// `support`: the notice reports a problem, so the WhatsApp support line sits right under it (owner, 2026-11-03).
+type Props = { text: string; tone?: 'info' | 'warning' | 'success'; support?: boolean };
 
 /** Short inline notice (policy hint, test-mode reminder, success message). */
-export function Notice({ text, tone = 'info' }: Props) {
+export function Notice({ text, tone = 'info', support = false }: Props) {
   const color = tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : colors.goldLight;
   const icon = tone === 'warning' ? 'warning-outline' : tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline';
   return (
@@ -30,6 +32,7 @@ export function Notice({ text, tone = 'info' }: Props) {
         )}
         <Text style={styles.text}>{text}</Text>
       </View>
+      {support ? <SupportLink problem={text} /> : null}
     </FadeInView>
   );
 }

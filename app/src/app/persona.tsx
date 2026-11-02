@@ -190,7 +190,7 @@ export default function PersonaScreen() {
               );
             })}
           </View>
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           {/* M109d: once the yearly change is used, the pick becomes a dashboard request. */}
           {pendingRequest || requestSent ? null : (
             <AppButton
@@ -205,7 +205,7 @@ export default function PersonaScreen() {
         <FadeInView offset={10} style={styles.codeBlock}>
           <Notice tone="success" text={t('persona.codeSent', { email })} />
           <FormField label={t('persona.codeLabel')} value={code} onChangeText={setCode} latin keyboardType="number-pad" maxLength={6} />
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           <AppButton label={busy ? t('persona.sending') : t('persona.confirm')} icon="checkmark-outline" loading={busy} onPress={() => (busy ? null : confirm())} />
           <AppButton label={t('persona.back')} variant="outline" onPress={() => (busy ? null : setStage('pick'))} />
         </FadeInView>

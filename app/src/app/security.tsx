@@ -138,7 +138,7 @@ export default function SecurityScreen() {
             secureTextEntry
             textContentType="newPassword"
           />
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           {saved ? <Notice tone="success" text={t('security.passwordSaved')} /> : null}
           <AppButton label={t('security.savePassword')} icon="key-outline" loading={busy} onPress={() => void save()} />
         </GlassCard>

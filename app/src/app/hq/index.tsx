@@ -137,7 +137,7 @@ export default function HqScreen() {
       {status === 'signedIn' ? (
         <>
           <SectionHeader title={t('hq.myVisits')} />
-          {actionError ? <Notice tone="warning" text={actionError} /> : null}
+          {actionError ? <Notice tone="warning" text={actionError} support /> : null}
           {visits.data ? (
             visits.data.visits.length ? (
               visits.data.visits.map((visit, index) => (

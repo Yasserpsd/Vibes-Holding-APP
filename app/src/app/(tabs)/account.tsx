@@ -19,6 +19,7 @@ import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/components/ProfileCompleteness';
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
+import { SupportLink } from '@/components/SupportLink';
 import { WalletCard } from '@/components/WalletCard';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
@@ -67,6 +68,8 @@ export default function AccountScreen() {
           <AppButton label={t('account.benefits')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
           <AppButton label={t('account.about')} variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />
           {languageChoiceOffered(false) ? <AppButton label={t('account.menu.language')} variant="outline" icon="language-outline" onPress={chooseLanguage} /> : null}
+          {/* Owner (2026-11-03): the management's only WhatsApp line, for everyone — guests too. */}
+          <SupportLink />
         </FadeInView>
       </PlaceholderScreen>
     );
@@ -87,12 +90,16 @@ export default function AccountScreen() {
           <ProfileHeader me={me} />
         </FadeInView>
       ) : (
-        <Notice tone="warning" text={t('account.loadFailed')} />
+        <Notice tone="warning" text={t('account.loadFailed')} support />
       )}
       {/* M117: the 30-day deletion countdown with its «تراجع» door — only while a deletion is scheduled. */}
       {me ? <DeletionBanner account={String(me.id)} /> : null}
       <FadeInView delay={entranceDelay(1, 90)}>
         <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} subscribeCta />
+      </FadeInView>
+      {/* Owner (2026-11-03, a customer from China could not reach us): the management's only WhatsApp line. */}
+      <FadeInView delay={entranceDelay(1, 120)}>
+        <SupportLink />
       </FadeInView>
       {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 

@@ -381,6 +381,8 @@
   "support.link": "Direct support on WhatsApp",
   "support.whatsappOpener": "Hello, I am facing a problem in the Investors Club app.",
   "support.problemLine": "Problem: {problem}",
+  "support.official": "The only official number to reach the club management — from any country",
+  "support.contactOpener": "Hello, I am contacting the Investors Club management from the app.",
   "profile.contactEmail": "Contact e-mail",
   "profile.contactEmailHint": "Invoices and every club message reach you here; change it any time. The sign-in e-mail itself does not change.",
   "profile.contactEmailInvalid": "Enter a valid contact e-mail address.",

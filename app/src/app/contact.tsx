@@ -125,7 +125,7 @@ function Thread({ query }: { query: ThreadQuery }) {
           )}
         </ScrollView>
       )}
-      {error ? <Notice tone="warning" text={error} /> : null}
+      {error ? <Notice tone="warning" text={error} support /> : null}
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TextInput
           value={text}

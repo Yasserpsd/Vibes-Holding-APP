@@ -187,7 +187,7 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
           <AppButton label={t('card.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
         </>
       ) : null}
-      {error ? <Notice tone="warning" text={error} /> : null}
+      {error ? <Notice tone="warning" text={error} support /> : null}
 
       <Text style={styles.pollMeta}>
         {[

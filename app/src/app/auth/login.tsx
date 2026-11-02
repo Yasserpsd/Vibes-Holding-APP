@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -94,6 +95,7 @@ export default function LoginScreen() {
       {error ? (
         <FadeInView offset={8}>
           <Text style={styles.error}>{error}</Text>
+          <SupportLink problem={error} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(4)}>

@@ -141,7 +141,7 @@ function ApplyForm({ data }: { data: AffiliateOverview }) {
         <FormField label={t('affiliate.heardFromNote')} value={heardFromNote} onChangeText={setHeardFromNote} maxLength={200} />
       ) : null}
 
-      {submitError ? <Notice tone="warning" text={submitError} /> : null}
+      {submitError ? <Notice tone="warning" text={submitError} support /> : null}
       <Notice tone="info" text={t('affiliate.applyNote')} />
       <AppButton label={t('affiliate.submit')} icon="send-outline" loading={busy} onPress={() => void submit()} />
     </>

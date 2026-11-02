@@ -161,12 +161,12 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
       ))}
       {problem ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={problem} />
+          <Notice tone="warning" text={problem} support />
         </FadeInView>
       ) : null}
       {submit.error ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={submit.error.message} />
+          <Notice tone="warning" text={submit.error.message} support />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(form.fields.length)}>

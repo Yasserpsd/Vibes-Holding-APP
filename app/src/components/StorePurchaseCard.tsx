@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { FadeInView, PopIn, PressScale, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
@@ -190,7 +191,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
             </PressScale>
           ) : null}
         </FadeInView>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (<><Text style={styles.error}>{error}</Text><SupportLink problem={error} /></>) : null}
         <Text style={styles.legal}>
           {t('store.legal', { store: storeName() })}
         </Text>

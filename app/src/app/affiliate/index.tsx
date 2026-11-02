@@ -173,7 +173,7 @@ export default function AffiliateScreen() {
               <Text style={styles.agreementText}>{data.agreementText}</Text>
             </GlassCard>
           </FadeInView>
-          {actionError ? <Notice tone="warning" text={actionError} /> : null}
+          {actionError ? <Notice tone="warning" text={actionError} support /> : null}
           <AppButton label={t('affiliate.accept')} icon="checkmark-circle-outline" loading={busy} onPress={() => void acceptAgreement()} />
           <AppButton label={t('affiliate.editApplication')} variant="ghost" onPress={() => router.push('/affiliate/apply' as Href)} />
         </>

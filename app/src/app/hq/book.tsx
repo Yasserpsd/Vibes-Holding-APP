@@ -217,7 +217,7 @@ export default function BookVisitScreen() {
       {submitError ? (
         <FadeInView offset={8}>
           {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
-          {gated ? <ProfileGateNotice text={submitError} /> : <Notice tone="warning" text={submitError} />}
+          {gated ? <ProfileGateNotice text={submitError} /> : <Notice tone="warning" text={submitError} support />}
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(5)}>

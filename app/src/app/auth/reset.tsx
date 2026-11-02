@@ -11,6 +11,7 @@ import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifier
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -107,6 +108,7 @@ export default function ResetPasswordScreen() {
       {error ? (
         <FadeInView offset={8}>
           <Text style={styles.error}>{error}</Text>
+          <SupportLink problem={error} />
         </FadeInView>
       ) : null}
       {step === 'request' ? (

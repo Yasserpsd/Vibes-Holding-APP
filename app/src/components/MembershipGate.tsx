@@ -10,6 +10,7 @@ import { GlassCard, GoldGradient } from '@/components/lux';
 import { Floating, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import {
@@ -172,7 +173,7 @@ export function MembershipGateHost() {
                     <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
                   </View>
                 ) : null}
-                {error ? <Text style={styles.error}>{error}</Text> : null}
+                {error ? (<><Text style={styles.error}>{error}</Text><SupportLink problem={error} /></>) : null}
                 {signedIn ? (
                   <AppButton
                     label={phase === 'activating' ? t('store.activating') : t('gate.activateNow')}

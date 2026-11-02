@@ -76,7 +76,7 @@ export default function HqAdminScreen() {
       </FadeInView>
       {actionError ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={actionError} />
+          <Notice tone="warning" text={actionError} support />
         </FadeInView>
       ) : null}
       {data ? (

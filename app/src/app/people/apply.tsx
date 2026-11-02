@@ -212,7 +212,7 @@ function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; 
       </FadeInView>
       {apply.error ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={apply.error.message} />
+          <Notice tone="warning" text={apply.error.message} support />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(14)}>

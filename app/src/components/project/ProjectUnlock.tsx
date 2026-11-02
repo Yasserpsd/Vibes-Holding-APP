@@ -134,7 +134,7 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
           {error ? (
             <FadeInView offset={8}>
               {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
-              {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} />}
+              {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} support />}
             </FadeInView>
           ) : null}
           <ConfirmSheet

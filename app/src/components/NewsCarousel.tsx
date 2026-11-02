@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
@@ -33,113 +33,150 @@ const DIR = I18nManager.isRTL ? -1 : 1;
  */
 // M182 (owner, 2026-11-02): the carousel's items come from the server's home scope — money and
 // business only (markets, oil, gold, crypto…), the spiciest headlines first, same for everyone.
+// M187 (owner, 2026-11-03: «تهنيج… والصورة اللي فاتت تكون ظاهرة»): every card stays mounted with its
+// image loaded once, and each card's place is computed from one ever-moving position (in cards), so a
+// slide never re-keys a card, never resets an offset and never re-renders the section — only the dots.
 export function NewsCarousel() {
   const router = useRouter();
   const feed = useHomeNews();
   const items = useMemo(() => (feed.data?.items ?? []).slice(0, SLIDES), [feed.data]);
-  const [index, setIndex] = useState(0);
   const [width, setWidth] = useState(0);
   const [touched, setTouched] = useState(false);
-  const [drag] = useState(() => new Animated.Value(0));
+  const [position] = useState(() => new Animated.Value(0));
+  const touch = useCallback(() => setTouched(true), []);
   const cardWidth = width ? width - PEEK : 0;
   const step = cardWidth + GAP;
   // The pager's handlers are created once; they read the live count and step from `live`.
   const [pager] = useState(() => {
-    const live = { count: 0, step: 0, busy: false };
-    // JS-driven on purpose (owner, 2026-11-02: blank carousel on real phones): the native driver kept
-    // stale transforms on the re-keyed cards after each advance, leaving the center card off-screen.
-    // On the JS thread every render recomputes the transforms from the real value, so the resting
-    // state (drag = 0, center card in place) can never diverge from what the screen shows.
-    const settle = () => Animated.spring(drag, { toValue: 0, speed: 18, bounciness: 4, useNativeDriver: false }).start();
-    const slide = (move: 1 | -1) => {
-      const { count, step: size, busy } = live;
-      if (busy) return;
-      if (count < 2 || !size) return settle();
-      live.busy = true;
-      Animated.timing(drag, { toValue: -DIR * size * move, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => {
-        live.busy = false;
-        if (!finished) return;
-        // Zero the offset in the same tick as the index change: the new center paints in place, no gap frame.
-        drag.setValue(0);
-        setIndex((current) => (current + move + count) % count);
-      });
+    const live = { count: 0, step: 0, at: 0, now: 0, base: 0, onIndex: (_index: number) => {}, onTouch: () => {} };
+    const wrap = (value: number) => ((Math.round(value) % live.count) + live.count) % live.count;
+    // JS-driven on purpose (owner, 2026-11-02: blank carousel on real phones with the native driver).
+    const go = (target: number) => {
+      live.at = target;
+      if (live.count) live.onIndex(wrap(target));
+      Animated.timing(position, { toValue: target, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    };
+    position.addListener(({ value }) => {
+      live.now = value;
+    });
+    // Signed distance from the current card to item `slot`, the short way round.
+    const offsetOf = (slot: number) => {
+      const half = Math.floor(live.count / 2);
+      return ((((slot - wrap(live.at) + half) % live.count) + live.count) % live.count) - half;
     };
     const pan = PanResponder.create({
       onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
       onPanResponderGrant: () => {
-        drag.stopAnimation();
-        setTouched(true);
+        position.stopAnimation();
+        live.base = live.now;
+        live.onTouch();
       },
-      onPanResponderMove: (_event, gesture) => drag.setValue(gesture.dx),
+      // Dragging toward the reading start brings the next card in (rightward in Arabic).
+      onPanResponderMove: (_event, gesture) => {
+        if (live.step) position.setValue(live.base - (DIR * gesture.dx) / live.step);
+      },
       onPanResponderRelease: (_event, gesture) => {
-        // Dragging toward the reading start brings the next card in (rightward in Arabic).
         const forward = DIR === -1 ? gesture.dx > 0 : gesture.dx < 0;
-        const far = Math.abs(gesture.dx) > live.step * 0.22 || Math.abs(gesture.vx) > 0.35;
-        if (far) slide(forward ? 1 : -1);
-        else settle();
+        const far = live.count > 1 && (Math.abs(gesture.dx) > live.step * 0.22 || Math.abs(gesture.vx) > 0.35);
+        go(far ? (forward ? Math.floor(live.now) + 1 : Math.ceil(live.now) - 1) : Math.round(live.now));
       },
       onPanResponderTerminationRequest: () => false,
-      onPanResponderTerminate: settle,
+      onPanResponderTerminate: () => go(Math.round(live.now)),
     });
-    const sync = (count: number, size: number) => {
-      live.count = count;
-      live.step = size;
+    return {
+      pan,
+      sync: (count: number, size: number) => {
+        live.count = count;
+        live.step = size;
+      },
+      next: () => go(Math.round(live.at) + 1),
+      jump: (slot: number) => go(Math.round(live.at) + offsetOf(slot)),
+      // A tap on the center card opens it (true); a tap on a peeking card slides it in.
+      tap: (slot: number) => {
+        const offset = offsetOf(slot);
+        if (offset === 0) return true;
+        go(Math.round(live.at) + offset);
+        return false;
+      },
+      listen: (onIndex: (index: number) => void, onTouch: () => void) => {
+        live.onIndex = onIndex;
+        live.onTouch = onTouch;
+        if (live.count) onIndex(wrap(live.at));
+      },
     };
-    return { slide, pan, sync };
   });
 
   useEffect(() => pager.sync(items.length, step), [pager, items.length, step]);
 
-  // The finished slide already shows the new card in place; the new index takes over from zero offset.
-  useLayoutEffect(() => {
-    drag.setValue(0);
-  }, [index, drag]);
-
   useEffect(() => {
     if (touched || items.length < 2 || !width) return;
-    const timer = setInterval(() => pager.slide(1), ROTATE_MS);
+    const timer = setInterval(pager.next, ROTATE_MS);
     return () => clearInterval(timer);
   }, [touched, items.length, width, pager]);
 
+  // Card `slot` sits (slot − position) cards away, folded into [−half, count − half) so the fold stays off-screen.
+  const translates = useMemo(() => {
+    const count = items.length;
+    const half = Math.floor(count / 2);
+    return items.map((_item, slot) =>
+      Animated.multiply(Animated.subtract(Animated.modulo(Animated.add(Animated.multiply(position, -1), slot + half + count * 1000), count || 1), half), DIR * step),
+    );
+  }, [items, position, step]);
+
   if (!items.length) return null;
-  const count = items.length;
-  const current = index % count;
-  const offsets = !width ? [0] : count > 2 ? [-1, 0, 1] : count === 2 ? [0, 1] : [0];
-  const open = (item: NewsItem) => router.push(`/news/${item.id}` as Href);
+  const shown = width ? items : items.slice(0, 1);
 
   return (
     <FadeInView delay={200}>
       <SectionHeader icon="newspaper-outline" title={t('home.newsDoor')} subtitle={t('home.newsDoorSub')} cta={t('home.newsAll')} onPress={() => router.push('/news' as Href)} />
       <MarketsStrip />
       <View style={styles.pager} onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))} {...pager.pan.panHandlers}>
-        {offsets.map((offset) => {
-          const item = items[(current + offset + count) % count] as NewsItem;
-          const translateX = offset === 0 ? drag : Animated.add(drag, DIR * offset * step);
-          return (
-            <Animated.View key={item.id} style={[offset !== 0 && styles.side, cardWidth ? { width: cardWidth } : null, { transform: [{ translateX }] }]}>
-              <NewsSlide item={item} onPress={offset === 0 ? () => open(item) : () => pager.slide(offset > 0 ? 1 : -1)} />
-            </Animated.View>
-          );
-        })}
-      </View>
-      <View style={styles.dots}>
-        {items.map((entry, dot) => (
-          <Pressable
-            key={entry.id}
-            hitSlop={6}
-            onPress={() => {
-              setTouched(true);
-              setIndex(dot);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={entry.title}
-          >
-            <View style={[styles.dot, dot === current && styles.dotOn]} />
-          </Pressable>
+        {shown.map((item, slot) => (
+          <CarouselCard key={item.id} item={item} slot={slot} cardWidth={cardWidth} translateX={width ? translates[slot] : undefined} pager={pager} />
         ))}
       </View>
+      <CarouselDots items={items} pager={pager} onTouch={touch} />
       <NumberOfDayCard />
     </FadeInView>
+  );
+}
+
+type Slide = ReturnType<typeof Animated.multiply>;
+type Pager = { tap: (slot: number) => boolean; jump: (slot: number) => void; listen: (onIndex: (index: number) => void, onTouch: () => void) => void };
+
+/** One card of the strip: mounted once per item, so its image never reloads or lingers on the wrong story. */
+const CarouselCard = memo(function CarouselCard({ item, slot, cardWidth, translateX, pager }: { item: NewsItem; slot: number; cardWidth: number; translateX?: Slide; pager: Pager }) {
+  const router = useRouter();
+  return (
+    // Every card shares one height: the first stays in flow and gives the strip its size.
+    <Animated.View style={[slot !== 0 && styles.side, cardWidth ? { width: cardWidth } : null, translateX ? { transform: [{ translateX }] } : null]}>
+      <NewsSlide item={item} onPress={() => (pager.tap(slot) ? router.push(`/news/${item.id}` as Href) : undefined)} />
+    </Animated.View>
+  );
+});
+
+/** The dots hold the only state a slide changes, so the rest of the section never re-renders mid-flight. */
+function CarouselDots({ items, pager, onTouch }: { items: NewsItem[]; pager: Pager; onTouch: () => void }) {
+  const [index, setIndex] = useState(0);
+  useEffect(() => pager.listen(setIndex, onTouch), [pager, onTouch]);
+  const current = index % items.length;
+  return (
+    <View style={styles.dots}>
+      {items.map((entry, dot) => (
+        <Pressable
+          key={entry.id}
+          hitSlop={6}
+          onPress={() => {
+            onTouch();
+            pager.jump(dot);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={entry.title}
+        >
+          <View style={[styles.dot, dot === current && styles.dotOn]} />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 

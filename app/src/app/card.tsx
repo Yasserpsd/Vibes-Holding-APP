@@ -308,7 +308,7 @@ function PrintBlock({ active }: { active: boolean }) {
           </Text>
           <Text style={styles.statusLine}>{t(request.method === 'pickup' ? 'card.pendingPickup' : 'card.printPending')}</Text>
           <Text style={styles.hint}>{t('card.receivedHint')}</Text>
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           <AppButton label={confirming ? t('card.sending') : t('card.receivedButton')} icon="checkmark-circle-outline" variant="outline" loading={confirming} onPress={() => (confirming ? null : void confirmReceived())} />
         </View>
       ) : open ? (
@@ -342,7 +342,7 @@ function PrintBlock({ active }: { active: boolean }) {
           ) : null}
           <FormField label={t('card.phoneField')} value={phone} onChangeText={setPhone} latin keyboardType="phone-pad" maxLength={30} />
           <FormField label={t('card.noteField')} value={note} onChangeText={setNote} maxLength={300} />
-          {error ? <Notice tone="warning" text={error} /> : null}
+          {error ? <Notice tone="warning" text={error} support /> : null}
           <AppButton label={busy ? t('card.sending') : t('card.submit')} icon="paper-plane-outline" loading={busy} onPress={() => (busy ? null : void submit())} />
         </FadeInView>
       ) : request && delivered ? (

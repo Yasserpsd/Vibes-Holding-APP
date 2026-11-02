@@ -4,6 +4,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FadeInView, SkeletonCards, usePulse, Wiggle } from '@/components/motion';
+import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -46,6 +47,8 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
             <AppButton label={t('common.retry')} variant="outline" icon="refresh" onPress={onRetry} />
           </FadeInView>
         ) : null}
+        {/* Owner (2026-11-03): every failed screen offers the management's WhatsApp line right away. */}
+        <SupportLink problem={errorMessage(error)} />
       </View>
     );
   }

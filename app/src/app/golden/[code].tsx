@@ -183,7 +183,7 @@ function InterestSheet({ visible, code, companyName, onClose }: SheetProps) {
                 </>
               ) : null}
               <FormField label={t('offer.note')} value={note} onChangeText={setNote} multiline />
-              {error ? <Notice tone="warning" text={error} /> : null}
+              {error ? <Notice tone="warning" text={error} support /> : null}
               <AppButton label={t('offer.send')} icon="paper-plane-outline" loading={busy} onPress={() => void submit()} />
               <AppButton label={t('common.cancel')} variant="outline" onPress={close} />
             </FadeInView>

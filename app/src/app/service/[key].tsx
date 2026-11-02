@@ -206,7 +206,7 @@ export default function ServiceScreen() {
       {payError ? (
         <FadeInView offset={8}>
           {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
-          {payGated ? <ProfileGateNotice text={payError} /> : <Notice tone="warning" text={payError} />}
+          {payGated ? <ProfileGateNotice text={payError} /> : <Notice tone="warning" text={payError} support />}
         </FadeInView>
       ) : null}
       {handedOver ? (

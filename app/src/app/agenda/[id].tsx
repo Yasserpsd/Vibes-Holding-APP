@@ -218,7 +218,7 @@ export default function AgendaEventScreen() {
               {error ? (
                 <FadeInView offset={8}>
                   {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
-                  {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} />}
+                  {gated ? <ProfileGateNotice text={error} /> : <Notice tone="warning" text={error} support />}
                 </FadeInView>
               ) : null}
               {/* M172 (owner): one «تأكيد الحضور» button; a «both» event asks how he attends with two pills. */}
