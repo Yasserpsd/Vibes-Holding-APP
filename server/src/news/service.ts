@@ -353,6 +353,19 @@ export class NewsService {
     await this.deps.kv.set(NEWS_SNAPSHOT_KEY, snapshot);
   }
 
+  /**
+   * M182b (owner: «إشعار للخبر الناري»): the breaking candidates — fresh money stories (2 h) whose
+   * headline carries at least two spark hits, hardest-hitting first. The words stay the source's.
+   */
+  breaking(lang: NewsLang, now = Date.now(), freshMs = 2 * 3_600_000, minSpark = 20): NewsItem[] {
+    return this.visible(lang)
+      .filter((item) => item.topics.some((topic) => HOME_TOPICS.has(topic)) && now - Date.parse(item.publishedAt) <= freshMs)
+      .map((item) => ({ item, spark: sparkOf(item), score: scoreOf(item, HOME_TOPICS as Set<TopicKey>, now) + (this.boosts.get(item.sourceId) ?? 0) }))
+      .filter((row) => row.spark >= minSpark)
+      .sort((a, b) => b.spark + b.score - (a.spark + a.score))
+      .map((row) => row.item);
+  }
+
   /** Shown items, of one language when given. */
   private visible(lang?: NewsLang): NewsItem[] {
     const rows: NewsItem[] = [];

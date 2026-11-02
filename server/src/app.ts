@@ -66,6 +66,7 @@ import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { workshopAdRoutes, WorkshopAdService } from './agenda/ad.js';
 import { MarketAlertsService, marketAlertRoutes } from './markets/alerts.js';
+import { BreakingNewsService } from './news/breaking.js';
 import { marketsRoutes, MarketsService } from './markets/service.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
@@ -155,7 +156,7 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
-export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; englishSweep: EnglishSweep; postsEnglish: PostsEnglish; projectsEnglish: ProjectsEnglish };
+export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; breakingNews: BreakingNewsService; englishSweep: EnglishSweep; postsEnglish: PostsEnglish; projectsEnglish: ProjectsEnglish };
 
 const MEGABYTE = 1024 * 1024;
 
@@ -448,6 +449,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const companion = new CompanionService({ kv, log: app.log, config, push, projects, agenda, discounts });
   // M179: the advisor's market-move alerts — owner thresholds, once per quote a day, skips members who muted him.
   const marketAlerts = new MarketAlertsService({ kv, log: app.log, markets, push, muted: () => companion.mutedIds(), enabled: config.MARKET_ALERTS === '1' });
+  // M182b: the breaking-news push — a fresh money story with a hard-hitting headline, capped and quiet-houred like M179.
+  const breakingNews = new BreakingNewsService({ kv, log: app.log, news, push, enabled: config.NEWS_BREAKING === '1' });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
   const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL });
@@ -664,5 +667,5 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     });
   });
 
-  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, marketAlerts, englishSweep, postsEnglish, projectsEnglish };
+  return { app, projects, golden, news, videos, payments, notifier, membership, push, media, sync, dashboard, feed, analytics, companion, marketAlerts, breakingNews, englishSweep, postsEnglish, projectsEnglish };
 }

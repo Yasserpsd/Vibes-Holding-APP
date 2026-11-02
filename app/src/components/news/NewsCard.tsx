@@ -18,6 +18,23 @@ type Props = {
   compact?: boolean;
 };
 
+/** M182b (owner): a story younger than this wears the red «عاجل» pill. */
+export const BREAKING_MS = 2 * 3_600_000;
+export const isBreaking = (publishedAt: string): boolean => Date.now() - Date.parse(publishedAt) < BREAKING_MS;
+
+export function BreakingPill() {
+  return (
+    <View style={pillStyles.pill}>
+      <Text style={pillStyles.text}>{t('news.breaking')}</Text>
+    </View>
+  );
+}
+
+const pillStyles = StyleSheet.create({
+  pill: { paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radii.pill, backgroundColor: colors.danger },
+  text: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 16, color: '#FFFFFF' },
+});
+
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
 export function NewsCard({ item, onPress, compact = false }: Props) {
   // An English item inside the Arabic layout reads from the left; in the English layout it needs nothing.
@@ -25,6 +42,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>
       <GlassCard radius={radii.xl} style={[styles.card, compact && styles.compact]}>
         <View style={styles.meta}>
+          {isBreaking(item.publishedAt) ? <BreakingPill /> : null}
           <Text style={styles.source} numberOfLines={1}>
             {item.source.name}
           </Text>

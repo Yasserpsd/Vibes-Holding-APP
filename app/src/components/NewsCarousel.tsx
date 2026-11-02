@@ -5,6 +5,7 @@ import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleShe
 
 import { useHomeNews, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
+import { BreakingPill, isBreaking } from '@/components/news/NewsCard';
 import { MarketsStrip } from '@/components/MarketsStrip';
 import { FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -154,6 +155,7 @@ function NewsSlide({ item, onPress }: { item: NewsItem; onPress: () => void }) {
         )}
         <View style={styles.body}>
           <View style={styles.meta}>
+            {isBreaking(item.publishedAt) ? <BreakingPill /> : null}
             <View style={styles.sourcePill}>
               <Text style={styles.source} numberOfLines={1}>{item.source.name}</Text>
             </View>
