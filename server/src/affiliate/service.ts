@@ -8,18 +8,26 @@ import type { Notifier } from '../mail/notify.js';
 import type { KV } from '../store.js';
 
 /**
- * M184: «برنامج ممثلي النادي» — the in-app affiliate program. Any signed-in account applies with
+ * M184: «برنامج ممثلي نادي المستثمرين» — the in-app affiliate program. Any signed-in account applies with
  * its full details (bank, address, how it heard of the club), receives the agreement by e-mail,
  * accepts it in the app, and ONLY the administration's approval in the dashboard activates it
  * (owner, 2026-11-02: «لازم ندوس من الداشبورد عشان نقبله»). The referral code is the member's
  * membership number — the same hub-verified channel as M32 invites — so a registration is never
  * attributed from the client, and a referral counts as PAID only when the server confirms the
  * membership activation (membership/service.ts and paylinks/service.ts call paid()).
+ *
+ * M186 (owner, 2026-11-02): «ممثلو نادي المستثمرين» v3 — the commission follows the affiliate's own
+ * membership AT THE MOMENT each referral pays (250 / 350, stamped once into `earnings`, so a lapsed
+ * membership never rewrites what was earned); every affiliate runs a performance cycle (default 30
+ * days, 10 paying members, 1,500 SAR transport and incidentals allowance, once per cycle); when the
+ * cycle's counter runs out the server files a renewal request to the team and the dashboard renews
+ * it with a new duration, target and allowance.
  */
 export const AFFILIATES_KEY = 'affiliate:records';
 export const PAYOUTS_KEY = 'affiliate:payouts';
 export const AFFILIATE_CONFIG_KEY = 'affiliate:config';
 const MAX_PAYOUTS = 3000;
+const DAY_MS = 86_400_000;
 
 export type AffiliateStatus = 'agreement' | 'pending' | 'approved' | 'rejected';
 
@@ -46,6 +54,31 @@ export type AffiliateRecord = {
   decidedAt: string | null;
   decidedBy: string | null;
   adminNote: string | null;
+  /** M186: the affiliate's own membership as last seen through the hub (decides the commission tier). */
+  membership?: { active: boolean; endDate: string | null; seenAt: string };
+  /** M186: one stamp per paid referral — the amount is fixed the moment it is counted. */
+  earnings?: AffiliateEarning[];
+  /** M186: performance cycles, oldest first; the last one is the current counter. */
+  cycles?: AffiliateCycle[];
+  /** M186: set when the current cycle ran out — the dashboard's renewal clears it. */
+  renewalRequestedAt?: string | null;
+};
+
+export type AffiliateEarning = { inviteId: string; name: string; paidAt: string; amount: number; member: boolean };
+
+export type AffiliateCycle = {
+  n: number;
+  startAt: string;
+  endAt: string;
+  /** Paying members needed inside the window for the allowance. */
+  target: number;
+  /** SAR — the transport and incidentals allowance («بدل مواصلات ومصروفات نثرية»). */
+  bonus: number;
+  /** When the target was reached and the allowance joined the balance. */
+  bonusAt: string | null;
+  /** When the counter ran out (or the dashboard renewed early); `paid` is frozen then. */
+  closedAt: string | null;
+  paid: number | null;
 };
 
 export type PayoutStatus = 'requested' | 'paid' | 'rejected';
@@ -66,8 +99,14 @@ export type PayoutRecord = {
 };
 
 export type AffiliateConfig = {
-  /** SAR per referred member who registered with the code AND paid the membership. */
+  /** SAR per referred member who registered with the code AND paid the membership (affiliate without a membership). */
   commission: number;
+  /** M186: the same commission when the affiliate holds an active annual membership. */
+  commissionMember: number;
+  /** M186: the default performance cycle — days, paying members, allowance in SAR (0 = no allowance). */
+  cycleDays: number;
+  cycleTarget: number;
+  cycleBonus: number;
   /** Paid referrals required before «سحب الأرباح» opens (owner, 2026-11-02: «حد أدنى 5 أعضاء»). */
   minPayoutPaid: number;
   /** The full agreement (dashboard-editable); {commission} and {minPayout} become the current values. */
@@ -119,16 +158,26 @@ export const DEFAULT_AGREEMENT = [
   'رابعًا — التزامات النادي:',
   'تنحصر التزامات النادي في تقديم العضوية ومزاياها للأعضاء المسجّلين، وتشغيل برنامج الممثلين، واحتساب العمولات المستحقة وفق هذه الاتفاقية.',
   '',
-  'خامسًا — العمولة:',
-  '1. يستحق الممثل عمولة قدرها {commission} عن كل عضو سجّل عبر رمز الإحالة الخاص به وسدّد رسوم العضوية السنوية فعليًا. ولا تُستحق أي عمولة عن التسجيل وحده دون سداد.',
-  '2. تُحتسب العمولات وفق سجلات النادي وأنظمته الإلكترونية، وهي المرجع الوحيد المعتمد في ذلك.',
-  '3. تُصرف العمولات بناءً على طلب سحب يقدّمه الممثل من التطبيق، وتُحوَّل إلى حسابه البنكي المسجّل بعد مراجعة الطلب واعتماده من الإدارة.',
-  '4. لا يُقدَّم طلب سحب للعمولات إلا بعد اكتمال {minPayout} أعضاء مسدّدين لرسوم العضوية عبر رمز الإحالة الخاص بالممثل.',
+  'خامسًا — العمولات المستحقة:',
+  '1. يستحق الممثل غير المشترك في العضوية السنوية عمولة قدرها {commission} عن كل عضو سجّل عبر رمز الإحالة الخاص به وسدّد رسوم العضوية السنوية فعليًا.',
+  '2. يستحق الممثل المشترك في العضوية السنوية عمولة قدرها {commissionMember} عن كل عضو دافع بالشروط ذاتها.',
+  '3. تُحدَّد فئة العمولة بحالة عضوية الممثل في تاريخ سداد العضو المُحال، وتثبت العمولة عن ذلك العضو عند احتسابها. ولا تُستحق أي عمولة عن التسجيل وحده دون سداد.',
+  '4. تُحتسب العمولات وفق سجلات النادي وأنظمته الإلكترونية، وهي المرجع الوحيد المعتمد في ذلك.',
   '',
-  'سادسًا — مدة الاتفاقية وإنهاؤها:',
-  'للنادي قبول أي طلب انضمام أو رفضه دون إبداء الأسباب، وله إيقاف أي ممثل أو تعديل قيمة العمولة أو إنهاء البرنامج في أي وقت، مع حفظ حق الممثل في العمولات المستحقة له قبل الإنهاء.',
+  'سادسًا — بدل المواصلات والمصروفات النثرية:',
+  '1. يحصل الممثل على مبلغ {bonus} بدل مواصلات ومصروفات نثرية، دعمًا إضافيًا من إدارة النادي، متى نجح في استقطاب {bonusTarget} أعضاء دافعين خلال دورة أداء مدتها {bonusDays} يومًا، سواء كان مشتركًا في العضوية السنوية أو غير مشترك.',
+  '2. تبدأ دورة الأداء الأولى من تاريخ اعتماد الممثل، ويعرض التطبيق عدّادًا بالأيام المتبقية وعدد الأعضاء الدافعين خلالها. وعند انتهاء الدورة ترفع المنظومة طلب تجديد إلى الإدارة، وتُجدَّد الدورة بالمدة والعدد والمبلغ الذي تحدده الإدارة.',
+  '3. يُستحق البدل مرة واحدة عن كل دورة، ويُضاف إلى رصيد الممثل ويُصرف وفق أحكام صرف العمولات.',
   '',
-  'سابعًا — أحكام عامة:',
+  'سابعًا — صرف المستحقات:',
+  '1. الحد الأدنى لصرف المستحقات وتحويلها هو استقطاب {minPayout} أعضاء دافعين عبر رمز الإحالة الخاص بالممثل، سواء كان مشتركًا في العضوية السنوية أو غير مشترك.',
+  '2. تُرحَّل العمولات المستحقة وتبقى محفوظة في رصيد الممثل إلى حين بلوغ الحد الأدنى المطلوب للصرف.',
+  '3. تُصرف المستحقات بناءً على طلب سحب يقدّمه الممثل من التطبيق، وتُحوَّل إلى حسابه البنكي المسجّل بعد مراجعة الطلب واعتماده من الإدارة.',
+  '',
+  'ثامنًا — مدة الاتفاقية وإنهاؤها:',
+  'للنادي قبول أي طلب انضمام أو رفضه دون إبداء الأسباب، وله إيقاف أي ممثل أو تعديل قيم العمولات والبدل وشروط دورات الأداء أو إنهاء البرنامج في أي وقت، مع حفظ حق الممثل في المستحقات الثابتة له قبل التعديل أو الإنهاء.',
+  '',
+  'تاسعًا — أحكام عامة:',
   'تخضع هذه الاتفاقية لأنظمة المملكة العربية السعودية، وتُعد الموافقة الإلكترونية من داخل التطبيق إقرارًا وتوقيعًا ملزمًا.',
 ].join('\n');
 
@@ -153,29 +202,53 @@ export const DEFAULT_AGREEMENT_EN = [
   "Fourth — The Club's obligations:",
   "The Club's obligations are limited to providing the membership and its benefits to registered members, operating the affiliates program, and calculating the commissions due under this agreement.",
   '',
-  'Fifth — Commission:',
-  '1. The Affiliate earns a commission of {commission} for every member who registered through his referral code and actually paid the annual membership fee. No commission is due for registration alone without payment.',
-  "2. Commissions are calculated according to the Club's records and electronic systems, which are the sole authoritative reference.",
-  '3. Commissions are paid upon a withdrawal request submitted by the Affiliate from the app and transferred to his registered bank account after the management reviews and approves the request.',
-  "4. A withdrawal request may be submitted only after {minPayout} members have paid the membership fee through the Affiliate's referral code.",
+  'Fifth — Commissions:',
+  '1. An Affiliate who does not hold the annual membership earns a commission of {commission} for every member who registered through his referral code and actually paid the annual membership fee.',
+  '2. An Affiliate who holds the annual membership earns a commission of {commissionMember} for every paying member on the same terms.',
+  "3. The commission tier follows the Affiliate's membership status on the date the referred member pays, and the commission for that member is fixed once calculated. No commission is due for registration alone without payment.",
+  "4. Commissions are calculated according to the Club's records and electronic systems, which are the sole authoritative reference.",
   '',
-  'Sixth — Term and termination:',
-  "The Club may accept or refuse any application without stating reasons, and may suspend any affiliate, change the commission amount or end the program at any time, while preserving the Affiliate's right to the commissions earned before termination.",
+  'Sixth — Transportation and incidental-expenses allowance:',
+  '1. The Affiliate receives {bonus} as a transportation and incidental-expenses allowance, as additional support from the Club management, upon bringing in {bonusTarget} paying members within a performance cycle of {bonusDays} days, whether or not he holds the annual membership.',
+  '2. The first performance cycle starts on the date the Affiliate is approved, and the app shows a counter of the days remaining and the paying members within it. When a cycle ends, the system files a renewal request with the management, and the cycle is renewed with the duration, target and amount the management sets.',
+  "3. The allowance is due once per cycle; it is added to the Affiliate's balance and paid out under the payout provisions.",
   '',
-  'Seventh — General provisions:',
+  'Seventh — Payouts:',
+  "1. The minimum for paying out and transferring dues is {minPayout} paying members brought in through the Affiliate's referral code, whether or not he holds the annual membership.",
+  "2. Earned commissions carry forward and remain held in the Affiliate's balance until the payout minimum is reached.",
+  '3. Dues are paid upon a withdrawal request submitted by the Affiliate from the app and transferred to his registered bank account after the management reviews and approves the request.',
+  '',
+  'Eighth — Term and termination:',
+  "The Club may accept or refuse any application without stating reasons, and may suspend any affiliate, change the commission and allowance amounts and the performance-cycle terms, or end the program at any time, while preserving the Affiliate's right to the dues fixed before the change or termination.",
+  '',
+  'Ninth — General provisions:',
   'This agreement is governed by the laws of the Kingdom of Saudi Arabia, and electronic acceptance inside the app constitutes a binding acknowledgment and signature.',
 ].join('\n');
 
 export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
   commission: 250,
+  commissionMember: 350,
+  cycleDays: 30,
+  cycleTarget: 10,
+  cycleBonus: 1500,
   minPayoutPaid: 5,
   agreementText: DEFAULT_AGREEMENT,
   agreementTextEn: DEFAULT_AGREEMENT_EN,
-  // The owner's wording (2026-11-02), with the amounts dashboard-driven.
-  introText:
-    'انضم إلى برنامج ممثلي نادي المستثمرين: عرّف بعضوية النادي ومزاياها، ووظّف شبكة علاقاتك ومحيط معارفك، وادعُ المهتمين منهم إلى التسجيل عبر رابط مخصص لك، واحصل على عائد قدره {commission} عن كل عضو سجّل عبر رابطك وسدّد رسوم العضوية السنوية من خلاله. يخضع الانضمام لموافقة إدارة النادي بعد قبول الاتفاقية، ويتاح سحب العائد بعد اكتمال {minPayout} أعضاء مسدّدين.',
-  introTextEn:
-    "Join the Investors Club Affiliates Program and introduce others to the Club's membership and exclusive benefits. Leverage your professional network and personal connections to invite interested individuals to register through your unique referral link, and earn {commission} for every new member who registers through your link and pays the annual membership fee. Participation is subject to approval by the Club management following acceptance of the program agreement, and withdrawals unlock once {minPayout} referred members have paid.",
+  // M186: the owner's terms (2026-11-02) in the club's voice, every amount dashboard-driven.
+  introText: [
+    'انضم إلى برنامج ممثلي نادي المستثمرين، وكن سفيرًا لمجتمع أعمال يجمع روّاد الأعمال والمستثمرين. عرّف بعضوية النادي ومزاياها في محيط علاقاتك، وادعُ المهتمين إلى التسجيل عبر رابطك الخاص.',
+    '• عمولة {commission} عن كل عضو دافع، ترتفع إلى {commissionMember} إن كنت مشتركًا في العضوية السنوية.',
+    '• بدل مواصلات ومصروفات نثرية قدره {bonus} عند استقطاب {bonusTarget} أعضاء دافعين خلال {bonusDays} يومًا، مشتركًا كنت أو غير مشترك.',
+    '• يُتاح صرف المستحقات بعد اكتمال {minPayout} أعضاء دافعين، وتُرحَّل العمولات محفوظةً في رصيدك إلى حين بلوغ هذا الحد.',
+    'يخضع الانضمام لموافقة إدارة النادي بعد قبول اتفاقية البرنامج.',
+  ].join('\n'),
+  introTextEn: [
+    'Join the Investors Club Affiliates Program and become an ambassador for a business community that brings entrepreneurs and investors together. Introduce the Club membership and its benefits within your network, and invite interested contacts to register through your personal link.',
+    '• {commission} for every paying member, rising to {commissionMember} when you hold the annual membership yourself.',
+    '• A {bonus} transportation and incidental-expenses allowance when you bring in {bonusTarget} paying members within {bonusDays} days, member or not.',
+    '• Payouts open once {minPayout} referred members have paid; earned commissions carry forward in your balance until then.',
+    'Participation is subject to the Club management’s approval after you accept the program agreement.',
+  ].join('\n'),
   shareText: [
     'أدعوك للانضمام إلى نادي المستثمرين Investors Club — مجتمع أعمال وشراكات وخدمات لروّاد الأعمال والمستثمرين.',
     'سجّل عبر رابطي الشخصي: {link}',
@@ -184,11 +257,38 @@ export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
   heardOptions: DEFAULT_HEARD_OPTIONS,
 };
 
+/**
+ * M186: bumped whenever the default texts change for a new set of terms — stored texts saved under an
+ * older version give way to the new defaults once (the owner's terms must reach the app and the mail).
+ */
+const TEXTS_VERSION = 3;
+
 /** What the affiliate sees about each referral (no contact details — only the hub holds those). */
-export type AffiliateReferral = { name: string; at: string; paid: boolean };
+export type AffiliateReferral = { name: string; at: string; paid: boolean; paidAt: string | null; amount: number | null };
+
+/** M186: the counter the app and the dashboard show for the current cycle. */
+export type AffiliateCycleView = {
+  n: number;
+  startAt: string;
+  endAt: string;
+  daysLeft: number;
+  target: number;
+  paid: number;
+  bonus: number;
+  achieved: boolean;
+  bonusAt: string | null;
+  /** running = the counter is live; renewal = it ran out and waits for the dashboard. */
+  state: 'running' | 'renewal';
+};
 
 export type AffiliateBalance = {
+  /** The rate that applies to the next paying referral (follows the affiliate's membership now). */
   commission: number;
+  commissionBase: number;
+  commissionMember: number;
+  member: boolean;
+  /** Allowances already added to the balance. */
+  bonuses: number;
   /** Paid referrals required before a payout may be requested (0 = no minimum). */
   minPaid: number;
   referrals: number;
@@ -231,15 +331,22 @@ export class AffiliateService {
   }
 
   async config(): Promise<AffiliateConfig> {
-    const stored = await this.deps.kv.get<Partial<AffiliateConfig>>(AFFILIATE_CONFIG_KEY);
+    const stored = await this.deps.kv.get<Partial<AffiliateConfig> & { textsVersion?: number }>(AFFILIATE_CONFIG_KEY);
+    // Texts saved under older terms give way to the current defaults (M186); the numbers always stand.
+    const texts = stored?.textsVersion === TEXTS_VERSION ? stored : undefined;
     const options = (stored?.heardOptions ?? []).map((option) => option.trim()).filter(Boolean);
+    const count = (value: unknown, fallback: number, min = 0) => (typeof value === 'number' && value >= min ? Math.round(value) : fallback);
     return {
-      commission: typeof stored?.commission === 'number' && stored.commission > 0 ? Math.round(stored.commission) : DEFAULT_AFFILIATE_CONFIG.commission,
-      minPayoutPaid: typeof stored?.minPayoutPaid === 'number' && stored.minPayoutPaid >= 0 ? Math.round(stored.minPayoutPaid) : DEFAULT_AFFILIATE_CONFIG.minPayoutPaid,
-      agreementText: stored?.agreementText?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
-      agreementTextEn: stored?.agreementTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementTextEn,
-      introText: stored?.introText?.trim() || DEFAULT_AFFILIATE_CONFIG.introText,
-      introTextEn: stored?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
+      commission: count(stored?.commission, DEFAULT_AFFILIATE_CONFIG.commission, 1),
+      commissionMember: count(stored?.commissionMember, DEFAULT_AFFILIATE_CONFIG.commissionMember, 1),
+      cycleDays: count(stored?.cycleDays, DEFAULT_AFFILIATE_CONFIG.cycleDays, 1),
+      cycleTarget: count(stored?.cycleTarget, DEFAULT_AFFILIATE_CONFIG.cycleTarget, 1),
+      cycleBonus: count(stored?.cycleBonus, DEFAULT_AFFILIATE_CONFIG.cycleBonus),
+      minPayoutPaid: count(stored?.minPayoutPaid, DEFAULT_AFFILIATE_CONFIG.minPayoutPaid),
+      agreementText: texts?.agreementText?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
+      agreementTextEn: texts?.agreementTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementTextEn,
+      introText: texts?.introText?.trim() || DEFAULT_AFFILIATE_CONFIG.introText,
+      introTextEn: texts?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: stored?.shareText?.trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: options.length ? options : DEFAULT_AFFILIATE_CONFIG.heardOptions,
     };
@@ -249,6 +356,10 @@ export class AffiliateService {
     const current = await this.config();
     const next: AffiliateConfig = {
       commission: input.commission !== undefined ? Math.round(input.commission) : current.commission,
+      commissionMember: input.commissionMember !== undefined ? Math.round(input.commissionMember) : current.commissionMember,
+      cycleDays: input.cycleDays !== undefined ? Math.max(1, Math.round(input.cycleDays)) : current.cycleDays,
+      cycleTarget: input.cycleTarget !== undefined ? Math.max(1, Math.round(input.cycleTarget)) : current.cycleTarget,
+      cycleBonus: input.cycleBonus !== undefined ? Math.max(0, Math.round(input.cycleBonus)) : current.cycleBonus,
       minPayoutPaid: input.minPayoutPaid !== undefined ? Math.max(0, Math.round(input.minPayoutPaid)) : current.minPayoutPaid,
       agreementText: (input.agreementText ?? current.agreementText).trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
       agreementTextEn: (input.agreementTextEn ?? current.agreementTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.agreementTextEn,
@@ -258,18 +369,165 @@ export class AffiliateService {
       heardOptions: (input.heardOptions ?? current.heardOptions).map((option) => option.trim()).filter(Boolean),
     };
     if (!next.heardOptions.length) next.heardOptions = DEFAULT_AFFILIATE_CONFIG.heardOptions;
-    await this.deps.kv.set(AFFILIATE_CONFIG_KEY, next);
+    await this.deps.kv.set(AFFILIATE_CONFIG_KEY, { ...next, textsVersion: TEXTS_VERSION });
     return next;
   }
 
-  /** The amount in words the texts carry («250 ريال سعودي»). */
+  /** The amount in words the texts carry («250 ريال سعودي», «1,500 ريال سعودي»). */
   static commissionLabel(commission: number): string {
-    return `${commission} ريال سعودي`;
+    return `${commission.toLocaleString('en-US')} ريال سعودي`;
   }
 
   /** The same amount for the English app («SAR 250»). */
   static commissionLabelEn(commission: number): string {
-    return `SAR ${commission}`;
+    return `SAR ${commission.toLocaleString('en-US')}`;
+  }
+
+  /** Every placeholder of the intro and the agreement, in the reader's language. */
+  static fillTerms(text: string, config: AffiliateConfig, lang: 'ar' | 'en'): string {
+    const money = lang === 'en' ? AffiliateService.commissionLabelEn : AffiliateService.commissionLabel;
+    return text
+      .replaceAll('{commissionMember}', money(config.commissionMember))
+      .replaceAll('{commission}', money(config.commission))
+      .replaceAll('{bonusTarget}', String(config.cycleTarget))
+      .replaceAll('{bonusDays}', String(config.cycleDays))
+      .replaceAll('{bonus}', money(config.cycleBonus))
+      .replaceAll('{minPayout}', String(config.minPayoutPaid));
+  }
+
+  /** M186: a member at `at` when the last-seen membership window covers it (an annual membership ends a year after it starts). */
+  private static memberAt(record: AffiliateRecord, at: string): boolean {
+    const seen = record.membership;
+    if (!seen?.active && !seen?.endDate) return false;
+    if (!seen.endDate) return seen.active;
+    const end = Date.parse(seen.endDate);
+    const when = Date.parse(at);
+    return when <= end && when >= end - 366 * DAY_MS;
+  }
+
+  private static newCycle(n: number, days: number, target: number, bonus: number, now: Date): AffiliateCycle {
+    return {
+      n,
+      startAt: now.toISOString(),
+      endAt: new Date(now.getTime() + days * DAY_MS).toISOString(),
+      target,
+      bonus,
+      bonusAt: null,
+      closedAt: null,
+      paid: null,
+    };
+  }
+
+  /** The affiliate's paid referrals straight from the invite records (the hub-verified channel). */
+  private async paidInvites(contactId: number): Promise<Array<{ id: string; name: string; paidAt: string }>> {
+    return (await this.deps.invites.list())
+      .filter((invite) => invite.inviterId === contactId && invite.activatedAt)
+      .map((invite) => ({ id: invite.id, name: invite.inviteeName, paidAt: invite.activatedAt as string }));
+  }
+
+  private static countIn(paid: Array<{ paidAt: string }>, cycle: AffiliateCycle): number {
+    return paid.filter((entry) => entry.paidAt >= cycle.startAt && entry.paidAt <= cycle.endAt).length;
+  }
+
+  /**
+   * M186: brings one affiliate up to date — stamps new paid referrals at the tier of that moment,
+   * adds the cycle allowance when the target is met inside the window, and files the renewal request
+   * when the counter runs out. Called on every app visit (with the hub's fresh membership) and by the
+   * scheduled sweep; idempotent. Until a membership was seen once, stamping waits for the visit.
+   */
+  async sync(contactId: number, now = new Date(), membership?: { active: boolean; endDate: string | null }): Promise<void> {
+    const [config, paid] = await Promise.all([this.config(), this.paidInvites(contactId)]);
+    const events = await this.mutate((affiliates) => {
+      const record = affiliates.find((entry) => entry.contactId === contactId);
+      const out: { bonus?: AffiliateCycle; ended?: AffiliateCycle; record?: AffiliateRecord } = {};
+      if (!record || record.status !== 'approved') return out;
+      if (membership) record.membership = { ...membership, seenAt: now.toISOString() };
+      if (!record.earnings) {
+        // The first sync after M186: referrals paid before it keep the original 250 (the owner's plan).
+        record.earnings = paid.map((entry) => ({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: config.commission, member: false }));
+      } else if (record.membership) {
+        const stamped = new Set(record.earnings.map((entry) => entry.inviteId));
+        for (const entry of paid) {
+          if (stamped.has(entry.id)) continue;
+          const member = AffiliateService.memberAt(record, entry.paidAt);
+          record.earnings.push({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: member ? config.commissionMember : config.commission, member });
+        }
+      }
+      if (!record.cycles?.length) {
+        record.cycles = [AffiliateService.newCycle(1, config.cycleDays, config.cycleTarget, config.cycleBonus, now)];
+      }
+      const cycle = record.cycles[record.cycles.length - 1];
+      if (!cycle || cycle.closedAt) return out;
+      const inWindow = AffiliateService.countIn(paid, cycle);
+      if (!cycle.bonusAt && cycle.bonus > 0 && inWindow >= cycle.target) {
+        cycle.bonusAt = now.toISOString();
+        out.bonus = { ...cycle };
+      }
+      if (now.toISOString() > cycle.endAt) {
+        cycle.closedAt = now.toISOString();
+        cycle.paid = inWindow;
+        record.renewalRequestedAt = now.toISOString();
+        out.ended = { ...cycle };
+      }
+      out.record = { ...record };
+      return out;
+    });
+    if (events.record && events.bonus) this.deps.notifier.affiliateBonus(events.record, events.bonus);
+    if (events.record && events.ended) this.deps.notifier.affiliateCycleEnded(events.record, events.ended);
+  }
+
+  /** The scheduled sweep: every approved affiliate, so a counter that runs out files its request on time. */
+  async sweep(now = new Date()): Promise<void> {
+    const approved = (await this.loadRecords()).filter((record) => record.status === 'approved');
+    for (const record of approved) {
+      try {
+        await this.sync(record.contactId, now);
+      } catch (error) {
+        this.deps.log.error({ err: error, contactId: record.contactId }, 'affiliate sweep failed');
+      }
+    }
+  }
+
+  /** The dashboard renews (or restarts early) the counter with a new duration, target and allowance. */
+  async renewCycle(contactId: number, input: { days: number; target: number; bonus: number }, now = new Date()): Promise<AffiliateRecord | null> {
+    const paid = await this.paidInvites(contactId);
+    const result = await this.mutate((affiliates) => {
+      const record = affiliates.find((entry) => entry.contactId === contactId);
+      if (!record) return null;
+      if (record.status !== 'approved') throw new RequestError('not_affiliate', 'الممثل غير معتمد حاليًا', 400);
+      const cycles = (record.cycles ??= []);
+      const current = cycles[cycles.length - 1];
+      if (current && !current.closedAt) {
+        current.closedAt = now.toISOString();
+        current.paid = AffiliateService.countIn(paid, current);
+      }
+      const next = AffiliateService.newCycle(cycles.length + 1, input.days, input.target, input.bonus, now);
+      cycles.push(next);
+      record.renewalRequestedAt = null;
+      return { record: { ...record }, cycle: next };
+    });
+    if (result) this.deps.notifier.affiliateCycleRenewed(result.record, result.cycle);
+    return result?.record ?? null;
+  }
+
+  /** The current counter as the app and the dashboard show it. */
+  async cycleView(contactId: number, now = new Date()): Promise<AffiliateCycleView | null> {
+    const record = await this.find(contactId);
+    const cycle = record?.cycles?.[record.cycles.length - 1];
+    if (!record || !cycle) return null;
+    const paid = cycle.closedAt && cycle.paid !== null ? cycle.paid : AffiliateService.countIn(await this.paidInvites(contactId), cycle);
+    return {
+      n: cycle.n,
+      startAt: cycle.startAt,
+      endAt: cycle.endAt,
+      daysLeft: cycle.closedAt ? 0 : Math.max(0, Math.ceil((Date.parse(cycle.endAt) - now.getTime()) / DAY_MS)),
+      target: cycle.target,
+      paid,
+      bonus: cycle.bonus,
+      achieved: Boolean(cycle.bonusAt),
+      bonusAt: cycle.bonusAt,
+      state: cycle.closedAt ? 'renewal' : 'running',
+    };
   }
 
   referralLink(code: string): string {
@@ -323,8 +581,7 @@ export class AffiliateService {
       affiliates.push(next);
       return next;
     });
-    // The mail fills {commission}; {minPayout} is filled here so the mailed agreement reads whole.
-    this.deps.notifier.affiliateAgreement(record, config.agreementText.replaceAll('{minPayout}', String(config.minPayoutPaid)), AffiliateService.commissionLabel(config.commission));
+    this.deps.notifier.affiliateAgreement(record, AffiliateService.fillTerms(config.agreementText, config, 'ar'), AffiliateService.commissionLabel(config.commission));
     return record;
   }
 
@@ -346,6 +603,7 @@ export class AffiliateService {
 
   /** The dashboard's decision — the only way an affiliate becomes active (owner, 2026-11-02). */
   async decide(contactId: number, status: 'approved' | 'rejected', note: string, adminName: string, now = new Date()): Promise<AffiliateRecord | null> {
+    const config = await this.config();
     const record = await this.mutate((affiliates) => {
       const existing = affiliates.find((entry) => entry.contactId === contactId);
       if (!existing) return null;
@@ -356,6 +614,12 @@ export class AffiliateService {
       existing.decidedAt = now.toISOString();
       existing.decidedBy = adminName;
       existing.adminNote = note.trim() || null;
+      if (status === 'approved') {
+        // M186: a fresh approval stamps every paid referral at its own tier, and the first counter starts now.
+        existing.earnings ??= [];
+        if (!existing.cycles?.length) existing.cycles = [AffiliateService.newCycle(1, config.cycleDays, config.cycleTarget, config.cycleBonus, now)];
+        existing.renewalRequestedAt ??= null;
+      }
       return { ...existing };
     });
     if (record) this.deps.notifier.affiliateDecided(record, this.referralLink(record.code));
@@ -364,23 +628,44 @@ export class AffiliateService {
 
   /** The affiliate's referrals: every hub-verified registration with his code, paid = membership activated. */
   async referrals(contactId: number): Promise<AffiliateReferral[]> {
-    const mine = await this.deps.invites.mine(contactId);
-    return mine.map((person) => ({ name: person.name, at: person.at, paid: person.state === 'member' }));
+    const [invites, record] = await Promise.all([this.deps.invites.list(), this.find(contactId)]);
+    const amounts = new Map((record?.earnings ?? []).map((entry) => [entry.inviteId, entry.amount]));
+    return invites
+      .filter((invite) => invite.inviterId === contactId)
+      .map((invite) => ({
+        name: invite.inviteeName,
+        at: invite.createdAt,
+        paid: Boolean(invite.activatedAt),
+        paidAt: invite.activatedAt,
+        amount: amounts.get(invite.id) ?? null,
+      }));
   }
 
   async balance(contactId: number): Promise<AffiliateBalance> {
-    const [config, referrals, payouts] = await Promise.all([this.config(), this.referrals(contactId), this.loadPayouts()]);
-    const paid = referrals.filter((person) => person.paid).length;
+    const [config, record, invites, payouts] = await Promise.all([this.config(), this.find(contactId), this.deps.invites.list(), this.loadPayouts()]);
+    const mine = invites.filter((invite) => invite.inviterId === contactId);
+    const paidList = mine.filter((invite) => invite.activatedAt);
+    const paid = paidList.length;
     const withdrawn = payouts
       .filter((payout) => payout.contactId === contactId && payout.status !== 'rejected')
       .reduce((sum, payout) => sum + payout.amount, 0);
-    const earned = paid * config.commission;
+    const member = record ? AffiliateService.memberAt(record, new Date().toISOString()) : false;
+    const commission = member ? config.commissionMember : config.commission;
+    // Stamped referrals keep their fixed amount; any not stamped yet count at today's tier until the next sync.
+    const stamped = new Map((record?.earnings ?? []).map((entry) => [entry.inviteId, entry.amount]));
+    const commissions = paidList.reduce((sum, entry) => sum + (stamped.get(entry.id) ?? commission), 0);
+    const bonuses = (record?.cycles ?? []).filter((cycle) => cycle.bonusAt).reduce((sum, cycle) => sum + cycle.bonus, 0);
+    const earned = commissions + bonuses;
     return {
-      commission: config.commission,
+      commission,
+      commissionBase: config.commission,
+      commissionMember: config.commissionMember,
+      member,
+      bonuses,
       minPaid: config.minPayoutPaid,
-      referrals: referrals.length,
+      referrals: mine.length,
       paid,
-      unpaid: referrals.length - paid,
+      unpaid: mine.length - paid,
       earned,
       withdrawn,
       available: Math.max(0, earned - withdrawn),
@@ -396,7 +681,7 @@ export class AffiliateService {
     const balance = await this.balance(contactId);
     const payout = await this.mutate((affiliates, payouts) => {
       const affiliate = affiliates.find((entry) => entry.contactId === contactId);
-      if (!affiliate || affiliate.status !== 'approved') throw new RequestError('not_affiliate', 'هذه الخدمة لممثلي النادي المعتمدين', 403);
+      if (!affiliate || affiliate.status !== 'approved') throw new RequestError('not_affiliate', 'هذه الخدمة لممثلي نادي المستثمرين المعتمدين', 403);
       if (payouts.some((entry) => entry.contactId === contactId && entry.status === 'requested')) {
         throw new RequestError('payout_open', 'لديك طلب سحب قيد المراجعة بالفعل', 400);
       }

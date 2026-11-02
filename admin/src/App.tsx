@@ -41,7 +41,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'partners', label: 'شركاؤنا', icon: 'partners' },
   { key: 'cards', label: 'طلبات الكروت', icon: 'cards' },
   { key: 'invites', label: 'الدعوات', icon: 'invites' },
-  { key: 'affiliates', label: 'ممثلو النادي', icon: 'partners' },
+  { key: 'affiliates', label: 'ممثلو نادي المستثمرين', icon: 'partners' },
   { key: 'inbox', label: 'رسائل الأعضاء', icon: 'inbox' },
   { key: 'agenda', label: 'أجندة النادي', icon: 'agenda' },
   { key: 'hq', label: 'حجوزات المقر', icon: 'home' },

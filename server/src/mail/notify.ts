@@ -274,11 +274,11 @@ export class Notifier {
       'اتفاقية برنامج ممثلي نادي المستثمرين',
       {
         lang: 'ar',
-        title: 'اتفاقية برنامج ممثلي النادي',
+        title: 'اتفاقية برنامج ممثلي نادي المستثمرين',
         subtitle: 'تصلك هذه الاتفاقية قبل تفعيل انضمامك',
         greeting: `أهلًا بك يا ${record.name}`,
         lead: [
-          'وصل طلب انضمامك إلى برنامج ممثلي نادي المستثمرين. نرفق لك نص الاتفاقية كاملًا، وللمتابعة افتح التطبيق: حسابي ← ممثلو النادي، ثم اضغط «أوافق على الاتفاقية».',
+          'وصل طلب انضمامك إلى برنامج ممثلي نادي المستثمرين. نرفق لك نص الاتفاقية كاملًا، وللمتابعة افتح التطبيق: حسابي ← ممثلو نادي المستثمرين، ثم اضغط «أوافق على الاتفاقية».',
           ...paragraphs,
         ],
         note: 'يُعرض الطلب على إدارة النادي بعد موافقتك على الاتفاقية، ولا يُفعَّل الانضمام إلا باعتماد الإدارة.',
@@ -289,8 +289,8 @@ export class Notifier {
 
   /** M184: the applicant accepted the agreement — the decision is the dashboard's. */
   affiliateApplied(record: { name: string; phone: string; email: string; code: string; entityType: string; bankName: string; iban: string; city: string; address: string; heardFrom: string; heardFromNote: string }): void {
-    this.dispatch(`طلب انضمام لبرنامج ممثلي النادي: ${record.name}`, [
-      `قدّم أحد الأعضاء طلب انضمام لبرنامج ممثلي النادي من ${APP_NAME} ووافق على الاتفاقية.`,
+    this.dispatch(`طلب انضمام لبرنامج ممثلي نادي المستثمرين: ${record.name}`, [
+      `قدّم أحد الأعضاء طلب انضمام لبرنامج ممثلي نادي المستثمرين من ${APP_NAME} ووافق على الاتفاقية.`,
       '',
       `الاسم: ${record.name || '—'}`,
       `صفة مقدّم الطلب: ${record.entityType === 'company' ? 'شركة' : 'فرد'}`,
@@ -303,7 +303,7 @@ export class Notifier {
       `العنوان: ${record.address}`,
       `كيف تعرّف على النادي: ${record.heardFrom}${record.heardFromNote ? ` — ${record.heardFromNote}` : ''}`,
       '',
-      'القبول أو الرفض من لوحة الإدارة: قسم «ممثلو النادي». لا يُفعَّل الممثل إلا بقراركم.',
+      'القبول أو الرفض من لوحة الإدارة: قسم «ممثلو نادي المستثمرين». لا يُفعَّل الممثل إلا بقراركم.',
     ]);
   }
 
@@ -312,17 +312,17 @@ export class Notifier {
     const approved = record.status === 'approved';
     this.sendRoyal(
       record.email,
-      approved ? 'اعتماد انضمامك لبرنامج ممثلي النادي' : 'قرار بشأن طلب انضمامك لبرنامج ممثلي النادي',
+      approved ? 'اعتماد انضمامك لبرنامج ممثلي نادي المستثمرين' : 'قرار بشأن طلب انضمامك لبرنامج ممثلي نادي المستثمرين',
       {
         lang: 'ar',
         title: approved ? 'تم اعتماد انضمامك' : 'قرار الإدارة بشأن طلبك',
         greeting: `أهلًا بك يا ${record.name}`,
         lead: approved
           ? [
-              'اعتمدت إدارة النادي انضمامك إلى برنامج ممثلي نادي المستثمرين. تجد رابط الإحالة الخاص بك ولوحة المتابعة في التطبيق: حسابي ← ممثلو النادي.',
+              'اعتمدت إدارة النادي انضمامك إلى برنامج ممثلي نادي المستثمرين. تجد رابط الإحالة الخاص بك ولوحة المتابعة في التطبيق: حسابي ← ممثلو نادي المستثمرين.',
               'تذكير: تُستحق العمولة عن كل عضو سجّل عبر رمزك وسدّد رسوم العضوية السنوية فعليًا.',
             ]
-          : ['نشكر لك اهتمامك بالانضمام إلى برنامج ممثلي النادي. بعد المراجعة لم تعتمد الإدارة الطلب في الوقت الحالي، ويمكنك التقديم مجددًا لاحقًا.'],
+          : ['نشكر لك اهتمامك بالانضمام إلى برنامج ممثلي نادي المستثمرين. بعد المراجعة لم تعتمد الإدارة الطلب في الوقت الحالي، ويمكنك التقديم مجددًا لاحقًا.'],
         rows: approved
           ? [
               { label: 'رمز الإحالة', value: record.code },
@@ -338,8 +338,8 @@ export class Notifier {
 
   /** M184: «سحب الأرباح» — the manual bank transfer is the administration's work. */
   affiliatePayoutRequested(payout: { id: string; name: string; amount: number; bankName: string; accountName: string; iban: string }): void {
-    this.dispatch(`طلب سحب أرباح من ممثل النادي: ${payout.name}`, [
-      `قدّم أحد ممثلي النادي طلب سحب أرباحه من ${APP_NAME}. التحويل يدوي من الإدارة، ثم يُعلَّم الطلب «تم الدفع» من لوحة الإدارة: قسم «ممثلو النادي».`,
+    this.dispatch(`طلب سحب أرباح من ممثل نادي المستثمرين: ${payout.name}`, [
+      `قدّم أحد ممثلي نادي المستثمرين طلب سحب أرباحه من ${APP_NAME}. التحويل يدوي من الإدارة، ثم يُعلَّم الطلب «تم الدفع» من لوحة الإدارة: قسم «ممثلو نادي المستثمرين».`,
       '',
       `الممثل: ${payout.name}`,
       `المبلغ: ${payout.amount} ريال سعودي`,
@@ -355,7 +355,7 @@ export class Notifier {
     const paid = payout.status === 'paid';
     this.sendRoyal(
       email,
-      paid ? 'تم تحويل أرباحك — برنامج ممثلي النادي' : 'قرار بشأن طلب سحب الأرباح',
+      paid ? 'تم تحويل أرباحك — برنامج ممثلي نادي المستثمرين' : 'قرار بشأن طلب سحب الأرباح',
       {
         lang: 'ar',
         title: paid ? 'تم تحويل أرباحك' : 'قرار بشأن طلب السحب',
@@ -370,6 +370,70 @@ export class Notifier {
         ],
       },
       'affiliate payout',
+    );
+  }
+
+  /** M186: the cycle target was met inside the window — the allowance joined the affiliate's balance. */
+  affiliateBonus(record: { name: string; email: string }, cycle: { n: number; target: number; bonus: number }): void {
+    this.sendRoyal(
+      record.email,
+      'تهانينا — استحققت بدل المواصلات والمصروفات النثرية',
+      {
+        lang: 'ar',
+        title: 'إنجاز يستحق التقدير',
+        greeting: `أهلًا بك يا ${record.name}`,
+        lead: [
+          `بلغت هدف دورة الأداء باستقطاب ${cycle.target} أعضاء دافعين، وتقديرًا لجهدك أضافت إدارة النادي بدل المواصلات والمصروفات النثرية إلى رصيدك في برنامج ممثلي نادي المستثمرين.`,
+          'يُصرف البدل مع عمولاتك وفق أحكام صرف المستحقات، وتجد التفاصيل في التطبيق: حسابي ← برنامج ممثلي نادي المستثمرين.',
+        ],
+        rows: [
+          { label: 'رقم الدورة', value: String(cycle.n) },
+          { label: 'البدل', value: `${cycle.bonus.toLocaleString('en-US')} ريال سعودي` },
+        ],
+      },
+      'affiliate bonus',
+    );
+  }
+
+  /** M186: the counter ran out — the team renews it from the dashboard with a new duration and target. */
+  affiliateCycleEnded(record: { name: string; phone: string; email: string; code: string }, cycle: { n: number; startAt: string; endAt: string; target: number; paid: number | null; bonusAt: string | null }): void {
+    this.dispatch(`طلب تجديد دورة ممثل نادي المستثمرين: ${record.name}`, [
+      `انتهت مدة دورة الأداء لأحد ممثلي نادي المستثمرين في ${APP_NAME}، وينتظر تجديد الدورة بمدة جديدة وعدد أعضاء جديد.`,
+      '',
+      `الممثل: ${record.name || '—'}`,
+      `الجوال: ${record.phone || '—'}`,
+      `البريد: ${record.email || '—'}`,
+      `رقم العضوية: ${record.code}`,
+      `رقم الدورة: ${cycle.n}`,
+      `المدة: من ${cycle.startAt.slice(0, 10)} إلى ${cycle.endAt.slice(0, 10)}`,
+      `الأعضاء الدافعون خلال الدورة: ${cycle.paid ?? 0} من ${cycle.target}`,
+      `بدل المواصلات: ${cycle.bonusAt ? 'استُحق وأُضيف إلى الرصيد' : 'لم يُستحق في هذه الدورة'}`,
+      '',
+      'التجديد من لوحة الإدارة: قسم «ممثلو نادي المستثمرين» ← «تجديد الدورة».',
+    ]);
+  }
+
+  /** M186: the dashboard renewed the counter — the affiliate hears the new terms. */
+  affiliateCycleRenewed(record: { name: string; email: string }, cycle: { n: number; endAt: string; target: number; bonus: number }): void {
+    this.sendRoyal(
+      record.email,
+      'بدأت دورة أداء جديدة — برنامج ممثلي نادي المستثمرين',
+      {
+        lang: 'ar',
+        title: 'دورة أداء جديدة',
+        greeting: `أهلًا بك يا ${record.name}`,
+        lead: [
+          'جدّدت إدارة النادي دورة الأداء الخاصة بك في برنامج ممثلي نادي المستثمرين، والعدّاد يعمل الآن في التطبيق.',
+          ...(cycle.bonus > 0 ? [`استقطب ${cycle.target} أعضاء دافعين قبل نهاية الدورة لتحصل على بدل المواصلات والمصروفات النثرية.`] : []),
+        ],
+        rows: [
+          { label: 'رقم الدورة', value: String(cycle.n) },
+          { label: 'تنتهي في', value: cycle.endAt.slice(0, 10) },
+          { label: 'الهدف', value: `${cycle.target} أعضاء دافعين` },
+          ...(cycle.bonus > 0 ? [{ label: 'البدل', value: `${cycle.bonus.toLocaleString('en-US')} ريال سعودي` }] : []),
+        ],
+      },
+      'affiliate cycle',
     );
   }
 

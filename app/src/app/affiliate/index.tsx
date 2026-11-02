@@ -4,7 +4,7 @@ import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 
-import { useAffiliate, affiliateApi, type AffiliatePayout, type AffiliateReferral } from '@/api/affiliate';
+import { useAffiliate, affiliateApi, type AffiliateCycle, type AffiliatePayout, type AffiliateReferral } from '@/api/affiliate';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -23,7 +23,7 @@ import { colors, radii, spacing, typography } from '@/theme/tokens';
 const LRM = '‎';
 
 /**
- * M184: «برنامج ممثلي النادي» — every signed-in account may apply (full form), the agreement
+ * M184: «برنامج ممثلي نادي المستثمرين» — every signed-in account may apply (full form), the agreement
  * arrives by e-mail and is accepted here, and ONLY the administration's dashboard approval
  * activates the affiliate. Approved: the panel shows the personal link, every referral with its
  * paid state («عضو غير دافع» until the server confirms the payment), the balance and «سحب الأرباح».
@@ -88,9 +88,24 @@ export default function AffiliateScreen() {
                 <BalanceCell label={t('affiliate.unpaidCount')} value={formatNumber(data.balance.unpaid)} />
                 <BalanceCell label={t('affiliate.withdrawn')} value={formatNumber(data.balance.withdrawn)} />
               </View>
-              <SarText style={styles.commissionNote}>{t('affiliate.commissionNote', { amount: formatNumber(data.balance.commission) })}</SarText>
+              <SarText style={styles.commissionNote}>
+                {data.balance.commissionMember === undefined
+                  ? t('affiliate.commissionNote', { amount: formatNumber(data.balance.commission) })
+                  : data.balance.member
+                    ? t('affiliate.commissionMember', { amount: formatNumber(data.balance.commission) })
+                    : t('affiliate.commissionBase', { amount: formatNumber(data.balance.commission), member: formatNumber(data.balance.commissionMember) })}
+              </SarText>
+              {data.balance.bonuses ? (
+                <SarText style={styles.commissionNote}>{t('affiliate.bonuses', { amount: formatNumber(data.balance.bonuses) })}</SarText>
+              ) : null}
             </GlassCard>
           </FadeInView>
+
+          {data.cycle ? (
+            <FadeInView delay={entranceDelay(1)}>
+              <CycleCard cycle={data.cycle} />
+            </FadeInView>
+          ) : null}
 
           <FadeInView delay={entranceDelay(1)}>
             <View style={styles.linkBox}>
@@ -202,6 +217,34 @@ function BalanceCell({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** M186: the performance-cycle counter — days left, paying members against the target, the allowance. */
+function CycleCard({ cycle }: { cycle: AffiliateCycle }) {
+  const progress = cycle.target > 0 ? Math.min(1, cycle.paid / cycle.target) : 0;
+  return (
+    <GlassCard radius={radii.lg} style={styles.cycleCard}>
+      <View style={styles.cycleHead}>
+        <Ionicons name="hourglass-outline" size={18} color={colors.gold} />
+        <Text style={styles.cycleTitle}>{t('affiliate.cycleTitle', { n: formatNumber(cycle.n) })}</Text>
+      </View>
+      <View style={styles.balanceRow}>
+        <BalanceCell label={t('affiliate.cycleDaysLeft')} value={formatNumber(cycle.daysLeft)} />
+        <BalanceCell label={t('affiliate.cyclePaid')} value={formatNumber(cycle.paid)} />
+        <BalanceCell label={t('affiliate.cycleTarget')} value={formatNumber(cycle.target)} />
+      </View>
+      <View style={styles.track}>
+        <View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} />
+      </View>
+      {cycle.state === 'running' ? <Text style={styles.cycleNote}>{t('affiliate.cycleEnds', { date: formatArabicDate(cycle.endAt) })}</Text> : null}
+      {cycle.achieved ? (
+        <SarText style={styles.cycleNote}>{t('affiliate.cycleAchieved', { bonus: formatNumber(cycle.bonus) })}</SarText>
+      ) : cycle.state === 'running' && cycle.bonus > 0 ? (
+        <SarText style={styles.cycleNote}>{t('affiliate.cycleBonusHint', { target: formatNumber(cycle.target), bonus: formatNumber(cycle.bonus) })}</SarText>
+      ) : null}
+      {cycle.state === 'renewal' ? <Notice tone="info" text={t('affiliate.cycleRenewal')} /> : null}
+    </GlassCard>
+  );
+}
+
 function ReferralRow({ person }: { person: AffiliateReferral }) {
   return (
     <GlassCard radius={radii.md} style={styles.row}>
@@ -245,6 +288,12 @@ const styles = StyleSheet.create({
   cellValue: { ...typography.subtitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   cellLabel: { ...typography.caption, color: colors.textMuted },
   commissionNote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  cycleCard: { padding: spacing.lg, gap: spacing.sm },
+  cycleHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  cycleTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
+  cycleNote: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, lineHeight: 20 },
+  track: { height: 6, borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
+  trackFill: { height: 6, borderRadius: radii.pill, backgroundColor: colors.gold },
   linkBox: {
     borderWidth: 1,
     borderColor: colors.gold,

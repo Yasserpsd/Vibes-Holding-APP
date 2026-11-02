@@ -11,7 +11,7 @@ import { LogMailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
 import { MemoryKV } from './store.js';
 
-// M184: «برنامج ممثلي النادي» — the full-form application, the mailed agreement, the dashboard's
+// M184: «برنامج ممثلي نادي المستثمرين» — the full-form application, the mailed agreement, the dashboard's
 // approval as the only activation, hub-verified referrals, and the manual payout flow.
 const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', NOTIFY_EMAIL: 'admin@vcmem.com', PUBLIC_URL: 'https://api-test.vibesholdingsa.com' });
 
@@ -45,13 +45,13 @@ const send = (method: 'POST' | 'PUT' | 'DELETE', url: string, payload: Record<st
 let nextPhone = 7714250;
 const register = (email: string, extra: Record<string, unknown> = {}) =>
   send('POST', '/api/auth/register', {
-    name: 'ممثل النادي',
+    name: 'ممثل نادي المستثمرين',
     country: 'sa',
     phone: `055${(nextPhone += 1)}`,
     email,
     password: 'secret123',
     persona: 'neutral',
-    bio: 'حساب اختبار لبرنامج ممثلي النادي.',
+    bio: 'حساب اختبار لبرنامج ممثلي نادي المستثمرين.',
     ...extra,
   });
 
@@ -111,7 +111,7 @@ test('every signed-in account sees the program pitch, the agreement and the opti
   // The agreement follows the app language too (owner, 2026-11-02); Arabic stays authoritative.
   assert.match(english.json().agreementText as string, /Affiliates Program Agreement/);
   assert.match(english.json().agreementText as string, /SAR 250/);
-  assert.match(english.json().agreementText as string, /after 5 members have paid/);
+  assert.match(english.json().agreementText as string, /minimum for paying out and transferring dues is 5 paying members/);
 });
 
 test('the application needs the full form, and the agreement is mailed to the applicant', async () => {
@@ -126,7 +126,7 @@ test('the application needs the full form, and the agreement is mailed to the ap
   assert.equal(badSource.json().error.code, 'heard_from');
 
   // The account holder name is English only (owner, 2026-11-02); the Arabic fields stay Arabic.
-  const arabicAccount = await send('POST', '/api/affiliate/apply', { ...APPLY, accountName: 'ممثل النادي التجريبي' }, memberToken);
+  const arabicAccount = await send('POST', '/api/affiliate/apply', { ...APPLY, accountName: 'ممثل نادي المستثمرين التجريبي' }, memberToken);
   assert.equal(arabicAccount.statusCode, 400, arabicAccount.body);
   assert.match(arabicAccount.json().error.message as string, /الإنجليزية/);
 
@@ -159,7 +159,7 @@ test('accepting the agreement sends the request to the administration — nothin
 
   const mail = mailer.sent.at(-1);
   assert.equal(mailer.sent.length, before + 1);
-  assert.match(mail?.subject ?? '', /طلب انضمام لبرنامج ممثلي النادي/);
+  assert.match(mail?.subject ?? '', /طلب انضمام لبرنامج ممثلي نادي المستثمرين/);
   assert.match(mail?.text ?? '', /SA4420000001234567891234/);
   assert.match(mail?.text ?? '', /منصة إكس/);
   assert.match(mail?.text ?? '', /صفة مقدّم الطلب: فرد/);
@@ -196,7 +196,12 @@ test('the dashboard approval activates the affiliate and hands him his link', as
   assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${encodeURIComponent(memberCode)}`);
   assert.ok((mine.json().shareText as string).includes(memberCode));
   assert.equal(mine.json().balance.available, 0);
-  assert.equal(mine.json().balance.commission, 250);
+  // The mock hub hands this member an active membership: the member tier applies (M186).
+  assert.equal(mine.json().balance.commission, 350);
+  assert.equal(mine.json().balance.commissionBase, 250);
+  assert.equal(mine.json().cycle.target, 10);
+  assert.equal(mine.json().cycle.daysLeft, 30);
+  assert.equal(mine.json().cycle.state, 'running');
 
   // No paid members yet: the minimum (5 paid) shuts the payout door first.
   const payout = await send('POST', '/api/affiliate/payout', { bankName: 'بنك', accountName: 'Account Holder', iban: 'SA4420000001234567891234' }, memberToken);
@@ -254,7 +259,7 @@ test('the owner edits the program content from the dashboard', async () => {
   assert.equal(saved.json().config.commission, 300);
 
   const mine = await get('/api/affiliate', memberToken);
-  assert.equal(mine.json().balance.commission, 300);
+  assert.equal(mine.json().balance.commissionBase, 300);
   assert.match(mine.json().introText as string, /300 ريال سعودي/);
   assert.equal(mine.json().heardOptions.length, 3);
   assert.equal(mine.json().shareText, `سجّل من رابطي https://api-test.vibesholdingsa.com/r/${encodeURIComponent(memberCode)} بالرمز ${memberCode}.`);

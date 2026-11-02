@@ -167,11 +167,14 @@ export type InviteRecord = {
 
 export type InvitesConfig = { giftText: string; shareText: string };
 
-/** M184: «برنامج ممثلي النادي» — mirrors server/src/affiliate/service.ts. */
+/** M184: «برنامج ممثلي نادي المستثمرين» — mirrors server/src/affiliate/service.ts. */
 export type AffiliateStatus = 'agreement' | 'pending' | 'approved' | 'rejected';
 
 export type AffiliateStats = {
   commission: number;
+  /** M186: whether the affiliate's own membership was active when last seen (350 vs 250 tier). */
+  member: boolean;
+  bonuses: number;
   referrals: number;
   paid: number;
   unpaid: number;
@@ -202,6 +205,23 @@ export type AffiliateRow = {
   decidedBy: string | null;
   adminNote: string | null;
   stats: AffiliateStats;
+  /** M186: set when the counter ran out and waits for «تجديد الدورة». */
+  renewalRequestedAt?: string | null;
+  cycle: AffiliateCycleView | null;
+};
+
+/** M186: the performance-cycle counter — mirrors AffiliateCycleView on the server. */
+export type AffiliateCycleView = {
+  n: number;
+  startAt: string;
+  endAt: string;
+  daysLeft: number;
+  target: number;
+  paid: number;
+  bonus: number;
+  achieved: boolean;
+  bonusAt: string | null;
+  state: 'running' | 'renewal';
 };
 
 export type AffiliatePayoutRow = {
@@ -221,6 +241,10 @@ export type AffiliatePayoutRow = {
 
 export type AffiliateConfig = {
   commission: number;
+  commissionMember: number;
+  cycleDays: number;
+  cycleTarget: number;
+  cycleBonus: number;
   minPayoutPaid: number;
   agreementText: string;
   agreementTextEn: string;
@@ -611,6 +635,8 @@ export const api = {
     call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/decision`, { status, note }),
   affiliatePayoutDecision: (id: string, status: 'paid' | 'rejected', note: string) =>
     call<{ payout: AffiliatePayoutRow }>('POST', `/api/admin/affiliates/payouts/${id}/decision`, { status, note }),
+  affiliateCycle: (contactId: number, input: { days: number; target: number; bonus: number }) =>
+    call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/cycle`, input),
   affiliateConfig: (input: Partial<AffiliateConfig>) => call<{ config: AffiliateConfig }>('POST', '/api/admin/affiliates/config', input),
   invites: () => call<{ invites: InviteRecord[]; config: InvitesConfig }>('GET', '/api/admin/invites'),
   inviteGift: (id: string, note: string) => call<{ invite: InviteRecord }>('POST', `/api/admin/invites/${id}/gift`, { note }),

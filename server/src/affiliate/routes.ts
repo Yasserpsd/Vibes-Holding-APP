@@ -54,6 +54,10 @@ const payoutDecisionSchema = z.object({
 const configSchema = z
   .object({
     commission: z.number().int().min(1, 'العمولة بالريال السعودي').max(100000),
+    commissionMember: z.number().int().min(1, 'عمولة الممثل المشترك بالريال السعودي').max(100000),
+    cycleDays: z.number().int().min(1, 'مدة الدورة بالأيام').max(365),
+    cycleTarget: z.number().int().min(1, 'هدف الدورة بعدد الأعضاء الدافعين').max(1000),
+    cycleBonus: z.number().int().min(0, 'البدل بالريال السعودي').max(1000000),
     minPayoutPaid: z.number().int().min(0, 'الحد الأدنى للسحب بعدد الأعضاء المسدّدين').max(1000),
     agreementText: z.string().trim().min(100, 'نص الاتفاقية قصير جدًا').max(20000),
     agreementTextEn: z.string().trim().min(100, 'The English agreement is too short').max(20000),
@@ -63,6 +67,12 @@ const configSchema = z
     heardOptions: z.array(z.string().trim().min(1).max(60)).min(2).max(30),
   })
   .partial();
+
+const cycleSchema = z.object({
+  days: z.number().int().min(1, 'مدة الدورة بالأيام').max(365),
+  target: z.number().int().min(1, 'عدد الأعضاء الدافعين المطلوب').max(1000),
+  bonus: z.number().int().min(0, 'البدل بالريال السعودي').max(1000000),
+});
 
 const contactIdSchema = z.object({ contactId: z.coerce.number().int().positive() });
 const idSchema = z.object({ id: z.string().uuid() });
@@ -86,7 +96,7 @@ function ownApplication(record: AffiliateRecord) {
 }
 
 /**
- * M184: «برنامج ممثلي النادي». The member applies with his full details, accepts the mailed
+ * M184: «برنامج ممثلي نادي المستثمرين». The member applies with his full details, accepts the mailed
  * agreement in the app, and the dashboard's approval alone activates him. The referral code is his
  * membership number (the hub-verified M32 channel); «paid» comes only from the server-confirmed
  * membership activation.
@@ -101,14 +111,16 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       const current = await requireSession(request, reply);
       if (!current) return;
       const me = await auth.me(current.session);
+      // M186: every visit brings the counter, the stamps and the allowance up to date with the hub's fresh membership.
+      await service.sync(me.id, new Date(), { active: me.membership.status === 'active', endDate: me.membership.endDate });
       const [config, record] = await Promise.all([service.config(), service.find(me.id)]);
       // The texts follow the app's language (owner, 2026-11-02); the Arabic agreement stays the authoritative one.
       const lang = langOf(request);
-      const commissionLabel = lang === 'en' ? AffiliateService.commissionLabelEn(config.commission) : AffiliateService.commissionLabel(config.commission);
-      const fill = (text: string) => text.replaceAll('{commission}', commissionLabel).replaceAll('{minPayout}', String(config.minPayoutPaid));
+      const fill = (text: string) => AffiliateService.fillTerms(text, config, lang === 'en' ? 'en' : 'ar');
       const base = {
         status: record?.status ?? ('none' as const),
         commission: config.commission,
+        commissionMember: config.commissionMember,
         minPayoutPaid: config.minPayoutPaid,
         introText: fill(lang === 'en' ? config.introTextEn : config.introText),
         agreementText: fill(lang === 'en' ? config.agreementTextEn : config.agreementText),
@@ -117,7 +129,12 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       };
       if (record?.status !== 'approved') return base;
       const link = service.referralLink(record.code);
-      const [referrals, balance, payouts] = await Promise.all([service.referrals(me.id), service.balance(me.id), service.myPayouts(me.id)]);
+      const [referrals, balance, payouts, cycle] = await Promise.all([
+        service.referrals(me.id),
+        service.balance(me.id),
+        service.myPayouts(me.id),
+        service.cycleView(me.id),
+      ]);
       return {
         ...base,
         code: record.code,
@@ -125,6 +142,7 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
         shareText: config.shareText.replaceAll('{link}', link || record.code).replaceAll('{code}', record.code),
         referrals,
         balance,
+        cycle,
         payouts: payouts.map((payout) => ({
           id: payout.id,
           amount: payout.amount,
@@ -186,7 +204,11 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       if (!admin) return;
       const [affiliates, payouts, config] = await Promise.all([service.list(), service.listPayouts(), service.config()]);
       const rows = await Promise.all(
-        affiliates.map(async (record) => ({ ...record, stats: await service.balance(record.contactId) })),
+        affiliates.map(async (record) => ({
+          ...record,
+          stats: await service.balance(record.contactId),
+          cycle: await service.cycleView(record.contactId),
+        })),
       );
       return { affiliates: rows, payouts, config };
     }),
@@ -230,6 +252,22 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       const record = await service.decide(params.contactId, input.status, input.note, admin.me.name || admin.me.email);
       if (!record) return reply.code(404).send({ error: { code: 'not_found', message: 'الطلب غير موجود' } });
       return { affiliate: { ...record, stats: await service.balance(record.contactId) } };
+    }),
+  );
+
+  /** M186: renew the counter (the request filed when it ran out) or restart it early with new terms. */
+  app.post(
+    '/api/admin/affiliates/:contactId/cycle',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(contactIdSchema, request.params, reply);
+      if (!params) return;
+      const input = parse(cycleSchema, request.body, reply);
+      if (!input) return;
+      const record = await service.renewCycle(params.contactId, input);
+      if (!record) return reply.code(404).send({ error: { code: 'not_found', message: 'الممثل غير موجود' } });
+      return { affiliate: { ...record, stats: await service.balance(record.contactId), cycle: await service.cycleView(record.contactId) } };
     }),
   );
 

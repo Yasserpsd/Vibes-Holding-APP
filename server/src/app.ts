@@ -313,8 +313,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
-  // «برنامج ممثلي النادي» (M184): applications, agreement mail, dashboard approval, referrals and payouts.
+  // «برنامج ممثلي نادي المستثمرين» (M184): applications, agreement mail, dashboard approval, referrals and payouts.
   const affiliate = new AffiliateService({ kv, invites, notifier, log: app.log, publicUrl: config.PUBLIC_URL });
+  // M186: counters that run out file their renewal request on time, even when the affiliate never opens the app.
+  const affiliateTimer = setInterval(() => void affiliate.sweep().catch((error: unknown) => app.log.error({ err: error }, 'affiliate sweep failed')), 10 * 60_000);
+  affiliateTimer.unref();
+  app.addHook('onClose', async () => clearInterval(affiliateTimer));
   // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
   const totp = new TotpStore(kv);
   // M156: the AI pass on display names (rules run without it); fails open on any model trouble.

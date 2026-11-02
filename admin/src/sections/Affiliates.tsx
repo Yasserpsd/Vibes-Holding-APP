@@ -19,9 +19,10 @@ const PAYOUT_STATES: Record<AffiliatePayoutRow['status'], { label: string; tone:
 };
 
 /**
- * M184: «ممثلو النادي» — the applications with their full details (bank, address, the source),
+ * M184: «ممثلو نادي المستثمرين» — the applications with their full details (bank, address, the source),
  * the approval that alone activates an affiliate, the payout requests the administration transfers
  * by hand, and the program's editable content (agreement, commission, options, texts).
+ * M186: the commission tiers, the performance-cycle counter per affiliate and «تجديد الدورة».
  */
 export function Affiliates() {
   const { signOut, notify } = useShell();
@@ -33,6 +34,7 @@ export function Affiliates() {
 
   const waiting = state.data?.affiliates.filter((row) => row.status === 'pending').length ?? 0;
   const openPayouts = state.data?.payouts.filter((row) => row.status === 'requested').length ?? 0;
+  const renewals = state.data?.affiliates.filter((row) => row.status === 'approved' && row.cycle?.state === 'renewal').length ?? 0;
 
   async function act(label: string, run: () => Promise<unknown>, key: string) {
     setBusyId(key);
@@ -61,6 +63,25 @@ export function Affiliates() {
     void act(status === 'paid' ? 'سُجّل التحويل وأُبلغ الممثل.' : 'رُفض طلب السحب وأُبلغ الممثل.', () => api.affiliatePayoutDecision(row.id, status, note), `p:${row.id}`);
   }
 
+  /** M186: renew the counter (or restart it early) — the defaults are the program's current terms. */
+  function renewCycle(row: AffiliateRow) {
+    const defaults = state.data?.config;
+    const ask = (label: string, fallback: number, min: number) => {
+      const answer = window.prompt(label, String(fallback));
+      if (answer === null) return null;
+      const value = Math.round(Number(answer.trim()));
+      return Number.isFinite(value) && value >= min ? value : null;
+    };
+    const days = ask(`مدة الدورة الجديدة لـ «${row.name}» (بالأيام):`, defaults?.cycleDays ?? 30, 1);
+    if (days === null) return;
+    const target = ask('عدد الأعضاء الدافعين المطلوب خلال الدورة:', row.cycle?.target ?? defaults?.cycleTarget ?? 10, 1);
+    if (target === null) return;
+    const bonus = ask('بدل المواصلات والمصروفات النثرية عند بلوغ الهدف (بالريال؛ 0 = بدون بدل):', row.cycle?.bonus ?? defaults?.cycleBonus ?? 1500, 0);
+    if (bonus === null) return;
+    if (!window.confirm(`بدء دورة جديدة لـ «${row.name}»: ${formatNumber(days)} يومًا، الهدف ${formatNumber(target)} أعضاء دافعين، البدل ${formatNumber(bonus)} ريال؟`)) return;
+    void act('بدأت الدورة الجديدة وأُبلغ الممثل.', () => api.affiliateCycle(row.contactId, { days, target, bonus }), `c:${row.contactId}`);
+  }
+
   async function saveConfig() {
     if (!config || saving) return;
     setSaving(true);
@@ -79,14 +100,14 @@ export function Affiliates() {
   return (
     <>
       <SectionHead
-        title="ممثلو النادي"
-        hint={state.data ? `طلبات بانتظار القرار: ${formatNumber(waiting)} · طلبات سحب مفتوحة: ${formatNumber(openPayouts)}` : undefined}
+        title="ممثلو نادي المستثمرين"
+        hint={state.data ? `طلبات بانتظار القرار: ${formatNumber(waiting)} · طلبات سحب مفتوحة: ${formatNumber(openPayouts)} · طلبات تجديد الدورة: ${formatNumber(renewals)}` : undefined}
         onReload={state.reload}
         busy={state.loading}
       />
       <p className="muted">
-        برنامج ممثلي النادي: العضو يقدّم طلبًا ببياناته كاملة، تصله الاتفاقية بالبريد ويوافق عليها من التطبيق، ولا يتفعّل إلا باعتمادكم هنا. رمز الإحالة هو رقم
-        عضويته، والعمولة تُستحق فقط عن عضو سجّل برمزه وسدّد العضوية فعلًا (من تأكيد السيرفر، لا من التطبيق). التحويل البنكي يدوي، ثم يُعلَّم طلب السحب «تم الدفع».
+        برنامج ممثلي نادي المستثمرين: العضو يقدّم طلبًا ببياناته كاملة، تصله الاتفاقية بالبريد ويوافق عليها من التطبيق، ولا يتفعّل إلا باعتمادكم هنا. رمز الإحالة هو رقم
+        عضويته، والعمولة تُستحق فقط عن عضو سجّل برمزه وسدّد العضوية فعلًا (من تأكيد السيرفر، لا من التطبيق). التحويل البنكي يدوي، ثم يُعلَّم طلب السحب «تم الدفع». العمولة 250 لغير المشترك و350 للمشترك في العضوية السنوية (حسب حالته وقت سداد العضو)، ولكل ممثل عدّاد دورة أداء: عند بلوغ الهدف داخل المدة يُضاف البدل إلى رصيده تلقائيًا، وعند انتهاء المدة يصلكم طلب تجديد بالبريد ويظهر هنا بزر «تجديد الدورة».
       </p>
       <Async state={state} rows={5}>
         {(data) => (
@@ -186,8 +207,29 @@ export function Affiliates() {
                         {`دافعون: ${formatNumber(row.stats.paid)} · غير دافعين: ${formatNumber(row.stats.unpaid)}`}
                         <br />
                         {`الرصيد المتاح: ${formatNumber(row.stats.available)} ريال`}
+                        <br />
+                        {`فئة العمولة: ${row.stats.member ? 'مشترك' : 'غير مشترك'} (${formatNumber(row.stats.commission)} ريال)${row.stats.bonuses ? ` · بدلات: ${formatNumber(row.stats.bonuses)} ريال` : ''}`}
                       </>
                     ),
+                  },
+                  {
+                    key: 'cycle',
+                    label: 'دورة الأداء',
+                    cell: (row) =>
+                      row.cycle ? (
+                        <>
+                          {row.cycle.state === 'renewal' ? <Pill tone="gold">انتهت — بانتظار التجديد</Pill> : <Pill tone="ok">{`متبقٍ ${formatNumber(row.cycle.daysLeft)} يومًا`}</Pill>}
+                          <div className="muted">{`الدورة ${formatNumber(row.cycle.n)}: ${formatNumber(row.cycle.paid)} من ${formatNumber(row.cycle.target)} أعضاء دافعين · البدل ${formatNumber(row.cycle.bonus)} ريال${row.cycle.achieved ? ' (استُحق)' : ''}`}</div>
+                          <div className="muted">{`تنتهي: ${formatDateTime(row.cycle.endAt)}`}</div>
+                          {row.status === 'approved' ? (
+                            <button type="button" className={row.cycle.state === 'renewal' ? undefined : 'ghost'} disabled={busyId === `c:${row.contactId}`} onClick={() => renewCycle(row)}>
+                              {row.cycle.state === 'renewal' ? 'تجديد الدورة' : 'بدء دورة جديدة'}
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        '—'
+                      ),
                   },
                   { key: 'at', label: 'قدّم', cell: (row) => formatDateTime(row.appliedAt) },
                   {
@@ -221,7 +263,7 @@ export function Affiliates() {
               <form className="card editor" onSubmit={(event) => { event.preventDefault(); void saveConfig(); }}>
                 <h3>محتوى البرنامج (يظهر في التطبيق وفي بريد الاتفاقية)</h3>
                 <label>
-                  العمولة بالريال السعودي عن كل عضو دافع
+                  عمولة الممثل غير المشترك (بالريال عن كل عضو دافع)
                   <input
                     type="number"
                     min={1}
@@ -229,6 +271,28 @@ export function Affiliates() {
                     value={config.commission}
                     onChange={(event) => setConfig({ ...config, commission: Number(event.target.value) || config.commission })}
                   />
+                </label>
+                <label>
+                  عمولة الممثل المشترك في العضوية السنوية (بالريال عن كل عضو دافع)
+                  <input
+                    type="number"
+                    min={1}
+                    max={100000}
+                    value={config.commissionMember}
+                    onChange={(event) => setConfig({ ...config, commissionMember: Number(event.target.value) || config.commissionMember })}
+                  />
+                </label>
+                <label>
+                  مدة دورة الأداء الافتراضية (بالأيام)
+                  <input type="number" min={1} max={365} value={config.cycleDays} onChange={(event) => setConfig({ ...config, cycleDays: Number(event.target.value) || config.cycleDays })} />
+                </label>
+                <label>
+                  هدف الدورة الافتراضي (عدد الأعضاء الدافعين خلال المدة)
+                  <input type="number" min={1} max={1000} value={config.cycleTarget} onChange={(event) => setConfig({ ...config, cycleTarget: Number(event.target.value) || config.cycleTarget })} />
+                </label>
+                <label>
+                  بدل المواصلات والمصروفات النثرية عند بلوغ الهدف (بالريال؛ 0 = بدون بدل)
+                  <input type="number" min={0} max={1000000} value={config.cycleBonus} onChange={(event) => setConfig({ ...config, cycleBonus: Math.max(0, Number(event.target.value) || 0) })} />
                 </label>
                 <label>
                   الحد الأدنى لطلب السحب (عدد الأعضاء المسدّدين؛ 0 = بدون حد)
@@ -241,12 +305,12 @@ export function Affiliates() {
                   />
                 </label>
                 <label>
-                  تعريف البرنامج (أعلى شاشة الانضمام؛ {'{commission}'} تصير قيمة العمولة و{'{minPayout}'} الحد الأدنى للسحب)
-                  <textarea rows={3} maxLength={2000} value={config.introText} onChange={(event) => setConfig({ ...config, introText: event.target.value })} />
+                  تعريف البرنامج (أعلى شاشة الانضمام؛ {'{commission}'} عمولة غير المشترك، {'{commissionMember}'} عمولة المشترك، {'{bonus}'} البدل، {'{bonusTarget}'} هدف الدورة، {'{bonusDays}'} مدتها، {'{minPayout}'} الحد الأدنى للسحب)
+                  <textarea rows={6} maxLength={2000} value={config.introText} onChange={(event) => setConfig({ ...config, introText: event.target.value })} />
                 </label>
                 <label>
                   تعريف البرنامج بالإنجليزية (للتطبيق بالوضع الإنجليزي؛ نفس الرموز)
-                  <textarea rows={3} maxLength={2000} dir="ltr" value={config.introTextEn} onChange={(event) => setConfig({ ...config, introTextEn: event.target.value })} />
+                  <textarea rows={6} maxLength={2000} dir="ltr" value={config.introTextEn} onChange={(event) => setConfig({ ...config, introTextEn: event.target.value })} />
                 </label>
                 <label>
                   نص المشاركة الذي يرسله الممثل ({'{link}'} رابطه و{'{code}'} رمزه)
@@ -261,7 +325,7 @@ export function Affiliates() {
                   />
                 </label>
                 <label>
-                  نص الاتفاقية الكامل ({'{commission}'} تصير قيمة العمولة و{'{minPayout}'} الحد الأدنى للسحب)
+                  نص الاتفاقية الكامل ({'{commission}'} عمولة غير المشترك، {'{commissionMember}'} عمولة المشترك، {'{bonus}'} البدل، {'{bonusTarget}'} هدف الدورة، {'{bonusDays}'} مدتها، {'{minPayout}'} الحد الأدنى للسحب)
                   <textarea rows={18} maxLength={20000} value={config.agreementText} onChange={(event) => setConfig({ ...config, agreementText: event.target.value })} />
                 </label>
                 <label>

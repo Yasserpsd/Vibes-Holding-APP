@@ -4,7 +4,7 @@ import { useAuth } from '@/auth/AuthProvider';
 
 import { apiGet, apiRequest } from './client';
 
-// Mirrors server/src/affiliate/routes.ts (M184): «برنامج ممثلي النادي».
+// Mirrors server/src/affiliate/routes.ts (M184): «برنامج ممثلي نادي المستثمرين».
 export type AffiliateStatus = 'none' | 'agreement' | 'pending' | 'approved' | 'rejected';
 
 export type AffiliateEntityType = 'individual' | 'company';
@@ -27,8 +27,28 @@ export type AffiliateApplication = {
 /** One registration through the affiliate's code; paid = the server confirmed the membership payment. */
 export type AffiliateReferral = { name: string; at: string; paid: boolean };
 
+/** M186: the performance-cycle counter; an older server sends none. */
+export type AffiliateCycle = {
+  n: number;
+  startAt: string;
+  endAt: string;
+  daysLeft: number;
+  target: number;
+  paid: number;
+  bonus: number;
+  achieved: boolean;
+  bonusAt: string | null;
+  state: 'running' | 'renewal';
+};
+
 export type AffiliateBalance = {
+  /** The rate for the next paying referral (follows the affiliate's own membership). */
   commission: number;
+  /** M186 tiers; an older server sends none. */
+  commissionBase?: number;
+  commissionMember?: number;
+  member?: boolean;
+  bonuses?: number;
   /** Paid referrals required before a payout may be requested; an older server sends none. */
   minPaid?: number;
   referrals: number;
@@ -63,6 +83,7 @@ export type AffiliateOverview = {
   shareText?: string;
   referrals?: AffiliateReferral[];
   balance?: AffiliateBalance;
+  cycle?: AffiliateCycle | null;
   payouts?: AffiliatePayout[];
 };
 
