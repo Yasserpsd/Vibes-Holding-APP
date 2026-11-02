@@ -297,6 +297,13 @@ export class AgendaService {
     if (!event) throw new RequestError('not_found', 'الفعالية غير موجودة', 404);
     const fee = feeFor(event, me.membership.status === 'active');
     if (fee <= 0) throw new RequestError('no_fee', 'لا توجد رسوم على حضورك لهذه الفعالية');
+    // M182e: the supported price is final — the monthly deal does not stack on it (an admin's own code still may).
+    if ((event.originalFeeSar ?? 0) > event.feeSar) {
+      const monthly = await this.deps.discounts.activeMonthly(now);
+      if (monthly && monthly.code === code.trim().toUpperCase()) {
+        throw new RequestError('supported_price', 'هذه الفعالية بسعر مدعوم من النادي — لا يُجمع عليه عرض الشهر');
+      }
+    }
     return this.deps.discounts.apply(code, fee, now);
   }
 
@@ -315,8 +322,15 @@ export class AgendaService {
     }
     const member = me.membership.status === 'active';
     const fee = feeFor(event, member);
+    // M182e (owner: «بعد الخصم بالفعل 290 ليه مكتوب 261»): a supported price (originalFeeSar) is final —
+    // the automatic monthly deal never stacks on it (older app bundles still send it); an admin's own code still applies.
+    let code = discountCode;
+    if (code && (event.originalFeeSar ?? 0) > event.feeSar && this.deps.discounts) {
+      const monthly = await this.deps.discounts.activeMonthly(now);
+      if (monthly && monthly.code === code.trim().toUpperCase()) code = undefined;
+    }
     // M107: the code is validated BEFORE the registration is touched, so a bad code changes nothing.
-    const discount = discountCode && fee > 0 && this.deps.discounts ? await this.deps.discounts.apply(discountCode, fee, now) : undefined;
+    const discount = code && fee > 0 && this.deps.discounts ? await this.deps.discounts.apply(code, fee, now) : undefined;
     const due = discount ? discount.amountAfter : fee;
     const stamp = new Date(now).toISOString();
 

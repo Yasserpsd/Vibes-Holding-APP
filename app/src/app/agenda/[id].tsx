@@ -46,6 +46,9 @@ export default function AgendaEventScreen() {
   const [bookingY, setBookingY] = useState(0);
   const event = query.data?.event;
   const myFee = event ? (event.myFeeSar ?? event.feeSar) : 0;
+  // M182e (owner: «بعد الخصم بالفعل 290 ليه مكتوب 261»): a supported price (originalFeeSar struck above it)
+  // is final — the month's automatic code never rides along or shows on it.
+  const supportedPrice = (event?.originalFeeSar ?? 0) > 0;
   const attendance: AgendaAttendance = event?.mode === 'online' ? 'online' : event?.mode === 'hq' ? 'hq' : chosen;
 
   const tap = (attendance: AgendaAttendance) => {
@@ -53,7 +56,7 @@ export default function AgendaEventScreen() {
     setError(null);
     setGated(false);
     register.mutate(
-      { eventId: event.id, attendance, discountCode: deal?.code || undefined },
+      { eventId: event.id, attendance, discountCode: !supportedPrice && deal?.code ? deal.code : undefined },
       {
         onSuccess: async (answer) => {
           // M111: the checkout renders embedded inside the app. A 100% code settles on the spot.
@@ -77,7 +80,7 @@ export default function AgendaEventScreen() {
   };
 
   // The one button: «تأكيد الحضور» for a member (or a no-fee event), the same words with the fee for everyone else.
-  const dealOn = Boolean(event?.mustPay && myFee > 0 && deal);
+  const dealOn = Boolean(event?.mustPay && myFee > 0 && deal && !supportedPrice);
   const payFee = dealOn && deal ? dealAmount(myFee, deal.percent) : myFee;
   const confirmLabel = event && event.mustPay && myFee > 0 ? t('agenda.withFee', { label: t('agenda.confirmAttendance'), fee: String(payFee) }) : t('agenda.confirmAttendance');
   const canBook = Boolean(event && signedIn && event.open && !event.mine?.paid);
