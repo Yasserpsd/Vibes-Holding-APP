@@ -45,7 +45,8 @@ export function withoutMediaLines(text: string): string {
 const HEADING_MAX = 60;
 
 const LABEL_MAX = 40;
-const NUMBER = /(\d[\d,.٫٬]*\s?(?:%|٪|ريال|SAR|مقعدًا|مقعد)?)/u;
+// «ريال» swallows its suffixed forms (ريالًا/ريالاً/ريالات) so the tanween never falls outside the lit span.
+const NUMBER = /(\d[\d,.٫٬]*\s?(?:%|٪|ريال(?:ات|ًا|اً|ا)?|SAR|مقعدًا|مقعد)?)/u;
 
 const ICONS: { test: RegExp; icon: IoniconName }[] = [
   { test: /مكان|مقر|موقع|place|venue|location/iu, icon: 'location-outline' },
