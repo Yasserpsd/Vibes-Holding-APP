@@ -41,6 +41,8 @@ const LRM = '‎';
  * M177 (owner, 2026-11-01): «كل اللي يدخل يشوف الورشة مرة في اليوم» — the opening popup, once per Riyadh day:
  * the next open workshop with the day's AI-written words (server/src/agenda/ad.ts), its photo (the HQ photo
  * when it has none) and one button to its page. Closing it leaves the home exactly as it was.
+ * Owner (2026-11-02): the X over the photo never responded on real phones — removed; «لاحقًا» (and the
+ * Android back button) is the one way out.
  */
 export function WorkshopAdPopup() {
   const router = useRouter();
@@ -88,9 +90,6 @@ export function WorkshopAdPopup() {
                 </View>
               </View>
             </PressScale>
-            <PressScale onPress={dismiss} accessibilityRole="button" accessibilityLabel={t('workshopAd.close')} style={styles.close}>
-              <Ionicons name="close" size={20} color={colors.textPrimary} />
-            </PressScale>
             <Text style={styles.headline}>{ad.headline}</Text>
             <Text style={styles.body}>{ad.body}</Text>
             <View style={styles.facts}>
@@ -134,7 +133,6 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   badgeText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, color: colors.goldInk },
-  close: { position: 'absolute', top: spacing.md + spacing.sm, end: spacing.md + spacing.sm, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0, 0, 0, 0.55)', alignItems: 'center', justifyContent: 'center' },
   headline: { ...typography.title, fontSize: 21, lineHeight: 33, color: colors.gold, textAlign: textStart, marginTop: spacing.xs },
   body: { ...typography.body, fontSize: 15, lineHeight: 25, color: colors.textPrimary, textAlign: textStart },
   facts: { gap: 2, paddingVertical: spacing.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.borderGoldSoft },

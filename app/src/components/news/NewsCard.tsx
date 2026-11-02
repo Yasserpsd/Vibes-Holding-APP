@@ -38,7 +38,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         </View>
         <View style={styles.body}>
           <View style={styles.text}>
-            <Text style={[styles.title, textDir(item.title)]} numberOfLines={compact ? 3 : 3}>
+            <Text style={[styles.title, compact && styles.compactTitle, textDir(item.title)]} numberOfLines={3}>
               {item.title}
             </Text>
             {!compact && item.snippet ? (
@@ -131,6 +131,8 @@ const styles = StyleSheet.create({
   body: { flexDirection: 'row', gap: spacing.md },
   text: { flex: 1, gap: spacing.xs },
   title: { ...typography.subtitle, color: colors.textPrimary },
+  // The decisions strip reserves all three title lines so its cards share one height.
+  compactTitle: { minHeight: typography.subtitle.lineHeight * 3 },
   snippet: { ...typography.caption, color: colors.textSecondary },
   image: { width: 92, height: 92, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden' },
   imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldFaint, borderWidth: 1, borderColor: colors.borderGoldSoft },

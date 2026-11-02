@@ -185,11 +185,13 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       key: 'momentum',
       cta: 'Request the service',
       title: 'Momentum: websites, apps and marketing',
-      summary: 'Website and app design, digital marketing packages and influencer advertising at a 50% discount for members.',
-      memberLabel: '50% discount for members',
+      summary: 'Website and app design, marketing packages built on request, and influencer advertising. Open to everyone — club members get 50% off every Momentum service.',
+      detail: 'The Momentum team listens to your needs and builds the right package — a website, an app or a full marketing campaign. Request the service and the team reaches you directly on WhatsApp.',
+      priceLabel: 'Packages on request',
+      memberLabel: '50% off every service for members',
       action: {
-        message: 'I would like to use the member discount on Momentum services.',
-        fields: [{ key: 'service', label: 'Service', options: ['Website', 'App', 'Digital marketing', 'Influencer advertising'] }],
+        message: 'I would like to request a Momentum service through the Investors Club.',
+        fields: [{ key: 'service', label: 'Service', options: ['Website', 'App', 'Marketing package on request', 'Influencer advertising'] }],
       },
     },
     // M107: «franchise» and «manfaz» removed with their Arabic entries.

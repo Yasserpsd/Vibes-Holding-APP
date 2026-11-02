@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMarkets, type MarketGroup, type MarketQuote } from '@/api/markets';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
-import { ChangeText, priceText } from '@/components/MarketsStrip';
+import { ChangeText, priceText, QuoteIcon } from '@/components/MarketsStrip';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -65,13 +65,13 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
   const label = english ? quote.labelEn : quote.label;
   return (
     <View style={[styles.row, !last && styles.divider]}>
+      {/* Owner (2026-11-02): each quote wears its icon, and the «متأخر 15 دقيقة» line left the screens. */}
+      <QuoteIcon quote={quote} size={20} />
       <View style={styles.start}>
         <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
         <Text style={styles.meta} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
         {quote.gramSar ? <Text style={styles.gram} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
-        <Text style={styles.meta} numberOfLines={1}>
-          {quote.delayedMin ? `${formatRelativeTime(quote.at)} · ${t('markets.delayed', { min: quote.delayedMin })}` : formatRelativeTime(quote.at)}
-        </Text>
+        <Text style={styles.meta} numberOfLines={1}>{formatRelativeTime(quote.at)}</Text>
       </View>
       <Pressable style={styles.rowAsk} hitSlop={8} onPress={() => onAsk(label)} accessibilityRole="button" accessibilityLabel={t('markets.askAbout', { label })}>
         <Ionicons name="sparkles-outline" size={16} color={colors.gold} />

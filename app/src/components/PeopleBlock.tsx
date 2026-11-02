@@ -96,5 +96,6 @@ const styles = StyleSheet.create({
   avatarPhoto: { width: '100%', height: '100%' },
   initial: { color: colors.gold, fontFamily: fonts.bold },
   name: { ...typography.body, color: colors.textPrimary, textAlign: 'center' },
-  title: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  // Two caption lines reserved so one-line and two-line titles keep the strip's cards one height.
+  title: { ...typography.caption, color: colors.textMuted, textAlign: 'center', minHeight: typography.caption.lineHeight * 2 },
 });

@@ -13,7 +13,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 type Props = {
   video: Video;
   onPress: () => void;
-  /** Fixed width for horizontal strips. */
+  /** Fixed width for horizontal strips; the card then stretches to the strip's tallest card. */
   width?: number;
   /** Opens the advisor with this video as the context; the card shows «اسأل المستشار» when set. */
   onAsk?: () => void;
@@ -23,9 +23,10 @@ type Props = {
 export function VideoCard({ video, onPress, width, onAsk }: Props) {
   // The thumbnail fades in once it arrives instead of popping over the dark surface.
   const [thumbOpacity] = useState(() => new Animated.Value(0));
+  const strip = width !== undefined;
   return (
-    <PressScale onPress={onPress} wrapStyle={width ? { width } : null}>
-      <GlassCard>
+    <PressScale onPress={onPress} wrapStyle={strip ? [styles.fill, { width }] : null} style={strip ? styles.fill : null}>
+      <GlassCard style={strip ? styles.fill : undefined}>
         <View style={styles.thumbBox}>
           <Animated.Image
             resizeMethod="resize"
@@ -40,8 +41,8 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
             <Ionicons name="play" size={22} color={colors.goldInk} />
           </View>
         </View>
-        <View style={styles.texts}>
-          <Text style={styles.title} numberOfLines={2}>
+        <View style={[styles.texts, strip && styles.fill]}>
+          <Text style={[styles.title, strip && styles.titleStrip]} numberOfLines={2}>
             {video.title}
           </Text>
           {video.blurb ? (
@@ -55,7 +56,7 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
               onPress={onAsk}
               hitSlop={6}
               accessibilityLabel={t('videos.askAbout', { title: video.title })}
-              wrapStyle={styles.askWrap}
+              wrapStyle={[styles.askWrap, strip && styles.askWrapStrip]}
               style={styles.ask}
             >
               <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
@@ -80,11 +81,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     boxShadow: shadows.glowGold,
   },
+  fill: { flex: 1 },
   texts: { padding: spacing.md, gap: 4 },
   title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
+  // Strip cards keep two title lines so the blurbs and dates line up across the row.
+  titleStrip: { minHeight: typography.body.lineHeight * 2 },
   blurb: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   date: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   askWrap: { alignSelf: 'flex-start', marginTop: spacing.xs },
+  askWrapStrip: { marginTop: 'auto' },
   ask: {
     flexDirection: 'row',
     alignItems: 'center',

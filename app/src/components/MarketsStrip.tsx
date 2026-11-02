@@ -11,6 +11,29 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
 const HOME_COUNT = 3;
+// One width for every tile (owner, 2026-11-01: «كلهم نفس المقاس»); the row stretches them to the tallest.
+const QUOTE_WIDTH = 124;
+
+// Owner (2026-11-02): every quote wears its own face — the Saudi flag on TASI, gold and silver as
+// metal, the oil drum on brent/WTI, each currency's flag, Bitcoin's own logo. Emoji render in color
+// inside Text on both platforms, so no asset and no native module (OTA-safe on the 1.1.0 binary).
+const QUOTE_EMOJI: Record<string, string> = {
+  tasi: '🇸🇦',
+  gold: '🥇',
+  silver: '🥈',
+  brent: '🛢️',
+  wti: '🛢️',
+  usd: '🇺🇸',
+  aed: '🇦🇪',
+  eur: '🇪🇺',
+  gbp: '🇬🇧',
+};
+
+export function QuoteIcon({ quote, size = 15 }: { quote: MarketQuote; size?: number }) {
+  if (quote.key === 'btc') return <Ionicons name="logo-bitcoin" size={size} color={colors.gold} />;
+  const emoji = QUOTE_EMOJI[quote.key] ?? (quote.group === 'crypto' ? '🪙' : '📈');
+  return <Text style={{ fontSize: size - 1, lineHeight: size + 5 }}>{emoji}</Text>;
+}
 
 /** Big prices as whole numbers with separators; small ones (currencies, silver) keep two decimals, tiny coins four. */
 export function priceText(price: number): string {
@@ -47,23 +70,21 @@ export function MarketsStrip() {
     <View style={styles.markets}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {shown.map((quote) => (
-          <PressScale key={quote.key} onPress={open} accessibilityRole="button" accessibilityLabel={english ? quote.labelEn : quote.label}>
-            <View style={styles.quote}>
+          <PressScale key={quote.key} onPress={open} wrapStyle={styles.tile} style={styles.quote} accessibilityRole="button" accessibilityLabel={english ? quote.labelEn : quote.label}>
+            <View style={styles.labelRow}>
+              <QuoteIcon quote={quote} />
               <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
-              <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
-              <ChangeText quote={quote} />
-              <Text style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
-              {quote.gramSar ? <Text style={styles.extra} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
-              {quote.delayedMin ? <Text style={styles.unit} numberOfLines={1}>{t('markets.delayed', { min: quote.delayedMin })}</Text> : null}
             </View>
+            <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
+            <ChangeText quote={quote} />
+            <Text style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
+            {quote.gramSar ? <Text style={styles.extra} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
           </PressScale>
         ))}
-        <PressScale onPress={open} accessibilityRole="button" accessibilityLabel={t('markets.viewAll')}>
-          <View style={[styles.quote, styles.all]}>
-            <Ionicons name="stats-chart" size={20} color={colors.gold} />
-            <Text style={styles.label} numberOfLines={1}>{t('markets.viewAll')}</Text>
-            <Text style={styles.unit} numberOfLines={1}>{t('markets.viewAllSub')}</Text>
-          </View>
+        <PressScale onPress={open} wrapStyle={styles.tile} style={[styles.quote, styles.all]} accessibilityRole="button" accessibilityLabel={t('markets.viewAll')}>
+          <Ionicons name="stats-chart" size={20} color={colors.gold} />
+          <Text style={[styles.label, styles.allText]} numberOfLines={1}>{t('markets.viewAll')}</Text>
+          <Text style={[styles.unit, styles.allText]} numberOfLines={1}>{t('markets.viewAllSub')}</Text>
         </PressScale>
       </ScrollView>
     </View>
@@ -73,9 +94,12 @@ export function MarketsStrip() {
 const styles = StyleSheet.create({
   markets: { gap: 4, marginBottom: spacing.sm },
   row: { gap: spacing.sm },
-  quote: { minWidth: 104, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 1 },
+  tile: { width: QUOTE_WIDTH },
+  quote: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 1 },
   all: { alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.goldSoft },
-  label: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
+  allText: { alignSelf: 'stretch', textAlign: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  label: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart, flexShrink: 1 },
   price: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
   change: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   pct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },

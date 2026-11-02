@@ -80,15 +80,17 @@ export default function RootLayout() {
 
   // M152: the last visit's content comes back from disk behind the splash, so the home draws at once
   // and refreshes behind; from then on every change is mirrored to the file (see lib/queryCache.ts).
+  // It waits for i18n: the file is kept only when it was saved in the language the app opens in.
   const [cacheReady, setCacheReady] = useState(false);
   useEffect(() => {
+    if (!i18nReady) return;
     let unsubscribe: (() => void) | null = null;
     void restoreQueryCache(queryClient).finally(() => {
       unsubscribe = persistQueryCache(queryClient);
       setCacheReady(true);
     });
     return () => unsubscribe?.();
-  }, []);
+  }, [i18nReady]);
 
   const ready = (fontsLoaded || fontError !== null) && i18nReady && cacheReady;
   useEffect(() => {

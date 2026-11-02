@@ -2,6 +2,8 @@ import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query';
 // The legacy entry gates its own native module (M92 pattern): safe on every binary.
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { getLang, type Lang } from '@/i18n';
+
 /**
  * M152 (owner: «التطبيق بطيء شوية عايزه أسرع»): the public content queries survive a relaunch.
  * The home paints at once from the last visit and TanStack refreshes whatever is stale behind it,
@@ -19,7 +21,9 @@ const WRITE_DELAY_MS = 1000;
 // the register screen draw their fields from the file at once and refresh behind.
 const KEEP_ROOTS = new Set(['content', 'services', 'videos', 'partners', 'posts', 'people', 'agenda', 'projects', 'golden', 'meetups', 'auth']);
 
-type Snapshot = { savedAt: number; state: ReturnType<typeof dehydrate> };
+// The server answers in the app's language (x-app-lang), so a snapshot belongs to the language it was
+// saved in: after a language switch the other language's copy is dropped, never painted (owner, 2026-11-01).
+type Snapshot = { savedAt: number; lang: Lang; state: ReturnType<typeof dehydrate> };
 
 function fileUri(): string | null {
   const dir = FileSystem.documentDirectory;
@@ -30,7 +34,7 @@ function keepQuery(queryKey: readonly unknown[]): boolean {
   return typeof queryKey[0] === 'string' && KEEP_ROOTS.has(queryKey[0]);
 }
 
-/** Fills the cache from the last launch's file. Never throws: a missing or bad file is an empty cache. */
+/** Fills the cache from the last launch's file (call after initI18n). Never throws: a missing or bad file is an empty cache. */
 export async function restoreQueryCache(client: QueryClient): Promise<boolean> {
   const uri = fileUri();
   if (!uri) return false;
@@ -38,6 +42,7 @@ export async function restoreQueryCache(client: QueryClient): Promise<boolean> {
     const parsed = JSON.parse(await FileSystem.readAsStringAsync(uri)) as Partial<Snapshot> | null;
     if (!parsed || typeof parsed.savedAt !== 'number' || !parsed.state || !Array.isArray(parsed.state.queries)) return false;
     if (Date.now() - parsed.savedAt > MAX_AGE_MS) return false;
+    if (parsed.lang !== getLang()) return false;
     const fresh = parsed.state.queries.filter((query) => keepQuery(query.queryKey) && Date.now() - query.state.dataUpdatedAt <= MAX_AGE_MS);
     hydrate(client, { mutations: [], queries: fresh });
     return fresh.length > 0;
@@ -56,6 +61,7 @@ export function persistQueryCache(client: QueryClient): () => void {
     timer = null;
     const snapshot: Snapshot = {
       savedAt: Date.now(),
+      lang: getLang(),
       state: dehydrate(client, { shouldDehydrateQuery: (query) => query.state.status === 'success' && keepQuery(query.queryKey), shouldDehydrateMutation: () => false }),
     };
     const text = JSON.stringify(snapshot);

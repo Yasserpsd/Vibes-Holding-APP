@@ -93,6 +93,8 @@ export const SERVICES_CONTENT_KEY = 'content:services';
 /** The only management number and the studio number (docs/PROJECT_BRIEF.md section 1). */
 export const MANAGEMENT_WHATSAPP = '+966551623111';
 export const STUDIO_WHATSAPP = '+966538461110';
+/** Owner (2026-11-02): Momentum requests go to Momentum's own number. */
+export const MOMENTUM_WHATSAPP = '+966537827771';
 
 const management = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: MANAGEMENT_WHATSAPP, message, fields });
 const studio = (message: string, fields: ServiceField[] = []): ServiceAction => ({ type: 'whatsapp', phone: STUDIO_WHATSAPP, message, fields });
@@ -384,17 +386,19 @@ export const SERVICES_SEED: ServicesContent = {
     {
       key: 'momentum',
       title: 'مومنتوم: المواقع والتطبيقات والتسويق',
-      summary: 'تصميم المواقع والتطبيقات، باقات التسويق الإلكتروني وإعلانات المؤثرين بخصم 50% للأعضاء.',
-      detail: null,
+      // Owner (2026-11-02): open to everyone (not members-only), marketing packages built on request,
+      // and the 50% member discount covers every Momentum service.
+      summary: 'تصميم المواقع والتطبيقات، وباقات تسويق تُصمَّم حسب طلبك، وإعلانات المؤثرين. متاحة للجميع، وأعضاء النادي يحصلون على خصم 50% على جميع خدمات مومنتوم.',
+      detail: 'فريق مومنتوم يستمع لاحتياجك ويبني لك الباقة المناسبة — موقعًا أو تطبيقًا أو حملة تسويقية متكاملة. اطلب الخدمة وسيتواصل معك الفريق مباشرة على الواتساب.',
       icon: 'globe',
       group: 'discount',
-      priceLabel: null,
-      memberLabel: 'خصم 50% للأعضاء',
-      access: 'member',
-      // Owner (2026-10-21): momentum requests go to the same stage/podcast number.
-      action: studio('أرغب في الاستفادة من خصم الأعضاء على خدمات مومنتوم.', [
-        { key: 'service', label: 'الخدمة', options: ['موقع إلكتروني', 'تطبيق', 'تسويق إلكتروني', 'إعلانات مؤثرين'] },
-      ]),
+      priceLabel: 'باقات حسب الطلب',
+      memberLabel: 'خصم 50% للأعضاء على جميع الخدمات',
+      access: 'everyone',
+      // Owner (2026-11-02): momentum requests go to Momentum's own number.
+      action: { type: 'whatsapp', phone: MOMENTUM_WHATSAPP, message: 'أرغب في طلب خدمة من مومنتوم عبر نادي المستثمرين.', fields: [
+        { key: 'service', label: 'الخدمة', options: ['موقع إلكتروني', 'تطبيق', 'باقة تسويق حسب الطلب', 'إعلانات مؤثرين'] },
+      ] },
       infoUrl: 'https://momentummix.com/',
       videoUrl: '',
       order: 15,
@@ -404,8 +408,10 @@ export const SERVICES_SEED: ServicesContent = {
   ],
   // v15 (owner, 2026-10-26): «انشر تطبيقك على Android و iOS» replaces «على المتجرين».
   // v16 (owner, 2026-10-26): every service carries its own film (`videoUrl`, dashboard-edited; «اصنع ملتقاك» seeded).
-  version: 16,
-  updatedAt: '2026-10-26T12:00:00.000Z',
+  // v17 (owner, 2026-11-02): Momentum opens to everyone with on-request marketing packages, 50% off
+  // every Momentum service for members, and requests go to Momentum's own WhatsApp.
+  version: 17,
+  updatedAt: '2026-11-02T12:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

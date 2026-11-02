@@ -128,7 +128,10 @@ export class ContextResolver {
       case 'service': {
         const service = (await getServicesContent(this.deps.kv)).services.find((entry) => entry.key === context.id);
         if (!service) return NONE;
-        const text = lines([`خدمة: ${service.title}`, service.summary, service.detail, service.priceLabel && `السعر: ${service.priceLabel}`, service.memberLabel && `للأعضاء: ${service.memberLabel}`, service.access === 'member' && 'الخدمة للأعضاء المشتركين.']);
+        // Owner (2026-11-02): a WhatsApp-handled service carries its request number, so the brain can
+        // hand it over when the member asks to order (e.g. Momentum's own number).
+        const phone = service.action.type === 'whatsapp' ? service.action.phone : null;
+        const text = lines([`خدمة: ${service.title}`, service.summary, service.detail, service.priceLabel && `السعر: ${service.priceLabel}`, service.memberLabel && `للأعضاء: ${service.memberLabel}`, service.access === 'member' && 'الخدمة للأعضاء المشتركين.', phone && `للطلب عبر واتساب: ${phone}`]);
         return { url: service.infoUrl ?? '', title: `خدمة ${service.title} — ${APP}`, focus: focus(service.title, text) };
       }
       case 'post': {

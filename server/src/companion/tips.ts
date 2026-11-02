@@ -6,6 +6,11 @@ import type { AppLang } from '../lang.js';
  * picked by persona and membership and rotated per member (two members rarely get the same one on
  * the same day). Built from the club's real benefits — no AI cost at send time, no promised returns.
  * The same tips fill «مقترح لك» rows in the notifications tab for the last days.
+ *
+ * Owner (2026-11-02, «طور اكتر طريقة تعامل المستشار مع الشخص في الرسايل»): the advisor writes like a
+ * person who thought of you today — he opens with the member, offers to do the work himself («أرتّب
+ * لك», «أحجز لك»), and invites a reply, instead of reciting the service. Same rules as ever: no
+ * «مجاني», «رصيد» and «الشراكات», no promised returns.
  */
 
 export type TipAudience = { persona: string | null; member: boolean };
@@ -32,22 +37,22 @@ const TIPS: TipDef[] = [
     route: '/services',
     needs: ['deal', 'percent'],
     ar: {
-      member: { title: '{name}، كود {deal} مفعّل لك', body: 'خصم {percent}% يُطبَّق تلقائيًا هذا الشهر على الورش والخدمات داخل التطبيق — بدون أن تكتب شيئًا.' },
+      member: { title: '{name}، كود {deal} مفعّل لك', body: 'جهّزت لك خصم {percent}% هذا الشهر — يُطبَّق تلقائيًا على الورش والخدمات داخل التطبيق دون أن تكتب شيئًا. استفد منه قبل نهاية الشهر، وأنا هنا إن احترت بين الخيارات.' },
     },
     en: {
-      member: { title: '{name}, code {deal} is on for you', body: '{percent}% off, applied automatically this month to workshops and services in the app — nothing to type.' },
+      member: { title: '{name}, code {deal} is on for you', body: 'I set up {percent}% off for you this month — applied automatically to workshops and services in the app, nothing to type. Use it before the month ends; I am here if you want help choosing.' },
     },
   },
   {
     key: 'famous',
     route: '/service/famous',
     ar: {
-      member: { title: '{name}، قصتك تستحق أن تُروى', body: 'انضم إلى «شخصية ومسيرة» بدون رسوم بعضويتك السنوية، ودع أعضاء النادي يتعرّفون على مسيرتك.' },
-      guest: { title: '{name}، قصتك تستحق أن تُروى', body: '«شخصية ومسيرة» تعرّف أعضاء النادي بمسيرتك — بدون رسوم مع العضوية السنوية.' },
+      member: { title: '{name}، قصتك تستحق أن تُروى', body: 'أرى أن مسيرتك تستحق أن يعرفها أعضاء النادي. «شخصية ومسيرة» متاحة لك بدون رسوم بعضويتك — قل لي متى تحب أن نبدأ وأرافقك خطوة بخطوة.' },
+      guest: { title: '{name}، قصتك تستحق أن تُروى', body: '«شخصية ومسيرة» تعرّف أعضاء النادي بمسيرتك، بدون رسوم مع العضوية السنوية — اسألني عنها وأشرح لك كيف تبدأ.' },
     },
     en: {
-      member: { title: '{name}, your story deserves the spotlight', body: 'Join «Profile & Journey» at no charge with your annual membership and let the members meet you.' },
-      guest: { title: '{name}, your story deserves the spotlight', body: '«Profile & Journey» introduces you to the club members — at no charge with the annual membership.' },
+      member: { title: '{name}, your story deserves the spotlight', body: 'Your journey deserves to be known by the members. «Profile & Journey» is yours at no charge with your membership — tell me when you want to start and I will walk you through it.' },
+      guest: { title: '{name}, your story deserves the spotlight', body: '«Profile & Journey» introduces you to the club members, at no charge with the annual membership — ask me and I will show you how to start.' },
     },
   },
   {
@@ -55,8 +60,8 @@ const TIPS: TipDef[] = [
     route: '/projects',
     personas: ['investor', 'neutral'],
     only: 'member',
-    ar: { member: { title: '{name}، رصيدك في بنك المشاريع ينتظرك', body: 'استخدم رصيدك لفتح تفاصيل مشروع يناسب اهتماماتك والتواصل مع مؤسسه مباشرة.' } },
-    en: { member: { title: '{name}, your Projects Bank credit is waiting', body: 'Use your credit to unlock a project that fits your interests and reach its founder directly.' } },
+    ar: { member: { title: '{name}، رصيدك في بنك المشاريع ينتظرك', body: 'رصيدك يفتح لك تفاصيل المشاريع والتواصل مع مؤسسيها مباشرة. أخبرني بما يهمك — قطاعًا أو فكرة — وأرشّح لك اليوم ما يناسبك.' } },
+    en: { member: { title: '{name}, your Projects Bank credit is waiting', body: 'Your credit unlocks project details and direct contact with their founders. Tell me what interests you — a sector or an idea — and I will pick the right one for you today.' } },
   },
   {
     key: 'project',
@@ -64,36 +69,36 @@ const TIPS: TipDef[] = [
     personas: ['investor', 'neutral'],
     needs: ['project', 'sector'],
     ar: {
-      member: { title: '{name}، مشروع مرشّح لك اليوم', body: '«{project}» في قطاع {sector} — افتحه برصيدك في بنك المشاريع واسألني عنه قبل أن تقرر.' },
-      guest: { title: '{name}، مشروع مرشّح لك اليوم', body: '«{project}» في قطاع {sector} — تصفّحه في بنك المشاريع واسألني عنه.' },
+      member: { title: '{name}، مشروع مرشّح لك اليوم', body: 'وقع اختياري اليوم على «{project}» في قطاع {sector}. افتحه برصيدك في بنك المشاريع، وأنا معك إن أردت رأيًا قبل أن تقرر.' },
+      guest: { title: '{name}، مشروع مرشّح لك اليوم', body: 'وقع اختياري اليوم على «{project}» في قطاع {sector}. تصفّحه في بنك المشاريع، وحدّثني إن أحببت أن أخبرك المزيد عنه.' },
     },
     en: {
-      member: { title: '{name}, a project picked for you today', body: '«{project}» in {sector} — unlock it with your Projects Bank credit and ask me about it first.' },
-      guest: { title: '{name}, a project picked for you today', body: '«{project}» in {sector} — browse it in the Projects Bank and ask me about it.' },
+      member: { title: '{name}, a project picked for you today', body: 'Today I picked «{project}» in {sector} for you. Unlock it with your Projects Bank credit — and I am here if you want a second opinion before you decide.' },
+      guest: { title: '{name}, a project picked for you today', body: 'Today I picked «{project}» in {sector}. Browse it in the Projects Bank, and talk to me if you want to hear more about it.' },
     },
   },
   {
     key: 'meeting-room',
     route: '/service/meeting-room',
     ar: {
-      member: { title: '{name}، قاعة اجتماعات فاخرة لك', body: 'قاعة الاجتماعات في مقر النادي بدون رسوم طوال عضويتك — اطلب مني وأحجزها لك في الوقت الذي تختاره.' },
-      guest: { title: '{name}، اجتماعك القادم في مقر النادي', body: 'قاعة اجتماعات فاخرة بدون رسوم طوال مدة العضوية السنوية — وأنا أحجزها لك متى أردت.' },
+      member: { title: '{name}، قاعة اجتماعات فاخرة لك', body: 'اجتماعك القادم يستحق مكانًا يليق به. قاعة الاجتماعات في مقر النادي جاهزة لك بدون رسوم طوال عضويتك — قل لي الموعد الذي يناسبك وأرتّب لك الحجز كاملًا.' },
+      guest: { title: '{name}، اجتماعك القادم في مقر النادي', body: 'اجتماعك القادم يستحق مكانًا يليق به: قاعة فاخرة بدون رسوم طوال مدة العضوية السنوية — وأنا أتولى الحجز عنك متى أردت.' },
     },
     en: {
-      member: { title: '{name}, a premium meeting room for you', body: 'The HQ meeting room is yours at no charge for your whole membership — ask me and I will book it for you.' },
-      guest: { title: '{name}, host your next meeting at the HQ', body: 'A premium meeting room at no charge for the whole annual membership — I book it whenever you want.' },
+      member: { title: '{name}, a premium meeting room for you', body: 'Your next meeting deserves the right room. The HQ meeting room is yours at no charge for your whole membership — tell me the time that suits you and I will arrange the booking.' },
+      guest: { title: '{name}, host your next meeting at the HQ', body: 'Your next meeting deserves the right room: a premium hall at no charge for the whole annual membership — and I handle the booking whenever you want.' },
     },
   },
   {
     key: 'meetup',
     route: '/service/meetup',
     ar: {
-      member: { title: '{name}، اصنع ملتقاك على مسرح النادي', body: 'خصم 50% لك على «اصنع ملتقاك» — ملتقى باسمك على مسرح النادي يجمع جمهورك وشركاءك.' },
-      guest: { title: '{name}، اصنع ملتقاك على مسرح النادي', body: 'ملتقى باسمك على مسرح النادي — وأعضاء النادي يحصلون على خصم 50%.' },
+      member: { title: '{name}، اصنع ملتقاك على مسرح النادي', body: 'تخيّل ملتقى باسمك على مسرح النادي يجمع جمهورك وشركاءك — وخصمك 50% جاهز. أخبرني بفكرتك وأمشي معك فيها من البداية.' },
+      guest: { title: '{name}، اصنع ملتقاك على مسرح النادي', body: 'تخيّل ملتقى باسمك على مسرح النادي يجمع جمهورك وشركاءك — وأعضاء النادي يحصلون على خصم 50%. أخبرني بفكرتك وأدلّك على الخطوات.' },
     },
     en: {
-      member: { title: '{name}, host your meetup on the club stage', body: '50% off «Build Your Meetup» for you — an event in your name on the club stage.' },
-      guest: { title: '{name}, host your meetup on the club stage', body: 'An event in your name on the club stage — members get 50% off.' },
+      member: { title: '{name}, host your meetup on the club stage', body: 'Picture a meetup in your name on the club stage, with your audience and partners — and your 50% discount is ready. Tell me your idea and I will walk it with you from the start.' },
+      guest: { title: '{name}, host your meetup on the club stage', body: 'Picture a meetup in your name on the club stage, with your audience and partners — members get 50% off. Tell me your idea and I will show you the steps.' },
     },
   },
   {
@@ -101,60 +106,62 @@ const TIPS: TipDef[] = [
     route: '/service/pitch-deck',
     personas: ['entrepreneur', 'neutral'],
     ar: {
-      member: { title: '{name}، قوِّ موقفك أمام المستثمرين', body: 'خصم 50% لك على تصميم Pitch Deck احترافي يعرض مشروعك بثقة ووضوح.' },
-      guest: { title: '{name}، قوِّ موقفك أمام المستثمرين', body: 'Pitch Deck احترافي يعرض مشروعك بثقة — وأعضاء النادي يحصلون على خصم 50%.' },
+      member: { title: '{name}، قوِّ موقفك أمام المستثمرين', body: 'عرض تقديمي قوي يصنع فرقًا حقيقيًا أمام المستثمرين. فريقنا يصمّم لك Pitch Deck احترافيًا بخصمك 50% — أرسل لي فكرة مشروعك وأدلّك على الخطوة الأولى.' },
+      guest: { title: '{name}، قوِّ موقفك أمام المستثمرين', body: 'عرض تقديمي قوي يصنع فرقًا حقيقيًا أمام المستثمرين — وأعضاء النادي يحصلون على خصم 50% على تصميمه. أرسل لي فكرة مشروعك وأدلّك على الخطوة الأولى.' },
     },
     en: {
-      member: { title: '{name}, stand stronger before investors', body: '50% off a professional Pitch Deck that presents your project with confidence.' },
-      guest: { title: '{name}, stand stronger before investors', body: 'A professional Pitch Deck for your project — members get 50% off.' },
+      member: { title: '{name}, stand stronger before investors', body: 'A strong deck makes a real difference before investors. Our team designs your professional Pitch Deck at your 50% discount — send me your project idea and I will point you to the first step.' },
+      guest: { title: '{name}, stand stronger before investors', body: 'A strong deck makes a real difference before investors — and members get 50% off its design. Send me your project idea and I will point you to the first step.' },
     },
   },
   {
     key: 'momentum',
     route: '/service/momentum',
     ar: {
-      member: { title: '{name}، موقعك الإلكتروني مع مومنتوم', body: 'مومنتوم تصمّم وتنفّذ موقعك وتطبيقك وتسويقك — بخصم 50% لك كعضو في النادي.' },
-      guest: { title: '{name}، موقعك الإلكتروني مع مومنتوم', body: 'مومنتوم تصمّم وتنفّذ خدمات المنظومة كلها: المواقع والتطبيقات والتسويق — بخصم 50% للأعضاء.' },
+      // Owner (2026-11-02): Momentum is open to everyone, its marketing packages are built on request,
+      // and the member discount covers every Momentum service.
+      member: { title: '{name}، مومنتوم تبني حضورك الرقمي', body: 'موقع، تطبيق، أو باقة تسويق تُصمَّم حسب طلبك — وخصمك 50% كعضو يشمل جميع خدمات مومنتوم. اطلبها من التطبيق ويتواصل معك الفريق مباشرة.' },
+      guest: { title: '{name}، مومنتوم تبني حضورك الرقمي', body: 'موقع، تطبيق، أو باقة تسويق تُصمَّم حسب طلبك — مومنتوم متاحة للجميع، وأعضاء النادي يحصلون على خصم 50% على جميع خدماتها.' },
     },
     en: {
-      member: { title: '{name}, your website with Momentum', body: 'Momentum designs and builds your website, app and marketing — 50% off for you as a member.' },
-      guest: { title: '{name}, your website with Momentum', body: 'Momentum builds websites, apps and marketing for the whole ecosystem — 50% off for members.' },
+      member: { title: '{name}, Momentum builds your digital presence', body: 'A website, an app, or a marketing package built on your request — and your 50% member discount covers every Momentum service. Request it in the app and the team reaches you directly.' },
+      guest: { title: '{name}, Momentum builds your digital presence', body: 'A website, an app, or a marketing package built on your request — Momentum is open to everyone, and members get 50% off every service.' },
     },
   },
   {
     key: 'studio',
     route: '/service/studio',
     ar: {
-      member: { title: '{name}، سجّل حلقتك في بودكاست الملتقى', body: 'خصم 50% لك على حجز استديو البودكاست، بلا حد للاستخدام.' },
-      guest: { title: '{name}، صوتك يستحق منصة', body: 'استديو بودكاست الملتقى مجهّز لتسجيل حلقتك — والأعضاء يحصلون على خصم 50%.' },
+      member: { title: '{name}، سجّل حلقتك في بودكاست الملتقى', body: 'حلقتك القادمة تستحق صوتًا وصورة باحتراف. الاستديو محجوز لك بخصم 50% وبلا حد للاستخدام — قل لي الموعد وأرتّبه لك.' },
+      guest: { title: '{name}، صوتك يستحق منصة', body: 'حلقتك القادمة تستحق صوتًا وصورة باحتراف. استديو بودكاست الملتقى جاهز لتسجيلها — وأعضاء النادي يحصلون على خصم 50%.' },
     },
     en: {
-      member: { title: '{name}, record your episode at the podcast studio', body: '50% off booking the podcast studio, with no usage limit.' },
-      guest: { title: '{name}, your voice deserves a stage', body: 'The podcast studio is ready for your episode — members get 50% off.' },
+      member: { title: '{name}, record your episode at the podcast studio', body: 'Your next episode deserves professional sound and picture. The studio is yours at 50% off with no usage limit — tell me the time and I will arrange it.' },
+      guest: { title: '{name}, your voice deserves a stage', body: 'Your next episode deserves professional sound and picture. The podcast studio is ready — and members get 50% off.' },
     },
   },
   {
     key: 'theater',
     route: '/service/theater',
     ar: {
-      member: { title: '{name}، مسرح النادي لفعاليتك', body: 'خصم 50% لك على حجز مسرح النادي لفعاليتك أو إطلاق مشروعك القادم.' },
-      guest: { title: '{name}، مسرح النادي لفعاليتك', body: 'أطلق فعاليتك من مسرح النادي — والأعضاء يحصلون على خصم 50%.' },
+      member: { title: '{name}، مسرح النادي لفعاليتك', body: 'إطلاق مشروعك أو فعاليتك من مسرح النادي يمنحها حضورًا مختلفًا — وخصمك 50% جاهز. أخبرني بالفكرة وأرتّب لك التفاصيل.' },
+      guest: { title: '{name}، مسرح النادي لفعاليتك', body: 'إطلاق فعاليتك من مسرح النادي يمنحها حضورًا مختلفًا أمام جمهور يفهم ما تبني — وأعضاء النادي يحصلون على خصم 50%.' },
     },
     en: {
-      member: { title: '{name}, the club theater for your event', body: '50% off booking the club theater for your event or your next launch.' },
-      guest: { title: '{name}, the club theater for your event', body: 'Launch your event from the club theater — members get 50% off.' },
+      member: { title: '{name}, the club theater for your event', body: 'Launching your project or event from the club theater gives it a different presence — and your 50% discount is ready. Tell me the idea and I will arrange the details.' },
+      guest: { title: '{name}, the club theater for your event', body: 'Launching your event from the club theater gives it a different presence, before an audience that gets what you are building — members get 50% off.' },
     },
   },
   {
     key: 'workshop',
     route: '/service/workshop',
     ar: {
-      member: { title: '{name}، مقعدك في ورشة هذا الشهر', body: 'احجز ورشة العمل القادمة بخصم 50% لأعضاء النادي — مقاعدها محدودة.' },
-      guest: { title: '{name}، مقعدك في ورشة هذا الشهر', body: 'ورش عملية مع خبراء — احجز مقعدك الآن، والأعضاء يحصلون على خصم 50%.' },
+      member: { title: '{name}، مقعدك في ورشة هذا الشهر', body: 'ورشة هذا الشهر مقاعدها محدودة، وخصمك 50% كعضو جاهز. أخبرني إن أحببت أن أحجز لك مقعدك قبل أن تكتمل.' },
+      guest: { title: '{name}، مقعدك في ورشة هذا الشهر', body: 'ورش عملية مع خبراء يشاركونك تجاربهم — احجز مقعدك مبكرًا، وأعضاء النادي يحصلون على خصم 50%.' },
     },
     en: {
-      member: { title: '{name}, your seat at this month\'s workshop', body: 'Book the next workshop at 50% off for members — seats are limited.' },
-      guest: { title: '{name}, your seat at this month\'s workshop', body: 'Hands-on workshops with experts — book now; members get 50% off.' },
+      member: { title: '{name}, your seat at this month\'s workshop', body: 'Seats at this month\'s workshop are limited, and your 50% member discount is ready. Tell me if you want me to hold your seat before it fills up.' },
+      guest: { title: '{name}, your seat at this month\'s workshop', body: 'Hands-on workshops with experts who share their experience — book early; members get 50% off.' },
     },
   },
   {
@@ -162,40 +169,40 @@ const TIPS: TipDef[] = [
     route: '/service/repost',
     personas: ['entrepreneur'],
     only: 'member',
-    ar: { member: { title: '{name}، أبرز مشروعك هذا الشهر', body: 'إبراز مشروعك على منصات النادي مرة كل شهر ضمن عضويتك — لا تفوّت مرة هذا الشهر.' } },
-    en: { member: { title: '{name}, feature your project this month', body: 'Your project on the club platforms once a month with your membership — don\'t miss this month\'s.' } },
+    ar: { member: { title: '{name}، أبرز مشروعك هذا الشهر', body: 'من حقك هذا الشهر إبراز مشروعك على منصات النادي ضمن عضويتك — لم تستخدمه بعد؟ قل لي وأجهّز لك الظهور.' } },
+    en: { member: { title: '{name}, feature your project this month', body: 'This month\'s feature of your project on the club platforms is part of your membership — haven\'t used it yet? Tell me and I will set it up.' } },
   },
   {
     key: 'success-partners',
     route: '/service/success-partners',
     personas: ['entrepreneur'],
     ar: {
-      member: { title: '{name}، اعرض مشروعك على المستثمرين', body: 'سجّل مشروعك في «شركاء النجاح» — أولوية لأعضاء النادي في التقييم والعرض.' },
-      guest: { title: '{name}، اعرض مشروعك على المستثمرين', body: 'سجّل مشروعك في «شركاء النجاح» ليُعرض على أعضاء النادي بعد التقييم.' },
+      member: { title: '{name}، اعرض مشروعك على المستثمرين', body: 'مشروعك جاهز ليراه المستثمرون؟ سجّله في «شركاء النجاح» — لك أولوية في التقييم والعرض كعضو، وأنا أرافقك في كل خطوة.' },
+      guest: { title: '{name}، اعرض مشروعك على المستثمرين', body: 'مشروعك جاهز ليراه المستثمرون؟ سجّله في «شركاء النجاح» ليُعرض على أعضاء النادي بعد التقييم — وأنا أرافقك في خطوات التسجيل.' },
     },
     en: {
-      member: { title: '{name}, put your project before investors', body: 'Register in «Success Partners» — members get priority in review and showcase.' },
-      guest: { title: '{name}, put your project before investors', body: 'Register in «Success Partners» to be shown to the club members after review.' },
+      member: { title: '{name}, put your project before investors', body: 'Is your project ready to be seen? Register it in «Success Partners» — you get member priority in review and showcase, and I will be with you at every step.' },
+      guest: { title: '{name}, put your project before investors', body: 'Is your project ready to be seen? Register it in «Success Partners» to be shown to the members after review — and I will walk you through the registration.' },
     },
   },
   {
     key: 'consultation',
     route: '/advisor',
     ar: {
-      member: { title: '{name}، استشارتك اليوم بدون رسوم', body: 'اسألني عن أي قرار في مشروعك أو استثمارك — أنا مستشارك داخل النادي طوال اليوم.' },
-      guest: { title: '{name}، مستشارك معك', body: 'اسألني عن خطوتك القادمة في الاستثمار أو ريادة الأعمال — وأرشّح لك ما يناسبك في النادي.' },
+      member: { title: '{name}، استشارتك اليوم بدون رسوم', body: 'كيف تسير أمورك هذه الأيام؟ أنا هنا طوال اليوم لأي قرار في مشروعك أو استثمارك — اكتب لي وأجيبك فورًا، بدون رسوم.' },
+      guest: { title: '{name}، مستشارك معك', body: 'كيف تسير أمورك هذه الأيام؟ حدّثني عن خطوتك القادمة في الاستثمار أو ريادة الأعمال، وأرشّح لك ما يناسبك في النادي.' },
     },
     en: {
-      member: { title: '{name}, your consultation today, at no charge', body: 'Ask me about any decision in your project or investment — I am your advisor inside the club.' },
-      guest: { title: '{name}, your advisor is here', body: 'Ask me about your next step in investing or entrepreneurship — I will point you to what fits.' },
+      member: { title: '{name}, your consultation today, at no charge', body: 'How are things going these days? I am here all day for any decision in your project or investment — write to me and I will answer right away, at no charge.' },
+      guest: { title: '{name}, your advisor is here', body: 'How are things going these days? Tell me about your next step in investing or entrepreneurship, and I will point you to what fits in the club.' },
     },
   },
   {
     key: 'membership',
     route: '/membership',
     only: 'guest',
-    ar: { guest: { title: '{name}، كل هذا ضمن عضوية واحدة', body: 'قاعة اجتماعات بدون رسوم، خصم 50% على خدمات النادي، ورصيد في بنك المشاريع — اشترك من داخل التطبيق.' }, member: { title: '', body: '' } },
-    en: { guest: { title: '{name}, all of this in one membership', body: 'A meeting room at no charge, 50% off club services and Projects Bank credit — subscribe inside the app.' }, member: { title: '', body: '' } },
+    ar: { guest: { title: '{name}، كل هذا ضمن عضوية واحدة', body: 'قاعة اجتماعات بدون رسوم، خصم 50% على خدمات النادي وخدمات مومنتوم، ورصيد في بنك المشاريع — كلها بعضوية واحدة من داخل التطبيق. اسألني عن أي تفصيلة قبل أن تقرر.' }, member: { title: '', body: '' } },
+    en: { guest: { title: '{name}, all of this in one membership', body: 'A meeting room at no charge, 50% off club and Momentum services, and Projects Bank credit — all in one membership, inside the app. Ask me anything before you decide.' }, member: { title: '', body: '' } },
   },
 ];
 
