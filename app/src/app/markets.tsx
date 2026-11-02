@@ -5,6 +5,7 @@ import { useMarkets, type MarketGroup, type MarketQuote } from '@/api/markets';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
 import { ChangeText, priceText, QuoteIcon } from '@/components/MarketsStrip';
+import { SarText } from '@/components/SarText';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -69,8 +70,8 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
       <QuoteIcon quote={quote} size={20} />
       <View style={styles.start}>
         <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
-        <Text style={styles.meta} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
-        {quote.gramSar ? <Text style={styles.gram} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
+        <SarText style={styles.meta} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>
+        {quote.gramSar ? <SarText style={styles.gram} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</SarText> : null}
         <Text style={styles.meta} numberOfLines={1}>{formatRelativeTime(quote.at)}</Text>
       </View>
       <Pressable style={styles.rowAsk} hitSlop={8} onPress={() => onAsk(label)} accessibilityRole="button" accessibilityLabel={t('markets.askAbout', { label })}>

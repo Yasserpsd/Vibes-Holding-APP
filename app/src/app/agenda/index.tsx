@@ -4,6 +4,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { FlipCountdown } from '@/components/wow';
@@ -101,9 +102,9 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
             {`${formatEventDays(event.dates, event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
           </Text>
           {past ? null : (
-            <Text style={styles.fee} numberOfLines={1}>
+            <SarText style={styles.fee} numberOfLines={1}>
               {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
-            </Text>
+            </SarText>
           )}
           {mine ? (
             <View style={styles.minePill}>

@@ -38,6 +38,8 @@ const PAGE_SIZE = 20;
 export const newsApi = {
   topics: () => apiGet<NewsTopics>('/api/news/topics'),
   feed: (topic: string | undefined, page: number) => apiGet<NewsPage>('/api/news/feed', { topic, page, limit: PAGE_SIZE }),
+  /** M182: the home carousel — money topics only, the spiciest headlines first (server-ranked). */
+  homeFeed: () => apiGet<NewsPage>('/api/news/feed', { scope: 'home', page: 1, limit: 8 }),
   decisions: (page: number, limit = PAGE_SIZE) => apiGet<NewsPage>('/api/news/decisions', { page, limit }),
   item: (id: string) => apiGet<{ item: NewsItem }>(`/api/news/${encodeURIComponent(id)}`),
   prefs: () => apiGet<NewsPrefs>('/api/news/prefs'),
@@ -58,6 +60,11 @@ export function useNewsFeed(topic: string | undefined, who: string) {
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
   });
+}
+
+/** The home carousel's picks, refreshed every few minutes so «الأخبار الشقية» stay fresh. */
+export function useHomeNews() {
+  return useQuery({ queryKey: ['news', 'home'], queryFn: newsApi.homeFeed, staleTime: 5 * 60_000, refetchInterval: 10 * 60_000 });
 }
 
 export function useDecisions(limit = PAGE_SIZE) {

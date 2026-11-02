@@ -4,6 +4,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import type { Service } from '@/api/content';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { PopIn, PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
@@ -63,13 +64,13 @@ export function ServiceTile({ service, onPress }: Props) {
           {service.summary}
         </Text>
         {/* Always rendered: the reserved line keeps every tile in the grid the same height. */}
-        <Text style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
+        <SarText style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
           {service.memberLabel ?? service.priceLabel ?? ''}
-        </Text>
+        </SarText>
         {/* M109b: the membership saving, loud on every priced tile (reserved so rows stay even). */}
-        <Text style={[styles.savings, locked && styles.lockedText]} numberOfLines={1}>
+        <SarText style={[styles.savings, locked && styles.lockedText]} numberOfLines={1}>
           {service.savingsSar ? t('service.save', { amount: formatNumber(service.savingsSar) }) : ''}
-        </Text>
+        </SarText>
       </View>
     </PressScale>
   );

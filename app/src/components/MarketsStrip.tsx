@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMarkets, type MarketQuote } from '@/api/markets';
 import { PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
@@ -77,8 +78,8 @@ export function MarketsStrip() {
             </View>
             <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
             <ChangeText quote={quote} />
-            <Text style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</Text>
-            {quote.gramSar ? <Text style={styles.extra} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</Text> : null}
+            <SarText style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>
+            {quote.gramSar ? <SarText style={styles.extra} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</SarText> : null}
           </PressScale>
         ))}
         <PressScale onPress={open} wrapStyle={styles.tile} style={[styles.quote, styles.all]} accessibilityRole="button" accessibilityLabel={t('markets.viewAll')}>

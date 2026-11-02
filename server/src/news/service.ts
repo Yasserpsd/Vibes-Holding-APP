@@ -53,7 +53,29 @@ const PERSONA_TOPICS: Record<string, TopicKey[]> = {
 };
 
 /** `lang` picks the feed: Arabic sources for the Arabic app, English sources for the English one (never translated, rule 7). */
-export type ListQuery = { topic?: TopicKey; page: number; limit: number; lang?: NewsLang };
+export type ListQuery = { topic?: TopicKey; page: number; limit: number; lang?: NewsLang; scope?: 'home' };
+
+/**
+ * M182 (owner, 2026-11-02, «ديما الأخبار اللي في الرئيسية ليها علاقة بالمال والأعمال والنفط والذهب
+ * والعملات الرقمية … وخصوصا الأخبار الشقية اوي»): the home carousel shows money news only, and the
+ * stories with teeth first. Selection and ranking only — rule 7 holds, the words stay the source's.
+ */
+const HOME_TOPICS: ReadonlySet<TopicKey> = new Set(['economy', 'markets', 'finance', 'crypto', 'metals', 'oil', 'energy', 'realestate', 'startups', 'tech', 'industry', 'retail']);
+/** The spice: numbers that shock, deals, crashes, records — the headlines that make people open the app. */
+const SPARK = [
+  /مليار|تريليون|قياسي|تاريخي|استحواذ|اندماج|صفقة|اكتتاب|إفلاس|انهيار|يقفز|قفز|صاروخي|هبوط حاد|تراجع حاد|يتجاوز|لأول مرة|عقوبات|غرامة|تحذير|يحذر|مفاجئ|مفاجأة|أعلى مستوى|أدنى مستوى|خسائر|أرباح قياسية|ملياردير|ثروة/u,
+  /billion|trillion|record|historic|acquisition|merger|deal|ipo|bankruptcy|crash|surge|soars|plunge|jumps|sanctions|fine|warning|shock|all-time|first time|billionaire|fortune/iu,
+];
+/** Up to +28 on top of scoreOf's ~140 scale: spice beats a few hours of age, never a day's. */
+function sparkOf(item: NewsItem): number {
+  const text = `${item.title} ${item.snippet ?? ''}`;
+  let hits = 0;
+  for (const pattern of SPARK) {
+    const found = text.match(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`));
+    hits += found ? found.length : 0;
+  }
+  return Math.min(28, hits * 10);
+}
 export type Audience = { prefs: NewsPrefs | null; persona: string };
 
 type Indexed = { item: NewsItem; tokens: Set<string> };
@@ -391,6 +413,16 @@ export class NewsService {
    * to the member's interests (or persona defaults; guests see every topic), best first.
    */
   feed(query: ListQuery, audience: Audience): NewsPage {
+    // M182: the home carousel — money topics only, the spiciest headlines first, same for everyone.
+    if (query.scope === 'home') {
+      const now = Date.now();
+      const rows = this.currentPicks(query.lang ?? 'ar', now)
+        .filter((pick) => pick.item.topics.some((topic) => HOME_TOPICS.has(topic)))
+        .map((pick) => ({ item: pick.item, score: scoreOf(pick.item, HOME_TOPICS as Set<TopicKey>, now) + (this.boosts.get(pick.item.sourceId) ?? 0) + sparkOf(pick.item) }))
+        .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt))
+        .map(({ item }) => item);
+      return paginate(rows, query, this.updatedAt, false);
+    }
     const interests = audience.prefs?.topics.length ? audience.prefs.topics : this.suggestedTopics(audience.persona);
     // M166: the base sections (crypto, gold and silver, oil, markets) ride along with whatever he picked.
     const wanted = new Set<TopicKey>(interests.length ? [...interests, ...CORE_TOPICS] : []);

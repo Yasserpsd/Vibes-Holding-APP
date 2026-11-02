@@ -3,7 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useNewsFeed, type NewsItem } from '@/api/news';
+import { useHomeNews, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
 import { MarketsStrip } from '@/components/MarketsStrip';
 import { FadeInView, PressScale } from '@/components/motion';
@@ -30,10 +30,12 @@ const DIR = I18nManager.isRTL ? -1 : 1;
  * the next one peeks in, the first touch stops the auto-advance for good, and the dots jump to an item.
  * Every card keeps one height (image or fallback, two title lines, two snippet lines).
  */
-export function NewsCarousel({ who }: { who: string }) {
+// M182 (owner, 2026-11-02): the carousel's items come from the server's home scope — money and
+// business only (markets, oil, gold, crypto…), the spiciest headlines first, same for everyone.
+export function NewsCarousel() {
   const router = useRouter();
-  const feed = useNewsFeed(undefined, who);
-  const items = useMemo(() => (feed.data?.pages[0]?.items ?? []).slice(0, SLIDES), [feed.data]);
+  const feed = useHomeNews();
+  const items = useMemo(() => (feed.data?.items ?? []).slice(0, SLIDES), [feed.data]);
   const [index, setIndex] = useState(0);
   const [width, setWidth] = useState(0);
   const [touched, setTouched] = useState(false);

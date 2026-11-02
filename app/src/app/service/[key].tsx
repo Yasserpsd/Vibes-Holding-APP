@@ -13,6 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
+import { SarText } from '@/components/SarText';
 import { UpsellCard } from '@/components/MembershipUpsell';
 import { MonthlyDealBadge } from '@/components/MonthlyDeal';
 import { PaperCard, usePaper } from '@/components/paper';
@@ -138,17 +139,17 @@ export default function ServiceScreen() {
             <Text style={styles.title}>{service.title}</Text>
             {service.priceLabel || service.memberLabel ? (
               <View style={styles.labels}>
-                {service.priceLabel ? <Text style={styles.price}>{service.priceLabel}</Text> : null}
-                {service.memberLabel ? <Text style={styles.member}>{service.memberLabel}</Text> : null}
+                {service.priceLabel ? <SarText style={styles.price}>{service.priceLabel}</SarText> : null}
+                {service.memberLabel ? <SarText style={styles.member}>{service.memberLabel}</SarText> : null}
               </View>
             ) : null}
             {/* M109b «وفّر … ريال بعضويتك»: the membership saving, loud under the price. */}
             {service.savingsSar ? (
               <View style={styles.savingsPill}>
                 <Ionicons name="sparkles" size={13} color={colors.goldInk} />
-                <Text style={styles.savingsText} numberOfLines={1}>
+                <SarText style={styles.savingsText} numberOfLines={1}>
                   {t('service.save', { amount: formatNumber(service.savingsSar) })}
-                </Text>
+                </SarText>
               </View>
             ) : null}
           </View>

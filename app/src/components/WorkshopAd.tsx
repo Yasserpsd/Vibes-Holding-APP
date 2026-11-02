@@ -9,6 +9,7 @@ import { useHq } from '@/api/hq';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
@@ -96,11 +97,11 @@ export function WorkshopAdPopup() {
               <Text style={styles.title} numberOfLines={2}>{ad.title}</Text>
               <Text style={styles.when}>{when}</Text>
               {ad.feeSar > 0 ? (
-                <Text style={styles.fee}>
+                <SarText style={styles.fee}>
                   {ad.memberFeeSar > 0
                     ? t('workshopAd.feeBoth', { fee: formatNumber(ad.feeSar), member: formatNumber(ad.memberFeeSar) })
                     : t('workshopAd.feeMemberIncluded', { fee: formatNumber(ad.feeSar) })}
-                </Text>
+                </SarText>
               ) : null}
             </View>
             <AppButton label={ad.cta} icon="flash-outline" onPress={open} />

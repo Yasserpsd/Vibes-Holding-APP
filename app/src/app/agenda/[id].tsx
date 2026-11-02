@@ -14,6 +14,7 @@ import { dealAmount, MonthlyDealBadge } from '@/components/MonthlyDeal';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
+import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { StructuredText } from '@/components/StructuredText';
@@ -141,20 +142,20 @@ export default function AgendaEventScreen() {
                 ) : (
                   <View style={styles.prices}>
                     <View style={styles.feePill}>
-                      <Text style={styles.feeText} numberOfLines={1}>
+                      <SarText style={styles.feeText} numberOfLines={1}>
                         {event.feeSar > 0 ? t('agenda.nonMemberPrice', { fee: String(event.feeSar) }) : t('agenda.free')}
-                      </Text>
+                      </SarText>
                     </View>
                     <View style={[styles.feePill, styles.memberPill]}>
-                      <Text style={styles.feeText} numberOfLines={1}>
+                      <SarText style={styles.feeText} numberOfLines={1}>
                         {(event.memberFeeSar ?? 0) > 0 ? t('agenda.memberPrice', { fee: String(event.memberFeeSar) }) : t('agenda.included')}
-                      </Text>
+                      </SarText>
                     </View>
                   </View>
                 )}
               </View>
               {(event.savingsSar ?? 0) > 0 ? (
-                <Text style={styles.savings}>{t('agenda.save', { amount: String(event.savingsSar) })}</Text>
+                <SarText style={styles.savings}>{t('agenda.save', { amount: String(event.savingsSar) })}</SarText>
               ) : null}
             </GlassCard>
           </FadeInView>
@@ -166,13 +167,13 @@ export default function AgendaEventScreen() {
               <GlassCard golden style={styles.memberCta}>
                 <View style={styles.memberCtaHead}>
                   <Ionicons name="ribbon-outline" size={22} color={colors.goldLight} />
-                  <Text style={styles.memberCtaTitle}>
+                  <SarText style={styles.memberCtaTitle}>
                     {(event.memberFeeSar ?? 0) > 0
                       ? t('agenda.memberCtaTitleFee', { fee: String(event.memberFeeSar), full: String(event.feeSar) })
                       : t('agenda.memberCtaTitle')}
-                  </Text>
+                  </SarText>
                 </View>
-                <Text style={styles.memberCtaText}>{t('agenda.memberCtaText', { amount: String(event.savingsSar) })}</Text>
+                <SarText style={styles.memberCtaText}>{t('agenda.memberCtaText', { amount: String(event.savingsSar) })}</SarText>
                 <AppButton label={t('agenda.memberCtaButton')} icon="sparkles-outline" onPress={showMembershipGate} />
               </GlassCard>
             </FadeInView>

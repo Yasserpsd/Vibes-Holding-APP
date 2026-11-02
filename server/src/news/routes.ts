@@ -14,6 +14,8 @@ export type NewsRoutesOptions = { service: NewsService; auth: AuthService; kv: K
 
 const listSchema = z.object({
   topic: z.string().trim().max(30).optional(),
+  // M182: scope=home — the home carousel's money-only, spice-first selection.
+  scope: z.enum(['home']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -69,7 +71,7 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
       const who = await whoIs(request);
       const chosen = who ? await topicsOf(who.contactId) : null;
       const prefs = chosen ? { topics: chosen.topics, updatedAt: '' } : null;
-      return service.feed({ topic, page: query.page, limit: query.limit, lang: langOf(request) }, { prefs, persona: who?.me?.persona ?? '' });
+      return service.feed({ topic, scope: query.scope, page: query.page, limit: query.limit, lang: langOf(request) }, { prefs, persona: who?.me?.persona ?? '' });
     }),
   );
 

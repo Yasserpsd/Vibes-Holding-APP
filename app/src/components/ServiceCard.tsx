@@ -5,6 +5,7 @@ import type { Service } from '@/api/content';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
@@ -39,8 +40,8 @@ export function ServiceCard({ service, onPress }: Props) {
           </Text>
           {service.priceLabel || service.memberLabel ? (
             <View style={styles.labels}>
-              {service.priceLabel ? <Text style={[styles.price, locked && styles.lockedBody]}>{service.priceLabel}</Text> : null}
-              {service.memberLabel ? <Text style={[styles.member, locked && styles.lockedGold]}>{service.memberLabel}</Text> : null}
+              {service.priceLabel ? <SarText style={[styles.price, locked && styles.lockedBody]}>{service.priceLabel}</SarText> : null}
+              {service.memberLabel ? <SarText style={[styles.member, locked && styles.lockedGold]}>{service.memberLabel}</SarText> : null}
             </View>
           ) : null}
           {/* M74 (owner): every service carries its imperative CTA — «سجّل», «احجز»… */}

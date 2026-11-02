@@ -366,7 +366,7 @@ export default function HomeScreen() {
 
       {/* M176 (owner): the news moved a little lower and became a moving carousel with the live price strip. */}
       {order.slice(0, 2).map((key) => sections[key]?.() ?? null)}
-      <NewsCarousel who={status === 'signedIn' ? `${me?.id ?? 'me'}` : 'guest'} />
+      <NewsCarousel />
       {order.slice(2).map((key) => sections[key]?.() ?? null)}
 
       {/* M74's «هل حددت وجهتك؟» card left the neutral's home (owner, 2026-10-21); persona change
