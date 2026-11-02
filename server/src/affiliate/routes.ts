@@ -56,6 +56,7 @@ const configSchema = z
     commission: z.number().int().min(1, 'العمولة بالريال السعودي').max(100000),
     minPayoutPaid: z.number().int().min(0, 'الحد الأدنى للسحب بعدد الأعضاء المسدّدين').max(1000),
     agreementText: z.string().trim().min(100, 'نص الاتفاقية قصير جدًا').max(20000),
+    agreementTextEn: z.string().trim().min(100, 'The English agreement is too short').max(20000),
     introText: z.string().trim().min(20, 'اكتب تعريف البرنامج').max(2000),
     introTextEn: z.string().trim().min(20, 'Write the program pitch in English').max(2000),
     shareText: z.string().trim().min(10, 'اكتب نص المشاركة').max(1000),
@@ -101,16 +102,16 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       if (!current) return;
       const me = await auth.me(current.session);
       const [config, record] = await Promise.all([service.config(), service.find(me.id)]);
-      // The pitch follows the app's language; the agreement stays the Arabic legal text.
+      // The texts follow the app's language (owner, 2026-11-02); the Arabic agreement stays the authoritative one.
       const lang = langOf(request);
-      const commissionLabel = AffiliateService.commissionLabel(config.commission);
-      const fill = (text: string, label: string) => text.replaceAll('{commission}', label).replaceAll('{minPayout}', String(config.minPayoutPaid));
+      const commissionLabel = lang === 'en' ? AffiliateService.commissionLabelEn(config.commission) : AffiliateService.commissionLabel(config.commission);
+      const fill = (text: string) => text.replaceAll('{commission}', commissionLabel).replaceAll('{minPayout}', String(config.minPayoutPaid));
       const base = {
         status: record?.status ?? ('none' as const),
         commission: config.commission,
         minPayoutPaid: config.minPayoutPaid,
-        introText: lang === 'en' ? fill(config.introTextEn, AffiliateService.commissionLabelEn(config.commission)) : fill(config.introText, commissionLabel),
-        agreementText: fill(config.agreementText, commissionLabel),
+        introText: fill(lang === 'en' ? config.introTextEn : config.introText),
+        agreementText: fill(lang === 'en' ? config.agreementTextEn : config.agreementText),
         heardOptions: config.heardOptions,
         application: record ? ownApplication(record) : null,
       };

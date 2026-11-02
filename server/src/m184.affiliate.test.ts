@@ -108,6 +108,10 @@ test('every signed-in account sees the program pitch, the agreement and the opti
   const english = await app.inject({ method: 'GET', url: '/api/affiliate', headers: { ...bearer(memberToken), 'x-app-lang': 'en' } });
   assert.match(english.json().introText as string, /Affiliates Program/);
   assert.match(english.json().introText as string, /SAR 250/);
+  // The agreement follows the app language too (owner, 2026-11-02); Arabic stays authoritative.
+  assert.match(english.json().agreementText as string, /Affiliates Program Agreement/);
+  assert.match(english.json().agreementText as string, /SAR 250/);
+  assert.match(english.json().agreementText as string, /after 5 members have paid/);
 });
 
 test('the application needs the full form, and the agreement is mailed to the applicant', async () => {

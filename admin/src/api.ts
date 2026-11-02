@@ -223,6 +223,7 @@ export type AffiliateConfig = {
   commission: number;
   minPayoutPaid: number;
   agreementText: string;
+  agreementTextEn: string;
   introText: string;
   introTextEn: string;
   shareText: string;

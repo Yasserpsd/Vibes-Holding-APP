@@ -72,6 +72,8 @@ export type AffiliateConfig = {
   minPayoutPaid: number;
   /** The full agreement (dashboard-editable); {commission} and {minPayout} become the current values. */
   agreementText: string;
+  /** The agreement for the English app (owner, 2026-11-02); the Arabic text stays the authoritative one. */
+  agreementTextEn: string;
   /** The program pitch shown in the app before applying. */
   introText: string;
   /** The same pitch for the English app (owner, 2026-11-02: «Club Affiliates Program»). */
@@ -130,10 +132,45 @@ export const DEFAULT_AGREEMENT = [
   'تخضع هذه الاتفاقية لأنظمة المملكة العربية السعودية، وتُعد الموافقة الإلكترونية من داخل التطبيق إقرارًا وتوقيعًا ملزمًا.',
 ].join('\n');
 
+/** The Arabic agreement rendered in English for the English app; the Arabic text stays authoritative. */
+export const DEFAULT_AGREEMENT_EN = [
+  'Investors Club Affiliates Program Agreement',
+  '',
+  'Preamble: This agreement is made between the Virtual Community Investment Company, the official operator of the Investors Club (the "Club"), and the applicant (the "Affiliate"). By accepting it electronically inside the app, the Affiliate acknowledges having read and understood it and agrees to be bound by all its terms. This is an English rendering of the agreement; its Arabic text remains the authoritative version.',
+  '',
+  "First — Scope of the Affiliate's work:",
+  "1. The Affiliate's role is limited to introducing the Investors Club membership and its benefits as presented inside the official app, and inviting interested individuals to register through his personal referral link or referral code.",
+  '2. The Affiliate may not present any benefits, prices or promises not stated in the app, nor provide investment advice, guarantees or projections of returns of any kind.',
+  '',
+  'Second — Status of the Affiliate:',
+  "1. The Affiliate is an independent marketer — not an employee, agent or partner of the Club — and holds no authority to contract or make commitments in the Club's name.",
+  "2. The Affiliate may use the Club's name or logo only within the introduction described above; creating accounts, pages or websites that suggest an official affiliation with the Club is prohibited.",
+  '',
+  'Third — Limits of liability:',
+  "1. The Club bears no legal or financial liability of any kind for any act of the Affiliate, any misuse of the Club's name or brand, or any commitment the Affiliate makes to third parties.",
+  '2. The Affiliate alone bears full responsibility for his marketing methods and channels and for their compliance with the laws of the Kingdom of Saudi Arabia, and shall indemnify the Club for any damage arising from his breach of this agreement.',
+  '',
+  "Fourth — The Club's obligations:",
+  "The Club's obligations are limited to providing the membership and its benefits to registered members, operating the affiliates program, and calculating the commissions due under this agreement.",
+  '',
+  'Fifth — Commission:',
+  '1. The Affiliate earns a commission of {commission} for every member who registered through his referral code and actually paid the annual membership fee. No commission is due for registration alone without payment.',
+  "2. Commissions are calculated according to the Club's records and electronic systems, which are the sole authoritative reference.",
+  '3. Commissions are paid upon a withdrawal request submitted by the Affiliate from the app and transferred to his registered bank account after the management reviews and approves the request.',
+  "4. A withdrawal request may be submitted only after {minPayout} members have paid the membership fee through the Affiliate's referral code.",
+  '',
+  'Sixth — Term and termination:',
+  "The Club may accept or refuse any application without stating reasons, and may suspend any affiliate, change the commission amount or end the program at any time, while preserving the Affiliate's right to the commissions earned before termination.",
+  '',
+  'Seventh — General provisions:',
+  'This agreement is governed by the laws of the Kingdom of Saudi Arabia, and electronic acceptance inside the app constitutes a binding acknowledgment and signature.',
+].join('\n');
+
 export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
   commission: 250,
   minPayoutPaid: 5,
   agreementText: DEFAULT_AGREEMENT,
+  agreementTextEn: DEFAULT_AGREEMENT_EN,
   // The owner's wording (2026-11-02), with the amounts dashboard-driven.
   introText:
     'انضم إلى برنامج ممثلي نادي المستثمرين: عرّف بعضوية النادي ومزاياها، ووظّف شبكة علاقاتك ومحيط معارفك، وادعُ المهتمين منهم إلى التسجيل عبر رابط مخصص لك، واحصل على عائد قدره {commission} عن كل عضو سجّل عبر رابطك وسدّد رسوم العضوية السنوية من خلاله. يخضع الانضمام لموافقة إدارة النادي بعد قبول الاتفاقية، ويتاح سحب العائد بعد اكتمال {minPayout} أعضاء مسدّدين.',
@@ -200,6 +237,7 @@ export class AffiliateService {
       commission: typeof stored?.commission === 'number' && stored.commission > 0 ? Math.round(stored.commission) : DEFAULT_AFFILIATE_CONFIG.commission,
       minPayoutPaid: typeof stored?.minPayoutPaid === 'number' && stored.minPayoutPaid >= 0 ? Math.round(stored.minPayoutPaid) : DEFAULT_AFFILIATE_CONFIG.minPayoutPaid,
       agreementText: stored?.agreementText?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
+      agreementTextEn: stored?.agreementTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.agreementTextEn,
       introText: stored?.introText?.trim() || DEFAULT_AFFILIATE_CONFIG.introText,
       introTextEn: stored?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: stored?.shareText?.trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
@@ -213,6 +251,7 @@ export class AffiliateService {
       commission: input.commission !== undefined ? Math.round(input.commission) : current.commission,
       minPayoutPaid: input.minPayoutPaid !== undefined ? Math.max(0, Math.round(input.minPayoutPaid)) : current.minPayoutPaid,
       agreementText: (input.agreementText ?? current.agreementText).trim() || DEFAULT_AFFILIATE_CONFIG.agreementText,
+      agreementTextEn: (input.agreementTextEn ?? current.agreementTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.agreementTextEn,
       introText: (input.introText ?? current.introText).trim() || DEFAULT_AFFILIATE_CONFIG.introText,
       introTextEn: (input.introTextEn ?? current.introTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: (input.shareText ?? current.shareText).trim() || DEFAULT_AFFILIATE_CONFIG.shareText,

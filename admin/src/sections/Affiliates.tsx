@@ -264,6 +264,10 @@ export function Affiliates() {
                   نص الاتفاقية الكامل ({'{commission}'} تصير قيمة العمولة و{'{minPayout}'} الحد الأدنى للسحب)
                   <textarea rows={18} maxLength={20000} value={config.agreementText} onChange={(event) => setConfig({ ...config, agreementText: event.target.value })} />
                 </label>
+                <label>
+                  نص الاتفاقية بالإنجليزية (للتطبيق بالوضع الإنجليزي؛ النص العربي هو المرجع)
+                  <textarea rows={18} maxLength={20000} dir="ltr" value={config.agreementTextEn} onChange={(event) => setConfig({ ...config, agreementTextEn: event.target.value })} />
+                </label>
                 <div>
                   <button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ المحتوى'}</button>
                 </div>
