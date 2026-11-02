@@ -3,7 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useHomeNews, type NewsItem } from '@/api/news';
+import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
 import { BreakingPill, isBreaking } from '@/components/news/NewsCard';
 import { MarketsStrip } from '@/components/MarketsStrip';
@@ -138,7 +138,36 @@ export function NewsCarousel() {
           </Pressable>
         ))}
       </View>
+      <NumberOfDayCard />
     </FadeInView>
+  );
+}
+
+/** M182c «رقم اليوم»: the day's biggest money figure, golden under the carousel; a tap opens its story. */
+function NumberOfDayCard() {
+  const router = useRouter();
+  const number = useNumberOfDay().data?.number ?? null;
+  if (!number) return null;
+  return (
+    <PressScale
+      onPress={() => router.push(`/news/${number.item.id}` as Href)}
+      glow
+      glowRadius={radii.lg}
+      accessibilityRole="button"
+      accessibilityLabel={`${t('news.numberOfDay')}: ${number.text}`}
+      wrapStyle={styles.numberWrap}
+    >
+      <GlassCard golden style={styles.numberCard}>
+        <View style={styles.numberSide}>
+          <Text style={styles.numberEyebrow}>{t('news.numberOfDay')}</Text>
+          <Text style={styles.numberValue} numberOfLines={1}>{number.text}</Text>
+        </View>
+        <View style={styles.numberTexts}>
+          <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{number.item.title}</Text>
+          <Text style={styles.numberSource} numberOfLines={1}>{number.item.source.name}</Text>
+        </View>
+      </GlassCard>
+    </PressScale>
   );
 }
 
@@ -183,6 +212,14 @@ const styles = StyleSheet.create({
   // Two reserved lines each: every card in the pager keeps one height.
   title: { ...typography.subtitle, fontSize: 17, lineHeight: 27, minHeight: 54, color: colors.textPrimary, textAlign: textStart },
   snippet: { ...typography.body, fontSize: 14, lineHeight: 22, minHeight: 44, color: colors.textSecondary, textAlign: textStart },
+  numberWrap: { marginTop: spacing.sm },
+  numberCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  numberSide: { alignItems: 'center', gap: 2 },
+  numberEyebrow: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  numberValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
+  numberTexts: { flex: 1, gap: 2 },
+  numberTitle: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.textPrimary, textAlign: textStart },
+  numberSource: { ...typography.caption, fontSize: 11, color: colors.textMuted, textAlign: textStart },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderGoldSoft },
   dotOn: { width: 18, backgroundColor: colors.gold },

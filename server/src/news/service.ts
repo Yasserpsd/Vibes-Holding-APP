@@ -66,6 +66,26 @@ const SPARK = [
   /مليار|تريليون|قياسي|تاريخي|استحواذ|اندماج|صفقة|اكتتاب|إفلاس|انهيار|يقفز|قفز|صاروخي|هبوط حاد|تراجع حاد|يتجاوز|لأول مرة|عقوبات|غرامة|تحذير|يحذر|مفاجئ|مفاجأة|أعلى مستوى|أدنى مستوى|خسائر|أرباح قياسية|ملياردير|ثروة/u,
   /billion|trillion|record|historic|acquisition|merger|deal|ipo|bankruptcy|crash|surge|soars|plunge|jumps|sanctions|fine|warning|shock|all-time|first time|billionaire|fortune/iu,
 ];
+// M182c «رقم اليوم»: the biggest figure a money headline printed in the last 24 h — the source's own
+// words (rule 7), picked by magnitude: scale words (مليار، تريليون…) beat bare percentages.
+const SCALE_WORDS: Record<string, number> = { تريليون: 1e12, trillion: 1e12, مليار: 1e9, billion: 1e9, مليون: 1e6, million: 1e6, ألف: 1e3, thousand: 1e3, '%': 1, '٪': 1 };
+const FIGURE = /([0-9٠-٩][0-9٠-٩.,،٬٫]*)\s*(تريليون|مليار|مليون|ألف|trillion|billion|million|thousand|%|٪)/giu;
+const westernDigits = (text: string): string => text.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+
+export function biggestFigure(text: string): { magnitude: number; text: string } | null {
+  let best: { magnitude: number; text: string } | null = null;
+  for (const match of text.matchAll(FIGURE)) {
+    const raw = westernDigits(match[1] ?? '').replace(/[,،٬]/gu, '').replace(/٫/gu, '.');
+    const value = Number.parseFloat(raw);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const magnitude = value * (SCALE_WORDS[(match[2] ?? '').toLowerCase()] ?? 1);
+    if (!best || magnitude > best.magnitude) best = { magnitude, text: (match[0] ?? '').trim() };
+  }
+  return best;
+}
+
+export type NumberOfDay = { text: string; item: PublicNewsItem };
+
 /** Up to +28 on top of scoreOf's ~140 scale: spice beats a few hours of age, never a day's. */
 function sparkOf(item: NewsItem): number {
   const text = `${item.title} ${item.snippet ?? ''}`;
@@ -364,6 +384,18 @@ export class NewsService {
       .filter((row) => row.spark >= minSpark)
       .sort((a, b) => b.spark + b.score - (a.spark + a.score))
       .map((row) => row.item);
+  }
+
+  /** M182c «رقم اليوم»: the day's biggest money figure with its story, or null on a quiet day. */
+  numberOfDay(lang: NewsLang, now = Date.now()): NumberOfDay | null {
+    const dayAgo = now - 24 * 3_600_000;
+    let best: { magnitude: number; text: string; item: NewsItem } | null = null;
+    for (const item of this.visible(lang)) {
+      if (Date.parse(item.publishedAt) < dayAgo || !item.topics.some((topic) => HOME_TOPICS.has(topic))) continue;
+      const figure = biggestFigure(`${item.title} ${item.snippet ?? ''}`);
+      if (figure && (!best || figure.magnitude > best.magnitude)) best = { ...figure, item };
+    }
+    return best ? { text: best.text, item: toPublic(best.item) } : null;
   }
 
   /** Shown items, of one language when given. */

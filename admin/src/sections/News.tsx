@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { formatNumber, formatRelative } from '../format';
 import type { NewsSourceRow } from '../types';
+import { NewsBreaking } from './NewsBreaking';
 import { Async, Chips, Pill, SectionHead, messageOf, useLoad, useShell } from '../ui';
 
 type LangFilter = 'ar' | 'en';
@@ -181,6 +182,8 @@ export function News() {
           return (
             <div className="stack">
               <DailyProjectCard />
+              {/* M182c: the breaking-news push lives with the news it reads. */}
+              <NewsBreaking />
               <section className="card">
                 <div className="row">
                   <dl className="strip three">

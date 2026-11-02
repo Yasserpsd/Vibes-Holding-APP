@@ -644,6 +644,10 @@ export const api = {
   marketAlerts: () => call<MarketAlertsData>('GET', '/api/admin/market-alerts'),
   saveMarketAlerts: (settings: MarketAlertSettings) => call<{ ok: true; settings: MarketAlertSettings }>('PUT', '/api/admin/market-alerts', settings),
   testMarketAlert: () => call<{ ok: true; sent: number; message: { title: string; body: string } }>('POST', '/api/admin/market-alerts/test'),
+  // M182c: the breaking-news push — cap, quiet hours, spark bar, a test push to the admin.
+  newsBreaking: () => call<NewsBreakingData>('GET', '/api/admin/news/breaking'),
+  saveNewsBreaking: (settings: NewsBreakingSettings) => call<{ ok: true; settings: NewsBreakingSettings }>('PUT', '/api/admin/news/breaking', settings),
+  testNewsBreaking: () => call<{ ok: true; sent: number; message: { title: string; body: string } }>('POST', '/api/admin/news/breaking/test'),
   // M81 «صور التطبيق»: code-defined image slots the owner fills with uploads.
   contentImages: () => call<{ slots: ImageSlot[] }>('GET', '/api/admin/content/images'),
   saveContentImage: (key: string, url: string | null) => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url }),
@@ -681,6 +685,17 @@ export type MarketAlertsData = {
   enabled: boolean;
   sentToday: string[];
   watching: { key: string; label: string; group: MarketGroup; changePct: number; threshold: number; delayedMin: number | null; crossed: boolean }[];
+};
+
+/** M182c — mirrors server/src/news/breaking.ts. */
+export type NewsBreakingSettings = { enabled: boolean; dailyCap: number; quietFrom: number; quietTo: number; minSpark: number };
+export type NewsBreakingData = {
+  settings: NewsBreakingSettings;
+  defaults: NewsBreakingSettings;
+  enabled: boolean;
+  sentToday: number;
+  sentIds: string[];
+  candidates: { lang: string; id: string; title: string; sourceName: string }[];
 };
 
 /** M68 «شركاؤنا» — mirrors server/src/partners/service.ts. */

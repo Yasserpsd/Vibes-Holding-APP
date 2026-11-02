@@ -66,7 +66,7 @@ import { KeywordClassifier, type Classifier } from './news/classify.js';
 import { OpenAIClassifier } from './news/openai.js';
 import { workshopAdRoutes, WorkshopAdService } from './agenda/ad.js';
 import { MarketAlertsService, marketAlertRoutes } from './markets/alerts.js';
-import { BreakingNewsService } from './news/breaking.js';
+import { BreakingNewsService, breakingNewsRoutes } from './news/breaking.js';
 import { marketsRoutes, MarketsService } from './markets/service.js';
 import { newsRoutes } from './news/routes.js';
 import { NewsService } from './news/service.js';
@@ -597,6 +597,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M176: the home's live price strip (gold, silver, oil, Bitcoin) — real quotes, shared 10-minute cache.
   await app.register(marketsRoutes, { service: markets });
   await app.register(marketAlertRoutes, { service: marketAlerts, markets, push, auth });
+  await app.register(breakingNewsRoutes, { service: breakingNews, news, push, auth });
   // M177: the daily AI-written ad for the next open workshop — the app's once-a-day opening popup.
   await app.register(workshopAdRoutes, { service: new WorkshopAdService({ kv, log: app.log, agenda, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl }) });
   await app.register(videosRoutes, { service: videos });

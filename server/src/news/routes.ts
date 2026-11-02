@@ -75,6 +75,14 @@ export const newsRoutes: FastifyPluginAsync<NewsRoutesOptions> = async (app, { s
     }),
   );
 
+  // M182c «رقم اليوم»: the day's biggest money figure with its story (the source's own words).
+  app.get(
+    '/api/news/number',
+    guard(async (request) => {
+      return { number: service.numberOfDay(langOf(request)) };
+    }),
+  );
+
   app.get(
     '/api/news/decisions',
     guard(async (request, reply) => {

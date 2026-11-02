@@ -40,6 +40,8 @@ export const newsApi = {
   feed: (topic: string | undefined, page: number) => apiGet<NewsPage>('/api/news/feed', { topic, page, limit: PAGE_SIZE }),
   /** M182: the home carousel — money topics only, the spiciest headlines first (server-ranked). */
   homeFeed: () => apiGet<NewsPage>('/api/news/feed', { scope: 'home', page: 1, limit: 8 }),
+  /** M182c «رقم اليوم»: the day's biggest money figure with its story (the source's own words). */
+  numberOfDay: () => apiGet<{ number: NumberOfDay | null }>('/api/news/number'),
   decisions: (page: number, limit = PAGE_SIZE) => apiGet<NewsPage>('/api/news/decisions', { page, limit }),
   item: (id: string) => apiGet<{ item: NewsItem }>(`/api/news/${encodeURIComponent(id)}`),
   prefs: () => apiGet<NewsPrefs>('/api/news/prefs'),
@@ -65,6 +67,12 @@ export function useNewsFeed(topic: string | undefined, who: string) {
 /** The home carousel's picks, refreshed every few minutes so «الأخبار الشقية» stay fresh. */
 export function useHomeNews() {
   return useQuery({ queryKey: ['news', 'home'], queryFn: newsApi.homeFeed, staleTime: 5 * 60_000, refetchInterval: 10 * 60_000 });
+}
+
+export type NumberOfDay = { text: string; item: NewsItem };
+
+export function useNumberOfDay() {
+  return useQuery({ queryKey: ['news', 'number'], queryFn: newsApi.numberOfDay, staleTime: 30 * 60_000 });
 }
 
 export function useDecisions(limit = PAGE_SIZE) {

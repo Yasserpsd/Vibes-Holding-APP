@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { BreakingNewsService, breakingMessage } from './news/breaking.js';
+import { biggestFigure } from './news/service.js';
 import type { NewsService } from './news/service.js';
 import type { NewsItem } from './news/types.js';
 import type { PushMessage, PushService } from './push/service.js';
@@ -32,6 +33,13 @@ const newsWith = (ar: NewsItem[], en: NewsItem[] = []): NewsService => ({ breaki
 // 11:00 Riyadh (08:00 UTC) — outside the quiet hours; 23:30 Riyadh is inside them.
 const DAY_MS = Date.parse('2026-11-02T08:00:00.000Z');
 const NIGHT_MS = Date.parse('2026-11-02T20:30:00.000Z');
+
+test('M182c: the biggest figure wins — scale words beat percentages, Arabic digits read fine', () => {
+  assert.equal(biggestFigure('أرامكو تحقق 120 مليار ريال وقيمتها 1.8 تريليون')?.text, '1.8 تريليون');
+  assert.equal(biggestFigure('السهم يقفز 40% بعد صفقة بـ 500 مليون')?.text, '500 مليون');
+  assert.equal(biggestFigure('المؤشر يرتفع ٣٥٪')?.text, '٣٥٪');
+  assert.equal(biggestFigure('خبر بلا أرقام'), null);
+});
 
 test('M182b: the push carries the source name and its own headline, and opens the item', () => {
   const message = breakingMessage(item({ id: 'n1' }));
