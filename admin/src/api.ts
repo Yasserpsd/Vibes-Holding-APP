@@ -167,6 +167,66 @@ export type InviteRecord = {
 
 export type InvitesConfig = { giftText: string; shareText: string };
 
+/** M184: «برنامج ممثلي النادي» — mirrors server/src/affiliate/service.ts. */
+export type AffiliateStatus = 'agreement' | 'pending' | 'approved' | 'rejected';
+
+export type AffiliateStats = {
+  commission: number;
+  referrals: number;
+  paid: number;
+  unpaid: number;
+  earned: number;
+  withdrawn: number;
+  available: number;
+};
+
+export type AffiliateRow = {
+  contactId: number;
+  name: string;
+  email: string;
+  phone: string;
+  code: string;
+  status: AffiliateStatus;
+  entityType: 'individual' | 'company';
+  bankName: string;
+  accountName: string;
+  iban: string;
+  city: string;
+  address: string;
+  heardFrom: string;
+  heardFromNote: string;
+  appliedAt: string;
+  agreementSentAt: string;
+  agreementAcceptedAt: string | null;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  adminNote: string | null;
+  stats: AffiliateStats;
+};
+
+export type AffiliatePayoutRow = {
+  id: string;
+  contactId: number;
+  name: string;
+  amount: number;
+  bankName: string;
+  accountName: string;
+  iban: string;
+  status: 'requested' | 'paid' | 'rejected';
+  requestedAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  adminNote: string | null;
+};
+
+export type AffiliateConfig = {
+  commission: number;
+  agreementText: string;
+  introText: string;
+  shareText: string;
+  heardOptions: string[];
+};
+
 /** M36: «راسل الإدارة» — one thread per member; mirrors server/src/contact/service.ts. */
 export type ContactMessage = {
   id: string;
@@ -541,6 +601,12 @@ export const api = {
   contactThreads: () => call<{ threads: ContactThreadSummary[] }>('GET', '/api/admin/contact'),
   contactThread: (contactId: number) => call<{ thread: ContactThread }>('GET', `/api/admin/contact/${contactId}`),
   contactReply: (contactId: number, text: string) => call<{ message: ContactMessage }>('POST', `/api/admin/contact/${contactId}/reply`, { text }),
+  affiliates: () => call<{ affiliates: AffiliateRow[]; payouts: AffiliatePayoutRow[]; config: AffiliateConfig }>('GET', '/api/admin/affiliates'),
+  affiliateDecision: (contactId: number, status: 'approved' | 'rejected', note: string) =>
+    call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/decision`, { status, note }),
+  affiliatePayoutDecision: (id: string, status: 'paid' | 'rejected', note: string) =>
+    call<{ payout: AffiliatePayoutRow }>('POST', `/api/admin/affiliates/payouts/${id}/decision`, { status, note }),
+  affiliateConfig: (input: Partial<AffiliateConfig>) => call<{ config: AffiliateConfig }>('POST', '/api/admin/affiliates/config', input),
   invites: () => call<{ invites: InviteRecord[]; config: InvitesConfig }>('GET', '/api/admin/invites'),
   inviteGift: (id: string, note: string) => call<{ invite: InviteRecord }>('POST', `/api/admin/invites/${id}/gift`, { note }),
   invitesConfig: (input: Partial<InvitesConfig>) => call<{ config: InvitesConfig }>('POST', '/api/admin/invites/config', input),
