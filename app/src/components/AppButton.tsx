@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
+import { SarText } from '@/components/SarText';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -43,9 +44,9 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
         <Ionicons name={icon} size={18} color={color} />
       ) : null}
       {/* A definite width (flex) keeps Android from dropping the last Arabic word of the label. */}
-      <Text style={[styles.label, icon || loading ? styles.labelBeside : null, { color }]} numberOfLines={2}>
+      <SarText style={[styles.label, icon || loading ? styles.labelBeside : null, { color }]} numberOfLines={2}>
         {label}
-      </Text>
+      </SarText>
     </AnimatedPressable>
   );
 }

@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { LockedNotice } from '@/components/LockedNotice';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -70,7 +71,7 @@ function PaymentRow({ payment, onPress }: { payment: Payment; onPress: () => voi
             </Text>
           </View>
         </View>
-        <Text style={styles.amount}>{`${amountLabel(payment)}${payment.memberPrice ? ` · ${t('payments.memberPrice')}` : ''}`}</Text>
+        <SarText style={styles.amount}>{`${amountLabel(payment)}${payment.memberPrice ? ` · ${t('payments.memberPrice')}` : ''}`}</SarText>
         <View style={styles.footer}>
           <Text style={styles.meta}>{formatArabicDateTime(payment.createdAt)}</Text>
           <Ionicons name={chevronForward()} size={16} color={colors.goldLight} />

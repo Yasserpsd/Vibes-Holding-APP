@@ -277,7 +277,7 @@ function ActionPanel({ action, price, signedIn, paying, answers, onAnswer, onWha
           {price ? (
             <View style={styles.priceRow}>
               <Text style={styles.paperPriceLabel}>{t('service.amount')}</Text>
-              <Text style={styles.paperPriceValue}>{amountLabel(price)}</Text>
+              <SarText style={styles.paperPriceValue}>{amountLabel(price)}</SarText>
               {price.memberPrice ? <Text style={styles.paperPriceNote}>{t('service.memberPrice')}</Text> : null}
             </View>
           ) : null}

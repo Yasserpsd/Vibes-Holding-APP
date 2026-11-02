@@ -239,7 +239,8 @@ export const SERVICES_SEED: ServicesContent = {
       detail: 'ثلاثة أيام عملية تنقل مشروعك من الفكرة إلى خطة تنفيذ واضحة، بحضور خبراء النادي.',
       icon: 'school',
       group: 'entrepreneur',
-      priceLabel: '290 ريالًا بدلًا من 1,200',
+      // Owner (2026-11-02): the workshop price is plainly 290 — the discount is already inside it.
+      priceLabel: '290 ريال',
       memberLabel: 'خصم 50% للأعضاء',
       access: 'everyone',
       action: { type: 'form', formKey: 'workshop', label: 'سجّل في الورشة' },

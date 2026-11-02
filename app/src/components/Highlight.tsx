@@ -1,5 +1,6 @@
-import { Text, type StyleProp, type TextStyle } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 
+import { SarText } from '@/components/SarText';
 import { colors, fonts } from '@/theme/tokens';
 
 /**
@@ -20,13 +21,15 @@ type Props = {
 
 export function Highlight({ text, style, tone = colors.goldLight, numberOfLines }: Props) {
   const parts = text.split(IMPORTANT);
+  // The lit span is a SarText so «290 ريال» shows the riyal symbol; it inherits the body's fontSize.
+  const fontSize = (StyleSheet.flatten(style) as TextStyle | undefined)?.fontSize;
   return (
     <Text style={style} numberOfLines={numberOfLines}>
       {parts.map((part, index) =>
         index % 2 === 1 ? (
-          <Text key={index} style={{ fontFamily: fonts.semiBold, color: tone }}>
+          <SarText key={index} style={{ fontFamily: fonts.semiBold, color: tone, fontSize }}>
             {part}
-          </Text>
+          </SarText>
         ) : (
           part
         ),

@@ -5,6 +5,7 @@ import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native
 
 import { amountLabel, usePayment } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
+import { SarText } from '@/components/SarText';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -69,7 +70,7 @@ export default function CheckoutScreen() {
           <Text style={styles.service} numberOfLines={2}>
             {payment.serviceTitle}
           </Text>
-          <Text style={styles.amount}>{amountLabel(payment)}</Text>
+          <SarText style={styles.amount}>{amountLabel(payment)}</SarText>
         </View>
         <View style={styles.secureRow}>
           <Ionicons name="lock-closed" size={13} color={colors.gold} />

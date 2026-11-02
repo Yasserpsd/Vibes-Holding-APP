@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useMonthlyDeal } from '@/api/payments';
 import { GlassCard, NeonPulse } from '@/components/lux';
 import { PopIn } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
@@ -40,8 +41,8 @@ export function MonthlyDealBadge({ amount, currency }: { amount?: number; curren
         <Text style={styles.line}>{t('deal.percent', { percent: formatNumber(deal.percent) })}</Text>
         {amount && after !== null ? (
           <View style={styles.prices}>
-            <Text style={styles.after}>{`${LRM}${formatNumber(after)} ${currency ?? t('deal.sar')}`}</Text>
-            <Text style={styles.before}>{`${LRM}${formatNumber(amount)} ${currency ?? t('deal.sar')}`}</Text>
+            <SarText style={styles.after}>{`${LRM}${formatNumber(after)} ${currency ?? t('deal.sar')}`}</SarText>
+            <SarText style={styles.before}>{`${LRM}${formatNumber(amount)} ${currency ?? t('deal.sar')}`}</SarText>
           </View>
         ) : null}
         <Text style={styles.hint}>{t('deal.hint')}</Text>

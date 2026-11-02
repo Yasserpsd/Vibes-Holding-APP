@@ -5,6 +5,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
@@ -94,12 +95,12 @@ export function parseBlocks(text: string): Block[] {
   return blocks;
 }
 
-/** Figures glow gold inside the owner's sentence. */
+/** Figures glow gold inside the owner's sentence; «ريال»/SAR inside them becomes the riyal symbol. */
 function Lit({ text, style, paper = false }: { text: string; style: object; paper?: boolean }) {
   const parts = text.split(NUMBER);
   return (
     <Text style={style}>
-      {parts.map((part, index) => (index % 2 === 1 ? <Text key={index} style={paper ? styles.litPaper : styles.lit}>{part}</Text> : part))}
+      {parts.map((part, index) => (index % 2 === 1 ? <SarText key={index} style={[style, paper ? styles.litPaper : styles.lit]}>{part}</SarText> : part))}
     </Text>
   );
 }

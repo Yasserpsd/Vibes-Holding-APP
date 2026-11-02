@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { GoldSweep } from '@/components/wow';
@@ -68,7 +69,7 @@ export default function GoldenScreen() {
             <View style={styles.valueRow}>
               <View style={styles.valueBadge}>
                 <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>
-                <Text style={styles.valueText}>{formatMillionsSar(portfolioShown)}</Text>
+                <SarText style={styles.valueText}>{formatMillionsSar(portfolioShown)}</SarText>
               </View>
               {/* Icons pass: how many companies stand under the umbrella — the same live feed. */}
               <View style={styles.valueBadge}>

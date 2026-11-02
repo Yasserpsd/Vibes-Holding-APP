@@ -19,7 +19,6 @@ const QUOTE_WIDTH = 124;
 // metal, the oil drum on brent/WTI, each currency's flag, Bitcoin's own logo. Emoji render in color
 // inside Text on both platforms, so no asset and no native module (OTA-safe on the 1.1.0 binary).
 const QUOTE_EMOJI: Record<string, string> = {
-  tasi: '🇸🇦',
   gold: '🥇',
   silver: '🥈',
   brent: '🛢️',
@@ -40,6 +39,11 @@ export function QuoteIcon({ quote, size = 15 }: { quote: MarketQuote; size?: num
 export function priceText(price: number): string {
   if (price >= 1000) return formatNumber(price);
   return price < 1 ? price.toFixed(4) : price.toFixed(2);
+}
+
+/** Owner (2026-11-02, «خلي الرقم الأول وبعدين العلامة»): a riyal-priced quote carries the symbol right after the number. */
+export function isRiyalUnit(unit: string): boolean {
+  return unit === 'ريال' || unit === 'SAR';
 }
 
 export function ChangeText({ quote }: { quote: MarketQuote }) {
@@ -73,12 +77,15 @@ export function MarketsStrip() {
         {shown.map((quote) => (
           <PressScale key={quote.key} onPress={open} wrapStyle={styles.tile} style={styles.quote} accessibilityRole="button" accessibilityLabel={english ? quote.labelEn : quote.label}>
             <View style={styles.labelRow}>
-              <QuoteIcon quote={quote} />
+              {/* Owner (2026-11-02): no flag on TASI in the strip — «السوق السعودي» keeps its full name. */}
+              {quote.key === 'tasi' ? null : <QuoteIcon quote={quote} />}
               <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
             </View>
-            <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
+            <SarText style={styles.price} numberOfLines={1}>
+              {isRiyalUnit(english ? quote.unitEn : quote.unit) ? `${LRM}${priceText(quote.price)} ريال` : `${LRM}${priceText(quote.price)}`}
+            </SarText>
             <ChangeText quote={quote} />
-            <SarText style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>
+            {isRiyalUnit(english ? quote.unitEn : quote.unit) ? null : <SarText style={styles.unit} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>}
             {quote.gramSar ? <SarText style={styles.extra} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</SarText> : null}
           </PressScale>
         ))}

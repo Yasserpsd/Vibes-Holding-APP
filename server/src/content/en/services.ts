@@ -100,7 +100,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       title: 'Workshops',
       summary: 'The “Your venture from idea to execution” workshop: 17 to 19 October 2026 at the club HQ and online.',
       detail: "Three practical days that take your venture from the idea to a clear execution plan, with the club's experts.",
-      priceLabel: 'SAR 290 instead of 1,200',
+      priceLabel: '290 SAR',
       memberLabel: '50% discount for members',
       action: { label: 'Register for the workshop' },
     },

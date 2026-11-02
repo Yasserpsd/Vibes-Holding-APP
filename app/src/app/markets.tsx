@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMarkets, type MarketGroup, type MarketQuote } from '@/api/markets';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
-import { ChangeText, priceText, QuoteIcon } from '@/components/MarketsStrip';
+import { ChangeText, isRiyalUnit, priceText, QuoteIcon } from '@/components/MarketsStrip';
 import { SarText } from '@/components/SarText';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
@@ -64,13 +64,16 @@ export default function MarketsScreen() {
 function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; onAsk: (label: string) => void }) {
   const english = getLang() === 'en';
   const label = english ? quote.labelEn : quote.label;
+  const unit = english ? quote.unitEn : quote.unit;
+  // Owner (2026-11-02, «الرقم الأول وبعدين العلامة»): a riyal price carries the symbol after the number, no unit word.
+  const riyal = isRiyalUnit(unit);
   return (
     <View style={[styles.row, !last && styles.divider]}>
       {/* Owner (2026-11-02): each quote wears its icon, and the «متأخر 15 دقيقة» line left the screens. */}
       <QuoteIcon quote={quote} size={20} />
       <View style={styles.start}>
         <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
-        <SarText style={styles.meta} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>
+        {riyal ? null : <SarText style={styles.meta} numberOfLines={1}>{unit}</SarText>}
         {quote.gramSar ? <SarText style={styles.gram} numberOfLines={1}>{t('markets.gram', { price: formatNumber(quote.gramSar) })}</SarText> : null}
         <Text style={styles.meta} numberOfLines={1}>{formatRelativeTime(quote.at)}</Text>
       </View>
@@ -78,7 +81,7 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
         <Ionicons name="sparkles-outline" size={16} color={colors.gold} />
       </Pressable>
       <View style={styles.end}>
-        <Text style={styles.price} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</Text>
+        <SarText style={styles.price} numberOfLines={1}>{riyal ? `${LRM}${priceText(quote.price)} ريال` : `${LRM}${priceText(quote.price)}`}</SarText>
         <ChangeText quote={quote} />
       </View>
     </View>

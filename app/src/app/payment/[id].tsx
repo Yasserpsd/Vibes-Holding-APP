@@ -7,6 +7,7 @@ import { amountLabel, usePayment, type PaymentStatus } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, Sheen, usePulse } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
@@ -122,9 +123,9 @@ function Row({ label, value, latin = false, gold = false }: { label: string; val
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, latin && styles.latin, gold && styles.rowGold]} selectable>
+      <SarText style={[styles.rowValue, latin && styles.latin, gold && styles.rowGold]} selectable>
         {value}
-      </Text>
+      </SarText>
     </View>
   );
 }

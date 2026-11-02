@@ -13,7 +13,7 @@ import { t } from '@/i18n';
 import { textDir, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const ROTATE_MS = 4500;
 const SLIDES = 8;
@@ -158,9 +158,10 @@ function NumberOfDayCard() {
       wrapStyle={styles.numberWrap}
     >
       <GlassCard golden style={styles.numberCard}>
+        {/* Owner (2026-11-02, «خلي الرقم اكبر شئ وراه خلفية مميزة»): the figure is the hero — huge, dark ink on the lit gold slab. */}
         <View style={styles.numberSide}>
           <Text style={styles.numberEyebrow}>{t('news.numberOfDay')}</Text>
-          <Text style={styles.numberValue} numberOfLines={1}>{number.text}</Text>
+          <Text style={styles.numberValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{number.text}</Text>
         </View>
         <View style={styles.numberTexts}>
           <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{number.item.title}</Text>
@@ -214,9 +215,21 @@ const styles = StyleSheet.create({
   snippet: { ...typography.body, fontSize: 14, lineHeight: 22, minHeight: 44, color: colors.textSecondary, textAlign: textStart },
   numberWrap: { marginTop: spacing.sm },
   numberCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  numberSide: { alignItems: 'center', gap: 2 },
-  numberEyebrow: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
-  numberValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
+  numberSide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+    minWidth: 112,
+    maxWidth: 160,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
+  },
+  numberEyebrow: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
+  numberValue: { fontFamily: fonts.bold, fontSize: 32, lineHeight: 46, color: colors.goldInk },
   numberTexts: { flex: 1, gap: 2 },
   numberTitle: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.textPrimary, textAlign: textStart },
   numberSource: { ...typography.caption, fontSize: 11, color: colors.textMuted, textAlign: textStart },

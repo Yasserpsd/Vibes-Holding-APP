@@ -9,6 +9,7 @@ import { AppButton } from '@/components/AppButton';
 import { LockedNotice } from '@/components/LockedNotice';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { getLang, t } from '@/i18n';
@@ -96,7 +97,7 @@ function RequestRow({ request, onOpen }: { request: MemberRequest; onOpen: (() =
           </View>
         </View>
         <Text style={styles.title}>{title}</Text>
-        {amount ? <Text style={styles.amount}>{amount}</Text> : null}
+        {amount ? <SarText style={styles.amount}>{amount}</SarText> : null}
         <View style={styles.footer}>
           <Text style={styles.meta}>{`${t('requests.number', { number: request.number })} · ${formatArabicDateTime(request.createdAt)}`}</Text>
           <Ionicons name={open ? 'chevron-up-outline' : 'chevron-down-outline'} size={16} color={colors.goldLight} />

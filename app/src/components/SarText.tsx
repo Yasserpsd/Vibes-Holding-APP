@@ -12,7 +12,8 @@ import { Image, StyleSheet, Text, type TextProps } from 'react-native';
 const SYMBOL = require('../../assets/images/sar-symbol.png');
 /** The asset's width/height (458×512), so the inline image keeps the symbol's proportions. */
 const RATIO = 458 / 512;
-const WORD = /(ريال|SAR)/;
+// Longest forms first so «ريالًا» never leaves its tanween behind the symbol.
+const WORD = /(ريالات|ريالًا|ريالاً|ريالا|ريال|ر\.س|SAR)/;
 
 export function SarText({ children, style, ...rest }: TextProps) {
   const flat = StyleSheet.flatten(style) ?? {};
