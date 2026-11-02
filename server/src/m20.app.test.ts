@@ -385,14 +385,19 @@ test('advisor contexts are built on the server from public data: no founder cont
 
   const aboutNews = await ask({ type: 'news', id: newsItem.id });
   assert.equal(aboutNews.context?.title, newsItem.title);
-  assert.equal(aboutNews.context?.text, `العنوان الأصلي: ${newsItem.title}\nالمصدر: ${newsItem.sourceName}\nمقتطف المصدر: ${newsItem.snippet}`);
+  // M183: the live member block rides at the end of every focus; the news part stays the source's own words.
+  assert.ok(aboutNews.context?.text.startsWith(`العنوان الأصلي: ${newsItem.title}\nالمصدر: ${newsItem.sourceName}\nمقتطف المصدر: ${newsItem.snippet}`), aboutNews.context?.text);
+  assert.ok(aboutNews.context?.text.includes('نشاط العضو في التطبيق'));
   assert.equal(aboutNews.page_url, newsUrl);
 
   const created = await post('/api/admin/posts', { title: 'ورشة التقييم', body: 'ورشة عملية عن تقييم المشاريع الناشئة.', status: 'published' }, memberToken);
   const aboutPost = await ask({ type: 'post', id: created.json().post.id });
   assert.ok(aboutPost.context?.text.includes('ورشة عملية عن تقييم المشاريع الناشئة.'));
   const draft = await post('/api/admin/posts', { title: 'مسودة سرية', body: 'لا تُنشر', status: 'draft' }, memberToken);
-  assert.equal((await ask({ type: 'post', id: draft.json().post.id })).context, undefined, 'a draft is not public data');
+  // M183: the member block may ride alone, but a draft's words never reach the context.
+  const aboutDraft = await ask({ type: 'post', id: draft.json().post.id });
+  assert.ok(!JSON.stringify(aboutDraft.context ?? '').includes('لا تُنشر'), 'a draft is not public data');
+  assert.ok(!JSON.stringify(aboutDraft.context ?? '').includes('مسودة سرية'), 'a draft is not public data');
 
   assert.equal((await ask({ type: 'video', id: 'CnWMWS_nDpM' })).context?.type, 'video');
   assert.ok((await ask({ type: 'service', id: 'pitch-deck' })).context?.text.includes('خدمة:'));
@@ -402,7 +407,8 @@ test('advisor contexts are built on the server from public data: no founder cont
   assert.ok(!/1,900|3,900|paymob/.test(membership.context?.text ?? ''), 'rule 3');
   const golden = await ask({ type: 'screen', id: 'golden' });
   assert.ok(golden.context?.text.includes('المعلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد'), 'valuations carry the disclaimer');
-  assert.equal((await ask({ type: 'screen', id: 'somewhere-new' })).context?.text, '');
+  // M183: an unknown screen has no words of its own; only the live member block remains.
+  assert.ok((await ask({ type: 'screen', id: 'somewhere-new' })).context?.text.startsWith('═ نشاط العضو في التطبيق'));
   assert.ok(Object.values(membership.context ?? {}).every((value) => String(value).length <= 6000));
 
   assert.equal((await post('/api/advisor/message', { text: 'سؤال', context: { type: 'member', id: 5 } }, memberToken)).statusCode, 400);

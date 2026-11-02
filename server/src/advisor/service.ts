@@ -10,7 +10,12 @@ import type { ProjectsService } from '../projectsBank/service.js';
 import type { KV } from '../store.js';
 import type { MarketsService } from '../markets/service.js';
 import type { VideosService } from '../videos/service.js';
-import { ContextResolver, type AdvisorContext } from './context.js';
+import type { AuthService } from '../auth/service.js';
+import type { FetchImpl } from '../news/rss.js';
+import type { ProjectAccessService } from '../projectsBank/access.js';
+import type { RequestsService } from '../requests/service.js';
+import { ContextResolver, CONTEXT_TEXT_MAX, type AdvisorContext } from './context.js';
+import { MemberPresence, fetchDeck, NO_PRESENCE } from './presence.js';
 import { BlockList, blockListFromConfig, isSystemNoise, stripUrls, toGate, toMessage, type AdvisorGate, type AdvisorMessage } from './sanitize.js';
 
 /** M151: a PDF the member attached, as base64 (checked by the route: magic bytes, ≤ 10 MB). */
@@ -44,9 +49,20 @@ const meOf = (contact: HubContact | null | undefined): Me | null => (contact && 
 export class AdvisorService {
   private settings: { value: Settings; at: number; ttl: number } | null = null;
   private readonly contexts: ContextResolver;
+  private presence: MemberPresence | null = null;
+  private fetchImpl: FetchImpl = fetch;
 
   constructor(private readonly deps: Deps) {
     this.contexts = new ContextResolver(deps);
+  }
+
+  /**
+   * M183 live awareness: built after the other services exist (app.ts wires them later than the advisor).
+   * Without this call the advisor still works, only without the member block and the deck attachment.
+   */
+  wire(extra: { auth: AuthService; requests?: RequestsService; access?: ProjectAccessService; fetchImpl?: FetchImpl }): void {
+    this.presence = new MemberPresence({ auth: extra.auth, requests: extra.requests, access: extra.access, log: this.deps.log });
+    if (extra.fetchImpl) this.fetchImpl = extra.fetchImpl;
   }
 
   /** The hub's webhook says its config changed (`config.changed`): the next message reads it again. */
@@ -73,15 +89,28 @@ export class AdvisorService {
     // What the member points at («اسأل المستشار»), built here from public data: the hub hands it to the workflow as `focus`.
     // The English app says so in the page title and the focus, so the brain answers in English (no plugin change).
     const page = await this.contexts.resolve(context, lang);
+    // M183: the member's live app activity rides inside the focus, and an unlocked project's deck
+    // rides as the message file when he asks for its analysis (same PDF branch as his own uploads).
+    const live = this.presence ? await this.presence.of(session, context, message) : NO_PRESENCE;
+    let focus = page.focus;
+    let outgoing = file;
+    if (live.block) {
+      focus = focus
+        ? { ...focus, text: focus.text ? `${focus.text.slice(0, CONTEXT_TEXT_MAX - live.block.length - 2)}\n\n${live.block}` : live.block }
+        : { type: 'screen', id: 'app', title: 'تطبيق نادي المستثمرين', text: live.block };
+    }
+    if (!outgoing && live.deckUrl && live.deckName) {
+      outgoing = await fetchDeck(live.deckUrl, live.deckName, this.fetchImpl, this.deps.log);
+    }
     const result = await this.deps.hub.call('message', {
       uuid: session.uuid,
       message,
       page_url: page.url,
-      page_title: page.title,
+      page_title: page.title || (live.block ? 'تطبيق نادي المستثمرين' : ''),
       ip,
-      ...(page.focus ? { context: page.focus } : {}),
-      ...(file ? { file: `data:application/pdf;base64,${file.base64}`, file_name: file.name } : {}),
-    }, file ? { timeoutMs: 90_000 } : {});
+      ...(focus ? { context: focus } : {}),
+      ...(outgoing ? { file: `data:application/pdf;base64,${outgoing.base64}`, file_name: outgoing.name } : {}),
+    }, outgoing ? { timeoutMs: 90_000 } : {});
     const me = meOf(result.contact);
     if (result.gated) {
       return { messageId: null, waiting: false, human: false, gate: toGate(result.gate, result.contact ?? null, settings.block), me };

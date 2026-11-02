@@ -82,7 +82,7 @@ test('home, about and membership content follow the wording rules', async () => 
   assert.equal(membership.json().title, 'العضوية السنوية لنادي المستثمرين');
   assert.equal(membership.json().groups.length, 7);
   // Older app versions still get the flat lists.
-  assert.equal(membership.json().benefits.length, 28);
+  assert.equal(membership.json().benefits.length, 29);
   // Rule 3: the web price block of the owner's page and its pay links never reach the app.
   assert.ok(!/1,900|3,900|160 ريال|paymob|اشترك الآن/.test(membership.body));
   assert.equal(membership.json().comingSoon.length, 1);

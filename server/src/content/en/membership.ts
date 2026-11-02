@@ -21,6 +21,7 @@ const GROUPS_EN: Translation<MembershipGroup>[] = [
       { text: 'A full year to build lasting relationships: meetups, evenings and workshops all year round, giving you enough time to get to know people, build trust and grow your professional network' },
       { text: 'A community of neutral members, entrepreneurs and investors: widen your network and see varied experiences and paths from inside the Kingdom and beyond' },
       { text: 'Fresh chances to meet and learn all year: attend the club’s meetups, workshops and private evenings at no charge' },
+      { text: 'Missed a session? Full recordings of the lectures and workshops are yours, no conditions, for your whole membership year — watch them whenever you like' },
       { text: 'A stage for your venture before people interested in partnership opportunities: days dedicated to entrepreneurs, and priority booking of your slot at the “5 minutes” meetup to present your venture live' },
     ],
   },

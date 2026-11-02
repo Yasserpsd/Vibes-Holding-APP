@@ -552,6 +552,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const personaRequests = new PersonaRequestsService(kv);
   // M138 «متابعة طلباتي»: one timeline over every store, and the ledger of service requests + golden interests.
   const requests = new RequestsService({ kv, log: app.log, notices, sources: { card, hq, forms, workshops, agenda, persona: personaRequests, profiles, payments, deletion } });
+  // M183: the advisor's live member awareness — his timeline, his bank balance and the unlocked deck.
+  advisor.wire({ auth, requests, access, fetchImpl });
   await app.register(requestsRoutes, { service: requests, auth });
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl, daily: dailyProject });
   await app.register(ratingsRoutes, { service: ratings, auth, projects });
