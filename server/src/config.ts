@@ -113,6 +113,7 @@ const envSchema = z.object({
   UPLOADS_SWEEP: z.enum(['0', '1']).optional(),
   UPLOAD_MAX_IMAGE_MB: z.coerce.number().int().min(1).max(50).default(10),
   UPLOAD_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(2000).default(200),
+  UPLOAD_MAX_PDF_MB: z.coerce.number().int().min(1).max(200).default(50),
   // M189 4K video: a Bunny Stream library takes every uploaded video when the three values are set (rule 1: env only).
   // BUNNY_STREAM_CDN_HOST is the library's pull zone (vz-....b-cdn.net); BUNNY_STREAM_TOKEN_KEY signs playback links
   // when the pull zone has token authentication on. Each server (test, production) gets its own library.
@@ -120,7 +121,7 @@ const envSchema = z.object({
   BUNNY_STREAM_API_KEY: z.string().min(10).optional(),
   BUNNY_STREAM_CDN_HOST: z.string().regex(/^[a-z0-9.-]+$/i).optional(),
   BUNNY_STREAM_TOKEN_KEY: z.string().min(8).optional(),
-  BUNNY_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(102400).default(51200),
+  BUNNY_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(1024000).default(512000),
   // M129 off-site backup: a nightly copy of the kv table and the media bucket to the owner's own
   // hosting over SFTP. The key is the PRIVATE OpenSSH key, base64-encoded into one line (rule 1:
   // environment only, never in git). Host, user and key unset = backups off (local runs, tests).

@@ -42,6 +42,8 @@ export type AgendaEvent = {
   past?: boolean;
   /** M191: the workshop recordings' titles (the videos come only through the members-only endpoint). */
   recordings?: { title: string }[];
+  /** M192: the slides' titles (the PDFs come only through the members-only endpoint). */
+  files?: { title: string }[];
 };
 
 export type AgendaRegisterAnswer = {
@@ -111,12 +113,13 @@ export function useAgendaTicket(eventId: string | undefined, enabled: boolean) {
 }
 
 export type AgendaRecordingLink = { title: string; url: string; poster: string };
+export type AgendaFileLink = { title: string; url: string };
 
 /** M191: the workshop recordings' playable links — the server answers them to ACTIVE annual members only. */
 export function useAgendaRecordings(eventId: string | undefined, enabled: boolean) {
   return useQuery({
     queryKey: ['agenda', 'recordings', eventId],
-    queryFn: () => apiGet<{ recordings: AgendaRecordingLink[] }>(`/api/agenda/${encodeURIComponent(eventId ?? '')}/recordings`),
+    queryFn: () => apiGet<{ recordings: AgendaRecordingLink[]; files?: AgendaFileLink[] }>(`/api/agenda/${encodeURIComponent(eventId ?? '')}/recordings`),
     enabled: Boolean(eventId) && enabled,
     // The CDN links are signed for hours; refresh well before they lapse.
     staleTime: 5 * 60_000,

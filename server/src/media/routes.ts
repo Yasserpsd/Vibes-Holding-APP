@@ -48,10 +48,10 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, {
   );
 
   // Disk store only (development, tests): the signed ticket in the query is the permission, like a presigned bucket URL.
-  // With a bucket the route does not exist. A raw image or video body reaches the handler as a stream (this parser is
+  // With a bucket the route does not exist. A raw image, video or PDF body reaches the handler as a stream (this parser is
   // scoped to this plugin); JSON and text bodies keep Fastify's default 1 MB limit, so the server never buffers a large body.
   if (store instanceof DiskMediaStore) {
-    app.addContentTypeParser(/^(image|video)\//, (_request, payload, done) => done(null, payload));
+    app.addContentTypeParser(/^(image\/|video\/|application\/pdf$)/, (_request, payload, done) => done(null, payload));
     app.put(
       '/api/admin/uploads/put',
       guard(async (request, reply) => {
@@ -82,6 +82,8 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, {
 
   app.get('/media/*', async (request, reply) => {
     const key = (request.params as { '*': string })['*'];
+    // M192: members-only files (workshop slides) leave only through the members' endpoint.
+    if (await service.isPrivate(key)) return reply.code(404).send(NOT_FOUND);
     const query = request.query as { w?: unknown; raw?: unknown };
     // M169: a picture leaves as a small WebP at the width the screen asked for (`?w=`), from this server,
     // cacheable for a year. `raw=1` (the dashboard's download) and videos keep the original path below.

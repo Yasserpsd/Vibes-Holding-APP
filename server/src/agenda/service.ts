@@ -72,6 +72,8 @@ export type AgendaEvent = {
    * everyone else sees the titles and the members-only lock.
    */
   recordings?: AgendaRecording[];
+  /** M192 (owner: «اضيف ملف pdf اللي تم عرضه في الملتقى»): the slides, uploaded `/media/` PDFs, members-only like the recordings. */
+  files?: AgendaFile[];
   /** M43: the English of the owner's words, written once by AI and editable from the dashboard. */
   en?: AgendaEnglish | null;
   /** False once the owner edited the English himself: automatic retranslation then stops. */
@@ -79,6 +81,7 @@ export type AgendaEvent = {
 };
 
 export type AgendaRecording = { title: string; videoId: string };
+export type AgendaFile = { title: string; url: string };
 
 export type AgendaEnglish = { title: string; blurb: string; place: string | null };
 
@@ -141,6 +144,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   interests: string[];
   /** M191: the recordings' titles for everyone; the videos themselves only through the members-only endpoint. */
   recordings: { title: string }[];
+  /** M192: the slides' titles; the files themselves only through the members-only endpoint. */
+  files: { title: string }[];
 };
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
@@ -171,6 +176,7 @@ export function feeFor(event: Pick<AgendaEvent, 'feeSar' | 'memberFeeSar'>, memb
 
 export class AgendaService {
   private eventsChain: Promise<unknown> = Promise.resolve();
+  private privateCache: Promise<{ videoIds: Set<string>; fileUrls: string[] }> | null = null;
   private regsChain: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly deps: Deps) {}
@@ -185,6 +191,7 @@ export class AgendaService {
       const result = change(events);
       events.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       await this.deps.kv.set(AGENDA_EVENTS_KEY, { events: events.slice(0, MAX_EVENTS) });
+      this.privateCache = null;
       this.deps.onChange?.();
       return result;
     });
@@ -246,6 +253,7 @@ export class AgendaService {
       coverUrl: event.coverUrl || null,
       past,
       recordings: (event.recordings ?? []).map((recording) => ({ title: recording.title })),
+      files: (event.files ?? []).map((file) => ({ title: file.title })),
     };
   }
 
@@ -566,9 +574,16 @@ export class AgendaService {
     return { ...fields, dates: days, date: days[0] };
   }
 
-  /** M191: every Bunny video that belongs to a recording (members-only, never through the public stream link). */
-  async recordingIds(): Promise<Set<string>> {
-    return new Set((await this.loadEvents()).flatMap((event) => (event.recordings ?? []).map((recording) => recording.videoId)));
+  /**
+   * M191/M192: the recordings' Bunny ids and the slides' URLs — members-only, never through the public
+   * `/media/` links. Asked on every media request, so it is kept in memory until an event changes.
+   */
+  privateMedia(): Promise<{ videoIds: Set<string>; fileUrls: string[] }> {
+    this.privateCache ??= this.loadEvents().then((events) => ({
+      videoIds: new Set(events.flatMap((event) => (event.recordings ?? []).map((recording) => recording.videoId))),
+      fileUrls: events.flatMap((event) => (event.files ?? []).map((file) => file.url)),
+    }));
+    return this.privateCache;
   }
 
   async create(input: AgendaEventInput, now = Date.now()): Promise<AgendaEvent> {

@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { openLink } from '@/lib/openLink';
 import { textStart } from '@/i18n/direction';
 import { playVideo } from '@/lib/player';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -18,22 +19,24 @@ import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
  * recordings. An ACTIVE annual member gets one row per day that opens the in-app player; everyone
  * else sees the same titles locked, with the membership door — a paid workshop ticket never unlocks them.
  */
-export function WorkshopRecordings({ eventId, titles }: { eventId: string; titles: { title: string }[] }) {
+export function WorkshopRecordings({ eventId, titles, files }: { eventId: string; titles: { title: string }[]; files: { title: string }[] }) {
   const router = useRouter();
   const { status, me } = useAuth();
   const signedIn = status === 'signedIn';
   const member = signedIn && me?.membership.status === 'active';
   const links = useAgendaRecordings(eventId, member);
-  if (titles.length === 0) return null;
+  if (titles.length === 0 && files.length === 0) return null;
 
   const playable = member ? (links.data?.recordings ?? null) : null;
   const rows = playable ?? titles.map((entry) => ({ title: entry.title, url: '', poster: '' }));
+  // M192: the slides shown at the workshop, opened in the in-app browser.
+  const documents = (member ? links.data?.files : null) ?? files.map((entry) => ({ title: entry.title, url: '' }));
 
   return (
     <GlassCard golden style={styles.card}>
       <View style={styles.head}>
         <Ionicons name="play-circle" size={26} color={colors.goldLight} />
-        <Text style={styles.title}>{t('agenda.recordingsTitle')}</Text>
+        <Text style={styles.title}>{t(titles.length > 0 ? 'agenda.recordingsTitle' : 'agenda.filesTitle')}</Text>
       </View>
       <View style={styles.badge}>
         <Ionicons name="ribbon-outline" size={14} color={colors.goldLight} />
@@ -55,6 +58,20 @@ export function WorkshopRecordings({ eventId, titles }: { eventId: string; title
               <Ionicons name={member ? 'play' : 'lock-closed'} size={18} color={member ? colors.gold : colors.textMuted} />
               <Text style={[styles.rowText, !ready && styles.rowTextLocked]} numberOfLines={2}>
                 {recording.title}
+              </Text>
+            </View>
+          </PressScale>
+        );
+      })}
+
+      {documents.map((file, index) => {
+        const ready = Boolean(file.url);
+        return (
+          <PressScale key={`file-${index}-${file.title}`} disabled={!ready} onPress={() => void openLink(file.url)} accessibilityLabel={file.title}>
+            <View style={[styles.row, !ready && styles.rowLocked]}>
+              <Ionicons name={member ? 'document-text-outline' : 'lock-closed'} size={18} color={member ? colors.gold : colors.textMuted} />
+              <Text style={[styles.rowText, !ready && styles.rowTextLocked]} numberOfLines={2}>
+                {file.title}
               </Text>
             </View>
           </PressScale>

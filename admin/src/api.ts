@@ -386,8 +386,11 @@ export type AgendaEventInput = {
   open: boolean;
   /** M191: the workshop's recordings (Bunny Stream videos), playable in the app by active annual members only. */
   recordings?: AgendaRecording[];
+  /** M192: the slides shown at the workshop (uploaded PDFs), members-only like the recordings. */
+  files?: AgendaFile[];
 };
 export type AgendaRecording = { title: string; videoId: string };
+export type AgendaFile = { title: string; url: string };
 export type AgendaEvent = AgendaEventInput & {
   id: string;
   createdAt: string;
@@ -513,10 +516,10 @@ export type PayLinkInput = {
   customer: { name: string; phone: string; email: string };
 };
 
-export type UploadKind = 'image' | 'video';
+export type UploadKind = 'image' | 'video' | 'document';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
-export type UploadConfig = { images: UploadLimits; videos: UploadLimits; durable: boolean; stream?: boolean };
+export type UploadConfig = { images: UploadLimits; videos: UploadLimits; documents?: UploadLimits; durable: boolean; stream?: boolean };
 /** Where the bytes go: a presigned multipart POST to the bucket, a raw PUT to the API's token URL, or (M189 4K video) Bunny Stream over TUS. */
 export type UploadTarget =
   | { method: 'POST'; url: string; fields: Record<string, string> }

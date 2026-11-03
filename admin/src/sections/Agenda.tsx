@@ -7,7 +7,8 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 /** M41 «أجندة النادي»: events across the whole year, their registrations, and the members' push reminder. */
 
 const MODE_LABEL: Record<AgendaMode, string> = { hq: 'حضوري', online: 'أونلاين', both: 'حضوري وأونلاين' };
-const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, originalFeeSar: 0, memberFeeSar: 0, interests: [], open: true, recordings: [] };
+const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, originalFeeSar: 0, memberFeeSar: 0, interests: [], open: true, recordings: [], files: [] };
+const BUNNY_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const DAY_NAMES = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع'];
 
 /** M107: the unified interests (mirrors server/src/interests/types.ts). */
@@ -29,9 +30,11 @@ export function Agenda() {
   const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput; english: { title: string; blurb: string; place: string } } | null>(null);
   const [rows, setRows] = useState<{ event: AgendaEvent; registrations: AgendaRegistration[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | 'recording' | null>(null);
+  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | 'recording' | 'file' | null>(null);
   const [recordingProgress, setRecordingProgress] = useState(0);
   const recordingRef = useRef<HTMLInputElement>(null);
+  const fileUploadRef = useRef<HTMLInputElement>(null);
+  const [bunnyLink, setBunnyLink] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
   const upcoming = state.data?.events.filter((event) => !pastOf(event)).length ?? 0;
@@ -133,9 +136,7 @@ export function Agenda() {
     try {
       const uploaded = await uploadFile(file, setRecordingProgress);
       if (uploaded.kind !== 'video' || !uploaded.key.startsWith('stream/')) throw new Error('خادم الفيديو غير مفعّل على هذا الخادم بعد.');
-      const recordings = editor.input.recordings ?? [];
-      const title = recordings.length < DAY_NAMES.length ? `اليوم ${DAY_NAMES[recordings.length]}` : `الجزء ${recordings.length + 1}`;
-      edit({ recordings: [...recordings, { title, videoId: uploaded.key.slice('stream/'.length) }] });
+      addRecording(uploaded.key.slice('stream/'.length));
     } catch (failure) {
       fail(failure);
     } finally {
@@ -143,6 +144,44 @@ export function Agenda() {
       if (recordingRef.current) recordingRef.current.value = '';
     }
   }
+
+  /** The next day's name for a new recording: «اليوم الأول»، «اليوم الثاني»… */
+  function addRecording(videoId: string) {
+    const recordings = editor?.input.recordings ?? [];
+    if (recordings.some((recording) => recording.videoId === videoId)) return;
+    const title = recordings.length < DAY_NAMES.length ? `اليوم ${DAY_NAMES[recordings.length]}` : `الجزء ${recordings.length + 1}`;
+    edit({ recordings: [...recordings, { title, videoId }] });
+  }
+
+  // M192 (owner: «ارفع علي bunny مباشر واديله بس لينك»): any Bunny link or Video ID of the club's library; the server checks it on save.
+  function addBunnyLink() {
+    const videoId = BUNNY_ID.exec(bunnyLink)?.[0]?.toLowerCase();
+    if (!videoId) {
+      fail(new Error('الصق رابط الفيديو من Bunny أو رقمه (Video ID).'));
+      return;
+    }
+    addRecording(videoId);
+    setBunnyLink('');
+  }
+
+  // M192: the slides shown at the workshop — a PDF, members-only in the app.
+  async function pickSlides(file: File | undefined) {
+    if (!file || !editor || uploading) return;
+    setUploading('file');
+    try {
+      const uploaded = await uploadFile(file);
+      if (uploaded.kind !== 'document') throw new Error('اختر ملف PDF.');
+      edit({ files: [...(editor.input.files ?? []), { title: file.name.replace(/\.pdf$/i, ''), url: uploaded.url }] });
+    } catch (failure) {
+      fail(failure);
+    } finally {
+      setUploading(null);
+      if (fileUploadRef.current) fileUploadRef.current.value = '';
+    }
+  }
+
+  const editFile = (index: number, title: string | null) =>
+    edit({ files: (editor?.input.files ?? []).flatMap((file, at) => (at !== index ? [file] : title === null ? [] : [{ ...file, title }])) });
 
   const editRecording = (index: number, title: string | null) =>
     edit({ recordings: (editor?.input.recordings ?? []).flatMap((recording, at) => (at !== index ? [recording] : title === null ? [] : [{ ...recording, title }])) });
@@ -202,7 +241,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, originalFeeSar: row.originalFeeSar ?? 0, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open, recordings: row.recordings ?? [] }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, originalFeeSar: row.originalFeeSar ?? 0, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open, recordings: row.recordings ?? [], files: row.files ?? [] }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -297,7 +336,22 @@ export function Agenda() {
               ))}
               <input ref={recordingRef} type="file" accept="video/*" disabled={uploading !== null} onChange={(event) => void pickRecording(event.target.files?.[0])} />
               {uploading === 'recording' ? <p className="muted">جارٍ رفع الفيديو… {Math.round(recordingProgress * 100)}% — لا تغلق الصفحة</p> : null}
+              <div className="row-actions">
+                <input value={bunnyLink} onChange={(event) => setBunnyLink(event.target.value)} placeholder="أو الصق رابط الفيديو من Bunny (أو Video ID)" dir="ltr" aria-label="رابط الفيديو من Bunny" />
+                <button type="button" disabled={!bunnyLink.trim()} onClick={addBunnyLink}>إضافة من Bunny</button>
+              </div>
               <p className="muted hint">بعد اكتمال الرفع انتظر دقائق حتى يجهز الفيديو ثم اضغط «حفظ». غير الأعضاء يرون عناوين التسجيلات مع دعوة للاشتراك فقط.</p>
+            </fieldset>
+            <fieldset>
+              <legend>ملفات العرض (PDF) — حصرية لأعضاء العضوية السنوية</legend>
+              {(editor.input.files ?? []).map((file, index) => (
+                <div key={file.url} className="row-actions">
+                  <input value={file.title} maxLength={120} onChange={(event) => editFile(index, event.target.value)} aria-label="عنوان الملف" />
+                  <button type="button" className="ghost" onClick={() => editFile(index, null)}>إزالة</button>
+                </div>
+              ))}
+              <input ref={fileUploadRef} type="file" accept="application/pdf" disabled={uploading !== null} onChange={(event) => void pickSlides(event.target.files?.[0])} />
+              {uploading === 'file' ? <p className="muted">جارٍ رفع الملف…</p> : null}
             </fieldset>
             <label>
               سعر غير الأعضاء بالريال (0 = بدون رسوم للجميع)

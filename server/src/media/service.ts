@@ -6,7 +6,7 @@ import { RequestError } from '../auth/guard.js';
 import { isStreamId, type BunnyStream, type StreamFile, type StreamTicket } from './bunny.js';
 import type { MediaLocation, MediaStore, UploadTicket } from './store.js';
 
-export type MediaKind = 'image' | 'video';
+export type MediaKind = 'image' | 'video' | 'document';
 
 // `stored`: phones record QuickTime (.mov); Android's browser refuses that label but plays the same H.264 bytes as MP4.
 const TYPES: Record<string, { kind: MediaKind; extension: string; stored?: string }> = {
@@ -17,11 +17,13 @@ const TYPES: Record<string, { kind: MediaKind; extension: string; stored?: strin
   'video/mp4': { kind: 'video', extension: 'mp4' },
   'video/quicktime': { kind: 'video', extension: 'mp4', stored: 'video/mp4' },
   'video/webm': { kind: 'video', extension: 'webm' },
+  // M192: the slides a workshop showed, for members only.
+  'application/pdf': { kind: 'document', extension: 'pdf' },
 };
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm']);
 
 /** Keys are made here and nowhere else, so a key that matches can never leave its folder. */
-const KEY_PATTERN = /^posts\/\d{4}\/\d{2}\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.(jpg|png|webp|gif|mp4|mov|webm)$/;
+const KEY_PATTERN = /^posts\/\d{4}\/\d{2}\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.(jpg|png|webp|gif|mp4|mov|webm|pdf)$/;
 const PREFIX = 'posts/';
 const ORPHAN_HOURS = 24;
 const SWEEP_EVERY_MS = 24 * 60 * 60_000;
@@ -42,6 +44,8 @@ export type MediaOptions = {
   origins: string[];
   maxImageBytes: number;
   maxVideoBytes: number;
+  /** M192: PDF files (workshop slides). */
+  maxDocumentBytes?: number;
   /** M189: videos go to Bunny Stream (4K, adaptive HLS) when set; images stay in the store. */
   stream?: BunnyStream | null;
   maxStreamBytes?: number;
@@ -66,14 +70,19 @@ export function isMediaKey(key: string): boolean {
 }
 
 export function kindOfKey(key: string): MediaKind {
-  return VIDEO_EXTENSIONS.has(key.split('.').pop() ?? '') ? 'video' : 'image';
+  const extension = key.split('.').pop() ?? '';
+  return extension === 'pdf' ? 'document' : VIDEO_EXTENSIONS.has(extension) ? 'video' : 'image';
 }
+
+const LABELS: Record<MediaKind, string> = { image: 'الصورة', video: 'الفيديو', document: 'الملف' };
 
 /** Uploaded media of the dashboard (M15): upload tickets, the public `/media/<key>` links and clean-up. */
 export class MediaService {
   private timers: NodeJS.Timeout[] = [];
   /** M191: Bunny videos that only members may play (workshop recordings); the public stream link refuses them. */
   private isPrivateStream: (id: string) => Promise<boolean> = async () => false;
+  /** M192: uploaded files only members may open (workshop slides); the public `/media/<key>` link refuses them. */
+  private isPrivateKey: (key: string) => Promise<boolean> = async () => false;
   private swept: { at: string; removed: number } | null = null;
 
   constructor(private readonly options: MediaOptions) {}
@@ -84,6 +93,7 @@ export class MediaService {
 
   private limit(kind: MediaKind): number {
     if (kind === 'image') return this.options.maxImageBytes;
+    if (kind === 'document') return this.options.maxDocumentBytes ?? this.options.maxImageBytes;
     return this.options.stream ? (this.options.maxStreamBytes ?? this.options.maxVideoBytes) : this.options.maxVideoBytes;
   }
 
@@ -92,6 +102,7 @@ export class MediaService {
     return {
       images: { types: types('image'), maxBytes: this.options.maxImageBytes },
       videos: { types: types('video'), maxBytes: this.limit('video') },
+      documents: { types: types('document'), maxBytes: this.limit('document') },
       durable: this.store.durable,
       stream: Boolean(this.options.stream),
     };
@@ -115,8 +126,22 @@ export class MediaService {
     return match[1];
   }
 
-  keepPrivate(check: (id: string) => Promise<boolean>): void {
-    this.isPrivateStream = check;
+  keepPrivate(streams: (id: string) => Promise<boolean>, keys: (key: string) => Promise<boolean> = async () => false): void {
+    this.isPrivateStream = streams;
+    this.isPrivateKey = keys;
+  }
+
+  isPrivate(key: string): Promise<boolean> {
+    return this.isPrivateKey(key);
+  }
+
+  /** M192: a short-lived link to a members-only file (the bucket's presigned link; the disk store in development answers its own URL). */
+  async memberFileUrl(url: string): Promise<string | null> {
+    const key = MediaService.keyInPath(url);
+    if (!key) return null;
+    const location = await this.store.locate(key);
+    if (!location) return null;
+    return 'redirect' in location ? location.redirect : this.urlFor(key);
   }
 
   /** Where `/media/stream/<id>/<file>` sends the player; null when streaming is off, the path is not ours or the video is members-only. */
@@ -138,7 +163,10 @@ export class MediaService {
     const state = await this.options.stream.state(id);
     if (state === 'ready') return;
     if (state === 'waiting') throw new RequestError('media_processing', 'الفيديو قيد المعالجة لدى خادم الفيديو، أعد الحفظ بعد دقيقة');
-    throw new RequestError('invalid_media', state === 'failed' ? 'تعذّرت معالجة الفيديو، ارفعه من جديد' : 'لم يكتمل رفع الفيديو، ارفعه من جديد');
+    throw new RequestError(
+      'invalid_media',
+      state === 'failed' ? 'تعذّرت معالجة الفيديو، ارفعه من جديد' : 'الفيديو غير موجود في مكتبة النادي على Bunny، أو لم يكتمل رفعه',
+    );
   }
 
   /** The poster a streamed video gets when the admin uploaded none: Bunny's own thumbnail. */
@@ -168,11 +196,11 @@ export class MediaService {
     if (!this.options.enabled) throw new RequestError('uploads_unavailable', 'رفع الملفات غير مفعّل على هذا الخادم بعد', 503);
     const type = TYPES[input.contentType];
     if (!type) {
-      throw new RequestError('unsupported_type', 'نوع الملف غير مدعوم: الصور بصيغة JPG أو PNG أو WebP أو GIF، والفيديو بصيغة MP4 أو MOV أو WebM');
+      throw new RequestError('unsupported_type', 'نوع الملف غير مدعوم: الصور بصيغة JPG أو PNG أو WebP أو GIF، والفيديو بصيغة MP4 أو MOV أو WebM، والملفات بصيغة PDF');
     }
     const max = this.limit(type.kind);
     if (input.size > max) {
-      throw new RequestError('too_large', `حجم ${type.kind === 'image' ? 'الصورة' : 'الفيديو'} أكبر من الحد المسموح (${megabytes(max)} ميجابايت)`);
+      throw new RequestError('too_large', `حجم ${LABELS[type.kind]} أكبر من الحد المسموح (${megabytes(max)} ميجابايت)`);
     }
     if (type.kind === 'video' && this.options.stream) {
       const id = await this.options.stream.create(input.filename);
@@ -188,7 +216,7 @@ export class MediaService {
    * (a bucket policy already enforces the limit; this also covers a file that was never sent).
    */
   async check(url: string, kind: MediaKind): Promise<void> {
-    const label = kind === 'image' ? 'الصورة' : 'الفيديو';
+    const label = LABELS[kind];
     if (kind === 'image' && this.options.stream && this.streamIdOf(url, 'thumbnail.jpg')) return;
     const streamId = kind === 'video' ? this.streamIdOf(url) : null;
     if (streamId && this.options.stream) return this.checkStream(streamId);

@@ -106,3 +106,28 @@ test('the public stream link refuses a recording but still serves post videos', 
   assert.equal((await get(`/media/stream/${RECORDING}/thumbnail.jpg`)).statusCode, 404);
   assert.equal((await get(`/media/stream/${OTHER}/playlist.m3u8`)).statusCode, 302);
 });
+
+test('M192: the workshop slides (PDF) open for members only', async () => {
+  const pdf = Buffer.from('%PDF-1.4 1 0 obj<<>>endobj trailer<<>> %%EOF');
+  const ticket = await send('POST', '/api/admin/uploads', { filename: 'slides.pdf', contentType: 'application/pdf', size: pdf.length }, adminToken);
+  assert.equal(ticket.statusCode, 201, ticket.body);
+  const { url, upload } = ticket.json() as { url: string; upload: { url: string; headers: Record<string, string> } };
+  const put = await app.inject({ method: 'PUT', url: new URL(upload.url).pathname + new URL(upload.url).search, headers: upload.headers, payload: pdf });
+  assert.equal(put.statusCode, 204, put.body);
+  const path = new URL(url).pathname;
+  assert.equal((await get(path)).statusCode, 200, 'public before it joins a workshop');
+
+  const saved = await send('PUT', `/api/admin/agenda/${eventId}`, { files: [{ title: 'عرض الورشة', url }] }, adminToken);
+  assert.equal(saved.statusCode, 200, saved.body);
+  assert.equal((await get(path)).statusCode, 404, 'members-only once attached');
+
+  const event = await get(`/api/agenda/${eventId}`, visitorToken);
+  assert.deepEqual(event.json().event.files, [{ title: 'عرض الورشة' }]);
+  assert.ok(!event.body.includes(path));
+  assert.equal((await get(`/api/agenda/${eventId}/recordings`, visitorToken)).statusCode, 403);
+  const member = await get(`/api/agenda/${eventId}/recordings`, memberToken);
+  const files = member.json().files as { title: string; url: string }[];
+  assert.equal(files[0]?.title, 'عرض الورشة');
+  assert.ok(files[0]?.url.endsWith(path));
+  assert.equal(member.json().recordings.length, 1, 'the recordings stay as they were');
+});

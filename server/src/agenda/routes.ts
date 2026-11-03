@@ -46,6 +46,11 @@ const eventSchema = z.object({
     .array(z.object({ title: z.string().trim().min(1, 'اكتب عنوان التسجيل').max(120), videoId: z.string().uuid() }))
     .max(14, 'بحد أقصى 14 تسجيلًا')
     .optional(),
+  /** M192: the slides shown at the workshop, uploaded PDFs. */
+  files: z
+    .array(z.object({ title: z.string().trim().min(1, 'اكتب عنوان الملف').max(120), url: z.string().trim().url().max(500) }))
+    .max(10, 'بحد أقصى 10 ملفات')
+    .optional(),
   /** M43: the dashboard's own English wording; absent or empty = the automatic translation stands. */
   english: z.object({ title: z.string().trim().max(140).default(''), blurb: z.string().trim().max(1000).default(''), place: z.string().trim().max(200).default('') }).nullish(),
 });
@@ -76,13 +81,15 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     if (out) await service.setEnglish(event.id, { title: out[0] || event.title, blurb: out[1] || event.blurb, place: event.place ? out[2] || event.place : null }, true);
   };
 
-  /** M191: a recording joins an event only once Bunny has it playable; ones already on the event pass as they are. */
-  const checkRecordings = async (recordings: { videoId: string }[] | undefined, previous: AgendaEvent | null): Promise<void> => {
-    const known = new Set((previous?.recordings ?? []).map((recording) => recording.videoId));
-    for (const { videoId } of recordings ?? []) {
-      if (known.has(videoId)) continue;
-      if (!media) throw new RequestError('uploads_unavailable', 'خادم الفيديو غير مفعّل على هذا الخادم', 503);
-      await media.checkStream(videoId);
+  /** M191: a recording joins an event only once Bunny has it playable; ones already on the event pass as they are. M192: the same for the slides. */
+  const checkAttachments = async (input: { recordings?: { videoId: string }[]; files?: { url: string }[] }, previous: AgendaEvent | null): Promise<void> => {
+    const knownVideos = new Set((previous?.recordings ?? []).map((recording) => recording.videoId));
+    const knownFiles = new Set((previous?.files ?? []).map((file) => file.url));
+    const pending = [...(input.recordings ?? []).filter((entry) => !knownVideos.has(entry.videoId)), ...(input.files ?? []).filter((entry) => !knownFiles.has(entry.url))];
+    if (pending.length > 0 && !media) throw new RequestError('uploads_unavailable', 'رفع الملفات غير مفعّل على هذا الخادم', 503);
+    for (const entry of pending) {
+      if ('videoId' in entry) await media?.checkStream(entry.videoId);
+      else await media?.check(entry.url, 'document');
     }
   };
 
@@ -156,7 +163,12 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
         const playback = media?.memberPlayback(recording.videoId);
         return playback ? [{ title: recording.title, ...playback }] : [];
       });
-      return { recordings };
+      const files = [];
+      for (const file of event.files ?? []) {
+        const url = await media?.memberFileUrl(file.url);
+        if (url) files.push({ title: file.title, url });
+      }
+      return { recordings, files };
     }),
   );
 
@@ -200,7 +212,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       if (!admin) return;
       const input = parse(eventSchema, request.body, reply);
       if (!input) return;
-      await checkRecordings(input.recordings, null);
+      await checkAttachments(input, null);
       const { english, ...fields } = input;
       const event = await service.create(fields);
       await applyEnglish(event, english, null);
@@ -224,7 +236,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       // Zod 4 fills the defaults even under .partial(): only what the dashboard sent may change.
       const input = sentOnly(parsed, request.body);
       const previous = await service.event(params.id);
-      await checkRecordings(input.recordings, previous);
+      await checkAttachments(input, previous);
       const { english, ...fields } = input;
       const updated = await service.update(params.id, fields);
       if (!updated) return reply.code(404).send({ error: { code: 'not_found', message: 'الفعالية غير موجودة' } });

@@ -83,7 +83,7 @@ test('a post may carry the video once Bunny has a playable resolution', async ()
   const media = service();
   const url = media.streamUrl(ID);
   video = null;
-  await assert.rejects(media.check(url, 'video'), /لم يكتمل رفع الفيديو/);
+  await assert.rejects(media.check(url, 'video'), /لم يكتمل رفعه/);
   video = { status: 3, availableResolutions: '' };
   await assert.rejects(media.check(url, 'video'), /قيد المعالجة/);
   video = { status: 5, availableResolutions: '' };

@@ -365,6 +365,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     origins: [...new Set(mediaOrigins)],
     maxImageBytes: config.UPLOAD_MAX_IMAGE_MB * MEGABYTE,
     maxVideoBytes: config.UPLOAD_MAX_VIDEO_MB * MEGABYTE,
+    maxDocumentBytes: config.UPLOAD_MAX_PDF_MB * MEGABYTE,
     stream:
       config.BUNNY_STREAM_LIBRARY_ID && config.BUNNY_STREAM_API_KEY && config.BUNNY_STREAM_CDN_HOST
         ? new BunnyStream({ libraryId: config.BUNNY_STREAM_LIBRARY_ID, apiKey: config.BUNNY_STREAM_API_KEY, cdnHost: config.BUNNY_STREAM_CDN_HOST, tokenKey: config.BUNNY_STREAM_TOKEN_KEY })
@@ -449,7 +450,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
   const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices });
   // M191: workshop recordings play for members only, never through the public `/media/stream/` link.
-  media.keepPrivate(async (id) => (await agenda.recordingIds()).has(id));
+  media.keepPrivate(
+    async (id) => (await agenda.privateMedia()).videoIds.has(id),
+    // M192: the workshop slides too.
+    async (key) => (await agenda.privateMedia()).fileUrls.some((url) => MediaService.keyInPath(url) === key),
+  );
   // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).
   if (autoPush) agenda.startReminders();
   // M173: the 12-hour workshop nudges (09:00 + 21:00 Riyadh) to every device without a confirmed seat; same switch.

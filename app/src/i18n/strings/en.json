@@ -1025,6 +1025,7 @@
   "agenda.memberCtaText": "The annual membership covers this workshop and every club event — save {amount} SAR from your first seat.",
   "agenda.memberCtaButton": "Activate the membership now",
   "agenda.recordingsTitle": "Watch the full workshop",
+  "agenda.filesTitle": "Workshop files",
   "agenda.recordingsBadge": "Exclusive to annual members",
   "agenda.recordingsLocked": "Missed the workshop? The full recording is for annual members only — activate your membership to watch it in up to 4K.",
   "agenda.recordingsSignIn": "Sign in to watch the recordings",
