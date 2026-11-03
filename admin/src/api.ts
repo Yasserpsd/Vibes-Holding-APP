@@ -384,7 +384,10 @@ export type AgendaEventInput = {
   /** M107: the unified interest keys this event suits. */
   interests?: string[];
   open: boolean;
+  /** M191: the workshop's recordings (Bunny Stream videos), playable in the app by active annual members only. */
+  recordings?: AgendaRecording[];
 };
+export type AgendaRecording = { title: string; videoId: string };
 export type AgendaEvent = AgendaEventInput & {
   id: string;
   createdAt: string;

@@ -72,6 +72,8 @@ export function kindOfKey(key: string): MediaKind {
 /** Uploaded media of the dashboard (M15): upload tickets, the public `/media/<key>` links and clean-up. */
 export class MediaService {
   private timers: NodeJS.Timeout[] = [];
+  /** M191: Bunny videos that only members may play (workshop recordings); the public stream link refuses them. */
+  private isPrivateStream: (id: string) => Promise<boolean> = async () => false;
   private swept: { at: string; removed: number } | null = null;
 
   constructor(private readonly options: MediaOptions) {}
@@ -113,10 +115,30 @@ export class MediaService {
     return match[1];
   }
 
-  /** Where `/media/stream/<id>/<file>` sends the player; null when streaming is off or the path is not ours. */
-  streamRedirect(id: string, file: string): string | null {
+  keepPrivate(check: (id: string) => Promise<boolean>): void {
+    this.isPrivateStream = check;
+  }
+
+  /** Where `/media/stream/<id>/<file>` sends the player; null when streaming is off, the path is not ours or the video is members-only. */
+  async streamRedirect(id: string, file: string): Promise<string | null> {
     if (!this.options.stream || !isStreamId(id) || (file !== 'playlist.m3u8' && file !== 'thumbnail.jpg')) return null;
+    if (await this.isPrivateStream(id)) return null;
     return this.options.stream.playbackUrl(id, file);
+  }
+
+  /** M191: direct, short-lived CDN links for a member's player (signed when the pull zone has token auth on). */
+  memberPlayback(id: string): { url: string; poster: string } | null {
+    if (!this.options.stream || !isStreamId(id)) return null;
+    return { url: this.options.stream.playbackUrl(id, 'playlist.m3u8'), poster: this.options.stream.playbackUrl(id, 'thumbnail.jpg') };
+  }
+
+  /** A Bunny video may be attached once it exists and has a playable resolution. */
+  async checkStream(id: string): Promise<void> {
+    if (!this.options.stream) throw new RequestError('uploads_unavailable', 'خادم الفيديو غير مفعّل على هذا الخادم', 503);
+    const state = await this.options.stream.state(id);
+    if (state === 'ready') return;
+    if (state === 'waiting') throw new RequestError('media_processing', 'الفيديو قيد المعالجة لدى خادم الفيديو، أعد الحفظ بعد دقيقة');
+    throw new RequestError('invalid_media', state === 'failed' ? 'تعذّرت معالجة الفيديو، ارفعه من جديد' : 'لم يكتمل رفع الفيديو، ارفعه من جديد');
   }
 
   /** The poster a streamed video gets when the admin uploaded none: Bunny's own thumbnail. */
@@ -169,12 +191,7 @@ export class MediaService {
     const label = kind === 'image' ? 'الصورة' : 'الفيديو';
     if (kind === 'image' && this.options.stream && this.streamIdOf(url, 'thumbnail.jpg')) return;
     const streamId = kind === 'video' ? this.streamIdOf(url) : null;
-    if (streamId && this.options.stream) {
-      const state = await this.options.stream.state(streamId);
-      if (state === 'ready') return;
-      if (state === 'waiting') throw new RequestError('media_processing', 'الفيديو قيد المعالجة لدى خادم الفيديو، أعد الحفظ بعد دقيقة');
-      throw new RequestError('invalid_media', state === 'failed' ? 'تعذّرت معالجة الفيديو، ارفعه من جديد' : 'لم يكتمل رفع الفيديو، ارفعه من جديد');
-    }
+    if (streamId && this.options.stream) return this.checkStream(streamId);
     const key = this.keyOf(url);
     if (!key || kindOfKey(key) !== kind) throw new RequestError('invalid_media', `ملف ${label} غير صالح، ارفعه من جديد`);
     const info = await this.store.head(key);

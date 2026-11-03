@@ -75,7 +75,7 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, {
   // M189: a Bunny Stream video (or its thumbnail) by its stable link; the CDN link is signed and short-lived.
   app.get('/media/stream/:id/:file', async (request, reply) => {
     const { id, file } = request.params as { id: string; file: string };
-    const target = service.streamRedirect(id, file);
+    const target = await service.streamRedirect(id, file);
     if (!target) return reply.code(404).send(NOT_FOUND);
     return reply.header('cache-control', 'public, max-age=600').redirect(target, 302);
   });

@@ -18,6 +18,7 @@ import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { StructuredText } from '@/components/StructuredText';
+import { WorkshopRecordings } from '@/components/WorkshopRecordings';
 import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -125,6 +126,13 @@ export default function AgendaEventScreen() {
           {event.blurb ? (
             <FadeInView delay={100}>
               <StructuredText text={event.blurb} />
+            </FadeInView>
+          ) : null}
+
+          {/* M191: the full recordings — playable for annual members, locked with the membership door for everyone else. */}
+          {event.recordings?.length ? (
+            <FadeInView delay={130}>
+              <WorkshopRecordings eventId={event.id} titles={event.recordings} />
             </FadeInView>
           ) : null}
 

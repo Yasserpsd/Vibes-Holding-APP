@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "admin-test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "admin", "run", "dev", "--", "--port", "5173", "--strictPort", "--mode", "testapi"],
+      "port": 5173
+    },
+    {
       "name": "server-mock",
       "runtimeExecutable": "node",
       "runtimeArgs": ["--env-file=server/.env.mock.local", "server/node_modules/tsx/dist/cli.mjs", "server/src/index.ts"],

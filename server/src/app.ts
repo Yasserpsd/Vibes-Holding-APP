@@ -448,6 +448,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   news.useTopics(async (contactId) => (await interests.newsTopicsFor(contactId)) ?? (await news.prefs(contactId))?.topics ?? null);
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
   const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices });
+  // M191: workshop recordings play for members only, never through the public `/media/stream/` link.
+  media.keepPrivate(async (id) => (await agenda.recordingIds()).has(id));
   // M107: the day-before reminder to confirmed attendees (same switch as every automatic push).
   if (autoPush) agenda.startReminders();
   // M173: the 12-hour workshop nudges (09:00 + 21:00 Riyadh) to every device without a confirmed seat; same switch.
@@ -628,7 +630,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
-  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges });
+  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges, media });
   await app.register(badgesRoutes, { auth, agenda, profiles, payments });
   await app.register(companionRoutes, { service: companion, auth });
   await app.register(payLinksRoutes, { service: paylinks, auth });

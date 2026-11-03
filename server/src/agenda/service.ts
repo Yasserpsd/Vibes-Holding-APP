@@ -66,11 +66,19 @@ export type AgendaEvent = {
   open: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * M191 (owner: «يتفرج علي الورشة لانه مقدرش يحضر … خاصة بالأعضاء فقط»): the workshop's recordings,
+   * one Bunny Stream video per part. Only ACTIVE members get playable links (GET …/recordings);
+   * everyone else sees the titles and the members-only lock.
+   */
+  recordings?: AgendaRecording[];
   /** M43: the English of the owner's words, written once by AI and editable from the dashboard. */
   en?: AgendaEnglish | null;
   /** False once the owner edited the English himself: automatic retranslation then stops. */
   enAuto?: boolean;
 };
+
+export type AgendaRecording = { title: string; videoId: string };
 
 export type AgendaEnglish = { title: string; blurb: string; place: string | null };
 
@@ -131,6 +139,8 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   savingsSar: number;
   /** M107: the unified interest keys this event suits (the app badges the matching ones). */
   interests: string[];
+  /** M191: the recordings' titles for everyone; the videos themselves only through the members-only endpoint. */
+  recordings: { title: string }[];
 };
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
@@ -235,6 +245,7 @@ export class AgendaService {
       imageUrl: event.imageUrl || null,
       coverUrl: event.coverUrl || null,
       past,
+      recordings: (event.recordings ?? []).map((recording) => ({ title: recording.title })),
     };
   }
 
@@ -553,6 +564,11 @@ export class AgendaService {
     const days = [...new Set(fields.dates)].sort();
     if (days.length <= 1) return { ...fields, dates: undefined, date: days[0] ?? fields.date };
     return { ...fields, dates: days, date: days[0] };
+  }
+
+  /** M191: every Bunny video that belongs to a recording (members-only, never through the public stream link). */
+  async recordingIds(): Promise<Set<string>> {
+    return new Set((await this.loadEvents()).flatMap((event) => (event.recordings ?? []).map((recording) => recording.videoId)));
   }
 
   async create(input: AgendaEventInput, now = Date.now()): Promise<AgendaEvent> {

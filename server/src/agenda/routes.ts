@@ -1,15 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { adminGuard, dashboardGuard, guard, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
+import { adminGuard, dashboardGuard, guard, optionalSession, parse, RequestError, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { INTEREST_KEYS } from '../interests/types.js';
 import { langOf } from '../lang.js';
+import type { MediaService } from '../media/service.js';
 import type { Translator } from '../translate.js';
 import type { WorkshopNudgeService } from './nudges.js';
 import type { AgendaEvent, AgendaService } from './service.js';
 
-export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator; nudges?: WorkshopNudgeService };
+export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator; nudges?: WorkshopNudgeService; media?: MediaService };
+
+const MEMBERS_ONLY = { error: { code: 'members_only', message: 'تسجيلات الورش حصرية لأعضاء العضوية السنوية' } };
 
 const registerSchema = z.object({ attendance: z.enum(['hq', 'online']), discountCode: z.string().trim().max(30).optional() });
 const discountSchema = z.object({ code: z.string().trim().min(1).max(30) });
@@ -38,6 +41,11 @@ const eventSchema = z.object({
   /** M107: the unified interest keys this event suits (targets the push, badges the agenda). */
   interests: z.array(z.enum(INTEREST_KEYS as [string, ...string[]])).max(10).default([]),
   open: z.boolean().default(true),
+  /** M191: the workshop's recordings in order, each a Bunny Stream video uploaded from the dashboard. */
+  recordings: z
+    .array(z.object({ title: z.string().trim().min(1, 'اكتب عنوان التسجيل').max(120), videoId: z.string().uuid() }))
+    .max(14, 'بحد أقصى 14 تسجيلًا')
+    .optional(),
   /** M43: the dashboard's own English wording; absent or empty = the automatic translation stands. */
   english: z.object({ title: z.string().trim().max(140).default(''), blurb: z.string().trim().max(1000).default(''), place: z.string().trim().max(200).default('') }).nullish(),
 });
@@ -45,7 +53,7 @@ const eventSchema = z.object({
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M41 «أجندة النادي»: the public agenda, the one-tap registration, and the dashboard's event management. */
-export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator, nudges }) => {
+export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator, nudges, media }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   const requireAppAdmin = adminGuard(auth);
@@ -66,6 +74,16 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     if (event.en != null && (event.enAuto === false || !arabicChanged)) return;
     const out = await translator.translate([event.title, event.blurb, event.place]);
     if (out) await service.setEnglish(event.id, { title: out[0] || event.title, blurb: out[1] || event.blurb, place: event.place ? out[2] || event.place : null }, true);
+  };
+
+  /** M191: a recording joins an event only once Bunny has it playable; ones already on the event pass as they are. */
+  const checkRecordings = async (recordings: { videoId: string }[] | undefined, previous: AgendaEvent | null): Promise<void> => {
+    const known = new Set((previous?.recordings ?? []).map((recording) => recording.videoId));
+    for (const { videoId } of recordings ?? []) {
+      if (known.has(videoId)) continue;
+      if (!media) throw new RequestError('uploads_unavailable', 'خادم الفيديو غير مفعّل على هذا الخادم', 503);
+      await media.checkStream(videoId);
+    }
   };
 
   app.get(
@@ -121,6 +139,27 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     }),
   );
 
+  // M191: the workshop recordings, playable links for ACTIVE annual members only (whatever ticket anyone bought).
+  app.get(
+    '/api/agenda/:id/recordings',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      reply.header('cache-control', 'no-store');
+      const event = await service.event(params.id);
+      if (!event) return reply.code(404).send({ error: { code: 'not_found', message: 'الفعالية غير موجودة' } });
+      const me = await auth.me(current.session);
+      if (me.membership.status !== 'active') return reply.code(403).send(MEMBERS_ONLY);
+      const recordings = (event.recordings ?? []).flatMap((recording) => {
+        const playback = media?.memberPlayback(recording.videoId);
+        return playback ? [{ title: recording.title, ...playback }] : [];
+      });
+      return { recordings };
+    }),
+  );
+
   // M107: the confirmed attendee's ticket (QR), shown in the app like the HQ pass.
   app.get(
     '/api/agenda/:id/ticket',
@@ -161,6 +200,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       if (!admin) return;
       const input = parse(eventSchema, request.body, reply);
       if (!input) return;
+      await checkRecordings(input.recordings, null);
       const { english, ...fields } = input;
       const event = await service.create(fields);
       await applyEnglish(event, english, null);
@@ -184,6 +224,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       // Zod 4 fills the defaults even under .partial(): only what the dashboard sent may change.
       const input = sentOnly(parsed, request.body);
       const previous = await service.event(params.id);
+      await checkRecordings(input.recordings, previous);
       const { english, ...fields } = input;
       const updated = await service.update(params.id, fields);
       if (!updated) return reply.code(404).send({ error: { code: 'not_found', message: 'الفعالية غير موجودة' } });

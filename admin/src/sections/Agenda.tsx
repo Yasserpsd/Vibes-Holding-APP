@@ -7,7 +7,8 @@ import { Async, DataTable, MemberLink, messageOf, Pill, SectionHead, sessionOver
 /** M41 «أجندة النادي»: events across the whole year, their registrations, and the members' push reminder. */
 
 const MODE_LABEL: Record<AgendaMode, string> = { hq: 'حضوري', online: 'أونلاين', both: 'حضوري وأونلاين' };
-const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, originalFeeSar: 0, memberFeeSar: 0, interests: [], open: true };
+const EMPTY: AgendaEventInput = { title: '', blurb: '', date: '', time: '', endTime: '', place: 'مقر النادي بالرياض', onlineUrl: '', imageUrl: null, coverUrl: null, mode: 'both', feeSar: 0, originalFeeSar: 0, memberFeeSar: 0, interests: [], open: true, recordings: [] };
+const DAY_NAMES = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع'];
 
 /** M107: the unified interests (mirrors server/src/interests/types.ts). */
 const INTEREST_OPTIONS: { key: string; label: string }[] = [
@@ -28,7 +29,9 @@ export function Agenda() {
   const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput; english: { title: string; blurb: string; place: string } } | null>(null);
   const [rows, setRows] = useState<{ event: AgendaEvent; registrations: AgendaRegistration[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | null>(null);
+  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | 'recording' | null>(null);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+  const recordingRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
   const upcoming = state.data?.events.filter((event) => !pastOf(event)).length ?? 0;
@@ -122,6 +125,28 @@ export function Agenda() {
     }
   }
 
+  // M191: a workshop recording goes straight to Bunny Stream (resumable, up to 4K); the app plays it for active members only.
+  async function pickRecording(file: File | undefined) {
+    if (!file || !editor || uploading) return;
+    setUploading('recording');
+    setRecordingProgress(0);
+    try {
+      const uploaded = await uploadFile(file, setRecordingProgress);
+      if (uploaded.kind !== 'video' || !uploaded.key.startsWith('stream/')) throw new Error('خادم الفيديو غير مفعّل على هذا الخادم بعد.');
+      const recordings = editor.input.recordings ?? [];
+      const title = recordings.length < DAY_NAMES.length ? `اليوم ${DAY_NAMES[recordings.length]}` : `الجزء ${recordings.length + 1}`;
+      edit({ recordings: [...recordings, { title, videoId: uploaded.key.slice('stream/'.length) }] });
+    } catch (failure) {
+      fail(failure);
+    } finally {
+      setUploading(null);
+      if (recordingRef.current) recordingRef.current.value = '';
+    }
+  }
+
+  const editRecording = (index: number, title: string | null) =>
+    edit({ recordings: (editor?.input.recordings ?? []).flatMap((recording, at) => (at !== index ? [recording] : title === null ? [] : [{ ...recording, title }])) });
+
   return (
     <>
       <SectionHead title="أجندة النادي" hint={state.data ? `فعاليات قادمة: ${formatNumber(upcoming)}` : undefined} onReload={state.reload} busy={state.loading} />
@@ -177,7 +202,7 @@ export function Agenda() {
                 label: '',
                 cell: (row) => (
                   <span className="row-actions">
-                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, originalFeeSar: row.originalFeeSar ?? 0, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
+                    <button type="button" onClick={() => setEditor({ row, input: { title: row.title, blurb: row.blurb, date: row.date, dates: row.dates?.slice(1) ?? [], time: row.time, endTime: row.endTime, place: row.place, onlineUrl: row.onlineUrl, imageUrl: row.imageUrl ?? null, coverUrl: row.coverUrl ?? null, mode: row.mode, feeSar: row.feeSar, originalFeeSar: row.originalFeeSar ?? 0, memberFeeSar: row.memberFeeSar ?? 0, interests: row.interests ?? [], open: row.open, recordings: row.recordings ?? [] }, english: { title: row.en?.title ?? '', blurb: row.en?.blurb ?? '', place: row.en?.place ?? '' } })}>تعديل</button>
                     <button type="button" disabled={busy} onClick={() => void push(row)}>إشعار</button>
                   </span>
                 ),
@@ -262,6 +287,18 @@ export function Agenda() {
               <input ref={fileRef} type="file" accept="image/*" disabled={uploading !== null} onChange={(event) => void pickImage(event.target.files?.[0])} />
               {uploading === 'imageUrl' ? <p className="muted">جارٍ رفع الصورة…</p> : null}
             </fieldset>
+            <fieldset>
+              <legend>تسجيلات الورشة — حصرية لأعضاء العضوية السنوية (فيديو لكل يوم، بجودة حتى 4K)</legend>
+              {(editor.input.recordings ?? []).map((recording, index) => (
+                <div key={recording.videoId} className="row-actions">
+                  <input value={recording.title} maxLength={120} onChange={(event) => editRecording(index, event.target.value)} aria-label="عنوان التسجيل" />
+                  <button type="button" className="ghost" onClick={() => editRecording(index, null)}>إزالة</button>
+                </div>
+              ))}
+              <input ref={recordingRef} type="file" accept="video/*" disabled={uploading !== null} onChange={(event) => void pickRecording(event.target.files?.[0])} />
+              {uploading === 'recording' ? <p className="muted">جارٍ رفع الفيديو… {Math.round(recordingProgress * 100)}% — لا تغلق الصفحة</p> : null}
+              <p className="muted hint">بعد اكتمال الرفع انتظر دقائق حتى يجهز الفيديو ثم اضغط «حفظ». غير الأعضاء يرون عناوين التسجيلات مع دعوة للاشتراك فقط.</p>
+            </fieldset>
             <label>
               سعر غير الأعضاء بالريال (0 = بدون رسوم للجميع)
               <input type="number" min={0} max={100000} value={editor.input.feeSar} onChange={(event) => edit({ feeSar: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
@@ -312,7 +349,7 @@ export function Agenda() {
               </label>
             </fieldset>
             <div className="row-actions">
-              <button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
+              <button type="submit" disabled={busy || uploading !== null}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
               {editor.row ? <button type="button" className="ghost" disabled={busy} onClick={() => void remove(editor.row as AgendaEvent)}>حذف</button> : null}
             </div>
           </form>
