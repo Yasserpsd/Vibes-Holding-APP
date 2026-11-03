@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { FormFileField } from '@/components/FormFileField';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
@@ -85,7 +86,7 @@ export function FormEmbed({ formKey }: { formKey: string | undefined }) {
       {/* M170 (owner, 2026-10-31): a signed-in NON-MEMBER reads the condition before he fills the form —
           the page stays open to everyone, the project simply waits for the membership. Guests see nothing extra. */}
       {form.nonMemberNotice && me && me.membership.status !== 'active' ? <MemberNotice text={form.nonMemberNotice} /> : null}
-      <Form key={form.key} form={form} me={me} />
+      <Form key={form.key} form={form} me={me} signedIn={signedIn} />
     </>
   );
 }
@@ -100,16 +101,22 @@ function prefillOf(field: FormFieldDef, me: Me | null): string {
   return space < 0 ? '' : me.name.slice(space + 1);
 }
 
-function Form({ form, me }: { form: FormDef; me: Me | null }) {
+function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: boolean }) {
   const submit = useSubmitForm(form.key);
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries(form.fields.map((field) => [field.key, prefillOf(field, me)])));
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  // M193: an attachment still on its way holds the submit button.
+  const [uploading, setUploading] = useState(false);
 
   const setAnswer = (fieldKey: string, value: string) => setAnswers((current) => ({ ...current, [fieldKey]: value }));
 
   const send = () => {
     if (submit.isPending) return;
+    if (uploading) {
+      setProblem(t('form.file.wait'));
+      return;
+    }
     for (const field of form.fields) {
       if (field.required && !(answers[field.key] ?? '').trim()) {
         setProblem(field.type === 'agree' ? t('form.agree', { field: field.label }) : t('form.missing', { field: field.label }));
@@ -141,7 +148,7 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
       {/* M142: every field but the consent box can be spoken. */}
       <VoiceFill
         fields={form.fields
-          .filter((field) => field.type !== 'agree')
+          .filter((field) => field.type !== 'agree' && field.type !== 'file')
           .map(
             (field): FillField => ({
               key: field.key,
@@ -156,7 +163,18 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
       />
       {form.fields.map((field, index) => (
         <FadeInView key={field.key} delay={entranceDelay(index)}>
-          <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
+          {field.type === 'file' ? (
+            <FormFileField
+              formKey={form.key}
+              label={field.label}
+              signedIn={signedIn}
+              value={answers[field.key] ?? ''}
+              onChange={(value) => setAnswer(field.key, value)}
+              onBusy={setUploading}
+            />
+          ) : (
+            <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
+          )}
         </FadeInView>
       ))}
       {problem ? (
@@ -170,7 +188,7 @@ function Form({ form, me }: { form: FormDef; me: Me | null }) {
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(form.fields.length)}>
-        <AppButton label={form.submitLabel} icon="paper-plane-outline" loading={submit.isPending} onPress={send} />
+        <AppButton label={form.submitLabel} icon="paper-plane-outline" loading={submit.isPending} disabled={uploading} onPress={send} />
       </FadeInView>
     </PaperCard>
   );

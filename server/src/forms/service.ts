@@ -8,6 +8,7 @@ import { formStatus, fromForm, type RequestStatus } from '../requests/model.js';
 import type { MemberNotices } from '../requests/notices.js';
 import type { KV } from '../store.js';
 import { getFormsContent, type FormDef, type FormFieldDef } from './content.js';
+import { formFileKeyOf, type FormFiles } from './files.js';
 
 /**
  * M16: submissions of the in-app registration forms (شركاء النجاح, the workshop). A submission is
@@ -57,6 +58,8 @@ function fieldProblem(field: FormFieldDef, raw: string, optionsOf: (field: FormF
   if (!value) return field.required ? `اكتب «${field.label}» أولًا` : null;
   if (field.type === 'agree') return value === AGREED ? null : `وافق على «${field.label}» أولًا`;
   if (field.type === 'select') return optionsOf(field).has(value) ? null : `اختر قيمة من قائمة «${field.label}»`;
+  // M193: the file itself is checked against the store in submit(); here only its link shape.
+  if (field.type === 'file') return formFileKeyOf(value) ? null : `ارفع «${field.label}» من زر الإرفاق`;
   const max = field.type === 'textarea' ? MAX_LONG_TEXT : MAX_TEXT;
   return value.length > max ? `«${field.label}» أطول من المسموح` : null;
 }
@@ -65,8 +68,14 @@ type Deps = { kv: KV; notifier: Notifier; notices?: MemberNotices };
 
 export class FormsService {
   private chain: Promise<unknown> = Promise.resolve();
+  private files: FormFiles | null = null;
 
   constructor(private readonly deps: Deps) {}
+
+  /** M193: the attachment store (wired once the media store exists). */
+  attachFiles(files: FormFiles): void {
+    this.files = files;
+  }
 
   private async load(): Promise<FormSubmission[]> {
     return (await this.deps.kv.get<{ submissions: FormSubmission[] }>(FORM_SUBMISSIONS_KEY))?.submissions ?? [];
@@ -113,11 +122,20 @@ export class FormsService {
       const problem = fieldProblem(field, raw[field.key] ?? '', optionsOf);
       if (problem) throw new RequestError('invalid_field', problem, 400);
     }
+    // M193: an attachment must really have arrived; its answer is kept as the canonical private link.
+    const fileLinks = new Map<string, string>();
+    for (const field of form.fields) {
+      const value = (raw[field.key] ?? '').trim();
+      if (field.type !== 'file' || !value) continue;
+      if (!this.files) throw new RequestError('uploads_unavailable', 'رفع الملفات غير متاح حاليًا، أرسل الطلب بدون الملف وستطلبه منك الإدارة', 503);
+      await this.files.check(value, field.label);
+      fileLinks.set(field.key, this.files.linkFor(formFileKeyOf(value) ?? ''));
+    }
 
     const answers: FormAnswer[] = form.fields.map((field) => ({
       key: field.key,
       label: field.label,
-      value: field.type === 'agree' ? 'نعم' : (raw[field.key] ?? '').trim(),
+      value: field.type === 'agree' ? 'نعم' : (fileLinks.get(field.key) ?? (raw[field.key] ?? '').trim()),
     }));
     const byPrefill = (wanted: FormFieldDef['prefill']): string => {
       const field = form.fields.find((entry) => entry.prefill === wanted);

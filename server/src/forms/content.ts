@@ -9,7 +9,7 @@ import { FORMS_EN } from '../content/en/forms.js';
  * the answers back, the server validates, keeps the submission for the dashboard and mails the
  * management. Field answers are plain strings; an `agree` field arrives as '1' when ticked.
  */
-export type FormFieldType = 'text' | 'textarea' | 'select' | 'agree';
+export type FormFieldType = 'text' | 'textarea' | 'select' | 'agree' | 'file';
 
 export type FormFieldDef = {
   key: string;
@@ -19,7 +19,10 @@ export type FormFieldDef = {
   options?: string[];
   placeholder?: string;
   required: boolean;
-  /** agree: a page the member can read before ticking. */
+  /**
+   * agree: a page the member can read before ticking.
+   * file (M193): the app uploads one attachment (forms/files.ts) and sends its private link as the answer.
+   */
   url?: string | null;
   /** Latin input (e-mail, phone, links) is typed left-to-right in both languages. */
   latin?: boolean;
@@ -58,8 +61,8 @@ export type FormsContent = { forms: FormDef[]; version: number; updatedAt: strin
 export const FORMS_CONTENT_KEY = 'content:forms';
 
 // The شركاء النجاح fields are the web form's own (pvspaces.com/sp/, read 2026-10-04), with the
-// file upload replaced by an optional link: the binary has no file picker (see the M11 note), so
-// the management asks for the files when it calls back. The workshop form keeps only what the web
+// M193 (owner, 2026-11-03): the pitch deck is an uploaded attachment again (the link field and the
+// yes/no question are gone) — the store binaries carry the document picker since M151. The workshop form keeps only what the web
 // flow asks beyond the account itself (the web page registers a hub account; in-app the member is
 // already signed in, rule 2).
 export const FORMS_SEED: FormsContent = {
@@ -75,7 +78,7 @@ export const FORMS_SEED: FormsContent = {
       closedText: 'التسجيل في البرنامج متوقف حاليًا. تابع إعلانات النادي أو راسل الإدارة.',
       submitLabel: 'إرسال الطلب',
       successText:
-        'استلمنا تسجيل مشروعك في شركاء النجاح، وستراجعه لجنة البرنامج وتتواصل معك الإدارة. إن كان لديك ملخص جدوى أو ملفات إضافية فسيُطلب منك إرسالها عند التواصل.',
+        'استلمنا تسجيل مشروعك في شركاء النجاح، وستراجعه لجنة البرنامج وتتواصل معك الإدارة.',
       memberNudge:
         'انتبه: لن يُنشر مشروعك في بنك المشاريع ولن يُعرض على أي من الشركاء المحتملين إلا بعد اشتراكك في العضوية السنوية. فعّل عضويتك الآن ليدخل مشروعك دائرة العرض على مستثمري النادي.',
       nonMemberNotice:
@@ -119,14 +122,11 @@ export const FORMS_SEED: FormsContent = {
           ],
         },
         { key: 'summary', label: 'وصف موجز للشركة أو الفكرة أو الشراكة المقترحة', type: 'textarea', required: true },
-        { key: 'deck', label: 'هل لديك ملخص جدوى (Pitch Deck، ملف PDF، فيديو، وثائق، صور ونحوها)؟', type: 'select', required: true, options: ['نعم', 'لا'] },
         {
-          key: 'deckLink',
-          label: 'رابط الملف إن وُجد (اختياري)',
-          type: 'text',
+          key: 'deckFile',
+          label: 'ملف Pitch Deck أو ملخص الجدوى (اختياري): PDF أو PowerPoint أو Word أو صورة',
+          type: 'file',
           required: false,
-          latin: true,
-          placeholder: 'https://…',
         },
         { key: 'website', label: 'الموقع الإلكتروني لشركتك أو مشروعك (اختياري)', type: 'text', required: false, latin: true },
         {
@@ -307,8 +307,9 @@ export const FORMS_SEED: FormsContent = {
   ],
   // v7 (owner, 2026-10-26): «نشر تطبيقك على Android و iOS» replaces «على المتجرين».
   // v8 (M170, 2026-10-31): the non-member notice above the شركاء النجاح form.
-  version: 8,
-  updatedAt: '2026-10-31T00:00:00.000Z',
+  // v9 (M193, 2026-11-03): the pitch deck is an uploaded file (no link field, no yes/no question).
+  version: 9,
+  updatedAt: '2026-11-03T00:00:00.000Z',
 };
 
 /** Writes the seed when no forms content exists yet, or when the stored seed is older than this one. */

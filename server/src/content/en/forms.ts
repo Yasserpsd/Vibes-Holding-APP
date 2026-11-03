@@ -12,7 +12,7 @@ export const FORMS_EN: Translation<FormsContent> = {
       closedText: "Registration in the programme is currently paused. Follow the club's announcements or write to the management.",
       submitLabel: 'Send the request',
       successText:
-        'We received your Success Partners registration; the programme committee will review it and the management will contact you. If you have a pitch deck or extra files, you will be asked to send them when we call back.',
+        'We received your Success Partners registration; the programme committee will review it and the management will contact you.',
       memberNudge:
         'Note: your venture will not be published in the Projects Bank and will not be presented to any potential partners until you subscribe to the annual membership. Activate your membership now so your venture enters the circle shown to the club’s investors.',
       nonMemberNotice:
@@ -52,8 +52,7 @@ export const FORMS_EN: Translation<FormsContent> = {
           ],
         },
         { key: 'summary', label: 'A brief description of the company, the idea or the proposed partnership' },
-        { key: 'deck', label: 'Do you have a pitch deck (PDF, video, documents, photos and the like)?', options: ['Yes', 'No'] },
-        { key: 'deckLink', label: 'A link to the file, if any (optional)' },
+        { key: 'deckFile', label: 'Pitch deck or feasibility summary (optional): PDF, PowerPoint, Word or an image' },
         { key: 'website', label: "Your company's or venture's website (optional)" },
         {
           key: 'ownership',

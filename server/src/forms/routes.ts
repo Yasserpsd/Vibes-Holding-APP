@@ -7,10 +7,12 @@ import { langOf } from '../lang.js';
 import type { NotifyRecipients } from '../mail/recipients.js';
 import { statusSchema } from '../requests/routes.js';
 import type { KV } from '../store.js';
+import { DiskMediaStore } from '../media/store.js';
 import { getFormsContent } from './content.js';
+import { FORM_FILE_TYPES, formFileInputSchema, isFormFileKey, type FormFiles } from './files.js';
 import { mySubmission, type FormsService } from './service.js';
 
-export type FormsRoutesOptions = { service: FormsService; auth: AuthService; notify: NotifyRecipients; kv: KV };
+export type FormsRoutesOptions = { service: FormsService; auth: AuthService; notify: NotifyRecipients; kv: KV; files?: FormFiles | null };
 
 const submitSchema = z.object({
   answers: z.record(z.string().max(40), z.string().max(2000)).default({}),
@@ -23,7 +25,7 @@ const recipientsSchema = z.object({
 const handledSchema = z.object({ handled: z.boolean() });
 
 /** M16: the in-app registration forms and the dashboard's notification-recipients setting. */
-export const formsRoutes: FastifyPluginAsync<FormsRoutesOptions> = async (app, { service, auth, notify, kv }) => {
+export const formsRoutes: FastifyPluginAsync<FormsRoutesOptions> = async (app, { service, auth, notify, kv, files }) => {
   const whoIs = optionalSession(auth);
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
@@ -62,6 +64,39 @@ export const formsRoutes: FastifyPluginAsync<FormsRoutesOptions> = async (app, {
       return reply.code(201).send({ submission: mySubmission(submission) });
     }),
   );
+
+  // M193: an upload ticket for a form's attachment (the pitch deck). A session is required so the
+  // bucket is never an open drop box; the form must really carry a file field.
+  app.post(
+    '/api/forms/:key/upload',
+    guard(async (request, reply) => {
+      const current = await requireSession(request, reply);
+      if (!current) return;
+      const input = parse(formFileInputSchema, request.body, reply);
+      if (!input) return;
+      const key = String((request.params as { key?: string }).key ?? '');
+      const form = (await getFormsContent(kv, 'ar')).forms.find((entry) => entry.key === key);
+      if (!form?.fields.some((field) => field.type === 'file')) return reply.code(404).send({ error: { code: 'not_found', message: 'هذا النموذج لا يقبل ملفات' } });
+      if (!files) return reply.code(503).send({ error: { code: 'uploads_unavailable', message: 'رفع الملفات غير متاح حاليًا، أرسل الطلب بدون الملف وستطلبه منك الإدارة' } });
+      return reply.code(201).send(await files.createUpload(input));
+    }),
+  );
+
+  // M193: the management's link to an attachment (dashboard + mail). The random key is the permission;
+  // the answer is a short-lived presigned redirect, never cached.
+  app.get('/forms/files/*', async (request, reply) => {
+    const key = (request.params as { '*': string })['*'];
+    const notFound = { error: { code: 'not_found', message: 'الملف غير موجود' } };
+    reply.header('cache-control', 'no-store');
+    if (!files || !isFormFileKey(key)) return reply.code(404).send(notFound);
+    const location = await files.store.locate(key);
+    if (!location) return reply.code(404).send(notFound);
+    if ('redirect' in location) return reply.redirect(location.redirect, 302);
+    if (!(files.store instanceof DiskMediaStore)) return reply.code(404).send(notFound);
+    const extension = key.split('.').pop() ?? '';
+    const type = Object.keys(FORM_FILE_TYPES).find((entry) => FORM_FILE_TYPES[entry] === extension) ?? 'application/octet-stream';
+    return reply.header('content-type', type).header('content-length', location.size).header('x-content-type-options', 'nosniff').send(files.store.open(location.path));
+  });
 
   // The dashboard: every submission, the form titles for the filter, and the handled toggle.
   app.get(

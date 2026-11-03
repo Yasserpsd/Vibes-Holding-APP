@@ -185,6 +185,7 @@ export default function RootLayout() {
                 <Stack.Screen name="delete-account" options={{ ...detailHeader, title: t('deleteAccount.title') }} />
                 {/* M116d: club pages inside the app (terms, privacy…) — the screen sets its own title. */}
                 <Stack.Screen name="webpage" options={{ ...detailHeader, title: '' }} />
+                <Stack.Screen name="deck" options={{ ...detailHeader, title: '' }} />
                 <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
                 <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />

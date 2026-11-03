@@ -21,13 +21,11 @@ export const PROFILE_GATE_MESSAGE =
 // M172 (owner, 2026-10-31, members could not book the AI workshop: «لو أنا عضو أضغط بس على زرار تأكيد
 // الحضور بس كده مش أكتر»): the workshop/event registration is NOT gated any more — nobody has a website
 // or social link to type before a seat; the M156 completion wall already holds the identity fields.
-const GATED_ROUTES = new Set([
-  'POST /api/payments',
-  'POST /api/hq/visits',
-  'POST /api/projects/:id/unlock',
-  // M116 (owner: «نربط تكملة البروفايل بأنه يعمل أي حاجة»): rating a project needs a complete profile too.
-  'POST /api/projects/:id/reviews',
-]);
+// M116 (owner: «نربط تكملة البروفايل بأنه يعمل أي حاجة») gated payments, HQ visits, unlocks and ratings.
+// M193 (owner, 2026-11-03, a member with a full profile could not send his request): no action is
+// gated any more — the M156 sign-in wall already holds the identity fields. The hook stays so a route
+// can be gated again by adding it here.
+const GATED_ROUTES = new Set<string>([]);
 
 export function registerProfileGate(app: FastifyInstance, auth: AuthService): void {
   app.addHook('preHandler', async (request, reply) => {

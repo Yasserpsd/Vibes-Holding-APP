@@ -49,7 +49,7 @@ const PARTNER_ANSWERS = {
   stage: 'بدأت بتحقيق دخل',
   sector: 'التجارة والتجزئة',
   summary: 'منصة تجارة متخصصة تبحث عن شركاء.',
-  deck: 'نعم',
+
   ownership: '1',
   nda: '1',
 };

@@ -207,6 +207,7 @@ function BalanceRow({ balance }: { balance: ProjectsBalance }) {
 }
 
 function ContactList({ contact, projectTitle }: { contact: ProjectContact; projectTitle: string }) {
+  const router = useRouter();
   const empty = !contact.whatsapp && !contact.email && !contact.website && !contact.pitchUrl;
   if (empty) return <Text style={styles.hint}>{t('unlock.empty')}</Text>;
   const greeting = t('unlock.greeting', { title: projectTitle });
@@ -215,7 +216,8 @@ function ContactList({ contact, projectTitle }: { contact: ProjectContact; proje
       {contact.whatsapp ? <ContactRow icon="logo-whatsapp" label={t('unlock.whatsapp')} value={contact.whatsapp} latin delay={entranceDelay(1)} onPress={() => void openWhatsApp(contact.whatsapp, greeting)} /> : null}
       {contact.email ? <ContactRow icon="mail-outline" label={t('unlock.email')} value={contact.email} latin delay={entranceDelay(2)} onPress={() => void Linking.openURL(`mailto:${contact.email}`).catch(() => undefined)} /> : null}
       {contact.website ? <ContactRow icon="globe-outline" label={t('unlock.website')} value={contact.website} latin delay={entranceDelay(3)} onPress={() => void openLink(contact.website)} /> : null}
-      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label={t('unlock.pitch')} value={t('unlock.openPitch')} delay={entranceDelay(4)} onPress={() => void openLink(contact.pitchUrl)} /> : null}
+      {/* M193: the deck opens at once in the in-app viewer (Android cannot show a PDF in the browser sheet). */}
+      {contact.pitchUrl ? <ContactRow icon="document-text-outline" label={t('unlock.pitch')} value={t('unlock.openPitch')} delay={entranceDelay(4)} onPress={() => router.push({ pathname: '/deck', params: { url: contact.pitchUrl, title: projectTitle } })} /> : null}
     </View>
   );
 }

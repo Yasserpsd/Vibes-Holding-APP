@@ -52,6 +52,7 @@ import { PlayStoreClient } from './downloads/playStore.js';
 import { downloadsRoutes } from './downloads/routes.js';
 import { DownloadsService } from './downloads/service.js';
 import { DashboardService } from './dashboard/service.js';
+import { FormFiles } from './forms/files.js';
 import { formsRoutes } from './forms/routes.js';
 import { FormsService } from './forms/service.js';
 import { hqRoutes } from './hq/routes.js';
@@ -380,6 +381,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     sweepEnabled: config.UPLOADS_SWEEP === '1' && Boolean(config.DATABASE_URL),
     log: app.log,
   });
+  // M193: the forms' attachments (the Success Partners pitch deck) share the media store, under forms/.
+  const formFiles = new FormFiles({ store: mediaStore, origin: [...new Set(mediaOrigins)][0]!, enabled: mediaStore.durable || config.APP_ENV !== 'production' });
+  forms.attachFiles(formFiles);
   // Payments: Moyasar invoices (live since the 2026-10-20 contract) or Paymob intentions for
   // real-world services; the mock gateway stands in until any live keys exist.
   const paymentGateway: PaymobGateway & Partial<MoyasarConfirmer> =
@@ -634,7 +638,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   );
   await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
   await app.register(workshopsRoutes, { service: workshops, auth });
-  await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv });
+  await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv, files: formFiles });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges, media });
   await app.register(badgesRoutes, { auth, agenda, profiles, payments });
   await app.register(companionRoutes, { service: companion, auth });

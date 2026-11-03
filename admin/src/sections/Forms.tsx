@@ -87,7 +87,15 @@ export function Forms() {
                         .filter((answer) => answer.value)
                         .map((answer) => (
                           <li key={answer.key}>
-                            <strong>{answer.label}:</strong> {answer.value}
+                            <strong>{answer.label}:</strong>{' '}
+                            {/* M193: an uploaded attachment (the pitch deck) opens from here. */}
+                            {/^https?:\/\/[^\s]+\/forms\/files\//.test(answer.value) ? (
+                              <a href={answer.value} target="_blank" rel="noreferrer">
+                                فتح الملف المرفق
+                              </a>
+                            ) : (
+                              answer.value
+                            )}
                           </li>
                         ))}
                     </ul>

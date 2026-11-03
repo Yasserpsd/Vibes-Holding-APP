@@ -51,7 +51,8 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (app, {
   // With a bucket the route does not exist. A raw image, video or PDF body reaches the handler as a stream (this parser is
   // scoped to this plugin); JSON and text bodies keep Fastify's default 1 MB limit, so the server never buffers a large body.
   if (store instanceof DiskMediaStore) {
-    app.addContentTypeParser(/^(image\/|video\/|application\/pdf$)/, (_request, payload, done) => done(null, payload));
+    // M193: form attachments add Word and PowerPoint bodies.
+    app.addContentTypeParser(/^(image\/|video\/|application\/(pdf|msword)$|application\/vnd\.)/, (_request, payload, done) => done(null, payload));
     app.put(
       '/api/admin/uploads/put',
       guard(async (request, reply) => {

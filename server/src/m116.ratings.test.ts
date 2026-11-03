@@ -105,11 +105,10 @@ after(async () => {
   await app.close();
 });
 
-test('rating needs a session and a complete profile; anyone complete rates, member or not', async () => {
+// M193: the complete-profile gate is gone (see profiles/gate.ts); a session is still required.
+test('rating needs a session; anyone signed in rates, member or not', async () => {
   assert.equal((await send('POST', '/api/projects/1/reviews', { stars: 5 })).statusCode, 401);
-  const gated = await send('POST', '/api/projects/1/reviews', { stars: 5 }, bareToken);
-  assert.equal(gated.statusCode, 403);
-  assert.equal(gated.json().error.code, 'profile_incomplete');
+  assert.ok(bareToken);
   const ok = await send('POST', '/api/projects/1/reviews', { stars: 4, comment: 'مشروع واعد جدًا' }, raterToken);
   assert.equal(ok.statusCode, 200, ok.body);
   assert.equal(ok.json().summary.stars, 4);

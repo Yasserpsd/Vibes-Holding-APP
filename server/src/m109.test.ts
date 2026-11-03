@@ -190,17 +190,11 @@ test('M109d: the yearly window and the dashboard-reviewed change request', async
   assert.equal(second.json().error.code, 'window_open');
 });
 
-test('M109i: the complete-profile gate refuses bookings until the six fields are filled', async () => {
+// M193 (owner, 2026-11-03): the M109i complete-profile gate is lifted — a booking goes through
+// without website/social/city on the profile.
+test('M193: a booking no longer waits for the six profile fields', async () => {
   const hq = await get('/api/hq', bareToken);
   const day = (hq.json().days as { date: string }[])[4]!.date;
-  const refused = await send('POST', '/api/hq/visits', { date: day, time: '09:00', purpose: 'اجتماع عمل', note: '' }, bareToken);
-  assert.equal(refused.statusCode, 403, refused.body);
-  assert.equal(refused.json().error.code, 'profile_incomplete');
-  assert.match(refused.json().error.message, /كمّل بياناتك/);
-
-  // Filling the six fields opens the door.
-  const completed = await send('PATCH', '/api/me', { jobTitle: 'مؤسس', company: 'شركة', city: 'جدة', website: 'https://example.test', social: 'https://x.com/bare' }, bareToken);
-  assert.equal(completed.statusCode, 200, completed.body);
   const allowed = await send('POST', '/api/hq/visits', { date: day, time: '09:00', purpose: 'اجتماع عمل', note: '' }, bareToken);
   assert.equal(allowed.statusCode, 200, allowed.body);
 });
