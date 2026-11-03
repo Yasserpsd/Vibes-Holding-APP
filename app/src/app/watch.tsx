@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
@@ -134,7 +135,10 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
     instance.play();
   });
   const VideoView = video.VideoView;
-  const viewRef = useRef<InstanceType<VideoModule['VideoView']>>(null);
+  const screen = useWindowDimensions();
+  const [wide, setWide] = useState(false);
+  const [chrome, setChrome] = useState(true);
+  const [playing, setPlaying] = useState(true);
   const [renditions, setRenditions] = useState<Rendition[]>([]);
   const [quality, setQuality] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -144,7 +148,11 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
   useEffect(() => {
     tickEvery(player, 0.5);
     const sub = player.addListener('timeUpdate', ({ currentTime }) => setTime({ at: currentTime, total: player.duration || 0 }));
-    return () => sub.remove();
+    const playingSub = player.addListener('playingChange', ({ isPlaying }) => setPlaying(isPlaying));
+    return () => {
+      sub.remove();
+      playingSub.remove();
+    };
   }, [player]);
 
   useEffect(() => {
@@ -175,22 +183,33 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
     await player.replaceAsync(rendition.uri ?? url).catch(() => ready.remove());
   };
 
-  return (
+  const seek = (seconds: number) => {
+    seekTo(player, seconds);
+    setTime((now) => ({ ...now, at: seconds }));
+  };
+
+  // M192 (owner: «لما ندوس ملئ الشاشة الموبايل يقلب لوحده … ولما اقفل يرجع طبيعي»): the app is
+  // portrait-locked in its binary, so «ملء الشاشة» turns the picture itself sideways over the whole
+  // screen — the member just tilts the phone; closing it brings the normal page back.
+  const controls = (
     <>
-      <View style={styles.playerBox}>
-        <VideoView ref={viewRef} style={styles.media} player={player} contentFit="contain" nativeControls />
-      </View>
-      <Scrubber at={time.at} total={time.total} onSeek={(seconds) => {
-        seekTo(player, seconds);
-        setTime((now) => ({ ...now, at: seconds }));
-      }} />
+      <Scrubber at={time.at} total={time.total} onSeek={seek} />
       <View style={styles.bar}>
         <BarButton icon="play-back" label="10-" hint={t('watch.back10')} onPress={() => player.seekBy(-10)} />
+        <BarButton icon={playing ? 'pause' : 'play'} label={playing ? t('watch.pause') : t('watch.play')} hint={playing ? t('watch.pause') : t('watch.play')} onPress={() => (playing ? player.pause() : player.play())} />
         <BarButton icon="play-forward" label="10+" hint={t('watch.forward10')} onPress={() => player.seekBy(10)} />
         {renditions.length > 0 ? (
           <BarButton icon="options-outline" label={quality ?? t('watch.auto')} hint={t('watch.quality')} active={picking} onPress={() => setPicking((open) => !open)} />
         ) : null}
-        <BarButton icon="expand-outline" label={t('watch.fullscreen')} hint={t('watch.fullscreen')} onPress={() => void viewRef.current?.enterFullscreen()} />
+        <BarButton
+          icon={wide ? 'contract-outline' : 'expand-outline'}
+          label={wide ? t('watch.exitFullscreen') : t('watch.fullscreen')}
+          hint={wide ? t('watch.exitFullscreen') : t('watch.fullscreen')}
+          onPress={() => {
+            setPicking(false);
+            setWide((on) => !on);
+          }}
+        />
       </View>
       {picking ? (
         <View style={styles.qualities}>
@@ -204,6 +223,24 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
           })}
         </View>
       ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <View style={styles.playerBox}>{wide ? null : <VideoView style={styles.media} player={player} contentFit="contain" nativeControls />}</View>
+      {wide ? null : controls}
+      <Modal visible={wide} animationType="fade" supportedOrientations={['portrait']} statusBarTranslucent onRequestClose={() => setWide(false)}>
+        <StatusBar hidden />
+        <View style={styles.wideStage}>
+          <View style={{ width: screen.height, height: screen.width, transform: [{ rotate: '90deg' }] }}>
+            <VideoView style={styles.media} player={player} contentFit="contain" nativeControls={false} />
+            {/* A tap on the picture hides or shows the controls, so a long lecture plays clean. */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setChrome((on) => !on)} accessibilityRole="button" accessibilityLabel={t('watch.fullscreen')} />
+            {chrome ? <View style={styles.wideControls}>{controls}</View> : null}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -284,6 +321,9 @@ const styles = StyleSheet.create({
   qualityOn: { backgroundColor: colors.gold },
   qualityText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight },
   qualityTextOn: { color: colors.black },
+  wideStage: { flex: 1, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  // Landscape edges hold the notch and the home bar: keep the controls clear of both.
+  wideControls: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 44, paddingBottom: spacing.sm, backgroundColor: 'rgba(7, 7, 8, 0.82)' },
   ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: colors.black },
   ghost: {
     flex: 1,
