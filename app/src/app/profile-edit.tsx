@@ -120,16 +120,20 @@ export default function ProfileEditScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('profile.email')} latin editable={false} value={me.email} hint={t('profile.emailLocked')} />
-        <FormField
-          label={t('profile.contactEmail')}
-          latin
-          autoCapitalize="none"
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          value={contactEmail}
-          onChangeText={setContactEmail}
-          hint={t('profile.contactEmailHint')}
-        />
+        {/* Owner (2026-11-03): two e-mail boxes confused members — the contact e-mail shows only when the
+            sign-in address is an Apple relay or missing. */}
+        {me.emailRelay || !me.email ? (
+          <FormField
+            label={t('profile.contactEmail')}
+            latin
+            autoCapitalize="none"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            value={contactEmail}
+            onChangeText={setContactEmail}
+            hint={t('profile.contactEmailHint')}
+          />
+        ) : null}
         {config ? (
           <View style={styles.group}>
             <Text style={styles.label}>{t('profile.country')}</Text>
