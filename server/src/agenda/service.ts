@@ -80,7 +80,7 @@ export type AgendaEvent = {
   enAuto?: boolean;
 };
 
-export type AgendaRecording = { title: string; videoId: string };
+export type AgendaRecording = { title: string; videoId: string; /** M192: the dashboard's banner for this part. */ image?: string | null };
 export type AgendaFile = { title: string; url: string };
 
 export type AgendaEnglish = { title: string; blurb: string; place: string | null };
@@ -143,7 +143,7 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
   /** M107: the unified interest keys this event suits (the app badges the matching ones). */
   interests: string[];
   /** M191: the recordings' titles for everyone; the videos themselves only through the members-only endpoint. */
-  recordings: { title: string }[];
+  recordings: { title: string; image?: string }[];
   /** M192: the slides' titles; the files themselves only through the members-only endpoint. */
   files: { title: string }[];
 };
@@ -252,7 +252,7 @@ export class AgendaService {
       imageUrl: event.imageUrl || null,
       coverUrl: event.coverUrl || null,
       past,
-      recordings: (event.recordings ?? []).map((recording) => ({ title: recording.title })),
+      recordings: (event.recordings ?? []).map((recording) => ({ title: recording.title, ...(recording.image ? { image: recording.image } : {}) })),
       files: (event.files ?? []).map((file) => ({ title: file.title })),
     };
   }

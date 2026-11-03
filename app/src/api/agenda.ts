@@ -41,7 +41,7 @@ export type AgendaEvent = {
   /** M77: the event's last day has passed — listed faded; an older server sends none. */
   past?: boolean;
   /** M191: the workshop recordings' titles (the videos come only through the members-only endpoint). */
-  recordings?: { title: string }[];
+  recordings?: { title: string; image?: string }[];
   /** M192: the slides' titles (the PDFs come only through the members-only endpoint). */
   files?: { title: string }[];
 };

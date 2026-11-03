@@ -389,7 +389,7 @@ export type AgendaEventInput = {
   /** M192: the slides shown at the workshop (uploaded PDFs), members-only like the recordings. */
   files?: AgendaFile[];
 };
-export type AgendaRecording = { title: string; videoId: string };
+export type AgendaRecording = { title: string; videoId: string; /** M192: the banner tile shown for this day in the app. */ image?: string | null };
 export type AgendaFile = { title: string; url: string };
 export type AgendaEvent = AgendaEventInput & {
   id: string;

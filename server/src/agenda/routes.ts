@@ -43,7 +43,8 @@ const eventSchema = z.object({
   open: z.boolean().default(true),
   /** M191: the workshop's recordings in order, each a Bunny Stream video uploaded from the dashboard. */
   recordings: z
-    .array(z.object({ title: z.string().trim().min(1, 'اكتب عنوان التسجيل').max(120), videoId: z.string().uuid() }))
+    // M192 (owner: «اضيف بانر شيك … لكل حلقة»): an optional banner per part, an uploaded image.
+    .array(z.object({ title: z.string().trim().min(1, 'اكتب عنوان التسجيل').max(120), videoId: z.string().uuid(), image: z.string().trim().url().max(500).nullish() }))
     .max(14, 'بحد أقصى 14 تسجيلًا')
     .optional(),
   /** M192: the slides shown at the workshop, uploaded PDFs. */
@@ -82,13 +83,16 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
   };
 
   /** M191: a recording joins an event only once Bunny has it playable; ones already on the event pass as they are. M192: the same for the slides. */
-  const checkAttachments = async (input: { recordings?: { videoId: string }[]; files?: { url: string }[] }, previous: AgendaEvent | null): Promise<void> => {
+  const checkAttachments = async (input: { recordings?: { videoId: string; image?: string | null }[]; files?: { url: string }[] }, previous: AgendaEvent | null): Promise<void> => {
     const knownVideos = new Set((previous?.recordings ?? []).map((recording) => recording.videoId));
     const knownFiles = new Set((previous?.files ?? []).map((file) => file.url));
-    const pending = [...(input.recordings ?? []).filter((entry) => !knownVideos.has(entry.videoId)), ...(input.files ?? []).filter((entry) => !knownFiles.has(entry.url))];
+    const knownImages = new Set((previous?.recordings ?? []).flatMap((recording) => (recording.image ? [recording.image] : [])));
+    const banners = (input.recordings ?? []).flatMap((entry) => (entry.image && !knownImages.has(entry.image) ? [{ image: entry.image }] : []));
+    const pending = [...(input.recordings ?? []).filter((entry) => !knownVideos.has(entry.videoId)), ...(input.files ?? []).filter((entry) => !knownFiles.has(entry.url)), ...banners];
     if (pending.length > 0 && !media) throw new RequestError('uploads_unavailable', 'رفع الملفات غير مفعّل على هذا الخادم', 503);
     for (const entry of pending) {
       if ('videoId' in entry) await media?.checkStream(entry.videoId);
+      else if ('image' in entry) await media?.check(entry.image, 'image');
       else await media?.check(entry.url, 'document');
     }
   };
@@ -161,7 +165,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       if (me.membership.status !== 'active') return reply.code(403).send(MEMBERS_ONLY);
       const recordings = (event.recordings ?? []).flatMap((recording) => {
         const playback = media?.memberPlayback(recording.videoId);
-        return playback ? [{ title: recording.title, ...playback }] : [];
+        return playback ? [{ title: recording.title, ...playback, ...(recording.image ? { poster: recording.image, image: recording.image } : {}) }] : [];
       });
       const files = [];
       for (const file of event.files ?? []) {

@@ -131,3 +131,24 @@ test('M192: the workshop slides (PDF) open for members only', async () => {
   assert.ok(files[0]?.url.endsWith(path));
   assert.equal(member.json().recordings.length, 1, 'the recordings stay as they were');
 });
+
+test('M192: a banner per part shows to everyone and becomes the member player poster', async () => {
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4c40000000049454e44ae426082', 'hex');
+  const ticket = await send('POST', '/api/admin/uploads', { filename: 'day1.png', contentType: 'image/png', size: png.length }, adminToken);
+  assert.equal(ticket.statusCode, 201, ticket.body);
+  const { url, upload } = ticket.json() as { url: string; upload: { url: string; headers: Record<string, string> } };
+  const put = await app.inject({ method: 'PUT', url: new URL(upload.url).pathname + new URL(upload.url).search, headers: upload.headers, payload: png });
+  assert.equal(put.statusCode, 204, put.body);
+
+  const refused = await send('PUT', `/api/admin/agenda/${eventId}`, { recordings: [{ title: 'اليوم الأول', videoId: RECORDING, image: 'https://evil.test/x.png' }] }, adminToken);
+  assert.equal(refused.statusCode, 400, 'a banner must be an uploaded image');
+  const saved = await send('PUT', `/api/admin/agenda/${eventId}`, { recordings: [{ title: 'اليوم الأول', videoId: RECORDING, image: url }] }, adminToken);
+  assert.equal(saved.statusCode, 200, saved.body);
+
+  const event = await get(`/api/agenda/${eventId}`, visitorToken);
+  assert.deepEqual(event.json().event.recordings, [{ title: 'اليوم الأول', image: url }]);
+  assert.equal((await get(new URL(url).pathname)).statusCode, 200, 'the banner stays public');
+  const [recording] = (await get(`/api/agenda/${eventId}/recordings`, memberToken)).json().recordings as { poster: string; image?: string }[];
+  assert.equal(recording?.poster, url);
+  assert.equal(recording?.image, url);
+});

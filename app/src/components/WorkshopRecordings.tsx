@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { useAgendaRecordings } from '@/api/agenda';
 import { useAuth } from '@/auth/AuthProvider';
@@ -9,17 +9,18 @@ import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { textStart } from '@/i18n/direction';
 import { playVideo } from '@/lib/player';
-import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M191 (owner: «يتفرج علي الورشة لانه مقدرش يحضر … خاصة بالأعضاء فقط»): the workshop's full
  * recordings. An ACTIVE annual member gets one row per day that opens the in-app player; everyone
  * else sees the same titles locked, with the membership door — a paid workshop ticket never unlocks them.
  */
-export function WorkshopRecordings({ eventId, titles, files, past = false }: { eventId: string; titles: { title: string }[]; files: { title: string }[]; past?: boolean }) {
+export function WorkshopRecordings({ eventId, titles, files, past = false }: { eventId: string; titles: { title: string; image?: string }[]; files: { title: string }[]; past?: boolean }) {
   const router = useRouter();
   const { status, me } = useAuth();
   const signedIn = status === 'signedIn';
@@ -53,24 +54,41 @@ export function WorkshopRecordings({ eventId, titles, files, past = false }: { e
         </Text>
       </View>
 
-      {rows.map((recording, index) => {
-        const ready = Boolean(recording.url);
-        return (
-          <PressScale
-            key={`${index}-${recording.title}`}
-            disabled={!ready}
-            onPress={() => playVideo(router, { url: recording.url, title: recording.title, poster: recording.poster })}
-            accessibilityLabel={recording.title}
-          >
-            <View style={[styles.row, !ready && styles.rowLocked]}>
-              <Ionicons name={member ? 'play' : 'lock-closed'} size={18} color={member ? colors.gold : colors.textMuted} />
-              <Text style={[styles.rowText, !ready && styles.rowTextLocked]} numberOfLines={2}>
-                {recording.title}
-              </Text>
-            </View>
-          </PressScale>
-        );
-      })}
+      {/* M192 (owner: «بانر شيك … لكل حلقة … جنب بعض»): one banner tile per day, side by side. */}
+      <View style={styles.tiles}>
+        {rows.map((recording, index) => {
+          const ready = Boolean(recording.url);
+          // A dashboard banner already carries the day's name in big letters; a video frame gets the title over a shade.
+          const custom = titles[index]?.image;
+          const banner = custom ?? (recording.poster || undefined);
+          return (
+            <PressScale
+              key={`${index}-${recording.title}`}
+              style={styles.tileWrap}
+              disabled={!ready}
+              onPress={() => playVideo(router, { url: recording.url, title: recording.title, poster: recording.poster })}
+              accessibilityLabel={recording.title}
+            >
+              <View style={styles.tile}>
+                {banner ? (
+                  <Image source={{ uri: sized(banner, 160) }} style={[StyleSheet.absoluteFill, !member && styles.tileLocked]} resizeMode="cover" accessibilityLabel={recording.title} />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, styles.tileFallback]} />
+                )}
+                {custom ? null : <View style={styles.tileScrim} pointerEvents="none" />}
+                <View style={[styles.tileIcon, !member && styles.tileIconLocked]}>
+                  <Ionicons name={member ? 'play' : 'lock-closed'} size={18} color={member ? colors.black : colors.goldLight} />
+                </View>
+                {custom ? null : (
+                  <Text style={styles.tileTitle} numberOfLines={2}>
+                    {recording.title}
+                  </Text>
+                )}
+              </View>
+            </PressScale>
+          );
+        })}
+      </View>
 
       {documents.map((file, index) => {
         const ready = Boolean(file.url);
@@ -130,6 +148,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   rowLocked: { opacity: 0.75 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tileWrap: { width: '31.5%' },
+  tile: { aspectRatio: 3 / 4, borderRadius: radii.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.surfaceElevated, justifyContent: 'flex-end', padding: spacing.sm },
+  tileLocked: { opacity: 0.55 },
+  tileFallback: { backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  tileScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
+  tileIcon: {
+    position: 'absolute',
+    top: spacing.sm,
+    start: spacing.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gold,
+  },
+  tileIconLocked: { backgroundColor: colors.overlay, borderWidth: 1, borderColor: colors.borderGold },
+  tileTitle: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 19, color: colors.textPrimary, textAlign: 'center' },
   rowText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   rowTextLocked: { color: colors.textSecondary },
   note: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },

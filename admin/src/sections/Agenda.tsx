@@ -30,7 +30,7 @@ export function Agenda() {
   const [editor, setEditor] = useState<{ row: AgendaEvent | null; input: AgendaEventInput; english: { title: string; blurb: string; place: string } } | null>(null);
   const [rows, setRows] = useState<{ event: AgendaEvent; registrations: AgendaRegistration[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | 'recording' | 'file' | null>(null);
+  const [uploading, setUploading] = useState<'imageUrl' | 'coverUrl' | 'recording' | 'file' | 'banner' | null>(null);
   const [recordingProgress, setRecordingProgress] = useState(0);
   const recordingRef = useRef<HTMLInputElement>(null);
   const fileUploadRef = useRef<HTMLInputElement>(null);
@@ -144,6 +144,22 @@ export function Agenda() {
       if (recordingRef.current) recordingRef.current.value = '';
     }
   }
+
+  // M192 (owner: «اضيف بانر شيك … لكل حلقة … جنب بعض»): one banner per day, the tile members tap in the app.
+  async function pickBanner(index: number, file: File | undefined) {
+    if (!file || !editor || uploading) return;
+    setUploading('banner');
+    try {
+      const uploaded = await uploadFile(file);
+      if (uploaded.kind !== 'image') throw new Error('اختر صورة للبانر.');
+      edit({ recordings: (editor.input.recordings ?? []).map((recording, at) => (at === index ? { ...recording, image: uploaded.url } : recording)) });
+    } catch (failure) {
+      fail(failure);
+    } finally {
+      setUploading(null);
+    }
+  }
+  const dropBanner = (index: number) => edit({ recordings: (editor?.input.recordings ?? []).map((recording, at) => (at === index ? { ...recording, image: null } : recording)) });
 
   /** The next day's name for a new recording: «اليوم الأول»، «اليوم الثاني»… */
   function addRecording(videoId: string) {
@@ -330,10 +346,18 @@ export function Agenda() {
               <legend>تسجيلات الورشة — حصرية لأعضاء العضوية السنوية (فيديو لكل يوم، بجودة حتى 4K)</legend>
               {(editor.input.recordings ?? []).map((recording, index) => (
                 <div key={recording.videoId} className="row-actions">
+                  {recording.image ? <img src={recording.image} alt="" style={{ width: 45, height: 60, objectFit: 'cover', borderRadius: 6 }} referrerPolicy="no-referrer" /> : null}
                   <input value={recording.title} maxLength={120} onChange={(event) => editRecording(index, event.target.value)} aria-label="عنوان التسجيل" />
+                  <label className="ghost" style={{ cursor: uploading ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
+                    {recording.image ? 'تغيير البانر' : 'إضافة بانر'}
+                    <input type="file" accept="image/*" hidden disabled={uploading !== null} onChange={(event) => void pickBanner(index, event.target.files?.[0])} />
+                  </label>
+                  {recording.image ? <button type="button" className="ghost" onClick={() => dropBanner(index)}>حذف البانر</button> : null}
                   <button type="button" className="ghost" onClick={() => editRecording(index, null)}>إزالة</button>
                 </div>
               ))}
+              <p className="muted">البانر يظهر للجميع في صفحة الورشة، والأيام جنب بعض (يُفضَّل طوليًا 3:4، مثل 900×1200). بدون بانر تظهر لقطة من الفيديو.</p>
+              {uploading === 'banner' ? <p className="muted">جارٍ رفع البانر…</p> : null}
               <input ref={recordingRef} type="file" accept="video/*" disabled={uploading !== null} onChange={(event) => void pickRecording(event.target.files?.[0])} />
               {uploading === 'recording' ? <p className="muted">جارٍ رفع الفيديو… {Math.round(recordingProgress * 100)}% — لا تغلق الصفحة</p> : null}
               <div className="row-actions">
