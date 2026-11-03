@@ -19,7 +19,7 @@ import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
  * recordings. An ACTIVE annual member gets one row per day that opens the in-app player; everyone
  * else sees the same titles locked, with the membership door — a paid workshop ticket never unlocks them.
  */
-export function WorkshopRecordings({ eventId, titles, files }: { eventId: string; titles: { title: string }[]; files: { title: string }[] }) {
+export function WorkshopRecordings({ eventId, titles, files, past = false }: { eventId: string; titles: { title: string }[]; files: { title: string }[]; past?: boolean }) {
   const router = useRouter();
   const { status, me } = useAuth();
   const signedIn = status === 'signedIn';
@@ -27,6 +27,7 @@ export function WorkshopRecordings({ eventId, titles, files }: { eventId: string
   const links = useAgendaRecordings(eventId, member);
   if (titles.length === 0 && files.length === 0) return null;
 
+  const missed = past && titles.length > 0;
   const playable = member ? (links.data?.recordings ?? null) : null;
   const rows = playable ?? titles.map((entry) => ({ title: entry.title, url: '', poster: '' }));
   // M192: the slides shown at the workshop, opened in the in-app browser.
@@ -34,6 +35,13 @@ export function WorkshopRecordings({ eventId, titles, files }: { eventId: string
 
   return (
     <GlassCard golden style={styles.card}>
+      {/* M192 (owner: «فاتتك الورشة ما تشيل هم»): a finished workshop opens with the reassurance. */}
+      {missed ? (
+        <View style={styles.missed}>
+          <Text style={styles.missedTitle}>{t('agenda.missedTitle')}</Text>
+          <Text style={styles.missedBody}>{t('agenda.missedBody')}</Text>
+        </View>
+      ) : null}
       <View style={styles.head}>
         <Ionicons name="play-circle" size={26} color={colors.goldLight} />
         <Text style={styles.title}>{t(titles.length > 0 ? 'agenda.recordingsTitle' : 'agenda.filesTitle')}</Text>
@@ -81,7 +89,7 @@ export function WorkshopRecordings({ eventId, titles, files }: { eventId: string
       {member && links.isError ? <Text style={styles.note}>{t('agenda.recordingsError')}</Text> : null}
       {!member ? (
         <>
-          <Text style={styles.note}>{t('agenda.recordingsLocked')}</Text>
+          <Text style={styles.note}>{t(missed ? 'agenda.recordingsLockedShort' : 'agenda.recordingsLocked')}</Text>
           {signedIn ? (
             <AppButton label={t('agenda.memberCtaButton')} icon="sparkles-outline" onPress={showMembershipGate} />
           ) : (
@@ -95,6 +103,9 @@ export function WorkshopRecordings({ eventId, titles, files }: { eventId: string
 
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
+  missed: { gap: 2, paddingBottom: spacing.xs },
+  missedTitle: { ...typography.subtitle, fontSize: 19, lineHeight: 30, color: colors.textPrimary, textAlign: textStart },
+  missedBody: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.subtitle, fontSize: 18, lineHeight: 28, color: colors.goldLight, flex: 1, textAlign: textStart },
   badge: {

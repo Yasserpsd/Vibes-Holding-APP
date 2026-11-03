@@ -74,10 +74,23 @@ export function playVideo(router: Router, request: PlayRequest): void {
   router.push({
     pathname: '/watch',
     params: {
-      url: request.url,
+      // M192: expo-router decodes params once on read without encoding them on push, which turned a
+      // signed CDN link's `%2F` into `/` (Bunny 403). Encoded here; watch.tsx reads it with linkParam().
+      url: encodeURIComponent(request.url),
       ...(youtubeId ? { yt: youtubeId } : {}),
       ...(request.title ? { title: request.title } : {}),
-      ...(request.poster ? { poster: request.poster } : {}),
+      ...(request.poster ? { poster: encodeURIComponent(request.poster) } : {}),
     },
   });
+}
+
+/** M192: a link param as playVideo sent it — already decoded by the router, or still encoded if it was not. */
+export function linkParam(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw) return '';
+  if (/^https?:/i.test(raw)) return raw;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return '';
+  }
 }

@@ -132,7 +132,7 @@ export default function AgendaEventScreen() {
           {/* M191: the full recordings — playable for annual members, locked with the membership door for everyone else. */}
           {event.recordings?.length || event.files?.length ? (
             <FadeInView delay={130}>
-              <WorkshopRecordings eventId={event.id} titles={event.recordings ?? []} files={event.files ?? []} />
+              <WorkshopRecordings eventId={event.id} titles={event.recordings ?? []} files={event.files ?? []} past={event.past === true} />
             </FadeInView>
           ) : null}
 

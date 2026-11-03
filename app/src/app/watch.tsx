@@ -5,7 +5,7 @@ import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
+import { linkParam, loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type VideoModule = typeof import('expo-video');
@@ -18,7 +18,7 @@ type VideoModule = typeof import('expo-video');
  */
 export default function WatchScreen() {
   const params = useLocalSearchParams<{ url?: string; yt?: string; title?: string; poster?: string }>();
-  const url = typeof params.url === 'string' ? params.url : '';
+  const url = linkParam(params.url);
   const youtubeId = typeof params.yt === 'string' && params.yt ? params.yt : url ? youtubeIdOf(url) : null;
   const title = typeof params.title === 'string' ? params.title : '';
 

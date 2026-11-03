@@ -7,6 +7,7 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
+import { isWatchable, WatchRibbon } from '@/components/WatchRibbon';
 import { FlipCountdown } from '@/components/wow';
 import { getLang, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -69,7 +70,10 @@ export function EventDateBadge({ date, size = 'md', highlight = false }: { date:
 function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEvent; highlight?: boolean; countdownMs?: number; onPress: () => void }) {
   const mine = event.mine;
   // M77 (owner): a finished event stays on the list — M96 made it «مش منوّرة», a switched-off lamp.
-  const past = event.past === true;
+  // M192: a finished workshop with recordings stays lit, with the «متاحة للمشاهدة» ribbon.
+  const watchable = isWatchable(event);
+  const past = event.past === true && !watchable;
+  const ended = event.past === true;
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, highlight && styles.cardGlow]}>
@@ -84,7 +88,9 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
         <View style={styles.scrim} pointerEvents="none" />
         <View style={styles.topRow}>
           <EventDateBadge date={event.date} highlight={highlight} />
-          {past ? (
+          {watchable ? (
+            <WatchRibbon />
+          ) : past ? (
             <View style={[styles.pill, styles.pillDim]}>
               <Text style={[styles.pillText, styles.pillTextDim]}>{t('agenda.ended')}</Text>
             </View>
@@ -101,7 +107,7 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
           <Text style={styles.meta} numberOfLines={2}>
             {`${formatEventDays(event.dates, event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
           </Text>
-          {past ? null : (
+          {ended ? null : (
             <SarText style={styles.fee} numberOfLines={1}>
               {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
             </SarText>
@@ -114,7 +120,7 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
               </Text>
             </View>
           ) : null}
-          {countdownMs === undefined || past ? null : (
+          {countdownMs === undefined || ended ? null : (
             <View style={styles.countdownWrap}>
               <FlipCountdown targetMs={countdownMs} compact />
             </View>

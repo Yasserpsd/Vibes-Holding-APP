@@ -6,6 +6,7 @@ import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
 import { EventDateBadge } from '@/app/agenda/index';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
+import { isWatchable, WatchRibbon } from '@/components/WatchRibbon';
 import { FlipCountdown } from '@/components/wow';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -62,7 +63,9 @@ export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
 /** M96 (owner): «الصورة هي الملك» — the photo fills the card; date, title and the counter sit ON it over a scrim. */
 function MiniEvent({ event, nearest, countdownMs, onPress }: { event: AgendaEvent; nearest: boolean; countdownMs?: number; onPress: () => void }) {
   const days = event.dates?.length ?? 1;
-  const past = event.past === true;
+  // M192: a finished workshop with recordings stays lit, with the «متاحة للمشاهدة» ribbon.
+  const watchable = isWatchable(event);
+  const past = event.past === true && !watchable;
   const photo = cardImageOf(event);
   return (
     <PressScale onPress={onPress} glow={!past} glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={event.title}>
@@ -82,7 +85,7 @@ function MiniEvent({ event, nearest, countdownMs, onPress }: { event: AgendaEven
           <View style={styles.topPills}>
             {days > 1 ? <GoldPill text={formatDayCount(days)} /> : null}
             {/* With many events the member must see which ones are still ahead — and which ones ran already. */}
-            {past ? <GoldPill text={t('agenda.ended')} dim /> : nearest ? null : <GoldPill text={t('agenda.upcoming')} />}
+            {watchable ? <WatchRibbon small /> : past ? <GoldPill text={t('agenda.ended')} dim /> : nearest ? null : <GoldPill text={t('agenda.upcoming')} />}
           </View>
         </View>
         <View style={styles.bottom}>
@@ -90,9 +93,9 @@ function MiniEvent({ event, nearest, countdownMs, onPress }: { event: AgendaEven
             {event.title}
           </Text>
           <Text style={[styles.meta, past && styles.metaPast]} numberOfLines={1}>
-            {past ? t('agenda.ended') : event.mine?.paid ? t('agenda.confirmed') : event.feeSar > 0 ? t('agenda.feeTag') : t('agenda.free')}
+            {watchable ? t('agenda.watchMeta') : past ? t('agenda.ended') : event.mine?.paid ? t('agenda.confirmed') : event.feeSar > 0 ? t('agenda.feeTag') : t('agenda.free')}
           </Text>
-          {countdownMs === undefined ? null : <FlipCountdown targetMs={countdownMs} compact />}
+          {countdownMs === undefined || watchable ? null : <FlipCountdown targetMs={countdownMs} compact />}
         </View>
       </View>
     </PressScale>
