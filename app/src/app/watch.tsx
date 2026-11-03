@@ -1,12 +1,13 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { linkParam, loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
-import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type VideoModule = typeof import('expo-video');
 
@@ -57,20 +58,22 @@ export default function WatchScreen() {
         }
       />
     );
-  } else if (!youtubeId && url && video) {
-    player = <NativePlayer module={video} url={url} />;
   }
+  // The uploaded-video player brings its own box and control bar (M192).
+  const native = !player && !youtubeId && url && video ? <NativePlayer module={video} url={url} /> : null;
 
   return (
     <View style={styles.page}>
       <Stack.Screen options={title ? { title } : undefined} />
-      <View style={styles.playerBox}>
-        {player ?? (
-          <View style={styles.fallbackBox}>
-            <Text style={styles.fallbackText}>{t('watch.unavailable')}</Text>
-          </View>
-        )}
-      </View>
+      {native ?? (
+        <View style={styles.playerBox}>
+          {player ?? (
+            <View style={styles.fallbackBox}>
+              <Text style={styles.fallbackText}>{t('watch.unavailable')}</Text>
+            </View>
+          )}
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.below}>
         {title ? (
           <FadeInView delay={40}>
@@ -92,14 +95,171 @@ function LoadingGhost() {
   );
 }
 
-/** Mounted only when the expo-video native module exists in this binary (hooks stay unconditional inside). */
+type Player = ReturnType<VideoModule['useVideoPlayer']>;
+
+/** The player object is native and mutable by design; these setters keep the React compiler's hook rules happy. */
+function seekTo(player: Player, seconds: number): void {
+  player.currentTime = seconds;
+}
+function tickEvery(player: Player, seconds: number): void {
+  player.timeUpdateEventInterval = seconds;
+}
+
+/** A Bunny HLS rendition the member can pin (M192); `uri` null = adaptive («تلقائي»). */
+type Rendition = { label: string; uri: string | null };
+
+/** The renditions a signed `…/playlist.m3u8` lists, highest first; they share its signed directory. */
+async function renditionsOf(url: string): Promise<Rendition[]> {
+  if (!/\/playlist\.m3u8$/.test(url)) return [];
+  const response = await fetch(url);
+  if (!response.ok) return [];
+  const base = url.slice(0, url.lastIndexOf('/') + 1);
+  const lines = (await response.text()).split(/\r?\n/);
+  const found: { height: number; uri: string }[] = [];
+  lines.forEach((line, index) => {
+    const height = /RESOLUTION=\d+x(\d+)/.exec(line)?.[1];
+    const next = lines[index + 1]?.trim();
+    if (height && next && !next.startsWith('#')) found.push({ height: Number(height), uri: base + next });
+  });
+  return found.sort((x, y) => y.height - x.height).map((entry) => ({ label: `${entry.height}p`, uri: entry.uri }));
+}
+
+/**
+ * Mounted only when the expo-video native module exists in this binary (hooks stay unconditional inside).
+ * M192 (owner: «شريط اقدر اقدم منه وارجع واقدر اخلي الشاشة كاملة … اغير كوالتي»): a bar under the
+ * picture — 10 seconds back/forward, the quality (adaptive or one fixed rendition) and fullscreen.
+ */
 function NativePlayer({ module: video, url }: { module: VideoModule; url: string }) {
   const player = video.useVideoPlayer(url, (instance) => {
     instance.play();
   });
   const VideoView = video.VideoView;
-  // Fullscreen is on by default in the native controls; nothing else is configured here.
-  return <VideoView style={styles.media} player={player} contentFit="contain" nativeControls />;
+  const viewRef = useRef<InstanceType<VideoModule['VideoView']>>(null);
+  const [renditions, setRenditions] = useState<Rendition[]>([]);
+  const [quality, setQuality] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [time, setTime] = useState({ at: 0, total: 0 });
+
+  // The JS scrubber's clock: twice a second, independent of the native controls.
+  useEffect(() => {
+    tickEvery(player, 0.5);
+    const sub = player.addListener('timeUpdate', ({ currentTime }) => setTime({ at: currentTime, total: player.duration || 0 }));
+    return () => sub.remove();
+  }, [player]);
+
+  useEffect(() => {
+    let alive = true;
+    renditionsOf(url)
+      .then((list) => {
+        if (alive) setRenditions(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+
+  const choose = async (rendition: Rendition) => {
+    setPicking(false);
+    const next = rendition.uri ? rendition.label : null;
+    if (next === quality) return;
+    const at = player.currentTime;
+    setQuality(next);
+    // The new source starts at 0: jump back to the same second once it can play.
+    const ready = player.addListener('statusChange', ({ status }) => {
+      if (status !== 'readyToPlay') return;
+      ready.remove();
+      seekTo(player, at);
+      player.play();
+    });
+    await player.replaceAsync(rendition.uri ?? url).catch(() => ready.remove());
+  };
+
+  return (
+    <>
+      <View style={styles.playerBox}>
+        <VideoView ref={viewRef} style={styles.media} player={player} contentFit="contain" nativeControls />
+      </View>
+      <Scrubber at={time.at} total={time.total} onSeek={(seconds) => {
+        seekTo(player, seconds);
+        setTime((now) => ({ ...now, at: seconds }));
+      }} />
+      <View style={styles.bar}>
+        <BarButton icon="play-back" label="10-" hint={t('watch.back10')} onPress={() => player.seekBy(-10)} />
+        <BarButton icon="play-forward" label="10+" hint={t('watch.forward10')} onPress={() => player.seekBy(10)} />
+        {renditions.length > 0 ? (
+          <BarButton icon="options-outline" label={quality ?? t('watch.auto')} hint={t('watch.quality')} active={picking} onPress={() => setPicking((open) => !open)} />
+        ) : null}
+        <BarButton icon="expand-outline" label={t('watch.fullscreen')} hint={t('watch.fullscreen')} onPress={() => void viewRef.current?.enterFullscreen()} />
+      </View>
+      {picking ? (
+        <View style={styles.qualities}>
+          {[{ label: t('watch.auto'), uri: null }, ...renditions].map((rendition) => {
+            const on = (rendition.uri ? rendition.label : null) === quality;
+            return (
+              <Pressable key={rendition.label} onPress={() => void choose(rendition)} style={[styles.quality, on && styles.qualityOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                <Text style={[styles.qualityText, on && styles.qualityTextOn]}>{rendition.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+function BarButton({ icon, label, hint, active = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; hint: string; active?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.barButton, (pressed || active) && styles.barButtonOn]} accessibilityRole="button" accessibilityLabel={hint} hitSlop={6}>
+      <Ionicons name={icon} size={20} color={colors.goldLight} />
+      <Text style={styles.barLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** «اجري لنقطة معينة»: tap or drag anywhere on the line to jump there; the times sit at both ends. */
+function Scrubber({ at, total, onSeek }: { at: number; total: number; onSeek: (seconds: number) => void }) {
+  const [width, setWidth] = useState(1);
+  const [drag, setDrag] = useState<number | null>(null);
+  const fractionOf = (x: number) => Math.min(1, Math.max(0, x / width));
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => total > 0,
+        onMoveShouldSetPanResponder: () => total > 0,
+        onPanResponderGrant: (event) => setDrag(fractionOf(event.nativeEvent.locationX)),
+        onPanResponderMove: (event) => setDrag(fractionOf(event.nativeEvent.locationX)),
+        onPanResponderRelease: (event) => {
+          onSeek(fractionOf(event.nativeEvent.locationX) * total);
+          setDrag(null);
+        },
+        onPanResponderTerminate: () => setDrag(null),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt when the line or the length changes
+    [width, total, onSeek],
+  );
+  const shown = drag ?? (total > 0 ? at / total : 0);
+  return (
+    <View style={styles.scrub}>
+      <Text style={styles.scrubTime}>{clock(drag !== null ? drag * total : at)}</Text>
+      <View style={styles.scrubTrack} onLayout={(event) => setWidth(Math.max(1, event.nativeEvent.layout.width))} {...responder.panHandlers}>
+        <View style={styles.scrubRail} pointerEvents="none">
+          <View style={[styles.scrubFill, { width: `${shown * 100}%` }]} />
+        </View>
+        <View style={[styles.scrubKnob, { left: shown * width - 9 }]} pointerEvents="none" />
+      </View>
+      <Text style={styles.scrubTime}>{clock(total)}</Text>
+    </View>
+  );
+}
+
+function clock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  const two = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(s / 3600);
+  return h > 0 ? `${h}:${two(Math.floor((s % 3600) / 60))}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
 }
 
 const styles = StyleSheet.create({
@@ -108,6 +268,22 @@ const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.black },
   webContainer: { backgroundColor: colors.black },
   media: { width: '100%', height: '100%' },
+  // Media controls keep the universal left-to-right order (back on the left, time running rightwards) even in Arabic.
+  scrub: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm, backgroundColor: colors.surface },
+  scrubTime: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.textSecondary, minWidth: 52, textAlign: 'center' },
+  scrubTrack: { flex: 1, height: 36, justifyContent: 'center' },
+  scrubRail: { height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' },
+  scrubFill: { height: 4, backgroundColor: colors.gold },
+  scrubKnob: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: colors.goldLight, top: 9 },
+  bar: { direction: 'ltr', flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },
+  barButton: { alignItems: 'center', gap: 2, minWidth: 64, paddingVertical: 6, paddingHorizontal: spacing.sm, borderRadius: radii.md },
+  barButtonOn: { backgroundColor: colors.surfaceElevated },
+  barLabel: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
+  qualities: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface },
+  quality: { paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGold },
+  qualityOn: { backgroundColor: colors.gold },
+  qualityText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight },
+  qualityTextOn: { color: colors.black },
   ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: colors.black },
   ghost: {
     flex: 1,
