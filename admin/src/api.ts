@@ -513,11 +513,12 @@ export type PayLinkInput = {
 export type UploadKind = 'image' | 'video';
 export type UploadLimits = { types: string[]; maxBytes: number };
 /** `durable: false`: files sit on the server's temporary disk and vanish on the next deploy. */
-export type UploadConfig = { images: UploadLimits; videos: UploadLimits; durable: boolean };
-/** Where the bytes go: a presigned multipart POST to the bucket, or a raw PUT to the API's token URL. */
+export type UploadConfig = { images: UploadLimits; videos: UploadLimits; durable: boolean; stream?: boolean };
+/** Where the bytes go: a presigned multipart POST to the bucket, a raw PUT to the API's token URL, or (M189 4K video) Bunny Stream over TUS. */
 export type UploadTarget =
   | { method: 'POST'; url: string; fields: Record<string, string> }
-  | { method: 'PUT'; url: string; headers: Record<string, string> };
+  | { method: 'PUT'; url: string; headers: Record<string, string> }
+  | { method: 'TUS'; url: string; headers: Record<string, string> };
 export type UploadTicket = { key: string; url: string; kind: UploadKind; upload: UploadTarget };
 export type Uploaded = { url: string; kind: UploadKind; key: string };
 
@@ -859,8 +860,70 @@ function transferError(xhr: XMLHttpRequest): ApiError {
   return new ApiError(message ?? TRANSFER_FAILED, xhr.status, 'upload_failed');
 }
 
+const TUS_CHUNK = 50 * 1024 * 1024;
+const TUS_RETRY_MS = [1000, 3000, 10000, 30000];
+
+/** TUS metadata values are base64 of UTF-8 (Arabic file names included). */
+function tusMeta(pairs: Record<string, string>): string {
+  const base64 = (value: string) => btoa(Array.from(new TextEncoder().encode(value), (byte) => String.fromCharCode(byte)).join(''));
+  return Object.entries(pairs)
+    .map(([name, value]) => `${name} ${base64(value)}`)
+    .join(',');
+}
+
+/** One TUS request; answers the response headers that matter. Progress counts only this request's bytes. */
+function tusRequest(method: 'POST' | 'PATCH' | 'HEAD', url: string, headers: Record<string, string>, body: Blob | null, signal?: AbortSignal, onSent?: (bytes: number) => void): Promise<{ location: string | null; offset: number }> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(cancelled());
+      return;
+    }
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.setRequestHeader('Tus-Resumable', '1.0.0');
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    if (onSent) xhr.upload.onprogress = (event) => onSent(event.loaded);
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve({ location: xhr.getResponseHeader('Location'), offset: Number(xhr.getResponseHeader('Upload-Offset') ?? -1) })
+        : reject(new ApiError(TRANSFER_FAILED, xhr.status, 'upload_failed'));
+    xhr.onerror = () => reject(new ApiError(TRANSFER_FAILED, 0, 'network'));
+    xhr.onabort = () => reject(cancelled());
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.send(body);
+  });
+}
+
+/**
+ * M189: big videos go to Bunny Stream in 50 MB pieces. A failed piece is retried after asking Bunny
+ * how far it got, so a dropped connection on a 4K file costs one piece, not the whole upload.
+ */
+async function tusTransfer(target: Extract<UploadTarget, { method: 'TUS' }>, file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
+  const created = await tusRequest('POST', target.url, { ...target.headers, 'Upload-Length': String(file.size), 'Upload-Metadata': tusMeta({ filetype: file.type, title: file.name }) }, null, signal);
+  if (!created.location) throw new ApiError(TRANSFER_FAILED, 0, 'upload_failed');
+  const location = new URL(created.location, target.url).toString();
+  let offset = 0;
+  let failures = 0;
+  while (offset < file.size) {
+    const start = offset;
+    const piece = file.slice(start, Math.min(start + TUS_CHUNK, file.size));
+    try {
+      const sent = await tusRequest('PATCH', location, { ...target.headers, 'Upload-Offset': String(start), 'Content-Type': 'application/offset+octet-stream' }, piece, signal, (bytes) => onProgress?.((start + bytes) / file.size));
+      offset = sent.offset >= 0 ? sent.offset : start + piece.size;
+      failures = 0;
+    } catch (error) {
+      if (signal?.aborted || failures >= TUS_RETRY_MS.length) throw error;
+      await new Promise((resume) => setTimeout(resume, TUS_RETRY_MS[failures]));
+      failures += 1;
+      offset = (await tusRequest('HEAD', location, target.headers, null, signal).catch(() => ({ offset: start }))).offset;
+      if (offset < 0) offset = start;
+    }
+  }
+}
+
 /** Sends the bytes to the ticket's URL. XMLHttpRequest because fetch reports no upload progress. Never carries the Authorization header: the URL is the bucket, or holds its own token. */
 function transfer(target: UploadTarget, file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
+  if (target.method === 'TUS') return tusTransfer(target, file, onProgress, signal);
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(cancelled());

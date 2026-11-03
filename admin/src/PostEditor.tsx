@@ -586,7 +586,15 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             <legend>الفيديو</legend>
             {videoFile ? (
               <div className="video-preview">
-                <video src={videoFile.url} poster={videoFile.poster ?? undefined} controls playsInline preload="metadata" />
+                {/* M189: a Bunny Stream video is HLS, which desktop browsers do not all play; the app does. */}
+                {videoFile.url.includes('/media/stream/') ? (
+                  <>
+                    {videoFile.poster ? <img src={videoFile.poster} alt="" /> : null}
+                    <p className="muted hint">تم رفع الفيديو بجودته الأصلية حتى 4K، ويُعرض في التطبيق بعد انتهاء المعالجة (دقائق حسب الطول).</p>
+                  </>
+                ) : (
+                  <video src={videoFile.url} poster={videoFile.poster ?? undefined} controls playsInline preload="metadata" />
+                )}
                 <button type="button" onClick={() => setVideoFile(null)}>إزالة الفيديو</button>
               </div>
             ) : null}
@@ -608,7 +616,11 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                 <button className="pick" type="button" onClick={() => videoInput.current?.click()}>إضافة فيديو</button>
               </div>
             ) : null}
-            <p className="muted hint">فيديو واحد حجمه حتى {megabytes(config.videos.maxBytes)} ميجابايت ({typeNames(config.videos.types)}).</p>
+            <p className="muted hint">
+              {config.stream
+                ? `فيديو واحد بجودة حتى 4K، حجمه حتى ${Math.round(config.videos.maxBytes / 1024 ** 3)} جيجابايت (${typeNames(config.videos.types)}).`
+                : `فيديو واحد حجمه حتى ${megabytes(config.videos.maxBytes)} ميجابايت (${typeNames(config.videos.types)}).`}
+            </p>
             <label>
               فيديو يوتيوب (رابط)
               <input placeholder="https://youtu.be/…" dir="ltr" value={video} onChange={(e) => setVideo(e.target.value)} />

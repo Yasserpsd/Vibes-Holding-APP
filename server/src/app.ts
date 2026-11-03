@@ -88,6 +88,7 @@ import { WorkshopNudgeService } from './agenda/nudges.js';
 import { projectsRoutes } from './projectsBank/routes.js';
 import { ProjectsService } from './projectsBank/service.js';
 import { ImageVariants } from './media/images.js';
+import { BunnyStream } from './media/bunny.js';
 import { mediaRoutes } from './media/routes.js';
 import { S3MediaStore } from './media/s3.js';
 import { MediaService } from './media/service.js';
@@ -364,6 +365,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     origins: [...new Set(mediaOrigins)],
     maxImageBytes: config.UPLOAD_MAX_IMAGE_MB * MEGABYTE,
     maxVideoBytes: config.UPLOAD_MAX_VIDEO_MB * MEGABYTE,
+    stream:
+      config.BUNNY_STREAM_LIBRARY_ID && config.BUNNY_STREAM_API_KEY && config.BUNNY_STREAM_CDN_HOST
+        ? new BunnyStream({ libraryId: config.BUNNY_STREAM_LIBRARY_ID, apiKey: config.BUNNY_STREAM_API_KEY, cdnHost: config.BUNNY_STREAM_CDN_HOST, tokenKey: config.BUNNY_STREAM_TOKEN_KEY })
+        : null,
+    maxStreamBytes: config.BUNNY_MAX_VIDEO_MB * MEGABYTE,
     enabled: mediaStore.durable || config.APP_ENV !== 'production',
     // M118b (the night the sweep ATE the photos): «referenced» used to mean the POSTS' media only,
     // so every people photo, agenda hero, service banner and image slot counted as an orphan and

@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
 import { RequestError } from '../auth/guard.js';
+import { isStreamId, type BunnyStream, type StreamFile, type StreamTicket } from './bunny.js';
 import type { MediaLocation, MediaStore, UploadTicket } from './store.js';
 
 export type MediaKind = 'image' | 'video';
@@ -33,7 +34,7 @@ export const uploadInputSchema = z.object({
 });
 export type UploadInput = z.infer<typeof uploadInputSchema>;
 
-export type Upload = { key: string; url: string; kind: MediaKind; upload: UploadTicket };
+export type Upload = { key: string; url: string; kind: MediaKind; upload: UploadTicket | StreamTicket };
 
 export type MediaOptions = {
   store: MediaStore;
@@ -41,6 +42,9 @@ export type MediaOptions = {
   origins: string[];
   maxImageBytes: number;
   maxVideoBytes: number;
+  /** M189: videos go to Bunny Stream (4K, adaptive HLS) when set; images stay in the store. */
+  stream?: BunnyStream | null;
+  maxStreamBytes?: number;
   /** False in production without a bucket: files on a temporary disk must never look like a working upload. */
   enabled: boolean;
   /** Keys the posts point at right now; everything else is an abandoned upload once it is a day old. */
@@ -77,20 +81,48 @@ export class MediaService {
   }
 
   private limit(kind: MediaKind): number {
-    return kind === 'image' ? this.options.maxImageBytes : this.options.maxVideoBytes;
+    if (kind === 'image') return this.options.maxImageBytes;
+    return this.options.stream ? (this.options.maxStreamBytes ?? this.options.maxVideoBytes) : this.options.maxVideoBytes;
   }
 
   config() {
     const types = (kind: MediaKind) => Object.keys(TYPES).filter((type) => TYPES[type]?.kind === kind);
     return {
       images: { types: types('image'), maxBytes: this.options.maxImageBytes },
-      videos: { types: types('video'), maxBytes: this.options.maxVideoBytes },
+      videos: { types: types('video'), maxBytes: this.limit('video') },
       durable: this.store.durable,
+      stream: Boolean(this.options.stream),
     };
   }
 
   urlFor(key: string): string {
     return `${this.options.origins[0]}/media/${key}`;
+  }
+
+  /** M189: the stable app link of a Bunny video; `/media/stream/...` redirects to the CDN. */
+  streamUrl(id: string, file: StreamFile = 'playlist.m3u8'): string {
+    return `${this.options.origins[0]}/media/stream/${id}/${file}`;
+  }
+
+  /** The Bunny video id behind one of our stream links (the playlist, or its thumbnail as a poster); null otherwise. */
+  streamIdOf(url: string, file: StreamFile = 'playlist.m3u8'): string | null {
+    if (!URL.canParse(url)) return null;
+    const parsed = new URL(url);
+    const match = /^\/media\/stream\/([^/]+)\/([^/]+)$/.exec(parsed.pathname);
+    if (!this.options.origins.includes(parsed.origin) || !match?.[1] || match[2] !== file || !isStreamId(match[1])) return null;
+    return match[1];
+  }
+
+  /** Where `/media/stream/<id>/<file>` sends the player; null when streaming is off or the path is not ours. */
+  streamRedirect(id: string, file: string): string | null {
+    if (!this.options.stream || !isStreamId(id) || (file !== 'playlist.m3u8' && file !== 'thumbnail.jpg')) return null;
+    return this.options.stream.playbackUrl(id, file);
+  }
+
+  /** The poster a streamed video gets when the admin uploaded none: Bunny's own thumbnail. */
+  posterFor(videoUrl: string): string | null {
+    const id = this.streamIdOf(videoUrl);
+    return id ? this.streamUrl(id, 'thumbnail.jpg') : null;
   }
 
   /** The key in any URL shaped like a media link, whatever its host: a changed public domain must not orphan old posts' files. */
@@ -120,6 +152,10 @@ export class MediaService {
     if (input.size > max) {
       throw new RequestError('too_large', `حجم ${type.kind === 'image' ? 'الصورة' : 'الفيديو'} أكبر من الحد المسموح (${megabytes(max)} ميجابايت)`);
     }
+    if (type.kind === 'video' && this.options.stream) {
+      const id = await this.options.stream.create(input.filename);
+      return { key: `stream/${id}`, url: this.streamUrl(id), kind: 'video', upload: this.options.stream.ticket(id, now.getTime()) };
+    }
     const month = now.toISOString().slice(0, 7).replace('-', '/');
     const key = `${PREFIX}${month}/${randomUUID()}.${type.extension}`;
     return { key, url: this.urlFor(key), kind: type.kind, upload: await this.store.ticket(key, type.stored ?? input.contentType, max) };
@@ -130,8 +166,16 @@ export class MediaService {
    * (a bucket policy already enforces the limit; this also covers a file that was never sent).
    */
   async check(url: string, kind: MediaKind): Promise<void> {
-    const key = this.keyOf(url);
     const label = kind === 'image' ? 'الصورة' : 'الفيديو';
+    if (kind === 'image' && this.options.stream && this.streamIdOf(url, 'thumbnail.jpg')) return;
+    const streamId = kind === 'video' ? this.streamIdOf(url) : null;
+    if (streamId && this.options.stream) {
+      const state = await this.options.stream.state(streamId);
+      if (state === 'ready') return;
+      if (state === 'waiting') throw new RequestError('media_processing', 'الفيديو قيد المعالجة لدى خادم الفيديو، أعد الحفظ بعد دقيقة');
+      throw new RequestError('invalid_media', state === 'failed' ? 'تعذّرت معالجة الفيديو، ارفعه من جديد' : 'لم يكتمل رفع الفيديو، ارفعه من جديد');
+    }
+    const key = this.keyOf(url);
     if (!key || kindOfKey(key) !== kind) throw new RequestError('invalid_media', `ملف ${label} غير صالح، ارفعه من جديد`);
     const info = await this.store.head(key);
     if (!info) throw new RequestError('invalid_media', `لم يكتمل رفع ${label}، ارفعه من جديد`);
@@ -200,6 +244,6 @@ export class MediaService {
   }
 
   status(): Record<string, unknown> {
-    return { ...this.store.status(), enabled: this.options.enabled, sweep: this.options.sweepEnabled, maxImageMb: megabytes(this.options.maxImageBytes), maxVideoMb: megabytes(this.options.maxVideoBytes), swept: this.swept };
+    return { ...this.store.status(), stream: this.options.stream?.status() ?? null, enabled: this.options.enabled, sweep: this.options.sweepEnabled, maxImageMb: megabytes(this.options.maxImageBytes), maxVideoMb: megabytes(this.options.maxVideoBytes), swept: this.swept };
   }
 }

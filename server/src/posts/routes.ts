@@ -115,6 +115,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     if (!input.videoFile) return;
     await media.check(input.videoFile.url, 'video');
     if (input.videoFile.poster) await media.check(input.videoFile.poster, 'image');
+    // M189: a Bunny video without an uploaded poster shows Bunny's own thumbnail.
+    else input.videoFile.poster = media.posterFor(input.videoFile.url);
   };
 
   /** Removes the uploaded files a changed or deleted post no longer uses, unless another post still does. */
