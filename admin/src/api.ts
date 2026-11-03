@@ -1,7 +1,7 @@
 import type { AccountFilter, AccountsResult, Personas, PersonaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://vibes-holding-app-production.up.railway.app';
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api-test.vibesholdingsa.com';
 const TOKEN_KEY = 'club-admin-token';
 
 export type Me = { id: number; name: string; email: string; isAdmin: boolean; isModerator: boolean };
