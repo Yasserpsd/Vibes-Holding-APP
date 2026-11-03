@@ -18,6 +18,7 @@ import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { StructuredText } from '@/components/StructuredText';
+import { isWatchable } from '@/components/WatchRibbon';
 import { WorkshopRecordings } from '@/components/WorkshopRecordings';
 import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
@@ -216,7 +217,8 @@ export default function AgendaEventScreen() {
               <AppButton label={t('agenda.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
             </>
           ) : !event.open ? (
-            <Notice tone="info" text={t('agenda.closed')} />
+            // M192 (owner): a finished workshop with recordings says it was recorded, not «التسجيل مغلق».
+            <Notice tone="info" text={t(isWatchable(event) ? 'agenda.recordedForYou' : 'agenda.closed')} />
           ) : (
             <View style={styles.booking} onLayout={(layout) => setBookingY(layout.nativeEvent.layout.y)}>
               {event.mine && !event.mine.paid ? <Notice tone="warning" text={t('agenda.pendingPay')} /> : null}

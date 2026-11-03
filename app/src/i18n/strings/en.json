@@ -1027,6 +1027,7 @@
   "agenda.onlineLink": "Online attendance link",
   "agenda.pendingPay": "Payment not completed yet — finish it to confirm your attendance.",
   "agenda.closed": "Registration is currently closed",
+  "agenda.recordedForYou": "We recorded it for you, so you don't miss a thing",
   "agenda.past": "This event has ended",
   "agenda.ended": "Ended",
   "agenda.upcoming": "Upcoming",
