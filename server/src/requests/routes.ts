@@ -3,15 +3,17 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
+import { langOf } from '../lang.js';
 import type { RequestsService } from './service.js';
 
-export type RequestsRoutesOptions = { service: RequestsService; auth: AuthService };
+export type RequestsRoutesOptions = { service: RequestsService; auth: AuthService; english?: EnglishCache };
 
 export const statusSchema = z.object({ status: z.enum(['pending', 'in_progress', 'done', 'rejected', 'cancelled']), note: z.string().trim().max(300).default('') });
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M138: the member's timeline and the dashboard's status control for the ledger entries. */
-export const requestsRoutes: FastifyPluginAsync<RequestsRoutesOptions> = async (app, { service, auth }) => {
+export const requestsRoutes: FastifyPluginAsync<RequestsRoutesOptions> = async (app, { service, auth, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -21,7 +23,14 @@ export const requestsRoutes: FastifyPluginAsync<RequestsRoutesOptions> = async (
     guard(async (request, reply) => {
       const current = await requireSession(request, reply);
       if (!current) return;
-      return { requests: await service.timeline(current.session.contactId) };
+      const requests = await service.timeline(current.session.contactId);
+      const lang = langOf(request);
+      if (!english || lang !== 'en') return { requests };
+      // Owner (2026-11-04): a request's title, questions and answers read in English in the English app.
+      const titled = await english.rows(requests, ['titleEn'], lang);
+      return {
+        requests: await Promise.all(titled.map(async (entry) => ({ ...entry, rows: await english.rows(entry.rows, ['labelEn', 'value'], lang) }))),
+      };
     }),
   );
 

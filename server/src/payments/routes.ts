@@ -9,11 +9,12 @@ import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import { langOf } from '../lang.js';
 import type { AuthService } from '../auth/service.js';
 import { getServicesContent } from '../content/services.js';
+import type { EnglishCache } from '../englishCache.js';
 import type { KV } from '../store.js';
 import { mockCheckoutPage, returnPage } from './pages.js';
 import type { PaymentsService } from './service.js';
 
-export type PaymentsRoutesOptions = { service: PaymentsService; auth: AuthService; kv: KV; appScheme: string; smtpHost?: string | null; smtpPort?: number };
+export type PaymentsRoutesOptions = { service: PaymentsService; auth: AuthService; kv: KV; appScheme: string; smtpHost?: string | null; smtpPort?: number; english?: EnglishCache };
 
 const startSchema = z.object({
   serviceKey: z.string().trim().min(1).max(60),
@@ -56,7 +57,7 @@ function flatQuery(query: unknown): Record<string, string> {
 }
 
 /** Payments need a session; the Paymob callback and the browser pages are public (HMAC-checked). */
-export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme, smtpHost, smtpPort }) => {
+export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme, smtpHost, smtpPort, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   // The mock gateway page posts a plain HTML form.
@@ -81,7 +82,9 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
     guard(async (request, reply) => {
       const current = await requireSession(request, reply);
       if (!current) return;
-      return { payments: await service.list(current.session.contactId) };
+      const payments = await service.list(current.session.contactId);
+      // Owner (2026-11-04): the service name reads in English in the English app (translated once, cached).
+      return { payments: english ? await english.rows(payments, ['serviceTitle'], langOf(request)) : payments };
     }),
   );
 
@@ -92,7 +95,8 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       if (!current) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      return { payment: await service.get(current.session.contactId, params.id) };
+      const payment = await service.get(current.session.contactId, params.id);
+      return { payment: english && payment ? ((await english.rows([payment], ['serviceTitle'], langOf(request)))[0] ?? payment) : payment };
     }),
   );
 

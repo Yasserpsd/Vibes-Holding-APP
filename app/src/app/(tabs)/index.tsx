@@ -4,6 +4,7 @@ import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useAgenda } from '@/api/agenda';
+import { displayProfile } from '@/api/auth';
 import { useHomeContent, useMeetupsContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { useHq } from '@/api/hq';
 import { usePartners, type Partner } from '@/api/partners';
@@ -124,7 +125,7 @@ export default function HomeScreen() {
     }
   };
 
-  const greeting = status === 'signedIn' && me ? t('home.greeting', { name: me.name.split(' ')[0] }) : '';
+  const greeting = status === 'signedIn' && me ? t('home.greeting', { name: displayProfile(me).name.split(' ')[0] }) : '';
   const featured = videos.data?.pages[0]?.featured ?? [];
 
   // M74: the home follows the account's persona — a signed-in account without one reads the neutral variant.

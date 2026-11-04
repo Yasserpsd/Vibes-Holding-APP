@@ -1,5 +1,7 @@
 import { Image, StyleSheet, Text, type TextProps } from 'react-native';
 
+import { getLang } from '@/i18n';
+
 /**
  * Owner (2026-11-02, with the symbol's picture: «الريال نستعيض عنها بالعلامة دي»): every price shows
  * the official Saudi riyal symbol (U+20C0) instead of the word «ريال»/SAR. Device fonts on older
@@ -27,7 +29,7 @@ export function SarText({ children, style, ...rest }: TextProps) {
               source={SYMBOL}
               style={{ width: Math.round(height * RATIO), height, tintColor: flat.color }}
               resizeMode="contain"
-              accessibilityLabel={part}
+              accessibilityLabel={getLang() === 'en' ? 'SAR' : part}
             />
           ) : (
             part

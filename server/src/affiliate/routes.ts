@@ -4,13 +4,14 @@ import { z } from 'zod';
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
+import type { NameTransliterator } from '../auth/namesEnglish.js';
 import { APP_STORE_BADGE, PLAY_STORE_BADGE } from '../legal/badges.js';
 import { APP_STORE_URL, PLAY_STORE_URL } from '../legal/applink.js';
 import { cityChoices, cityKeyOf } from './cities.js';
 import { ibanIssueMessage, saudiIbanIssue } from './iban.js';
 import { AffiliateService, type AffiliateRecord } from './service.js';
 
-export type AffiliateRoutesOptions = { service: AffiliateService; auth: AuthService };
+export type AffiliateRoutesOptions = { service: AffiliateService; auth: AuthService; names?: NameTransliterator };
 
 /** M195: a Saudi IBAN (SA + 22, mod-97 checked); spaces and case are forgiven. */
 const ibanSchema = z
@@ -117,7 +118,7 @@ function ownApplication(record: AffiliateRecord) {
  * membership number (the hub-verified M32 channel); «paid» comes only from the server-confirmed
  * membership activation.
  */
-export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async (app, { service, auth }) => {
+export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async (app, { service, auth, names }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -162,7 +163,8 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
         membershipCode: record.code,
         link,
         shareText: config.shareText.replaceAll('{link}', link || code).replaceAll('{code}', code),
-        referrals,
+        // Owner (2026-11-04): the English app shows the referred people's names in Latin letters.
+        referrals: names ? await localizeReferrals(referrals, names, lang) : referrals,
         balance,
         cycle,
         payouts: payouts.map((payout) => ({
@@ -349,4 +351,9 @@ p.en{direction:ltr;font-size:13px;margin-bottom:14px}
 </div>
 <div class="hint">اضغط على الشعار للتحميل · Tap the badge to download</div>
 </div></body></html>`;
+}
+
+async function localizeReferrals<T extends { name: string }>(rows: T[], names: NameTransliterator, lang: ReturnType<typeof langOf>): Promise<T[]> {
+  const shown = await names.names(rows.map((row) => row.name), lang).catch(() => rows.map((row) => row.name));
+  return rows.map((row, index) => ({ ...row, name: shown[index] ?? row.name }));
 }

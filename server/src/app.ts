@@ -20,6 +20,7 @@ import { badgesRoutes } from './badges/routes.js';
 import { AdminOtpStore } from './auth/adminOtp.js';
 import { TotpStore } from './auth/totp.js';
 import { MeLocalizer, ME_TRANSLATE_SYSTEM } from './auth/meEnglish.js';
+import { NameTransliterator, NAMES_TRANSLATE_SYSTEM } from './auth/namesEnglish.js';
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { PersonaRequestsService } from './auth/personaRequests.js';
 import { NameJudge } from './auth/name.js';
@@ -40,6 +41,7 @@ import { appVersionRoutes, installAppVersionGate } from './appVersion.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { EnglishSweep } from './content/englishSweep.js';
+import { EnglishCache } from './englishCache.js';
 import { PostsEnglish } from './posts/english.js';
 import { contentRoutes } from './content/routes.js';
 import { discountsRoutes } from './discounts/routes.js';
@@ -281,6 +283,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
   // M122: the same translator turns each video's Arabic lines English once (owner: zero Arabic in the English app).
   const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, translator, fetchImpl });
+  // Owner (2026-11-04): short texts with no English copy (request answers, workshop file titles, invite texts) — translated once, cached.
+  const englishCache = new EnglishCache(kv, translator);
   // M122: the English sweep — finds Arabic showing in the English content and translates it by itself.
   const englishSweep = new EnglishSweep({ kv, translator, log: app.log, bump: () => sync.bump('content') });
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
@@ -593,7 +597,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const requests = new RequestsService({ kv, log: app.log, notices, sources: { card, hq, forms, workshops, agenda, persona: personaRequests, profiles, payments, deletion } });
   // M183: the advisor's live member awareness — his timeline, his bank balance and the unlocked deck.
   advisor.wire({ auth, requests, access, affiliate, fetchImpl });
-  await app.register(requestsRoutes, { service: requests, auth });
+  await app.register(requestsRoutes, { service: requests, auth, english: englishCache });
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl, daily: dailyProject });
   await app.register(ratingsRoutes, { service: ratings, auth, projects });
   await app.register(interestsRoutes, { service: interests, auth });
@@ -654,16 +658,21 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv, files: formFiles });
-  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges, media });
+  await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges, media, english: englishCache });
   await app.register(badgesRoutes, { auth, agenda, profiles, payments });
   await app.register(companionRoutes, { service: companion, auth });
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
-  await app.register(invitesRoutes, { service: invites, auth });
-  await app.register(affiliateRoutes, { service: affiliate, auth });
+  await app.register(invitesRoutes, { service: invites, auth, english: englishCache });
+  // Owner (2026-11-04): referred people's names in Latin letters for the English app (cached per name).
+  const names = new NameTransliterator(
+    kv,
+    config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: NAMES_TRANSLATE_SYSTEM }) : new OffTranslator(),
+  );
+  await app.register(affiliateRoutes, { service: affiliate, auth, names });
   await app.register(legalRoutes, { notifier });
   await app.register(appLinkRoutes);
-  await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme, smtpHost: config.SMTP_HOST ?? null, smtpPort: config.SMTP_PORT });
+  await app.register(paymentsRoutes, { service: payments, auth, kv, appScheme, smtpHost: config.SMTP_HOST ?? null, smtpPort: config.SMTP_PORT, english: englishCache });
   await app.register(membershipRoutes, { service: membership, auth, webhookAuth: config.REVENUECAT_WEBHOOK_AUTH });
   await app.register(pushRoutes, { service: push, auth });
   // M169: pictures leave resized and cacheable; without sharp the originals answer as before.

@@ -144,7 +144,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   };
   const requireSession = sessionGuard(service);
 
-  app.get('/api/auth/config', async () => ({
+  app.get('/api/auth/config', async (request) => ({
     countries: COUNTRIES.map((country) => ({
       code: country.code,
       name: country.name,
@@ -159,7 +159,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       max: mobileRule(country.code)?.max ?? 12,
       starts: mobileRule(country.code)?.starts ?? [],
     })),
-    personas: PERSONAS,
+    // The English app (and older bundles that print the server label) gets the English persona wording.
+    personas: PERSONAS.map(({ key, label, labelEn }) => ({ key, label: langOf(request) === 'en' ? labelEn : label })),
     phonePolicy: PHONE_POLICY_TEXT,
     emailPolicy: EMAIL_POLICY_TEXT,
     registrationOpen: service.registrationOpen,

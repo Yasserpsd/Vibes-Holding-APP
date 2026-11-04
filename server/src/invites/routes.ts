@@ -3,9 +3,11 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
+import { langOf } from '../lang.js';
 import type { InvitesService } from './service.js';
 
-export type InvitesRoutesOptions = { service: InvitesService; auth: AuthService };
+export type InvitesRoutesOptions = { service: InvitesService; auth: AuthService; english?: EnglishCache };
 
 const configSchema = z
   .object({
@@ -22,7 +24,7 @@ const idSchema = z.object({ id: z.string().uuid() });
  * each one got. The code itself is checked and stored by the hub during registration
  * (`/api/auth/register` + plugin 2.7.2), not here.
  */
-export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (app, { service, auth }) => {
+export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (app, { service, auth, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -33,11 +35,14 @@ export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (ap
       if (!current) return;
       const me = await auth.me(current.session);
       const config = await service.config();
+      // Owner (2026-11-04): the English app gets these dashboard texts in English (translated once, cached).
+      const [giftText, shareTemplate] = english ? await english.texts([config.giftText, config.shareText], langOf(request)) : [config.giftText, config.shareText];
+      const template = (shareTemplate ?? config.shareText).includes('{code}') ? (shareTemplate ?? config.shareText) : config.shareText;
       return {
         code: me.cardNumber,
         eligible: true, // M143: every signed-in (verified) account may invite; the membership gate is gone.
-        giftText: config.giftText,
-        shareText: config.shareText.replaceAll('{code}', me.cardNumber),
+        giftText: giftText ?? config.giftText,
+        shareText: template.replaceAll('{code}', me.cardNumber),
         invited: await service.mine(me.id),
       };
     }),

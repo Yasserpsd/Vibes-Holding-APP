@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { authApi, useAuthConfig, type Persona } from '@/api/auth';
+import { authApi, displayProfile, useAuthConfig, type Persona } from '@/api/auth';
 import { GATE_FIELDS } from '@/api/gateFields';
 import { errorMessage } from '@/api/client';
 import { interestsApi, useInterests } from '@/api/interests';
@@ -18,11 +18,14 @@ import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { VoiceFill } from '@/components/VoiceFill';
-import { t } from '@/i18n';
+import { t, tOptional } from '@/i18n';
 import { isEmail, nameIssue, phoneIssue } from '@/lib/validation';
 import { brand, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
 const PERSONAS: Persona[] = ['neutral', 'entrepreneur', 'investor'];
+
+/** The app's own wording for a persona (English in the English app); the server label is only a fallback. */
+const personaLabel = (item: { key: Persona; label: string }): string => tOptional(`persona.${item.key}`) ?? item.label;
 
 /**
  * M147 «أكمل ملفك» (owner: «إجباري يكمل باقي البيانات بمجرد ما يسجل دخول»): a Google/Apple-born
@@ -164,7 +167,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           <Image source={require('../../assets/images/club-logo.png')} style={styles.emblem} resizeMode="contain" />
           <View style={styles.row}>
             <Ionicons name="person-circle-outline" size={22} color={brand.navy} />
-            <Text style={styles.title}>{t('completeProfile.title', { name: me?.name ?? '' })}</Text>
+            <Text style={styles.title}>{t('completeProfile.title', { name: me ? displayProfile(me).name : '' })}</Text>
           </View>
           <Text style={styles.body}>{t('completeProfile.body')}</Text>
 
@@ -175,7 +178,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 ...(need('name') ? [{ key: 'name', label: t('completeProfile.name'), type: 'text' as const, required: true }] : []),
                 ...(need('company') || memberType === 'company' ? [{ key: 'company', label: t('auth.register.companyName'), type: 'text' as const, required: true }] : []),
                 ...(need('phone') ? [{ key: 'phone', label: t('auth.register.phone'), type: 'phone' as const, required: true }] : []),
-                ...(need('persona') && config ? [{ key: 'persona', label: t('completeProfile.persona'), type: 'select' as const, options: config.personas.map((item) => item.label), required: true }] : []),
+                ...(need('persona') && config ? [{ key: 'persona', label: t('completeProfile.persona'), type: 'select' as const, options: config.personas.map(personaLabel), required: true }] : []),
                 ...(need('interests') && interestsList.data
                   ? [{ key: 'interests', label: t('auth.register.interests'), type: 'multiselect' as const, options: interestsList.data.interests.map((item) => item.label), required: true }]
                   : []),
@@ -186,7 +189,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 name,
                 company,
                 phone,
-                persona: config?.personas.find((item) => item.key === persona)?.label ?? '',
+                persona: persona ? personaLabel({ key: persona, label: config?.personas.find((item) => item.key === persona)?.label ?? '' }) : '',
                 interests: interests.map((key) => interestsList.data?.interests.find((item) => item.key === key)?.label ?? '').filter(Boolean).join('، '),
                 bio,
                 jobTitle,
@@ -198,7 +201,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 if (values.name) setName(values.name);
                 if (values.company) setCompany(values.company);
                 if (values.phone) setPhone(values.phone);
-                const pickedPersona = config?.personas.find((item) => item.label === values.persona)?.key;
+                const pickedPersona = config?.personas.find((item) => personaLabel(item) === values.persona || item.label === values.persona)?.key;
                 if (pickedPersona) setPersona(pickedPersona);
                 if (values.interests) {
                   const keys = values.interests
@@ -287,7 +290,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 <ChipRow>
                   {PERSONAS.map((key) => {
                     const item = config.personas.find((entry) => entry.key === key);
-                    return item ? <Chip key={key} label={item.label} selected={persona === key} onPress={() => field('persona', setPersona as (value: string) => void)(key)} /> : null;
+                    return item ? <Chip key={key} label={personaLabel(item)} selected={persona === key} onPress={() => field('persona', setPersona as (value: string) => void)(key)} /> : null;
                   })}
                 </ChipRow>
               </FieldGroup>

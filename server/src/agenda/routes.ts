@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { adminGuard, dashboardGuard, guard, optionalSession, parse, RequestError, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
 import { INTEREST_KEYS } from '../interests/types.js';
 import { langOf } from '../lang.js';
 import type { MediaService } from '../media/service.js';
@@ -10,7 +11,7 @@ import type { Translator } from '../translate.js';
 import type { WorkshopNudgeService } from './nudges.js';
 import type { AgendaEvent, AgendaService } from './service.js';
 
-export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator; nudges?: WorkshopNudgeService; media?: MediaService };
+export type AgendaRoutesOptions = { service: AgendaService; auth: AuthService; autoPush?: boolean; translator?: Translator; nudges?: WorkshopNudgeService; media?: MediaService; english?: EnglishCache };
 
 const MEMBERS_ONLY = { error: { code: 'members_only', message: 'تسجيلات الورش حصرية لأعضاء العضوية السنوية' } };
 
@@ -59,7 +60,16 @@ const eventSchema = z.object({
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M41 «أجندة النادي»: the public agenda, the one-tap registration, and the dashboard's event management. */
-export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator, nudges, media }) => {
+export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app, { service, auth, autoPush = true, translator, nudges, media, english }) => {
+  // Owner (2026-11-04): the recording and slide titles («اليوم الأول») read in English in the English app.
+  const englishParts = async <T extends { recordings?: { title: string }[]; files?: { title: string }[] }>(event: T, lang: ReturnType<typeof langOf>): Promise<T> => {
+    if (!english || lang !== 'en' || (!event.recordings?.length && !event.files?.length)) return event;
+    return {
+      ...event,
+      ...(event.recordings ? { recordings: await english.rows(event.recordings, ['title'], lang) } : {}),
+      ...(event.files ? { files: await english.rows(event.files, ['title'], lang) } : {}),
+    };
+  };
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   const requireAppAdmin = adminGuard(auth);
@@ -101,7 +111,9 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     '/api/agenda',
     guard(async (request) => {
       const who = await whoIs(request);
-      return { events: await service.forViewer(who?.me ?? null, langOf(request)) };
+      const lang = langOf(request);
+      const events = await service.forViewer(who?.me ?? null, lang);
+      return { events: await Promise.all(events.map((event) => englishParts(event, lang))) };
     }),
   );
 
@@ -113,7 +125,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
       const who = await whoIs(request);
       const event = await service.viewerEvent(params.id, who?.me ?? null, langOf(request));
       if (!event) return reply.code(404).send({ error: { code: 'not_found', message: 'الفعالية غير موجودة' } });
-      return { event };
+      return { event: await englishParts(event, langOf(request)) };
     }),
   );
 
@@ -172,7 +184,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
         const url = await media?.memberFileUrl(file.url);
         if (url) files.push({ title: file.title, url });
       }
-      return { recordings, files };
+      return englishParts({ recordings, files }, langOf(request));
     }),
   );
 

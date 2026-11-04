@@ -120,6 +120,13 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "lang.english": "English",
     "lang.current": "الحالية",
     "lang.cancel": "إلغاء",
+    "account.menu.theme": "المظهر",
+    "theme.title": "مظهر التطبيق",
+    "theme.message": "اختر المظهر الذي يناسبك. يُعاد تشغيل التطبيق ليتغيّر المظهر.",
+    "theme.light": "فاتح",
+    "theme.dark": "غامق",
+    "theme.current": "الحالي",
+    "theme.cancel": "إلغاء",
     "common.clubName": "Investors Club",
     "common.underConstruction": "قيد الإنشاء",
     "common.password": "كلمة المرور",
@@ -1566,6 +1573,13 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "lang.english": "English",
     "lang.current": "current",
     "lang.cancel": "Cancel",
+    "account.menu.theme": "Appearance",
+    "theme.title": "App appearance",
+    "theme.message": "Choose the look you prefer. The app restarts to apply it.",
+    "theme.light": "Light",
+    "theme.dark": "Dark",
+    "theme.current": "current",
+    "theme.cancel": "Cancel",
     "common.clubName": "Investors Club",
     "common.underConstruction": "Coming soon",
     "common.password": "Password",
@@ -2968,6 +2982,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "markets": "شريط أسعار الذهب والفضة والنفط",
     "workshopAd": "إعلان الورشة اليومي (نافذة الافتتاح)",
     "affiliate": "برنامج ممثلي نادي المستثمرين",
-    "update": "رسائل التحديث (إجباري / إعادة تشغيل)"
+    "update": "رسائل التحديث (إجباري / إعادة تشغيل)",
+    "theme": "مظهر التطبيق (فاتح وداكن)"
   }
 };

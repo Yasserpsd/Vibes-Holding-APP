@@ -99,7 +99,8 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       const current = await requireSession(request, reply);
       if (!current) return;
       const [config, mine] = await Promise.all([service.config(), service.mine(current.session.contactId)]);
-      return { intro: config.intro, profile: mine ? myProfile(mine) : null };
+      // Owner (2026-11-04): the same English intro the people list shows.
+      return { intro: english ? await english.intro(config.intro, langOf(request)) : config.intro, profile: mine ? myProfile(mine) : null };
     }),
   );
 
