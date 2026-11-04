@@ -222,6 +222,8 @@ test('unverified login returns a pending token; reset password works', async () 
   const unknown = await post('/api/auth/reset/request', { login: 'nobody-here@icloud.com' });
   assert.equal(unknown.statusCode, 404, unknown.body);
   assert.match(unknown.json().error.message, /لا يوجد حساب/);
+  // The app translates no_account in both languages (M128); not_found would read as «العنصر غير موجود».
+  assert.equal(unknown.json().error.code, 'no_account');
   const confirmed = await post('/api/auth/reset/confirm', { login: 'noura@icloud.com', code: MOCK_CODE, password: 'newpass1' });
   assert.equal(confirmed.statusCode, 200, confirmed.body);
 });

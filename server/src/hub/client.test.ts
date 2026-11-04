@@ -47,6 +47,17 @@ test('a hub older than 2.7.0 answers hub_not_supported; a missing record inside 
   await rejects(hub.call('admin_member', { uuid: 'app-12345678', contact_id: 9 }), 'not_found', 404);
 });
 
+test('M197: a reset for an unknown login keeps the hub own not_found (hub 2.26.3), never hub_not_supported', async () => {
+  const hub = new LiveHubClient({ url: 'https://hub.example.com', siteKey: SITE_KEY, log });
+  answerWith(404, { code: 'not_found', message: 'لا يوجد حساب بهذا البريد أو الجوال', data: { status: 404 } });
+  await rejects(hub.call('reset_request', { login: 'nobody@example.com', ip: '1.1.1.1' }), 'not_found', 404);
+  await rejects(hub.call('reset_confirm', { login: 'nobody@example.com', code: '1234', password: 'x', ip: '1.1.1.1' }), 'not_found', 404);
+  mock.restoreAll();
+  // A plugin without the op at all still reads as unsupported.
+  answerWith(404, { code: 'not_found', message: 'عملية غير معروفة', data: { status: 404 } });
+  await rejects(hub.call('reset_request', { login: 'nobody@example.com', ip: '1.1.1.1' }), 'hub_not_supported', 501);
+});
+
 test('an untrusted site is a setup problem (502), never a 403 that would sign the admin out; not_admin stays a 403', async () => {
   const hub = new LiveHubClient({ url: 'https://hub.example.com', siteKey: SITE_KEY, log });
   answerWith(403, { code: 'forbidden', message: 'غير مصرح', data: { status: 403 } });

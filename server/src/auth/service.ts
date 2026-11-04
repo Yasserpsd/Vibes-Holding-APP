@@ -133,6 +133,12 @@ export function mailAddressOf(contact: { email: string; contact_email?: string }
   return real || String(contact.email ?? '').trim();
 }
 
+/** M197: the hub's «no account» answer on a reset becomes `no_account`, the code the app already translates (M128). */
+function rethrowNoAccount(error: unknown): never {
+  if (error instanceof HubError && error.code === 'not_found') throw new HubError('no_account', error.message, 404);
+  throw error;
+}
+
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
   // M156 (owner): a kunya or a made-up name meets the gate too — the member writes a real first + family name.
@@ -751,14 +757,14 @@ export class AuthService {
 
   /** M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither. */
   async requestReset(login: string, ip: string, country?: string): Promise<{ sentTo: string; provider: string }> {
-    const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip });
+    const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip }).catch(rethrowNoAccount);
     const sentTo = typeof result.sent_to === 'string' ? result.sent_to : '';
     const provider = result.provider === 'apple' || result.provider === 'google' ? result.provider : '';
     return { sentTo, provider };
   }
 
   async confirmReset(login: string, code: string, password: string, ip: string, country?: string): Promise<void> {
-    await this.deps.hub.call('reset_confirm', { login: normLogin(login, country), code, password, ip });
+    await this.deps.hub.call('reset_confirm', { login: normLogin(login, country), code, password, ip }).catch(rethrowNoAccount);
   }
 
   /** M117: true when the password matches this account — a hub login check, no session is created. */

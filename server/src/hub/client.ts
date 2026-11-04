@@ -8,6 +8,8 @@ type LiveHubOptions = { url: string; siteKey: string; log: FastifyBaseLogger; ti
 const UNKNOWN_OP_TEXT = 'عملية غير معروفة';
 /** Ops of bridge v2 that only the hub's trusted site may call (docs/BRIDGE_V2.md 1.1; social_login since 2.8.0). */
 const PRIVILEGED_OP = /^(admin_|activate_member$|social_login$|changes$|publish$|payment_get$)/;
+/** M197 (hub 2.26.3): these ops answer a real 404 `not_found` of their own («لا يوجد حساب…») — never an unknown-op 404. */
+const OWN_404_OP = /^(reset_request|reset_confirm)$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -62,7 +64,7 @@ export class LiveHubClient implements HubClient {
         throw new HubError('hub_config', 'إعداد الربط بالنادي غير صحيح، أبلغ الإدارة', 502);
       }
       // An op the installed plugin does not know (bridge v2 needs 2.7.0). A missing record inside a known op keeps its own 404.
-      if (json.code === 'not_found' && status === 404 && (!json.message || json.message === UNKNOWN_OP_TEXT || !PRIVILEGED_OP.test(op))) {
+      if (json.code === 'not_found' && status === 404 && (!json.message || json.message === UNKNOWN_OP_TEXT || (!PRIVILEGED_OP.test(op) && !OWN_404_OP.test(op)))) {
         throw new HubError('hub_not_supported', 'هذه الخدمة غير متاحة حاليًا', 501);
       }
       // Privileged ops answer 403 `forbidden` until the app server's row is marked trusted on the hub's «المواقع» page.
