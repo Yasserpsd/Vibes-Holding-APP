@@ -179,7 +179,9 @@ export function Affiliates() {
                     label: 'مقدّم الطلب',
                     cell: (row) => (
                       <>
-                        <MemberLink id={row.contactId} name={row.name || row.email} /> <bdi dir="ltr" className="num">{row.code}</bdi>
+                        <MemberLink id={row.contactId} name={row.name || row.email} />{' '}
+                        {/* M198: the short alias he shares, then the membership number the hub counts. */}
+                        {row.shortCode ? <strong><bdi dir="ltr" className="num">{row.shortCode}</bdi></strong> : null} <bdi dir="ltr" className="num">{row.code}</bdi>
                       </>
                     ),
                   },

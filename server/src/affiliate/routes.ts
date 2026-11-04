@@ -147,7 +147,9 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
         application: record ? ownApplication(record) : null,
       };
       if (record?.status !== 'approved') return base;
-      const link = service.referralLink(record.code);
+      // M198: the member shares his short alias; the membership number stays the hub's referral key.
+      const code = AffiliateService.codeOf(record);
+      const link = service.referralLink(code);
       const [referrals, balance, payouts, cycle] = await Promise.all([
         service.referrals(me.id),
         service.balance(me.id),
@@ -156,9 +158,10 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       ]);
       return {
         ...base,
-        code: record.code,
+        code,
+        membershipCode: record.code,
         link,
-        shareText: config.shareText.replaceAll('{link}', link || record.code).replaceAll('{code}', record.code),
+        shareText: config.shareText.replaceAll('{link}', link || code).replaceAll('{code}', code),
         referrals,
         balance,
         cycle,
@@ -300,7 +303,7 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
     const code = String((request.params as { code?: string }).code ?? '').trim();
     const record = code ? await service.findByCode(code) : null;
     if (!record || record.status !== 'approved') return reply.redirect('/app', 302);
-    return reply.header('content-type', 'text/html; charset=utf-8').send(referralPage(record.code));
+    return reply.header('content-type', 'text/html; charset=utf-8').send(referralPage(AffiliateService.codeOf(record)));
   });
 };
 

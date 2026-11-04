@@ -35,6 +35,8 @@ let app: BuiltApp['app'];
 let memberToken = '';
 let memberId = 0;
 let memberCode = '';
+// M198: the member shares his SHORT alias («MMT-11»); the membership number stays the hub's referral key.
+let shortCode = '';
 let adminToken = '';
 
 const bearer = (token?: string) => (token ? { authorization: `Bearer ${token}` } : {});
@@ -188,13 +190,16 @@ test('the dashboard approval activates the affiliate and hands him his link', as
   const mail = mailer.sent.at(-1);
   assert.equal(mailer.sent.length, before + 1);
   assert.deepEqual(mail?.to, ['m184+member@gmail.com']);
-  assert.match(mail?.text ?? '', new RegExp(memberCode));
+  shortCode = approved.json().affiliate.shortCode as string;
+  assert.match(shortCode, /^MMT-\d+$/);
+  assert.match(mail?.text ?? '', new RegExp(shortCode));
 
   const mine = await get('/api/affiliate', memberToken);
   assert.equal(mine.json().status, 'approved');
-  assert.equal(mine.json().code, memberCode);
-  assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${encodeURIComponent(memberCode)}`);
-  assert.ok((mine.json().shareText as string).includes(memberCode));
+  assert.equal(mine.json().code, shortCode);
+  assert.equal(mine.json().membershipCode, memberCode);
+  assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${shortCode}`);
+  assert.ok((mine.json().shareText as string).includes(shortCode));
   assert.equal(mine.json().balance.available, 0);
   // The mock hub hands this member an active membership: the member tier applies (M186).
   assert.equal(mine.json().balance.commission, 350);
@@ -215,7 +220,8 @@ test('the referral link page shows the code; an unknown code falls back to /app'
   assert.equal(page.statusCode, 200, page.body);
   assert.match(page.headers['content-type'] as string, /text\/html/);
   assert.equal(page.headers['cache-control'], 'no-store');
-  assert.ok(page.body.includes(memberCode));
+  // M198: the page shows the short alias even when the link carried the membership number.
+  assert.ok(page.body.includes(shortCode));
   assert.ok(page.body.includes('كود الدعوة'));
 
   const unknown = await get('/r/I-0009999999');
@@ -262,7 +268,7 @@ test('the owner edits the program content from the dashboard', async () => {
   assert.equal(mine.json().balance.commissionBase, 300);
   assert.match(mine.json().introText as string, /300 ريال سعودي/);
   assert.equal(mine.json().heardOptions.length, 3);
-  assert.equal(mine.json().shareText, `سجّل من رابطي https://api-test.vibesholdingsa.com/r/${encodeURIComponent(memberCode)} بالرمز ${memberCode}.`);
+  assert.equal(mine.json().shareText, `سجّل من رابطي https://api-test.vibesholdingsa.com/r/${shortCode} بالرمز ${shortCode}.`);
 
   // Back to the default commission for the tests after this one.
   await send('POST', '/api/admin/affiliates/config', { commission: 250 }, adminToken);

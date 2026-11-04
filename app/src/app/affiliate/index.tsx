@@ -111,7 +111,12 @@ export default function AffiliateScreen() {
             <View style={styles.linkBox}>
               <Text style={styles.linkLabel}>{t('affiliate.linkLabel')}</Text>
               {data.link ? <Text style={styles.link}>{`${LRM}${data.link}`}</Text> : null}
-              <Text style={styles.codeLine}>{`${t('affiliate.codeLabel')}: ${LRM}${data.code ?? ''}`}</Text>
+              {/* M198 (owner): the short alias is the hero; the long membership number stays a footnote. */}
+              <Text style={styles.codeLine}>{t('affiliate.codeLabel')}</Text>
+              <Text style={styles.shortCode}>{`${LRM}${data.code ?? ''}`}</Text>
+              {data.membershipCode && data.membershipCode !== data.code ? (
+                <Text style={styles.codeLine}>{`${t('affiliate.membershipCodeLabel')}: ${LRM}${data.membershipCode}`}</Text>
+              ) : null}
             </View>
           </FadeInView>
 
@@ -305,6 +310,7 @@ const styles = StyleSheet.create({
   linkLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   link: { ...typography.body, color: colors.gold, textAlign: 'center' },
   codeLine: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  shortCode: { ...typography.title, color: colors.textPrimary, textAlign: 'center', letterSpacing: 2 },
   sectionTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart, marginTop: spacing.md },
   sectionHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   listHead: { gap: 2 },

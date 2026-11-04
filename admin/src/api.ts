@@ -189,6 +189,8 @@ export type AffiliateRow = {
   email: string;
   phone: string;
   code: string;
+  /** M198: the short alias the member shares («FAR-27»); older records get it on the next load. */
+  shortCode?: string;
   status: AffiliateStatus;
   entityType: 'individual' | 'company';
   bankName: string;

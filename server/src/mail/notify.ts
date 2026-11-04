@@ -329,7 +329,9 @@ export class Notifier {
   }
 
   /** M184: the dashboard decided — the applicant hears it in a royal mail. M195: in his language. */
-  affiliateDecided(record: { name: string; email: string; code: string; status: string; adminNote: string | null; lang?: 'ar' | 'en' }, link: string): void {
+  affiliateDecided(record: { name: string; email: string; code: string; shortCode?: string; status: string; adminNote: string | null; lang?: 'ar' | 'en' }, link: string): void {
+    // M198: the member is told the short alias he shares; the membership number stays his card's.
+    const code = record.shortCode ?? record.code;
     const approved = record.status === 'approved';
     if (record.lang === 'en') {
       this.sendRoyal(
@@ -347,7 +349,7 @@ export class Notifier {
             : ['Thank you for your interest in the Investors Club Affiliates Program. After review, the management has not approved the application at this time; you may apply again later.'],
           rows: approved
             ? [
-                { label: 'Referral code', value: record.code },
+                { label: 'Referral code', value: code },
                 ...(link ? [{ label: 'Referral link', value: link }] : []),
               ]
             : record.adminNote
@@ -373,7 +375,7 @@ export class Notifier {
           : ['نشكر لك اهتمامك بالانضمام إلى برنامج ممثلي نادي المستثمرين. بعد المراجعة لم تعتمد الإدارة الطلب في الوقت الحالي، ويمكنك التقديم مجددًا لاحقًا.'],
         rows: approved
           ? [
-              { label: 'رمز الإحالة', value: record.code },
+              { label: 'رمز الإحالة', value: code },
               ...(link ? [{ label: 'رابط الإحالة', value: link }] : []),
             ]
           : record.adminNote

@@ -39,7 +39,6 @@ export default function ProfileEditScreen() {
     website: me?.website ?? '',
     bio: me?.bio ?? '',
     social: me?.social ?? '',
-    password: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,10 +49,6 @@ export default function ProfileEditScreen() {
     if (busy) return;
     if (form.name.trim().length < 2) {
       setError(t('profile.nameRequired'));
-      return;
-    }
-    if (form.password && form.password.length < 6) {
-      setError(t('profile.passwordShort'));
       return;
     }
     if (phoneChanged && phoneIssue(phone, country) !== null) {
@@ -73,7 +68,6 @@ export default function ProfileEditScreen() {
       bio: form.bio.trim(),
       social: form.social.trim(),
     };
-    if (form.password) patch.password = form.password;
     if (phoneChanged) {
       patch.phone = phone.trim();
       patch.country = countryCode;
@@ -169,16 +163,14 @@ export default function ProfileEditScreen() {
       <FadeInView delay={entranceDelay(6)}>
         <FormField label={t('profile.social')} latin autoCapitalize="none" multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
       </FadeInView>
-      <FadeInView delay={entranceDelay(7)}>
-        <FormField label={t('profile.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={form.password} onChangeText={set('password')} hint={t('profile.newPasswordHint')} />
-      </FadeInView>
+      {/* M198 (owner): the password changed from here once — it now lives in حسابي ← إعدادات الأمان only. */}
       {error ? (
         <FadeInView offset={6}>
           <Text style={styles.error}>{error}</Text>
           <SupportLink problem={error} />
         </FadeInView>
       ) : null}
-      <FadeInView delay={entranceDelay(8)}>
+      <FadeInView delay={entranceDelay(7)}>
         <AppButton label={busy ? t('profile.saving') : t('profile.save')} icon="save-outline" loading={busy} onPress={() => void save()} />
       </FadeInView>
     </Screen>

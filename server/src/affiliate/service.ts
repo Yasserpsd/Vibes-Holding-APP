@@ -10,6 +10,7 @@ import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 
 import { cityByKey, cityKeyOf, CITY_NAME, OTHER_CITY } from './cities.js';
+import { newShortCode, normalizeShortCode } from './shortCode.js';
 
 /**
  * M184: «برنامج ممثلي نادي المستثمرين» — the in-app affiliate program. Any signed-in account applies with
@@ -57,6 +58,12 @@ export type AffiliateRecord = {
   phone: string;
   /** The membership number — the referral code the hub verifies at registration (M32 channel). */
   code: string;
+  /**
+   * M198: the short alias the member shares instead («FAR-27»: three Latin letters of his name + a
+   * number). The server maps it back to `code` before the hub ever sees it. Older records get theirs
+   * on the next load.
+   */
+  shortCode?: string;
   status: AffiliateStatus;
   /** The application form (owner, 2026-11-02: bank, IBAN, address, the source, and فرد/شركة are mandatory). */
   entityType: 'individual' | 'company';
@@ -368,10 +375,37 @@ type Deps = {
 export class AffiliateService {
   private chain: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly deps: Deps) {}
+  private backfillQueued = false;
 
+  constructor(private readonly deps: Deps) {
+    // M198: a short code typed as «كود الدعوة» becomes the membership number before the hub call.
+    deps.invites.setAliasResolver(async (raw) => (await this.findByShortCode(raw))?.code ?? null);
+  }
+
+  /**
+   * The records, every one with a short code: those saved before M198 get theirs here, in the order
+   * they applied (deterministic, so the alias is the same on every load), and the next write keeps it.
+   */
   private async loadRecords(): Promise<AffiliateRecord[]> {
-    return (await this.deps.kv.get<{ affiliates: AffiliateRecord[] }>(AFFILIATES_KEY))?.affiliates ?? [];
+    const affiliates = (await this.deps.kv.get<{ affiliates: AffiliateRecord[] }>(AFFILIATES_KEY))?.affiliates ?? [];
+    const missing = affiliates.filter((record) => !record.shortCode);
+    if (missing.length) {
+      const taken = new Set(affiliates.map((record) => record.shortCode ?? '').filter(Boolean));
+      for (const record of [...missing].sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))) {
+        record.shortCode = newShortCode(record.name, record.contactId, taken);
+        taken.add(record.shortCode);
+      }
+      if (!this.backfillQueued) {
+        this.backfillQueued = true;
+        void this.mutate(() => undefined).catch((error) => this.deps.log.warn({ err: error }, 'affiliate: short-code backfill failed'));
+      }
+    }
+    return affiliates;
+  }
+
+  /** The code the member shares and sees: the short alias, or the membership number before M198. */
+  static codeOf(record: Pick<AffiliateRecord, 'code' | 'shortCode'>): string {
+    return record.shortCode ?? record.code;
   }
 
   private async loadPayouts(): Promise<PayoutRecord[]> {
@@ -672,9 +706,18 @@ export class AffiliateService {
     return (await this.loadRecords()).find((record) => record.contactId === contactId) ?? null;
   }
 
+  /** By the membership number OR the short alias (M198) — both forms of the link keep working. */
   async findByCode(code: string): Promise<AffiliateRecord | null> {
     const wanted = code.trim().toUpperCase();
-    return (await this.loadRecords()).find((record) => record.code.toUpperCase() === wanted) ?? null;
+    const short = normalizeShortCode(code);
+    return (await this.loadRecords()).find((record) => record.code.toUpperCase() === wanted || (short !== null && record.shortCode === short)) ?? null;
+  }
+
+  /** By the short alias only («far 27» tolerated); null when the text is not a short code or nobody holds it. */
+  async findByShortCode(raw: string): Promise<AffiliateRecord | null> {
+    const short = normalizeShortCode(raw);
+    if (!short) return null;
+    return (await this.loadRecords()).find((record) => record.shortCode === short) ?? null;
   }
 
   /**
@@ -710,6 +753,8 @@ export class AffiliateService {
         email: member.email,
         phone: member.phone,
         code: member.code,
+        // M198: a re-application keeps the alias the member may already have shared.
+        shortCode: existing?.shortCode ?? newShortCode(member.name, member.contactId, affiliates.map((entry) => entry.shortCode ?? '')),
         status: 'agreement',
         entityType: form.entityType,
         bankName: form.bankName,
@@ -778,7 +823,7 @@ export class AffiliateService {
       }
       return { ...existing };
     });
-    if (record) this.deps.notifier.affiliateDecided(record, this.referralLink(record.code));
+    if (record) this.deps.notifier.affiliateDecided(record, this.referralLink(AffiliateService.codeOf(record)));
     return record;
   }
 

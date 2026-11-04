@@ -92,8 +92,14 @@ type Deps = { kv: KV; hub: HubClient; notifier: Notifier; log: FastifyBaseLogger
 export class InvitesService {
   private chain: Promise<unknown> = Promise.resolve();
   private hubSupport: { ok: boolean; at: number } | null = null;
+  private aliasResolver: ((raw: string) => Promise<string | null>) | null = null;
 
   constructor(private readonly deps: Deps) {}
+
+  /** M198: the affiliate service maps a short alias («FAR-27») to the membership number it stands for. */
+  setAliasResolver(resolver: (raw: string) => Promise<string | null>): void {
+    this.aliasResolver = resolver;
+  }
 
   private async load(): Promise<InviteRecord[]> {
     return (await this.deps.kv.get<{ invites: InviteRecord[] }>(INVITES_KEY))?.invites ?? [];
@@ -135,7 +141,9 @@ export class InvitesService {
    * lost, so the invitee is told to clear it instead.
    */
   async prepare(raw: string): Promise<string> {
-    const code = normalizeInviteCode(raw);
+    // M198: an affiliate's short alias stands for his membership number — resolved here, so the hub
+    // keeps receiving membership numbers only (rule 2: identity stays at the hub).
+    const code = normalizeInviteCode(raw) ?? (this.aliasResolver ? await this.aliasResolver(raw) : null);
     if (!code) {
       throw new RequestError('invite_code', 'كود الدعوة غير صحيح — راجعه مع من دعاك، أو امسحه وأكمل التسجيل', 400);
     }
