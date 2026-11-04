@@ -13,10 +13,16 @@ import type { KV } from './store.js';
  * binary gets 426 `update_required` on every `/api/*` call (the bundle shows the forced-update cover, and
  * older bundles show the Arabic message as their error text), and `GET /api/app/status` tells a fresh
  * launch at once. The floor comes from the dashboard (kv `app:minVersion`) or the MIN_APP_VERSION variable;
- * empty = nobody is blocked. `APP_REQUIRE_VERSION=1` also blocks app requests that carry no version header
+ * falls back to STORE_APP_VERSION (the binary in the stores). `APP_REQUIRE_VERSION` (default 1) also blocks app requests that carry no version header
  * (bundles older than M195 — only the ones that already send `x-app-platform`, so the dashboard is never hit).
  */
 export const MIN_VERSION_KEY = 'app:minVersion';
+/**
+ * The binary in the stores today (owner, 2026-11-04: «أي حد معاه نسخة أقدم من اللي في المتجر متفتحتش أصلًا»):
+ * the floor when neither the dashboard nor MIN_APP_VERSION says otherwise. BUMP IT with every store release
+ * (app/app.config.ts `version`) — a value above the store's would lock everybody out.
+ */
+export const STORE_APP_VERSION = '1.3.0';
 const VERSION = /^\d+(\.\d+){0,3}$/;
 
 export function compareVersions(a: string, b: string): number {
@@ -71,7 +77,7 @@ function minVersionReader(kv: KV, envMinVersion: string): FloorReader {
     async read() {
       if (cached && Date.now() - cached.at < 30_000) return cached.value;
       const stored = (await kv.get<{ minVersion: string }>(MIN_VERSION_KEY))?.minVersion?.trim() ?? '';
-      const value = VERSION.test(stored) ? stored : VERSION.test(envMinVersion) ? envMinVersion : '';
+      const value = VERSION.test(stored) ? stored : VERSION.test(envMinVersion) ? envMinVersion : STORE_APP_VERSION;
       cached = { value, at: Date.now() };
       return value;
     },

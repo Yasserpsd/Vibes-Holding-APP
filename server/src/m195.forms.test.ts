@@ -226,9 +226,9 @@ test('the forced-update floor: an older binary gets 426 on app calls, the status
 
   const current = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android', 'x-app-version': '1.3.0' });
   assert.equal(current.statusCode, 200, current.body);
-  // No version header (a bundle older than M195) passes while APP_REQUIRE_VERSION is off; the dashboard (no platform header) always passes.
+  // No version header (a bundle older than M195) is blocked by default (owner: nothing older than the store opens); the dashboard (no platform header) always passes.
   const unversioned = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android' });
-  assert.equal(unversioned.statusCode, 200, unversioned.body);
+  assert.equal(unversioned.statusCode, 426, unversioned.body);
   const dashboard = await get('/api/affiliate', memberToken, { 'x-app-version': '0.1.0' });
   assert.equal(dashboard.statusCode, 200, dashboard.body);
 

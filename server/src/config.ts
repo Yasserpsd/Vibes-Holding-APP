@@ -27,10 +27,10 @@ const envSchema = z.object({
   AUTH_ADMIN_ONLY: z.enum(['0', '1']).default('0'),
   // M87: the advisor's daily persona push; '0' kills it cold.
   COMPANION_PUSH: z.enum(['0', '1']).default('1'),
-  // M195: the lowest app binary allowed (e.g. 1.3.0); older ones get 426 update_required on every call. Empty = nobody blocked.
+  // M195: the lowest app binary allowed; older ones get 426 update_required on every call. Empty = the store version (STORE_APP_VERSION in appVersion.ts).
   MIN_APP_VERSION: z.string().trim().default(''),
-  // M195: '1' also blocks app requests that carry no x-app-version header (bundles older than M195).
-  APP_REQUIRE_VERSION: z.enum(['0', '1']).default('0'),
+  // M195: '1' (default, owner: nothing older than the store opens) also blocks app requests with no x-app-version header (bundles older than M195); '0' lets them through.
+  APP_REQUIRE_VERSION: z.enum(['0', '1']).default('1'),
   // M179: the advisor's market-move alerts (push when a quote moves sharply); '0' kills it cold. Thresholds live in the dashboard.
   MARKET_ALERTS: z.enum(['0', '1']).default('1'),
   /** M182b: the breaking-news push (money story with a hard-hitting headline); '0' kills it. */
