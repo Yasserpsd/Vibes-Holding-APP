@@ -5,6 +5,8 @@ import type { FastifyBaseLogger } from 'fastify';
 import { RequestError } from '../auth/guard.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Notifier } from '../mail/notify.js';
+import type { AppLang } from '../lang.js';
+import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 
 /**
@@ -26,6 +28,9 @@ import type { KV } from '../store.js';
 export const AFFILIATES_KEY = 'affiliate:records';
 export const PAYOUTS_KEY = 'affiliate:payouts';
 export const AFFILIATE_CONFIG_KEY = 'affiliate:config';
+export const REMINDER_KEY = 'affiliate:reminder';
+/** M194: the daily reminder goes out in this Riyadh hour (19:00–19:59). */
+export const REMINDER_HOUR = 19;
 const MAX_PAYOUTS = 3000;
 const DAY_MS = 86_400_000;
 
@@ -121,6 +126,12 @@ export type AffiliateConfig = {
   shareText: string;
   /** «كيف تعرّفت على نادي المستثمرين؟» options (owner: formal Arabic, many choices). */
   heardOptions: string[];
+  /** M194: the advisor's daily push to approved affiliates with no paying member yet (dashboard switch + texts). */
+  reminderEnabled: boolean;
+  reminderTitle: string;
+  reminderBody: string;
+  reminderTitleEn: string;
+  reminderBodyEn: string;
 };
 
 export const DEFAULT_HEARD_OPTIONS = [
@@ -255,6 +266,12 @@ export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
     'وعند التسجيل أدخل رمز الإحالة {code} في خانة «كود الدعوة».',
   ].join('\n'),
   heardOptions: DEFAULT_HEARD_OPTIONS,
+  // M194 (owner, 2026-11-04: «يفكره يوميا انه لسه ما سجل يا صديقي»).
+  reminderEnabled: true,
+  reminderTitle: 'تذكير من مستشارك',
+  reminderBody: 'ما سجّلت أي عضو دافع حتى الآن يا صديقي. شارك رابطك الخاص اليوم، وعمولتك {commission} عن كل عضو يسدّد عضويته.',
+  reminderTitleEn: 'A reminder from your advisor',
+  reminderBodyEn: 'No paying member has joined through you yet, my friend. Share your personal link today and earn {commission} for every member who pays.',
 };
 
 /**
@@ -300,7 +317,19 @@ export type AffiliateBalance = {
   available: number;
 };
 
-type Deps = { kv: KV; invites: InvitesService; notifier: Notifier; log: FastifyBaseLogger; publicUrl: string };
+/** M194: the slice of PushService the daily reminder needs (absent = no reminder, e.g. AUTO_PUSH=0). */
+export type AffiliatePush = { sendTo(contactId: number, messageOf: (lang: AppLang) => { title: string; body: string; data?: Record<string, string> }): Promise<{ sent: number }> };
+
+type Deps = {
+  kv: KV;
+  invites: InvitesService;
+  notifier: Notifier;
+  log: FastifyBaseLogger;
+  publicUrl: string;
+  push?: AffiliatePush;
+  /** Accounts that muted the advisor's daily push (M87b) hear no reminder either. */
+  muted?: () => Promise<Set<number>>;
+};
 
 export class AffiliateService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -349,6 +378,11 @@ export class AffiliateService {
       introTextEn: texts?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: stored?.shareText?.trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: options.length ? options : DEFAULT_AFFILIATE_CONFIG.heardOptions,
+      reminderEnabled: typeof stored?.reminderEnabled === 'boolean' ? stored.reminderEnabled : DEFAULT_AFFILIATE_CONFIG.reminderEnabled,
+      reminderTitle: stored?.reminderTitle?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitle,
+      reminderBody: stored?.reminderBody?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderBody,
+      reminderTitleEn: stored?.reminderTitleEn?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitleEn,
+      reminderBodyEn: stored?.reminderBodyEn?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderBodyEn,
     };
   }
 
@@ -367,6 +401,11 @@ export class AffiliateService {
       introTextEn: (input.introTextEn ?? current.introTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: (input.shareText ?? current.shareText).trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: (input.heardOptions ?? current.heardOptions).map((option) => option.trim()).filter(Boolean),
+      reminderEnabled: input.reminderEnabled ?? current.reminderEnabled,
+      reminderTitle: (input.reminderTitle ?? current.reminderTitle).trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitle,
+      reminderBody: (input.reminderBody ?? current.reminderBody).trim() || DEFAULT_AFFILIATE_CONFIG.reminderBody,
+      reminderTitleEn: (input.reminderTitleEn ?? current.reminderTitleEn).trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitleEn,
+      reminderBodyEn: (input.reminderBodyEn ?? current.reminderBodyEn).trim() || DEFAULT_AFFILIATE_CONFIG.reminderBodyEn,
     };
     if (!next.heardOptions.length) next.heardOptions = DEFAULT_AFFILIATE_CONFIG.heardOptions;
     await this.deps.kv.set(AFFILIATE_CONFIG_KEY, { ...next, textsVersion: TEXTS_VERSION });
@@ -486,6 +525,40 @@ export class AffiliateService {
         this.deps.log.error({ err: error, contactId: record.contactId }, 'affiliate sweep failed');
       }
     }
+  }
+
+  /**
+   * M194 (owner, 2026-11-04): once a day at 19:00 Riyadh the advisor reminds every APPROVED affiliate
+   * who has no paying member yet («لسه ما سجّلت يا صديقي»), in the language his app runs in; tapping
+   * opens the affiliate panel. Dashboard switch + texts; muted advisor pushes stay muted. Safe to call
+   * any time — it acts once per Riyadh day, inside the hour.
+   */
+  async remind(now = Date.now()): Promise<number> {
+    const push = this.deps.push;
+    if (!push || riyadhHour(now) !== REMINDER_HOUR) return 0;
+    const today = riyadhDay(now);
+    if ((await this.deps.kv.get<{ day: string }>(REMINDER_KEY))?.day === today) return 0;
+    await this.deps.kv.set(REMINDER_KEY, { day: today });
+    const config = await this.config();
+    if (!config.reminderEnabled) return 0;
+    const [records, muted] = await Promise.all([this.loadRecords(), this.deps.muted ? this.deps.muted() : Promise.resolve(new Set<number>())]);
+    let reminded = 0;
+    for (const record of records) {
+      if (record.status !== 'approved' || muted.has(record.contactId)) continue;
+      try {
+        if ((await this.paidInvites(record.contactId)).length > 0) continue;
+        const outcome = await push.sendTo(record.contactId, (lang) => ({
+          title: lang === 'en' ? config.reminderTitleEn : config.reminderTitle,
+          body: AffiliateService.fillTerms(lang === 'en' ? config.reminderBodyEn : config.reminderBody, config, lang),
+          data: { screen: '/affiliate', type: 'affiliate-reminder' },
+        }));
+        if (outcome.sent > 0) reminded += 1;
+      } catch (error) {
+        this.deps.log.error({ err: error, contactId: record.contactId }, 'affiliate reminder failed');
+      }
+    }
+    this.deps.log.info({ reminded, day: today }, 'affiliate daily reminder');
+    return reminded;
   }
 
   /** The dashboard renews (or restarts early) the counter with a new duration, target and allowance. */

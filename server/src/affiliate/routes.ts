@@ -65,6 +65,11 @@ const configSchema = z
     introTextEn: z.string().trim().min(20, 'Write the program pitch in English').max(2000),
     shareText: z.string().trim().min(10, 'اكتب نص المشاركة').max(1000),
     heardOptions: z.array(z.string().trim().min(1).max(60)).min(2).max(30),
+    reminderEnabled: z.boolean(),
+    reminderTitle: z.string().trim().min(3, 'اكتب عنوان التذكير').max(80),
+    reminderBody: z.string().trim().min(10, 'اكتب نص التذكير').max(400),
+    reminderTitleEn: z.string().trim().min(3, 'Write the reminder title').max(80),
+    reminderBodyEn: z.string().trim().min(10, 'Write the reminder text').max(400),
   })
   .partial();
 

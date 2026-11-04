@@ -316,9 +316,18 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   // «برنامج ممثلي نادي المستثمرين» (M184): applications, agreement mail, dashboard approval, referrals and payouts.
-  const affiliate = new AffiliateService({ kv, invites, notifier, log: app.log, publicUrl: config.PUBLIC_URL });
+  // M194: the daily «لسه ما سجّلت يا صديقي» push rides the automatic-push switch; advisor-muted accounts stay quiet.
+  const affiliate = new AffiliateService({
+    kv,
+    invites,
+    notifier,
+    log: app.log,
+    publicUrl: config.PUBLIC_URL,
+    push: autoPush ? push : undefined,
+    muted: () => companion.mutedIds(),
+  });
   // M186: counters that run out file their renewal request on time, even when the affiliate never opens the app.
-  const affiliateTimer = setInterval(() => void affiliate.sweep().catch((error: unknown) => app.log.error({ err: error }, 'affiliate sweep failed')), 10 * 60_000);
+  const affiliateTimer = setInterval(() => void affiliate.sweep().then(() => affiliate.remind()).catch((error: unknown) => app.log.error({ err: error }, 'affiliate sweep failed')), 10 * 60_000);
   affiliateTimer.unref();
   app.addHook('onClose', async () => clearInterval(affiliateTimer));
   // M140: authenticator-app second factor — optional for members, mandatory for dashboard accounts with ADMIN_TOTP=1.
@@ -381,7 +390,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     sweepEnabled: config.UPLOADS_SWEEP === '1' && Boolean(config.DATABASE_URL),
     log: app.log,
   });
-  // M193: the forms' attachments (the Success Partners pitch deck) share the media store, under forms/.
+  // M194: the forms' attachments (the Success Partners pitch deck) share the media store, under forms/.
   const formFiles = new FormFiles({ store: mediaStore, origin: [...new Set(mediaOrigins)][0]!, enabled: mediaStore.durable || config.APP_ENV !== 'production' });
   forms.attachFiles(formFiles);
   // Payments: Moyasar invoices (live since the 2026-10-20 contract) or Paymob intentions for
@@ -578,7 +587,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M138 «متابعة طلباتي»: one timeline over every store, and the ledger of service requests + golden interests.
   const requests = new RequestsService({ kv, log: app.log, notices, sources: { card, hq, forms, workshops, agenda, persona: personaRequests, profiles, payments, deletion } });
   // M183: the advisor's live member awareness — his timeline, his bank balance and the unlocked deck.
-  advisor.wire({ auth, requests, access, fetchImpl });
+  advisor.wire({ auth, requests, access, affiliate, fetchImpl });
   await app.register(requestsRoutes, { service: requests, auth });
   await app.register(projectsRoutes, { service: projects, auth, access, brief, interests, ratings, publicUrl: config.PUBLIC_URL, fetchImpl, daily: dailyProject });
   await app.register(ratingsRoutes, { service: ratings, auth, projects });

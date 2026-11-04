@@ -252,6 +252,12 @@ export type AffiliateConfig = {
   introTextEn: string;
   shareText: string;
   heardOptions: string[];
+  /** M194: the daily reminder push to affiliates with no paying member yet. */
+  reminderEnabled: boolean;
+  reminderTitle: string;
+  reminderBody: string;
+  reminderTitleEn: string;
+  reminderBodyEn: string;
 };
 
 /** M36: «راسل الإدارة» — one thread per member; mirrors server/src/contact/service.ts. */

@@ -1353,7 +1353,7 @@
   "affiliate.agreementTitle": "اتفاقية البرنامج",
   "affiliate.accept": "أوافق على الاتفاقية",
   "affiliate.editApplication": "تعديل بيانات الطلب",
-  "affiliate.pending": "طلبك قيد مراجعة إدارة النادي، ويصلك بريد إلكتروني بالقرار.",
+  "affiliate.pending": "سيُفعَّل طلب انضمامك فور استلامك إيميل التأكيد.",
   "affiliate.rejected": "لم يُعتمد طلبك في الوقت الحالي، ويمكنك التقديم مجددًا.",
   "affiliate.adminNote": "ملاحظة الإدارة",
   "affiliate.available": "الرصيد المتاح للسحب",
@@ -1394,5 +1394,10 @@
   "affiliate.cycleBonusHint": "استقطب {target} أعضاء دافعين قبل نهاية الدورة لتحصل على بدل مواصلات ومصروفات نثرية قدره {bonus} ريال، مشتركًا كنت أو غير مشترك.",
   "affiliate.cycleAchieved": "أحسنت! بلغت هدف الدورة، وأُضيف بدل المواصلات والمصروفات النثرية ({bonus} ريال) إلى رصيدك.",
   "affiliate.cycleRenewal": "انتهت مدة هذه الدورة، وأُرسل طلب التجديد إلى إدارة النادي. يبدأ العدّاد من جديد فور تجديد الدورة.",
-  "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال"
+  "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال",
+  "affiliate.homeTitle": "أرباحي",
+  "affiliate.homeNudge": "ما سجّلت أي عضو دافع حتى الآن يا صديقي. شارك رابطك الآن وابدأ أول عمولة.",
+  "affiliate.homeEarned": "إجمالي ما كسبته حتى الآن: {amount} ريال",
+  "affiliate.homeAvailable": "المتاح (ريال)",
+  "affiliate.homeOpen": "لوحة الممثل ورابط الإحالة"
 }

@@ -1355,7 +1355,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.agreementTitle": "اتفاقية البرنامج",
     "affiliate.accept": "أوافق على الاتفاقية",
     "affiliate.editApplication": "تعديل بيانات الطلب",
-    "affiliate.pending": "طلبك قيد مراجعة إدارة النادي، ويصلك بريد إلكتروني بالقرار.",
+    "affiliate.pending": "سيُفعَّل طلب انضمامك فور استلامك إيميل التأكيد.",
     "affiliate.rejected": "لم يُعتمد طلبك في الوقت الحالي، ويمكنك التقديم مجددًا.",
     "affiliate.adminNote": "ملاحظة الإدارة",
     "affiliate.available": "الرصيد المتاح للسحب",
@@ -1396,7 +1396,12 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cycleBonusHint": "استقطب {target} أعضاء دافعين قبل نهاية الدورة لتحصل على بدل مواصلات ومصروفات نثرية قدره {bonus} ريال، مشتركًا كنت أو غير مشترك.",
     "affiliate.cycleAchieved": "أحسنت! بلغت هدف الدورة، وأُضيف بدل المواصلات والمصروفات النثرية ({bonus} ريال) إلى رصيدك.",
     "affiliate.cycleRenewal": "انتهت مدة هذه الدورة، وأُرسل طلب التجديد إلى إدارة النادي. يبدأ العدّاد من جديد فور تجديد الدورة.",
-    "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال"
+    "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال",
+    "affiliate.homeTitle": "أرباحي",
+    "affiliate.homeNudge": "ما سجّلت أي عضو دافع حتى الآن يا صديقي. شارك رابطك الآن وابدأ أول عمولة.",
+    "affiliate.homeEarned": "إجمالي ما كسبته حتى الآن: {amount} ريال",
+    "affiliate.homeAvailable": "المتاح (ريال)",
+    "affiliate.homeOpen": "لوحة الممثل ورابط الإحالة"
   },
   "en": {
     "tabs.home": "Home",
@@ -2753,7 +2758,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.agreementTitle": "Program agreement",
     "affiliate.accept": "I accept the agreement",
     "affiliate.editApplication": "Edit application details",
-    "affiliate.pending": "Your application is under review by the club management; the decision reaches you by e-mail.",
+    "affiliate.pending": "Your application will be activated as soon as you receive the confirmation e-mail.",
     "affiliate.rejected": "Your application was not approved at this time. You may apply again.",
     "affiliate.adminNote": "Management note",
     "affiliate.available": "Available balance",
@@ -2794,7 +2799,12 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cycleBonusHint": "Bring in {target} paying members before the cycle ends to receive a {bonus} SAR transportation and incidental-expenses allowance, member or not.",
     "affiliate.cycleAchieved": "Well done! You reached the cycle target, and the {bonus} SAR allowance was added to your balance.",
     "affiliate.cycleRenewal": "This cycle has ended and a renewal request was sent to the club management. The counter restarts as soon as the cycle is renewed.",
-    "affiliate.bonuses": "Allowances added to your balance: {amount} SAR"
+    "affiliate.bonuses": "Allowances added to your balance: {amount} SAR",
+    "affiliate.homeTitle": "My earnings",
+    "affiliate.homeNudge": "No paying member has joined through you yet, my friend. Share your link now and earn your first commission.",
+    "affiliate.homeEarned": "Earned so far: SAR {amount}",
+    "affiliate.homeAvailable": "Available (SAR)",
+    "affiliate.homeOpen": "Affiliate panel and referral link"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

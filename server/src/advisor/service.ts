@@ -10,6 +10,7 @@ import type { ProjectsService } from '../projectsBank/service.js';
 import type { KV } from '../store.js';
 import type { MarketsService } from '../markets/service.js';
 import type { VideosService } from '../videos/service.js';
+import type { AffiliateService } from '../affiliate/service.js';
 import type { AuthService } from '../auth/service.js';
 import type { FetchImpl } from '../news/rss.js';
 import type { ProjectAccessService } from '../projectsBank/access.js';
@@ -60,8 +61,8 @@ export class AdvisorService {
    * M183 live awareness: built after the other services exist (app.ts wires them later than the advisor).
    * Without this call the advisor still works, only without the member block and the deck attachment.
    */
-  wire(extra: { auth: AuthService; requests?: RequestsService; access?: ProjectAccessService; fetchImpl?: FetchImpl }): void {
-    this.presence = new MemberPresence({ auth: extra.auth, requests: extra.requests, access: extra.access, log: this.deps.log });
+  wire(extra: { auth: AuthService; requests?: RequestsService; access?: ProjectAccessService; affiliate?: AffiliateService; fetchImpl?: FetchImpl }): void {
+    this.presence = new MemberPresence({ auth: extra.auth, requests: extra.requests, access: extra.access, affiliate: extra.affiliate, log: this.deps.log });
     if (extra.fetchImpl) this.fetchImpl = extra.fetchImpl;
   }
 

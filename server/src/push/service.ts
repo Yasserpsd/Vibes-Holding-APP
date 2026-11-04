@@ -291,6 +291,11 @@ export class PushService {
   }
 
   /** M122: one message in two languages — each device hears the language its app last ran in. */
+  /** M194: one message to one account, each device in the language its app last ran in. */
+  async sendTo(contactId: number, messageOf: (lang: AppLang) => PushMessage): Promise<PushOutcome> {
+    return this.sendLocalized(contactId, messageOf);
+  }
+
   private async sendLocalized(contactId: number, messageOf: (lang: AppLang) => PushMessage): Promise<PushOutcome> {
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId);
     const english = mine.filter((entry) => entry.lang === 'en').map((entry) => entry.token);

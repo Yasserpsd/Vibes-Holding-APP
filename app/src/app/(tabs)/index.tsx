@@ -13,6 +13,7 @@ import { useProjectsList } from '@/api/queries';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
+import { AffiliateHomeCard } from '@/components/AffiliateHomeCard';
 import { AgendaBlock } from '@/components/AgendaBlock';
 import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
@@ -356,6 +357,9 @@ export default function HomeScreen() {
           <GoldHairline style={styles.heroDivider} />
         </FadeInView>
       </View>
+
+      {/* M194 (owner): «أرباحي» — first thing under the hero for an approved affiliate only. */}
+      <AffiliateHomeCard />
 
       {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}

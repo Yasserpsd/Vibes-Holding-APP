@@ -332,6 +332,25 @@ export function Affiliates() {
                   نص الاتفاقية بالإنجليزية (للتطبيق بالوضع الإنجليزي؛ النص العربي هو المرجع)
                   <textarea rows={18} maxLength={20000} dir="ltr" value={config.agreementTextEn} onChange={(event) => setConfig({ ...config, agreementTextEn: event.target.value })} />
                 </label>
+                <label>
+                  <input type="checkbox" checked={config.reminderEnabled} onChange={(event) => setConfig({ ...config, reminderEnabled: event.target.checked })} /> التذكير اليومي من المستشار (19:00 بتوقيت الرياض) للممثلين المعتمدين الذين لم يسجّل عبرهم أي عضو دافع بعد
+                </label>
+                <label>
+                  عنوان التذكير
+                  <input type="text" maxLength={80} value={config.reminderTitle} onChange={(event) => setConfig({ ...config, reminderTitle: event.target.value })} />
+                </label>
+                <label>
+                  نص التذكير ({'{commission}'} العمولة، {'{minPayout}'} الحد الأدنى للسحب)
+                  <textarea rows={3} maxLength={400} value={config.reminderBody} onChange={(event) => setConfig({ ...config, reminderBody: event.target.value })} />
+                </label>
+                <label>
+                  عنوان التذكير بالإنجليزية
+                  <input type="text" maxLength={80} dir="ltr" value={config.reminderTitleEn} onChange={(event) => setConfig({ ...config, reminderTitleEn: event.target.value })} />
+                </label>
+                <label>
+                  نص التذكير بالإنجليزية (نفس الرموز)
+                  <textarea rows={3} maxLength={400} dir="ltr" value={config.reminderBodyEn} onChange={(event) => setConfig({ ...config, reminderBodyEn: event.target.value })} />
+                </label>
                 <div>
                   <button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ المحتوى'}</button>
                 </div>

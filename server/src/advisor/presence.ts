@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 
+import type { AffiliateService } from '../affiliate/service.js';
 import type { AuthService } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import type { FetchImpl } from '../news/rss.js';
@@ -36,6 +37,8 @@ type Deps = {
   auth: AuthService;
   requests?: RequestsService;
   access?: ProjectAccessService;
+  /** M194: the affiliate standing (approved affiliates only). */
+  affiliate?: Pick<AffiliateService, 'find' | 'balance'>;
   log: FastifyBaseLogger;
 };
 
@@ -47,13 +50,28 @@ export class MemberPresence {
     try {
       const me = await this.deps.auth.me(session);
       if (!me) return NO_PRESENCE;
-      const [timeline, project] = await Promise.all([this.timelineLines(me.id), this.projectLines(session, context, message)]);
-      const lines = [...timeline, ...project.lines];
+      const [timeline, project, affiliate] = await Promise.all([this.timelineLines(me.id), this.projectLines(session, context, message), this.affiliateLines(me.id)]);
+      const lines = [...timeline, ...affiliate, ...project.lines];
       if (!lines.length) return { ...NO_PRESENCE, deckUrl: project.deckUrl, deckName: project.deckName };
       return { block: clip([PRESENCE_HEADER, ...lines].join('\n'), PRESENCE_MAX), deckUrl: project.deckUrl, deckName: project.deckName };
     } catch (error) {
       this.deps.log.warn({ err: error }, 'advisor presence unavailable');
       return NO_PRESENCE;
+    }
+  }
+
+  /** M194 (owner, 2026-11-04): an approved affiliate's numbers, so the advisor cheers him on and nudges him while nobody paid yet. */
+  private async affiliateLines(contactId: number): Promise<string[]> {
+    if (!this.deps.affiliate) return [];
+    try {
+      const record = await this.deps.affiliate.find(contactId);
+      if (record?.status !== 'approved') return [];
+      const balance = await this.deps.affiliate.balance(contactId);
+      const line = `ممثل معتمد في برنامج ممثلي نادي المستثمرين: ${balance.paid} عضو دافع، ${balance.unpaid} غير دافع، الرصيد المتاح ${balance.available} ريال (عمولته الحالية ${balance.commission} ريال عن كل عضو دافع).`;
+      return balance.paid === 0 ? [line, 'لم يسجّل عبره أي عضو دافع بعد: شجّعه بلطف على مشاركة رابطه الخاص من شاشة «أرباحي».'] : [line];
+    } catch (error) {
+      this.deps.log.warn({ err: error }, 'advisor presence affiliate failed');
+      return [];
     }
   }
 
