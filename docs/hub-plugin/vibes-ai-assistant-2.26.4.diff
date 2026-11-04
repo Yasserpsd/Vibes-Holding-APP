@@ -1,0 +1,199 @@
+diff -ru --strip-trailing-cr vibes-ai-assistant/includes/class-vai-admin.php vibes-ai-assistant/includes/class-vai-admin.php
+--- vibes-ai-assistant/includes/class-vai-admin.php	2026-10-28 22:24:12.000000000 +0300
++++ vibes-ai-assistant/includes/class-vai-admin.php	2026-11-04 23:08:49.366353300 +0300
+@@ -622,21 +622,46 @@
+ 	}
+ 
+ 	public static function page_accounts() {
+-		$q    = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+-		$rows = VAI_Hub::accounts( $q );
++		$q       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
++		$persona = isset( $_GET['persona'] ) ? sanitize_key( wp_unslash( $_GET['persona'] ) ) : '';
++		$persona = in_array( $persona, array( 'neutral', 'entrepreneur', 'investor', 'none' ), true ) ? $persona : '';
++		$rows    = VAI_Hub::accounts( $q, $persona !== '' ? 3000 : 300, $persona );
+ 		self::wrap_open( 'الحسابات المسجّلة', 'كل من أنشأ حسابًا من المساعد على أي موقع — بيانات منفصلة في جداول البلجن على هذا الموقع (كلمات المرور مشفّرة). من هنا تفعّل، وترقّي أدمن أو ناشرًا، وتعلّم عضوًا مدفوعًا.' );
+ 		// 2.19.0 (owner, 2026-10-21): how many of each فئة among the accounts — always on top of the list.
+ 		global $wpdb;
+ 		$ct = VAI_Hub::t( 'contacts' );
+ 		$pc = $wpdb->get_row( "SELECT SUM(CASE WHEN persona='neutral' THEN 1 ELSE 0 END) AS n, SUM(CASE WHEN persona='entrepreneur' THEN 1 ELSE 0 END) AS e, SUM(CASE WHEN persona='investor' THEN 1 ELSE 0 END) AS i FROM $ct WHERE (verified=1 OR is_member=1)", ARRAY_A );
+-		$pill = function ( $label, $value ) {
+-			return '<span style="background:#EDE4CF;border-radius:999px;padding:6px 14px;font-weight:600;display:inline-block">' . esc_html( $label ) . ': <span dir="ltr">' . (int) $value . '</span></span>';
++		// 2.26.4 (owner, 2026-11-04: «ادوس علي المستثمرين يظهرلي مستثمرين بس بالمهنة و رقم الجوال وجي منين مسجل منين»):
++		// every pill is a filter; the filtered view lists that فئة alone with the job, mobile and where/how each one registered.
++		$pill = function ( $key, $label, $value = null ) use ( $persona ) {
++			$on  = $persona === $key;
++			$url = admin_url( 'admin.php?page=vibes-ai-accounts' . ( $key !== '' ? '&persona=' . $key : '' ) );
++			return '<a href="' . esc_url( $url ) . '" style="text-decoration:none;background:' . ( $on ? '#0d274a' : '#EDE4CF' ) . ';color:' . ( $on ? '#fff' : '#0d274a' ) . ';border-radius:999px;padding:6px 14px;font-weight:600;display:inline-block">' . esc_html( $label ) . ( null === $value ? '' : ': <span dir="ltr">' . (int) $value . '</span>' ) . '</a>';
+ 		};
+ 		echo '<div class="vai-card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><strong>فئات الأعضاء:</strong> '
+-			. $pill( 'المحايد', isset( $pc['n'] ) ? $pc['n'] : 0 ) . ' '
+-			. $pill( 'رائد الأعمال', isset( $pc['e'] ) ? $pc['e'] : 0 ) . ' '
+-			. $pill( 'المستثمر', isset( $pc['i'] ) ? $pc['i'] : 0 ) . '</div>';
+-		echo '<div class="vai-card"><form method="get" class="vai-inline" style="margin-bottom:12px"><input type="hidden" name="page" value="vibes-ai-accounts"><input type="search" name="q" value="' . esc_attr( $q ) . '" placeholder="بحث بالاسم / البريد / الجوال / الشركة" style="max-width:360px;padding:7px 10px;border:1px solid #d5d2cb;border-radius:8px"> <button class="button">بحث</button> <span class="vai-help" style="display:inline">(' . count( $rows ) . ')</span> <a class="button" style="margin-right:auto" target="_blank" rel="noopener" href="' . esc_url( home_url( '/?vai-console=1' ) ) . '">لوحة الإدارة للأدمنز ↗</a></form>';
++			. $pill( '', 'الكل' ) . ' '
++			. $pill( 'neutral', 'المحايد', isset( $pc['n'] ) ? $pc['n'] : 0 ) . ' '
++			. $pill( 'entrepreneur', 'رائد الأعمال', isset( $pc['e'] ) ? $pc['e'] : 0 ) . ' '
++			. $pill( 'investor', 'المستثمر', isset( $pc['i'] ) ? $pc['i'] : 0 ) . ' '
++			. $pill( 'none', 'بدون فئة' ) . '</div>';
++		echo '<div class="vai-card"><form method="get" class="vai-inline" style="margin-bottom:12px"><input type="hidden" name="page" value="vibes-ai-accounts">' . ( $persona !== '' ? '<input type="hidden" name="persona" value="' . esc_attr( $persona ) . '">' : '' ) . '<input type="search" name="q" value="' . esc_attr( $q ) . '" placeholder="بحث بالاسم / البريد / الجوال / الشركة" style="max-width:360px;padding:7px 10px;border:1px solid #d5d2cb;border-radius:8px"> <button class="button">بحث</button> <span class="vai-help" style="display:inline">(' . count( $rows ) . ')</span> <a class="button" style="margin-right:auto" target="_blank" rel="noopener" href="' . esc_url( home_url( '/?vai-console=1' ) ) . '">لوحة الإدارة للأدمنز ↗</a></form>';
++		if ( $persona !== '' ) {
++			$titles = array( 'neutral' => 'المحايدون', 'entrepreneur' => 'رواد الأعمال', 'investor' => 'المستثمرون', 'none' => 'حسابات بدون فئة' );
++			echo '<h2 style="margin:4px 0 10px">' . esc_html( $titles[ $persona ] ) . ' <span dir="ltr">(' . count( $rows ) . ')</span></h2>';
++			echo '<table class="vai-table"><thead><tr><th>#</th><th>الاسم</th><th>المهنة</th><th>الجوال</th><th>البريد</th><th>سجّل من</th><th>جاء عن طريق</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>';
++			if ( ! $rows ) {
++				echo '<tr><td colspan="9" class="vai-empty">لا توجد حسابات في هذه الفئة.</td></tr>';
++			}
++			foreach ( $rows as $c ) {
++				$from   = VAI_Hub::source_parts( $c );
++				$job    = trim( (string) $c->job_title . ( $c->company ? ' — ' . $c->company : '' ), ' —' );
++				$status = $c->is_member ? ( VAI_Hub::member_active( $c ) ? '⭐ عضو مفعّل' : '⌛ عضوية منتهية' ) : ( ! (int) $c->verified ? '✉️ بانتظار التفعيل' : 'لم يدفع' );
++				$phone  = vai_phone_local( $c->phone_norm ?: $c->phone );
++				echo '<tr><td dir="ltr">' . (int) $c->id . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td>' . ( $job !== '' ? esc_html( $job ) : '—' ) . '</td><td dir="ltr">' . ( $phone !== '' ? '<a href="tel:' . esc_attr( $c->phone_norm ?: $c->phone ) . '">' . esc_html( $phone ) . '</a>' : '—' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '</td><td>' . esc_html( $from['platform'] ) . '</td><td>' . esc_html( $from['via'] ) . '</td><td>' . esc_html( vai_riyadh( $c->created_at ) ) . '</td><td>' . $status . '</td></tr>';
++			}
++			echo '</tbody></table></div></div>';
++			return;
++		}
+ 		echo '<table class="vai-table"><thead><tr><th></th><th>الاسم</th><th>البريد / الجوال</th><th>الوظيفة / الشركة</th><th>الحالة</th><th>الدور</th><th>آخر دخول</th><th>الموقع</th><th>المصدر</th><th></th></tr></thead><tbody>';
+ 		if ( ! $rows ) {
+ 			echo '<tr><td colspan="10" class="vai-empty">لا توجد حسابات بعد.</td></tr>';
+diff -ru --strip-trailing-cr vibes-ai-assistant/includes/class-vai-hub.php vibes-ai-assistant/includes/class-vai-hub.php
+--- vibes-ai-assistant/includes/class-vai-hub.php	2026-11-04 20:27:26.000000000 +0300
++++ vibes-ai-assistant/includes/class-vai-hub.php	2026-11-04 23:11:31.776191600 +0300
+@@ -3155,6 +3155,35 @@
+ 	}
+ 
+ 	/** 2.21.1 (M146): the source as a human reads it — «🍎 تطبيق iPhone», «🤖 تطبيق Android», «🌐 الموقع vcmem.com (حساب Google)». */
++	/**
++	 * 2.26.4 (owner, 2026-11-04: «بالمهنة و رقم الجوال وجي منين مسجل منين»): where an account registered (the platform)
++	 * and how he came (Apple / Google / e-mail, plus the member who invited him) — the same reading as the admin mail.
++	 */
++	public static function source_parts( $c ) {
++		$src  = isset( $c->source ) ? (string) $c->source : '';
++		$base = preg_replace( '/:(apple|google)$/', '', $src );
++		if ( 0 === strpos( $base, 'app-ios' ) ) {
++			$platform = 'تطبيق iPhone';
++		} elseif ( 0 === strpos( $base, 'app-android' ) ) {
++			$platform = 'تطبيق Android';
++		} elseif ( 'app' === $base ) {
++			$platform = 'التطبيق';
++		} elseif ( 'paypage' === $base || 'paymob' === $base ) {
++			$platform = 'صفحة الدفع';
++		} elseif ( 0 === strpos( $base, 'site:' ) ) {
++			$platform = 'موقع ' . substr( $base, 5 );
++		} else {
++			// No stored source (accounts before 2.21.1): the app server's own row is «التطبيق», never its host name.
++			$platform = ! empty( $c->site_trusted ) ? 'التطبيق' : ( ! empty( $c->host ) ? 'موقع ' . (string) $c->host : '—' );
++		}
++		$via = preg_match( '/:(apple|google)$/', $src, $m ) ? 'حساب ' . ( 'apple' === $m[1] ? 'Apple' : 'Google' ) : 'البريد الإلكتروني';
++		if ( isset( $c->referred_by ) && (int) $c->referred_by > 0 ) {
++			$ref  = self::contact( (int) $c->referred_by );
++			$via .= ' — دعوة من ' . ( $ref ? $ref->name : 'عضو' ) . ' (#' . (int) $c->referred_by . ')';
++		}
++		return array( 'platform' => $platform, 'via' => $via );
++	}
++
+ 	public static function source_label( $src ) {
+ 		$src   = (string) $src;
+ 		$parts = explode( ':', $src );
+@@ -3491,20 +3520,36 @@
+ 			self::insert_message( $acc->id, $site->id, 'system', '🆕 أنشأ حسابه بالدخول عبر ' . $pname . ' ✅' . ( (int) $acc->is_member ? ' وتم تفعيل عضويته تلقائيًا (دفع مسبق) ⭐' : '' ), null, vai_str( $d, 'page_url', 500 ) );
+ 			// 2.12.0 (owner): the new social account hears from us AT ONCE — his details + how to complete them.
+ 			if ( is_email( $acc->email ) && class_exists( 'VAI_Payments' ) ) {
+-				$hello = 'مرحبًا ' . $acc->name . "،
+-
+-" . 'تم إنشاء حسابك في Vibes Ventures ونادي المستثمرين بحساب ' . $pname . " ✅
+-
+-" . 'بيانات حسابك:' . "
+-" . '• البريد: ' . $acc->email . "
+-" . '• الدخول: بزر «المتابعة بحساب ' . $pname . '» نفسه على أي موقع من مواقع المنظومة أو من التطبيق، أو عيّن كلمة مرور خاصة بك في أي وقت من «نسيت كلمة المرور».' . "
+-
+-" . 'خطوة واحدة ناقصة لإكمال حسابك: افتح المساعد (الأيقونة أسفل الموقع) وأكمل جوالك وفئتك في النادي ونبذة عنك — دقيقة واحدة وتصلك كل خدماتنا باسمك.' . "
+-
+-" . ( (int) $acc->is_member ? 'عضويتك السنوية مفعّلة ⭐ — استمتع بكل المزايا.' : 'ولتفعيل عضويتك السنوية وكل مزاياها ادفع مباشرة من هنا: {pay_url}' ) . "
+-
+-" . 'نادي المستثمرين — Vibes Ventures';
+-				VAI_Hub::mail( VAI_Hub::mail_to( $acc ), 'حسابك في نادي المستثمرين جاهز — أكمل بياناتك في دقيقة', VAI_Payments::render( $hello, $acc ) );
++				// 2.26.4 (owner, 2026-11-04: «لغة التسجيل اللي مسجل بيها انجليزي ازاي يجيلي ايميل عربي؟»): the mail follows the
++				// member's language, and an app-born account is sent back to the app — no website assistant, no membership
++				// pay link (the membership is bought inside the app only).
++				$from_app = 0 === strpos( self::reg_source( $d, $site ), 'app' );
++				if ( self::lang_of( $acc ) === 'en' ) {
++					$subject = 'Your Investors Club account is ready — complete your details in a minute';
++					$hello   = 'Hello ' . $acc->name . ",\n\n"
++						. 'Your Investors Club account (Vibes Ventures) was created with your ' . $pname . " account ✅\n\n"
++						. "Your account:\n"
++						. '• Email: ' . $acc->email . "\n"
++						. '• Sign-in: the same «Continue with ' . $pname . '» button ' . ( $from_app ? 'in the Investors Club app' : 'on any site of the group or in the app' ) . ", or set your own password any time from «Forgot password».\n\n"
++						. ( $from_app
++							? 'One step left: open the Investors Club app and complete your mobile number, your category in the club and a short bio — one minute, and every service reaches you by name.'
++							: 'One step left: open the assistant (the icon at the bottom of the site) and complete your mobile number, your category in the club and a short bio — one minute, and every service reaches you by name.' )
++						. ( (int) $acc->is_member ? "\n\nYour annual membership is active ⭐ — enjoy every benefit." : ( $from_app ? '' : "\n\nTo activate your annual membership and all its benefits, pay directly here: {pay_url}" ) )
++						. "\n\nInvestors Club — Vibes Ventures";
++				} else {
++					$subject = 'حسابك في نادي المستثمرين جاهز — أكمل بياناتك في دقيقة';
++					$hello   = 'مرحبًا ' . $acc->name . "،\n\n"
++						. 'تم إنشاء حسابك في Vibes Ventures ونادي المستثمرين بحساب ' . $pname . " ✅\n\n"
++						. "بيانات حسابك:\n"
++						. '• البريد: ' . $acc->email . "\n"
++						. '• الدخول: بزر «المتابعة بحساب ' . $pname . '» نفسه ' . ( $from_app ? 'من تطبيق Investors Club' : 'على أي موقع من مواقع المنظومة أو من التطبيق' ) . "، أو عيّن كلمة مرور خاصة بك في أي وقت من «نسيت كلمة المرور».\n\n"
++						. ( $from_app
++							? 'خطوة واحدة ناقصة لإكمال حسابك: افتح تطبيق Investors Club وأكمل جوالك وفئتك في النادي ونبذة عنك — دقيقة واحدة وتصلك كل خدماتنا باسمك.'
++							: 'خطوة واحدة ناقصة لإكمال حسابك: افتح المساعد (الأيقونة أسفل الموقع) وأكمل جوالك وفئتك في النادي ونبذة عنك — دقيقة واحدة وتصلك كل خدماتنا باسمك.' )
++						. ( (int) $acc->is_member ? "\n\nعضويتك السنوية مفعّلة ⭐ — استمتع بكل المزايا." : ( $from_app ? '' : "\n\nولتفعيل عضويتك السنوية وكل مزاياها ادفع مباشرة من هنا: {pay_url}" ) )
++						. "\n\nنادي المستثمرين — Vibes Ventures";
++				}
++				VAI_Hub::mail( VAI_Hub::mail_to( $acc ), $subject, VAI_Payments::render( $hello, $acc ) );
+ 			}
+ 			if ( self::profile_complete( $acc ) ) {
+ 				self::notify_registration( $acc, $site );
+@@ -5123,7 +5168,7 @@
+ 		return (array) $wpdb->get_results( "SELECT c.*, s.host FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE c.is_member=1 ORDER BY c.member_started_at DESC, c.id DESC LIMIT 500" );
+ 	}
+ 
+-	public static function accounts( $q = '', $limit = 300 ) {
++	public static function accounts( $q = '', $limit = 300, $persona = '' ) {
+ 		global $wpdb;
+ 		$ct   = self::t( 'contacts' );
+ 		$st   = self::t( 'sites' );
+@@ -5131,10 +5176,17 @@
+ 		$w    = "c.pass_hash<>''";
+ 		if ( $q !== '' ) {
+ 			$like = '%' . $wpdb->esc_like( $q ) . '%';
+-			$w   .= ' AND (c.name LIKE %s OR c.email LIKE %s OR c.phone LIKE %s OR c.company LIKE %s)';
+-			$args = array( $like, $like, $like, $like );
++			$w   .= ' AND (c.name LIKE %s OR c.email LIKE %s OR c.phone LIKE %s OR c.company LIKE %s OR c.job_title LIKE %s)';
++			$args = array( $like, $like, $like, $like, $like );
++		}
++		// 2.26.4 (owner, 2026-11-04: «ادوس علي المستثمرين يظهرلي مستثمرين بس»): one فئة at a time, or the accounts with none yet.
++		if ( in_array( $persona, array( 'neutral', 'entrepreneur', 'investor' ), true ) ) {
++			$w     .= ' AND c.persona=%s';
++			$args[] = $persona;
++		} elseif ( 'none' === $persona ) {
++			$w .= " AND (c.persona IS NULL OR c.persona NOT IN ('neutral','entrepreneur','investor'))";
+ 		}
+-		$sql = "SELECT c.*, s.host FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE $w ORDER BY c.id DESC LIMIT " . (int) $limit;
++		$sql = "SELECT c.*, s.host, s.trusted AS site_trusted FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE $w ORDER BY c.id DESC LIMIT " . (int) $limit;
+ 		return (array) ( $args ? $wpdb->get_results( $wpdb->prepare( $sql, $args ) ) : $wpdb->get_results( $sql ) );
+ 	}
+ 
+diff -ru --strip-trailing-cr vibes-ai-assistant/vibes-ai-assistant.php vibes-ai-assistant/vibes-ai-assistant.php
+--- vibes-ai-assistant/vibes-ai-assistant.php	2026-11-04 20:27:26.000000000 +0300
++++ vibes-ai-assistant/vibes-ai-assistant.php	2026-11-04 23:08:58.535095500 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
+- * Version:     2.26.3
++ * Version:     2.26.4
+  * Author:      Vibes Ventures
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.26.3' );
++define( 'VAI_VERSION', '2.26.4' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );
