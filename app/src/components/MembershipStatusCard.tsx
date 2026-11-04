@@ -81,7 +81,7 @@ const styles = themedStyles(() => ({
   // A long server title wraps inside the row instead of pushing the badge out of the card.
   title: { ...typography.subtitle, color: colors.textPrimary, flexShrink: 1, textAlign: textStart },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill },
-  badgeText: { ...typography.caption, color: colors.black, fontSize: 12 },
+  badgeText: { ...typography.caption, color: colors.goldInk, fontSize: 12 },
   status: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   meta: { gap: 2, paddingStart: spacing.xl + spacing.sm },
   metaText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },

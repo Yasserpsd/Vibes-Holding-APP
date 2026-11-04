@@ -117,9 +117,9 @@ const styles = themedStyles(() => ({
     gap: 2,
     backgroundColor: 'rgba(10, 8, 2, 0.72)',
   },
-  title: { ...typography.body, fontFamily: fonts.bold, color: colors.textPrimary, textAlign: textStart },
+  title: { ...typography.body, fontFamily: fonts.bold, color: colors.onPhoto, textAlign: textStart },
   metaRow: { flexDirection: 'row', gap: spacing.sm },
-  meta: { ...typography.caption, color: colors.goldLight },
+  meta: { ...typography.caption, color: colors.onPhotoGold },
   dots: {
     position: 'absolute',
     top: spacing.sm,

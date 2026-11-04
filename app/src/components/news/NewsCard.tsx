@@ -50,7 +50,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
           <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
           {item.decision ? (
             <View style={styles.badge}>
-              <Ionicons name="ribbon-outline" size={11} color={colors.black} />
+              <Ionicons name="ribbon-outline" size={11} color={colors.goldInk} />
               <Text style={styles.badgeText}>{t('news.decisionBadge')}</Text>
             </View>
           ) : null}
@@ -146,7 +146,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.gold,
     boxShadow: shadows.glowGoldFaint,
   },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
+  badgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
   body: { flexDirection: 'row', gap: spacing.md },
   text: { flex: 1, gap: spacing.xs },
   title: { ...typography.subtitle, color: colors.textPrimary },

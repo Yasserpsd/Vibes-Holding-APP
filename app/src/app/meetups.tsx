@@ -95,7 +95,7 @@ const styles = themedStyles(() => ({
   fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.sm },
-  number: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.goldLight, opacity: 0.9 },
+  number: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.onPhotoGold, opacity: 0.9 },
   badge: {
     paddingVertical: 2,
     paddingHorizontal: spacing.sm,
@@ -104,9 +104,9 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  badgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.onPhotoGold },
   bottom: { padding: spacing.md, gap: spacing.xs },
-  title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
-  teaser: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.goldLight, textAlign: textStart },
+  title: { ...typography.subtitle, color: colors.onPhoto, textAlign: textStart },
+  teaser: { ...typography.caption, color: colors.onPhotoSoft, textAlign: textStart },
+  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.onPhotoGold, textAlign: textStart },
 }));

@@ -60,7 +60,7 @@ function BriefBody({ brief }: { brief: Brief }) {
         <GlassCard golden radius={radii.lg} style={styles.card}>
           <View style={styles.header}>
             <View style={styles.mark}>
-              <Ionicons name="sparkles" size={16} color={colors.black} />
+              <Ionicons name="sparkles" size={16} color={colors.goldInk} />
             </View>
             <Text style={styles.headerTitle}>{t('brief.title')}</Text>
           </View>
@@ -179,7 +179,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
                   )}
                 </View>
                 <View style={[styles.node, done && styles.nodeDone, current && styles.nodeCurrent]}>
-                  {done ? <Ionicons name="checkmark" size={12} color={colors.black} /> : null}
+                  {done ? <Ionicons name="checkmark" size={12} color={colors.goldInk} /> : null}
                   {current ? <View style={styles.nodeDot} /> : null}
                 </View>
                 <View style={styles.lineSlot}>
@@ -255,7 +255,7 @@ function BriefSkeleton() {
       <GlassCard golden radius={radii.lg} style={styles.card}>
         <View style={styles.header}>
           <View style={styles.mark}>
-            <Ionicons name="sparkles" size={16} color={colors.black} />
+            <Ionicons name="sparkles" size={16} color={colors.goldInk} />
           </View>
           <Text style={styles.headerTitle}>{t('brief.title')}</Text>
         </View>

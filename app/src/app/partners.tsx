@@ -101,7 +101,7 @@ function PartnerCard({ partner }: { partner: Partner }) {
     <GlassCard golden={!!partner.ribbon} style={styles.partner}>
       {partner.ribbon ? (
         <GoldGradient style={styles.ribbon}>
-          <Ionicons name="diamond" size={12} color={colors.black} />
+          <Ionicons name="diamond" size={12} color={colors.goldInk} />
           <Text style={styles.ribbonText} numberOfLines={1}>
             {partner.ribbon}
           </Text>
@@ -147,7 +147,7 @@ const styles = themedStyles(() => ({
     borderRadius: radii.lg - 5,
     borderWidth: 1,
     borderColor: colors.goldDark,
-    backgroundColor: '#0B0A08',
+    backgroundColor: colors.surface,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
@@ -180,7 +180,7 @@ const styles = themedStyles(() => ({
     paddingVertical: 6,
     paddingHorizontal: spacing.sm,
   },
-  ribbonText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.black },
+  ribbonText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldInk },
   partnerHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
   logoBox: {
     width: 56,

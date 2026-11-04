@@ -75,7 +75,7 @@ const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.black },
   // M106b: the theatre, faint and classy, under a dark wash that keeps every word readable.
   theatre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.35 },
-  theatreWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 7, 8, 0.72)' },
+  theatreWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.wash },
   safeArea: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
   hero: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },

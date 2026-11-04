@@ -177,7 +177,7 @@ const styles = themedStyles(() => ({
     boxShadow: shadows.glowGoldFaint,
   },
   bannerIconLocked: { backgroundColor: colors.overlay, borderWidth: 1, borderColor: colors.borderGold },
-  bannerTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.goldLight, textAlign: 'center' },
+  bannerTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.onPhotoGold, textAlign: 'center' },
   files: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
   fileWrap: { width: '31.5%' },
   file: {

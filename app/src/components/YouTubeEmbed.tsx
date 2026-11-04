@@ -32,7 +32,7 @@ export function YouTubeEmbed({ url, title }: { url: string; title: string }) {
         <View style={styles.scrim} />
         {webview ? (
           <View style={styles.playBadge}>
-            <Ionicons name="play" size={30} color={colors.black} />
+            <Ionicons name="play" size={30} color={colors.goldInk} />
           </View>
         ) : (
           <Text style={styles.unavailable}>{t('watch.unavailable')}</Text>

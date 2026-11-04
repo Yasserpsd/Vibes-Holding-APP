@@ -14,7 +14,7 @@ export function isWatchable(event: AgendaEvent): boolean {
 export function WatchRibbon({ small = false }: { small?: boolean }) {
   return (
     <View style={[styles.ribbon, small && styles.small]}>
-      <Ionicons name="play" size={small ? 11 : 13} color={colors.black} />
+      <Ionicons name="play" size={small ? 11 : 13} color={colors.goldInk} />
       <Text style={[styles.text, small && styles.textSmall]} numberOfLines={1}>
         {t('agenda.watchable')}
       </Text>
@@ -35,6 +35,6 @@ const styles = themedStyles(() => ({
     boxShadow: shadows.glowGoldFaint,
   },
   small: { paddingVertical: 3, paddingHorizontal: 8 },
-  text: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 17, color: colors.black },
+  text: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 17, color: colors.goldInk },
   textSmall: { fontSize: 11, lineHeight: 16 },
 }));

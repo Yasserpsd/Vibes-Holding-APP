@@ -416,7 +416,7 @@ const styles = themedStyles(() => ({
   club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: colors.gold, textAlign: textStart },
   clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: colors.goldLight, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
   categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: colors.gold },
-  categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.black },
+  categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.goldInk },
   // M103: the silvered, faded shell of the unactivated card.
   cardFaded: { opacity: 0.88 },
   // M103: the VIP mark — gold on gold-ink, impossible to miss.

@@ -146,8 +146,8 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  pillText: { ...typography.caption, color: colors.goldLight },
-  title: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.textPrimary, textAlign: textStart },
+  pillText: { ...typography.caption, color: colors.onPhotoGold },
+  title: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.onPhoto, textAlign: textStart },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },
 }));

@@ -20,7 +20,7 @@ import { formatNumber } from '@/lib/format';
 import { topicIcon, type IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { lazyTokens, themedStyles } from '@/theme/styles';
-import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, getThemeName, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
   const { id, contact } = useLocalSearchParams<{ id: string; contact?: string }>();
@@ -217,12 +217,16 @@ function ReadMore({ text }: { text: string }) {
 
 // M95 (owner): long content rotates through soft accents so pages never read single-toned.
 const GOLD_ACCENT = lazyTokens(() => ({ ink: colors.goldLight, bg: colors.goldSoft, border: colors.borderGoldSoft }));
-const RICH_ACCENTS = [
-  GOLD_ACCENT,
-  { ink: '#5ECFA0', bg: 'rgba(52,178,123,0.14)', border: 'rgba(52,178,123,0.4)' },
-  { ink: '#B9A6F7', bg: 'rgba(109,79,194,0.18)', border: 'rgba(167,139,250,0.4)' },
-  { ink: '#7CC4EA', bg: 'rgba(95,184,232,0.14)', border: 'rgba(95,184,232,0.4)' },
-];
+// M196: the pale inks of the dark theme vanish on white, so the light theme gets their deep cousins.
+const RICH_ACCENTS = lazyTokens(() => {
+  const light = getThemeName() === 'light';
+  return [
+    GOLD_ACCENT,
+    { ink: light ? '#0E7A5F' : '#5ECFA0', bg: 'rgba(52,178,123,0.14)', border: 'rgba(52,178,123,0.4)' },
+    { ink: light ? '#6D4FC2' : '#B9A6F7', bg: 'rgba(109,79,194,0.18)', border: 'rgba(167,139,250,0.4)' },
+    { ink: light ? '#1E6FA8' : '#7CC4EA', bg: 'rgba(95,184,232,0.14)', border: 'rgba(95,184,232,0.4)' },
+  ];
+});
 
 /** A paragraph longer than this becomes icon-led rows instead of one gray block. */
 const LONG_PARAGRAPH = 160;

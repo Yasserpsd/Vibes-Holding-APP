@@ -321,10 +321,10 @@ const styles = themedStyles(() => ({
   quality: { paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGold },
   qualityOn: { backgroundColor: colors.gold },
   qualityText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight },
-  qualityTextOn: { color: colors.black },
+  qualityTextOn: { color: colors.goldInk },
   wideStage: { flex: 1, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
   // Landscape edges hold the notch and the home bar: keep the controls clear of both.
-  wideControls: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 44, paddingBottom: spacing.sm, backgroundColor: 'rgba(7, 7, 8, 0.82)' },
+  wideControls: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 44, paddingBottom: spacing.sm, backgroundColor: colors.glass },
   ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: colors.black },
   ghost: {
     flex: 1,

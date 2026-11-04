@@ -29,6 +29,12 @@ const darkColors = {
   // M128 (owner): placeholders only — barely-there gray so an empty field never looks prefilled.
   textFaint: '#55555E',
 
+  // M196: text that sits ON a photo (over gradients.scrim) — the photo is dark in both themes.
+  onPhoto: '#FFFFFF',
+  onPhotoSoft: '#B9B9C0',
+  onPhotoMuted: '#7E7E86',
+  onPhotoGold: '#F2CE74',
+
   // Translucent accents shared by the cards.
   goldSoft: 'rgba(217, 168, 60, 0.14)',
   goldFaint: 'rgba(217, 168, 60, 0.07)',
@@ -38,6 +44,8 @@ const darkColors = {
   // Glass surface for overlays and floating bars.
   glass: 'rgba(22, 22, 26, 0.86)',
   overlay: 'rgba(5, 5, 6, 0.74)',
+  /** M196: the welcome theatre wash — darkens the film in the dark, mists it in the light. */
+  wash: 'rgba(7, 7, 8, 0.72)',
 
   success: '#34B27B',
   // WhatsApp's own brand green: the support line wears the real logo colours.
@@ -82,12 +90,19 @@ const lightColors: ColorTokens = {
   textMuted: '#6B7A90',
   textFaint: '#A9B4C4',
 
+  // M196: text that sits ON a photo (over gradients.scrim) — the photo is dark in both themes.
+  onPhoto: '#FFFFFF',
+  onPhotoSoft: '#B9B9C0',
+  onPhotoMuted: '#7E7E86',
+  onPhotoGold: '#F2CE74',
+
   goldSoft: 'rgba(184, 132, 42, 0.14)',
   goldFaint: 'rgba(184, 132, 42, 0.07)',
   borderGold: 'rgba(184, 132, 42, 0.45)',
   borderGoldSoft: 'rgba(184, 132, 42, 0.22)',
   glass: 'rgba(255, 255, 255, 0.92)',
   overlay: 'rgba(13, 39, 74, 0.55)',
+  wash: 'rgba(244, 246, 250, 0.82)',
 
   success: '#1E8E63',
   whatsapp: '#25D366',

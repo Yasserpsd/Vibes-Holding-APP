@@ -98,8 +98,8 @@ const styles = themedStyles(() => ({
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
   topRow: { flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.sm },
   bottom: { padding: spacing.sm + 2, gap: spacing.xs },
-  title: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.textPrimary, textAlign: textStart },
-  meta: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  title: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.onPhoto, textAlign: textStart },
+  meta: { ...typography.caption, color: colors.onPhotoGold, textAlign: textStart },
   pill: {
     paddingVertical: 2,
     paddingHorizontal: spacing.sm,
@@ -108,5 +108,5 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  pillText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  pillText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.onPhotoGold },
 }));

@@ -68,7 +68,7 @@ export function PostCard({ post }: { post: Post }) {
           {targeted ? (
             <View style={styles.audience}>
               <View style={styles.audienceBadge}>
-                <Ionicons name="person" size={12} color={colors.black} />
+                <Ionicons name="person" size={12} color={colors.goldInk} />
                 <Text style={styles.audienceBadgeText}>{targeted}</Text>
               </View>
             </View>
@@ -81,7 +81,7 @@ export function PostCard({ post }: { post: Post }) {
           {event ? (
             <View style={styles.event}>
               <View style={styles.eventBadge}>
-                <Ionicons name="calendar" size={12} color={colors.black} />
+                <Ionicons name="calendar" size={12} color={colors.goldInk} />
                 <Text style={styles.eventBadgeText}>{t('posts.eventBadge')}</Text>
               </View>
               <Text style={[styles.eventWhen, paper && styles.eventWhenPaper]} numberOfLines={1}>
@@ -92,7 +92,7 @@ export function PostCard({ post }: { post: Post }) {
           {post.kind === 'poll' ? (
             <View style={styles.event}>
               <View style={styles.eventBadge}>
-                <Ionicons name="stats-chart" size={12} color={colors.black} />
+                <Ionicons name="stats-chart" size={12} color={colors.goldInk} />
                 <Text style={styles.eventBadgeText}>{t('poll.badge')}</Text>
               </View>
               <Text style={[styles.eventWhen, paper && styles.eventWhenPaper]} numberOfLines={1}>
@@ -164,10 +164,10 @@ const styles = themedStyles(() => ({
   body: { ...typography.caption, color: colors.textSecondary },
   event: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   eventBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.gold },
-  eventBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
+  eventBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
   audience: { flexDirection: 'row' },
   audienceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.goldLight },
-  audienceBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.black },
+  audienceBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
   eventWhen: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, flexShrink: 1 },
   eventPlace: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
