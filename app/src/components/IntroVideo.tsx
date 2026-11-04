@@ -10,6 +10,7 @@ import { PopIn, PressScale } from '@/components/motion';
 import { getLang, t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { playVideo } from '@/lib/player';
+import { autoPopupsBlocked } from '@/lib/popupGate';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -33,7 +34,8 @@ export function IntroVideoPopup() {
   useEffect(() => {
     let alive = true;
     void loadSetting(SEEN_KEY).then((seen) => {
-      if (alive && !seen) setVisible(true);
+      // M195: never above the forced-update cover.
+      if (alive && !seen && !autoPopupsBlocked()) setVisible(true);
     });
     return () => {
       alive = false;

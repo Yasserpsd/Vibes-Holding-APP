@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useFormPalette } from '@/components/form/FormTheme';
 import { FadeInView, PopIn, Wiggle } from '@/components/motion';
 import { SupportLink } from '@/components/SupportLink';
 import { textStart } from '@/i18n/direction';
@@ -11,26 +12,31 @@ type Props = { text: string; tone?: 'info' | 'warning' | 'success'; support?: bo
 
 /** Short inline notice (policy hint, test-mode reminder, success message). */
 export function Notice({ text, tone = 'info', support = false }: Props) {
-  const color = tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : colors.goldLight;
+  // M195: inside a FormCard the notice follows the form identity (gold wash, navy ink; red for a warning).
+  const palette = useFormPalette();
+  const color = tone === 'warning' ? (palette ? palette.danger : colors.warning) : tone === 'success' ? colors.success : palette ? palette.accent : colors.goldLight;
+  const formBox = palette ? (tone === 'warning' ? { backgroundColor: palette.dangerBg, borderColor: palette.danger } : { backgroundColor: palette.noticeBg, borderColor: palette.noticeBorder }) : null;
+  const formText = palette ? { color: tone === 'warning' ? palette.danger : palette.noticeText } : null;
+  const formChip = palette ? { backgroundColor: 'transparent' } : null;
   const icon = tone === 'warning' ? 'warning-outline' : tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline';
   return (
     <FadeInView offset={8}>
-      <View style={[styles.box, tone === 'info' ? styles.boxGold : { borderColor: color }]}>
+      <View style={[styles.box, tone === 'info' ? styles.boxGold : { borderColor: color }, formBox]}>
         {/* M84e: a warning shakes once to be seen; the others pop into place. */}
         {tone === 'warning' ? (
           <Wiggle delay={260}>
-            <View style={styles.iconChip}>
+            <View style={[styles.iconChip, formChip]}>
               <Ionicons name={icon} size={16} color={color} />
             </View>
           </Wiggle>
         ) : (
           <PopIn delay={120}>
-            <View style={styles.iconChip}>
+            <View style={[styles.iconChip, formChip]}>
               <Ionicons name={icon} size={16} color={color} />
             </View>
           </PopIn>
         )}
-        <Text style={styles.text}>{text}</Text>
+        <Text style={[styles.text, formText]}>{text}</Text>
       </View>
       {support ? <SupportLink problem={text} /> : null}
     </FadeInView>

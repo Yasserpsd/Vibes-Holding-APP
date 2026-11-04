@@ -266,9 +266,28 @@ export class Notifier {
     ]);
   }
 
-  /** M184: the program agreement, mailed to the applicant the moment the application lands. */
-  affiliateAgreement(record: { name: string; email: string }, agreementText: string, commissionLabel: string): void {
+  /** M184: the program agreement, mailed to the applicant the moment the application lands. M195: in his language. */
+  affiliateAgreement(record: { name: string; email: string; lang?: 'ar' | 'en' }, agreementText: string, commissionLabel: string): void {
     const paragraphs = agreementText.replaceAll('{commission}', commissionLabel).split('\n').map((line) => line.trim()).filter(Boolean);
+    if (record.lang === 'en') {
+      this.sendRoyal(
+        record.email,
+        'Investors Club Affiliates Program agreement',
+        {
+          lang: 'en',
+          title: 'Investors Club Affiliates Program agreement',
+          subtitle: 'This agreement reaches you before your membership in the program is activated',
+          greeting: `Welcome, ${record.name}`,
+          lead: [
+            'Your application to the Investors Club Affiliates Program has arrived. The full agreement follows; to continue, open the app: My account → Investors Club affiliates, then tap «I accept the agreement».',
+            ...paragraphs,
+          ],
+          note: 'The application goes to the club management after you accept the agreement; only their approval activates your participation.',
+        },
+        'affiliate agreement',
+      );
+      return;
+    }
     this.sendRoyal(
       record.email,
       'اتفاقية برنامج ممثلي نادي المستثمرين',
@@ -288,7 +307,7 @@ export class Notifier {
   }
 
   /** M184: the applicant accepted the agreement — the decision is the dashboard's. */
-  affiliateApplied(record: { name: string; phone: string; email: string; code: string; entityType: string; bankName: string; iban: string; city: string; address: string; heardFrom: string; heardFromNote: string }): void {
+  affiliateApplied(record: { name: string; phone: string; email: string; code: string; entityType: string; bankName: string; iban: string; city: string; address: string; heardFrom: string; heardFromNote: string; lang?: 'ar' | 'en' }): void {
     this.dispatch(`طلب انضمام لبرنامج ممثلي نادي المستثمرين: ${record.name}`, [
       `قدّم أحد الأعضاء طلب انضمام لبرنامج ممثلي نادي المستثمرين من ${APP_NAME} ووافق على الاتفاقية.`,
       '',
@@ -301,15 +320,44 @@ export class Notifier {
       `الآيبان: ${record.iban}`,
       `المدينة: ${record.city}`,
       `العنوان: ${record.address}`,
-      `كيف تعرّف على النادي: ${record.heardFrom}${record.heardFromNote ? ` — ${record.heardFromNote}` : ''}`,
+      // M195 (owner): the source stands alone (no «Tell us the source» note), and the member's language is named.
+      `عرفنا عن طريق: ${record.heardFrom}`,
+      `لغة العضو: ${record.lang === 'en' ? 'English' : 'العربية'}`,
       '',
       'القبول أو الرفض من لوحة الإدارة: قسم «ممثلو نادي المستثمرين». لا يُفعَّل الممثل إلا بقراركم.',
     ]);
   }
 
-  /** M184: the dashboard decided — the applicant hears it in a royal mail. */
-  affiliateDecided(record: { name: string; email: string; code: string; status: string; adminNote: string | null }, link: string): void {
+  /** M184: the dashboard decided — the applicant hears it in a royal mail. M195: in his language. */
+  affiliateDecided(record: { name: string; email: string; code: string; status: string; adminNote: string | null; lang?: 'ar' | 'en' }, link: string): void {
     const approved = record.status === 'approved';
+    if (record.lang === 'en') {
+      this.sendRoyal(
+        record.email,
+        approved ? 'Your Investors Club Affiliates Program membership is approved' : 'A decision on your Affiliates Program application',
+        {
+          lang: 'en',
+          title: approved ? 'Your membership is approved' : 'The management’s decision on your application',
+          greeting: `Welcome, ${record.name}`,
+          lead: approved
+            ? [
+                'The club management approved your membership in the Investors Club Affiliates Program. Your referral link and your dashboard are in the app: My account → Investors Club affiliates.',
+                'Reminder: the commission is earned for every member who registers through your code and actually pays the annual membership fee.',
+              ]
+            : ['Thank you for your interest in the Investors Club Affiliates Program. After review, the management has not approved the application at this time; you may apply again later.'],
+          rows: approved
+            ? [
+                { label: 'Referral code', value: record.code },
+                ...(link ? [{ label: 'Referral link', value: link }] : []),
+              ]
+            : record.adminNote
+              ? [{ label: 'Management note', value: record.adminNote }]
+              : [],
+        },
+        'affiliate decision',
+      );
+      return;
+    }
     this.sendRoyal(
       record.email,
       approved ? 'اعتماد انضمامك لبرنامج ممثلي نادي المستثمرين' : 'قرار بشأن طلب انضمامك لبرنامج ممثلي نادي المستثمرين',

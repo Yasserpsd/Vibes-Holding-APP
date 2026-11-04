@@ -6,6 +6,7 @@ import { advisorApi, type FillField } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { audio, readBase64 } from '@/components/advisor/VoiceButton';
 import { GlowButton, PressScale } from '@/components/motion';
+import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { textStart } from '@/i18n/direction';
 import { t } from '@/i18n';
@@ -40,6 +41,11 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
   const mod = audio as NonNullable<typeof audio>;
   const recorder = mod.useAudioRecorder(mod.RecordingPresets.HIGH_QUALITY);
   const paper = usePaper();
+  // M195: inside a FormCard the pill and the hint follow the form identity (navy ink, gold accent).
+  const form = useFormPalette();
+  const formPill = form ? { backgroundColor: form.tone === 'dark' ? 'rgba(231, 173, 63, 0.12)' : form.card, borderColor: form.accent } : null;
+  const formText = form ? { color: form.accent } : null;
+  const formHint = form ? { color: form.muted } : null;
   const [recording, setRecording] = useState(false);
   const [working, setWorking] = useState(false);
   const [outcome, setOutcome] = useState<{ tone: 'done' | 'partial'; text: string } | null>(null);
@@ -115,20 +121,20 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
         onPress={press}
         glow={recording}
         glowRadius={radii.pill}
-        style={[styles.pill, paper && styles.pillPaper, recording && styles.pillRecording, (disabled || working) && styles.pillMuted]}
+        style={[styles.pill, paper && styles.pillPaper, formPill, recording && styles.pillRecording, (disabled || working) && styles.pillMuted]}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ busy: working, disabled: disabled || working }}
       >
         <Animated.View style={{ transform: [{ scale: pulse }] }}>
-          <Ionicons name={recording ? 'stop-circle' : working ? 'hourglass-outline' : 'mic'} size={20} color={recording ? colors.white : colors.gold} />
+          <Ionicons name={recording ? 'stop-circle' : working ? 'hourglass-outline' : 'mic'} size={20} color={recording ? colors.white : form ? form.accent : colors.gold} />
         </Animated.View>
-        <Text style={[styles.pillText, paper && styles.pillTextPaper, recording && styles.pillTextRecording]} numberOfLines={1}>
+        <Text style={[styles.pillText, paper && styles.pillTextPaper, formText, recording && styles.pillTextRecording]} numberOfLines={1}>
           {label}
         </Text>
       </PressScale>
       </GlowButton>
-      <Text style={[styles.hint, paper && styles.hintPaper]}>{outcome ? outcome.text : t('voiceFill.hint')}</Text>
+      <Text style={[styles.hint, paper && styles.hintPaper, formHint]}>{outcome ? outcome.text : t('voiceFill.hint')}</Text>
       {outcome ? (
         <View style={[styles.outcomeBar, outcome.tone === 'done' ? styles.outcomeDone : styles.outcomePartial]} accessibilityElementsHidden />
       ) : null}
@@ -137,9 +143,10 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.xs, marginBottom: spacing.xs },
-  // The halo hugs the pill (the pill keeps its own flex-start inside the wrapper).
-  glow: { alignSelf: 'flex-start' },
+  // M195 (owner: «نص راكب على بعضه»): the pill row and the hint are two stacked blocks with real heights —
+  // the halo wrapper is a row of its own, never a floating layer the hint can slide under.
+  wrap: { gap: spacing.sm, marginBottom: spacing.xs, alignItems: 'stretch' },
+  glow: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   pill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',

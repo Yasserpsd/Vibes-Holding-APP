@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useFormPalette } from '@/components/form/FormTheme';
 import { SarText } from '@/components/SarText';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -23,7 +24,16 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function AppButton({ label, onPress, variant = 'primary', icon, style, disabled = false, loading = false }: Props) {
   const primary = variant === 'primary';
-  const color = primary ? colors.goldInk : colors.gold;
+  // M195: inside a FormCard the button wears the club identity — flat gold with navy text (no neon).
+  const palette = useFormPalette();
+  const color = palette ? (primary ? palette.buttonText : palette.accent) : primary ? colors.goldInk : colors.gold;
+  const formStyle = palette
+    ? primary
+      ? { backgroundColor: palette.buttonBg, borderColor: palette.buttonBorder, experimental_backgroundImage: undefined, boxShadow: undefined }
+      : variant === 'outline'
+        ? { backgroundColor: 'transparent', borderColor: palette.accent }
+        : null
+    : null;
   const muted = disabled || loading;
   // M38: the button dips under the finger and springs back — felt on every press in the app.
   const [scale] = useState(() => new Animated.Value(1));
@@ -36,7 +46,7 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
       disabled={muted}
       accessibilityRole="button"
       accessibilityState={{ disabled: muted, busy: loading }}
-      style={[styles.base, styles[variant], muted && styles.muted, style, { transform: [{ scale }] }]}
+      style={[styles.base, styles[variant], formStyle, muted && styles.muted, style, { transform: [{ scale }] }]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={color} />

@@ -9,6 +9,8 @@ import type { AppLang } from '../lang.js';
 import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 
+import { cityByKey, cityKeyOf, CITY_NAME, OTHER_CITY } from './cities.js';
+
 /**
  * M184: «برنامج ممثلي نادي المستثمرين» — the in-app affiliate program. Any signed-in account applies with
  * its full details (bank, address, how it heard of the club), receives the agreement by e-mail,
@@ -32,6 +34,18 @@ export const REMINDER_KEY = 'affiliate:reminder';
 /** M194: the daily reminder goes out in this Riyadh hour (19:00–19:59). */
 export const REMINDER_HOUR = 19;
 const MAX_PAYOUTS = 3000;
+/** M195: names compared loosely (spaces, case, hamza forms) when an address is checked against them. */
+const foldName = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase().replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+/** M195: words that make a line an address («حي», «شارع», "street", "building"…) — mirrors app/src/lib/validation.ts. */
+const ADDRESS_WORDS =
+  /(حي|شارع|طريق|مبنى|مبني|عمارة|عماره|رقم|شقة|شقه|الدور|فيلا|فله|فلة|مجمع|مخطط|بجوار|بجانب|قرب|مقابل|تقاطع|دوار|ميدان|street|st\.|road|rd\.|district|dist\.|building|bldg|apartment|apt|villa|unit|floor|near|next to|avenue|ave\.|tower|complex|compound|block|p\.?o\.? box|zip)/i;
+/** A few letter-only words with no digit, no punctuation and no address word read as a person's name («Abdulrahman AlAswad»). */
+export function looksLikePersonName(value: string): boolean {
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (/[0-9٠-٩]/.test(text) || /[,،;:/\-–()]/.test(text) || ADDRESS_WORDS.test(text)) return false;
+  const words = text.split(' ');
+  return words.length <= 4 && words.every((word) => /^[\u0600-\u06FFA-Za-z'’.]+$/.test(word));
+}
 const DAY_MS = 86_400_000;
 
 export type AffiliateStatus = 'agreement' | 'pending' | 'approved' | 'rejected';
@@ -53,6 +67,8 @@ export type AffiliateRecord = {
   address: string;
   heardFrom: string;
   heardFromNote: string;
+  /** M195: the applicant's app language — his agreement and decision mails follow it. */
+  lang?: AppLang;
   appliedAt: string;
   agreementSentAt: string;
   agreementAcceptedAt: string | null;
@@ -126,6 +142,8 @@ export type AffiliateConfig = {
   shareText: string;
   /** «كيف تعرّفت على نادي المستثمرين؟» options (owner: formal Arabic, many choices). */
   heardOptions: string[];
+  /** M195: the same options in English, line by line (the English app's labels); a missing line falls back to the Arabic. */
+  heardOptionsEn: string[];
   /** M194: the advisor's daily push to approved affiliates with no paying member yet (dashboard switch + texts). */
   reminderEnabled: boolean;
   reminderTitle: string;
@@ -146,6 +164,21 @@ export const DEFAULT_HEARD_OPTIONS = [
   'عن طريق صديق',
   'فعالية أو ملتقى',
   'أخرى',
+];
+
+/** M195: the English labels of DEFAULT_HEARD_OPTIONS, same order (the English app shows these). */
+export const DEFAULT_HEARD_OPTIONS_EN = [
+  'X (Twitter)',
+  'The official website',
+  'TikTok',
+  'Instagram',
+  'Snapchat',
+  'YouTube',
+  'LinkedIn',
+  'Google search',
+  'A friend',
+  'An event or meetup',
+  'Other',
 ];
 
 /** Drafted protective of the club (owner's spec 2026-11-02); the owner edits it from the dashboard. */
@@ -266,6 +299,7 @@ export const DEFAULT_AFFILIATE_CONFIG: AffiliateConfig = {
     'وعند التسجيل أدخل رمز الإحالة {code} في خانة «كود الدعوة».',
   ].join('\n'),
   heardOptions: DEFAULT_HEARD_OPTIONS,
+  heardOptionsEn: DEFAULT_HEARD_OPTIONS_EN,
   // M194 (owner, 2026-11-04: «يفكره يوميا انه لسه ما سجل يا صديقي»).
   reminderEnabled: true,
   reminderTitle: 'تذكير من مستشارك',
@@ -364,6 +398,8 @@ export class AffiliateService {
     // Texts saved under older terms give way to the current defaults (M186); the numbers always stand.
     const texts = stored?.textsVersion === TEXTS_VERSION ? stored : undefined;
     const options = (stored?.heardOptions ?? []).map((option) => option.trim()).filter(Boolean);
+    // M195: the English column rides along line by line; the defaults' English only with the default Arabic.
+    const optionsEn = (stored?.heardOptionsEn ?? []).map((option) => option.trim());
     const count = (value: unknown, fallback: number, min = 0) => (typeof value === 'number' && value >= min ? Math.round(value) : fallback);
     return {
       commission: count(stored?.commission, DEFAULT_AFFILIATE_CONFIG.commission, 1),
@@ -378,6 +414,7 @@ export class AffiliateService {
       introTextEn: texts?.introTextEn?.trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: stored?.shareText?.trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: options.length ? options : DEFAULT_AFFILIATE_CONFIG.heardOptions,
+      heardOptionsEn: optionsEn.some(Boolean) ? optionsEn : options.length ? [] : DEFAULT_AFFILIATE_CONFIG.heardOptionsEn,
       reminderEnabled: typeof stored?.reminderEnabled === 'boolean' ? stored.reminderEnabled : DEFAULT_AFFILIATE_CONFIG.reminderEnabled,
       reminderTitle: stored?.reminderTitle?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitle,
       reminderBody: stored?.reminderBody?.trim() || DEFAULT_AFFILIATE_CONFIG.reminderBody,
@@ -401,6 +438,7 @@ export class AffiliateService {
       introTextEn: (input.introTextEn ?? current.introTextEn).trim() || DEFAULT_AFFILIATE_CONFIG.introTextEn,
       shareText: (input.shareText ?? current.shareText).trim() || DEFAULT_AFFILIATE_CONFIG.shareText,
       heardOptions: (input.heardOptions ?? current.heardOptions).map((option) => option.trim()).filter(Boolean),
+      heardOptionsEn: (input.heardOptionsEn ?? current.heardOptionsEn).map((option) => option.trim()),
       reminderEnabled: input.reminderEnabled ?? current.reminderEnabled,
       reminderTitle: (input.reminderTitle ?? current.reminderTitle).trim() || DEFAULT_AFFILIATE_CONFIG.reminderTitle,
       reminderBody: (input.reminderBody ?? current.reminderBody).trim() || DEFAULT_AFFILIATE_CONFIG.reminderBody,
@@ -410,6 +448,28 @@ export class AffiliateService {
     if (!next.heardOptions.length) next.heardOptions = DEFAULT_AFFILIATE_CONFIG.heardOptions;
     await this.deps.kv.set(AFFILIATE_CONFIG_KEY, { ...next, textsVersion: TEXTS_VERSION });
     return next;
+  }
+
+  /** M195: the source options as {value: the stored Arabic, label: the reader's language}. */
+  static heardChoices(config: AffiliateConfig, lang: 'ar' | 'en'): { value: string; label: string }[] {
+    return config.heardOptions.map((option, index) => ({ value: option, label: (lang === 'en' && config.heardOptionsEn[index]?.trim()) || option }));
+  }
+
+  /**
+   * M195: the city of residence as the record stores it (the Arabic name). The app sends a list key, or
+   * 'other' plus a typed name; an older bundle's bare name of a listed city is mapped too, and any other
+   * free text must at least read as a name (letters only).
+   */
+  static resolveCity(value: string, other: string, en: boolean): string {
+    const listed = cityByKey(value);
+    if (listed && listed.key !== OTHER_CITY) return listed.ar;
+    const known = listed ? null : cityByKey(cityKeyOf(value));
+    if (known && known.key !== OTHER_CITY) return known.ar;
+    const typed = (listed ? other : value).replace(/\s+/g, ' ').trim();
+    if (!CITY_NAME.test(typed)) {
+      throw new RequestError('city', en ? 'Pick your city from the list, or type its name (letters only)' : 'اختر مدينتك من القائمة أو اكتب اسمها بالحروف فقط', 400);
+    }
+    return typed;
   }
 
   /** The amount in words the texts carry («250 ريال سعودي», «1,500 ريال سعودي»). */
@@ -623,12 +683,21 @@ export class AffiliateService {
    */
   async apply(
     member: { contactId: number; name: string; email: string; phone: string; code: string },
-    form: { entityType: 'individual' | 'company'; bankName: string; accountName: string; iban: string; city: string; address: string; heardFrom: string; heardFromNote: string },
+    form: { entityType: 'individual' | 'company'; bankName: string; accountName: string; iban: string; city: string; cityOther?: string; address: string; heardFrom: string; heardFromNote?: string },
     now = new Date(),
+    lang: AppLang = 'ar',
   ): Promise<AffiliateRecord> {
     const config = await this.config();
+    const en = lang === 'en';
     if (!config.heardOptions.includes(form.heardFrom)) {
-      throw new RequestError('heard_from', 'اختر كيف تعرّفت على النادي من القائمة', 400);
+      throw new RequestError('heard_from', en ? 'Pick how you heard about the Investors Club from the list' : 'اختر كيف عرفت عن نادي المستثمرين من القائمة', 400);
+    }
+    const city = AffiliateService.resolveCity(form.city, form.cityOther ?? '', en);
+    // M195: an address, not a person's name (owner: a member wrote his own name there) — 10+ characters, two words.
+    const address = form.address.replace(/\s+/g, ' ').trim();
+    const sameAsName = [member.name, form.accountName].some((name) => foldName(name) === foldName(address));
+    if (address.length < 10 || address.split(' ').length < 2 || sameAsName || looksLikePersonName(address)) {
+      throw new RequestError('address', en ? 'Write a real address: district, street and building number' : 'اكتب عنوانًا فعليًا: الحي والشارع ورقم المبنى', 400);
     }
     const record = await this.mutate((affiliates) => {
       const existing = affiliates.find((entry) => entry.contactId === member.contactId);
@@ -642,7 +711,16 @@ export class AffiliateService {
         phone: member.phone,
         code: member.code,
         status: 'agreement',
-        ...form,
+        entityType: form.entityType,
+        bankName: form.bankName,
+        accountName: form.accountName,
+        iban: form.iban,
+        city,
+        address,
+        heardFrom: form.heardFrom,
+        // M195 (owner): the «Tell us the source» note is gone — the option stands alone.
+        heardFromNote: '',
+        lang,
         appliedAt: now.toISOString(),
         agreementSentAt: now.toISOString(),
         agreementAcceptedAt: null,
@@ -654,7 +732,12 @@ export class AffiliateService {
       affiliates.push(next);
       return next;
     });
-    this.deps.notifier.affiliateAgreement(record, AffiliateService.fillTerms(config.agreementText, config, 'ar'), AffiliateService.commissionLabel(config.commission));
+    // M195: the agreement mail in the applicant's language (the Arabic text stays the authoritative one).
+    this.deps.notifier.affiliateAgreement(
+      record,
+      AffiliateService.fillTerms(en ? config.agreementTextEn : config.agreementText, config, en ? 'en' : 'ar'),
+      en ? AffiliateService.commissionLabelEn(config.commission) : AffiliateService.commissionLabel(config.commission),
+    );
     return record;
   }
 

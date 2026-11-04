@@ -30,6 +30,7 @@ import { AdsAttribution } from '@/components/AdsAttribution';
 import { PushRegistrar } from '@/components/PushRegistrar';
 import { ScreenTracker } from '@/components/ScreenTracker';
 import { SyncPoller } from '@/components/SyncPoller';
+import { UpdateGate } from '@/components/UpdateGate';
 import { initI18n, t } from '@/i18n';
 import { isRTL, syncDirection } from '@/i18n/direction';
 import { syncStrings } from '@/i18n/remote';
@@ -126,6 +127,8 @@ export default function RootLayout() {
           <AdsAttribution />
           <SyncPoller />
           <ScreenTracker />
+          {/* M195: the forced-update cover and the «restart to apply the OTA» banner. */}
+          <UpdateGate />
           <StatusBar style="light" />
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}

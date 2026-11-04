@@ -252,6 +252,8 @@ export type AffiliateConfig = {
   introTextEn: string;
   shareText: string;
   heardOptions: string[];
+  /** M195: the English labels, line by line in the same order (the English app shows these). */
+  heardOptionsEn: string[];
   /** M194: the daily reminder push to affiliates with no paying member yet. */
   reminderEnabled: boolean;
   reminderTitle: string;

@@ -35,6 +35,8 @@ const WRITE_TIMEOUT_MS = 30_000;
 // The auth provider registers the current session token and a handler for rejected sessions.
 let currentToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
+// M195: the server answered 426 update_required — the UpdateGate shows the forced-update cover.
+let onUpdateRequired: ((message: string) => void) | null = null;
 
 export function setAuthToken(token: string | null): void {
   currentToken = token;
@@ -42,6 +44,10 @@ export function setAuthToken(token: string | null): void {
 
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   onUnauthorized = handler;
+}
+
+export function setUpdateRequiredHandler(handler: ((message: string) => void) | null): void {
+  onUpdateRequired = handler;
 }
 
 // Built by hand: Hermes does not implement URLSearchParams fully.
@@ -61,7 +67,8 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   // The server answers in the app's language where it has both (news feeds, topics, content).
   // M146: the platform rides along so the hub's «عضو جديد» mail says iPhone / Android.
   // M168: the completion-gate fields this bundle draws — the server's wall names only these.
-  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS, 'x-app-gate': GATE_FIELDS.join(',') };
+  // M195: the binary version rides along so the server can refuse a build that is too old (426 update_required).
+  const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS, 'x-app-gate': GATE_FIELDS.join(','), 'x-app-version': env.appVersion };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 
@@ -96,6 +103,7 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     // A rejected session token (expired or revoked) signs the user out everywhere.
     const expiredSession = response.status === 401 && token && token === currentToken && code !== 'bad_login';
     if (expiredSession) onUnauthorized?.();
+    if (response.status === 426 || code === 'update_required') onUpdateRequired?.(message);
     throw new ApiError(message, response.status, code);
   }
 

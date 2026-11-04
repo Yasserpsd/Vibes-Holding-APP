@@ -6,16 +6,21 @@ import type { AuthService } from '../auth/service.js';
 import { langOf } from '../lang.js';
 import { APP_STORE_BADGE, PLAY_STORE_BADGE } from '../legal/badges.js';
 import { APP_STORE_URL, PLAY_STORE_URL } from '../legal/applink.js';
+import { cityChoices, cityKeyOf } from './cities.js';
+import { ibanIssueMessage, saudiIbanIssue } from './iban.js';
 import { AffiliateService, type AffiliateRecord } from './service.js';
 
 export type AffiliateRoutesOptions = { service: AffiliateService; auth: AuthService };
 
-/** An IBAN as banks print it: two letters then 13 to 32 digits/letters; spaces and case are forgiven. */
+/** M195: a Saudi IBAN (SA + 22, mod-97 checked); spaces and case are forgiven. */
 const ibanSchema = z
   .string()
   .trim()
   .transform((value) => value.replace(/\s+/g, '').toUpperCase())
-  .pipe(z.string().regex(/^[A-Z]{2}[0-9A-Z]{13,32}$/, 'اكتب رقم الآيبان كاملًا كما يظهر في حسابك البنكي'));
+  .superRefine((value, ctx) => {
+    const issue = saudiIbanIssue(value);
+    if (issue) ctx.addIssue({ code: 'custom', message: ibanIssueMessage(issue) });
+  });
 
 const bankSchema = {
   bankName: z.string().trim().min(2, 'اكتب اسم البنك').max(80),
@@ -25,7 +30,8 @@ const bankSchema = {
     .trim()
     .min(2, 'اكتب اسم صاحب الحساب كما هو مسجّل في البنك')
     .max(120)
-    .regex(/^[A-Za-z0-9\s.,'&()/-]+$/, 'اكتب اسم صاحب الحساب بالأحرف الإنجليزية كما هو مسجّل لدى البنك'),
+    // M195: letters only (spaces, dots, apostrophes and hyphens inside), as the owner asked.
+    .regex(/^[A-Za-z][A-Za-z\s.'’-]*$/, 'اكتب اسم صاحب الحساب بالأحرف الإنجليزية فقط كما هو مسجّل لدى البنك'),
   iban: ibanSchema,
 };
 
@@ -33,9 +39,11 @@ const applySchema = z.object({
   // Owner, 2026-11-02: the applicant must say whether he applies as a person or a company.
   entityType: z.enum(['individual', 'company'], { message: 'حدّد هل تقدّم الطلب بصفتك فردًا أم شركة' }),
   ...bankSchema,
-  city: z.string().trim().min(2, 'اكتب مدينة الإقامة').max(60),
-  address: z.string().trim().min(5, 'اكتب العنوان').max(240),
-  heardFrom: z.string().trim().min(2, 'اختر كيف تعرّفت على النادي').max(60),
+  // M195: a list key ('other' + cityOther), or a bare city name from an older bundle (the service resolves it).
+  city: z.string().trim().min(2, 'اختر مدينة الإقامة').max(60),
+  cityOther: z.string().trim().max(60).default(''),
+  address: z.string().trim().min(10, 'اكتب عنوانًا فعليًا: الحي والشارع ورقم المبنى').max(240),
+  heardFrom: z.string().trim().min(2, 'اختر كيف عرفت عن نادي المستثمرين').max(60),
   heardFromNote: z.string().trim().max(200).default(''),
 });
 
@@ -65,6 +73,7 @@ const configSchema = z
     introTextEn: z.string().trim().min(20, 'Write the program pitch in English').max(2000),
     shareText: z.string().trim().min(10, 'اكتب نص المشاركة').max(1000),
     heardOptions: z.array(z.string().trim().min(1).max(60)).min(2).max(30),
+    heardOptionsEn: z.array(z.string().trim().max(80)).max(30),
     reminderEnabled: z.boolean(),
     reminderTitle: z.string().trim().min(3, 'اكتب عنوان التذكير').max(80),
     reminderBody: z.string().trim().min(10, 'اكتب نص التذكير').max(400),
@@ -94,6 +103,8 @@ function ownApplication(record: AffiliateRecord) {
     address: record.address,
     heardFrom: record.heardFrom,
     heardFromNote: record.heardFromNote,
+    // M195: the city as a list key so a re-application prefills the picker.
+    cityKey: cityKeyOf(record.city),
     appliedAt: record.appliedAt,
     agreementAcceptedAt: record.agreementAcceptedAt,
     adminNote: record.status === 'rejected' ? record.adminNote : null,
@@ -130,6 +141,9 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
         introText: fill(lang === 'en' ? config.introTextEn : config.introText),
         agreementText: fill(lang === 'en' ? config.agreementTextEn : config.agreementText),
         heardOptions: config.heardOptions,
+        // M195: the same options labelled in the app's language, and the Saudi cities to pick from.
+        heardChoices: AffiliateService.heardChoices(config, lang === 'en' ? 'en' : 'ar'),
+        cities: cityChoices(lang === 'en' ? 'en' : 'ar'),
         application: record ? ownApplication(record) : null,
       };
       if (record?.status !== 'approved') return base;
@@ -171,6 +185,8 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       const record = await service.apply(
         { contactId: me.id, name: me.name, email: me.email, phone: me.phone, code: me.cardNumber },
         input,
+        new Date(),
+        langOf(request),
       );
       return { application: ownApplication(record) };
     }),

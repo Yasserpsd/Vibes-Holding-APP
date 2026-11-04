@@ -5,9 +5,20 @@
  * User-opened dialogs (the store popup behind a button) are not gated.
  */
 let claimed = false;
+// M195: while the forced-update cover is up no automatic popup may open (a native Modal would sit above the cover).
+let blocked = false;
+
+export function blockAutoPopups(value: boolean): void {
+  blocked = value;
+}
+
+/** True while the forced-update cover is up: self-opening popups (the intro video) stay shut. */
+export function autoPopupsBlocked(): boolean {
+  return blocked;
+}
 
 export function claimAutoPopup(): boolean {
-  if (claimed) return false;
+  if (claimed || blocked) return false;
   claimed = true;
   return true;
 }

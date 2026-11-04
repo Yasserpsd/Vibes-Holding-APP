@@ -19,6 +19,8 @@ export type AffiliateApplication = {
   address: string;
   heardFrom: string;
   heardFromNote: string;
+  /** M195: the city as a list key ('other' = typed freely); an older server sends none. */
+  cityKey?: string;
   appliedAt: string;
   agreementAcceptedAt: string | null;
   adminNote: string | null;
@@ -76,6 +78,10 @@ export type AffiliateOverview = {
   introText: string;
   agreementText: string;
   heardOptions: string[];
+  /** M195: the same options as {value (the stored Arabic), label (the app's language)}; an older server sends none. */
+  heardChoices?: { value: string; label: string }[];
+  /** M195: the Saudi cities to pick from (value = key, label in the app's language), 'other' last; an older server sends none. */
+  cities?: { value: string; label: string }[];
   application: AffiliateApplication | null;
   /** Present only once the administration approved the affiliate. */
   code?: string;
@@ -93,6 +99,8 @@ export type AffiliateForm = {
   accountName: string;
   iban: string;
   city: string;
+  /** M195: the typed city when `city` is 'other'. */
+  cityOther?: string;
   address: string;
   heardFrom: string;
   heardFromNote: string;

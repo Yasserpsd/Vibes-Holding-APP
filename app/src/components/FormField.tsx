@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { FadeInView } from '@/components/motion';
+import { FieldError } from '@/components/form/FormParts';
+import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -12,18 +13,33 @@ type Props = TextInputProps & {
   error?: string | null;
   /** Latin content (e-mail, phone, password) is typed left-to-right in both languages. */
   latin?: boolean;
+  /** M195: the row the screen scrolls to when this field holds the first error (useFormErrors.anchor). */
+  anchorRef?: Ref<View>;
 };
 
-export function FormField({ label, hint, error, latin = false, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+/**
+ * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
+ * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
+ */
+export function FormField({ label, hint, error, latin = false, anchorRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // M85: inside a PaperCard the field wears the light palette on its own.
   const paper = usePaper();
+  const form = useFormPalette();
+  const formInput = form
+    ? {
+        color: form.ink,
+        backgroundColor: form.field,
+        borderColor: error ? form.danger : focused ? form.fieldFocus : form.fieldBorder,
+        borderWidth: error || focused ? 1.5 : 1,
+      }
+    : null;
   return (
-    <View style={styles.field}>
-      <Text style={[styles.label, paper && styles.paperLabel]}>{label}</Text>
+    <View ref={anchorRef} style={styles.field} collapsable={false}>
+      <Text style={[styles.label, paper && styles.paperLabel, form ? { color: error ? form.danger : form.inkSoft } : null]}>{label}</Text>
       <TextInput
-        placeholderTextColor={paper ? colors.paperFaint : colors.textFaint}
-        selectionColor={paper ? colors.paperGold : colors.gold}
+        placeholderTextColor={form ? form.placeholder : paper ? colors.paperFaint : colors.textFaint}
+        selectionColor={form ? form.fieldFocus : paper ? colors.paperGold : colors.gold}
         multiline={multiline}
         {...inputProps}
         onFocus={(event) => {
@@ -39,17 +55,20 @@ export function FormField({ label, hint, error, latin = false, style, multiline,
           paper && styles.paperInput,
           latin ? styles.latin : { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
           multiline && styles.multiline,
-          focused && !error ? (paper ? styles.paperInputFocused : styles.inputFocused) : null,
-          error ? styles.inputError : null,
+          !form && focused && !error ? (paper ? styles.paperInputFocused : styles.inputFocused) : null,
+          !form && error ? styles.inputError : null,
+          formInput,
           style,
         ]}
       />
       {error ? (
-        <FadeInView offset={4}>
+        form ? (
+          <FieldError text={error} />
+        ) : (
           <Text style={styles.error}>{error}</Text>
-        </FadeInView>
+        )
       ) : hint ? (
-        <Text style={[styles.hint, paper && styles.paperHint]}>{hint}</Text>
+        <Text style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -68,6 +87,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
+    minHeight: 50,
   },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },

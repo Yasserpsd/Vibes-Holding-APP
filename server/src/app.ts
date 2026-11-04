@@ -36,6 +36,7 @@ import { affiliateRoutes } from './affiliate/routes.js';
 import { AffiliateService } from './affiliate/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { appLinkRoutes } from './legal/applink.js';
+import { appVersionRoutes, installAppVersionGate } from './appVersion.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { EnglishSweep } from './content/englishSweep.js';
@@ -180,6 +181,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   app.addHook('onRequest', async (request, reply) => {
     if (request.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
   });
+
+  // M195: the forced-update floor (dashboard value or MIN_APP_VERSION) — an app binary below it gets 426 on every
+  // /api call. Installed here, before any route plugin, so every context inherits the hook.
+  installAppVersionGate(app, { kv, envMinVersion: config.MIN_APP_VERSION, requireHeader: config.APP_REQUIRE_VERSION === '1' });
 
   // The web dashboard lives on its own origin and signs in with Bearer tokens (no cookies): answer only listed origins.
   const adminOrigins = new Set((config.ADMIN_ORIGINS ?? '').split(',').map(trimOrigin).filter(Boolean));
@@ -595,6 +600,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(discountsRoutes, { service: discounts, auth });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep, requests });
   await app.register(appStringsRoutes, { kv, auth, sync });
+  await app.register(appVersionRoutes, { kv, auth, envMinVersion: config.MIN_APP_VERSION, requireHeader: config.APP_REQUIRE_VERSION === '1' });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const deletionSweep = async (): Promise<void> => {

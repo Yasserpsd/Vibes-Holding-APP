@@ -32,11 +32,14 @@ export function nameRuleIssue(input: string): NameIssue | null {
   const name = normalizeName(input);
   if (name.length < 5) return 'short';
   if (/[0-9٠-٩]/.test(name)) return 'symbols';
+  // M195 (owner): a dot, an @ or an underscore is a username («yasser4.designer»), whatever the word count.
+  if (/[.@_]/.test(name)) return 'symbols';
   const words = name.split(/[\s]+/).filter(Boolean);
   if (words.length < 2) return 'oneWord';
   for (const word of words) {
-    // Letters of Arabic or Latin, with an apostrophe, dot or hyphen inside («Al-Otaibi», «D'Souza», «عبد.»).
-    if (!/^[\p{Script=Arabic}\p{Script=Latin}][\p{Script=Arabic}\p{Script=Latin}'’.\-]*$/u.test(word)) return 'symbols';
+    // Letters of Arabic or Latin, with an apostrophe or hyphen inside («Al-Otaibi», «D'Souza»). M195 (owner): a dot
+    // means a username («yasser4.designer»), never a name.
+    if (!/^[\p{Script=Arabic}\p{Script=Latin}][\p{Script=Arabic}\p{Script=Latin}'’\-]*$/u.test(word)) return 'symbols';
     if (/(.)\1{3,}/u.test(word)) return 'mash';
     if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(word)) return 'mash';
     if (/[^aeiouyAEIOUY\p{Script=Arabic}'’.\-]{9,}/u.test(word)) return 'mash';
@@ -56,7 +59,7 @@ export function nameIssueMessage(issue: NameIssue, lang: 'ar' | 'en' = 'ar'): st
     const why: Record<NameIssue, string> = {
       short: 'The name is too short.',
       oneWord: 'Write your first name and your family name.',
-      symbols: 'Letters only — no digits or symbols.',
+      symbols: 'Letters only — no digits, dots, @ or symbols.',
       kunya: 'A kunya such as «Abu Mohammed» is not accepted.',
       mash: 'This does not read as a real name.',
       placeholder: 'This does not read as a real name.',
@@ -66,7 +69,7 @@ export function nameIssueMessage(issue: NameIssue, lang: 'ar' | 'en' = 'ar'): st
   const why: Record<NameIssue, string> = {
     short: 'الاسم قصير جدًا.',
     oneWord: 'اكتب اسمك الأول واسم العائلة.',
-    symbols: 'الاسم بالحروف فقط، بدون أرقام أو رموز.',
+    symbols: 'الاسم بالحروف فقط، بدون أرقام أو نقاط أو رموز.',
     kunya: 'الكنية مثل «أبو محمد» لا تُقبل كاسم.',
     mash: 'هذا لا يبدو اسمًا حقيقيًا.',
     placeholder: 'هذا لا يبدو اسمًا حقيقيًا.',

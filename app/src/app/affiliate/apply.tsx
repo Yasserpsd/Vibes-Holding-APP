@@ -1,31 +1,38 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import type { ScrollView } from 'react-native';
 
 import { useAffiliate, affiliateApi, type AffiliateEntityType, type AffiliateOverview } from '@/api/affiliate';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { ChipRow, ErrorSummary, FieldGroup } from '@/components/form/FormParts';
+import { FormCard } from '@/components/form/FormTheme';
+import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
-import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { OptionPicker } from '@/components/OptionPicker';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { addressIssue, ibanIssue, isLatinName, normalizeIban } from '@/lib/validation';
 
 /**
  * M184: the application form (owner, 2026-11-02: full details — bank, IBAN, address, and
- * «كيف تعرّفت على نادي المستثمرين؟» from a dashboard-editable list). Submitting mails the
+ * «كيف عرفت عن نادي المستثمرين؟» from a dashboard-editable list). Submitting mails the
  * agreement; the administration's dashboard approval alone activates the affiliate.
+ * M195 (owner, 2026-11-04): the club identity (navy + gold, dark tone on this black screen), real
+ * checks (IBAN mod-97, English account name, a city from a list, a real address) with red errors
+ * under the field, a red summary on top and an automatic scroll to the first error; the source
+ * options and every text follow the app's language.
  */
 export default function AffiliateApplyScreen() {
   const { status } = useAuth();
   const router = useRouter();
   const overview = useAffiliate(status === 'signedIn');
+  const scrollRef = useRef<ScrollView | null>(null);
 
   if (status !== 'signedIn') {
     return (
@@ -38,19 +45,22 @@ export default function AffiliateApplyScreen() {
   }
 
   return (
-    <Screen title={t('affiliate.applyTitle')} subtitle={t('affiliate.applySubtitle')}>
+    <Screen title={t('affiliate.applyTitle')} subtitle={t('affiliate.applySubtitle')} scrollRef={scrollRef}>
       <Stack.Screen options={{ title: t('nav.affiliate') }} />
       {!overview.data ? (
         <StateView loading={overview.isLoading} error={overview.error} onRetry={() => void overview.refetch()} />
       ) : (
-        <ApplyForm data={overview.data} />
+        <ApplyForm data={overview.data} scrollRef={scrollRef} />
       )}
     </Screen>
   );
 }
 
+type Field = 'entityType' | 'bankName' | 'accountName' | 'iban' | 'city' | 'cityOther' | 'address' | 'heardFrom';
+const ORDER: Field[] = ['entityType', 'bankName', 'accountName', 'iban', 'city', 'cityOther', 'address', 'heardFrom'];
+
 /** Mounted only once the overview is loaded, so a re-application starts prefilled. */
-function ApplyForm({ data }: { data: AffiliateOverview }) {
+function ApplyForm({ data, scrollRef }: { data: AffiliateOverview; scrollRef: React.RefObject<ScrollView | null> }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { me } = useAuth();
@@ -60,30 +70,49 @@ function ApplyForm({ data }: { data: AffiliateOverview }) {
   const [bankName, setBankName] = useState(application?.bankName ?? '');
   const [accountName, setAccountName] = useState(application?.accountName ?? '');
   const [iban, setIban] = useState(application?.iban ?? '');
-  const [city, setCity] = useState(application?.city ?? '');
+  const [city, setCity] = useState<string | null>(application?.cityKey ?? null);
+  const [cityOther, setCityOther] = useState(application?.cityKey === 'other' ? (application.city ?? '') : '');
   const [address, setAddress] = useState(application?.address ?? '');
   const [heardFrom, setHeardFrom] = useState<string | null>(application?.heardFrom || null);
-  const [heardFromNote, setHeardFromNote] = useState(application?.heardFromNote ?? '');
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const form = useFormErrors<Field>(scrollRef);
+
+  // An older server sends the Arabic strings only; the app then shows them as they are.
+  const heardChoices = data.heardChoices ?? data.heardOptions.map((option) => ({ value: option, label: option }));
+  const cities = data.cities ?? [];
+
+  const validate = () => {
+    const next: Partial<Record<Field, string>> = {};
+    if (!entityType) next.entityType = t('form.error.memberType');
+    if (bankName.trim().length < 2) next.bankName = t('form.error.bank');
+    if (!isLatinName(accountName)) next.accountName = t('form.error.latin');
+    const ibanProblem = ibanIssue(iban);
+    if (ibanProblem) next.iban = t(`form.error.iban.${ibanProblem}`);
+    if (cities.length && !city) next.city = t('form.error.city');
+    if (cities.length && city === 'other' && !/^[؀-ۿA-Za-z][؀-ۿA-Za-z\s'’-]{2,}$/.test(cityOther.trim())) next.cityOther = t('form.error.cityOther');
+    const addressProblem = addressIssue(address, [me?.name ?? '', accountName, bankName]);
+    if (addressProblem) next.address = t(`form.error.address.${addressProblem}`);
+    if (!heardFrom) next.heardFrom = t('form.error.heardFrom');
+    return next;
+  };
 
   const submit = async () => {
-    if (!entityType || !bankName.trim() || !accountName.trim() || !iban.trim() || !city.trim() || !address.trim() || !heardFrom) {
-      setSubmitError(t('affiliate.incomplete'));
-      return;
-    }
-    setBusy(true);
+    if (busy) return;
     setSubmitError(null);
+    if (form.fail(validate(), ORDER) || !entityType) return;
+    setBusy(true);
     try {
       await affiliateApi.apply({
         entityType,
         bankName: bankName.trim(),
         accountName: accountName.trim(),
-        iban: iban.trim(),
-        city: city.trim(),
+        iban: normalizeIban(iban),
+        city: cities.length ? (city ?? '') : cityOther.trim(),
+        cityOther: city === 'other' ? cityOther.trim() : '',
         address: address.trim(),
-        heardFrom,
-        heardFromNote: heardFromNote.trim(),
+        heardFrom: heardFrom ?? '',
+        heardFromNote: '',
       });
       await queryClient.invalidateQueries({ queryKey: ['affiliate'] });
       router.back();
@@ -95,60 +124,147 @@ function ApplyForm({ data }: { data: AffiliateOverview }) {
   };
 
   return (
-    <>
-      <FadeInView delay={entranceDelay(0)}>
-        <Text style={styles.heardLabel}>{t('affiliate.entityType')}</Text>
-        <View style={styles.chips}>
-          <Chip label={t('affiliate.individual')} selected={entityType === 'individual'} dimmed={entityType === 'company'} onPress={() => setEntityType('individual')} />
-          <Chip label={t('affiliate.company')} selected={entityType === 'company'} dimmed={entityType === 'individual'} onPress={() => setEntityType('company')} />
-        </View>
-      </FadeInView>
-      <FadeInView delay={entranceDelay(0)}>
-        <FormField label={t('affiliate.bankName')} value={bankName} onChangeText={setBankName} maxLength={80} />
-      </FadeInView>
-      <FadeInView delay={entranceDelay(1)}>
-        {/* Owner (2026-11-02): the bank account is English; every other field takes Arabic freely. */}
-        <FormField label={t('affiliate.accountName')} hint={t('affiliate.accountNameHint')} value={accountName} onChangeText={setAccountName} latin autoCapitalize="words" autoCorrect={false} maxLength={120} />
-      </FadeInView>
-      <FadeInView delay={entranceDelay(2)}>
-        <FormField
-          label={t('affiliate.iban')}
-          hint={t('affiliate.ibanHint')}
-          value={iban}
-          onChangeText={setIban}
-          latin
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={40}
-        />
-      </FadeInView>
-      <FadeInView delay={entranceDelay(3)}>
-        <FormField label={t('affiliate.city')} value={city} onChangeText={setCity} maxLength={60} />
-      </FadeInView>
-      <FadeInView delay={entranceDelay(4)}>
-        <FormField label={t('affiliate.address')} value={address} onChangeText={setAddress} multiline maxLength={240} />
-      </FadeInView>
+    <FormCard tone="dark">
+      <ErrorSummary count={form.count} />
 
-      <FadeInView delay={entranceDelay(5)}>
-        <Text style={styles.heardLabel}>{t('affiliate.heardFrom')}</Text>
-        <View style={styles.chips}>
-          {data.heardOptions.map((option) => (
-            <Chip key={option} label={option} selected={heardFrom === option} dimmed={heardFrom !== null && heardFrom !== option} onPress={() => setHeardFrom(option)} />
-          ))}
-        </View>
-      </FadeInView>
-      {heardFrom === 'أخرى' || heardFrom === 'Other' ? (
-        <FormField label={t('affiliate.heardFromNote')} value={heardFromNote} onChangeText={setHeardFromNote} maxLength={200} />
+      <FieldGroup label={t('affiliate.entityType')} error={form.errors.entityType} anchorRef={form.anchor('entityType')}>
+        <ChipRow>
+          <Chip
+            label={t('affiliate.individual')}
+            selected={entityType === 'individual'}
+            onPress={() => {
+              setEntityType('individual');
+              form.clear('entityType');
+            }}
+          />
+          <Chip
+            label={t('affiliate.company')}
+            selected={entityType === 'company'}
+            onPress={() => {
+              setEntityType('company');
+              form.clear('entityType');
+            }}
+          />
+        </ChipRow>
+      </FieldGroup>
+
+      <FormField
+        label={t('affiliate.bankName')}
+        value={bankName}
+        onChangeText={(value) => {
+          setBankName(value);
+          form.clear('bankName');
+        }}
+        error={form.errors.bankName}
+        anchorRef={form.anchor('bankName')}
+        maxLength={80}
+      />
+      {/* Owner (2026-11-02): the bank account is English; every other field takes Arabic freely. */}
+      <FormField
+        label={t('affiliate.accountName')}
+        hint={t('affiliate.accountNameHint')}
+        value={accountName}
+        onChangeText={(value) => {
+          setAccountName(value);
+          form.clear('accountName');
+        }}
+        error={form.errors.accountName}
+        anchorRef={form.anchor('accountName')}
+        latin
+        autoCapitalize="words"
+        autoCorrect={false}
+        maxLength={120}
+      />
+      <FormField
+        label={t('affiliate.iban')}
+        hint={t('affiliate.ibanHint')}
+        placeholder={t('affiliate.ibanPlaceholder')}
+        value={iban}
+        onChangeText={(value) => {
+          setIban(value);
+          form.clear('iban');
+        }}
+        error={form.errors.iban}
+        anchorRef={form.anchor('iban')}
+        latin
+        autoCapitalize="characters"
+        autoCorrect={false}
+        maxLength={34}
+      />
+
+      {cities.length ? (
+        <OptionPicker
+          label={t('affiliate.city')}
+          options={cities}
+          selected={city}
+          onSelect={(value) => {
+            setCity(value);
+            form.clear('city');
+          }}
+          placeholder={t('affiliate.cityPlaceholder')}
+          error={form.errors.city}
+          anchorRef={form.anchor('city')}
+        />
+      ) : (
+        <FormField
+          label={t('affiliate.city')}
+          value={cityOther}
+          onChangeText={(value) => {
+            setCityOther(value);
+            form.clear('cityOther');
+          }}
+          error={form.errors.cityOther}
+          anchorRef={form.anchor('cityOther')}
+          maxLength={60}
+        />
+      )}
+      {cities.length && city === 'other' ? (
+        <FormField
+          label={t('affiliate.cityOther')}
+          value={cityOther}
+          onChangeText={(value) => {
+            setCityOther(value);
+            form.clear('cityOther');
+          }}
+          error={form.errors.cityOther}
+          anchorRef={form.anchor('cityOther')}
+          maxLength={60}
+        />
       ) : null}
+
+      <FormField
+        label={t('affiliate.address')}
+        hint={t('affiliate.addressHint')}
+        value={address}
+        onChangeText={(value) => {
+          setAddress(value);
+          form.clear('address');
+        }}
+        error={form.errors.address}
+        anchorRef={form.anchor('address')}
+        multiline
+        maxLength={240}
+      />
+
+      <FieldGroup label={t('affiliate.heardFrom')} error={form.errors.heardFrom} anchorRef={form.anchor('heardFrom')}>
+        <ChipRow>
+          {heardChoices.map((option) => (
+            <Chip
+              key={option.value}
+              label={option.label}
+              selected={heardFrom === option.value}
+              onPress={() => {
+                setHeardFrom(option.value);
+                form.clear('heardFrom');
+              }}
+            />
+          ))}
+        </ChipRow>
+      </FieldGroup>
 
       {submitError ? <Notice tone="warning" text={submitError} support /> : null}
       <Notice tone="info" text={t('affiliate.applyNote')} />
       <AppButton label={t('affiliate.submit')} icon="send-outline" loading={busy} onPress={() => void submit()} />
-    </>
+    </FormCard>
   );
 }
-
-const styles = StyleSheet.create({
-  heardLabel: { ...typography.body, color: colors.textPrimary, textAlign: textStart, marginBottom: spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-});

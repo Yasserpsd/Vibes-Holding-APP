@@ -36,3 +36,90 @@ export function phoneIssue(value: string, rules: PhoneRules | undefined): 'bad' 
 export function looksLikePhone(value: string): boolean {
   return /^[\d\s+()-]+$/.test(value.trim());
 }
+
+// ---------------------------------------------------------------------------------------------
+// M195 (owner, 2026-11-04): real checks, not only «not empty». The server applies the same rules.
+
+export type NameIssueKey = 'short' | 'oneWord' | 'symbols' | 'username' | 'kunya';
+
+const KUNYA = new Set(['ابو', 'ابا', 'ابي', 'ام', 'بو', 'abu', 'abo', 'abou', 'um', 'umm', 'om', 'bu', 'bo']);
+const foldArabic = (word: string) => word.toLowerCase().replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+
+/**
+ * A real first name + family name: letters and spaces only, at least two words (an apostrophe or a hyphen
+ * inside a word is fine: «Al-Otaibi»). Digits, dots, «@» and underscores mean a username («yasser4.designer»).
+ */
+export function nameIssue(value: string): NameIssueKey | null {
+  const name = value.replace(/[ً-ْـٰ]/g, '').replace(/\s+/g, ' ').trim();
+  if (!name) return 'short';
+  if (/[@._0-9٠-٩]/.test(name)) return 'username';
+  if (name.length < 5) return 'short';
+  const words = name.split(' ').filter(Boolean);
+  if (words.length < 2) return 'oneWord';
+  for (const word of words) {
+    // Explicit ranges (Arabic + Latin blocks) rather than \p{Script=…}: safe on every Hermes build.
+    if (!/^[؀-ۿݐ-ݿA-Za-zÀ-ɏ][؀-ۿݐ-ݿA-Za-zÀ-ɏ'’-]*$/.test(word)) return 'symbols';
+  }
+  if (words.filter((word) => word.replace(/['’-]/g, '').length >= 2).length < 2) return 'oneWord';
+  if (words.length === 2 && KUNYA.has(foldArabic(words[0] ?? '').replace(/^ال/, ''))) return 'kunya';
+  return null;
+}
+
+export type IbanIssueKey = 'start' | 'length' | 'checksum';
+
+/** Spaces out, upper case: what the server stores. */
+export function normalizeIban(value: string): string {
+  return value.replace(/\s+/g, '').toUpperCase();
+}
+
+/** A Saudi IBAN: «SA» + 22 characters (24 in all), passing the ISO 7064 mod-97 check. */
+export function ibanIssue(value: string): IbanIssueKey | null {
+  const iban = normalizeIban(value);
+  if (!iban.startsWith('SA')) return 'start';
+  if (iban.length !== 24 || !/^SA\d{2}[0-9A-Z]{20}$/.test(iban)) return 'length';
+  return ibanMod97(iban) === 1 ? null : 'checksum';
+}
+
+/** ISO 7064 mod-97-10 over the rearranged IBAN, digit by digit (no BigInt needed). */
+export function ibanMod97(iban: string): number {
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let remainder = 0;
+  for (const char of rearranged) {
+    const code = char.charCodeAt(0);
+    const piece = code >= 65 && code <= 90 ? String(code - 55) : char;
+    for (const digit of piece) remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder;
+}
+
+/** English letters only (spaces, dots, apostrophes and hyphens inside allowed): the bank's account holder name. */
+export function isLatinName(value: string): boolean {
+  const name = value.trim();
+  return name.length >= 2 && /^[A-Za-z][A-Za-z\s.'’-]*$/.test(name);
+}
+
+export type AddressIssueKey = 'short' | 'name';
+
+/**
+ * An address, not a person's name: at least 10 characters and two words, and never equal to the names
+ * the form already knows (owner: a member wrote his own name as the address).
+ */
+export function addressIssue(value: string, knownNames: string[]): AddressIssueKey | null {
+  const address = value.replace(/\s+/g, ' ').trim();
+  if (address.length < 10 || address.split(' ').length < 2) return 'short';
+  if (looksLikePersonName(address)) return 'name';
+  const folded = foldArabic(address);
+  if (knownNames.some((name) => name.trim() && foldArabic(name.replace(/\s+/g, ' ').trim()) === folded)) return 'name';
+  return null;
+}
+
+/** Words that make a line an address («حي», «شارع», "street", "building"…); shared with the server's rule. */
+const ADDRESS_WORDS = /(حي|شارع|طريق|مبنى|مبني|عمارة|عماره|رقم|شقة|شقه|الدور|فيلا|فله|فلة|مجمع|مخطط|بجوار|بجانب|قرب|مقابل|تقاطع|دوار|ميدان|street|st\.|road|rd\.|district|dist\.|building|bldg|apartment|apt|villa|unit|floor|near|next to|avenue|ave\.|tower|complex|compound|block|p\.?o\.? box|zip)/i;
+
+/** A few letter-only words with no digit, no punctuation and no address word read as a person's name. */
+export function looksLikePersonName(value: string): boolean {
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (/[0-9٠-٩]/.test(text) || /[,،;:/\-–()]/.test(text) || ADDRESS_WORDS.test(text)) return false;
+  const words = text.split(' ');
+  return words.length <= 4 && words.every((word) => /^[؀-ۿA-Za-z'’.]+$/.test(word));
+}

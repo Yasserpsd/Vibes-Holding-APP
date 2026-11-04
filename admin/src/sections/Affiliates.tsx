@@ -86,7 +86,11 @@ export function Affiliates() {
     if (!config || saving) return;
     setSaving(true);
     try {
-      await api.affiliateConfig({ ...config, heardOptions: config.heardOptions.map((option) => option.trim()).filter(Boolean) });
+      await api.affiliateConfig({
+        ...config,
+        heardOptions: config.heardOptions.map((option) => option.trim()).filter(Boolean),
+        heardOptionsEn: (config.heardOptionsEn ?? []).map((option) => option.trim()),
+      });
       notify('ok', 'حُفظ محتوى البرنامج.');
       state.reload();
     } catch (failure) {
@@ -193,7 +197,7 @@ export function Affiliates() {
                           <li><strong>الآيبان:</strong> <bdi dir="ltr" className="num">{row.iban}</bdi></li>
                           <li><strong>المدينة:</strong> {row.city}</li>
                           <li><strong>العنوان:</strong> {row.address}</li>
-                          <li><strong>كيف تعرّف على النادي:</strong> {row.heardFrom}{row.heardFromNote ? ` — ${row.heardFromNote}` : ''}</li>
+                          <li><strong>كيف عرف عن النادي:</strong> {row.heardFrom}</li>
                           {row.adminNote ? <li><strong>ملاحظة الإدارة:</strong> {row.adminNote}</li> : null}
                         </ul>
                       </details>
@@ -317,11 +321,20 @@ export function Affiliates() {
                   <textarea rows={3} maxLength={1000} value={config.shareText} onChange={(event) => setConfig({ ...config, shareText: event.target.value })} />
                 </label>
                 <label>
-                  خيارات «كيف تعرّفت على نادي المستثمرين؟» (سطر لكل خيار)
+                  خيارات «كيف عرفت عن نادي المستثمرين؟» (سطر لكل خيار)
                   <textarea
                     rows={6}
                     value={config.heardOptions.join('\n')}
                     onChange={(event) => setConfig({ ...config, heardOptions: event.target.value.split('\n') })}
+                  />
+                </label>
+                <label>
+                  الخيارات نفسها بالإنجليزية (سطر لكل خيار، بنفس الترتيب؛ السطر الفارغ يعرض العربي)
+                  <textarea
+                    rows={6}
+                    dir="ltr"
+                    value={(config.heardOptionsEn ?? []).join('\n')}
+                    onChange={(event) => setConfig({ ...config, heardOptionsEn: event.target.value.split('\n') })}
                   />
                 </label>
                 <label>

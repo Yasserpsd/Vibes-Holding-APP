@@ -119,3 +119,118 @@ export const typography = {
   caption: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20 },
   tabLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 14 },
 } as const;
+
+/**
+ * M195 (owner, 2026-11-04): ONE brand identity for every form — the navy and gold of the club's own
+ * e-mails (server/src/mail/royal.ts), nothing invented. The forms read this palette through
+ * <FormCard tone="light" | "dark"> (components/form/FormTheme.tsx); the rest of the app keeps the
+ * black-and-gold tokens above until the app-wide light mode (M196) lands.
+ */
+export const brand = {
+  navy: '#0d274a',
+  navyDeep: '#081a33',
+  navySoft: '#1b3a63',
+  gold: '#e7ad3f',
+  goldDeep: '#b8842a',
+  goldPale: '#fbf1dc',
+  /** The error red the owner asked for (#D92D20) — the same in both tones. */
+  danger: '#D92D20',
+  dangerSoft: '#FEF3F2',
+} as const;
+
+export type FormTone = 'light' | 'dark';
+
+export type FormPalette = {
+  tone: FormTone;
+  /** The sheet the form sits on, and the card around it. */
+  bg: string;
+  card: string;
+  cardBorder: string;
+  /** Text. */
+  ink: string;
+  inkSoft: string;
+  muted: string;
+  placeholder: string;
+  /** Inputs (every field, the country row and the pickers share these). */
+  field: string;
+  fieldBorder: string;
+  fieldFocus: string;
+  /** Chips: quiet when unselected, navy (or gold on dark) when chosen. */
+  chipBg: string;
+  chipBorder: string;
+  chipText: string;
+  chipSelectedBg: string;
+  chipSelectedBorder: string;
+  chipSelectedText: string;
+  /** The primary (gold) button. */
+  buttonBg: string;
+  buttonBorder: string;
+  buttonText: string;
+  /** Accents. */
+  accent: string;
+  danger: string;
+  dangerBg: string;
+  /** Info notice. */
+  noticeBg: string;
+  noticeBorder: string;
+  noticeText: string;
+};
+
+export const formPalettes: Record<FormTone, FormPalette> = {
+  light: {
+    tone: 'light',
+    bg: '#F4F6FA',
+    card: colors.white,
+    cardBorder: '#DCE3EE',
+    ink: brand.navy,
+    inkSoft: '#3E5068',
+    muted: '#6B7A90',
+    placeholder: '#A9B4C4',
+    field: colors.white,
+    fieldBorder: '#C9D3E0',
+    fieldFocus: brand.gold,
+    chipBg: colors.white,
+    chipBorder: brand.gold,
+    chipText: brand.navy,
+    chipSelectedBg: brand.navy,
+    chipSelectedBorder: brand.navy,
+    chipSelectedText: brand.gold,
+    buttonBg: brand.gold,
+    buttonBorder: brand.goldDeep,
+    buttonText: brand.navy,
+    accent: brand.goldDeep,
+    danger: brand.danger,
+    dangerBg: brand.dangerSoft,
+    noticeBg: brand.goldPale,
+    noticeBorder: '#EBD8A8',
+    noticeText: brand.navy,
+  },
+  dark: {
+    tone: 'dark',
+    bg: brand.navyDeep,
+    card: brand.navy,
+    cardBorder: brand.navySoft,
+    ink: colors.white,
+    inkSoft: '#D5DEEB',
+    muted: '#9FB0C6',
+    placeholder: '#6E829C',
+    field: brand.navyDeep,
+    fieldBorder: brand.navySoft,
+    fieldFocus: brand.gold,
+    chipBg: 'transparent',
+    chipBorder: brand.gold,
+    chipText: colors.white,
+    chipSelectedBg: brand.gold,
+    chipSelectedBorder: brand.gold,
+    chipSelectedText: brand.navy,
+    buttonBg: brand.gold,
+    buttonBorder: brand.goldDeep,
+    buttonText: brand.navy,
+    accent: brand.gold,
+    danger: '#FF6B61',
+    dangerBg: 'rgba(217, 45, 32, 0.16)',
+    noticeBg: 'rgba(231, 173, 63, 0.12)',
+    noticeBorder: 'rgba(231, 173, 63, 0.4)',
+    noticeText: '#F3E4B5',
+  },
+};

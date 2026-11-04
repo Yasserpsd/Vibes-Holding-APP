@@ -14,7 +14,7 @@ import { royalHtml, royalText } from './mail/royal.js';
 const silentLog = { info() {}, warn() {}, error() {}, debug() {}, trace() {}, fatal() {}, child() { return silentLog; } } as unknown as import('fastify').FastifyBaseLogger;
 
 test('m156: the name rule accepts real first + family names in Arabic and Latin', () => {
-  for (const name of ['محمد العتيبي', 'Nouf Alsufiany', 'عبد الله بن سعود', 'abdullah al-otaibi', 'أبو بكر العتيبي', "Dr. Ahmed D'Souza", 'سَعْد الشَّهْري']) {
+  for (const name of ['محمد العتيبي', 'Nouf Alsufiany', 'عبد الله بن سعود', 'abdullah al-otaibi', 'أبو بكر العتيبي', "Ahmed D'Souza", 'سَعْد الشَّهْري']) {
     assert.equal(nameRuleIssue(name), null, name);
   }
 });
@@ -23,6 +23,10 @@ test('m156: the name rule rejects kunyas, single words, placeholders, digits and
   assert.equal(nameRuleIssue('أبو محمد'), 'kunya');
   assert.equal(nameRuleIssue('أم جنا'), 'kunya');
   assert.equal(nameRuleIssue('Abu Khalid'), 'kunya');
+  // M195 (owner, 2026-11-04): a dot means a username, never a name («yasser4.designer» slipped through once).
+  assert.equal(nameRuleIssue('yasser4.designer'), 'symbols');
+  assert.equal(nameRuleIssue('yasser.designer'), 'symbols');
+  assert.equal(nameRuleIssue('Dr. Ahmed Salem'), 'symbols');
   assert.equal(nameRuleIssue('Charif'), 'oneWord');
   assert.equal(nameRuleIssue('سارة'), 'short');
   assert.equal(nameRuleIssue('ناصر ب'), 'oneWord');
