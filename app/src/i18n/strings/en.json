@@ -1437,10 +1437,10 @@
   "affiliate.cityOther": "City name",
   "affiliate.addressHint": "District, street, building number or a nearby landmark",
   "affiliate.ibanPlaceholder": "SA00 0000 0000 0000 0000 0000",
-  "update.required.title": "Please update the app",
+  "update.required.title": "Please update the Investors Club app",
   "update.required.body": "This version is out of date and no longer works. Update the Investors Club app from the store to continue.",
   "update.required.button": "Update from the store",
-  "update.restart.title": "Please restart the app",
-  "update.restart.body": "A new update has arrived and is not applied yet. Restart the app to get the improvements.",
+  "update.restart.title": "Please restart the Investors Club app",
+  "update.restart.body": "A new update has arrived and is not applied yet. Close the Investors Club app and open it again to get the improvements.",
   "update.restart.button": "Restart now"
 }

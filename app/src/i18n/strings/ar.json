@@ -1437,10 +1437,10 @@
   "affiliate.cityOther": "اسم المدينة",
   "affiliate.addressHint": "الحي، الشارع، رقم المبنى أو المعلم القريب",
   "affiliate.ibanPlaceholder": "SA00 0000 0000 0000 0000 0000",
-  "update.required.title": "يرجى تحديث التطبيق",
+  "update.required.title": "برجاء تحديث تطبيق Investors Club",
   "update.required.body": "هذا الإصدار قديم ولم يعد يعمل. حدّث تطبيق Investors Club من المتجر ليعمل معك.",
   "update.required.button": "تحديث من المتجر",
-  "update.restart.title": "يرجى إعادة تشغيل التطبيق",
-  "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أعد تشغيل التطبيق لتظهر التحسينات.",
+  "update.restart.title": "برجاء إعادة تشغيل تطبيق Investors Club",
+  "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أغلق تطبيق Investors Club وافتحه من جديد لتظهر التحسينات.",
   "update.restart.button": "إعادة التشغيل الآن"
 }

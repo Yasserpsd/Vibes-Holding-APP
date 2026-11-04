@@ -1439,11 +1439,11 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cityOther": "اسم المدينة",
     "affiliate.addressHint": "الحي، الشارع، رقم المبنى أو المعلم القريب",
     "affiliate.ibanPlaceholder": "SA00 0000 0000 0000 0000 0000",
-    "update.required.title": "يرجى تحديث التطبيق",
+    "update.required.title": "برجاء تحديث تطبيق Investors Club",
     "update.required.body": "هذا الإصدار قديم ولم يعد يعمل. حدّث تطبيق Investors Club من المتجر ليعمل معك.",
     "update.required.button": "تحديث من المتجر",
-    "update.restart.title": "يرجى إعادة تشغيل التطبيق",
-    "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أعد تشغيل التطبيق لتظهر التحسينات.",
+    "update.restart.title": "برجاء إعادة تشغيل تطبيق Investors Club",
+    "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أغلق تطبيق Investors Club وافتحه من جديد لتظهر التحسينات.",
     "update.restart.button": "إعادة التشغيل الآن"
   },
   "en": {
@@ -2885,11 +2885,11 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cityOther": "City name",
     "affiliate.addressHint": "District, street, building number or a nearby landmark",
     "affiliate.ibanPlaceholder": "SA00 0000 0000 0000 0000 0000",
-    "update.required.title": "Please update the app",
+    "update.required.title": "Please update the Investors Club app",
     "update.required.body": "This version is out of date and no longer works. Update the Investors Club app from the store to continue.",
     "update.required.button": "Update from the store",
-    "update.restart.title": "Please restart the app",
-    "update.restart.body": "A new update has arrived and is not applied yet. Restart the app to get the improvements.",
+    "update.restart.title": "Please restart the Investors Club app",
+    "update.restart.body": "A new update has arrived and is not applied yet. Close the Investors Club app and open it again to get the improvements.",
     "update.restart.button": "Restart now"
   },
   "groups": {
