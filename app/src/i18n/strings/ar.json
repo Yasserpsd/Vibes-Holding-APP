@@ -1396,8 +1396,7 @@
   "affiliate.cycleRenewal": "انتهت مدة هذه الدورة، وأُرسل طلب التجديد إلى إدارة النادي. يبدأ العدّاد من جديد فور تجديد الدورة.",
   "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال",
   "affiliate.homeTitle": "أرباحي",
-  "affiliate.homeNudge": "ما سجّلت أي عضو دافع حتى الآن يا صديقي. شارك رابطك الآن وابدأ أول عمولة.",
-  "affiliate.homeEarned": "إجمالي ما كسبته حتى الآن: {amount} ريال",
+  "affiliate.homeNudge": "شارك رابطك الآن، ورشّح أشخاصًا آخرين للعضوية، وابدأ في تحقيق عوائد مجزية.",
   "affiliate.homeAvailable": "المتاح (ريال)",
   "affiliate.homeOpen": "لوحة الممثل ورابط الإحالة"
 }

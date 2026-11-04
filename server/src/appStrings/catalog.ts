@@ -1398,8 +1398,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cycleRenewal": "انتهت مدة هذه الدورة، وأُرسل طلب التجديد إلى إدارة النادي. يبدأ العدّاد من جديد فور تجديد الدورة.",
     "affiliate.bonuses": "البدلات المضافة إلى رصيدك: {amount} ريال",
     "affiliate.homeTitle": "أرباحي",
-    "affiliate.homeNudge": "ما سجّلت أي عضو دافع حتى الآن يا صديقي. شارك رابطك الآن وابدأ أول عمولة.",
-    "affiliate.homeEarned": "إجمالي ما كسبته حتى الآن: {amount} ريال",
+    "affiliate.homeNudge": "شارك رابطك الآن، ورشّح أشخاصًا آخرين للعضوية، وابدأ في تحقيق عوائد مجزية.",
     "affiliate.homeAvailable": "المتاح (ريال)",
     "affiliate.homeOpen": "لوحة الممثل ورابط الإحالة"
   },
@@ -2801,8 +2800,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "affiliate.cycleRenewal": "This cycle has ended and a renewal request was sent to the club management. The counter restarts as soon as the cycle is renewed.",
     "affiliate.bonuses": "Allowances added to your balance: {amount} SAR",
     "affiliate.homeTitle": "My earnings",
-    "affiliate.homeNudge": "No paying member has joined through you yet, my friend. Share your link now and earn your first commission.",
-    "affiliate.homeEarned": "Earned so far: SAR {amount}",
+    "affiliate.homeNudge": "Share your link now, refer others to the membership, and start earning rewarding commissions.",
     "affiliate.homeAvailable": "Available (SAR)",
     "affiliate.homeOpen": "Affiliate panel and referral link"
   },

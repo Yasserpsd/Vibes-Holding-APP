@@ -13,7 +13,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 
 /**
  * M194 (owner, 2026-11-04): «أرباحي» — the very first card on an APPROVED affiliate's home. Balance,
- * paying / non-paying referrals, and a nudge while nobody paid yet; it opens the affiliate panel.
+ * paying / non-paying referrals and the owner's call to share (2026-11-04); it opens the affiliate panel.
  * Everyone else (no application, pending, rejected, guest) sees nothing.
  */
 export function AffiliateHomeCard() {
@@ -23,7 +23,6 @@ export function AffiliateHomeCard() {
   const data = affiliate.data;
   const balance = data?.status === 'approved' ? data.balance : undefined;
   if (!balance) return null;
-  const subtitle = balance.paid === 0 ? t('affiliate.homeNudge') : t('affiliate.homeEarned', { amount: formatNumber(balance.earned) });
 
   return (
     <FadeInView delay={120}>
@@ -34,7 +33,7 @@ export function AffiliateHomeCard() {
           </GoldGradient>
           <View style={styles.texts}>
             <Text style={styles.title}>{t('affiliate.homeTitle')}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.subtitle}>{t('affiliate.homeNudge')}</Text>
             <View style={styles.statsRow}>
               <Stat value={formatNumber(balance.available)} label={t('affiliate.homeAvailable')} />
               <Stat value={formatNumber(balance.paid)} label={t('affiliate.paidCount')} />

@@ -1396,8 +1396,7 @@
   "affiliate.cycleRenewal": "This cycle has ended and a renewal request was sent to the club management. The counter restarts as soon as the cycle is renewed.",
   "affiliate.bonuses": "Allowances added to your balance: {amount} SAR",
   "affiliate.homeTitle": "My earnings",
-  "affiliate.homeNudge": "No paying member has joined through you yet, my friend. Share your link now and earn your first commission.",
-  "affiliate.homeEarned": "Earned so far: SAR {amount}",
+  "affiliate.homeNudge": "Share your link now, refer others to the membership, and start earning rewarding commissions.",
   "affiliate.homeAvailable": "Available (SAR)",
   "affiliate.homeOpen": "Affiliate panel and referral link"
 }
