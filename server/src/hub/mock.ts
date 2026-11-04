@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { maskEmail } from '../auth/adminOtp.js';
 
 import { EMAIL_POLICY_TEXT, normEmail, normPhone, phoneIntl, phoneLocal } from './phone.js';
 import { MOCK_HUB_VERSION, MockAdmin } from './mockAdmin.js';
@@ -69,9 +70,11 @@ export class MockHubClient implements HubClient {
       case 'profile':
         return this.profile(body);
       case 'reset_request': {
+        // Plugin 2.26.3 (M197): an unknown login is an error, and the answer names the inbox (masked).
         const account = this.findAccount(str(body, 'login', 190));
-        if (account) account.resetPending = true;
-        return { ok: true, sent: true };
+        if (!account) throw new HubError('not_found', 'لا يوجد حساب بهذا البريد أو الجوال — تأكد منه، أو سجّل حسابًا جديدًا', 404);
+        account.resetPending = true;
+        return { ok: true, sent: true, sent_to: maskEmail(account.email), provider: '' };
       }
       case 'reset_confirm':
         return this.resetConfirm(body);

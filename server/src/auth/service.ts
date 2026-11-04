@@ -749,8 +749,12 @@ export class AuthService {
     }
   }
 
-  async requestReset(login: string, ip: string, country?: string): Promise<void> {
-    await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip });
+  /** M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither. */
+  async requestReset(login: string, ip: string, country?: string): Promise<{ sentTo: string; provider: string }> {
+    const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip });
+    const sentTo = typeof result.sent_to === 'string' ? result.sent_to : '';
+    const provider = result.provider === 'apple' || result.provider === 'google' ? result.provider : '';
+    return { sentTo, provider };
   }
 
   async confirmReset(login: string, code: string, password: string, ip: string, country?: string): Promise<void> {

@@ -217,6 +217,11 @@ test('unverified login returns a pending token; reset password works', async () 
 
   const reset = await post('/api/auth/reset/request', { login: 'noura@icloud.com' });
   assert.equal(reset.statusCode, 200);
+  assert.equal(reset.json().sentTo, 'no***@icloud.com');
+  // M197: an unknown login is said out loud instead of a code that never comes.
+  const unknown = await post('/api/auth/reset/request', { login: 'nobody-here@icloud.com' });
+  assert.equal(unknown.statusCode, 404, unknown.body);
+  assert.match(unknown.json().error.message, /لا يوجد حساب/);
   const confirmed = await post('/api/auth/reset/confirm', { login: 'noura@icloud.com', code: MOCK_CODE, password: 'newpass1' });
   assert.equal(confirmed.statusCode, 200, confirmed.body);
 });

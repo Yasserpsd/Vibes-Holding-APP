@@ -124,6 +124,9 @@ export type HubResponse = {
   /** `member_status` (M44): whether a contact matched the phone/e-mail. */
   found?: boolean;
   sent?: boolean;
+  /** `reset_request` since plugin 2.26.3 (M197): the inbox the code went to, masked, and the Apple/Google sign-up. */
+  sent_to?: string;
+  provider?: string;
   text?: string;
   contact?: HubContact | null;
   /** `config`: `widget_config()` — bot name, welcome text, menu, membership card, link library… */

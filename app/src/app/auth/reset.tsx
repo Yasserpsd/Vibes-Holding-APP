@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -25,8 +25,11 @@ export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither.
+  const [sent, setSent] = useState<{ sentTo: string; provider: string }>({ sentTo: '', provider: '' });
+  const [resent, setResent] = useState(false);
 
-  const request = async () => {
+  const request = async (again = false) => {
     if (busy) return;
     if (!identifierValid(identifier)) {
       setError(t('auth.reset.loginRequired'));
@@ -42,7 +45,9 @@ export default function ResetPasswordScreen() {
     setError(null);
     try {
       const { login, country } = identifierPayload(identifier);
-      await authApi.resetRequest(login, country);
+      const result = await authApi.resetRequest(login, country);
+      setSent({ sentTo: result.sentTo ?? '', provider: result.provider ?? '' });
+      setResent(again);
       setStep('confirm');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -93,10 +98,18 @@ export default function ResetPasswordScreen() {
   return (
     <Screen
       title={t('auth.reset.title')}
-      subtitle={step === 'request' ? t('auth.reset.subtitleRequest') : t('auth.reset.subtitleConfirm', { login: identifier.value.trim() })}
+      subtitle={
+        step === 'request'
+          ? t('auth.reset.subtitleRequest')
+          : sent.sentTo
+            ? t('auth.reset.sentTo', { email: `‎${sent.sentTo}‎` })
+            : t('auth.reset.subtitleConfirm', { login: identifier.value.trim() })
+      }
     >
       <FadeInView key={step} style={styles.fields}>
         {step === 'confirm' && config?.testCode ? <Notice tone="warning" text={t('auth.verify.testCode', { code: config.testCode })} /> : null}
+        {step === 'confirm' && sent.provider ? <Notice tone="info" text={t('auth.reset.socialNote', { provider: sent.provider === 'apple' ? 'Apple' : 'Google' })} /> : null}
+        {step === 'confirm' && resent ? <Notice tone="success" text={t('auth.reset.resent')} /> : null}
         <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} editable={step === 'request'} />
         {step === 'confirm' ? (
           <>
@@ -118,6 +131,9 @@ export default function ResetPasswordScreen() {
       ) : (
         <FadeInView key="confirm-submit" delay={entranceDelay(1)}>
           <AppButton label={t('auth.reset.save')} icon="key-outline" loading={busy} onPress={() => void confirm()} />
+          <Pressable accessibilityRole="button" onPress={() => void request(true)} disabled={busy} style={styles.resend} hitSlop={8}>
+            <Text style={styles.resendText}>{t('auth.reset.resend')}</Text>
+          </Pressable>
         </FadeInView>
       )}
     </Screen>
@@ -128,4 +144,6 @@ const styles = StyleSheet.create({
   fields: { gap: spacing.md },
   doneIcon: { alignSelf: 'center', marginTop: spacing.md },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
+  resend: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.xs },
+  resendText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
 });

@@ -358,8 +358,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('reset', 6, request, reply)) return;
       const body = parse(resetRequestSchema, request.body, reply);
       if (!body) return;
-      await service.requestReset(body.login, request.ip, body.country);
-      return { ok: true };
+      const sent = await service.requestReset(body.login, request.ip, body.country);
+      return { ok: true, ...sent };
     }),
   );
 

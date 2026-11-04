@@ -184,7 +184,7 @@ export const authApi = {
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
     apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
   resetRequest: (login: string, country?: string) =>
-    apiRequest<{ ok: true }>('POST', '/api/auth/reset/request', { body: { login, ...(country ? { country } : {}) }, token: null }),
+    apiRequest<{ ok: true; sentTo?: string; provider?: string }>('POST', '/api/auth/reset/request', { body: { login, ...(country ? { country } : {}) }, token: null }),
   resetConfirm: (login: string, code: string, password: string, country?: string) =>
     apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password, ...(country ? { country } : {}) }, token: null }),
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),
