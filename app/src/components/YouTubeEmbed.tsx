@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { loadWebView, youtubeIdOf } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -79,7 +80,7 @@ function LoadingGhost() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -107,4 +108,4 @@ const styles = StyleSheet.create({
   webContainer: { backgroundColor: colors.black, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   ghostWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: spacing.md, backgroundColor: colors.black },
   ghost: { flex: 1, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceElevated },
-});
+}));

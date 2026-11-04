@@ -1,6 +1,6 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { useGuestGate } from '@/auth/GuestGate';
@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /** M74: after the guest has browsed around a bit, a soft (dismissible) invitation to create an account. */
@@ -65,11 +66,11 @@ export function GuestNudge() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md },
   title: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
   text: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   later: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },
-});
+}));

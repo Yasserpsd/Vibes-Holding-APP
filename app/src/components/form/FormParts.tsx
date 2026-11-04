@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode, Ref } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FadeInView, Wiggle } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
 /** M195: the red line under a field or a chip group — icon + the exact problem. */
@@ -61,7 +62,7 @@ export function ChipRow({ children }: { children: ReactNode }) {
   return <View style={styles.chips}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { gap: spacing.xs },
   label: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 14, color: colors.textSecondary, textAlign: textStart },
   body: { borderRadius: radii.md },
@@ -79,4 +80,4 @@ const styles = StyleSheet.create({
   },
   summaryText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, flex: 1, textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-});
+}));

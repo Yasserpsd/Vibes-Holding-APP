@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FadeInView, Floating } from '@/components/motion';
 import { env } from '@/config/env';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const clubEmblem = require('../../assets/images/club-emblem.png');
@@ -48,7 +49,7 @@ export function PlaceholderScreen({ title, description, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: {
     flex: 1,
     backgroundColor: colors.black,
@@ -107,4 +108,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingBottom: spacing.md,
   },
-});
+}));

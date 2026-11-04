@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FadeInView, SkeletonCards, usePulse, Wiggle } from '@/components/motion';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -71,7 +72,7 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
   return null;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   skeleton: {
     paddingVertical: spacing.md,
   },
@@ -97,4 +98,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-});
+}));

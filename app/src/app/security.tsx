@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Switch, Text, View, type ScrollView } from 'react-native';
+import { Switch, Text, View, type ScrollView } from 'react-native';
 
 import { authApi } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -19,6 +19,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { authenticate, loadLocalAuth, lockAvailable, lockEnabled, setLockEnabled } from '@/lib/appLock';
 import type { IoniconName } from '@/lib/icons';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -203,7 +204,7 @@ function CardTitle({ icon, title }: { icon: IoniconName; title: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardTitleIcon: {
@@ -219,4 +220,4 @@ const styles = StyleSheet.create({
   lockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   lockText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   lockHint: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-});
+}));

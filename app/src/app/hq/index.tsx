@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useHqWallet, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
@@ -21,9 +21,10 @@ import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatNumber, weekdayName, weekdayOf } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-const STATUS_COLOR: Record<VisitStatus, string> = { pending: colors.warning, confirmed: colors.success, rejected: colors.danger, cancelled: colors.textMuted };
+const STATUS_COLOR: Record<VisitStatus, string> = lazyTokens(() => ({ pending: colors.warning, confirmed: colors.success, rejected: colors.danger, cancelled: colors.textMuted }));
 
 /** HQ page: address, tour, rules, and (for paid members) booking plus the member's visits. */
 export default function HqScreen() {
@@ -186,7 +187,7 @@ function VisitRow({ visit, onPass, onCancel }: { visit: Visit; onPass: () => voi
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // M81: the HQ gallery.
   heroPhoto: { width: '100%', height: 180, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
   photoStrip: { gap: spacing.sm, paddingTop: spacing.sm },
@@ -218,4 +219,4 @@ const styles = StyleSheet.create({
   cancelWrap: { flexShrink: 0 },
   cancel: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   cancelText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.danger },
-});
+}));

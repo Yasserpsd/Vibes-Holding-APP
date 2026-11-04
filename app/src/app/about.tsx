@@ -15,6 +15,7 @@ import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** «عنّا»: the club, its operator, Vibes Ventures and the ecosystem. All copy comes from the server. */
@@ -131,7 +132,7 @@ function ContactRow({ icon, label, value, onPress, border = false }: { icon: Ion
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   hero: { alignItems: 'center', gap: spacing.xs },
   // A quiet golden disc lifts the mark off the black — the screen's one hero glow.
   logoHalo: {
@@ -169,4 +170,4 @@ const styles = StyleSheet.create({
   latin: { writingDirection: 'ltr' },
   legal: { gap: 2, marginTop: spacing.sm },
   legalText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-});
+}));

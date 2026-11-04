@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type Ref } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import type { Country } from '@/api/auth';
 import { FieldError } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { getLang, t, tOptional } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /** Bundled translation first (the six GCC), then the server's English or Arabic name. */
@@ -123,7 +124,7 @@ export function CountryPicker({ countries, selected, onSelect, compact = false, 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   field: {
@@ -177,4 +178,4 @@ const styles = StyleSheet.create({
   rowTextActive: { color: colors.goldLight },
   rowTextBold: { fontFamily: fonts.semiBold },
   empty: { ...typography.body, color: colors.textMuted, textAlign: 'center', padding: spacing.md },
-});
+}));

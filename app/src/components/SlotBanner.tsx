@@ -1,8 +1,9 @@
-import { Image, StyleSheet } from 'react-native';
+import { Image } from 'react-native';
 
 import { useAppImages } from '@/api/images';
 import { FadeInView } from '@/components/motion';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows } from '@/theme/tokens';
 
 /**
@@ -19,7 +20,7 @@ export function SlotBanner({ slot }: { slot: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   banner: {
     width: '100%',
     height: 150,
@@ -29,4 +30,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     boxShadow: shadows.lift,
   },
-});
+}));

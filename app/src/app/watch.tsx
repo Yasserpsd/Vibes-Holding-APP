@@ -8,6 +8,7 @@ import { FadeInView, usePulse } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { linkParam, loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type VideoModule = typeof import('expo-video');
@@ -299,7 +300,7 @@ function clock(seconds: number): string {
   return h > 0 ? `${h}:${two(Math.floor((s % 3600) / 60))}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   page: { flex: 1, backgroundColor: colors.black },
   playerBox: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.black },
   web: { flex: 1, backgroundColor: colors.black },
@@ -336,4 +337,4 @@ const styles = StyleSheet.create({
   fallbackText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   below: { padding: spacing.md, gap: spacing.md },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
-});
+}));

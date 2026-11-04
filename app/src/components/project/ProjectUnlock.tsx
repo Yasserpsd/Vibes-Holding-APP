@@ -21,6 +21,7 @@ import { formatNumber } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { projectId: string; projectTitle: string; hasPitchDeck: boolean; autoStart?: boolean };
@@ -277,7 +278,7 @@ function Figure({ label, value, highlight = false }: { label: string; value: str
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: { gap: spacing.md, padding: spacing.md },
   boxUnlocked: { boxShadow: shadows.glowGold },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -306,4 +307,4 @@ const styles = StyleSheet.create({
   figureLabel: { ...typography.caption, color: colors.textMuted },
   figureValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.textPrimary },
   figureValueHighlight: { color: colors.gold },
-});
+}));

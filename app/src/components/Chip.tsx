@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, Pressable, Text } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FadeInView } from '@/components/motion';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -64,7 +65,7 @@ export function Chip({ label, selected = false, dimmed = false, onPress }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,4 +94,4 @@ const styles = StyleSheet.create({
   labelSelected: { fontFamily: fonts.bold },
   labelSelectedGold: { color: colors.goldInk },
   labelDimmed: { color: colors.textMuted },
-});
+}));

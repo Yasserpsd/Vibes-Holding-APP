@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { useHomeContent, useServices, type Service } from '@/api/content';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { ServiceCard } from '@/components/ServiceCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing } from '@/theme/tokens';
 
 const emblem = require('../../../assets/images/club-emblem.png');
@@ -65,7 +66,7 @@ export default function EntrepreneursScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   banner: {
     alignItems: 'center',
     paddingVertical: spacing.lg,
@@ -76,4 +77,4 @@ const styles = StyleSheet.create({
   },
   bannerEmblem: { width: 96, height: 96 },
   list: { gap: spacing.sm },
-});
+}));

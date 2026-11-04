@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { Share, Text, View } from 'react-native';
 
 import { useMyInvites, type Invitee, type InviteeState } from '@/api/invites';
 import { useAuth } from '@/auth/AuthProvider';
@@ -14,6 +14,7 @@ import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // Left-to-right mark: keeps the Latin membership number readable inside Arabic lines (Android RTL).
@@ -129,7 +130,7 @@ function InviteeRow({ person }: { person: Invitee }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   gift: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   codeBox: {
     borderWidth: 1,
@@ -157,4 +158,4 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowName: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   rowState: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-});
+}));

@@ -1,9 +1,10 @@
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { themedStyles } from '@/theme/styles';
 import { colors } from '@/theme/tokens';
 
 /** The «المتابعة كضيف» tap is recorded on the device: a returning visitor walks straight in. */
@@ -83,6 +84,6 @@ export function GuestGate() {
   return covered ? <View style={styles.cover} /> : null;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.black },
-});
+}));

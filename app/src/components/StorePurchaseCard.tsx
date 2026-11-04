@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { membershipApi, useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
@@ -26,6 +26,7 @@ import {
   storeName,
   type StoreOffer,
 } from '@/lib/purchases';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Phase = 'loading' | 'ready' | 'unavailable' | 'busy' | 'activating' | 'done' | 'pending';
@@ -226,7 +227,7 @@ function LinkText({ label, url }: { label: string; url: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
   doneGlow: { borderRadius: radii.md, boxShadow: shadows.glowGold },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -244,4 +245,4 @@ const styles = StyleSheet.create({
   legal: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   links: { flexDirection: 'row', gap: spacing.md },
   link: { ...typography.caption, color: colors.goldLight, textDecorationLine: 'underline' },
-});
+}));

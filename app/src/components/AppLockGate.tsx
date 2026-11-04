@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Image, StyleSheet, Text, View } from 'react-native';
+import { AppState, Image, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { t } from '@/i18n';
 import { authenticate, lockAvailable, lockEnabled } from '@/lib/appLock';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, spacing } from '@/theme/tokens';
 
 /** How long in the background before the lock asks for the face again. */
@@ -68,7 +69,7 @@ export function AppLockGate() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   cover: {
     position: 'absolute',
     top: 0,
@@ -86,4 +87,4 @@ const styles = StyleSheet.create({
   emblem: { width: 110, height: 110, opacity: 0.9 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   text: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 26, color: colors.textPrimary, textAlign: 'center' },
-});
+}));

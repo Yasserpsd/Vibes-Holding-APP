@@ -8,6 +8,7 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { youtubeIdOf } from '@/lib/player';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 200;
@@ -81,7 +82,7 @@ function MiniMeetup({ meetup, onPress }: { meetup: Meetup; onPress: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   strip: { gap: spacing.sm, paddingBottom: spacing.xs },
   card: {
     width: CARD_WIDTH,
@@ -108,4 +109,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   pillText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldLight },
-});
+}));

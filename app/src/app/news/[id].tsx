@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useNewsItem } from '@/api/news';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
@@ -12,6 +12,7 @@ import { t } from '@/i18n';
 import { textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** The item as the source published it, with the link to the original page and the advisor shortcut. */
@@ -100,7 +101,7 @@ export default function NewsItemScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
   image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, boxShadow: shadows.lift },
@@ -147,4 +148,4 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   noteText: { ...typography.caption, flex: 1, color: colors.textSecondary },
-});
+}));

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, type ScrollView } from 'react-native';
+import { Text, type ScrollView } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { useInterests } from '@/api/interests';
@@ -20,6 +20,7 @@ import { StateView } from '@/components/StateView';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, tOptional } from '@/i18n';
 import { isEmail, nameIssue, phoneIssue } from '@/lib/validation';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Form = {
@@ -348,6 +349,6 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs },
-});
+}));

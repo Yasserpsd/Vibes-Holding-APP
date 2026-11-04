@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -10,6 +10,7 @@ import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
 import { openLink } from '@/lib/openLink';
 import { loadWebView } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -127,10 +128,10 @@ export default function DeckScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   web: { flex: 1, backgroundColor: colors.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
   loadingText: { ...typography.caption, color: colors.textSecondary },
   bar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: colors.black, borderTopWidth: 1, borderTopColor: colors.border },
-});
+}));

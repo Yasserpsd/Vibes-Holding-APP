@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useHqSlots, useHqWallet, type HqSpace } from '@/api/hq';
@@ -19,6 +19,7 @@ import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatHours, formatNumber, weekdayName } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, spacing, typography } from '@/theme/tokens';
 
 /** M109a: the booking kinds — a plain visit, or an hours-wallet space (مكتب خاص / قاعة اجتماعات). */
@@ -228,7 +229,7 @@ export default function BookVisitScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   label: { ...typography.subtitle, color: colors.gold, textAlign: textStart, marginBottom: spacing.sm },
   strip: { gap: spacing.xs, paddingVertical: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
@@ -238,4 +239,4 @@ const styles = StyleSheet.create({
   walletHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hintSpace: { marginTop: spacing.md },
-});
+}));

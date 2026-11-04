@@ -20,6 +20,7 @@ import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const PERSONA_KEY: Record<string, StringKey> = { neutral: 'persona.neutral', entrepreneur: 'persona.entrepreneur', investor: 'persona.investor' };
@@ -377,7 +378,7 @@ function PrintBlock({ active }: { active: boolean }) {
 
 const CARD_BLACK = '#0B0A08';
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // The card: a gold slab on black — double gold frame, deep warm black, a gold glow around it.
   card: {
     borderRadius: radii.lg,
@@ -503,4 +504,4 @@ const styles = StyleSheet.create({
   statusTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
   statusLine: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   lostTitle: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, marginTop: spacing.xs },
-});
+}));

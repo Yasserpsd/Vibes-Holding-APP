@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProjectFilters, useProjectsList } from '@/api/queries';
@@ -17,6 +17,7 @@ import { t, tOptional } from '@/i18n';
 import { markSeen } from '@/lib/seen';
 import { formatNumber, formatSectorCount } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
@@ -226,7 +227,7 @@ function BankTotal({ total }: { total: number }) {
   return <Text style={styles.statPillText}>{t('projects.count', { count: formatNumber(shown) })}</Text>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.black },
   // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
   listContent: { paddingHorizontal: spacing.md, paddingBottom: ASK_ADVISOR_CLEARANCE },
@@ -284,4 +285,4 @@ const styles = StyleSheet.create({
   statPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { usePass, type PassState } from '@/api/hq';
 import { AppButton } from '@/components/AppButton';
@@ -11,13 +11,14 @@ import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatArabicDateTime, weekdayOf } from '@/lib/format';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-const STATE: Record<PassState, { text: StringKey; color: string; icon: 'time-outline' | 'checkmark-circle' | 'close-circle' }> = {
+const STATE: Record<PassState, { text: StringKey; color: string; icon: 'time-outline' | 'checkmark-circle' | 'close-circle' }> = lazyTokens(() => ({
   upcoming: { text: 'hqPass.upcoming', color: colors.warning, icon: 'time-outline' },
   active: { text: 'hqPass.active', color: colors.success, icon: 'checkmark-circle' },
   expired: { text: 'hqPass.expired', color: colors.danger, icon: 'close-circle' },
-};
+}));
 
 /** The entry pass of a confirmed visit, laid out as a ticket: who, which day and time, when it was booked, and the QR. */
 export default function PassScreen() {
@@ -105,7 +106,7 @@ function Cell({ label, value }: { label: string; value: string }) {
 
 const NOTCH = 22;
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   ticket: {
     borderRadius: radii.xl,
     borderWidth: 1,
@@ -151,4 +152,4 @@ const styles = StyleSheet.create({
   state: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },
   stateText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22 },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, Text, View } from 'react-native';
 
 import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
@@ -13,6 +13,7 @@ import { t } from '@/i18n';
 import { textDir, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const ROTATE_MS = 4500;
@@ -236,7 +237,7 @@ function NewsSlide({ item, onPress }: { item: NewsItem; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   pager: { overflow: 'hidden' },
   side: { position: 'absolute', top: 0, start: 0 },
   card: { padding: 0, overflow: 'hidden' },
@@ -273,4 +274,4 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderGoldSoft },
   dotOn: { width: 18, backgroundColor: colors.gold },
-});
+}));

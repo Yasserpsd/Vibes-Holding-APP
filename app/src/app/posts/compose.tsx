@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { adminMessagesApi, type MemberHit, type MessageAudience } from '@/api/posts';
@@ -16,6 +16,7 @@ import { Screen } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type AudienceKey = 'all' | 'neutral' | 'entrepreneur' | 'investor' | 'member';
@@ -190,7 +191,7 @@ export default function ComposeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, marginBottom: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   search: { gap: spacing.sm },
@@ -207,4 +208,4 @@ const styles = StyleSheet.create({
   hitName: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
   hitMeta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   empty: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-});
+}));

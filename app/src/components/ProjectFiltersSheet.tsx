@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import type { FilterOption } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
@@ -8,6 +8,7 @@ import { GoldHairline } from '@/components/lux';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -85,7 +86,7 @@ export function ProjectFiltersSheet({ open, onClose, sectors, stages, sector, st
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '80%',
@@ -107,4 +108,4 @@ const styles = StyleSheet.create({
   bodyContent: { gap: spacing.sm, paddingVertical: spacing.xs },
   sectionTitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, marginTop: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-});
+}));

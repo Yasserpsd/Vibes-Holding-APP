@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Text, View } from 'react-native';
 
 import { membershipApi, useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
@@ -23,6 +23,7 @@ import {
   storeName,
   type StoreOffer,
 } from '@/lib/purchases';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -259,7 +260,7 @@ export function MembershipHomeCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
@@ -303,4 +304,4 @@ const styles = StyleSheet.create({
     maxWidth: 110,
   },
   homeCtaText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldInk },
-});
+}));

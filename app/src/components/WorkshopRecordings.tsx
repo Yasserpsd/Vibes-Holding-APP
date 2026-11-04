@@ -13,6 +13,7 @@ import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { textStart } from '@/i18n/direction';
 import { playVideo } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -139,7 +140,7 @@ export function WorkshopRecordings({ eventId, titles, files, past = false }: { e
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
   missed: { gap: 2, paddingBottom: spacing.xs },
   missedTitle: { ...typography.subtitle, fontSize: 19, lineHeight: 30, color: colors.textPrimary, textAlign: textStart },
@@ -196,4 +197,4 @@ const styles = StyleSheet.create({
   fileDay: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: colors.textPrimary, textAlign: 'center' },
   fileTag: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14, color: colors.gold, letterSpacing: 1 },
   note: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
-});
+}));

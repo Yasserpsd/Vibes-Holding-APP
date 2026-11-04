@@ -7,6 +7,7 @@ import { VoiceButton, voiceInputAvailable } from '@/components/advisor/VoiceButt
 import { GlowButton, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { inputStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 type Props = {
@@ -95,7 +96,7 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: {
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -154,4 +155,4 @@ const styles = StyleSheet.create({
   spinner: { alignItems: 'center', justifyContent: 'center' },
   // Ionicons "send" points to the right; the reading direction here is right-to-left.
   sendIcon: { transform: [{ scaleX: -1 }] },
-});
+}));

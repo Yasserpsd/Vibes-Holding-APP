@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { AdvisorAction, HqProposal } from '@/api/advisor';
 import { AppButton } from '@/components/AppButton';
@@ -7,6 +7,7 @@ import { Chip } from '@/components/Chip';
 import { GlassCard } from '@/components/lux';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 export type HqBookAction = Extract<AdvisorAction, { type: 'hq_book' }>;
@@ -113,7 +114,7 @@ export function HqProposalCard({ action, busy, onPick, onConfirm }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { padding: spacing.md, gap: spacing.xs, alignSelf: 'stretch' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
   title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
@@ -122,4 +123,4 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   empty: { ...typography.caption, color: colors.warning, textAlign: textStart },
   foot: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginTop: spacing.xs },
-});
+}));

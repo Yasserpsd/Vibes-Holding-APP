@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { GlassCard } from '@/components/lux';
 import { FadeInView, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openContactWhatsApp, openSupportWhatsApp, SUPPORT_WHATSAPP } from '@/lib/support';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 // The left-to-right mark keeps «+966» at the start of the number inside Arabic text.
@@ -44,7 +45,7 @@ export function SupportLink({ problem }: { problem?: string | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   line: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: spacing.xs, paddingVertical: spacing.xs },
   lineText: { ...typography.caption, color: colors.textSecondary },
   lineNumber: { ...typography.caption, color: colors.whatsapp },
@@ -54,4 +55,4 @@ const styles = StyleSheet.create({
   title: { ...typography.subtitle, fontSize: 16, color: colors.textPrimary, textAlign: textStart },
   sub: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   number: { ...typography.body, fontSize: 17, color: colors.whatsapp, textAlign: textStart },
-});
+}));

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useMarkets, type MarketQuote } from '@/api/markets';
 import { PressScale } from '@/components/motion';
@@ -8,6 +8,7 @@ import { SarText } from '@/components/SarText';
 import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -99,7 +100,7 @@ export function MarketsStrip() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   markets: { gap: 4, marginBottom: spacing.sm },
   row: { gap: spacing.sm },
   tile: { width: QUOTE_WIDTH },
@@ -113,4 +114,4 @@ const styles = StyleSheet.create({
   pct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   unit: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
   extra: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
-});
+}));

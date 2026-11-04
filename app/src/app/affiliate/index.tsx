@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { Share, Text, View } from 'react-native';
 
 import { useAffiliate, affiliateApi, type AffiliateCycle, type AffiliatePayout, type AffiliateReferral } from '@/api/affiliate';
 import { errorMessage } from '@/api/client';
@@ -17,6 +17,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 // Left-to-right mark: keeps the Latin code and link readable inside Arabic lines (Android RTL).
@@ -283,7 +284,7 @@ function PayoutRow({ payout }: { payout: AffiliatePayout }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart, lineHeight: 26 },
   balanceCard: { padding: spacing.lg, gap: spacing.sm, alignItems: 'center' },
   balanceLabel: { ...typography.caption, color: colors.textSecondary },
@@ -326,4 +327,4 @@ const styles = StyleSheet.create({
   agreementCard: { padding: spacing.md, gap: spacing.sm },
   agreementTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   agreementText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, lineHeight: 22 },
-});
+}));

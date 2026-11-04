@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { authApi } from '@/api/auth';
 import { AppButton } from '@/components/AppButton';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -47,7 +48,7 @@ export function DeletionBanner({ account }: { account: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   band: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -58,4 +59,4 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   text: { ...typography.caption, fontSize: 14, lineHeight: 22, fontFamily: fonts.semiBold, color: colors.warning, flex: 1, textAlign: textStart },
-});
+}));

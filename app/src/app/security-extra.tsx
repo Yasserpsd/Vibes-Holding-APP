@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { GlassCard } from '@/components/lux';
@@ -9,6 +9,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -49,9 +50,9 @@ function Row({ icon, label, danger, onPress }: { icon: React.ComponentProps<type
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { padding: spacing.sm, gap: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm },
   rowLabel: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   rowDanger: { color: colors.danger },
-});
+}));

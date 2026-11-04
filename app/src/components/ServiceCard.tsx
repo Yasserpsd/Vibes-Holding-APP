@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
 import { GlassCard } from '@/components/lux';
@@ -9,6 +9,7 @@ import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { service: Service; onPress: () => void };
@@ -62,7 +63,7 @@ export function ServiceCard({ service, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -117,4 +118,4 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   ctaText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
-});
+}));

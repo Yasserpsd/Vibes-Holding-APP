@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 import type { PublicProject } from '@/api/types';
 import { GlassCard } from '@/components/lux';
@@ -8,6 +8,7 @@ import { PressScale, Sheen } from '@/components/motion';
 import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -118,7 +119,7 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // The golden projects wear the brand: a faint gold wash under the gold hairline.
   cardGolden: {
     backgroundColor: colors.goldFaint,
@@ -254,4 +255,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.goldInk,
   },
-});
+}));

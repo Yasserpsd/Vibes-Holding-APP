@@ -10,6 +10,7 @@ import { textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo, youtubeIdOf } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -212,7 +213,7 @@ function PaperBlocks({ blocks }: { blocks: Block[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   media: { width: '100%', borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden', marginVertical: spacing.xs },
   videoTile: { aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B0B0D' },
   play: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
@@ -253,4 +254,4 @@ const styles = StyleSheet.create({
   diamond: { color: colors.gold, fontSize: 9, lineHeight: 26 },
   bulletText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   lit: { fontFamily: fonts.semiBold, color: colors.goldLight },
-});
+}));

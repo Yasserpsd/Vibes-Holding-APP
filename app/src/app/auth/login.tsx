@@ -1,6 +1,6 @@
 import { Link, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { ApiError, errorMessage } from '@/api/client';
@@ -15,6 +15,7 @@ import { SocialButtons } from '@/components/SocialButtons';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function LoginScreen() {
@@ -117,7 +118,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   link: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
-});
+}));

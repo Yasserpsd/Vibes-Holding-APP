@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { requireOptionalNativeModule } from 'expo';
 import { useEffect, useState } from 'react';
-import { Alert, Animated, StyleSheet } from 'react-native';
+import { Alert, Animated } from 'react-native';
 
 import { advisorApi } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { GlowButton, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows } from '@/theme/tokens';
 
 /**
@@ -133,7 +134,7 @@ function VoiceButtonInner({ onText, onBusy, disabled }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: {
     width: 44,
     height: 44,
@@ -146,4 +147,4 @@ const styles = StyleSheet.create({
   },
   buttonRecording: { backgroundColor: colors.danger, borderColor: colors.danger, boxShadow: shadows.glowGoldStrong },
   buttonMuted: { opacity: 0.6 },
-});
+}));

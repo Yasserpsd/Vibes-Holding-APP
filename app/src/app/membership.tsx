@@ -17,6 +17,7 @@ import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { openWhatsApp } from '@/lib/whatsapp';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** Membership benefits as the owner wrote them (server content), grouped; lines can open a screen or WhatsApp. */
@@ -156,7 +157,7 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   guestActions: { gap: spacing.sm },
   intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   group: {
@@ -208,4 +209,4 @@ const styles = StyleSheet.create({
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   itemText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   itemSoon: { color: colors.textSecondary },
-});
+}));

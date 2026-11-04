@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { PopIn, PressScale } from '@/components/motion';
 import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -51,7 +52,7 @@ export function SectionHeader({ title, subtitle, cta, onPress, badge = 0, icon }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.sm, marginTop: spacing.sm },
   accent: {
     width: 4,
@@ -104,4 +105,4 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   badgeText: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 17, color: '#141005' },
-});
+}));

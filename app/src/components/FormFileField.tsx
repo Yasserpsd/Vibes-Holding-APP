@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { requireOptionalNativeModule } from 'expo';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { uploadFormFile } from '@/api/forms';
 import { AppButton } from '@/components/AppButton';
@@ -9,6 +9,7 @@ import { Notice } from '@/components/Notice';
 import { usePaper } from '@/components/paper';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -128,7 +129,7 @@ export function FormFileField({ formKey, label, signedIn, value, onChange, onBus
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: { gap: spacing.sm },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   paperLabel: { color: colors.paperInkSoft },
@@ -147,4 +148,4 @@ const styles = StyleSheet.create({
   paperFileName: { color: colors.paperInk },
   busy: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   actions: { gap: spacing.sm },
-});
+}));

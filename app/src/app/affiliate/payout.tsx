@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet } from 'react-native';
+
 
 import { useAffiliate, affiliateApi, type AffiliateOverview } from '@/api/affiliate';
 import { errorMessage } from '@/api/client';
@@ -15,6 +15,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, typography } from '@/theme/tokens';
 
 /**
@@ -100,6 +101,6 @@ function PayoutForm({ data }: { data: AffiliateOverview }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   amount: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
-});
+}));

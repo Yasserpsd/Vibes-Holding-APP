@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } fr
 
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 // The advisor's replies use markdown: **bold**, links (plain or [label](url)), headings, bullet lists and tables.
@@ -183,7 +184,7 @@ function Table({ header, rows, linkColor }: { header: string[]; rows: string[][]
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   bold: { fontFamily: fonts.semiBold },
   link: { textDecorationLine: 'underline' },
   blocks: { gap: spacing.sm, alignSelf: 'stretch' },
@@ -202,4 +203,4 @@ const styles = StyleSheet.create({
   headText: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
   cellText: { ...typography.caption, color: colors.textPrimary, textAlign: textStart },
   cellLead: { fontFamily: fonts.medium, color: colors.textSecondary },
-});
+}));

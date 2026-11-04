@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
@@ -32,6 +32,7 @@ import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
 import { composeRequest, openWhatsApp } from '@/lib/whatsapp';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** One service: what it is, what it costs, and the action (in-app payment, WhatsApp handover, web form, advisor, HQ, Projects Bank). */
@@ -340,7 +341,7 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
   return <FormField label={field.label} value={value} onChangeText={onChange} placeholder={field.placeholder} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   actionArea: { gap: spacing.md },
   // M81: the service's real photo, big on top.
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -397,4 +398,4 @@ const styles = StyleSheet.create({
   paperPriceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.paperGold },
   paperPriceNote: { ...typography.caption, color: colors.paperGold },
   paperPayHint: { ...typography.caption, color: colors.paperMuted, textAlign: textStart },
-});
+}));

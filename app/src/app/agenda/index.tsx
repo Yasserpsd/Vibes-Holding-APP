@@ -13,6 +13,7 @@ import { getLang, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDays } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -131,7 +132,7 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   card: {
     minHeight: 196,
@@ -184,4 +185,4 @@ const styles = StyleSheet.create({
   badgeDay: { color: colors.gold, fontFamily: fonts.bold, fontSize: 22, lineHeight: 26 },
   badgeDaySm: { fontSize: 18, lineHeight: 22 },
   badgeMonth: { ...typography.caption, color: colors.textSecondary },
-});
+}));

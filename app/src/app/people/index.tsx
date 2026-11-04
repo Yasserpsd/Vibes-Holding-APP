@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { usePeople, type Person } from '@/api/people';
 import { useAuth } from '@/auth/AuthProvider';
@@ -13,6 +13,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatPeopleCount } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** M11 «شخصية ومسيرة»: the approved club figures, and the member's way to apply. */
@@ -82,7 +83,7 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   // Icons pass: the roster-size pill.
   countRow: { flexDirection: 'row' },
@@ -114,4 +115,4 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowName: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   rowTitle: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-});
+}));

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
 import { isEmail, phoneIssue } from '@/lib/validation';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -130,7 +131,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   block: { gap: spacing.sm },
   switch: {
     flexDirection: 'row',
@@ -149,4 +150,4 @@ const styles = StyleSheet.create({
   // Skips the field's label line (caption lineHeight 20 + gap xs) so the dial box tops the input.
   dialBox: { marginTop: 24 },
   phoneField: { flex: 1 },
-});
+}));

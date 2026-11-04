@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useInterests, useSaveInterests } from '@/api/interests';
 import { errorMessage } from '@/api/client';
@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -113,10 +114,10 @@ export default function InterestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   suggestion: { gap: spacing.sm },
   suggestionText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-});
+}));

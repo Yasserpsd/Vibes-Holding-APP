@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useAgendaEvent, useRegisterAgenda, type AgendaAttendance, type AgendaEvent } from '@/api/agenda';
 import { useMonthlyDeal } from '@/api/payments';
@@ -25,6 +25,7 @@ import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDays, formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -255,7 +256,7 @@ export default function AgendaEventScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // M77: the owner's event image, big on top of everything.
   heroImage: { width: '100%', height: 200, borderRadius: radii.xl, backgroundColor: colors.surfaceElevated },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -306,4 +307,4 @@ const styles = StyleSheet.create({
   feeText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
   // The confirmed moment glows — celebratory, but classy.
   confirmGlow: { borderRadius: radii.md, boxShadow: shadows.glowGold },
-});
+}));

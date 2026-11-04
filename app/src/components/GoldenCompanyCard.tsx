@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import type { GoldenCompany } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
@@ -7,6 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { Sheen } from '@/components/motion';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -41,7 +42,7 @@ export function GoldenCompanyCard({ company }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     gap: spacing.md,
     padding: spacing.md,
@@ -83,4 +84,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-});
+}));

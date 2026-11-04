@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -14,6 +14,7 @@ import { Screen } from '@/components/Screen';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function ResetPasswordScreen() {
@@ -140,10 +141,10 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   fields: { gap: spacing.md },
   doneIcon: { alignSelf: 'center', marginTop: spacing.md },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   resend: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.xs },
   resendText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
-});
+}));

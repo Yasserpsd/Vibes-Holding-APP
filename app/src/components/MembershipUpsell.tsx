@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { ServicesUpsell } from '@/api/content';
 import { AppButton } from '@/components/AppButton';
@@ -9,6 +9,7 @@ import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -52,7 +53,7 @@ export function UpsellCard({ upsell }: { upsell: ServicesUpsell }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.md, padding: spacing.md },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   cardIcon: {
@@ -68,4 +69,4 @@ const styles = StyleSheet.create({
   cardTexts: { flex: 1, gap: 4 },
   cardTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   cardText: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
-});
+}));

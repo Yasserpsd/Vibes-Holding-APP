@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Linking, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Share, Text, View } from 'react-native';
 
 import { authApi, type TotpSetup } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -14,6 +14,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type Mode = 'idle' | 'enable' | 'relink' | 'backup' | 'disable';
@@ -208,7 +209,7 @@ export default function SecurityTotpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   titleIcon: { width: 30, height: 30, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldSoft },
@@ -222,4 +223,4 @@ const styles = StyleSheet.create({
   code: { fontFamily: fonts.semiBold, fontSize: 24, letterSpacing: 6, textAlign: 'center' },
   codes: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
   backupCode: { fontFamily: fonts.semiBold, fontSize: 16, letterSpacing: 1, color: colors.textPrimary, writingDirection: 'ltr', minWidth: '40%', textAlign: 'center' },
-});
+}));

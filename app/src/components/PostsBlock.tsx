@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { eventOf, useLatestPosts, type Post } from '@/api/posts';
 import { GlassCard } from '@/components/lux';
@@ -10,6 +10,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 import { withoutMediaLines } from '@/components/StructuredText';
 
@@ -137,7 +138,7 @@ export function PostCard({ post }: { post: Post }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   block: { gap: spacing.sm },
   // Padding sits on a View: Android measures a padded Text too narrow and truncates it.
   card: {
@@ -172,4 +173,4 @@ const styles = StyleSheet.create({
   eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   time: { ...typography.caption, color: colors.textMuted },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { authApi } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -15,6 +15,7 @@ import { PasswordPrompt } from '@/components/PasswordPrompt';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -192,7 +193,7 @@ export default function DeleteAccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
   sectionTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   reasonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs + 2 },
@@ -214,4 +215,4 @@ const styles = StyleSheet.create({
   doneIcon: { alignSelf: 'center' },
   doneTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: 'center' },
   doneText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-});
+}));

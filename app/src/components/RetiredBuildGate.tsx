@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, Linking, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { env } from '@/config/env';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, spacing } from '@/theme/tokens';
 
 /** M133b: the smart download link — iPhone → App Store, Android → Google Play, anything else → a page with both. */
@@ -32,7 +33,7 @@ export function RetiredBuildGate() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   cover: {
     position: 'absolute',
     top: 0,
@@ -51,4 +52,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: NAVY, textAlign: 'center' },
   body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 26, color: '#4A5568', textAlign: 'center' },
-});
+}));

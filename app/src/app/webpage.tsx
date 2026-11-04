@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { openLink } from '@/lib/openLink';
 import { loadWebView } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors } from '@/theme/tokens';
 
 /**
@@ -39,8 +40,8 @@ export default function WebPageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   web: { flex: 1, backgroundColor: colors.black },
   loading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.black },
-});
+}));

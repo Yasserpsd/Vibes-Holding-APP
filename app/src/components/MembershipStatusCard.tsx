@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Membership, MembershipContent } from '@/api/auth';
 import { AppButton } from '@/components/AppButton';
@@ -11,6 +11,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { showAdvisorBalance } from '@/lib/advisorBalance';
 import { formatArabicDate } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -69,7 +70,7 @@ export function MembershipStatusCard({ membership, texts, activationNote, title,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -85,4 +86,4 @@ const styles = StyleSheet.create({
   meta: { gap: 2, paddingStart: spacing.xl + spacing.sm },
   metaText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
   note: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-});
+}));

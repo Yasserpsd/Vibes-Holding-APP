@@ -12,6 +12,7 @@ import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { topicIcon, type IoniconName } from '@/lib/icons';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -273,7 +274,7 @@ function BriefSkeleton() {
 
 const NODE = 22;
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: { gap: spacing.md },
   card: { gap: spacing.md, padding: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -341,4 +342,4 @@ const styles = StyleSheet.create({
   barMedium: { width: '70%' },
   barShort: { width: '45%' },
   barTable: { height: 96, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
-});
+}));

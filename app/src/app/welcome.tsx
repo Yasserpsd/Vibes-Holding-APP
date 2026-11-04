@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
@@ -10,6 +10,7 @@ import { GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { languageChoiceOffered, t } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 // M106b (owner): the FULL original logo opens the app — whole, never cropped.
@@ -70,7 +71,7 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.black },
   // M106b: the theatre, faint and classy, under a dark wash that keeps every word readable.
   theatre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.35 },
@@ -84,4 +85,4 @@ const styles = StyleSheet.create({
   actions: { gap: spacing.sm + 4, marginTop: spacing.md },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   language: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
-});
+}));

@@ -1,11 +1,12 @@
 import type { ReactElement, ReactNode, RefObject } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, type RefreshControlProps } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View, type RefreshControlProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { EmblemWatermark, GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -56,7 +57,7 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.black },
   flex: { flex: 1 },
   // M85c density: tighter side gutters give the content the width the owner asked for.
@@ -65,4 +66,4 @@ const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   hairline: { marginTop: spacing.sm, width: 72, alignSelf: 'flex-start' },
-});
+}));

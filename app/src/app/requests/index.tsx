@@ -15,15 +15,16 @@ import { StateView } from '@/components/StateView';
 import { getLang, t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-const STATUS_COLOR: Record<RequestStatus, string> = {
+const STATUS_COLOR: Record<RequestStatus, string> = lazyTokens(() => ({
   pending: colors.warning,
   in_progress: colors.gold,
   done: colors.success,
   rejected: colors.danger,
   cancelled: colors.textMuted,
-};
+}));
 
 const KIND_ICON: Record<RequestKind, keyof typeof Ionicons.glyphMap> = {
   card: 'card-outline',
@@ -137,7 +138,7 @@ function RequestRow({ request, onOpen }: { request: MemberRequest; onOpen: (() =
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { gap: spacing.xs, padding: spacing.md },
   accent: { position: 'absolute', start: 0, top: 0, bottom: 0, width: 3 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -158,4 +159,4 @@ const styles = StyleSheet.create({
   openLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
   openText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.gold },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ReactElement } from 'react';
-import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useAgenda } from '@/api/agenda';
 import { useHomeContent, useMeetupsContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
@@ -40,6 +40,7 @@ import { iconFor, type IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
@@ -593,7 +594,7 @@ function FooterLink({ icon, label, onPress }: { icon: IoniconName; label: string
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // M85c: the hero got compact — the screen belongs to the content, not the emblem.
   hero: { alignItems: 'center', gap: 2, paddingTop: spacing.xs },
   emblemRing: {
@@ -801,4 +802,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   footerLinkText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.textPrimary },
-});
+}));

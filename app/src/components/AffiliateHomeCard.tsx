@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAffiliate } from '@/api/affiliate';
 import { useAuth } from '@/auth/AuthProvider';
@@ -9,6 +9,7 @@ import { FadeInView, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -63,7 +64,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm },
   icon: {
     width: 48,
@@ -91,4 +92,4 @@ const styles = StyleSheet.create({
   statLabel: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textSecondary },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },
-});
+}));

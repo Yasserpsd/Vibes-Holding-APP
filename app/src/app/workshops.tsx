@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useGuide, useMyWorkshops, useRegisterWorkshop, type GuideWorkshop } from '@/api/guide';
 import { useAuth } from '@/auth/AuthProvider';
@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 const MODE_KEY: Record<GuideWorkshop['mode'], StringKey> = {
@@ -124,7 +125,7 @@ function WorkshopCard({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -149,4 +150,4 @@ const styles = StyleSheet.create({
   schedule: { ...typography.caption, color: colors.textMuted, textAlign: textStart, flex: 1 },
   closed: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   form: { gap: spacing.sm },
-});
+}));

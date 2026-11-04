@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 import type { Video } from '@/api/videos';
 import { GlassCard } from '@/components/lux';
@@ -8,6 +8,7 @@ import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -69,7 +70,7 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   thumbBox: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
   thumb: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   play: {
@@ -101,4 +102,4 @@ const styles = StyleSheet.create({
     borderColor: colors.goldDark,
   },
   askText: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
-});
+}));

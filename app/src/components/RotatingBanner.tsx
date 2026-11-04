@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii } from '@/theme/tokens';
 
 const ROTATE_MS = 5000;
@@ -95,7 +96,7 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     borderRadius: radii.xl,
     borderWidth: 1,
@@ -106,4 +107,4 @@ const styles = StyleSheet.create({
   dots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 4 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.45)' },
   dotOn: { backgroundColor: colors.gold },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { AGREED, useFormDef, useMyFormSubmissions, useSubmitForm, type FormDef, type FormField as FormFieldDef } from '@/api/forms';
 import type { Me } from '@/api/auth';
@@ -20,6 +20,7 @@ import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -263,7 +264,7 @@ function Field({ field, value, onChange }: { field: FormFieldDef; value: string;
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   select: { gap: spacing.xs },
   selectLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
@@ -287,4 +288,4 @@ const styles = StyleSheet.create({
   // M170: the inline membership condition (before the form, and after the success check).
   notice: { gap: spacing.sm, padding: spacing.md },
   noticeTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
-});
+}));

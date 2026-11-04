@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
 /**
@@ -358,7 +359,7 @@ export function GrowBar({ percent, color = colors.gold, height = 8, trackColor =
   );
 }
 
-const skeletonStyles = StyleSheet.create({
+const skeletonStyles = themedStyles(() => ({
   wrap: { gap: spacing.sm, alignSelf: 'stretch' },
   card: {
     flexDirection: 'row',
@@ -375,4 +376,4 @@ const skeletonStyles = StyleSheet.create({
   barWide: { alignSelf: 'stretch' },
   barMid: { width: '70%' },
   barShort: { width: '45%' },
-});
+}));

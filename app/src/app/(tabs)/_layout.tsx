@@ -8,6 +8,7 @@ import { PopIn } from '@/components/motion';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
 import { useHiddenTabs } from '@/lib/personaTabs';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -125,7 +126,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   icon: { alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, alignItems: 'center', justifyContent: 'center' },
   haloFill: {
@@ -147,4 +148,4 @@ const styles = StyleSheet.create({
     minWidth: 20,
     boxShadow: shadows.glowGoldFaint,
   },
-});
+}));

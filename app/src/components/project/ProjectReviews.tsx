@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { useProjectReviews } from '@/api/queries';
 import type { ProjectReview } from '@/api/types';
@@ -12,6 +12,7 @@ import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -73,7 +74,7 @@ function ReviewRow({ review }: { review: ProjectReview }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { padding: spacing.md, gap: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
   title: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart, flexShrink: 1 },
@@ -99,4 +100,4 @@ const styles = StyleSheet.create({
   gate: { gap: spacing.sm },
   composer: { gap: spacing.sm },
   pickLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-});
+}));

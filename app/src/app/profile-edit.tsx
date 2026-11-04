@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { authApi, useAuthConfig, type ProfilePatch } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -16,6 +16,7 @@ import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { phoneIssue } from '@/lib/validation';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function ProfileEditScreen() {
@@ -177,8 +178,8 @@ export default function ProfileEditScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   group: { gap: spacing.xs, marginBottom: spacing.sm },
   label: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-});
+}));

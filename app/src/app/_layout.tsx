@@ -36,7 +36,8 @@ import { isRTL, syncDirection } from '@/i18n/direction';
 import { syncStrings } from '@/i18n/remote';
 import { installNotificationHandler } from '@/lib/notifications';
 import { persistQueryCache, restoreQueryCache } from '@/lib/queryCache';
-import { colors, fonts, typography } from '@/theme/tokens';
+import { loadTheme } from '@/theme/theme';
+import { colors, fonts, getThemeName, typography } from '@/theme/tokens';
 
 installNotificationHandler();
 SplashScreen.preventAutoHideAsync();
@@ -47,7 +48,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const detailHeader = {
+// M196: a function, not a constant — it reads the active palette at render, after loadTheme().
+const detailHeader = () => ({
   headerShown: true,
   headerStyle: { backgroundColor: colors.surface },
   headerTintColor: colors.gold,
@@ -57,7 +59,7 @@ const detailHeader = {
   headerShadowVisible: false,
   // V2: detail pages rise in with a fade — softer than the default hard slide.
   animation: 'fade_from_bottom' as const,
-};
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -71,8 +73,8 @@ export default function RootLayout() {
   // no screen draws in the wrong language or direction first.
   const [i18nReady, setI18nReady] = useState(false);
   useEffect(() => {
-    void initI18n()
-      .then(syncDirection)
+    // M196: the saved theme is applied in the same breath, so the first screen draws in it.
+    void Promise.allSettled([initI18n().then(syncDirection), loadTheme()])
       .catch(() => undefined)
       .finally(() => {
         setI18nReady(true);
@@ -129,7 +131,7 @@ export default function RootLayout() {
           <ScreenTracker />
           {/* M195: the forced-update cover and the «restart to apply the OTA» banner. */}
           <UpdateGate />
-          <StatusBar style="light" />
+          <StatusBar style={getThemeName() === 'light' ? 'dark' : 'light'} />
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}
             <LocaleProvider direction={isRTL() ? 'rtl' : 'ltr'}>
@@ -144,55 +146,55 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-                <Stack.Screen name="project/[id]" options={{ ...detailHeader, title: t('nav.project') }} />
-                <Stack.Screen name="golden" options={{ ...detailHeader, title: t('nav.golden') }} />
-                <Stack.Screen name="golden/[code]" options={{ ...detailHeader, title: t('nav.goldenOffer') }} />
-                <Stack.Screen name="membership" options={{ ...detailHeader, title: t('nav.membership') }} />
-                <Stack.Screen name="profile-edit" options={{ ...detailHeader, title: t('nav.profileEdit') }} />
-                <Stack.Screen name="news/[id]" options={{ ...detailHeader, title: t('nav.newsItem') }} />
-                <Stack.Screen name="news/decisions" options={{ ...detailHeader, title: t('nav.decisions') }} />
-                <Stack.Screen name="news/interests" options={{ ...detailHeader, title: t('nav.interests') }} />
-                <Stack.Screen name="markets" options={{ ...detailHeader, title: t('nav.markets') }} />
-                <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader, title: t('nav.entrepreneurs') }} />
-                <Stack.Screen name="services/index" options={{ ...detailHeader, title: t('nav.services') }} />
-                <Stack.Screen name="service/[key]" options={{ ...detailHeader, title: t('nav.service') }} />
-                <Stack.Screen name="form/[key]" options={{ ...detailHeader, title: t('nav.form') }} />
-                <Stack.Screen name="videos/index" options={{ ...detailHeader, title: t('nav.videos') }} />
-                <Stack.Screen name="watch" options={{ ...detailHeader, title: t('nav.watch') }} />
-                <Stack.Screen name="posts/index" options={{ ...detailHeader, title: t('nav.posts') }} />
-                <Stack.Screen name="posts/[id]" options={{ ...detailHeader, title: t('nav.post') }} />
-                <Stack.Screen name="posts/compose" options={{ ...detailHeader, title: t('compose.screenTitle') }} />
-                <Stack.Screen name="card" options={{ ...detailHeader, title: t('nav.card') }} />
-                <Stack.Screen name="invite" options={{ ...detailHeader, title: t('nav.invite') }} />
-                <Stack.Screen name="agenda/index" options={{ ...detailHeader, title: t('nav.agenda') }} />
-                <Stack.Screen name="agenda/[id]" options={{ ...detailHeader, title: t('nav.agendaEvent') }} />
-                <Stack.Screen name="people/index" options={{ ...detailHeader, title: t('nav.people') }} />
-                <Stack.Screen name="people/[id]" options={{ ...detailHeader, title: t('nav.person') }} />
-                <Stack.Screen name="people/apply" options={{ ...detailHeader, title: t('nav.peopleApply') }} />
-                <Stack.Screen name="guide" options={{ ...detailHeader, title: t('nav.guide') }} />
-                <Stack.Screen name="workshops" options={{ ...detailHeader, title: t('nav.workshops') }} />
-                <Stack.Screen name="meetups" options={{ ...detailHeader, title: t('nav.meetups') }} />
-                <Stack.Screen name="meetup/[key]" options={{ ...detailHeader, title: t('nav.meetup') }} />
-                <Stack.Screen name="about" options={{ ...detailHeader, title: t('nav.about') }} />
-                <Stack.Screen name="hq/index" options={{ ...detailHeader, title: t('nav.hq') }} />
-                <Stack.Screen name="hq/book" options={{ ...detailHeader, title: t('nav.hqBook') }} />
-                <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader, title: t('nav.hqPass') }} />
-                <Stack.Screen name="hq/admin" options={{ ...detailHeader, title: t('nav.hqAdmin') }} />
+                <Stack.Screen name="project/[id]" options={{ ...detailHeader(), title: t('nav.project') }} />
+                <Stack.Screen name="golden" options={{ ...detailHeader(), title: t('nav.golden') }} />
+                <Stack.Screen name="golden/[code]" options={{ ...detailHeader(), title: t('nav.goldenOffer') }} />
+                <Stack.Screen name="membership" options={{ ...detailHeader(), title: t('nav.membership') }} />
+                <Stack.Screen name="profile-edit" options={{ ...detailHeader(), title: t('nav.profileEdit') }} />
+                <Stack.Screen name="news/[id]" options={{ ...detailHeader(), title: t('nav.newsItem') }} />
+                <Stack.Screen name="news/decisions" options={{ ...detailHeader(), title: t('nav.decisions') }} />
+                <Stack.Screen name="news/interests" options={{ ...detailHeader(), title: t('nav.interests') }} />
+                <Stack.Screen name="markets" options={{ ...detailHeader(), title: t('nav.markets') }} />
+                <Stack.Screen name="portal/entrepreneurs" options={{ ...detailHeader(), title: t('nav.entrepreneurs') }} />
+                <Stack.Screen name="services/index" options={{ ...detailHeader(), title: t('nav.services') }} />
+                <Stack.Screen name="service/[key]" options={{ ...detailHeader(), title: t('nav.service') }} />
+                <Stack.Screen name="form/[key]" options={{ ...detailHeader(), title: t('nav.form') }} />
+                <Stack.Screen name="videos/index" options={{ ...detailHeader(), title: t('nav.videos') }} />
+                <Stack.Screen name="watch" options={{ ...detailHeader(), title: t('nav.watch') }} />
+                <Stack.Screen name="posts/index" options={{ ...detailHeader(), title: t('nav.posts') }} />
+                <Stack.Screen name="posts/[id]" options={{ ...detailHeader(), title: t('nav.post') }} />
+                <Stack.Screen name="posts/compose" options={{ ...detailHeader(), title: t('compose.screenTitle') }} />
+                <Stack.Screen name="card" options={{ ...detailHeader(), title: t('nav.card') }} />
+                <Stack.Screen name="invite" options={{ ...detailHeader(), title: t('nav.invite') }} />
+                <Stack.Screen name="agenda/index" options={{ ...detailHeader(), title: t('nav.agenda') }} />
+                <Stack.Screen name="agenda/[id]" options={{ ...detailHeader(), title: t('nav.agendaEvent') }} />
+                <Stack.Screen name="people/index" options={{ ...detailHeader(), title: t('nav.people') }} />
+                <Stack.Screen name="people/[id]" options={{ ...detailHeader(), title: t('nav.person') }} />
+                <Stack.Screen name="people/apply" options={{ ...detailHeader(), title: t('nav.peopleApply') }} />
+                <Stack.Screen name="guide" options={{ ...detailHeader(), title: t('nav.guide') }} />
+                <Stack.Screen name="workshops" options={{ ...detailHeader(), title: t('nav.workshops') }} />
+                <Stack.Screen name="meetups" options={{ ...detailHeader(), title: t('nav.meetups') }} />
+                <Stack.Screen name="meetup/[key]" options={{ ...detailHeader(), title: t('nav.meetup') }} />
+                <Stack.Screen name="about" options={{ ...detailHeader(), title: t('nav.about') }} />
+                <Stack.Screen name="hq/index" options={{ ...detailHeader(), title: t('nav.hq') }} />
+                <Stack.Screen name="hq/book" options={{ ...detailHeader(), title: t('nav.hqBook') }} />
+                <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader(), title: t('nav.hqPass') }} />
+                <Stack.Screen name="hq/admin" options={{ ...detailHeader(), title: t('nav.hqAdmin') }} />
                 {/* M128 (owner: «صفحة الدفع مرمية فوق») — the embedded checkout gets the same gold
                     header and back arrow as every detail screen, on a white sheet. */}
-                <Stack.Screen name="checkout/[id]" options={{ ...detailHeader, title: t('checkout.title'), contentStyle: { backgroundColor: '#FFFFFF' } }} />
-                <Stack.Screen name="payment/[id]" options={{ ...detailHeader, title: t('nav.payment') }} />
-                <Stack.Screen name="payments/index" options={{ ...detailHeader, title: t('nav.payments') }} />
-                <Stack.Screen name="security" options={{ ...detailHeader, title: t('security.title') }} />
-                <Stack.Screen name="security-extra" options={{ ...detailHeader, title: t('security.extraTitle') }} />
-                <Stack.Screen name="delete-account" options={{ ...detailHeader, title: t('deleteAccount.title') }} />
+                <Stack.Screen name="checkout/[id]" options={{ ...detailHeader(), title: t('checkout.title'), contentStyle: { backgroundColor: '#FFFFFF' } }} />
+                <Stack.Screen name="payment/[id]" options={{ ...detailHeader(), title: t('nav.payment') }} />
+                <Stack.Screen name="payments/index" options={{ ...detailHeader(), title: t('nav.payments') }} />
+                <Stack.Screen name="security" options={{ ...detailHeader(), title: t('security.title') }} />
+                <Stack.Screen name="security-extra" options={{ ...detailHeader(), title: t('security.extraTitle') }} />
+                <Stack.Screen name="delete-account" options={{ ...detailHeader(), title: t('deleteAccount.title') }} />
                 {/* M116d: club pages inside the app (terms, privacy…) — the screen sets its own title. */}
-                <Stack.Screen name="webpage" options={{ ...detailHeader, title: '' }} />
-                <Stack.Screen name="deck" options={{ ...detailHeader, title: '' }} />
-                <Stack.Screen name="auth/login" options={{ ...detailHeader, title: t('nav.login') }} />
-                <Stack.Screen name="auth/register" options={{ ...detailHeader, title: t('nav.register') }} />
-                <Stack.Screen name="auth/verify" options={{ ...detailHeader, title: t('nav.verify') }} />
-                <Stack.Screen name="auth/reset" options={{ ...detailHeader, title: t('nav.reset') }} />
+                <Stack.Screen name="webpage" options={{ ...detailHeader(), title: '' }} />
+                <Stack.Screen name="deck" options={{ ...detailHeader(), title: '' }} />
+                <Stack.Screen name="auth/login" options={{ ...detailHeader(), title: t('nav.login') }} />
+                <Stack.Screen name="auth/register" options={{ ...detailHeader(), title: t('nav.register') }} />
+                <Stack.Screen name="auth/verify" options={{ ...detailHeader(), title: t('nav.verify') }} />
+                <Stack.Screen name="auth/reset" options={{ ...detailHeader(), title: t('nav.reset') }} />
                   </Stack>
                 </View>
                 {/* Owner (2026-10-17): the bottom bar is FIXED on every page — this renders it wherever the (tabs) bar is not. */}

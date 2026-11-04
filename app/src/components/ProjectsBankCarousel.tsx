@@ -1,12 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Text, View } from 'react-native';
 
 import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 // Perf (owner, 2026-10-19): a calmer tempo — each flip decodes a fresh image, so fewer flips, less heat.
@@ -103,7 +104,7 @@ export function ProjectsBankCarousel() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { padding: 0, overflow: 'hidden', marginTop: spacing.sm },
   image: { width: '100%', height: 180, backgroundColor: colors.surfaceElevated },
   overlay: {
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.45)' },
   dotOn: { backgroundColor: colors.gold },
-});
+}));

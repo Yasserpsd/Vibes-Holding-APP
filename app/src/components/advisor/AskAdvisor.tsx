@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoldGradient } from '@/components/lux';
 import { usePulse } from '@/components/motion';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
 import { contextParams, type ChatContext } from './context';
@@ -103,7 +104,7 @@ export function AdvisorDockButton({ focused = false }: { focused?: boolean }) {
   );
 }
 
-const dockStyles = StyleSheet.create({
+const dockStyles = themedStyles(() => ({
   slot: { alignItems: 'center', justifyContent: 'flex-start' },
   // The crown rises above the bar; the dark ring cuts the circle out of the sheet like a socket.
   circleBox: { marginTop: -ADVISOR_DOCK_RISE },
@@ -119,4 +120,4 @@ const dockStyles = StyleSheet.create({
   },
   circleFocused: { borderColor: colors.goldLight, boxShadow: shadows.glowGoldStrong },
   halo: { borderRadius: radii.pill, boxShadow: shadows.glowGold },
-});
+}));

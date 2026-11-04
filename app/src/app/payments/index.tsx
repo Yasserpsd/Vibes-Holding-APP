@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { amountLabel, useMyPayments, type Payment, type PaymentStatus } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
@@ -14,9 +14,10 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
-const STATUS_COLOR: Record<PaymentStatus, string> = { created: colors.warning, paid: colors.success, failed: colors.danger };
+const STATUS_COLOR: Record<PaymentStatus, string> = lazyTokens(() => ({ created: colors.warning, paid: colors.success, failed: colors.danger }));
 
 /** The member's in-app payments (real-world services), newest first. */
 export default function PaymentsScreen() {
@@ -81,7 +82,7 @@ function PaymentRow({ payment, onPress }: { payment: Payment; onPress: () => voi
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { gap: spacing.xs, padding: spacing.md },
   // The start-side filament tells the status before the badge is read.
   accent: { position: 'absolute', start: 0, top: 0, bottom: 0, width: 3 },
@@ -93,4 +94,4 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   meta: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
-});
+}));

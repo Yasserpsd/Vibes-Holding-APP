@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useMonthlyDeal } from '@/api/payments';
 import { GlassCard, NeonPulse } from '@/components/lux';
@@ -8,6 +8,7 @@ import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -51,7 +52,7 @@ export function MonthlyDealBadge({ amount, currency }: { amount?: number; curren
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { gap: spacing.xs, padding: spacing.md, overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   check: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
@@ -63,4 +64,4 @@ const styles = StyleSheet.create({
   after: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
   before: { ...typography.caption, color: colors.textSecondary, textDecorationLine: 'line-through' },
   hint: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-});
+}));

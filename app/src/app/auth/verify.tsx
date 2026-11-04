@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { interestsApi } from '@/api/interests';
@@ -14,6 +14,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
 /** M157: `flow: 'register'` marks the signup path (login also lands here for a new device). */
@@ -144,10 +145,10 @@ export default function VerifyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // The one-time code reads like a minted number: large, centered, spaced.
   code: { fontFamily: fonts.semiBold, fontSize: 28, letterSpacing: 10, textAlign: 'center' },
   // While typing, the box lights up with the golden focus halo.
   codeFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   resendBlock: { gap: spacing.sm },
-});
+}));

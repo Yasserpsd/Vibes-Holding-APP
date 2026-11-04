@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 import { amountLabel, usePayment, type PaymentStatus } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
@@ -14,9 +14,10 @@ import { t, type StringKey } from '@/i18n';
 import { trackServicePurchase } from '@/lib/adsAttribution';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-const STATE: Record<PaymentStatus, { title: StringKey; text: StringKey; color: string; icon: 'time-outline' | 'checkmark-circle' | 'close-circle' }> = {
+const STATE: Record<PaymentStatus, { title: StringKey; text: StringKey; color: string; icon: 'time-outline' | 'checkmark-circle' | 'close-circle' }> = lazyTokens(() => ({
   created: {
     title: 'payment.created.title',
     text: 'payment.created.text',
@@ -35,7 +36,7 @@ const STATE: Record<PaymentStatus, { title: StringKey; text: StringKey; color: s
     color: colors.danger,
     icon: 'close-circle',
   },
-};
+}));
 
 /** One payment: the status as the server knows it (from the gateway callback), the details, and the way back. */
 export default function PaymentScreen() {
@@ -130,7 +131,7 @@ function Row({ label, value, latin = false, gold = false }: { label: string; val
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   state: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: radii.lg, borderWidth: 1, backgroundColor: colors.surface },
   statePaid: { boxShadow: shadows.glowGold, overflow: 'hidden' },
   stateTitle: { ...typography.subtitle, textAlign: 'center' },
@@ -143,4 +144,4 @@ const styles = StyleSheet.create({
   rowValue: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   rowGold: { ...typography.title, color: colors.gold },
   latin: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textSecondary, writingDirection: 'ltr', textAlign: textStart },
-});
+}));

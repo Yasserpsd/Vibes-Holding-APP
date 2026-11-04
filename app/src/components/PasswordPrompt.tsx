@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -63,7 +64,7 @@ function PromptSheet({ title, message, confirmLabel, busy = false, error, onConf
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: spacing.lg },
   sheet: {
@@ -78,4 +79,4 @@ const styles = StyleSheet.create({
   message: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   actions: { gap: spacing.sm },
   danger: { backgroundColor: colors.danger, borderColor: colors.danger },
-});
+}));

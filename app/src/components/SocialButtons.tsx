@@ -1,6 +1,6 @@
 import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -11,6 +11,7 @@ import { GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -71,8 +72,8 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   line: { flex: 1 },
   or: { ...typography.caption, color: colors.textMuted },
-});
+}));

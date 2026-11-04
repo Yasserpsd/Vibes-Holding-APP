@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { SarText } from '@/components/SarText';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -61,7 +62,7 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   base: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -100,4 +101,4 @@ const styles = StyleSheet.create({
   // Beside an icon the text gets the row's remaining width outright: Android's row measurement
   // otherwise drops the label's last Arabic word even with room to spare.
   labelBeside: { flexGrow: 1, flexBasis: 0 },
-});
+}));

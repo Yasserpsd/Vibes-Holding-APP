@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Text, View } from 'react-native';
 
 import { advisorApi, type FillField } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
@@ -10,6 +10,7 @@ import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { textStart } from '@/i18n/direction';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export type { FillField } from '@/api/advisor';
@@ -142,7 +143,7 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // M195 (owner: «نص راكب على بعضه»): the pill row and the hint are two stacked blocks with real heights —
   // the halo wrapper is a row of its own, never a floating layer the hint can slide under.
   wrap: { gap: spacing.sm, marginBottom: spacing.xs, alignItems: 'stretch' },
@@ -170,4 +171,4 @@ const styles = StyleSheet.create({
   outcomeBar: { height: 2, borderRadius: 1, width: 56 },
   outcomeDone: { backgroundColor: colors.success },
   outcomePartial: { backgroundColor: colors.gold },
-});
+}));

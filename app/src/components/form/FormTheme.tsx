@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { themedStyles } from '@/theme/styles';
 import { formPalettes, radii, shadows, spacing, type FormPalette, type FormTone } from '@/theme/tokens';
 
 /**
@@ -35,7 +36,7 @@ export function FormCard({ children, tone = 'light', style, bare = false }: Form
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     borderRadius: radii.xl,
     borderWidth: 1,
@@ -44,4 +45,4 @@ const styles = StyleSheet.create({
     boxShadow: shadows.lift,
   },
   cardDark: { boxShadow: shadows.glowGoldFaint },
-});
+}));

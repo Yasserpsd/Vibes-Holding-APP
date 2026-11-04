@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda } from '@/api/agenda';
 import { usePeople } from '@/api/people';
@@ -20,6 +20,7 @@ import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { countNew, markSeen, useSeenMarks } from '@/lib/seen';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 import { withoutMediaLines } from '@/components/StructuredText';
 
@@ -174,7 +175,7 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // M176: today's personal suggestion — golden, on top of the tab.
   tipCard: { gap: spacing.xs, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
   tipHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
@@ -200,4 +201,4 @@ const styles = StyleSheet.create({
   title: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   thumb: { width: 54, height: 54, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
-});
+}));

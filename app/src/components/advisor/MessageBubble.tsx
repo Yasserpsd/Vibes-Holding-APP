@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
 
 import type { AdvisorAction, AdvisorFile, AdvisorMessage, AppScreen, HqProposal } from '@/api/advisor';
 import { formatFileSize } from '@/components/advisor/FileButton';
@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motio
 import { t } from '@/i18n';
 import { textEnd, textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 import { HqProposalCard } from './HqProposalCard';
@@ -182,7 +183,7 @@ function ActionButton({ icon, label, onPress }: { icon: IoniconName; label: stri
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { marginBottom: spacing.sm },
   // In the forced RTL layout flex-start is the right edge.
   rowMine: { alignItems: 'flex-end' },
@@ -230,4 +231,4 @@ const styles = StyleSheet.create({
   cardBullet: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   cardNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   system: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginVertical: spacing.sm },
-});
+}));

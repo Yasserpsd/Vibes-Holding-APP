@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
@@ -8,6 +8,7 @@ import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -40,7 +41,7 @@ export function LockedNotice({ text, guest }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     gap: spacing.md,
     padding: spacing.md,
@@ -58,4 +59,4 @@ const styles = StyleSheet.create({
   },
   text: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   actions: { gap: spacing.sm },
-});
+}));

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { projectsApi, useProjectReviews } from '@/api/queries';
@@ -14,6 +14,7 @@ import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { StarsPicker } from '@/components/Stars';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -129,7 +130,7 @@ export function RateProjectModal({ projectId, visible, onClose }: { projectId: s
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.72)' },
   wrap: { flex: 1, justifyContent: 'flex-end', padding: spacing.md },
   sheet: {
@@ -146,4 +147,4 @@ const styles = StyleSheet.create({
   body: { gap: spacing.sm },
   pickLabel: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   pickerRow: { alignItems: 'center', paddingVertical: spacing.xs },
-});
+}));

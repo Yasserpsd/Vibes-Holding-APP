@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useGuide, type GuideStep } from '@/api/guide';
 import { AppButton } from '@/components/AppButton';
@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -81,7 +82,7 @@ export default function GuideScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   step: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -119,4 +120,4 @@ const styles = StyleSheet.create({
   benefitsTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   benefitText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
-});
+}));

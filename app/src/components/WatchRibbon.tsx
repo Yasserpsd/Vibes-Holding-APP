@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { AgendaEvent } from '@/api/agenda';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows } from '@/theme/tokens';
 
 /** M192 (owner: «يتحط عليها ribbon يبان للناس انها متاحه تشوفها»): a finished workshop with recordings stays lit. */
@@ -21,7 +22,7 @@ export function WatchRibbon({ small = false }: { small?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   ribbon: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -36,4 +37,4 @@ const styles = StyleSheet.create({
   small: { paddingVertical: 3, paddingHorizontal: 8 },
   text: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 17, color: colors.black },
   textSmall: { fontSize: 11, lineHeight: 16 },
-});
+}));

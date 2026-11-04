@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError, errorMessage } from '@/api/client';
@@ -17,6 +17,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -169,7 +170,7 @@ function Bubble({ message, pending }: { message: ContactMessage; pending: boolea
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   gate: { flex: 1, padding: spacing.md, gap: spacing.md, justifyContent: 'center' },
   gateCard: {
@@ -232,4 +233,4 @@ const styles = StyleSheet.create({
   // The paper plane flies forward in the RTL layout.
   sendIcon: { transform: [{ scaleX: -1 }] },
   hint: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs, backgroundColor: colors.surface },
-});
+}));

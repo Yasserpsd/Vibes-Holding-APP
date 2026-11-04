@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 import type { NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
@@ -9,6 +9,7 @@ import { t } from '@/i18n';
 import { textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = {
@@ -30,10 +31,10 @@ export function BreakingPill() {
   );
 }
 
-const pillStyles = StyleSheet.create({
+const pillStyles = themedStyles(() => ({
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radii.pill, backgroundColor: colors.danger },
   text: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 16, color: '#FFFFFF' },
-});
+}));
 
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
 export function NewsCard({ item, onPress, compact = false }: Props) {
@@ -114,7 +115,7 @@ function FadingImage({ uri }: { uri: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -168,4 +169,4 @@ const styles = StyleSheet.create({
   },
   readLink: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
   readText: { ...typography.caption, color: colors.goldLight, flexShrink: 0 },
-});
+}));

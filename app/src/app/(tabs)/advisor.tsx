@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
@@ -12,6 +12,7 @@ import { AppButton } from '@/components/AppButton';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing } from '@/theme/tokens';
 
 export default function AdvisorScreen() {
@@ -77,7 +78,7 @@ export default function AdvisorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.black },
   actions: { gap: spacing.sm, alignSelf: 'stretch' },
-});
+}));

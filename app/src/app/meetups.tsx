@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { youtubeIdOf } from '@/lib/player';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, spacing, typography } from '@/theme/tokens';
 
 /** M119: the five club meetups (vibesholding.com/mup) — ordered and introduced per persona. */
@@ -80,7 +81,7 @@ function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   card: {
     height: 210,
@@ -108,4 +109,4 @@ const styles = StyleSheet.create({
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   teaser: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.goldLight, textAlign: textStart },
-});
+}));

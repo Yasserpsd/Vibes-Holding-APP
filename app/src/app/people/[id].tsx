@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { usePerson } from '@/api/people';
@@ -14,6 +14,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** M11: one club figure's public page — photo, bio, journey milestones and links. */
@@ -149,7 +150,7 @@ function Points({ title, icon, items, delay }: { title: string; icon: 'trophy-ou
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   head: { alignItems: 'center', gap: spacing.sm },
   avatarRing: {
     borderRadius: radii.pill,
@@ -192,4 +193,4 @@ const styles = StyleSheet.create({
   point: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.gold, marginTop: 9 },
   pointText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart, lineHeight: 24 },
-});
+}));

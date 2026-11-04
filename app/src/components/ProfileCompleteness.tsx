@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Text, View } from 'react-native';
 
 import type { Me } from '@/api/auth';
 import { AppButton } from '@/components/AppButton';
@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/lux';
 import { PopIn } from '@/components/motion';
 import { t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -106,7 +107,7 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   dot: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
   dotOn: { backgroundColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   badgeWrap: { position: 'absolute', bottom: -2, alignSelf: 'center' },
@@ -132,4 +133,4 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
   text: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-});
+}));

@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 
 import { useDecisions } from '@/api/news';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 /** The fixed section, the same for everyone: official decisions, laws and regulations, newest first. */
@@ -53,10 +54,10 @@ export default function DecisionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   intro: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
-});
+}));

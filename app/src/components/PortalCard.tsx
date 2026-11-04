@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { HomePortal } from '@/api/content';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { PressScale, Sheen } from '@/components/motion';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { portal: HomePortal; onPress: () => void };
@@ -35,7 +36,7 @@ export function PortalCard({ portal, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -57,4 +58,4 @@ const styles = StyleSheet.create({
   texts: { flex: 1, gap: 2 },
   title: { fontFamily: fonts.bold, fontSize: 19, lineHeight: 28, color: colors.textPrimary, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-});
+}));

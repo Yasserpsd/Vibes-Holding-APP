@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Text, View } from 'react-native';
 
 import { amountLabel, usePayment } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
@@ -12,6 +12,7 @@ import { textStart } from '@/i18n/direction';
 import { trackServicePurchase } from '@/lib/adsAttribution';
 import { appScheme, openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { loadWebView } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -136,7 +137,7 @@ export default function CheckoutScreen() {
 // the gateway and bank pages assume a light background, and gold on white stays the brand accent.
 const PAPER = '#FFFFFF';
 const INK = '#1C1C1C';
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   page: { flex: 1, backgroundColor: PAPER },
   summary: {
     gap: spacing.xs,
@@ -156,4 +157,4 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PAPER },
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: PAPER },
   fallbackText: { ...typography.body, color: INK, textAlign: 'center' },
-});
+}));

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { authApi, type Persona } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -15,6 +15,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Choice = { key: Persona; icon: 'compass-outline' | 'rocket-outline' | 'trending-up-outline'; label: StringKey; hint: StringKey };
@@ -214,7 +215,7 @@ export default function PersonaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   choices: { gap: spacing.sm },
   choice: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   // M102 selection language: the chosen card is SHINY GOLD with dark text; the rest fade to gray.
@@ -235,4 +236,4 @@ const styles = StyleSheet.create({
   choiceHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   choiceHintSelected: { color: colors.goldInk, opacity: 0.75 },
   codeBlock: { gap: spacing.sm },
-});
+}));

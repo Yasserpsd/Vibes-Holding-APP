@@ -19,6 +19,7 @@ import { isRTL, textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { topicIcon, type IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
+import { lazyTokens, themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function ProjectScreen() {
@@ -215,7 +216,7 @@ function ReadMore({ text }: { text: string }) {
 }
 
 // M95 (owner): long content rotates through soft accents so pages never read single-toned.
-const GOLD_ACCENT = { ink: colors.goldLight, bg: colors.goldSoft, border: colors.borderGoldSoft };
+const GOLD_ACCENT = lazyTokens(() => ({ ink: colors.goldLight, bg: colors.goldSoft, border: colors.borderGoldSoft }));
 const RICH_ACCENTS = [
   GOLD_ACCENT,
   { ink: '#5ECFA0', bg: 'rgba(52,178,123,0.14)', border: 'rgba(52,178,123,0.4)' },
@@ -362,7 +363,7 @@ function GalleryImage({ uri, width }: { uri: string; width: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
   gallery: { borderRadius: radii.lg, overflow: 'hidden' },
@@ -456,4 +457,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   richPieceText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
-});
+}));

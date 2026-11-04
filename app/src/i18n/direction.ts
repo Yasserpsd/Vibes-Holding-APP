@@ -60,7 +60,7 @@ export function arrowForward(): 'arrow-back' | 'arrow-forward' {
 
 const ATTEMPT_KEY = 'investorsclub.lang.restart';
 
-async function restart(): Promise<void> {
+export async function restart(): Promise<void> {
   if (requireOptionalNativeModule('ExpoUpdates')) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports

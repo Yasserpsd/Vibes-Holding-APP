@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, RefreshControl, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
@@ -24,9 +24,11 @@ import { WalletCard } from '@/components/WalletCard';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
+import { chooseTheme } from '@/theme/theme';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
 
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -68,6 +70,8 @@ export default function AccountScreen() {
           <AppButton label={t('account.benefits')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
           <AppButton label={t('account.about')} variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />
           {languageChoiceOffered(false) ? <AppButton label={t('account.menu.language')} variant="outline" icon="language-outline" onPress={chooseLanguage} /> : null}
+          {/* M196: light or dark, the member's call. */}
+          <AppButton label={t('account.menu.theme')} variant="outline" icon="contrast-outline" onPress={chooseTheme} />
           {/* Owner (2026-11-03): the management's only WhatsApp line, for everyone — guests too. */}
           <SupportLink />
         </FadeInView>
@@ -152,6 +156,8 @@ export default function AccountScreen() {
           {/* M87b: the daily advisor message, on or off — server-side, follows the account. */}
           <CompanionToggleRow />
           {languageChoiceOffered(me?.isAdmin === true) ? <MenuRow icon="language-outline" label={t('account.menu.language')} onPress={chooseLanguage} /> : null}
+          {/* M196: light or dark, the member's call. */}
+          <MenuRow icon="contrast-outline" label={t('account.menu.theme')} onPress={chooseTheme} />
           {me?.isAdmin ? <MenuRow icon="key-outline" label={t('account.menu.hqAdmin')} onPress={() => router.push('/hq/admin')} /> : null}
           <MenuRow icon="log-out-outline" label={t('account.menu.signOut')} onPress={() => void signOut()} />
         </MenuGroup>
@@ -269,7 +275,7 @@ function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   loading: { flex: 1, backgroundColor: colors.black, padding: spacing.lg, justifyContent: 'center' },
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -312,4 +318,4 @@ const styles = StyleSheet.create({
   rowLabel: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   rowLabelDanger: { color: colors.danger },
   footer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md },
-});
+}));

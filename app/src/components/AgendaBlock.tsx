@@ -12,6 +12,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatDayCount } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 200;
@@ -112,7 +113,7 @@ function GoldPill({ text, dim = false }: { text: string; dim?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   strip: { gap: spacing.sm, paddingBottom: spacing.xs },
   card: {
     width: CARD_WIDTH,
@@ -146,4 +147,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   pillText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldLight },
-});
+}));

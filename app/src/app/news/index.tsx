@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem } from '@/api/news';
@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { formatNewsCount } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 // The decisions strip snaps card by card: the compact NewsCard width (260) plus the strip gap.
@@ -170,7 +171,7 @@ export default function NewsListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.black },
   // The bottom padding keeps the last card clear of the floating «اسأل المستشار» button.
   listContent: { paddingHorizontal: spacing.md, paddingBottom: ASK_ADVISOR_CLEARANCE },
@@ -210,4 +211,4 @@ const styles = StyleSheet.create({
   countPillText: { ...typography.caption, fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLight },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
-});
+}));

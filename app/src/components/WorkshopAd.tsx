@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Text, View } from 'react-native';
 
 import { apiGet } from '@/api/client';
 import { useHq } from '@/api/hq';
@@ -15,6 +15,7 @@ import { textStart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { formatEventDays, formatNumber } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** Mirrors server/src/agenda/ad.ts. */
@@ -126,7 +127,7 @@ export function WorkshopAdPopup() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md },
@@ -165,4 +166,4 @@ const styles = StyleSheet.create({
     boxShadow: shadows.glowGoldFaint,
   },
   supportText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
-});
+}));

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useGolden } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
@@ -14,6 +14,7 @@ import { StateView } from '@/components/StateView';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
 import { formatMillionsSar, formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 export default function GoldenScreen() {
@@ -95,7 +96,7 @@ export default function GoldenScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
   // The portfolio hero earns the full golden halo; the company cards below keep the faint one.
@@ -131,4 +132,4 @@ const styles = StyleSheet.create({
   valueLabel: { ...typography.caption, color: colors.textMuted },
   valueText: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.goldLight },
   disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.md },
-});
+}));

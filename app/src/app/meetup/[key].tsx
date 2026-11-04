@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useMeetupsContent, type Meetup } from '@/api/content';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
@@ -12,6 +12,7 @@ import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { FormEmbed } from '@/components/FormEmbed';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -64,7 +65,7 @@ export default function MeetupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   description: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   features: { gap: spacing.sm },
   feature: {
@@ -81,4 +82,4 @@ const styles = StyleSheet.create({
   featureBody: { flex: 1, gap: 2 },
   featureTitle: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight, textAlign: textStart },
   featureText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-});
+}));

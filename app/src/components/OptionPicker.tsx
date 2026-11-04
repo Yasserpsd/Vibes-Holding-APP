@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type Ref } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FieldError } from '@/components/form/FormParts';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
 export type PickerOption = { value: string; label: string };
@@ -104,7 +105,7 @@ export function OptionPicker({ label, options, selected, onSelect, placeholder, 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   field: { gap: spacing.xs },
   label: { ...typography.caption, textAlign: textStart },
   input: {
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
   rowText: { ...typography.body, flex: 1, textAlign: textStart },
   rowTextActive: { fontFamily: fonts.semiBold },
   empty: { ...typography.body, color: colors.textMuted, textAlign: 'center', padding: spacing.md },
-});
+}));

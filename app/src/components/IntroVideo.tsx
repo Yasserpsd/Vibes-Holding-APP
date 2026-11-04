@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Text, View } from 'react-native';
 
 import { useHq } from '@/api/hq';
 import { AppButton } from '@/components/AppButton';
@@ -11,6 +11,7 @@ import { getLang, t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { playVideo } from '@/lib/player';
 import { autoPopupsBlocked } from '@/lib/popupGate';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -78,7 +79,7 @@ export function IntroVideoPopup() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md },
@@ -99,4 +100,4 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.subtitle, color: colors.gold, textAlign: 'center', marginTop: spacing.xs },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
-});
+}));

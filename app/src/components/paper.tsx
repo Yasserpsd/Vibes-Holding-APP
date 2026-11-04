@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { themedStyles } from '@/theme/styles';
 import { colors, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 /**
@@ -37,7 +38,7 @@ export function PaperCard({ children, style, pinned = false }: PaperCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     backgroundColor: colors.paper,
     borderRadius: radii.xl,
@@ -62,4 +63,4 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   pinShine: { width: 5, height: 5, borderRadius: radii.pill, backgroundColor: 'rgba(255, 255, 255, 0.85)' },
-});
+}));

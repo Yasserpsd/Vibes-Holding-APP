@@ -4,6 +4,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/AuthProvider';
 import { t } from '@/i18n';
 import { isRTL } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -345,7 +346,7 @@ function DustMote({ mote }: { mote: Mote }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // The ticker: a thin lit tape, gold on dark, like an exchange board.
   ticker: {
     overflow: 'hidden',
@@ -389,4 +390,4 @@ const styles = StyleSheet.create({
   // Confetti and dust.
   confetti: { position: 'absolute', top: 0, borderRadius: 2 },
   mote: { position: 'absolute', borderRadius: radii.pill, backgroundColor: colors.goldNeon, boxShadow: shadows.glowGoldFaint },
-});
+}));

@@ -1,5 +1,5 @@
 import { useRouter, type Href } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 
 import { usePeople, type Person } from '@/api/people';
 import { AppButton } from '@/components/AppButton';
@@ -8,6 +8,7 @@ import { FadeInView, PressScale, entranceDelay } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -76,7 +77,7 @@ function PersonCard({ person, onPress }: { person: Person; onPress: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   strip: { gap: spacing.sm, paddingBottom: spacing.xs },
   card: {
     width: 150,
@@ -98,4 +99,4 @@ const styles = StyleSheet.create({
   name: { ...typography.body, color: colors.textPrimary, textAlign: 'center' },
   // Two caption lines reserved so one-line and two-line titles keep the strip's cards one height.
   title: { ...typography.caption, color: colors.textMuted, textAlign: 'center', minHeight: typography.caption.lineHeight * 2 },
-});
+}));

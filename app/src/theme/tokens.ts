@@ -1,7 +1,13 @@
 // Design tokens — premium champagne gold on deep black, tuned to the official logo gradient.
 // V2 (full visual overhaul): neon glows, gradients and glass surfaces, all core-RN so OTA-safe.
+//
+// M196 (owner, 2026-11-04: «اعمل وضع فاتح كمان»): two palettes behind ONE set of names. `colors`,
+// `shadows` and `gradients` are mutable objects filled by applyTheme() before the first screen draws
+// (theme/theme.ts); the dark palette is the V2 look unchanged, the light one is the navy-and-gold of
+// the club's e-mails (see `brand` below). Screens keep reading `colors.x` — but only at render time
+// or inside themedStyles() (theme/styles.ts), never in a module-scope constant.
 
-export const colors = {
+const darkColors = {
   // Champagne gold scale sampled from the official logo (highlight → body → shadow).
   gold: '#D9A83C',
   goldLight: '#F2CE74',
@@ -52,6 +58,55 @@ export const colors = {
   paperGold: '#8A6D1D',
 } as const;
 
+export type ColorTokens = { -readonly [K in keyof typeof darkColors]: string };
+
+/**
+ * M196 light palette: the same token names, so every screen renders in both. Ink is the club navy,
+ * the gold goes one step deeper (#B8842A) so it still reads on white; the ivory «paper» zones stay.
+ */
+const lightColors: ColorTokens = {
+  gold: '#B8842A',
+  goldLight: '#D9A83C',
+  goldDark: '#8A6D1D',
+  goldNeon: '#C9922E',
+  goldInk: '#141005',
+
+  black: '#F4F6FA',
+  surface: '#FFFFFF',
+  surfaceElevated: '#EEF2F7',
+  border: '#DCE3EE',
+
+  white: '#FFFFFF',
+  textPrimary: '#0D274A',
+  textSecondary: '#3E5068',
+  textMuted: '#6B7A90',
+  textFaint: '#A9B4C4',
+
+  goldSoft: 'rgba(184, 132, 42, 0.14)',
+  goldFaint: 'rgba(184, 132, 42, 0.07)',
+  borderGold: 'rgba(184, 132, 42, 0.45)',
+  borderGoldSoft: 'rgba(184, 132, 42, 0.22)',
+  glass: 'rgba(255, 255, 255, 0.92)',
+  overlay: 'rgba(13, 39, 74, 0.55)',
+
+  success: '#1E8E63',
+  whatsapp: '#25D366',
+  warning: '#B8842A',
+  danger: '#D92D20',
+
+  paper: '#FAF7F0',
+  paperCard: '#FFFFFF',
+  paperInk: '#17130A',
+  paperInkSoft: '#57503F',
+  paperMuted: '#8C8472',
+  paperFaint: '#BDB6A6',
+  paperBorder: '#E7E0D1',
+  paperGold: '#8A6D1D',
+};
+
+/** The active palette (dark until applyTheme() says otherwise). Mutated in place, never reassigned. */
+export const colors: ColorTokens = { ...darkColors };
+
 // M85: each service group wears its own soft accent on the light tiles (icon tint + CTA).
 export const serviceAccents = {
   entrepreneur: { ink: '#8A6D1D', tint: '#F7EFD8' },
@@ -60,7 +115,7 @@ export const serviceAccents = {
 } as const;
 
 // Neon glows and depth shadows (RN boxShadow — works on iOS and Android with the new architecture).
-export const shadows = {
+const darkShadows = {
   /** Soft golden halo for hero surfaces and primary buttons. */
   glowGold: '0 0 24px rgba(255, 216, 101, 0.25)',
   /** Stronger halo for the moments that should feel electric (active tab, membership card). */
@@ -71,8 +126,20 @@ export const shadows = {
   lift: '0 10px 30px rgba(0, 0, 0, 0.55)',
 } as const;
 
+export type ShadowTokens = { -readonly [K in keyof typeof darkShadows]: string };
+
+/** M196: in the light the neon becomes quiet navy depth — a halo on white reads as dirt. */
+const lightShadows: ShadowTokens = {
+  glowGold: '0 6px 18px rgba(13, 39, 74, 0.10)',
+  glowGoldStrong: '0 8px 24px rgba(184, 132, 42, 0.24)',
+  glowGoldFaint: '0 4px 14px rgba(13, 39, 74, 0.08)',
+  lift: '0 8px 24px rgba(13, 39, 74, 0.10)',
+};
+
+export const shadows: ShadowTokens = { ...darkShadows };
+
 // CSS gradients for experimental_backgroundImage (always pair with a backgroundColor fallback).
-export const gradients = {
+const darkGradients = {
   /** The brand gold, lit from the top-start corner like the logo. */
   gold: 'linear-gradient(135deg, #F7DA8A 0%, #E6BA54 38%, #C2912E 78%, #A67C22 100%)',
   /** Subtle vertical sheen that makes dark cards feel machined, not flat. */
@@ -84,6 +151,39 @@ export const gradients = {
   /** M96: bottom-up dark scrim that makes text readable on top of a photo. */
   scrim: 'linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0) 78%)',
 } as const;
+
+export type GradientTokens = { -readonly [K in keyof typeof darkGradients]: string };
+
+/** M196: the gold metal stays; the dark sheens become white-to-mist. The photo scrim is the same in both. */
+const lightGradients: GradientTokens = {
+  gold: darkGradients.gold,
+  surface: 'linear-gradient(180deg, #FFFFFF 0%, #F7F9FC 100%)',
+  goldWash: 'linear-gradient(160deg, rgba(184, 132, 42, 0.14) 0%, rgba(184, 132, 42, 0.03) 55%, rgba(255, 255, 255, 0) 100%)',
+  screen: 'linear-gradient(180deg, #FFFFFF 0%, #F4F6FA 34%)',
+  scrim: darkGradients.scrim,
+};
+
+export const gradients: GradientTokens = { ...darkGradients };
+
+export type ThemeName = 'dark' | 'light';
+
+export const palettes: Record<ThemeName, { colors: ColorTokens; shadows: ShadowTokens; gradients: GradientTokens }> = {
+  dark: { colors: { ...darkColors }, shadows: { ...darkShadows }, gradients: { ...darkGradients } },
+  light: { colors: lightColors, shadows: lightShadows, gradients: lightGradients },
+};
+
+let activeTheme: ThemeName = 'dark';
+
+/** The theme the token objects currently hold. */
+export const getThemeName = (): ThemeName => activeTheme;
+
+/** Fills `colors`, `shadows` and `gradients` with a palette, in place. Call before the first screen renders. */
+export function applyTheme(name: ThemeName): void {
+  activeTheme = name;
+  Object.assign(colors, palettes[name].colors);
+  Object.assign(shadows, palettes[name].shadows);
+  Object.assign(gradients, palettes[name].gradients);
+}
 
 export const spacing = {
   xs: 4,
@@ -180,16 +280,16 @@ export const formPalettes: Record<FormTone, FormPalette> = {
   light: {
     tone: 'light',
     bg: '#F4F6FA',
-    card: colors.white,
+    card: '#FFFFFF',
     cardBorder: '#DCE3EE',
     ink: brand.navy,
     inkSoft: '#3E5068',
     muted: '#6B7A90',
     placeholder: '#A9B4C4',
-    field: colors.white,
+    field: '#FFFFFF',
     fieldBorder: '#C9D3E0',
     fieldFocus: brand.gold,
-    chipBg: colors.white,
+    chipBg: '#FFFFFF',
     chipBorder: brand.gold,
     chipText: brand.navy,
     chipSelectedBg: brand.navy,
@@ -210,7 +310,7 @@ export const formPalettes: Record<FormTone, FormPalette> = {
     bg: brand.navyDeep,
     card: brand.navy,
     cardBorder: brand.navySoft,
-    ink: colors.white,
+    ink: '#FFFFFF',
     inkSoft: '#D5DEEB',
     muted: '#9FB0C6',
     placeholder: '#6E829C',
@@ -219,7 +319,7 @@ export const formPalettes: Record<FormTone, FormPalette> = {
     fieldFocus: brand.gold,
     chipBg: 'transparent',
     chipBorder: brand.gold,
-    chipText: colors.white,
+    chipText: '#FFFFFF',
     chipSelectedBg: brand.gold,
     chipSelectedBorder: brand.gold,
     chipSelectedText: brand.navy,

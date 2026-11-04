@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ import { getLang, hubText, t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { showAdvisorBalance } from '@/lib/advisorBalance';
 import { formatArabicDate, formatNumber } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 import { Composer } from './Composer';
@@ -399,7 +400,7 @@ function GateNotice({ gate, onDismiss, onMembership }: { gate: AdvisorGate; onDi
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.black },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -469,4 +470,4 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   contextText: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
-});
+}));

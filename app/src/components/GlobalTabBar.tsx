@@ -8,6 +8,7 @@ import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/co
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
 import { useHiddenTabs } from '@/lib/personaTabs';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -111,7 +112,7 @@ export function GlobalTabBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   // The same machined sheet as the (tabs) bar: rounded shoulders, golden hairline, lift.
   bar: {
     flexDirection: 'row',
@@ -150,4 +151,4 @@ const styles = StyleSheet.create({
   badgeText: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 14, color: colors.goldInk, textAlign: 'center' },
   label: { ...typography.tabLabel, color: colors.textMuted },
   labelActive: { color: colors.gold },
-});
+}));

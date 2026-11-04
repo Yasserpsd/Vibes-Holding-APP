@@ -10,6 +10,7 @@ import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StarsRow } from '@/components/Stars';
 import { chevronForward, textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // M99c (owner): ONE golden opportunity per APP OPEN — the seed lives for the JS session, so the pick
@@ -111,7 +112,7 @@ function Pill({ text }: { text: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     height: 220,
     marginTop: spacing.sm,
@@ -149,4 +150,4 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.textPrimary, textAlign: textStart },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },
-});
+}));

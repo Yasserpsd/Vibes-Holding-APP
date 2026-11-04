@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { hqApi, useAdminVisits, type AdminVisit, type VerifyResult, type VisitStatus } from '@/api/hq';
@@ -17,6 +17,7 @@ import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, weekdayOf } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const FILTERS: { key: VisitStatus | 'all'; label: StringKey }[] = [
@@ -126,7 +127,7 @@ function AdminRow({ visit, busy, onDecide }: { visit: AdminVisit; busy: boolean;
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   visit: { gap: 4, padding: spacing.md },
@@ -138,4 +139,4 @@ const styles = StyleSheet.create({
   action: { flex: 1 },
   // The scanned code is checked inside a gold-framed card: the desk's own little stage.
   verifyCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg },
-});
+}));

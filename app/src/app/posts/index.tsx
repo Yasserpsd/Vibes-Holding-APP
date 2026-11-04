@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { RefreshControl, StyleSheet, Text } from 'react-native';
+import { RefreshControl, Text } from 'react-native';
 
 import { usePosts } from '@/api/posts';
 import { useAuth } from '@/auth/AuthProvider';
@@ -12,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { markSeen } from '@/lib/seen';
+import { themedStyles } from '@/theme/styles';
 import { colors, typography } from '@/theme/tokens';
 
 /** Every «رسائل الإدارة» post, pinned first, then newest; older pages load on demand. M29: it is the member's inbox. */
@@ -75,6 +76,6 @@ export default function PostsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   empty: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-});
+}));

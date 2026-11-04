@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
-import { Image, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Share, Text, View } from 'react-native';
 
 import { usePartners, type Partner } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
@@ -16,6 +16,7 @@ import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -136,7 +137,7 @@ function PartnerCard({ partner }: { partner: Partner }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   gate: { gap: spacing.md, padding: spacing.md },
   empty: { ...typography.body, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.lg },
 
@@ -199,4 +200,4 @@ const styles = StyleSheet.create({
   discountPill: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.goldSoft },
   discountText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold },
   partnerDetail: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
-});
+}));

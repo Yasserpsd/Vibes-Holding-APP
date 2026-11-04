@@ -21,6 +21,7 @@ import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { playVideo } from '@/lib/player';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /** One «رسائل الإدارة» post or event: text, the event's date and place, images, a YouTube or uploaded video and link buttons, all opened in-app. */
@@ -243,7 +244,7 @@ function VideoTile({ url, poster, posterFit, label, title }: { url: string; post
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
@@ -305,4 +306,4 @@ const styles = StyleSheet.create({
     experimental_backgroundImage: gradients.gold,
     boxShadow: shadows.glowGold,
   },
-});
+}));

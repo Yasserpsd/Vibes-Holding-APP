@@ -12,6 +12,7 @@ import { env } from '@/config/env';
 import { t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { claimAutoPopup } from '@/lib/popupGate';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -157,7 +158,7 @@ export function RateUsPrompt() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: spacing.md },
   card: { alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
@@ -168,4 +169,4 @@ const styles = StyleSheet.create({
   text: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   hairline: { alignSelf: 'stretch', marginVertical: spacing.xs },
   done: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },
-});
+}));

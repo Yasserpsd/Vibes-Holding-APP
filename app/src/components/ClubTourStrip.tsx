@@ -1,11 +1,12 @@
 import { useRouter, type Href } from 'expo-router';
-import { Image, ScrollView, StyleSheet } from 'react-native';
+import { Image, ScrollView } from 'react-native';
 
 import { useHq } from '@/api/hq';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing } from '@/theme/tokens';
 
 const PHOTO_WIDTH = 240;
@@ -43,7 +44,7 @@ export function ClubTourStrip() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   strip: { gap: spacing.sm, paddingVertical: spacing.xs },
   photo: {
     width: PHOTO_WIDTH,
@@ -54,4 +55,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     boxShadow: shadows.lift,
   },
-});
+}));

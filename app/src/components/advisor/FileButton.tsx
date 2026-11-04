@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { requireOptionalNativeModule } from 'expo';
 import { useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { Alert } from 'react-native';
 
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii } from '@/theme/tokens';
 
 /** M151: the file size the advisor accepts (the server and the hub enforce the same cap). */
@@ -81,7 +82,7 @@ export function FileButton({ onFile, disabled }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: {
     width: 44,
     height: 44,
@@ -93,4 +94,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonMuted: { opacity: 0.6 },
-});
+}));

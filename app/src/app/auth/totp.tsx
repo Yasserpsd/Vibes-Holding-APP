@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet } from 'react-native';
+
 
 import { authApi } from '@/api/auth';
 import { ApiError, errorMessage } from '@/api/client';
@@ -12,6 +12,7 @@ import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
 type Params = { stepToken?: string };
@@ -87,8 +88,8 @@ export default function TotpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   code: { fontFamily: fonts.semiBold, fontSize: 26, letterSpacing: 6, textAlign: 'center' },
   codeFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   spacer: { height: spacing.sm },
-});
+}));

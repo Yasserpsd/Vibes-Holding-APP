@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts } from '@/theme/tokens';
 
 /**
@@ -49,10 +50,10 @@ export function StarsPicker({ value, onChange, size = 34 }: { value: number; onC
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   stars: { flexDirection: 'row', alignItems: 'center', gap: 1 },
   value: { fontFamily: fonts.semiBold, color: colors.gold },
   count: { fontFamily: fonts.regular, color: colors.textSecondary },
   picker: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-});
+}));

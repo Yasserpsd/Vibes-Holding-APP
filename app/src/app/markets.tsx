@@ -12,6 +12,7 @@ import { StateView } from '@/components/StateView';
 import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber, formatRelativeTime } from '@/lib/format';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
@@ -88,7 +89,7 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   ask: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: spacing.xs, paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGold, marginBottom: spacing.sm },
   askText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
   rowAsk: { padding: spacing.xs },
@@ -104,4 +105,4 @@ const styles = StyleSheet.create({
   gram: { fontSize: 12, lineHeight: 18, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
   price: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 26, color: colors.textPrimary },
   note: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginTop: spacing.lg },
-});
+}));

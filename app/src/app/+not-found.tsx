@@ -1,10 +1,11 @@
 import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { EmblemWatermark, GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
+import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function NotFoundScreen() {
@@ -25,7 +26,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -47,4 +48,4 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.sm,
   },
-});
+}));

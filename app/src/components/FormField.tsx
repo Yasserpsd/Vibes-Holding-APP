@@ -1,10 +1,11 @@
 import { useState, type Ref } from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { FieldError } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { inputStart, isRTL, textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = TextInputProps & {
@@ -74,7 +75,7 @@ export function FormField({ label, hint, error, latin = false, anchorRef, style,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   field: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   input: {
@@ -100,4 +101,4 @@ const styles = StyleSheet.create({
   paperInput: { color: colors.paperInk, backgroundColor: colors.paperCard, borderColor: colors.paperBorder },
   paperInputFocused: { borderColor: colors.paperGold },
   paperHint: { color: colors.paperMuted },
-});
+}));

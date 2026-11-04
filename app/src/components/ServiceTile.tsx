@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
 import { showMembershipGate } from '@/components/MembershipGate';
@@ -10,6 +10,7 @@ import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
+import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, serviceAccents, shadows, spacing, typography } from '@/theme/tokens';
 
 type Props = { service: Service; onPress: () => void };
@@ -85,7 +86,7 @@ export const serviceGridStyle = { flexDirection: 'row', flexWrap: 'wrap', gap: s
  */
 export const serviceTileWrapStyle = { flexBasis: '47%' as const, flexGrow: 1, maxWidth: '50%' as const };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: { flex: 1 },
   card: {
     flex: 1,
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.paperGold, textAlign: textStart },
   savings: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.paperGold, textAlign: textStart },
   lockedText: { opacity: 0.75 },
-});
+}));

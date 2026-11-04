@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FadeInView, PopIn, Wiggle } from '@/components/motion';
 import { SupportLink } from '@/components/SupportLink';
 import { textStart } from '@/i18n/direction';
+import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 // `support`: the notice reports a problem, so the WhatsApp support line sits right under it (owner, 2026-11-03).
@@ -43,7 +44,7 @@ export function Notice({ text, tone = 'info', support = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -67,4 +68,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldFaint,
   },
   text: { ...typography.caption, color: colors.textSecondary, flex: 1, textAlign: textStart },
-});
+}));
