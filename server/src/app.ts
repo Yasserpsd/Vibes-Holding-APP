@@ -293,7 +293,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const postsEnglish = new PostsEnglish({ service: posts, translator, log: app.log });
   const polls = new PollsService(kv);
   const markets = new MarketsService({ log: app.log, fetchImpl });
-  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos, markets });
+  const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos, markets, ratingOf: (id) => ratings.summary(id) });
   // Management notifications: the hosting mailbox (SMTP) with the hub's HTTPS wp_mail channel as
   // the automatic fallback (M112) — a blocked port or a TLS hiccup never loses a mail.
   const smtpMail: Mailer | null = config.SMTP_HOST

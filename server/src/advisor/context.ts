@@ -8,8 +8,10 @@ import type { AppLang } from '../lang.js';
 import { PartnersService } from '../partners/service.js';
 import type { NewsService } from '../news/service.js';
 import type { PostsService } from '../posts/service.js';
+import { storedBrief } from '../projectsBank/brief.js';
 import { stripContacts } from '../projectsBank/redact.js';
 import type { ProjectsService } from '../projectsBank/service.js';
+import type { RatingSummary } from '../ratings/service.js';
 import type { MarketsService } from '../markets/service.js';
 import type { KV } from '../store.js';
 import type { VideosService } from '../videos/service.js';
@@ -35,6 +37,8 @@ export type ResolvedContext = { url: string; title: string; focus: HubFocus | nu
 
 export const CONTEXT_TEXT_MAX = 6000;
 const SELECTION_MAX = 1000;
+/** M201: the brief's share of a project context, so the founder's description keeps the rest. */
+const BRIEF_TEXT_MAX = 2500;
 const APP = 'تطبيق نادي المستثمرين';
 const NONE: ResolvedContext = { url: '', title: '', focus: null };
 
@@ -76,7 +80,7 @@ function inEnglish(found: ResolvedContext): ResolvedContext {
 const clip = (value: string, max: number): string => value.replace(/[ \t]+/g, ' ').trim().slice(0, max);
 const lines = (rows: (string | null | undefined | false)[]): string => rows.filter((row): row is string => Boolean(row)).join('\n');
 
-type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: PostsService; videos?: VideosService; markets?: MarketsService };
+type Deps = { projects: ProjectsService; news: NewsService; kv: KV; posts?: PostsService; videos?: VideosService; markets?: MarketsService; ratingOf?: (projectId: number) => RatingSummary };
 
 export class ContextResolver {
   constructor(private readonly deps: Deps) {}
@@ -108,6 +112,8 @@ export class ContextResolver {
           project.stage && `المرحلة: ${project.stage.name}`,
           project.isGolden && 'مشروع ذهبي يحمل علامة V.',
           project.excerpt && `نبذة: ${project.excerpt}`,
+          // Before the long description: the cut at CONTEXT_TEXT_MAX takes the description's tail, never these.
+          ...(await this.shownOnProject(context.id)),
           project.details && `الوصف:\n${project.details}`,
         ]);
         // The founder's free text can carry a phone, an e-mail or a link: never into a context.
@@ -148,6 +154,36 @@ export class ContextResolver {
       case 'screen':
         return this.screen(context.id, focus);
     }
+  }
+
+  /**
+   * M201 (owner: an advisor button on every project): what the member reads on the project's screen besides the
+   * founder's text — the members' stars and «ملخص المستشار» as the app last showed it (the stored brief: public
+   * fields only, never built or worded here). The caller strips contact data from the whole text (rule 4).
+   * Never throws: a missing or unreadable brief costs its lines only.
+   */
+  private async shownOnProject(id: number): Promise<string[]> {
+    const rows: string[] = [];
+    const rating = this.deps.ratingOf?.(id);
+    if (rating && rating.stars !== null && rating.count > 0) rows.push(`تقييم الأعضاء: ${rating.stars} من 5 (عدد التقييمات: ${rating.count})`);
+    try {
+      const brief = await storedBrief(this.deps.kv, id);
+      if (!brief || typeof brief.summary !== 'string') return rows;
+      const list = (heading: string, entries: string[]): string[] => (entries.length ? [heading, ...entries.map((entry) => `• ${entry}`)] : []);
+      const block = lines([
+        'ملخص المستشار المعروض للعضو في شاشة المشروع:',
+        brief.summary,
+        ...(brief.table ?? []).map((row) => `• ${row.label}: ${row.value}`),
+        brief.stage?.estimated && `المرحلة بتقدير المستشار من وصف المشروع: ${brief.stage.label}`,
+        ...list('نقاط القوة:', brief.strengths ?? []),
+        ...list('مخاطر تستحق الانتباه:', brief.risks ?? []),
+        ...list('مشاريع منافسة من بنك المشاريع:', (brief.competitors ?? []).map((rival) => `${rival.title}${rival.sector ? ` (${rival.sector})` : ''}: ${rival.why}`)),
+      ]);
+      rows.push(block.slice(0, BRIEF_TEXT_MAX));
+    } catch {
+      // The context goes without the brief.
+    }
+    return rows;
   }
 
   private async screen(id: string, focus: (title: string, text: string) => HubFocus): Promise<ResolvedContext> {

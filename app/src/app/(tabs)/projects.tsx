@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProjectFilters, useProjectsList } from '@/api/queries';
 import type { ProjectsSort, PublicProject } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
-import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
+import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
 import { entranceDelay, FadeInView, PressScale, useCountUp } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -31,6 +31,8 @@ const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
 
 export default function ProjectsScreen() {
   const router = useRouter();
+  // M201: each card's «اسأل المستشار» opens the chat on that project.
+  const askAdvisor = useAskAdvisor();
   const { status } = useAuth();
   const signedIn = status === 'signedIn';
   const [search, setSearch] = useState('');
@@ -169,6 +171,7 @@ export default function ProjectsScreen() {
               project={item}
               onPress={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id) } })}
               onContact={() => router.push({ pathname: '/project/[id]', params: { id: String(item.id), contact: '1' } })}
+              onAskAdvisor={() => askAdvisor({ type: 'project', id: item.id, title: item.title })}
             />
           );
           // M130b (owner: «في تقل في تقليب بنك المشاريع»): the entrance animation is for the first

@@ -16,12 +16,14 @@ type Props = {
   onPress: () => void;
   /** M35: «تواصل مع المؤسس» straight from the list; the page then walks the unlock (rule 4 intact). */
   onContact?: () => void;
+  /** M201: «اسأل المستشار» on the card; the server builds what the advisor knows from the project's id. */
+  onAskAdvisor?: () => void;
 };
 
 /** Fixed image strip height; the sheen only needs the measured width. */
 const IMAGE_HEIGHT = 168;
 
-export function ProjectCard({ project, onPress, onContact }: Props) {
+export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props) {
   // The cover fades in once it arrives instead of popping over the dark surface.
   const [imageOpacity] = useState(() => new Animated.Value(0));
   const [imageWidth, setImageWidth] = useState(0);
@@ -36,6 +38,7 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
     imageOpacity.setValue(0);
   }
   const golden = project.isGolden;
+  const showContact = !golden && Boolean(onContact);
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>
       <GlassCard golden={golden} radius={radii.xl} style={golden ? styles.cardGolden : null}>
@@ -100,18 +103,39 @@ export function ProjectCard({ project, onPress, onContact }: Props) {
               </Text>
             </View>
           ) : null}
-          {!golden && onContact ? (
-            <PressScale
-              onPress={onContact}
-              glow
-              glowRadius={radii.md}
-              wrapStyle={styles.contactWrap}
-              style={styles.contactCta}
-              accessibilityLabel={t('project.contactCta')}
-            >
-              <Ionicons name="chatbubbles-outline" size={16} color={colors.goldInk} />
-              <Text style={styles.contactCtaText}>{t('project.contactCta')}</Text>
-            </PressScale>
+          {showContact || onAskAdvisor ? (
+            <View style={styles.actions}>
+              {showContact ? (
+                <PressScale
+                  onPress={onContact}
+                  glow
+                  glowRadius={radii.md}
+                  wrapStyle={styles.actionGrow}
+                  style={styles.contactCta}
+                  accessibilityLabel={t('project.contactCta')}
+                >
+                  <Ionicons name="chatbubbles-outline" size={16} color={colors.goldInk} />
+                  <Text style={styles.contactCtaText} numberOfLines={1}>
+                    {t('project.contactCta')}
+                  </Text>
+                </PressScale>
+              ) : null}
+              {/* M201 (owner): the advisor on EVERY project — it opens the chat already on this project.
+                  Beside the contact button it keeps its own width; alone (golden projects) it fills the row. */}
+              {onAskAdvisor ? (
+                <PressScale
+                  onPress={onAskAdvisor}
+                  wrapStyle={showContact ? null : styles.actionGrow}
+                  style={styles.advisorCta}
+                  accessibilityLabel={t('advisor.askAbout', { title: project.title })}
+                >
+                  <Ionicons name="sparkles" size={15} color={colors.gold} />
+                  <Text style={styles.advisorCtaText} numberOfLines={1}>
+                    {t('advisor.ask')}
+                  </Text>
+                </PressScale>
+              ) : null}
+            </View>
           ) : null}
         </View>
       </GlassCard>
@@ -236,8 +260,32 @@ const styles = themedStyles(() => ({
     lineHeight: 16,
     color: colors.goldLight,
   },
-  contactWrap: {
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
     marginTop: spacing.sm,
+  },
+  actionGrow: {
+    flex: 1,
+  },
+  advisorCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm - 1,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+  },
+  advisorCtaText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.goldLight,
   },
   contactCta: {
     flexDirection: 'row',
@@ -254,5 +302,6 @@ const styles = themedStyles(() => ({
     fontSize: 13,
     lineHeight: 20,
     color: colors.goldInk,
+    flexShrink: 1,
   },
 }));

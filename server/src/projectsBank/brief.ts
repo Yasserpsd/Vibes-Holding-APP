@@ -334,6 +334,11 @@ const answerSchema = z
 type Stored = { hash: string; brief: ProjectBrief; retryAt?: number };
 type Deps = { kv: KV; log: FastifyBaseLogger; apiKey?: string; model: string; fetchImpl?: FetchImpl };
 
+/** M201: the brief as the app last showed it — read as stored, no build and no model call (the advisor's context). */
+export async function storedBrief(kv: KV, id: number, lang: AppLang = 'ar'): Promise<ProjectBrief | null> {
+  return (await kv.get<Stored>(briefKey(id, lang)))?.brief ?? null;
+}
+
 export class BriefService {
   private readonly inflight = new Map<string, Promise<ProjectBrief>>();
   private readonly limiter = new RateLimiter();

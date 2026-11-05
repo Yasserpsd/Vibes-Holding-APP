@@ -149,6 +149,11 @@ export default function ProjectScreen() {
             </FadeInView>
           ) : null}
 
+          {/* M201 (owner): the advisor button up where it is seen — the chat opens already on this project. */}
+          <FadeInView delay={100}>
+            <AppButton label={t('project.discuss')} icon="sparkles" variant="outline" onPress={() => (advisorContext ? askAdvisor(advisorContext) : undefined)} />
+          </FadeInView>
+
           {/* M35: contact with the founder sits at the top — a golden project offers its partner page instead. */}
           {project.isGolden && project.goldenPartnerUrl ? (
             <FadeInView delay={60}>
