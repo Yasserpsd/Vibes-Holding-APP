@@ -13,6 +13,7 @@ import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { redirectDigest, toRedirectQuery, verifyRedirect, verifyWebhook, webhookDigest, type Json } from './hmac.js';
 import type { AppLang } from '../lang.js';
+import type { EnglishCache } from '../englishCache.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { invoiceHtml, invoiceSubject, invoiceText } from './invoice.js';
 import type { MoyasarConfirmer } from './moyasar.js';
@@ -120,6 +121,8 @@ type Deps = {
   discounts?: DiscountsService;
   /** M174: the member's receipt also goes on WhatsApp (the invoice mail stays: it is the numbered document and the admins' copy). */
   whatsapp?: WhatsappService;
+  /** Owner (2026-11-05): an English invoice is English throughout, stored Arabic included. */
+  english?: Pick<EnglishCache, 'texts'>;
 };
 
 function isoDaysAgo(now: number, days: number): string {
@@ -500,11 +503,12 @@ export class PaymentsService {
     if (!invoiceNo) throw new RequestError('not_found', 'العملية غير موجودة', 404);
     payment.invoiceNo = invoiceNo;
     const lang = payment.lang ?? 'ar';
+    const doc = await this.forInvoice(payment);
     const result = await this.deps.notifier.invoiceSend({
       email: payment.email,
       subject: invoiceSubject(invoiceNo, lang),
-      text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
-      html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
+      text: invoiceText(doc, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+      html: invoiceHtml(doc, invoiceNo, lang, this.deps.publicUrl),
     });
     return { ok: result.customer === null && result.admins === null, invoiceNo, customer: result.customer, admins: result.admins };
   }
@@ -567,11 +571,12 @@ export class PaymentsService {
     if (invoiceNo) {
       payment.invoiceNo = invoiceNo;
       if (payment.email) {
+        const doc = await this.forInvoice(payment);
         await this.deps.notifier.invoiceSend({
           email: payment.email,
           subject: invoiceSubject(invoiceNo, lang),
-          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
-          html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
+          text: invoiceText(doc, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+          html: invoiceHtml(doc, invoiceNo, lang, this.deps.publicUrl),
         });
       }
     }
@@ -583,7 +588,20 @@ export class PaymentsService {
   async invoicePage(id: string): Promise<string | null> {
     const payment = (await this.load()).find((entry) => entry.id === id);
     if (!payment || payment.status !== 'paid' || !payment.invoiceNo) return null;
-    return invoiceHtml(payment, payment.invoiceNo, payment.lang ?? 'ar', this.deps.publicUrl);
+    return invoiceHtml(await this.forInvoice(payment), payment.invoiceNo, payment.lang ?? 'ar', this.deps.publicUrl);
+  }
+
+  /** An English buyer's invoice shows the service, the name and the answers in English; the stored Arabic stays the original. */
+  private async forInvoice(payment: Payment): Promise<Payment> {
+    if ((payment.lang ?? 'ar') !== 'en' || !this.deps.english) return payment;
+    const texts = [payment.serviceTitle, payment.name, ...payment.answers.flatMap((answer) => [answer.label, answer.value])];
+    const shown = await this.deps.english.texts(texts, 'en').catch(() => texts);
+    return {
+      ...payment,
+      serviceTitle: shown[0] ?? payment.serviceTitle,
+      name: shown[1] ?? payment.name,
+      answers: payment.answers.map((answer, index) => ({ ...answer, label: shown[2 + index * 2] ?? answer.label, value: shown[3 + index * 2] ?? answer.value })),
+    };
   }
 
   /** Everything that happens once a gateway settled a payment: code use, mails, push, module listeners. */
@@ -595,15 +613,16 @@ export class PaymentsService {
       if (invoiceNo) {
         payment.invoiceNo = invoiceNo;
         const lang = payment.lang ?? 'ar';
+        const doc = await this.forInvoice(payment);
         await this.deps.notifier.invoiceSend({
           email: payment.email,
           subject: invoiceSubject(invoiceNo, lang),
-          text: invoiceText(payment, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
-          html: invoiceHtml(payment, invoiceNo, lang, this.deps.publicUrl),
+          text: invoiceText(doc, invoiceNo, `${this.deps.publicUrl}/pay/invoice/${payment.id}`, lang),
+          html: invoiceHtml(doc, invoiceNo, lang, this.deps.publicUrl),
         });
         // M174: never delays or fails the settle (the service swallows its own errors); `ref` makes a repeated gateway callback send once.
         if (this.deps.whatsapp && payment.phone.trim()) {
-          void this.deps.whatsapp.sendReceipt({ phone: payment.phone, lang, amount: payment.amount, service: payment.serviceTitle, invoiceNo, ref: `payment:${payment.id}` });
+          void this.deps.whatsapp.sendReceipt({ phone: payment.phone, lang, amount: payment.amount, service: doc.serviceTitle, invoiceNo, ref: `payment:${payment.id}` });
         }
       }
     }

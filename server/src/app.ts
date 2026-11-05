@@ -434,6 +434,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     notifier,
     push,
     whatsapp,
+    english: englishCache,
     // With Moyasar live the Paymob webhook route stays mounted but unforgeable (random secret).
     hmacSecret:
       paymentGateway.mode === 'live'
