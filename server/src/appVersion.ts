@@ -15,6 +15,8 @@ import type { KV } from './store.js';
  * launch at once. The floor comes from the dashboard (kv `app:minVersion`) or the MIN_APP_VERSION variable;
  * falls back to STORE_APP_VERSION (the binary in the stores). `APP_REQUIRE_VERSION` (default 1) also blocks app requests that carry no version header
  * (bundles older than M195 — only the ones that already send `x-app-platform`, so the dashboard is never hit).
+ * M200 (owner, 2026-11-05: «الغي الشرط ده فورا» — store phones stuck on an older bundle were told to update a build
+ * that was already the latest, and deleted the app): the gate is OFF unless APP_VERSION_GATE=1; off = no 426, status never asks.
  */
 export const MIN_VERSION_KEY = 'app:minVersion';
 /**
@@ -60,6 +62,8 @@ export type AppVersionOptions = {
   envMinVersion: string;
   /** APP_REQUIRE_VERSION=1: an app request without the header is treated as too old. */
   requireHeader: boolean;
+  /** APP_VERSION_GATE=1; anything else leaves every app version working (M200). */
+  enabled: boolean;
 };
 
 /** Paths every bundle may call however old: the status itself and the owner's wording. */
@@ -99,7 +103,8 @@ function tooOld(version: string | null, floor: string, requireHeader: boolean): 
  * The gate itself, installed on the ROOT instance (a hook added inside a registered plugin would only
  * cover that plugin's own routes): every app request below the floor is answered 426 at once.
  */
-export function installAppVersionGate(app: FastifyInstance, { kv, envMinVersion, requireHeader }: Omit<AppVersionOptions, 'auth'>): void {
+export function installAppVersionGate(app: FastifyInstance, { kv, envMinVersion, requireHeader, enabled }: Omit<AppVersionOptions, 'auth'>): void {
+  if (!enabled) return;
   const floorOf = minVersionReader(kv, envMinVersion);
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?')[0] ?? '';
@@ -112,7 +117,7 @@ export function installAppVersionGate(app: FastifyInstance, { kv, envMinVersion,
   });
 }
 
-export const appVersionRoutes: FastifyPluginAsync<AppVersionOptions> = async (app, { kv, auth, envMinVersion, requireHeader }) => {
+export const appVersionRoutes: FastifyPluginAsync<AppVersionOptions> = async (app, { kv, auth, envMinVersion, requireHeader, enabled }) => {
   const requireAdmin = dashboardGuard(auth);
   const floorOf = minVersionReader(kv, envMinVersion);
   const minVersion = floorOf.read;
@@ -123,7 +128,7 @@ export const appVersionRoutes: FastifyPluginAsync<AppVersionOptions> = async (ap
     const version = typeof query.version === 'string' && VERSION.test(query.version) ? query.version : appVersionOf(request);
     return {
       minVersion: floor,
-      updateRequired: tooOld(version, floor, requireHeader),
+      updateRequired: enabled && tooOld(version, floor, requireHeader),
       message: updateRequiredMessage(langOf(request)),
       storeUrls: { ios: APP_STORE_URL, android: PLAY_STORE_URL },
     };
@@ -134,7 +139,7 @@ export const appVersionRoutes: FastifyPluginAsync<AppVersionOptions> = async (ap
     guard(async (request, reply) => {
       if (!(await requireAdmin(request, reply))) return;
       const stored = (await kv.get<{ minVersion: string }>(MIN_VERSION_KEY))?.minVersion ?? '';
-      return { minVersion: await minVersion(), stored, envMinVersion, requireHeader };
+      return { minVersion: await minVersion(), stored, envMinVersion, requireHeader, enabled };
     }),
   );
 

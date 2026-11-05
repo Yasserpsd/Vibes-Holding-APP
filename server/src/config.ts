@@ -31,6 +31,8 @@ const envSchema = z.object({
   MIN_APP_VERSION: z.string().trim().default(''),
   // M195: '1' (default, owner: nothing older than the store opens) also blocks app requests with no x-app-version header (bundles older than M195); '0' lets them through.
   APP_REQUIRE_VERSION: z.enum(['0', '1']).default('1'),
+  // M200 (owner, 2026-11-05: the forced-update message made members delete the app): the whole gate is OFF unless this is '1'.
+  APP_VERSION_GATE: z.enum(['0', '1']).default('0'),
   // M179: the advisor's market-move alerts (push when a quote moves sharply); '0' kills it cold. Thresholds live in the dashboard.
   MARKET_ALERTS: z.enum(['0', '1']).default('1'),
   /** M182b: the breaking-news push (money story with a hard-hitting headline); '0' kills it. */

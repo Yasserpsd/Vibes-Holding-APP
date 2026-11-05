@@ -22,6 +22,7 @@ const config = loadConfig({
   NOTIFY_EMAIL: 'admin@vcmem.com',
   PUBLIC_URL: 'https://api-test.vibesholdingsa.com',
   MIN_APP_VERSION: '1.3.0',
+  APP_VERSION_GATE: '1',
 });
 
 class LeveledHub implements HubClient {
