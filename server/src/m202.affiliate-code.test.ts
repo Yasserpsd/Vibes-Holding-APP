@@ -145,6 +145,18 @@ test('the dashboard sets a code: shape and clashes checked, the old one kept, an
   assert.deepEqual((await affiliates.setShortCode(1, 'WSY2'))?.oldCodes, ['WSY-25', 'WAS2']);
 });
 
+test('the e-mail route carries the same code and link, approved affiliates only', async () => {
+  const mailed: { email: string; code: string; link: string }[] = [];
+  const { affiliates, seeded, kv } = service([record(1, 'فارس العتيبي', { shortCode: 'FAR2', oldCodes: ['FAR-24'] }), record(2, 'رنا سالم', { shortCode: 'RNA2', oldCodes: ['RNA-23'], status: 'pending' })]);
+  await seeded;
+  (affiliates as unknown as { deps: { notifier: unknown } }).deps.notifier = { affiliateLink: (who: { email: string }, code: string, link: string) => mailed.push({ email: who.email, code, link }) };
+  assert.deepEqual(await affiliates.sendLinks(1, 'email'), [{ contactId: 1, name: 'فارس العتيبي', code: 'FAR2', channel: 'email', error: null }]);
+  assert.deepEqual(mailed, [{ email: '1@gmail.com', code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' }]);
+  assert.equal((await affiliates.sendLinks(2, 'email')).length, 0);
+  await kv.set(AFFILIATES_KEY, { affiliates: [record(3, 'سارة علي', { shortCode: 'SAR2', oldCodes: ['SAR-10'], email: '' })] });
+  assert.equal((await affiliates.sendLinks(3, 'email'))[0]?.error, 'no_email');
+});
+
 test('WhatsApp: every approved affiliate gets the short code and link, one ref per code; a new approval sends too', async () => {
   const sent: { phone: string; name: string; code: string; link: string; ref: string }[] = [];
   const whatsapp = { sendAffiliateLink: async (input: never) => (sent.push(input), { channel: 'whatsapp' as const }) };

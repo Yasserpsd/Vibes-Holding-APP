@@ -98,6 +98,12 @@ export function Affiliates() {
     })();
   }
 
+  /** M202: for a number WhatsApp could not reach. */
+  function mailLink(row: AffiliateRow) {
+    if (!window.confirm(`إرسال الرمز والرابط بالبريد إلى «${row.name}»؟`)) return;
+    void act('أُرسل البريد بالرمز والرابط.', () => api.affiliateSendLinks(row.contactId, 'email'), `w:${row.contactId}`);
+  }
+
   /** M186: renew the counter (or restart it early) — the defaults are the program's current terms. */
   function renewCycle(row: AffiliateRow) {
     const defaults = state.data?.config;
@@ -300,6 +306,7 @@ export function Affiliates() {
                       ) : row.status === 'approved' ? (
                         <span>
                           <button type="button" disabled={busyId === `w:${row.contactId}`} onClick={() => sendLinks(row)}>واتساب</button>{' '}
+                          <button type="button" className="ghost" disabled={busyId === `w:${row.contactId}`} onClick={() => mailLink(row)}>بريد</button>{' '}
                           <button type="button" className="ghost" disabled={busyId === `a:${row.contactId}`} onClick={() => decide(row, 'rejected')}>إيقاف الممثل</button>
                         </span>
                       ) : (

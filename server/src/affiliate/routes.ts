@@ -91,7 +91,7 @@ const cycleSchema = z.object({
 
 const contactIdSchema = z.object({ contactId: z.coerce.number().int().positive() });
 const shortCodeSchema = z.object({ code: z.string().trim().min(1, 'اكتب الرمز').max(20) });
-const sendLinksSchema = z.object({ contactId: z.number().int().positive().optional() });
+const sendLinksSchema = z.object({ contactId: z.number().int().positive().optional(), via: z.enum(['whatsapp', 'email']).default('whatsapp') });
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** What the member's own screen needs about his application (bank data comes back for prefill). */
@@ -298,7 +298,7 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
     }),
   );
 
-  /** M202: the approved affiliates' code and link on WhatsApp (club_affiliate_link): one, or all when no id is sent. */
+  /** M202: the approved affiliates' code and link: one, or all when no id is sent; on WhatsApp (club_affiliate_link) or by e-mail. */
   app.post(
     '/api/admin/affiliates/send-links',
     guard(async (request, reply) => {
@@ -306,7 +306,7 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       if (!admin) return;
       const input = parse(sendLinksSchema, request.body ?? {}, reply);
       if (!input) return;
-      return { results: await service.sendLinks(input.contactId) };
+      return { results: await service.sendLinks(input.contactId, input.via) };
     }),
   );
 

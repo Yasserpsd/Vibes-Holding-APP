@@ -777,12 +777,20 @@ export class AffiliateService {
     });
   }
 
-  /** M202, dashboard only: sends the approved affiliates their code and link: one of them, or all. */
-  async sendLinks(contactId?: number): Promise<{ contactId: number; name: string; code: string; channel: string; error: string | null }[]> {
+  /** M202: the same code and link by e-mail, for a number WhatsApp cannot reach. */
+  private mailLink(record: AffiliateRecord): WaResult {
+    if (!record.email) return { channel: 'none', error: 'no_email' };
+    const code = AffiliateService.codeOf(record);
+    this.deps.notifier.affiliateLink(record, code, this.referralLink(code));
+    return { channel: 'email' };
+  }
+
+  /** M202, dashboard only: sends the approved affiliates their code and link: one of them, or all; by WhatsApp or by e-mail. */
+  async sendLinks(contactId?: number, via: 'whatsapp' | 'email' = 'whatsapp'): Promise<{ contactId: number; name: string; code: string; channel: string; error: string | null }[]> {
     const approved = (await this.loadRecords()).filter((record) => record.status === 'approved' && (contactId === undefined || record.contactId === contactId));
     const results: { contactId: number; name: string; code: string; channel: string; error: string | null }[] = [];
     for (const record of approved) {
-      const sent = await this.sendLink(record);
+      const sent = via === 'email' ? this.mailLink(record) : await this.sendLink(record);
       results.push({ contactId: record.contactId, name: record.name, code: AffiliateService.codeOf(record), channel: sent.channel, error: sent.error ?? null });
     }
     return results;

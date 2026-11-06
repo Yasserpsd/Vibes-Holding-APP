@@ -423,6 +423,30 @@ export class Notifier {
     );
   }
 
+  /** M202: his code and link by e-mail, for a number WhatsApp could not reach. */
+  affiliateLink(record: { name: string; email: string; lang?: 'ar' | 'en' }, code: string, link: string): void {
+    const en = record.lang === 'en';
+    this.sendRoyal(
+      record.email,
+      en ? 'Your code and link in the Investors Club Affiliates Program' : 'رمزك ورابطك في برنامج ممثلي نادي المستثمرين',
+      {
+        lang: en ? 'en' : 'ar',
+        title: en ? 'Your code and link' : 'رمزك ورابطك',
+        greeting: en ? `Hello, ${record.name}` : `مرحبًا ${record.name}`,
+        lead: [
+          en
+            ? 'Here are your details in the Investors Club Affiliates Program. Any earlier code or link of yours keeps working, and you can see the details in your account in the app.'
+            : 'هذه بياناتك في برنامج ممثلي نادي المستثمرين. أي رمز أو رابط سابق لك يظل يعمل كما هو، ويمكنك الاطلاع على التفاصيل من حسابك في التطبيق.',
+        ],
+        rows: [
+          { label: en ? 'Code' : 'الرمز', value: code },
+          { label: en ? 'Link' : 'الرابط', value: link },
+        ],
+      },
+      'affiliate link',
+    );
+  }
+
   /** M186: the cycle target was met inside the window — the allowance joined the affiliate's balance. */
   affiliateBonus(record: { name: string; email: string }, cycle: { n: number; target: number; bonus: number }): void {
     this.sendRoyal(
