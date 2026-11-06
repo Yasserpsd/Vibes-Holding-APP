@@ -35,6 +35,10 @@ const STATUS_ORDER: Record<string, number> = { accepted: 0, sent: 1, delivered: 
 export type SendInput = { phone: string | null | undefined; lang?: string | null; email?: string | null; ref?: string | null };
 export type WelcomeInput = SendInput & { name?: string | null };
 export type ReceiptInput = SendInput & { amount: number; service: string; invoiceNo: number | string };
+export type CodeInput = { phone: string | null | undefined; lang?: string | null; code: string };
+
+/** A number gets at most this many codes an hour on WhatsApp; the e-mail copy always goes out. */
+const CODE_LIMIT_PER_HOUR = 3;
 
 type Deps = {
   kv: KV;
@@ -63,6 +67,31 @@ export class WhatsappService {
 
   sendReceipt(input: ReceiptInput): Promise<WaResult> {
     return this.deliver('receipt', input, { amount: input.amount, service: input.service, invoiceNo: input.invoiceNo });
+  }
+
+  /**
+   * The sign-up and password codes (Authentication template, copy-code button). The code itself is never stored or logged:
+   * the record keeps the kind and the number only. Never throws; the hub mails the same code, so a refusal here costs nothing.
+   */
+  async sendCode(input: CodeInput): Promise<WaResult> {
+    try {
+      const phone = normalizePhone(input.phone);
+      const lang = toLang(input.lang);
+      if (!this.enabled) return { channel: 'none', error: 'whatsapp_disabled' };
+      if (!phone) return { channel: 'none', error: 'no_phone' };
+      const since = (this.deps.now ?? Date.now)() - 3_600_000;
+      const recent = (await this.records()).filter((record) => record.kind === 'code' && record.to === phone && Date.parse(record.createdAt) >= since);
+      if (recent.length >= CODE_LIMIT_PER_HOUR) return { channel: 'none', error: 'rate_limited' };
+      const template = pickTemplate(await this.templatesOf('code'), lang);
+      if (!template) return { channel: 'none', error: 'template_not_found' };
+      if (template.status !== 'APPROVED') return { channel: 'none', error: 'template_not_approved' };
+      const plan = { use: 'whatsapp' as const, template: template.name, language: template.language, params: [input.code] };
+      const sent = await this.sendPlanned(plan, { phone, kind: 'code', lang, ref: null }, input.code);
+      return sent.messageId ? { channel: 'whatsapp', messageId: sent.messageId } : { channel: 'none', error: sent.error };
+    } catch (error) {
+      this.deps.log.error({ kind: 'code', err: error instanceof Error ? error.name : 'error' }, 'whatsapp code delivery crashed');
+      return { channel: 'none', error: 'internal_error' };
+    }
   }
 
   /** Approved or not, the templates of one kind as Meta lists them (cached ten minutes; stale copy when Meta is down). */
@@ -100,7 +129,7 @@ export class WhatsappService {
   /** Dashboard view: both kinds with their live status and body text. Always asks Meta. */
   async templateOverview(): Promise<{ name: string; language: string; status: string; category: string | null; body: string }[]> {
     const rows: { name: string; language: string; status: string; category: string | null; body: string }[] = [];
-    for (const kind of ['welcome', 'receipt'] as const) {
+    for (const kind of ['welcome', 'receipt', 'code'] as const) {
       for (const template of await this.templatesOf(kind, true)) {
         const body = template.components.find((component) => component.type.toUpperCase() === 'BODY')?.text ?? '';
         rows.push({ name: template.name, language: template.language, status: template.status, category: template.category ?? null, body });
@@ -144,11 +173,11 @@ export class WhatsappService {
     }
   }
 
-  private async sendPlanned(plan: Extract<DeliveryPlan, { use: 'whatsapp' }>, meta: { phone: string; kind: WaKind; lang: WaLang; ref: string | null }): Promise<{ messageId?: string; error: string }> {
+  private async sendPlanned(plan: Extract<DeliveryPlan, { use: 'whatsapp' }>, meta: { phone: string; kind: WaKind; lang: WaLang; ref: string | null }, codeButton?: string): Promise<{ messageId?: string; error: string }> {
     const client = this.deps.client;
     if (!client) return { error: 'whatsapp_disabled' };
     try {
-      const messageId = await client.sendTemplate({ to: meta.phone, template: plan.template, language: plan.language, bodyParams: plan.params });
+      const messageId = await client.sendTemplate({ to: meta.phone, template: plan.template, language: plan.language, bodyParams: plan.params, ...(codeButton ? { codeButton } : {}) });
       await this.addRecord({ to: meta.phone, kind: meta.kind, template: plan.template, lang: plan.language, waMessageId: messageId, status: 'accepted', error: null, ref: meta.ref });
       this.deps.log.info({ kind: meta.kind, to: maskPhone(meta.phone), template: plan.template }, 'whatsapp template accepted by Meta');
       return { messageId, error: '' };

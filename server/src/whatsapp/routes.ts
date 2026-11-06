@@ -10,17 +10,19 @@ import type { WaResult, WhatsappService } from './service.js';
 /** One body for the hub's `whatsapp.send` event and the dashboard's test send. */
 export const sendSchema = z
   .object({
-    kind: z.enum(['welcome', 'receipt']),
+    kind: z.enum(['welcome', 'receipt', 'code']),
     phone: z.string().trim().min(5).max(30),
     lang: z.enum(['ar', 'en']).default('ar'),
     name: z.string().trim().max(120).optional(),
     amount: z.coerce.number().min(0).max(10_000_000).optional(),
     service: z.string().trim().max(200).optional(),
+    code: z.string().regex(/^\d{4,8}$/).optional(),
     invoiceNo: z.union([z.string().trim().min(1).max(40), z.number().int().positive()]).optional(),
     email: z.string().trim().email().max(200).optional(),
     /** The caller's own id for this message (payment id…): a repeated call with the same one sends nothing new. */
     ref: z.string().trim().min(1).max(80).optional(),
   })
+  .refine((body) => body.kind !== 'code' || body.code !== undefined, { message: 'رمز التحقق مطلوب' })
   .refine((body) => body.kind !== 'receipt' || (body.amount !== undefined && body.service && body.invoiceNo !== undefined), { message: 'الإيصال يحتاج amount و service و invoiceNo' });
 
 export type SendBody = z.infer<typeof sendSchema>;
@@ -34,6 +36,7 @@ const probeSchema = z.object({
 });
 
 export function runSend(service: WhatsappService, body: SendBody): Promise<WaResult> {
+  if (body.kind === 'code') return service.sendCode({ phone: body.phone, lang: body.lang, code: body.code ?? '' });
   const common = { phone: body.phone, lang: body.lang, email: body.email, ref: body.ref };
   return body.kind === 'welcome'
     ? service.sendWelcome({ ...common, name: body.name })

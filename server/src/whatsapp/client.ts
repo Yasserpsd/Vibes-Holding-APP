@@ -68,7 +68,7 @@ export class WhatsappClient {
   }
 
   /** Sends one approved template; `bodyParams` fill {{1}}, {{2}}… of the body in order. Returns Meta's message id. */
-  async sendTemplate(input: { to: string; template: string; language: string; bodyParams: string[] }): Promise<string> {
+  async sendTemplate(input: { to: string; template: string; language: string; bodyParams: string[]; codeButton?: string }): Promise<string> {
     const answer = await this.graph<{ messages?: { id?: string }[] }>('POST', `${encodeURIComponent(this.options.phoneId)}/messages`, {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -77,7 +77,15 @@ export class WhatsappClient {
       template: {
         name: input.template,
         language: { code: input.language },
-        ...(input.bodyParams.length ? { components: [{ type: 'body', parameters: input.bodyParams.map((text) => ({ type: 'text', text })) }] } : {}),
+        ...(input.bodyParams.length
+          ? {
+              components: [
+                { type: 'body', parameters: input.bodyParams.map((text) => ({ type: 'text', text })) },
+                // An Authentication template's copy-code button takes the code as well.
+                ...(input.codeButton ? [{ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: input.codeButton }] }] : []),
+              ],
+            }
+          : {}),
       },
     });
     const id = answer.messages?.[0]?.id;
