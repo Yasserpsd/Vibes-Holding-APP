@@ -275,7 +275,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!body) return;
       // M204: WhatsApp only. A bundle from before M204 still has the «send it to my e-mail» button.
       if (body.via === 'email') {
-        return reply.code(400).send({ error: { code: 'phone_code_whatsapp_only', message: 'الرمز يُرسل على واتساب فقط. إذا لم يصلك، راسل دعم النادي على واتساب.' } });
+        return reply.code(400).send({ error: { code: 'phone_code_whatsapp_only', message: 'الرمز يُرسل على واتساب فقط. إذا لم يصلك، تواصل مع دعم النادي على واتساب.' } });
       }
       return service.resendPhoneCode(body.stepToken);
     }),
