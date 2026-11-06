@@ -1,9 +1,9 @@
 # Vibes AI Assistant (hub) 2.28.0 — «عضوية شرفية» (M205)
 
-> **للمالك:** هذا الملف يُسلَّم كما هو لمحادثة تعديل الإضافات. المطلوب إصدار جديد من إضافة الهب
-> **Vibes AI Assistant 2.28.0** (بعد 2.27.1). السيرفر واللوحة والتطبيق جاهزة وتنتظر هذا الإصدار فقط:
+> **للمالك (تحديث 2026-11-06):** الإصدار **Vibes AI Assistant 2.28.0** جاهز ومجرَّب، وملفه في مجلد New Era:
+> «1- بلجن المساعد 2.28.0 (vcmem ثم باقي المواقع)» ← `vibes-ai-assistant-2.28.0.zip`. المطلوب رفعه على vcmem.com.
 > قبل رفعه يرد زر «منح العضوية الشرفية» في اللوحة برسالة «تحتاج تحديث إضافة الهب» ولا يتغير شيء عند الأعضاء.
-> النسخة الجديدة توضع في مجلد New Era وحده، وتُجرَّب على الـ rig قبل الرفع.
+> التغيير كاملًا في `vibes-ai-assistant-2.28.0.diff` بجانب هذا الملف.
 
 The rest is for whoever edits the plugin. It is a contract: the app server (`server/src`) already speaks it, and
 `server/src/hub/mock.ts` + `server/src/hub/mockAdmin.ts` are a working reference implementation
@@ -27,11 +27,16 @@ Two new columns on the contacts table (dbDelta + a bumped db version, like the e
 | `honorary` | `tinyint(1) NOT NULL DEFAULT 0` | 1 = holds the honorary membership |
 | `honorary_at` | `datetime NULL` | UTC time it was given; NULL when `honorary = 0` |
 
-**The flag overrides the paid clock, it does not replace it.** `is_member`, `member_started_at` and `member_days`
-keep their meaning and keep moving underneath (a store purchase or a Paymob payment still starts or extends the paid
-period as today). While `honorary = 1` the contact is a member whatever those three say. When the flag is taken back,
-the paid clock alone decides again: still a member if a paid period is running, expired or unpaid otherwise. Nothing
-is recomputed or copied at revoke time.
+**The honorary membership sits over the paid clock, it does not replace it.** A store purchase or a Paymob payment
+still starts or extends the paid period while it is on, and when it is taken back the paid clock alone decides again:
+still a member if a paid period is running, expired or unpaid otherwise.
+
+**As built in 2.28.0** (same answers on the wire, simpler inside): while `honorary = 1` the contact is put in the state
+the whole plugin already treats as «a member with no end date» (`is_member = 1`, `member_started_at NULL`), so no gate,
+list, count or reminder had to change. The paid clock is kept aside in three more columns — `paid_is_member`,
+`paid_started_at`, `paid_days` — and `member_change()` writes there for an honorary contact
+(`member_apply_under_honorary()`); `honorary_change()` moves the clock aside on a grant and back on a revoke, in one
+transaction with its history row.
 
 ## 2. Giving and taking back — `admin_grant` only
 
