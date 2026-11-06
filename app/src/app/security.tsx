@@ -129,7 +129,7 @@ export default function SecurityScreen() {
 
       {/* M198: the password form in the club's form identity (M195) — the only place it changes now. */}
       <FadeInView delay={entranceDelay(1)}>
-        <FormCard tone="dark">
+        <FormCard tone="light">
           <CardTitle icon="key-outline" title={t('security.changePassword')} />
           <ErrorSummary count={form.count} />
           <FormField

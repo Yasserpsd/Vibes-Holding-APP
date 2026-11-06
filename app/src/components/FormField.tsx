@@ -11,6 +11,10 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 type Props = TextInputProps & {
   label: string;
   hint?: string;
+  /** Owner (2026-11-06): the hint is one short line that shows only while the field is focused. */
+  hintOnFocus?: boolean;
+  /** M207: a caution that does not block the form; it shows once the member has left the field. */
+  warning?: string | null;
   error?: string | null;
   /** Latin content (e-mail, phone, password) is typed left-to-right in both languages. */
   latin?: boolean;
@@ -22,7 +26,7 @@ type Props = TextInputProps & {
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, error, latin = false, anchorRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus = false, warning, error, latin = false, anchorRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // M85: inside a PaperCard the field wears the light palette on its own.
   const paper = usePaper();
@@ -68,8 +72,14 @@ export function FormField({ label, hint, error, latin = false, anchorRef, style,
         ) : (
           <Text style={styles.error}>{error}</Text>
         )
-      ) : hint ? (
-        <Text style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
+      ) : warning && !focused ? (
+        form ? (
+          <FieldError text={warning} />
+        ) : (
+          <Text style={styles.error}>{warning}</Text>
+        )
+      ) : hint && (!hintOnFocus || focused) ? (
+        <Text numberOfLines={hintOnFocus ? 1 : undefined} style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
       ) : null}
     </View>
   );

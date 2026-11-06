@@ -8,6 +8,10 @@ import type { FastifyBaseLogger } from 'fastify';
  * words. An optional OpenAI pass judges what the rules let through; it fails OPEN (a model outage never blocks
  * a registration). The same rule decides `profileMissing: 'name'` for accounts that already exist, so an
  * «أبو جنا» signed up through Apple meets the gate and fixes the name before the app opens.
+ *
+ * M207 (owner, 2026-11-06: «يظهر سيؤدي إلى حذف حسابك بس وتسيبه يكمل عادي»): nothing is refused any more. Sign-up
+ * and the profile save take the name as written; the app shows a warning under the field. The rule only adds
+ * `name` to `profileMissing` beside another missing field. `nameProblem` and the model pass are unused for now.
  */
 export type NameIssue = 'short' | 'oneWord' | 'symbols' | 'kunya' | 'mash' | 'placeholder';
 

@@ -197,9 +197,13 @@ test('the English app gets English source options and cities; the English applic
   assert.match(decision?.text ?? '', /Referral code/);
 });
 
-test('a name with a dot or a digit is a username, not a name', async () => {
+// M207 (owner, 2026-11-06: «تسيبه يكمل عادي»): the app warns about an odd name, the server refuses nothing.
+test('M207: a username-like name is saved, never refused', async () => {
+  const original = (await get('/api/me', memberToken)).json().me.name as string;
   const dotted = await send('PATCH', '/api/me', { name: 'yasser.designer' }, memberToken);
-  assert.equal(dotted.statusCode, 400, dotted.body);
+  assert.equal(dotted.statusCode, 200, dotted.body);
+  assert.equal(dotted.json().me.name, 'yasser.designer');
+  await send('PATCH', '/api/me', { name: original }, memberToken);
   const numbered = await send('POST', '/api/auth/register', {
     name: 'yasser4.designer',
     country: 'sa',
@@ -209,8 +213,7 @@ test('a name with a dot or a digit is a username, not a name', async () => {
     persona: 'neutral',
     bio: 'حساب اختبار لقاعدة الأسماء.',
   });
-  assert.equal(numbered.statusCode, 400, numbered.body);
-  assert.match(numbered.json().error.message as string, /الحروف فقط/);
+  assert.equal(numbered.statusCode, 200, numbered.body);
 });
 
 test('the forced-update floor: an older binary gets 426 on app calls, the status tells a fresh launch', async () => {

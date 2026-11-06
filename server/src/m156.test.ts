@@ -78,7 +78,10 @@ const base = {
 test('m156: the gate asks for the job, a real name and a real address over an Apple relay (hub 2.26.0 only)', () => {
   assert.deepEqual(profileMissingOf(base), []);
   assert.deepEqual(profileMissingOf({ ...base, job_title: '' }), ['jobTitle']);
-  assert.deepEqual(profileMissingOf({ ...base, name: 'أبو جنا' }), ['name']);
+  // M207: an odd name alone never opens the gate; it shows only beside another missing field. An empty name is asked for.
+  assert.deepEqual(profileMissingOf({ ...base, name: 'أبو جنا' }), []);
+  assert.deepEqual(profileMissingOf({ ...base, name: 'أبو جنا', job_title: '' }), ['name', 'jobTitle']);
+  assert.deepEqual(profileMissingOf({ ...base, name: ' ' }), ['name']);
   // An older hub never reports contact_email: a relay account is not blocked for a field it cannot store.
   assert.deepEqual(profileMissingOf({ ...base, contact_email: '' }), ['contactEmail']);
   assert.deepEqual(profileMissingOf({ ...base, contact_email: 'nouf@example.test' }), []);

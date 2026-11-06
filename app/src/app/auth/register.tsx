@@ -67,9 +67,8 @@ export default function RegisterScreen() {
   };
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
-    // M156 (owner): a real first + family name; the server applies the full rule (kunya, placeholders, AI).
-    const nameProblem = nameIssue(form.name);
-    if (nameProblem) next.name = t(`form.error.name.${nameProblem}`);
+    // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
+    if (form.name.trim().length < 2) next.name = t('form.error.name.empty');
     if (phoneIssue(form.phone, country) !== null) next.phone = phoneExample ? t('form.error.phone', { example: phoneExample }) : t('form.error.phoneNoExample');
     if (!isEmail(form.email)) next.email = t('form.error.email');
     if (form.password.length < 6) next.password = t('form.error.password');
@@ -137,7 +136,8 @@ export default function RegisterScreen() {
         <SocialButtons onError={setSubmitError} />
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
-        <FormCard tone="dark">
+        {/* Owner (2026-11-06): the white form of the profile gate is the one look for sign-up too. */}
+        <FormCard tone="light">
           <ErrorSummary count={errors.count} />
           <Notice text={t('auth.register.phonePolicy')} />
           <FormField
@@ -147,6 +147,8 @@ export default function RegisterScreen() {
             error={errors.errors.name}
             anchorRef={errors.anchor('name')}
             hint={t('auth.register.nameHint')}
+            hintOnFocus
+            warning={form.name.trim().length >= 2 && nameIssue(form.name) ? t('form.nameWarning') : null}
             textContentType="name"
           />
 
@@ -159,7 +161,8 @@ export default function RegisterScreen() {
             value={form.phone}
             onChangeText={(value) => set('phone')(value.replace(/\D+/g, '').replace(/^0+/, ''))}
             placeholder={phoneExample || undefined}
-            hint={`${phoneExample ? t('auth.register.phoneHint', { example: phoneExample }) : t('auth.register.phoneHintNoExample')}\n${t('auth.register.phoneWhatsapp')}`}
+            hint={t('auth.register.phoneWhatsapp')}
+            hintOnFocus
             error={errors.errors.phone}
             anchorRef={errors.anchor('phone')}
           />
@@ -172,7 +175,6 @@ export default function RegisterScreen() {
             textContentType="emailAddress"
             value={form.email}
             onChangeText={set('email')}
-            hint={t('auth.register.emailPolicy')}
             error={errors.errors.email}
             anchorRef={errors.anchor('email')}
           />
@@ -185,6 +187,7 @@ export default function RegisterScreen() {
             value={form.password}
             onChangeText={set('password')}
             hint={t('auth.register.passwordHint')}
+            hintOnFocus
             error={errors.errors.password}
             anchorRef={errors.anchor('password')}
           />
@@ -214,6 +217,7 @@ export default function RegisterScreen() {
             value={form.inviteCode}
             onChangeText={set('inviteCode')}
             hint={t('auth.register.inviteCodeHint')}
+            hintOnFocus
             placeholder="FAR2"
           />
           ) : (

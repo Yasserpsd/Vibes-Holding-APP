@@ -100,8 +100,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
-    const nameProblem = need('name') ? nameIssue(name) : null;
-    if (nameProblem) next.name = t(`form.error.name.${nameProblem}`);
+    // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
+    if (need('name') && name.trim().length < 2) next.name = t('form.error.name.empty');
     if (need('contactEmail') && !isEmail(contactEmail)) next.contactEmail = t('form.error.email');
     if (need('phone') && phoneIssue(phone, country) !== null) next.phone = phoneExample ? t('form.error.phone', { example: phoneExample }) : t('form.error.phoneNoExample');
     if (need('persona') && !persona) next.persona = t('form.error.persona');
@@ -205,6 +205,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 value={name}
                 onChangeText={field('name', setName)}
                 hint={t('completeProfile.nameHint')}
+                hintOnFocus
+                warning={name.trim().length >= 2 && nameIssue(name) ? t('form.nameWarning') : null}
                 error={form.errors.name}
                 anchorRef={form.anchor('name')}
                 textContentType="name"
@@ -219,7 +221,6 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   label={t('completeProfile.contactEmail')}
                   value={contactEmail}
                   onChangeText={field('contactEmail', setContactEmail)}
-                  hint={t('completeProfile.contactEmailHint')}
                   error={form.errors.contactEmail}
                   anchorRef={form.anchor('contactEmail')}
                   latin
@@ -245,6 +246,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   textContentType="telephoneNumber"
                   placeholder={phoneExample || undefined}
                   hint={t('phoneCode.phoneHint')}
+                  hintOnFocus
                 />
               </View>
             ) : null}
@@ -281,6 +283,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   value={inviteCode}
                   onChangeText={setInviteCode}
                   hint={t('auth.register.inviteCodeHint')}
+                  hintOnFocus
                   placeholder="FAR2"
                 />
               ) : (

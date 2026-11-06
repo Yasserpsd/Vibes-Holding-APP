@@ -124,7 +124,7 @@ function ApplyForm({ data, scrollRef }: { data: AffiliateOverview; scrollRef: Re
   };
 
   return (
-    <FormCard tone="dark">
+    <FormCard tone="light">
       <ErrorSummary count={form.count} />
 
       <FieldGroup label={t('affiliate.entityType')} error={form.errors.entityType} anchorRef={form.anchor('entityType')}>

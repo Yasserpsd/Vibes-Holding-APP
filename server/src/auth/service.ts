@@ -9,7 +9,7 @@ import { isHonorary } from '../membership/honorary.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
 import type { AppLang, AppSource } from '../lang.js';
 import type { SocialIdentity } from './social.js';
-import { nameProblem, nameRuleIssue, type NameJudge } from './name.js';
+import { nameRuleIssue, type NameJudge } from './name.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
@@ -181,14 +181,16 @@ function rethrowNoAccount(error: unknown): never {
 
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
-  // M156 (owner): a kunya or a made-up name meets the gate too — the member writes a real first + family name.
-  if (nameRuleIssue(String(contact.name ?? ''))) missing.push('name');
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
   if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
   // M156 + M203 (owner, 2026-11-06: «رجع الوظيفة بس مهمة جدا بالنسبالي»).
   if (!String(contact.job_title ?? '').trim()) missing.push('jobTitle');
   // M156: an Apple-relay account must give a real address (only when the hub can store it, 2.26.0+).
   if (contact.contact_email !== undefined && isRelayEmail(contact.email) && !String(contact.contact_email).trim()) missing.push('contactEmail');
+  // M207 (owner, 2026-11-06: «تسيبه يكمل عادي»): an odd name (kunya, username) never blocks by itself. It only
+  // rides along when the gate opens anyway, so the field shows with its warning; an empty name is still asked for.
+  const name = String(contact.name ?? '').trim();
+  if (!name || (missing.length > 0 && nameRuleIssue(name))) missing.unshift('name');
   return missing;
 }
 
@@ -332,9 +334,7 @@ export class AuthService {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
     }
-    // M156 (owner): a real first + family name or no account — rules, then the model when configured.
-    const badName = await nameProblem(input.name, lang, this.deps.nameJudge);
-    if (badName) throw new AuthError('bad_name', badName, 400);
+    // M207 (owner, 2026-11-06): an odd name no longer stops the sign-up; the app shows a warning and lets him through.
     // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
     const referral = input.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(input.inviteCode) : '';
     // M206: hub 2.28.1 labels the member's source; older hubs ignore the field.
@@ -765,16 +765,12 @@ export class AuthService {
     return result.contact;
   }
 
-  async updateProfile(session: SessionRecord, patch: ProfilePatch, source?: AppSource, lang: AppLang = 'ar'): Promise<Me> {
+  async updateProfile(session: SessionRecord, patch: ProfilePatch, source?: AppSource, _lang: AppLang = 'ar'): Promise<Me> {
     const body: Record<string, unknown> = { uuid: session.uuid };
     // Hub 2.25.0: the platform rides along so the «اكتمل تسجيل عضو» mail of an older account (no stored source) says Apple / Google.
     if (source) body.source = source;
-    if (patch.name !== undefined) {
-      // M156: the completion gate (and the editor) fix a kunya or a made-up name — same rule as registration.
-      const badName = await nameProblem(patch.name, lang, this.deps.nameJudge);
-      if (badName) throw new AuthError('bad_name', badName, 400);
-      body.name = patch.name;
-    }
+    // M207: the name is saved as written (the app warns about an odd one, nothing is refused).
+    if (patch.name !== undefined) body.name = patch.name;
     if (patch.contactEmail !== undefined) body.contact_email = patch.contactEmail;
     if (patch.jobTitle !== undefined) body.job_title = patch.jobTitle;
     if (patch.company !== undefined) body.company = patch.company;
