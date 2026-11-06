@@ -157,17 +157,17 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     }
   };
 
-  // Owner (2026-11-06): a wrong value turns red while it is typed (once the field holds anything) and the red
-  // goes the moment it is right; leaving a field checks it in full, empty included.
+  // Owner (2026-11-07: «خلي التحذير يطلع لما أسيب الخانة… مش وأنا بكتب»): typing never paints a NEW red warning; an
+  // existing red goes the moment the value is right, and the verdict on a field comes when the member leaves it (or submits).
   const field = (key: Field, set: (value: string) => void) => (value: string) => {
     set(value);
-    form.check(key, value.trim() ? issueOf(key, value) : null);
+    if (!issueOf(key, value)) form.clear(key);
   };
   const blur = (key: Field) => () => form.check(key, issueOf(key, current[key]));
   const pickCountry = (code: string) => {
     setCountryCode(code);
     const land = config?.countries.find((item) => item.code === code) ?? country;
-    form.check('phone', phone ? issueOf('phone', phone, land) : null);
+    if (phone && !issueOf('phone', phone, land)) form.clear('phone');
   };
 
   return (

@@ -85,14 +85,14 @@ export default function RegisterScreen() {
         return null;
     }
   };
-  // Owner (2026-11-06): a wrong value turns red while it is typed (once the field holds anything) and the red
-  // goes the moment it is right; leaving a field checks it in full, empty included.
+  // Owner (2026-11-07: «خلي التحذير يطلع لما أسيب الخانة… مش وأنا بكتب»): typing never paints a NEW red warning; an
+  // existing red goes the moment the value is right, and the verdict on a field comes when the member leaves it (or submits).
   const set = (key: keyof Form) => (value: string) => {
     const draft = { ...form, [key]: value };
     setForm(draft);
-    errors.check(key, value.trim() ? issueOf(key, draft) : null);
+    if (!issueOf(key, draft)) errors.clear(key);
     // The number's rule follows the country.
-    if (key === 'country' && draft.phone) errors.check('phone', issueOf('phone', draft));
+    if (key === 'country' && draft.phone && !issueOf('phone', draft)) errors.clear('phone');
   };
   const blur = (key: Field) => () => errors.check(key, issueOf(key, form));
   const validate = () => {
