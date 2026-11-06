@@ -41,8 +41,8 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel }: Props) {
 
   const submit = async (value = code) => {
     if (busy) return;
-    if (!/^\d{4,6}$/.test(value)) {
-      setError(t('auth.verify.codeRequired'));
+    if (!/^\d{6}$/.test(value)) {
+      setError(t('phoneCode.codeRequired'));
       return;
     }
     setBusy(true);
@@ -87,10 +87,11 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel }: Props) {
         value={code}
         autoFocus
         onChangeText={(value) => {
-          // M203 (owner: seconds, not minutes): four digits typed or pasted from WhatsApp finish the step by themselves.
-          const digits = value.replace(/\D/g, '');
+          // M203 (owner: seconds, not minutes): the digits typed or pasted from WhatsApp finish the step by themselves.
+          // M209 (owner: «لازم يدخل 6»): the code has six digits, and only six are accepted.
+          const digits = value.replace(/\D/g, '').slice(0, 6);
           setCode(digits);
-          if (digits.length === 4) void submit(digits);
+          if (digits.length === 6) void submit(digits);
         }}
         onSubmitEditing={() => void submit()}
         error={error}

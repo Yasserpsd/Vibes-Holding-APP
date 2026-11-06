@@ -19,7 +19,7 @@ import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { maskNumber } from './phoneCode.js';
-import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, digitsFor, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
@@ -149,7 +149,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     return en ? { ...me, en } : me;
   };
 
-  const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']) });
+  const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']), code6: digitsFor(request.headers['x-app-gate']) === 6 });
 
   /**
    * M204 (owner: «كله حاجه علي واتس اب»): the persona-change and deletion codes go to the account's PROVEN WhatsApp
@@ -293,7 +293,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(phoneStartSchema, request.body, reply);
       if (!body) return;
       void reply.header('cache-control', 'no-store');
-      const started = await service.startPhoneChange(auth.session, body.phone, body.country, sourceOf(request), langOf(request));
+      const started = await service.startPhoneChange(auth.session, body.phone, body.country, sourceOf(request), langOf(request), digitsFor(request.headers['x-app-gate']));
       return 'me' in started ? { ...started, me: await withEnglish(request, started.me) } : started;
     }),
   );
@@ -306,7 +306,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const auth = await requireSession(request, reply);
       if (!auth) return;
       void reply.header('cache-control', 'no-store');
-      return service.startPhoneConfirm(auth.session);
+      return service.startPhoneConfirm(auth.session, digitsFor(request.headers['x-app-gate']));
     }),
   );
 
