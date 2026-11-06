@@ -75,10 +75,12 @@ function sameHash(left: string, right: string): boolean {
 }
 
 /**
- * The registered number confirming itself (the weekly popup) is the one step the e-mail cannot stand in for: a mailed
- * code proves nothing about the number, so that step fails and the member reaches support instead.
+ * Only the sign-in code may fall to the e-mail. A number proving itself, the registered one or a new one, is the step
+ * the e-mail cannot stand in for (a mailed code proves nothing about the number). Owner, 2026-11-06: the member may
+ * change his number himself whenever he likes, «اهم حاجه لما يغير الرقم يجيله كود علي واتس اب»: when WhatsApp cannot
+ * carry that code the step fails, and he types another number or reaches support.
  */
-const mayMail = (step: Pick<PhoneCodeStep, 'purpose' | 'newPhone'>): boolean => step.purpose === 'signin' || step.newPhone !== undefined;
+const mayMail = (step: Pick<PhoneCodeStep, 'purpose'>): boolean => step.purpose === 'signin';
 
 /** `•••123`: what the app shows of a number. */
 export function maskNumber(phone: string): string {

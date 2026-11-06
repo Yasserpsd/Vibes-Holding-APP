@@ -132,7 +132,13 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: 
                 </PressScale>
               </View>
             ) : (
-              <AppButton label={t('phoneAlert.cta')} icon="logo-whatsapp" loading={busy} onPress={() => void ask()} />
+              <>
+                <AppButton label={t('phoneAlert.cta')} icon="logo-whatsapp" loading={busy} onPress={() => void ask()} />
+                {/* Owner (2026-11-06): the member changes his number himself, any time; the new one proves itself with its own WhatsApp code. */}
+                <PressScale onPress={onWrongNumber} accessibilityRole="button" style={styles.links}>
+                  <Text style={styles.link}>{t('phoneAlert.wrongNumber')}</Text>
+                </PressScale>
+              </>
             )}
             <AppButton label={t(required ? 'waGate.cancel' : 'phoneAlert.later')} variant="outline" onPress={onLater} />
           </GlassCard>
