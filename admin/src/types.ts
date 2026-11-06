@@ -34,6 +34,9 @@ export type Account = {
   member_days: number;
   member_end: string;
   never_expires: 0 | 1;
+  /** M205 (hub 2.28.0+): «عضوية شرفية» — no days, no end date; absent on an older hub. */
+  honorary?: 0 | 1;
+  honorary_since?: string;
   daily_limit: number;
   daily_left: number | null;
   intent: number;
@@ -153,6 +156,7 @@ export type HubStats = {
     members_active: number;
     members_expired: number;
     members_no_expiry: number;
+    members_honorary?: number;
     admins: number;
     publishers: number;
     /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */
@@ -304,7 +308,7 @@ export type NewsSourceRow = {
 };
 export type NewsSourcesResult = { sources: NewsSourceRow[]; updatedAt: string | null; lastError: string | null; running: boolean; visibleByLang: { ar: number; en: number }; classifier: string };
 
-export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply';
+export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary';
 export type AuditEntry = {
   id: string;
   at: string;

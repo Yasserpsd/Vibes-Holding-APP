@@ -71,6 +71,8 @@ export default function CardScreen() {
   }
 
   const active = me.membership.status === 'active';
+  // M205: «عضوية شرفية» — no expiry date and no countdown on the card, its own line instead.
+  const honorary = active && me.membership.kind === 'honorary';
   const category = categoryOf(me.persona);
   const endDate = me.membership.endDate ? formatArabicDate(me.membership.endDate) : null;
   // M109e: the English card shows the member's own data in English too (name transliterated).
@@ -157,13 +159,19 @@ export default function CardScreen() {
           ) : null}
 
           <View style={[styles.footer, { borderTopColor: metal.inner }]}>
-            {active && endDate ? (
+            {honorary ? (
+              <View style={styles.cell}>
+                <Text style={styles.cellLabel}>{t('card.typeLabel')}</Text>
+                <Text style={[styles.cellValue, { color: metal.bright }]}>{t('membership.honorary')}</Text>
+              </View>
+            ) : null}
+            {active && endDate && !honorary ? (
               <View style={styles.cell}>
                 <Text style={styles.cellLabel}>{t('card.validThru')}</Text>
                 <Text style={[styles.cellValue, { color: metal.bright }]}>{endDate}</Text>
               </View>
             ) : null}
-            {active && me.membership.daysLeft !== null ? (
+            {active && me.membership.daysLeft !== null && !honorary ? (
               <View style={styles.cell}>
                 <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
                 <View style={styles.daysRow}>
@@ -191,7 +199,7 @@ export default function CardScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(1)}>
-        {active ? <Text style={styles.hint}>{t('card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
+        {active ? <Text style={styles.hint}>{t(honorary ? 'card.honoraryHint' : 'card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
       </FadeInView>
 
       {active && promoCode ? (

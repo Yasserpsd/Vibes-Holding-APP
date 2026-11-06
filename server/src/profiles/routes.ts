@@ -89,7 +89,9 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       const person = await service.person(params.id);
       if (!person) return reply.code(404).send({ error: { code: 'not_found', message: 'الملف غير موجود' } });
       const lang = langOf(request);
-      return { person: english ? await english.person(person, lang) : publicPersonFull(person) };
+      // M205: the «عضوية شرفية» badge on a member's own page — asked from the hub, never stored with the profile.
+      const honorary = await auth.honoraryOf(person.contactId);
+      return { person: { ...(english ? await english.person(person, lang) : publicPersonFull(person)), honorary } };
     }),
   );
 

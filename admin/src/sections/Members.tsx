@@ -33,8 +33,9 @@ const STATES: Record<Account['state'], { label: string; tone: Tone }> = {
   lead: { label: 'عميل محتمل', tone: 'muted' },
 };
 
-export function StatePill({ account }: { account: Pick<Account, 'state' | 'role'> }) {
-  const state = STATES[account.state] ?? { label: account.state, tone: 'muted' as Tone };
+export function StatePill({ account }: { account: Pick<Account, 'state' | 'role' | 'honorary'> }) {
+  // M205: the honorary membership reads as its own state, never as a paid subscription.
+  const state = account.honorary ? { label: 'عضوية شرفية', tone: 'gold' as Tone } : (STATES[account.state] ?? { label: account.state, tone: 'muted' as Tone });
   return (
     <>
       <Pill tone={state.tone}>{state.label}</Pill>
@@ -44,7 +45,8 @@ export function StatePill({ account }: { account: Pick<Account, 'state' | 'role'
 }
 
 /** "باقي 120 يومًا" for a dated membership, the plain fact for one without an end. */
-export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end'>): string {
+export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end' | 'honorary'>): string {
+  if (account.honorary) return 'شرفية بلا مدة';
   if (account.never_expires) return 'بلا تاريخ انتهاء';
   if (account.member_left === null) return '—';
   return `باقي ${daysText(account.member_left)}`;

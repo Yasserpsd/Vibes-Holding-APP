@@ -36,6 +36,8 @@ const grantSchema = z
   .object({ action: z.enum(['activate', 'extend', 'revoke']), days: z.number().int().min(1, 'عدد الأيام غير صحيح').max(3650, 'عدد الأيام غير صحيح').nullish(), note, confirm, requestId })
   .refine((body) => body.action === 'revoke' || typeof body.days === 'number', 'اكتب عدد الأيام');
 const roleSchema = z.object({ role: z.enum(['member', 'publisher']), note, confirm, requestId });
+// M205 «عضوية شرفية»: on = give, off = take back. No days: it has no duration.
+const honorarySchema = z.strictObject({ on: z.boolean(), note, confirm, requestId });
 const pbGrantSchema = z.object({ amount: z.number().int().min(-50).max(50).refine((value) => value !== 0, 'اكتب عدد المشاريع المضافة أو المخصومة'), note, confirm, requestId });
 // M204: «تأكيد الرقم يدويًا» for a member the WhatsApp code cannot reach (he wrote to the support line).
 const phoneWaiverSchema = z.object({ on: z.boolean(), confirm });
@@ -226,6 +228,19 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       const body = parse(grantSchema, request.body, reply);
       if (!body) return;
       return service.grant(admin, params.id, { action: body.action, days: body.action === 'revoke' ? null : (body.days ?? null), note: body.note, requestId: body.requestId ?? null });
+    }),
+  );
+
+  app.post(
+    '/api/admin/accounts/:id/honorary',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(honorarySchema, request.body, reply);
+      if (!body) return;
+      return service.honorary(admin, params.id, { on: body.on, note: body.note, requestId: body.requestId ?? null });
     }),
   );
 

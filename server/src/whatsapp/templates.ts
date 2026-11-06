@@ -1,6 +1,6 @@
 import type { WaTemplate } from './client.js';
 
-export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice';
+export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended';
 export type WaLang = 'ar' | 'en';
 
 /** The templates registered on the WABA (each exists in ar and en); `code` is the Authentication one. */
@@ -15,6 +15,10 @@ export const TEMPLATE_NAMES: Record<WaKind, string> = {
   visit_update: 'club_visit_update',
   request_update: 'club_request_update',
   invoice: 'club_invoice',
+  // M205: «عضوية شرفية» given by the administration (Utility, ar + en; one variable: the first name).
+  honorary: 'club_honorary_membership',
+  // M205: the honorary membership was taken back (it belongs to partners in the Vibes Ventures companies only).
+  honorary_ended: 'club_honorary_ended',
 };
 export const WA_KINDS = Object.keys(TEMPLATE_NAMES) as WaKind[];
 
@@ -58,7 +62,7 @@ export function formatAmount(amount: number | null | undefined): string {
 /** The values for {{1}}, {{2}}… in the order the templates define them (receipt: amount SAR, service, invoice number). */
 export function buildBodyParams(kind: WaKind, vars: TemplateVars, lang: WaLang): string[] {
   if (kind === 'code') return [cleanParam(vars.code, '-')];
-  if (kind === 'welcome') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا')];
+  if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا')];
   if (kind === 'affiliate_link') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
   const service = cleanParam(vars.service, lang === 'en' ? 'Service' : 'خدمة');
   // M204, in the order the templates were filed.

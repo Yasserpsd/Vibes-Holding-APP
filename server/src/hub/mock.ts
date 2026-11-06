@@ -86,7 +86,8 @@ export class MockHubClient implements HubClient {
         return this.activateMember(body);
       case 'member_status': {
         // M44: the hub answers other systems about a person's membership by phone or e-mail.
-        const contact = this.findAccount(str(body, 'email', 190)) ?? this.findAccount(str(body, 'phone', 40));
+        // M205 (hub 2.28.0): by contact id too.
+        const contact = this.contacts.get(Number(body.contact_id)) ?? this.findAccount(str(body, 'email', 190)) ?? this.findAccount(str(body, 'phone', 40));
         return contact ? { ok: true, found: true, contact: this.publicContact(contact) } : { ok: true, found: false };
       }
       case 'config':
@@ -395,8 +396,13 @@ export class MockHubClient implements HubClient {
   private publicContact(contact: MockContact): HubContact {
     const endMs = contact.memberStartedAt !== null ? contact.memberStartedAt + contact.memberDays * 86_400_000 : null;
     const daysLeft = contact.isMember && endMs !== null ? Math.ceil((endMs - Date.now()) / 86_400_000) : null;
-    const active = contact.isMember && (daysLeft === null || daysLeft > 0);
+    const paid = contact.isMember && (daysLeft === null || daysLeft > 0);
+    // M205 (hub 2.28.0): the honorary membership overrides the paid clock — a member with no days and no end date.
+    const honorary = typeof contact.honoraryAt === 'number';
+    const active = honorary || paid;
     return {
+      honorary: honorary ? 1 : 0,
+      honorary_since: honorary ? isoDate(contact.honoraryAt as number) : '',
       id: contact.id,
       name: contact.name,
       email: contact.email,
@@ -404,9 +410,9 @@ export class MockHubClient implements HubClient {
       phone_verified: contact.phone !== '' && contact.phoneVerified === contact.phone ? 1 : 0,
       stage: contact.verified ? (active ? 2 : 1) : 0,
       is_member: active ? 1 : 0,
-      member_left: daysLeft,
+      member_left: honorary ? null : daysLeft,
       member_days: contact.memberDays,
-      member_end: endMs !== null ? isoDate(endMs) : '',
+      member_end: honorary ? '' : endMs !== null ? isoDate(endMs) : '',
       member_expired: contact.isMember && !active ? 1 : 0,
       daily_limit: MOCK_DAILY_LIMIT,
       daily_left: active ? MOCK_DAILY_LIMIT : null,
@@ -427,7 +433,7 @@ export class MockHubClient implements HubClient {
       contact_email: contact.contactEmail ?? '',
       city: contact.city,
       bio: contact.bio,
-      pending_pay: contact.passHash && contact.verified && !contact.isMember ? 1 : 0,
+      pending_pay: contact.passHash && contact.verified && !contact.isMember && !honorary ? 1 : 0,
     };
   }
 }

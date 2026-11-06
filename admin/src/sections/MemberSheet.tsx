@@ -6,7 +6,7 @@ import type { Account, GrantAction, MemberDetail, MemberEvent } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
 import { dailyLeft, memberLeft, personaLabel, StatePill } from './Members';
 
-type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher';
+type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
 type Draft = { kind: ActionKind; amount: number; note: string; requestId: string };
 
@@ -15,11 +15,14 @@ const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: bool
   extend: { button: 'تمديد العضوية', title: 'تمديد العضوية' },
   revoke: { button: 'إلغاء العضوية', title: 'إلغاء العضوية', danger: true },
   pb: { button: 'إضافة رصيد بنك المشاريع', title: 'تعديل رصيد بنك المشاريع' },
+  // M205: only for official partners in the founding contract of a Vibes Ventures company — the administration gives it and takes it back, nobody else.
+  honorary: { button: 'منح العضوية الشرفية', title: 'منح العضوية الشرفية' },
+  unhonorary: { button: 'سحب العضوية الشرفية', title: 'سحب العضوية الشرفية', danger: true },
   publisher: { button: 'ترقية إلى موديريتور', title: 'صلاحية النشر (موديريتور)' },
   unpublisher: { button: 'سحب صلاحية الموديريتور', title: 'سحب صلاحية الموديريتور', danger: true },
 };
 
-const EVENT_KINDS: Record<string, string> = { registered: 'تسجيل', verified: 'تأكيد البريد', activated: 'تفعيل عضوية', renewed: 'تجديد عضوية', revoked: 'إلغاء عضوية', role: 'تغيير صلاحية', deleted: 'حذف الحساب' };
+const EVENT_KINDS: Record<string, string> = { registered: 'تسجيل', verified: 'تأكيد البريد', activated: 'تفعيل عضوية', renewed: 'تجديد عضوية', revoked: 'إلغاء عضوية', honorary: 'منح العضوية الشرفية', honorary_revoked: 'سحب العضوية الشرفية', role: 'تغيير صلاحية', deleted: 'حذف الحساب' };
 const EVENT_SOURCES: Record<string, string> = { paymob: 'بيموب', store: 'المتجر', admin: 'الإدارة', list: 'قائمة', manual: 'يدوي', app: 'التطبيق' };
 
 /** A membership the hub gives no end for: its flag says so, and so does a member with no days-left figure. */
@@ -29,7 +32,8 @@ function actionsFor(account: Account): ActionKind[] {
   // The hub refuses every grant and role change until the e-mail is confirmed: offering one ends in an error and a failed row in the audit log.
   if (account.state === 'lead' || account.state === 'pending') return [];
   // A membership with no end date has nothing to extend: the hub would start a dated period from today and so put an end to it.
-  const list: ActionKind[] = account.state !== 'member' ? ['activate'] : openEnded(account) ? ['pb', 'revoke'] : ['extend', 'pb', 'revoke'];
+  // M205: an honorary member has no days to add or cancel — only the honorary membership itself can be taken back.
+  const list: ActionKind[] = account.honorary ? ['pb', 'unhonorary'] : account.state !== 'member' ? ['activate', 'honorary'] : openEnded(account) ? ['pb', 'honorary', 'revoke'] : ['extend', 'pb', 'honorary', 'revoke'];
   if (account.role === 'publisher') list.push('unpublisher');
   else if (account.role !== 'admin') list.push('publisher');
   return list;
@@ -46,6 +50,10 @@ function summary(draft: Draft, name: string): string {
       return `ستُلغى عضوية «${name}» الآن، ويفقد مزايا الأعضاء في التطبيق والمواقع.`;
     case 'pb':
       return draft.amount > 0 ? `يزيد رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(draft.amount, 'مشروعين')}.` : `ينقص رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(-draft.amount, 'مشروعين')}.`;
+    case 'honorary':
+      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة بلا مدة ولا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
+    case 'unhonorary':
+      return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures.`;
     case 'publisher':
       return `سيصبح «${name}» موديريتور: يدخل اللوحة وينشر «رسائل الإدارة» فقط، بلا أي تحكم آخر.`;
     case 'unpublisher':
@@ -56,6 +64,7 @@ function summary(draft: Draft, name: string): string {
 function run(contactId: number, draft: Draft) {
   const meta = { note: draft.note, requestId: draft.requestId };
   if (draft.kind === 'pb') return api.pbGrant(contactId, { amount: draft.amount, ...meta });
+  if (draft.kind === 'honorary' || draft.kind === 'unhonorary') return api.honorary(contactId, { on: draft.kind === 'honorary', ...meta });
   if (draft.kind === 'publisher' || draft.kind === 'unpublisher') return api.setRole(contactId, { role: draft.kind === 'publisher' ? 'publisher' : 'member', ...meta });
   return api.grant(contactId, { action: draft.kind, days: draft.kind === 'revoke' ? null : draft.amount, ...meta });
 }
@@ -325,10 +334,11 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
 
       {everMember ? (
         <section className="sheet-block">
-          <h3>العضوية السنوية</h3>
+          <h3>{account.honorary ? 'العضوية الشرفية' : 'العضوية السنوية'}</h3>
           <dl className="fields">
+            {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
             <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
-            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
+            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'لا تنتهي' : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
             {account.state === 'member' ? <Field label="رصيد المستشار اليوم">{dailyLeft(account)}</Field> : null}
             <Field label="رصيد بنك المشاريع">{pb ? `المتبقي ${formatProjects(pb.left)}` : '—'}</Field>
             {pb ? <Field label="تفاصيل الرصيد">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
@@ -369,7 +379,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             ))}
           </div>
         ) : null}
-        {openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
+        {account.honorary ? <p className="muted hint">عضوية شرفية: بلا مدة ولا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
         {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
         {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
         {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}

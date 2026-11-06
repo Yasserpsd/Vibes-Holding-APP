@@ -11,6 +11,11 @@ export type MembershipStatus = 'unactivated' | 'active' | 'expired';
 
 export type Membership = {
   status: MembershipStatus;
+  /**
+   * M205: 'honorary' = «عضوية شرفية», given by the administration only (the hub stores it). Always active, with no days
+   * left and no end date; absent from a server before M205.
+   */
+  kind?: 'annual' | 'honorary';
   daysLeft: number | null;
   endDate: string | null;
   aiDailyLimit: number;

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "club_honorary_membership",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، بصفتكم شريكًا رسميًا في عقد تأسيس إحدى شركات Vibes Ventures. عضويتكم سارية دون مدة محددة ما دامت شراكتكم قائمة، وجميع مزايا النادي متاحة لكم في التطبيق.",
+    "bodyExamples": ["سلطان"]
+  },
+  {
+    "name": "club_honorary_membership",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, we are pleased to inform you that you have been granted Honorary Membership of Investors Club, as an official partner under the articles of association of one of the Vibes Ventures companies. It has no end date for as long as your partnership stands, and every club benefit is available to you in the app.",
+    "bodyExamples": ["Sultan"]
+  },
+  {
+    "name": "club_honorary_ended",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، نفيدكم بأن العضوية الشرفية في نادي المستثمرين مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، وقد انتهى العمل بها في حسابكم اعتبارًا من اليوم. لا يؤثر ذلك في أي عضوية سنوية سارية لديكم. نشكر لكم ما قدّمتموه، ويسعد إدارة النادي الرد على أي استفسار.",
+    "bodyExamples": ["سلطان"]
+  },
+  {
+    "name": "club_honorary_ended",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, please note that Honorary Membership of Investors Club is reserved for official partners under the articles of association of the Vibes Ventures companies, and it has ended on your account as of today. Any active annual membership you hold is not affected. Thank you for your contribution; the club's administration is glad to answer any question.",
+    "bodyExamples": ["Sultan"]
+  }
+]

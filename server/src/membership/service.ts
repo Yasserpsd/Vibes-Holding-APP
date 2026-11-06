@@ -6,6 +6,7 @@ import { membershipNumber, type AuthService, type Me } from '../auth/service.js'
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
+import { isHonorary } from './honorary.js';
 import type { ActivationLike, Notifier } from '../mail/notify.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import type { PushService } from '../push/service.js';
@@ -347,14 +348,17 @@ export class MembershipService {
       }
       this.deps.auth.forget(contactId);
       // M156 (owner): the member's own royal confirmation goes out the same instant, then the admins' copy.
-      if (result.contact) {
+      // M205: an honorary member who also holds a store subscription stays honorary — the hub keeps the paid period
+      // under the flag, the admins get their copy, and the member is not told «سارية حتى».
+      const honorary = isHonorary(result.contact);
+      if (result.contact && !honorary) {
         const royal = () => this.deps.notifier.memberActivated(mail);
         // M204: WhatsApp first; the e-mail follows `orMail`.
         if (this.deps.whatsapp) this.deps.whatsapp.announceMembership({ phone: mail.phone, lang: mail.lang, name: result.contact.name, expiresAt: mail.expiresAt, ref: `membership:${contactId}:${mail.reference}` }, royal);
         else royal();
       }
       this.deps.notifier.membershipActivated(mail);
-      this.deps.push.membershipActivated(contactId, { expiresAt: event.expiresAt, pending: false });
+      if (!honorary) this.deps.push.membershipActivated(contactId, { expiresAt: event.expiresAt, pending: false });
       if (this.deps.invites) await this.deps.invites.onActivated(contactId);
       return { ...event, activation: 'activated', reason: null };
     } catch (error) {

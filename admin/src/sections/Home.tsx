@@ -43,7 +43,7 @@ function Tiles({ hub }: { hub: HubStats }) {
   return (
     <div className="tiles">
       <Tile label="المسجّلون" value={totals.accounts} note={`${formatNumber(hub.today.signups)} اليوم`} onOpen={open('all')} />
-      <Tile label="الأعضاء المشتركون" value={totals.members_active} tone="gold" note={totals.members_no_expiry ? `منهم ${formatNumber(totals.members_no_expiry)} بلا تاريخ انتهاء` : undefined} onOpen={open('member')} />
+      <Tile label="الأعضاء المشتركون" value={totals.members_active} tone="gold" note={[totals.members_no_expiry ? `منهم ${formatNumber(totals.members_no_expiry)} بلا تاريخ انتهاء` : '', totals.members_honorary ? `${formatNumber(totals.members_honorary)} عضوية شرفية` : ''].filter(Boolean).join(' · ') || undefined} onOpen={open('member')} />
       <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open('unpaid')} />
       <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
       <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />

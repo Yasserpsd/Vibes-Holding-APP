@@ -36,6 +36,8 @@ export type MockContact = {
   avatar: string;
   isMember: boolean;
   memberDays: number;
+  /** M205: when the honorary membership was given (hub 2.28.0 `honorary_at`); it overrides the paid clock above. */
+  honoraryAt?: number | null;
   memberStartedAt: number | null;
   resetPending: boolean;
   role: MockRole;

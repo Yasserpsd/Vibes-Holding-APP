@@ -94,6 +94,7 @@ export class MockAdmin {
 
   private stateOf(contact: MockContact, now: number): HubAccountState {
     if (!contact.verified) return contact.passHash ? 'pending' : 'lead';
+    if (typeof contact.honoraryAt === 'number') return 'member';
     if (!contact.isMember) return 'unpaid';
     return contact.memberStartedAt === null || contact.memberStartedAt + contact.memberDays * DAY_MS > now ? 'member' : 'expired';
   }
@@ -133,7 +134,9 @@ export class MockAdmin {
       member_left: view.member_left,
       member_days: contact.isMember ? contact.memberDays : 0,
       member_end: view.member_end,
-      never_expires: contact.isMember && contact.memberStartedAt === null ? 1 : 0,
+      never_expires: view.honorary === 1 || (contact.isMember && contact.memberStartedAt === null) ? 1 : 0,
+      honorary: view.honorary ?? 0,
+      honorary_since: view.honorary_since ?? '',
       daily_limit: MOCK_DAILY_LIMIT,
       daily_left: view.daily_left,
       ...this.intent(contact, state, rows.length),
@@ -243,7 +246,8 @@ export class MockAdmin {
         unpaid: count('unpaid'),
         members_active: count('member'),
         members_expired: count('expired'),
-        members_no_expiry: contacts.filter((contact) => contact.isMember && contact.memberStartedAt === null).length,
+        members_no_expiry: contacts.filter((contact) => typeof contact.honoraryAt === 'number' || (contact.isMember && contact.memberStartedAt === null)).length,
+        members_honorary: contacts.filter((contact) => typeof contact.honoraryAt === 'number').length,
         admins: contacts.filter((contact) => contact.verified && contact.role === 'admin').length,
         publishers: contacts.filter((contact) => contact.verified && contact.role === 'publisher').length,
       },
@@ -417,8 +421,20 @@ export class MockAdmin {
     const admin = this.requireRole(body, ['admin']);
     const contact = this.target(body);
     const action = str(body, 'action', 20);
-    if (action !== 'activate' && action !== 'extend' && action !== 'revoke') throw new HubError('invalid', 'إجراء غير معروف', 400);
+    if (action !== 'activate' && action !== 'extend' && action !== 'revoke' && action !== 'honorary' && action !== 'honorary_revoke') throw new HubError('invalid', 'إجراء غير معروف', 400);
     if (!contact.verified) throw new HubError('invalid', 'الحساب غير مفعّل بالبريد بعد', 400);
+    // M205 (hub 2.28.0): the honorary membership is a flag over the paid clock — given and taken back here only.
+    const honorary = typeof contact.honoraryAt === 'number';
+    if (action === 'honorary' || action === 'honorary_revoke') {
+      const on = action === 'honorary';
+      if (on === honorary) throw new HubError('invalid', on ? 'العضوية الشرفية ممنوحة لهذا الحساب من قبل' : 'هذا الحساب لا يحمل عضوية شرفية', 409);
+      contact.honoraryAt = on ? Date.now() : null;
+      const { state } = this.deps;
+      const event: MockEvent = { id: nextId(state, 'event'), contactId: contact.id, kind: on ? 'honorary' : 'honorary_revoked', days: 0, source: 'admin', ref: '', actorId: admin.id, note: str(body, 'note', 300), at: Date.now() };
+      state.events.push(event);
+      return { ok: true, contact: this.deps.publicContact(contact), event: this.eventRow(event) };
+    }
+    if (honorary) throw new HubError('honorary', 'هذا الحساب يحمل العضوية الشرفية وهي بلا مدة: اسحبها أولًا لتعديل الاشتراك', 409);
     const days = Number(body.days);
     if (action !== 'revoke' && (!Number.isInteger(days) || days < 1 || days > 3650)) throw new HubError('invalid', 'عدد الأيام غير صحيح', 400);
     const { event } = this.memberChange(contact, action, days, 'admin', '', admin.id, str(body, 'note', 300));

@@ -485,6 +485,21 @@ export class PushService {
     });
   }
 
+  /** M205: the administration gave this member the honorary membership (no days, no end date) or took it back. */
+  honoraryChanged(contactId: number, on: boolean): void {
+    const data = { type: 'membership', status: on ? 'active' : 'changed', kind: 'honorary', screen: '/membership' };
+    this.background(contactId, (lang) => {
+      if (lang === 'en') {
+        return on
+          ? { title: 'You have been granted Honorary Membership', body: 'Your Honorary Membership of Investors Club is active, with no end date.', data }
+          : { title: 'Your Honorary Membership has ended', body: 'Honorary Membership is reserved for official partners under the articles of association of the Vibes Ventures companies. Any active annual membership you hold is not affected.', data };
+      }
+      return on
+        ? { title: 'مُنحتم العضوية الشرفية', body: 'يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، وهي سارية دون مدة محددة.', data }
+        : { title: 'انتهت العضوية الشرفية', body: 'العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ولا يؤثر انتهاؤها في أي عضوية سنوية سارية لديكم.', data };
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     const data = { type: 'membership', status: activation.pending ? 'pending' : 'active', screen: '/membership' };
     this.background(contactId, (lang) =>

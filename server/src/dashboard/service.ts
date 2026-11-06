@@ -7,12 +7,14 @@ import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
+import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
 import type { MembershipService } from '../membership/service.js';
 import type { PaymentStats, PaymentsService } from '../payments/service.js';
 import type { PbBalance, PbBalanceLite, PbBridge, PbMember } from '../projectsBank/bridge.js';
 import type { PushService } from '../push/service.js';
 import { parseHubTime, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 
 /**
  * The dashboard's view of the club (docs/BRIDGE_V2.md 4): the hub stays the one source of accounts and memberships
@@ -29,6 +31,7 @@ const BRIDGE_RETRY_MS = 60_000;
 const HUB_V2 = [2, 7, 0];
 const PB_V2 = [39, 0];
 const UPGRADE_HUB = 'حدّث إضافة الهب إلى 2.7.0';
+const UPGRADE_HUB_HONORARY = 'العضوية الشرفية تحتاج تحديث إضافة الهب إلى 2.28.0 أو أحدث';
 
 export type SectionError = { code: string; message: string };
 export type BridgeInfo = { hub: { version: string | null; ok: boolean }; pb: { version: string | null; ok: boolean } };
@@ -38,7 +41,7 @@ export type AuditEntry = {
   id: string;
   at: string;
   actor: { id: number; name: string; email: string };
-  action: 'grant' | 'role' | 'pb_grant' | 'reply';
+  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary';
   contactId: number;
   params: Record<string, unknown>;
   note: string;
@@ -66,8 +69,9 @@ function atLeast(version: string | null, wanted: number[]): boolean {
   return true;
 }
 
-export function toPbMember(account: Pick<HubAccount, 'id' | 'member_end' | 'member_days' | 'name' | 'email' | 'phone'>): PbMember {
-  return { contact_id: account.id, member_end: account.member_end, member_days: account.member_days, name: account.name, email: account.email, phone: account.phone };
+export function toPbMember(account: Pick<HubAccount, 'id' | 'member_end' | 'member_days' | 'honorary' | 'honorary_since' | 'name' | 'email' | 'phone'>): PbMember {
+  // M205: the honorary member's Projects Bank year (membership/honorary.ts).
+  return { contact_id: account.id, ...pbPeriodOf(account), name: account.name, email: account.email, phone: account.phone };
 }
 
 /** Answers kept for a short while under a key that does not depend on which admin asked. */
@@ -92,7 +96,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -412,6 +416,41 @@ export class DashboardService {
       this.bust('hub', 'pb');
       return { ok: true as const, contact: result.contact, event: result.event };
     });
+  }
+
+  /**
+   * M205 «عضوية شرفية»: given and taken back here only — an admin session, `confirm: true`, one audit entry. The flag
+   * itself is the hub's (`admin_grant` honorary / honorary_revoke, hub 2.28.0): it overrides the paid clock, so a store
+   * subscription under it keeps counting and decides the state again after a revoke. The member hears of a grant and
+   * of a revoke on WhatsApp (the same words by e-mail when WhatsApp cannot carry them) and in the app.
+   */
+  honorary(admin: AdminActor, contactId: number, input: { on: boolean; note: string; requestId: string | null }) {
+    return this.write(admin, 'honorary', contactId, { params: { on: input.on }, note: input.note, requestId: input.requestId }, async () => {
+      let result: HubResults['admin_grant'];
+      try {
+        result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: input.on ? 'honorary' : 'honorary_revoke', days: 0, note: input.note }, false);
+      } catch (error) {
+        if (error instanceof HubError && error.code === 'invalid' && (await this.hubBefore(HUB_HONORARY_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_HONORARY, 501);
+        throw error;
+      }
+      // A hub that answered without the flag did not understand the action: nothing changed and nobody is told.
+      if (isHonorary(result.contact) !== input.on) throw new HubError('hub_not_supported', UPGRADE_HUB_HONORARY, 501);
+      this.deps.auth.forget(contactId);
+      this.bust('hub', 'pb');
+      // The member is told both ways (owner, 2026-11-06): the grant, and the end with the reason it is tied to —
+      // the honorary membership belongs only to official partners in the founding contract of a Vibes Ventures company.
+      const { contact, event } = result;
+      const email = String(contact.contact_email ?? '').trim() || contact.email;
+      void this.deps.whatsapp?.sendHonorary({ phone: contact.phone, lang: contact.lang, name: contact.name, email, ref: `honorary:${contactId}:${event.id}` }, !input.on);
+      this.deps.push.honoraryChanged(contactId, input.on);
+      return { ok: true as const, contact: result.contact, event: result.event };
+    });
+  }
+
+  /** True only when the hub answered a real version older than `wanted` (the mock and an unknown version pass). */
+  private async hubBefore(wanted: number[]): Promise<boolean> {
+    const version = (await this.bridge()).hub.version;
+    return Boolean(version) && !String(version).endsWith('-mock') && !atLeast(version, wanted);
   }
 
   setRole(admin: AdminActor, contactId: number, input: { role: 'member' | 'publisher'; note: string; requestId: string | null }) {

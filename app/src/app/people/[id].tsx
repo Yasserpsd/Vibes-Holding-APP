@@ -42,6 +42,13 @@ export default function PersonScreen() {
               <PersonAvatar person={data} size={104} />
             </View>
             <Text style={styles.name}>{data.name}</Text>
+            {/* M205: the honorary membership of a Vibes Ventures board member, on his own page only. */}
+            {data.honorary ? (
+              <View style={styles.honorary}>
+                <Ionicons name="ribbon" size={13} color={colors.goldInk} />
+                <Text style={styles.honoraryText} numberOfLines={1}>{t('membership.honorary')}</Text>
+              </View>
+            ) : null}
             {data.title || data.company ? <Text style={styles.title}>{[data.title, data.company].filter(Boolean).join(' · ')}</Text> : null}
             {/* M73: the spotlight facts under the name — field/experience and the city. */}
             {data.specialty || data.city ? (
@@ -161,6 +168,8 @@ const styles = themedStyles(() => ({
   },
   name: { ...typography.title, color: colors.textPrimary, textAlign: 'center' },
   title: { ...typography.body, color: colors.gold, textAlign: 'center' },
+  honorary: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.gold },
+  honoraryText: { ...typography.caption, fontSize: 12, color: colors.goldInk },
   bio: { ...typography.body, color: colors.textSecondary, textAlign: textStart, lineHeight: 26 },
   card: {
     gap: spacing.sm,

@@ -5,6 +5,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Config } from '../config.js';
 import { normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
+import { isHonorary } from '../membership/honorary.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
 import type { AppLang, AppSource } from '../lang.js';
 import type { SocialIdentity } from './social.js';
@@ -42,6 +43,11 @@ export function membershipNumber(account: { id: number; persona: string }): stri
 
 export type Membership = {
   status: MembershipStatus;
+  /**
+   * M205: 'honorary' = «عضوية شرفية» for the Vibes Ventures board, given by an admin in the dashboard and stored by the
+   * hub (rule 2). Always active, no days left and no end date; nothing the app sends can set it.
+   */
+  kind: 'annual' | 'honorary';
   daysLeft: number | null;
   endDate: string | null;
   aiDailyLimit: number;
@@ -254,11 +260,14 @@ const ME_STALE_MAX_MS = 24 * 60 * 60_000;
 const ME_HUB_TIMEOUT_MS = 10_000;
 
 function membershipOf(contact: HubContact): Membership {
-  const status: MembershipStatus = contact.is_member ? 'active' : contact.member_expired ? 'expired' : 'unactivated';
+  // M205: the honorary membership never lapses — whatever the paid clock under it says.
+  const honorary = isHonorary(contact);
+  const status: MembershipStatus = honorary || contact.is_member ? 'active' : contact.member_expired ? 'expired' : 'unactivated';
   return {
     status,
-    daysLeft: status === 'active' ? contact.member_left : null,
-    endDate: contact.member_end ? contact.member_end : null,
+    kind: honorary ? 'honorary' : 'annual',
+    daysLeft: status === 'active' && !honorary ? contact.member_left : null,
+    endDate: contact.member_end && !honorary ? contact.member_end : null,
     aiDailyLimit: contact.daily_limit,
     aiDailyLeft: contact.daily_left,
   };
@@ -299,6 +308,7 @@ export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
   /** M165: accounts whose stale copy is being refreshed from the hub right now. */
   private readonly revalidating = new Set<string>();
+  private readonly honoraryCache = new Map<number, { value: boolean; at: number }>();
 
   constructor(private readonly deps: Deps) {}
 
@@ -674,6 +684,28 @@ export class AuthService {
     for (const [uuid, entry] of this.meCache) {
       if (entry.me.id === contactId) this.meCache.delete(uuid);
     }
+    this.honoraryCache.delete(contactId);
+  }
+
+  /**
+   * M205: whether ANOTHER member holds the honorary membership, for the badge on his «شخصية ومسيرة» page. The hub is
+   * asked by contact id (`member_status`, hub 2.28.0) and the yes/no is kept for a few minutes; an older hub, a hub
+   * hiccup or an unknown id answer false — the badge is never guessed.
+   */
+  async honoraryOf(contactId: number | null | undefined): Promise<boolean> {
+    if (!contactId) return false;
+    const cached = this.honoraryCache.get(contactId);
+    if (cached && Date.now() - cached.at < 10 * 60_000) return cached.value;
+    let value = false;
+    try {
+      const found = await this.deps.hub.call('member_status', { contact_id: contactId });
+      value = found.contact?.id === contactId && isHonorary(found.contact);
+    } catch {
+      value = false;
+    }
+    this.honoraryCache.set(contactId, { value, at: Date.now() });
+    if (this.honoraryCache.size > 2000) this.honoraryCache.clear();
+    return value;
   }
 
   /**

@@ -7,7 +7,7 @@ export type PersonLink = { label: string; url: string };
 export type Person = { id: string; name: string; title: string; company: string; photo: string | null };
 /** M73: the spotlight sections (owner, 2026-10-16); an older server sends none of them. */
 export type SpotlightFields = { specialty?: string; city?: string; achievements?: string[]; benefit?: string[]; seeking?: string; phone?: string; email?: string };
-export type PersonFull = Person & SpotlightFields & { bio: string; milestones: string[]; links: PersonLink[] };
+export type PersonFull = Person & SpotlightFields & { bio: string; milestones: string[]; links: PersonLink[]; /** M205: «عضوية شرفية», answered by the server from the hub; absent before M205. */ honorary?: boolean };
 export type PeopleAnswer = { intro: string; people: Person[] };
 
 export type ProfileStatus = 'pending' | 'approved' | 'rejected';

@@ -37,6 +37,13 @@ export type HubContact = {
   phone_verified?: 0 | 1;
   /** M156 (hub 2.26.0+): the member's stored language ('ar' | 'en' | ''); undefined on older hubs. */
   lang?: string;
+  /**
+   * M205 (hub 2.28.0+): 1 = «عضوية شرفية», given and taken back by an admin only. It overrides the paid clock: the hub
+   * answers is_member 1, member_left null and member_end '' while it is on. undefined on older hubs.
+   */
+  honorary?: 0 | 1;
+  /** M205: the Riyadh day the honorary membership was given ('' when none). */
+  honorary_since?: string;
   city: string;
   bio: string;
   pending_pay: 0 | 1;
@@ -182,6 +189,9 @@ export type HubAccount = {
   member_days: number;
   member_end: string;
   never_expires: 0 | 1;
+  /** M205 (hub 2.28.0+): see HubContact; an honorary account also answers never_expires 1. */
+  honorary?: 0 | 1;
+  honorary_since?: string;
   daily_limit: number;
   daily_left: number | null;
   intent: number;
@@ -238,7 +248,10 @@ export type HubLead = {
   created_at: string;
 };
 
-export type HubEventKind = 'registered' | 'verified' | 'activated' | 'renewed' | 'revoked' | 'role' | 'deleted';
+export type HubEventKind = 'registered' | 'verified' | 'activated' | 'renewed' | 'revoked' | 'role' | 'deleted' | 'honorary' | 'honorary_revoked';
+
+/** `admin_grant` actions; the two honorary ones exist since hub 2.28.0 (M205) and take no days. */
+export type HubGrantAction = 'activate' | 'extend' | 'revoke' | 'honorary' | 'honorary_revoke';
 
 export type HubEvent = {
   id: number;
@@ -301,6 +314,8 @@ export type HubStats = {
     members_active: number;
     members_expired: number;
     members_no_expiry: number;
+    /** M205 (hub 2.28.0+): honorary members, counted inside members_active and members_no_expiry too. */
+    members_honorary?: number;
     admins: number;
     publishers: number;
     /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */

@@ -34,7 +34,9 @@ export function MembershipStatusCard({ membership, texts, activationNote, title,
   const advisorLeftShown = useCountUp(active ? membership?.aiDailyLeft ?? 0 : 0);
   const tone = active ? colors.success : status === 'expired' ? colors.danger : status === 'unactivated' ? colors.warning : colors.textMuted;
   const icon = active ? 'shield-checkmark' : status === 'guest' ? 'person-circle-outline' : 'alert-circle-outline';
-  const label = t(`membership.badge.${status}`);
+  // M205: the honorary membership is its own status — never the paid wording, no days, no end date, nothing to buy.
+  const honorary = active && membership?.kind === 'honorary';
+  const label = t(honorary ? 'membership.badge.honorary' : `membership.badge.${status}`);
 
   return (
     <View onLayout={(event) => setSize(event.nativeEvent.layout)}>
@@ -44,18 +46,18 @@ export function MembershipStatusCard({ membership, texts, activationNote, title,
           <Ionicons name={icon} size={28} color={tone} />
           <View style={styles.texts}>
             <View style={styles.badgeRow}>
-              <Text style={styles.title}>{title ?? t('membership.annual')}</Text>
+              <Text style={styles.title}>{honorary ? t('membership.honorary') : (title ?? t('membership.annual'))}</Text>
               <PopIn delay={160} style={[styles.badge, { backgroundColor: tone }]}>
                 <Text style={styles.badgeText}>{label}</Text>
               </PopIn>
             </View>
-            <Text style={styles.status}>{texts?.[status] ?? t(`membership.status.${status}`)}</Text>
+            <Text style={styles.status}>{honorary ? t('membership.status.honorary') : (texts?.[status] ?? t(`membership.status.${status}`))}</Text>
           </View>
         </View>
         {membership?.status === 'active' ? (
           <View style={styles.meta}>
-            {membership.daysLeft !== null ? <Text style={styles.metaText}>{t('membership.daysLeft', { days: daysShown })}</Text> : null}
-            {membership.endDate ? <Text style={styles.metaText}>{t('membership.endsOn', { date: formatArabicDate(membership.endDate) })}</Text> : null}
+            {membership.daysLeft !== null && !honorary ? <Text style={styles.metaText}>{t('membership.daysLeft', { days: daysShown })}</Text> : null}
+            {membership.endDate && !honorary ? <Text style={styles.metaText}>{t('membership.endsOn', { date: formatArabicDate(membership.endDate) })}</Text> : null}
             {showAdvisorBalance(membership.aiDailyLeft, membership.aiDailyLimit) ? (
               <Text style={styles.metaText}>{t('membership.advisorBalance', { left: advisorLeftShown, limit: membership.aiDailyLimit })}</Text>
             ) : null}

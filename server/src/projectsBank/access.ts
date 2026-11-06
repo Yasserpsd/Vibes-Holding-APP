@@ -5,6 +5,7 @@ import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import type { HubContact } from '../hub/types.js';
+import { pbPeriodOf } from '../membership/honorary.js';
 import type { PbBalanceLite, PbBridge, PbContact, PbMember } from './bridge.js';
 import type { ProjectsService } from './service.js';
 
@@ -33,7 +34,8 @@ function toContact(contact: PbContact): UnlockedContact {
 }
 
 export function pbMemberOf(contact: HubContact): PbMember {
-  return { contact_id: contact.id, member_end: contact.member_end, member_days: contact.member_days, name: contact.name, email: contact.email, phone: contact.phone };
+  // M205: an honorary member has no end date; his Projects Bank year turns over from the day it was given.
+  return { contact_id: contact.id, ...pbPeriodOf(contact), name: contact.name, email: contact.email, phone: contact.phone };
 }
 
 type Deps = { pb: PbBridge; projects: ProjectsService; auth: AuthService; log: FastifyBaseLogger; /** The dashboard shows the same balance: it drops its copy. */ onUnlock?: () => void };

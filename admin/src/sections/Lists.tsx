@@ -573,6 +573,7 @@ function auditText(entry: AuditEntry): string {
     const days = typeof params.days === 'number' ? ` · ${formatDays(params.days)}` : '';
     return `${GRANTS[String(params.action)] ?? 'تعديل عضوية'}${days}`;
   }
+  if (entry.action === 'honorary') return params.on === false ? 'سحب العضوية الشرفية' : 'منح العضوية الشرفية';
   if (entry.action === 'role') return params.role === 'publisher' ? 'منح صلاحية النشر' : 'سحب صلاحية النشر';
   if (entry.action === 'pb_grant') {
     const amount = typeof params.amount === 'number' ? params.amount : 0;

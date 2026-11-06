@@ -36,6 +36,8 @@ export type SendInput = { phone: string | null | undefined; lang?: string | null
 export type WelcomeInput = SendInput & { name?: string | null };
 export type ReceiptInput = SendInput & { amount: number; service: string; invoiceNo: number | string };
 export type AffiliateLinkInput = SendInput & { name: string; code: string; link: string };
+/** M205: the honorary membership notice; `email` receives the same words when WhatsApp cannot carry them. */
+export type HonoraryInput = SendInput & { name?: string | null };
 /** M204: the five member messages that left the e-mail for WhatsApp. No `email` here: the caller owns the mail (see `orMail`). */
 export type MembershipInput = Omit<SendInput, 'email'> & { name?: string | null; until: string };
 export type EventTicketInput = Omit<SendInput, 'email'> & { event: string; date: string; ticket: string };
@@ -88,6 +90,11 @@ export class WhatsappService {
   /** M202: an affiliate's short code and link (Utility template). `ref` keeps one send per code. */
   sendAffiliateLink(input: AffiliateLinkInput): Promise<WaResult> {
     return this.deliver('affiliate_link', input, { name: input.name, code: input.code, link: input.link });
+  }
+
+  /** M205: «منحكم العضوية الشرفية», or its end when `ended`; `ref` keeps one message per grant or revoke. */
+  sendHonorary(input: HonoraryInput, ended = false): Promise<WaResult> {
+    return this.deliver(ended ? 'honorary_ended' : 'honorary', input, { name: firstName(input.name) });
   }
 
   /** M204: «تم تفعيل عضويتك… سارية حتى {{2}}». */
@@ -412,6 +419,30 @@ export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { 
     return lang === 'en'
       ? { subject: 'Welcome to Investors Club', text: `Welcome${vars.name ? `, ${vars.name}` : ''}. Your membership is active. Open the app to see what is waiting for you.` }
       : { subject: 'أهلاً بك في Investors Club', text: `أهلاً بك${vars.name ? ` يا ${vars.name}` : ''}. تم تفعيل عضويتك، افتح التطبيق لتتعرف على ما ينتظرك.` };
+  }
+  // M205: the same words as the two WhatsApp templates. The honorary membership belongs only to official partners in
+  // the founding contract («عقد التأسيس») of a Vibes Ventures company, and both messages say so (owner, 2026-11-06).
+  if (kind === 'honorary') {
+    return lang === 'en'
+      ? {
+          subject: 'Your Honorary Membership of Investors Club',
+          text: `Hello${vars.name ? ` ${vars.name}` : ''},\n\nWe are pleased to inform you that you have been granted Honorary Membership of Investors Club, as an official partner under the articles of association of one of the Vibes Ventures companies.\n\nIt has no end date for as long as your partnership stands, and every club benefit is available to you in the app.`,
+        }
+      : {
+          subject: 'عضويتكم الشرفية في نادي المستثمرين',
+          text: `مرحبًا${vars.name ? ` ${vars.name}` : ''}،\n\nيسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، بصفتكم شريكًا رسميًا في عقد تأسيس إحدى شركات Vibes Ventures.\n\nعضويتكم سارية دون مدة محددة ما دامت شراكتكم قائمة، وجميع مزايا النادي متاحة لكم في التطبيق.`,
+        };
+  }
+  if (kind === 'honorary_ended') {
+    return lang === 'en'
+      ? {
+          subject: 'Your Honorary Membership of Investors Club has ended',
+          text: `Hello${vars.name ? ` ${vars.name}` : ''},\n\nPlease note that Honorary Membership of Investors Club is reserved for official partners under the articles of association of the Vibes Ventures companies, and it has ended on your account as of today.\n\nAny active annual membership you hold is not affected. Thank you for your contribution; the club's administration is glad to answer any question.`,
+        }
+      : {
+          subject: 'انتهاء العضوية الشرفية في نادي المستثمرين',
+          text: `مرحبًا${vars.name ? ` ${vars.name}` : ''}،\n\nنفيدكم بأن العضوية الشرفية في نادي المستثمرين مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، وقد انتهى العمل بها في حسابكم اعتبارًا من اليوم.\n\nلا يؤثر ذلك في أي عضوية سنوية سارية لديكم. نشكر لكم ما قدّمتموه، ويسعد إدارة النادي الرد على أي استفسار.`,
+        };
   }
   if (kind === 'affiliate_link') {
     return lang === 'en'
