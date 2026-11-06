@@ -2,11 +2,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { dashboardGuard, guard, parse } from '../auth/guard.js';
+import { LEGACY_BEFORE_UTC, type LegacyAccounts } from '../auth/legacy.js';
 import type { AuthService } from '../auth/service.js';
 import type { InterestsService } from '../interests/service.js';
 import type { DashboardService } from './service.js';
 
-export type DashboardRoutesOptions = { service: DashboardService; auth: AuthService; interests?: InterestsService };
+export type DashboardRoutesOptions = { service: DashboardService; auth: AuthService; interests?: InterestsService; legacy?: LegacyAccounts };
 
 const q = z.string().trim().max(120).default('');
 const paging = { page: z.coerce.number().int().min(1).max(100_000).default(1), per_page: z.coerce.number().int().min(1).max(100).default(25) };
@@ -41,7 +42,7 @@ const phoneWaiverSchema = z.object({ on: z.boolean(), confirm });
 const replySchema = z.object({ text: z.string().trim().min(1, 'اكتب الرد أولًا').max(4000, 'الرد طويل، الحد 4000 حرف'), confirm, requestId });
 
 /** The dashboard's bridge v2 endpoints: all behind `dashboardGuard`, all `no-store` like every /api/ answer. */
-export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async (app, { service, auth, interests }) => {
+export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async (app, { service, auth, interests, legacy }) => {
   const requireAdmin = dashboardGuard(auth);
 
   app.get(
@@ -94,6 +95,32 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!interests) return detail;
       const labels = await interests.labelsFor([params.id]);
       return { ...detail, interests: labels[params.id] ?? [] };
+    }),
+  );
+
+  // M204: the accounts from before the WhatsApp sign-up keep signing in as they did (auth/legacy.ts). The list is
+  // taken once from the hub's own registry; taking it again only refreshes it with the same date limit.
+  app.get(
+    '/api/admin/accounts-legacy',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return { legacy: legacy?.info ?? null, before: LEGACY_BEFORE_UTC };
+    }),
+  );
+
+  app.post(
+    '/api/admin/accounts-legacy',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      if (!legacy) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const body = parse(z.object({ confirm }), request.body, reply);
+      if (!body) return;
+      const found = await service.accountIdsBefore(admin, LEGACY_BEFORE_UTC);
+      const saved = await legacy.save(found.ids, LEGACY_BEFORE_UTC, admin.me.name || admin.me.email);
+      request.log.info({ count: saved.ids.length, of: found.total }, 'older accounts snapshot taken');
+      return { legacy: legacy.info, accounts: found.total };
     }),
   );
 

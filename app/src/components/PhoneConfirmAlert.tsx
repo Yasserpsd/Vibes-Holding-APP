@@ -20,6 +20,8 @@ type Props = {
   onDone: () => void;
   /** The registered number is wrong: the profile editor takes a new one with its own code. */
   onWrongNumber: () => void;
+  /** M204: opened by a new dealing (lib/whatsappGate): says why, and its second button cancels instead of «لاحقًا». */
+  required?: boolean;
 };
 
 /**
@@ -27,7 +29,7 @@ type Props = {
  * inside one light popup. The button asks for the code (one paid message, only on the member's tap), the four digits
  * are typed here and finish by themselves, and «لاحقًا» is always there. Replaces the M203 alert + separate screen.
  */
-export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber }: Props) {
+export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: Props) {
   const { setMe } = useAuth();
   const [step, setStep] = useState<PhoneStepResult | null>(null);
   const [code, setCode] = useState('');
@@ -86,8 +88,8 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber }: Props) {
             <View style={styles.ring}>
               <Ionicons name="logo-whatsapp" size={34} color={colors.whatsapp} />
             </View>
-            <Text style={styles.title}>{t('phoneAlert.title')}</Text>
-            <Text style={styles.text}>{step ? t('phoneCode.sentWhatsapp', { phone: `‎${step.phone}‎` }) : t('phoneAlert.text')}</Text>
+            <Text style={styles.title}>{t(required ? 'waGate.title' : 'phoneAlert.title')}</Text>
+            <Text style={styles.text}>{step ? t('phoneCode.sentWhatsapp', { phone: `‎${step.phone}‎` }) : t(required ? 'waGate.text' : 'phoneAlert.text')}</Text>
             {step ? (
               <View style={styles.codeRow}>
                 <TextInput
@@ -132,7 +134,7 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber }: Props) {
             ) : (
               <AppButton label={t('phoneAlert.cta')} icon="logo-whatsapp" loading={busy} onPress={() => void ask()} />
             )}
-            <AppButton label={t('phoneAlert.later')} variant="outline" onPress={onLater} />
+            <AppButton label={t(required ? 'waGate.cancel' : 'phoneAlert.later')} variant="outline" onPress={onLater} />
           </GlassCard>
         </PopIn>
       </KeyboardAvoidingView>

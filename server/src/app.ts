@@ -24,6 +24,7 @@ import { NameTransliterator, NAMES_TRANSLATE_SYSTEM } from './auth/namesEnglish.
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { PersonaRequestsService } from './auth/personaRequests.js';
 import { NameJudge } from './auth/name.js';
+import { LegacyAccounts } from './auth/legacy.js';
 import { PhoneCodeStore } from './auth/phoneCode.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
@@ -355,7 +356,10 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     const out = await whatsapp.sendCode({ phone: step.phone, lang: step.lang, code });
     return { sent: out.channel === 'whatsapp', ...(out.messageId ? { messageId: out.messageId } : {}) };
   });
-  const auth: AuthService = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge, phoneCodes, whatsappEnabled: () => whatsapp.enabled });
+  // M204: the accounts from before the WhatsApp sign-up (a snapshot taken once from the hub's registry).
+  const legacy = new LegacyAccounts(kv);
+  await legacy.load();
+  const auth: AuthService = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge, phoneCodes, whatsappEnabled: () => whatsapp.enabled, legacy });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   // M138: the member's receipt mail on every action and mail + push on every status change.
@@ -703,7 +707,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(mediaRoutes, { service: media, auth, variants: imageVariants });
   await app.register(backupRoutes, { service: backup, auth });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish });
-  await app.register(dashboardRoutes, { service: dashboard, auth, interests });
+  await app.register(dashboardRoutes, { service: dashboard, auth, interests, legacy });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
   const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER
     ? new AppStoreClient({ issuerId: config.ASC_ISSUER_ID, keyId: config.ASC_KEY_ID, privateKey: config.ASC_PRIVATE_KEY, vendorNumber: config.ASC_VENDOR_NUMBER, appleId: config.ASC_APP_ID }, fetchImpl)

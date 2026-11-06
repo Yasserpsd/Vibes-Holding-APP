@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { GATE_FIELDS } from '@/api/gateFields';
 import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
+import { whatsappGateHolds } from '@/lib/whatsappGate';
 
 export class ApiError extends Error {
   constructor(
@@ -63,6 +64,8 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   if (!env.apiBaseUrl) {
     throw new ApiError(t('errors.noApiUrl'), 0, 'no_api_url');
   }
+  // M204: a new dealing of an account whose number is unproven waits for the WhatsApp confirmation popup.
+  if (whatsappGateHolds(method, path)) throw new ApiError(t('waGate.error'), 0, 'phone_required');
   const token = options.token === undefined ? currentToken : options.token;
   // The server answers in the app's language where it has both (news feeds, topics, content).
   // M146: the platform rides along so the hub's «عضو جديد» mail says iPhone / Android.

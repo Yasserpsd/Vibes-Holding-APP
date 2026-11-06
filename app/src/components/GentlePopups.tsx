@@ -27,7 +27,8 @@ export function GentlePopups() {
   const pathname = usePathname();
   // `confirmed`: a popup opened from the saved account, then torn down mid-animation by a 401 sign-out, crashed Fabric
   // on Android («addViewAt: child already has a parent»); the saved copy may also be stale about the number.
-  const account = status === 'signedIn' && confirmed && me ? String(me.id) : null;
+  // M204 (owner: «سيب الناس القديمة زي ما هي»): an account from before the WhatsApp sign-up sees no reminder at all.
+  const account = status === 'signedIn' && confirmed && me && !me.legacyAccount ? String(me.id) : null;
   const missing = gateMissing(account ? me : null);
   const data = useWeeklyNudge(account && missing.length ? `investorsclub.nudge.data.${account}` : null);
   const phone = useWeeklyNudge(account && me?.phoneConfirmDue ? `investorsclub.nudge.phone.${account}` : null);

@@ -12,6 +12,7 @@ import { nameProblem, nameRuleIssue, type NameJudge } from './name.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
+import type { LegacyAccounts } from './legacy.js';
 import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia, type PhoneCodeWaiver } from './phoneCode.js';
 import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
@@ -92,6 +93,10 @@ export type Me = {
   phoneVerified: boolean | null;
   /** M203: the app shows the «أكّد رقمك» alert. Set per answer (`phoneConfirmDue`): it depends on the switch. */
   phoneConfirmDue?: boolean;
+  /** M204: the number is unproven and a new dealing (booking, payment, request) asks for it first. Set per answer. */
+  phoneRequired?: boolean;
+  /** M204: an account from before the WhatsApp sign-up: the app opens no reminder popup for it. Set per answer. */
+  legacyAccount?: boolean;
 };
 
 /** M203 (owner, 2026-11-06, replaces the M147 list): sign-up gets shorter; bio, interests, type and company move to the profile. The job stays («مهمة جدا»). */
@@ -288,7 +293,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null; /** M203: absent or disabled WhatsApp = no code step. */ phoneCodes?: PhoneCodeStore | null; whatsappEnabled?: () => boolean };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null; /** M203: absent or disabled WhatsApp = no code step. */ phoneCodes?: PhoneCodeStore | null; whatsappEnabled?: () => boolean; /** M204: the accounts from before the WhatsApp sign-up. */ legacy?: LegacyAccounts };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -898,7 +903,25 @@ export class AuthService {
     if (!this.phoneCodeOn || !bundle.canPhoneCode) return false;
     if (contact.phone_verified === undefined || !String(contact.phone ?? '').trim()) return false;
     if (this.phoneCodeExempt(contact)) return false;
+    // M204: an older account keeps signing in as it always did until its number is proven.
+    if (this.legacyUnproven(contact.id, contact.phone_verified === 1)) return false;
     return (await this.deps.phoneCodes?.waiver(contact.id)) == null;
+  }
+
+  /** M204: from before the WhatsApp sign-up and its number still unproven: no code at sign-in, no reminder. */
+  private legacyUnproven(contactId: number, proven: boolean): boolean {
+    return !proven && Boolean(this.deps.legacy?.has(contactId));
+  }
+
+  /**
+   * M204: what the app needs beside the account, per answer. `phoneRequired` holds for old and new accounts alike: the
+   * reminder may be silent, but a new dealing waits for the number (owner: «اللي تعامل جديد اجباري ياكد رقم واتس اب»).
+   */
+  async accountFlags(me: Me): Promise<{ phoneConfirmDue: boolean; phoneRequired: boolean; legacyAccount: boolean }> {
+    const legacyAccount = Boolean(this.deps.legacy?.has(me.id));
+    const open = this.phoneCodeOn && me.phoneVerified === false && !this.phoneCodeExempt(me);
+    const phoneRequired = open && (await this.deps.phoneCodes?.waiver(me.id)) == null;
+    return { phoneConfirmDue: phoneRequired && !legacyAccount && Boolean(String(me.phone ?? '').trim()), phoneRequired, legacyAccount };
   }
 
   private phoneCodeExempt(contact: { email: string }): boolean {
@@ -908,8 +931,7 @@ export class AuthService {
 
   /** M203 (owner, 2026-11-06): any account with an unconfirmed number is told so, open session or not. */
   async phoneConfirmDue(me: Me): Promise<boolean> {
-    if (!this.phoneCodeOn || me.phoneVerified !== false || !String(me.phone ?? '').trim() || this.phoneCodeExempt(me)) return false;
-    return (await this.deps.phoneCodes?.waiver(me.id)) == null;
+    return (await this.accountFlags(me)).phoneConfirmDue;
   }
 
   /**

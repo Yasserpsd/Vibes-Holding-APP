@@ -20,6 +20,7 @@ import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
 import { GentlePopups } from '@/components/GentlePopups';
+import { WhatsappGateHost } from '@/components/WhatsappGateHost';
 import { RateUsPrompt } from '@/components/RateUsPrompt';
 import { RetiredBuildGate } from '@/components/RetiredBuildGate';
 import { MembershipGateHost } from '@/components/MembershipGate';
@@ -218,6 +219,8 @@ export default function RootLayout() {
           <SplashFlash />
           {/* M204 (owner): missing details and the unconfirmed number are weekly popups with «لاحقًا», never a wall. */}
           <GentlePopups />
+          {/* M204 (owner): a new dealing of an account with an unproven number asks for the WhatsApp code first. */}
+          <WhatsappGateHost />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
           <AppLockGate />
           {/* M137: the preview build is retired — a TEST binary shows only the «download the store app» cover. */}

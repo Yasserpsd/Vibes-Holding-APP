@@ -28,6 +28,10 @@ export type Me = {
   phoneVerified?: boolean | null;
   /** M203: the server asks the app to show the «أكّد رقمك» alert. */
   phoneConfirmDue?: boolean;
+  /** M204: the number is unproven: a new dealing (booking, payment, request) asks for it first (lib/whatsappGate). */
+  phoneRequired?: boolean;
+  /** M204: an account from before the WhatsApp sign-up: no reminder popup opens for it. */
+  legacyAccount?: boolean;
   /** M147: what the sign-in gate still needs (empty = complete); an older server sends none. */
   profileMissing?: ProfileMissing[];
   /** M156: the real address given over an Apple «Hide My Email» relay ('' until given); an older server sends none. */

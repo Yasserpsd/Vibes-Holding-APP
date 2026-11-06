@@ -310,3 +310,46 @@ test('m204: the persona-change and deletion codes go to the proven WhatsApp numb
   assert.equal(wa.codes.length, 1);
   assert.equal(mailer.sent.length, 1);
 });
+
+test('m204: an account from before the WhatsApp sign-up signs in with no code and sees no reminder; a new dealing still needs its number, and proving it makes it an ordinary account', async () => {
+  const account = await member();
+  const id = (account.me as unknown as { id: number }).id;
+  await kv.set('legacy-accounts', { before: '2026-11-05 21:00:00', ids: [id], takenAt: new Date().toISOString(), by: 'test' });
+  const old = await buildApp({ config: loadConfig(base), kv, hub, mailer, fetchImpl });
+  let ip = 0;
+  const ask = (method: 'GET' | 'POST', url: string, payload?: Record<string, unknown>, token?: string) =>
+    old.app.inject({ method, url, payload, remoteAddress: `10.2.4.${(ip += 1)}`, headers: { 'x-app-gate': NEW_BUNDLE, ...(token ? { authorization: `Bearer ${token}` } : {}) } });
+  try {
+    wa.codes.length = 0;
+    const signIn = await ask('POST', '/api/auth/login', { login: account.email, password: account.password });
+    assert.equal(signIn.statusCode, 200, signIn.body);
+    assert.equal(signIn.json().phoneStep, undefined);
+    assert.equal(wa.codes.length, 0, 'no paid message for an older account');
+    const token = signIn.json().token as string;
+    assert.ok(token);
+    assert.equal(signIn.json().me.legacyAccount, true);
+    assert.equal(signIn.json().me.phoneConfirmDue, false);
+    assert.equal(signIn.json().me.phoneRequired, true);
+
+    // The app's gate at a new dealing: the number proves itself with one code.
+    const step = await ask('POST', '/api/me/phone/confirm', {}, token);
+    assert.equal(step.statusCode, 200, step.body);
+    const proven = await ask('POST', '/api/me/phone/verify', { stepToken: step.json().stepToken, code: wa.codes.at(-1)?.code ?? '' }, token);
+    assert.equal(proven.statusCode, 200, proven.body);
+    const me = (await ask('GET', '/api/me', undefined, token)).json().me;
+    assert.equal(me.phoneVerified, true);
+    assert.equal(me.phoneRequired, false);
+    assert.equal(me.legacyAccount, true);
+
+    // From now on it is an ordinary account: the next sign-in asks for the WhatsApp code.
+    assert.equal((await ask('POST', '/api/auth/login', { login: account.email, password: account.password })).json().phoneStep, true);
+
+    // An account that is not on the list is untouched by all this.
+    const fresh = await member();
+    const freshSignIn = await ask('POST', '/api/auth/login', { login: fresh.email, password: fresh.password });
+    assert.equal(freshSignIn.json().phoneStep, true);
+  } finally {
+    await old.app.close();
+    await kv.delete('legacy-accounts');
+  }
+});

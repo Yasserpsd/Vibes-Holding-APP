@@ -140,7 +140,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   // M168: every account answer is shaped for the bundle that asked — the completion wall never names a
   // field that bundle cannot draw (an older bundle used to see an empty card and stay locked out).
   const withEnglish = async (request: FastifyRequest, account: Awaited<ReturnType<AuthService['me']>>) => {
-    const me = { ...forBundle(account, gateFieldsOf(request.headers['x-app-gate'])), phoneConfirmDue: await service.phoneConfirmDue(account) };
+    // M204: the reminder flag, the «new dealing needs the number» flag and the «older account, no popups» flag.
+    const me = { ...forBundle(account, gateFieldsOf(request.headers['x-app-gate'])), ...(await service.accountFlags(account)) };
     if (!meLocalizer) return me;
     const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
     return en ? { ...me, en } : me;

@@ -283,6 +283,22 @@ export class DashboardService {
     });
   }
 
+  /**
+   * M204: the ids of every account the hub registered before `beforeUtc` (its own `created_at`, UTC `Y-m-d H:i:s`),
+   * for the one-time «older accounts» snapshot. Read fresh, pages of 100, up to 20,000 accounts.
+   */
+  async accountIdsBefore(admin: AdminActor, beforeUtc: string): Promise<{ ids: number[]; total: number }> {
+    const ids: number[] = [];
+    let total = 0;
+    for (let page = 1; page <= 200; page += 1) {
+      const result = await this.hub(admin, 'admin_accounts', { q: '', state: 'all', page, per_page: 100 }, false);
+      total = result.total;
+      for (const account of result.items) if (account.created_at && account.created_at < beforeUtc) ids.push(account.id);
+      if (!result.items.length || page * 100 >= result.total) break;
+    }
+    return { ids, total };
+  }
+
   /** M33/M86: accounts by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
   async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number }> {
     const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0 };
