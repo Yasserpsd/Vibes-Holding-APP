@@ -94,10 +94,10 @@ export type Me = {
   phoneConfirmDue?: boolean;
 };
 
-/** M203 (owner, 2026-11-06, replaces the M147 + M156 list): sign-up gets shorter; job, bio, interests, type and company move to the profile. */
-export type ProfileMissing = 'name' | 'phone' | 'persona' | 'contactEmail';
+/** M203 (owner, 2026-11-06, replaces the M147 list): sign-up gets shorter; bio, interests, type and company move to the profile. The job stays («مهمة جدا»). */
+export type ProfileMissing = 'name' | 'phone' | 'persona' | 'jobTitle' | 'contactEmail';
 
-export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'phone', 'persona', 'contactEmail'];
+export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'phone', 'persona', 'jobTitle', 'contactEmail'];
 
 /**
  * M168 (owner, 2026-10-31, «كمية العملاء اللي بتشتكي مش عارفة تسجل غير طبيعي»): the fields EVERY
@@ -164,6 +164,8 @@ export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   if (nameRuleIssue(String(contact.name ?? ''))) missing.push('name');
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
   if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
+  // M156 + M203 (owner, 2026-11-06: «رجع الوظيفة بس مهمة جدا بالنسبالي»).
+  if (!String(contact.job_title ?? '').trim()) missing.push('jobTitle');
   // M156: an Apple-relay account must give a real address (only when the hub can store it, 2.26.0+).
   if (contact.contact_email !== undefined && isRelayEmail(contact.email) && !String(contact.contact_email).trim()) missing.push('contactEmail');
   return missing;

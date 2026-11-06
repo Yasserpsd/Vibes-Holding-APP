@@ -48,7 +48,7 @@ const call = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: Record<st
 
 let seq = 0;
 async function member(email = `m202.${(seq += 1)}@gmail.com`, phone = `05586${String(10000 + (seq += 1))}`) {
-  const account = { name: 'صالح الغامدي', country: 'sa', phone, email, password: 'secret123', persona: 'investor' };
+  const account = { name: 'صالح الغامدي', country: 'sa', phone, email, password: 'secret123', persona: 'investor', jobTitle: 'مدير تطوير أعمال' };
   const registered = await call('POST', '/api/auth/register', account);
   assert.equal(registered.statusCode, 200, registered.body);
   const verified = await call('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
@@ -65,7 +65,7 @@ after(async () => {
   await built.app.close();
 });
 
-test('m203: the short sign-up needs no bio, job, interests or member type, and opens with nothing missing', async () => {
+test('m203: the short sign-up needs no bio, interests or member type, and opens with nothing missing', async () => {
   const account = await member();
   assert.deepEqual(account.me.profileMissing, []);
 });

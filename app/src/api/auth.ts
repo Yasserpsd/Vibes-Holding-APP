@@ -108,6 +108,7 @@ export type RegisterInput = {
   email: string;
   password: string;
   persona: Persona;
+  jobTitle: string;
   /** M32: another member's membership number; the hub checks and stores it. */
   inviteCode?: string;
 };

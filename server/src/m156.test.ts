@@ -75,9 +75,9 @@ const base = {
   role: '',
 } as unknown as HubContact;
 
-test('m156: the gate asks for a real name and a real address over an Apple relay (hub 2.26.0 only); M202 moved the job to the profile', () => {
+test('m156: the gate asks for the job, a real name and a real address over an Apple relay (hub 2.26.0 only)', () => {
   assert.deepEqual(profileMissingOf(base), []);
-  assert.deepEqual(profileMissingOf({ ...base, job_title: '' }), []);
+  assert.deepEqual(profileMissingOf({ ...base, job_title: '' }), ['jobTitle']);
   assert.deepEqual(profileMissingOf({ ...base, name: 'أبو جنا' }), ['name']);
   // An older hub never reports contact_email: a relay account is not blocked for a field it cannot store.
   assert.deepEqual(profileMissingOf({ ...base, contact_email: '' }), ['contactEmail']);

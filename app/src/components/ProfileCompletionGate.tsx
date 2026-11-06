@@ -37,8 +37,8 @@ const personaLabel = (item: { key: Persona; label: string }): string => tOptiona
  * M195 (owner, 2026-11-04): the club identity (navy + gold on a light sheet), every field checked for
  * real (a username such as «yasser4.designer» is refused as a name), red borders and messages under
  * the fields, a red summary on top and an automatic scroll to the first error.
- * M203 (owner, 2026-11-06, replaces the M147 + M156 list): name, phone, category, and the real address of an Apple
- * relay account. The number is saved only after its WhatsApp code; job, bio, interests, member type and company
+ * M203 (owner, 2026-11-06, replaces the M147 list): name, phone, category, job, and the real address of an Apple
+ * relay account. The number is saved only after its WhatsApp code; bio, interests, member type and company
  * are asked later in the profile (the 7-day «كمّل بياناتك» popup and the interests screen).
  */
 export function ProfileCompletionGate() {
@@ -49,8 +49,8 @@ export function ProfileCompletionGate() {
   return <CompletionForm missing={missing} />;
 }
 
-type Field = 'name' | 'contactEmail' | 'phone' | 'persona';
-const ORDER: Field[] = ['name', 'contactEmail', 'phone', 'persona'];
+type Field = 'name' | 'contactEmail' | 'phone' | 'persona' | 'jobTitle';
+const ORDER: Field[] = ['name', 'contactEmail', 'phone', 'persona', 'jobTitle'];
 
 function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof useAuth>['me']>['profileMissing'] }) {
   const { me, setMe } = useAuth();
@@ -80,6 +80,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState('sa');
   const [persona, setPersona] = useState<Persona | ''>('');
+  const [jobTitle, setJobTitle] = useState(me?.jobTitle ?? '');
   /** M203: the code step of the number; the fields come back with «تغيير الرقم». */
   const [step, setStep] = useState<PhoneStepResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,6 +95,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
     if (need('contactEmail') && !isEmail(contactEmail)) next.contactEmail = t('form.error.email');
     if (need('phone') && phoneIssue(phone, country) !== null) next.phone = phoneExample ? t('form.error.phone', { example: phoneExample }) : t('form.error.phoneNoExample');
     if (need('persona') && !persona) next.persona = t('form.error.persona');
+    if (need('jobTitle') && jobTitle.trim().length < 2) next.jobTitle = t('form.error.jobTitle');
     return next;
   };
 
@@ -107,6 +109,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
         ...(need('name') ? { name: name.trim() } : {}),
         ...(need('contactEmail') ? { contactEmail: contactEmail.trim().toLowerCase() } : {}),
         ...(need('persona') && persona ? { persona } : {}),
+        ...(need('jobTitle') ? { jobTitle: jobTitle.trim() } : {}),
       };
       if (Object.keys(rest).length) setMe((await authApi.updateMe(rest)).me);
       // The number last: its code (or the switch being off) completes the account at the hub.
@@ -157,17 +160,19 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
           {step ? null : (
           <FormCard tone="light">
             <ErrorSummary count={form.count} />
-            {need('name') || need('phone') || need('persona') ? (
+            {need('name') || need('phone') || need('persona') || need('jobTitle') ? (
             <VoiceFill
               fields={[
                 ...(need('name') ? [{ key: 'name', label: t('completeProfile.name'), type: 'text' as const, required: true }] : []),
                 ...(need('phone') ? [{ key: 'phone', label: t('auth.register.phone'), type: 'phone' as const, required: true }] : []),
                 ...(need('persona') && config ? [{ key: 'persona', label: t('completeProfile.persona'), type: 'select' as const, options: config.personas.map(personaLabel), required: true }] : []),
+                ...(need('jobTitle') ? [{ key: 'jobTitle', label: t('completeProfile.jobTitle'), type: 'text' as const, required: true }] : []),
               ]}
               values={{
                 name,
                 phone,
                 persona: persona ? personaLabel({ key: persona, label: config?.personas.find((item) => item.key === persona)?.label ?? '' }) : '',
+                jobTitle,
               }}
               country={countryCode}
               disabled={waiting}
@@ -177,6 +182,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                 if (values.phone) setPhone(values.phone);
                 const pickedPersona = config?.personas.find((item) => personaLabel(item) === values.persona || item.label === values.persona)?.key;
                 if (pickedPersona) setPersona(pickedPersona);
+                if (values.jobTitle) setJobTitle(values.jobTitle);
               }}
             />
             ) : null}
@@ -240,6 +246,17 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                   })}
                 </ChipRow>
               </FieldGroup>
+            ) : null}
+
+            {need('jobTitle') ? (
+              <FormField
+                label={t('completeProfile.jobTitle')}
+                value={jobTitle}
+                onChangeText={field('jobTitle', setJobTitle)}
+                error={form.errors.jobTitle}
+                anchorRef={form.anchor('jobTitle')}
+                textContentType="jobTitle"
+              />
             ) : null}
 
             {waiting && !failed ? (

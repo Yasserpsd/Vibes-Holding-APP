@@ -26,12 +26,12 @@ const base = {
   role: '',
 } as unknown as HubContact;
 
-test('m203: a Google-born account misses phone and الفئة only; the rest is asked later in the profile', () => {
-  assert.deepEqual(profileMissingOf(base), ['phone', 'persona']);
-  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['phone', 'persona']);
+test('m203: a Google-born account misses phone, الفئة and the job; the rest is asked later in the profile', () => {
+  assert.deepEqual(profileMissingOf(base), ['phone', 'persona', 'jobTitle']);
+  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['phone', 'persona', 'jobTitle']);
 });
 
-test('m203: phone and persona complete a profile, whatever else is empty', () => {
+test('m203: phone, persona and job complete a profile, whatever else is empty', () => {
   const full = { ...base, member_type: 'individual' as const, phone: '0551234567', persona: 'investor', bio: 'نبذة طويلة بما يكفي للتحقق.', job_title: 'مستثمرة', interests: 'العقار، التقنية' };
   assert.deepEqual(profileMissingOf(full), []);
   assert.deepEqual(profileMissingOf({ ...full, bio: 'قصيرة' }), []);

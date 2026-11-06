@@ -28,21 +28,22 @@ type Form = {
   email: string;
   password: string;
   persona: Persona | '';
+  jobTitle: string;
   /** M32: another member's code; checked and stored by the server side. */
   inviteCode: string;
 };
 
-const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', inviteCode: '' };
+const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', jobTitle: '', inviteCode: '' };
 
 type Field = keyof Form;
-const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'persona'];
+const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'persona', 'jobTitle'];
 
 /**
  * The registration form. M195 (owner, 2026-11-04): the club identity (navy + gold, dark tone on the
  * black screen), real checks (a username is not a name, the phone follows the country's rule), red
  * borders and messages under the fields, a red summary on top and an automatic scroll to the first error.
- * M203 (owner, 2026-11-06): the short form: name, country, phone, e-mail, password, category. The code proves the
- * number on WhatsApp; job, bio, interests, member type and company are asked later in the profile (replaces M156).
+ * M203 (owner, 2026-11-06): the short form: name, country, phone, e-mail, password, category, job. The code proves
+ * the number on WhatsApp; bio, interests, member type and company are asked later in the profile.
  */
 export default function RegisterScreen() {
   const router = useRouter();
@@ -73,6 +74,7 @@ export default function RegisterScreen() {
     if (!isEmail(form.email)) next.email = t('form.error.email');
     if (form.password.length < 6) next.password = t('form.error.password');
     if (!form.persona) next.persona = t('form.error.persona');
+    if (form.jobTitle.trim().length < 2) next.jobTitle = t('form.error.jobTitle');
     return next;
   };
 
@@ -89,6 +91,7 @@ export default function RegisterScreen() {
         email: form.email.trim(),
         password: form.password,
         persona: form.persona,
+        jobTitle: form.jobTitle.trim(),
         inviteCode: form.inviteCode.trim() || undefined,
       });
       router.push({
@@ -194,6 +197,14 @@ export default function RegisterScreen() {
             </ChipRow>
           </FieldGroup>
 
+          <FormField
+            label={t('auth.register.jobTitle')}
+            value={form.jobTitle}
+            onChangeText={set('jobTitle')}
+            error={errors.errors.jobTitle}
+            anchorRef={errors.anchor('jobTitle')}
+            textContentType="jobTitle"
+          />
           {showInvite ? (
           <FormField
             label={t('auth.register.inviteCode')}

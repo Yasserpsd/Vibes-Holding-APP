@@ -23,8 +23,8 @@ const contact = {
 test('m168: a bundle without the header is held only on the legacy fields', () => {
   const fields = gateFieldsOf(undefined);
   assert.deepEqual([...fields].sort(), [...LEGACY_GATE_FIELDS].sort());
-  assert.deepEqual(profileMissingOf({ ...contact, name: 'أبو جنا' }), ['name']);
-  const me = forBundle({ id: 428, profileMissing: profileMissingOf({ ...contact, name: 'أبو جنا' }) }, fields);
+  assert.deepEqual(profileMissingOf(contact), ['jobTitle']);
+  const me = forBundle({ id: 428, profileMissing: profileMissingOf(contact) }, fields);
   assert.deepEqual(me.profileMissing, []);
 });
 
