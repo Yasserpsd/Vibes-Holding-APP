@@ -61,19 +61,46 @@ export default function RegisterScreen() {
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
   // M126 (owner): the dial code is right there, so the number never shows a leading zero.
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
-  const set = (key: keyof Form) => (value: string) => {
-    errors.clear(key);
-    setForm((current) => ({ ...current, [key]: value }));
+  /** The verdict on one field of a draft — null when it is fine. */
+  const issueOf = (key: Field, draft: Form): string | null => {
+    switch (key) {
+      // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
+      case 'name':
+        return draft.name.trim().length < 2 ? t('form.error.name.empty') : null;
+      case 'phone': {
+        const land = config?.countries.find((item) => item.code === draft.country) ?? country;
+        const example = land?.example ? land.example.replace(/^0+/, '') : '';
+        if (phoneIssue(draft.phone, land) === null) return null;
+        return example ? t('form.error.phone', { example }) : t('form.error.phoneNoExample');
+      }
+      case 'email':
+        return isEmail(draft.email) ? null : t('form.error.email');
+      case 'password':
+        return draft.password.length < 6 ? t('form.error.password') : null;
+      case 'persona':
+        return draft.persona ? null : t('form.error.persona');
+      case 'jobTitle':
+        return draft.jobTitle.trim().length < 2 ? t('form.error.jobTitle') : null;
+      default:
+        return null;
+    }
   };
+  // Owner (2026-11-06): a wrong value turns red while it is typed (once the field holds anything) and the red
+  // goes the moment it is right; leaving a field checks it in full, empty included.
+  const set = (key: keyof Form) => (value: string) => {
+    const draft = { ...form, [key]: value };
+    setForm(draft);
+    errors.check(key, value.trim() ? issueOf(key, draft) : null);
+    // The number's rule follows the country.
+    if (key === 'country' && draft.phone) errors.check('phone', issueOf('phone', draft));
+  };
+  const blur = (key: Field) => () => errors.check(key, issueOf(key, form));
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
-    // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
-    if (form.name.trim().length < 2) next.name = t('form.error.name.empty');
-    if (phoneIssue(form.phone, country) !== null) next.phone = phoneExample ? t('form.error.phone', { example: phoneExample }) : t('form.error.phoneNoExample');
-    if (!isEmail(form.email)) next.email = t('form.error.email');
-    if (form.password.length < 6) next.password = t('form.error.password');
-    if (!form.persona) next.persona = t('form.error.persona');
-    if (form.jobTitle.trim().length < 2) next.jobTitle = t('form.error.jobTitle');
+    for (const key of ORDER) {
+      const message = issueOf(key, form);
+      if (message) next[key] = message;
+    }
     return next;
   };
 
@@ -146,6 +173,7 @@ export default function RegisterScreen() {
             onChangeText={set('name')}
             error={errors.errors.name}
             anchorRef={errors.anchor('name')}
+            onBlur={blur('name')}
             hint={t('auth.register.nameHint')}
             hintOnFocus
             warning={form.name.trim().length >= 2 && nameIssue(form.name) ? t('form.nameWarning') : null}
@@ -165,6 +193,7 @@ export default function RegisterScreen() {
             hintOnFocus
             error={errors.errors.phone}
             anchorRef={errors.anchor('phone')}
+            onBlur={blur('phone')}
           />
           <FormField
             label={t('auth.register.email')}
@@ -177,6 +206,7 @@ export default function RegisterScreen() {
             onChangeText={set('email')}
             error={errors.errors.email}
             anchorRef={errors.anchor('email')}
+            onBlur={blur('email')}
           />
           <FormField
             label={t('common.password')}
@@ -190,6 +220,7 @@ export default function RegisterScreen() {
             hintOnFocus
             error={errors.errors.password}
             anchorRef={errors.anchor('password')}
+            onBlur={blur('password')}
           />
 
           <FieldGroup label={t('auth.register.persona')} error={errors.errors.persona} anchorRef={errors.anchor('persona')}>
@@ -206,6 +237,7 @@ export default function RegisterScreen() {
             onChangeText={set('jobTitle')}
             error={errors.errors.jobTitle}
             anchorRef={errors.anchor('jobTitle')}
+            onBlur={blur('jobTitle')}
             textContentType="jobTitle"
           />
           {showInvite ? (

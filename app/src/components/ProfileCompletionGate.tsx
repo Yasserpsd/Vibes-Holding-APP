@@ -98,14 +98,35 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
 
   const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
+  /** The verdict on one field for a given value — null when it is fine or not asked for. */
+  const issueOf = (key: Field, value: string, land = country): string | null => {
+    if (!need(key)) return null;
+    switch (key) {
+      // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
+      case 'name':
+        return value.trim().length < 2 ? t('form.error.name.empty') : null;
+      case 'contactEmail':
+        return isEmail(value) ? null : t('form.error.email');
+      case 'phone': {
+        if (phoneIssue(value, land) === null) return null;
+        const example = land?.example ? land.example.replace(/^0+/, '') : '';
+        return example ? t('form.error.phone', { example }) : t('form.error.phoneNoExample');
+      }
+      case 'persona':
+        return value ? null : t('form.error.persona');
+      case 'jobTitle':
+        return value.trim().length < 2 ? t('form.error.jobTitle') : null;
+      default:
+        return null;
+    }
+  };
+  const current: Record<Field, string> = { name, contactEmail, phone, persona, jobTitle };
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
-    // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
-    if (need('name') && name.trim().length < 2) next.name = t('form.error.name.empty');
-    if (need('contactEmail') && !isEmail(contactEmail)) next.contactEmail = t('form.error.email');
-    if (need('phone') && phoneIssue(phone, country) !== null) next.phone = phoneExample ? t('form.error.phone', { example: phoneExample }) : t('form.error.phoneNoExample');
-    if (need('persona') && !persona) next.persona = t('form.error.persona');
-    if (need('jobTitle') && jobTitle.trim().length < 2) next.jobTitle = t('form.error.jobTitle');
+    for (const key of ORDER) {
+      const message = issueOf(key, current[key]);
+      if (message) next[key] = message;
+    }
     return next;
   };
 
@@ -136,9 +157,17 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     }
   };
 
+  // Owner (2026-11-06): a wrong value turns red while it is typed (once the field holds anything) and the red
+  // goes the moment it is right; leaving a field checks it in full, empty included.
   const field = (key: Field, set: (value: string) => void) => (value: string) => {
     set(value);
-    form.clear(key);
+    form.check(key, value.trim() ? issueOf(key, value) : null);
+  };
+  const blur = (key: Field) => () => form.check(key, issueOf(key, current[key]));
+  const pickCountry = (code: string) => {
+    setCountryCode(code);
+    const land = config?.countries.find((item) => item.code === code) ?? country;
+    form.check('phone', phone ? issueOf('phone', phone, land) : null);
   };
 
   return (
@@ -209,6 +238,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 warning={name.trim().length >= 2 && nameIssue(name) ? t('form.nameWarning') : null}
                 error={form.errors.name}
                 anchorRef={form.anchor('name')}
+                onBlur={blur('name')}
                 textContentType="name"
               />
             ) : null}
@@ -223,6 +253,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   onChangeText={field('contactEmail', setContactEmail)}
                   error={form.errors.contactEmail}
                   anchorRef={form.anchor('contactEmail')}
+                  onBlur={blur('contactEmail')}
                   latin
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -234,13 +265,14 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
 
             {need('phone') && config ? (
               <View style={styles.group}>
-                <CountryPicker label={t('auth.register.country')} countries={config.countries} selected={countryCode} onSelect={field('phone', setCountryCode)} />
+                <CountryPicker label={t('auth.register.country')} countries={config.countries} selected={countryCode} onSelect={pickCountry} />
                 <FormField
                   label={t('auth.register.phone')}
                   value={phone}
                   onChangeText={(value) => field('phone', setPhone)(value.replace(/\D+/g, '').replace(/^0+/, ''))}
                   error={form.errors.phone}
                   anchorRef={form.anchor('phone')}
+                  onBlur={blur('phone')}
                   latin
                   keyboardType="phone-pad"
                   textContentType="telephoneNumber"
@@ -269,6 +301,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 onChangeText={field('jobTitle', setJobTitle)}
                 error={form.errors.jobTitle}
                 anchorRef={form.anchor('jobTitle')}
+                onBlur={blur('jobTitle')}
                 textContentType="jobTitle"
               />
             ) : null}

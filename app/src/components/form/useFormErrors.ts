@@ -69,8 +69,27 @@ export function useFormErrors<K extends string>(scrollRef?: RefObject<ScrollView
 
   const reset = useCallback(() => setErrors({}), []);
 
+  /**
+   * Live checks (owner, 2026-11-06: «أي خانة فيها مشكلة يظهر عليها أحمر فورًا ويظهر تحذير تحتها»): the screen
+   * calls this on every keystroke with the field's own verdict — a message paints the field red at once, null
+   * clears it the moment the value is right. The screens skip the check while the field is still empty and
+   * being typed, and run it in full when the member leaves the field.
+   */
+  const check = useCallback((key: K, message: string | null | undefined) => {
+    setErrors((current) => {
+      if (!message) {
+        if (!current[key]) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      }
+      if (current[key] === message) return current;
+      return { ...current, [key]: message };
+    });
+  }, []);
+
   /** One field turns red on its own (a fourth interest tapped) without touching the others. */
   const set = useCallback((key: K, message: string) => setErrors((current) => ({ ...current, [key]: message })), []);
 
-  return { errors, anchor, clear, fail, reset, set, count: Object.values(errors).filter(Boolean).length };
+  return { errors, anchor, clear, fail, reset, set, check, count: Object.values(errors).filter(Boolean).length };
 }
