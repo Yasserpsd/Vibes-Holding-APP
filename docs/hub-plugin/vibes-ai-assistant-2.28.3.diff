@@ -1,0 +1,160 @@
+diff -ruN vibes-ai-assistant/includes/class-vai-admin.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-admin.php
+--- vibes-ai-assistant/includes/class-vai-admin.php	2026-11-06 18:17:38.000000000 +0300
++++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-07 00:41:33.091653700 +0300
+@@ -629,46 +629,69 @@
+ 		$q       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+ 		$persona = isset( $_GET['persona'] ) ? sanitize_key( wp_unslash( $_GET['persona'] ) ) : '';
+ 		$persona = in_array( $persona, array( 'neutral', 'entrepreneur', 'investor', 'none' ), true ) ? $persona : '';
+-		$rows    = VAI_Hub::accounts( $q, $persona !== '' ? 3000 : 300, $persona );
++		// 2.28.3 (M210, owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين»): a second filter, WhatsApp-proven
++		// number or not, combined with the فئة filter; every row carries the badge whatever the filter.
++		$wa       = isset( $_GET['wa'] ) ? sanitize_key( wp_unslash( $_GET['wa'] ) ) : '';
++		$wa       = in_array( $wa, array( 'yes', 'no' ), true ) ? $wa : '';
++		$filtered = $persona !== '' || $wa !== '';
++		$rows     = VAI_Hub::accounts( $q, $filtered ? 3000 : 300, $persona, $wa );
+ 		self::wrap_open( 'الحسابات المسجّلة', 'كل من أنشأ حسابًا من المساعد على أي موقع — بيانات منفصلة في جداول البلجن على هذا الموقع (كلمات المرور مشفّرة). من هنا تفعّل، وترقّي أدمن أو ناشرًا، وتعلّم عضوًا مدفوعًا.' );
+ 		// 2.19.0 (owner, 2026-10-21): how many of each فئة among the accounts — always on top of the list.
+ 		global $wpdb;
+ 		$ct = VAI_Hub::t( 'contacts' );
+ 		$pc = $wpdb->get_row( "SELECT SUM(CASE WHEN persona='neutral' THEN 1 ELSE 0 END) AS n, SUM(CASE WHEN persona='entrepreneur' THEN 1 ELSE 0 END) AS e, SUM(CASE WHEN persona='investor' THEN 1 ELSE 0 END) AS i FROM $ct WHERE (verified=1 OR is_member=1)", ARRAY_A );
++		// M210: how many registered accounts hold a WhatsApp-proven number — the same base as the list (every account with a password).
++		$wc = $wpdb->get_row( "SELECT SUM(CASE WHEN phone_norm<>'' AND phone_verified_norm=phone_norm THEN 1 ELSE 0 END) AS y, SUM(CASE WHEN phone_norm='' OR phone_verified_norm<>phone_norm THEN 1 ELSE 0 END) AS n FROM $ct WHERE pass_hash<>''", ARRAY_A );
+ 		// 2.26.4 (owner, 2026-11-04: «ادوس علي المستثمرين يظهرلي مستثمرين بس بالمهنة و رقم الجوال وجي منين مسجل منين»):
+ 		// every pill is a filter; the filtered view lists that فئة alone with the job, mobile and where/how each one registered.
+-		$pill = function ( $key, $label, $value = null ) use ( $persona ) {
+-			$on  = $persona === $key;
+-			$url = admin_url( 'admin.php?page=vibes-ai-accounts' . ( $key !== '' ? '&persona=' . $key : '' ) );
++		$link = function ( $p, $w ) {
++			return admin_url( 'admin.php?page=vibes-ai-accounts' . ( $p !== '' ? '&persona=' . $p : '' ) . ( $w !== '' ? '&wa=' . $w : '' ) );
++		};
++		$pill = function ( $url, $on, $label, $value = null ) {
+ 			return '<a href="' . esc_url( $url ) . '" style="text-decoration:none;background:' . ( $on ? '#0d274a' : '#EDE4CF' ) . ';color:' . ( $on ? '#fff' : '#0d274a' ) . ';border-radius:999px;padding:6px 14px;font-weight:600;display:inline-block">' . esc_html( $label ) . ( null === $value ? '' : ': <span dir="ltr">' . (int) $value . '</span>' ) . '</a>';
+ 		};
+ 		echo '<div class="vai-card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><strong>فئات الأعضاء:</strong> '
+-			. $pill( '', 'الكل' ) . ' '
+-			. $pill( 'neutral', 'المحايد', isset( $pc['n'] ) ? $pc['n'] : 0 ) . ' '
+-			. $pill( 'entrepreneur', 'رائد الأعمال', isset( $pc['e'] ) ? $pc['e'] : 0 ) . ' '
+-			. $pill( 'investor', 'المستثمر', isset( $pc['i'] ) ? $pc['i'] : 0 ) . ' '
+-			. $pill( 'none', 'بدون فئة' ) . '</div>';
+-		echo '<div class="vai-card"><form method="get" class="vai-inline" style="margin-bottom:12px"><input type="hidden" name="page" value="vibes-ai-accounts">' . ( $persona !== '' ? '<input type="hidden" name="persona" value="' . esc_attr( $persona ) . '">' : '' ) . '<input type="search" name="q" value="' . esc_attr( $q ) . '" placeholder="بحث بالاسم / البريد / الجوال / الشركة" style="max-width:360px;padding:7px 10px;border:1px solid #d5d2cb;border-radius:8px"> <button class="button">بحث</button> <span class="vai-help" style="display:inline">(' . count( $rows ) . ')</span> <a class="button" style="margin-right:auto" target="_blank" rel="noopener" href="' . esc_url( home_url( '/?vai-console=1' ) ) . '">لوحة الإدارة للأدمنز ↗</a></form>';
+-		if ( $persona !== '' ) {
++			. $pill( $link( '', $wa ), $persona === '', 'الكل' ) . ' '
++			. $pill( $link( 'neutral', $wa ), $persona === 'neutral', 'المحايد', isset( $pc['n'] ) ? $pc['n'] : 0 ) . ' '
++			. $pill( $link( 'entrepreneur', $wa ), $persona === 'entrepreneur', 'رائد الأعمال', isset( $pc['e'] ) ? $pc['e'] : 0 ) . ' '
++			. $pill( $link( 'investor', $wa ), $persona === 'investor', 'المستثمر', isset( $pc['i'] ) ? $pc['i'] : 0 ) . ' '
++			. $pill( $link( 'none', $wa ), $persona === 'none', 'بدون فئة' ) . '</div>';
++		echo '<div class="vai-card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><strong>توثيق WhatsApp:</strong> '
++			. $pill( $link( $persona, '' ), $wa === '', 'الكل' ) . ' '
++			. $pill( $link( $persona, 'yes' ), $wa === 'yes', '✅ موثّق عبر WhatsApp', isset( $wc['y'] ) ? $wc['y'] : 0 ) . ' '
++			. $pill( $link( $persona, 'no' ), $wa === 'no', '⚠️ غير موثّق', isset( $wc['n'] ) ? $wc['n'] : 0 )
++			. ' <span class="vai-help" style="display:inline">الموثّق: رقم الجوال الحالي وصله كود عبر WhatsApp عند الدخول (منذ 2.27.0).</span></div>';
++		// M210: the badge every row carries in both tables.
++		$wa_badge = function ( $c ) {
++			$phone = isset( $c->phone_norm ) && $c->phone_norm !== '' ? $c->phone_norm : ( isset( $c->phone ) ? $c->phone : '' );
++			if ( VAI_Hub::phone_is_verified( $c ) ) {
++				return '<span style="background:#E6F4EA;color:#1E7B34;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap">✅ موثّق عبر WhatsApp</span>';
++			}
++			return '<span style="background:#FFF3E0;color:#B26A00;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap">⚠️ غير موثّق' . ( $phone === '' ? ' — بدون جوال' : '' ) . '</span>';
++		};
++		echo '<div class="vai-card"><form method="get" class="vai-inline" style="margin-bottom:12px"><input type="hidden" name="page" value="vibes-ai-accounts">' . ( $persona !== '' ? '<input type="hidden" name="persona" value="' . esc_attr( $persona ) . '">' : '' ) . ( $wa !== '' ? '<input type="hidden" name="wa" value="' . esc_attr( $wa ) . '">' : '' ) . '<input type="search" name="q" value="' . esc_attr( $q ) . '" placeholder="بحث بالاسم / البريد / الجوال / الشركة" style="max-width:360px;padding:7px 10px;border:1px solid #d5d2cb;border-radius:8px"> <button class="button">بحث</button> <span class="vai-help" style="display:inline">(' . count( $rows ) . ')</span> <a class="button" style="margin-right:auto" target="_blank" rel="noopener" href="' . esc_url( home_url( '/?vai-console=1' ) ) . '">لوحة الإدارة للأدمنز ↗</a></form>';
++		if ( $filtered ) {
+ 			$titles = array( 'neutral' => 'المحايدون', 'entrepreneur' => 'رواد الأعمال', 'investor' => 'المستثمرون', 'none' => 'حسابات بدون فئة' );
+-			echo '<h2 style="margin:4px 0 10px">' . esc_html( $titles[ $persona ] ) . ' <span dir="ltr">(' . count( $rows ) . ')</span></h2>';
+-			echo '<table class="vai-table"><thead><tr><th>#</th><th>الاسم</th><th>المهنة</th><th>الجوال</th><th>البريد</th><th>سجّل من</th><th>المصدر</th><th>طريقة الدخول</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>';
++			$wa_t   = array( 'yes' => 'الموثّقون عبر WhatsApp', 'no' => 'غير الموثّقين عبر WhatsApp' );
++			$title  = $persona !== '' ? $titles[ $persona ] . ( $wa !== '' ? ' — ' . $wa_t[ $wa ] : '' ) : $wa_t[ $wa ];
++			echo '<h2 style="margin:4px 0 10px">' . esc_html( $title ) . ' <span dir="ltr">(' . count( $rows ) . ')</span></h2>';
++			echo '<table class="vai-table"><thead><tr><th>#</th><th>الاسم</th><th>المهنة</th><th>الجوال</th><th>WhatsApp</th><th>البريد</th><th>سجّل من</th><th>المصدر</th><th>طريقة الدخول</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>';
+ 			if ( ! $rows ) {
+-				echo '<tr><td colspan="10" class="vai-empty">لا توجد حسابات في هذه الفئة.</td></tr>';
++				echo '<tr><td colspan="11" class="vai-empty">' . ( $wa !== '' ? 'لا توجد حسابات مطابقة.' : 'لا توجد حسابات في هذه الفئة.' ) . '</td></tr>';
+ 			}
+ 			foreach ( $rows as $c ) {
+ 				$from   = VAI_Hub::source_parts( $c );
+ 				$job    = trim( (string) $c->job_title . ( $c->company ? ' — ' . $c->company : '' ), ' —' );
+ 				$status = $c->is_member ? ( VAI_Hub::member_active( $c ) ? '⭐ عضو مفعّل' : '⌛ عضوية منتهية' ) : ( ! (int) $c->verified ? '✉️ بانتظار التفعيل' : 'لم يدفع' );
+ 				$phone  = vai_phone_local( $c->phone_norm ?: $c->phone );
+-				echo '<tr><td dir="ltr">' . (int) $c->id . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td>' . ( $job !== '' ? esc_html( $job ) : '—' ) . '</td><td dir="ltr">' . ( $phone !== '' ? '<a href="tel:' . esc_attr( $c->phone_norm ?: $c->phone ) . '">' . esc_html( $phone ) . '</a>' : '—' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '</td><td>' . esc_html( $from['platform'] ) . '</td><td>' . esc_html( $from['origin'] ) . '</td><td>' . esc_html( $from['login'] ) . '</td><td>' . esc_html( vai_riyadh( $c->created_at ) ) . '</td><td>' . $status . '</td></tr>';
++				echo '<tr><td dir="ltr">' . (int) $c->id . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td>' . ( $job !== '' ? esc_html( $job ) : '—' ) . '</td><td dir="ltr">' . ( $phone !== '' ? '<a href="tel:' . esc_attr( $c->phone_norm ?: $c->phone ) . '">' . esc_html( $phone ) . '</a>' : '—' ) . '</td><td>' . $wa_badge( $c ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '</td><td>' . esc_html( $from['platform'] ) . '</td><td>' . esc_html( $from['origin'] ) . '</td><td>' . esc_html( $from['login'] ) . '</td><td>' . esc_html( vai_riyadh( $c->created_at ) ) . '</td><td>' . $status . '</td></tr>';
+ 			}
+ 			echo '</tbody></table></div></div>';
+ 			return;
+ 		}
+-		echo '<table class="vai-table"><thead><tr><th></th><th>الاسم</th><th>البريد / الجوال</th><th>الوظيفة / الشركة</th><th>الحالة</th><th>الدور</th><th>آخر دخول</th><th>الموقع</th><th>المصدر</th><th></th></tr></thead><tbody>';
++		echo '<table class="vai-table"><thead><tr><th></th><th>الاسم</th><th>البريد / الجوال</th><th>WhatsApp</th><th>الوظيفة / الشركة</th><th>الحالة</th><th>الدور</th><th>آخر دخول</th><th>الموقع</th><th>المصدر</th><th></th></tr></thead><tbody>';
+ 		if ( ! $rows ) {
+-			echo '<tr><td colspan="10" class="vai-empty">لا توجد حسابات بعد.</td></tr>';
++			echo '<tr><td colspan="11" class="vai-empty">لا توجد حسابات بعد.</td></tr>';
+ 		}
+ 		foreach ( $rows as $c ) {
+ 			$left   = VAI_Hub::trial_days_left( $c );
+@@ -676,7 +699,7 @@
+ 			// 2.21.3 (M147): is the profile complete (phone, الفئة, interests, bio)?
+ 			$status .= VAI_Hub::profile_complete( $c ) ? '<br><small style="color:#2E7D32">🎯 البيانات مكتملة</small>' : '<br><small style="color:#B26A00">📝 البيانات ناقصة</small>';
+ 			$role   = $c->role === 'admin' ? ( (int) $c->admin_verified ? '🛡️ أدمن' : '🛡️ أدمن (لم يفعّل الكود)' ) : ( $c->role === 'publisher' ? '✍️ ناشر' : 'عضو' );
+-			echo '<tr><td>' . ( $c->avatar_url ? '<img src="' . esc_url( $c->avatar_url ) . '" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover">' : '' ) . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '<br>' . esc_html( vai_phone_local( $c->phone_norm ?: $c->phone ) ) . '</td><td>' . ( 'company' === $c->member_type ? '<span style="background:#EDE4CF;border-radius:6px;padding:1px 6px;font-size:11px">🏢 شركة</span> ' : '' ) . esc_html( trim( $c->job_title . ( $c->company ? ' — ' . $c->company : '' ), ' —' ) ) . ( $c->persona ? '<br><small>' . esc_html( VAI_Hub::persona_label( $c->persona ) ) . '</small>' : '' ) . ( $c->website ? '<br><a dir="ltr" href="' . esc_url( $c->website ) . '" target="_blank" rel="noopener">' . esc_html( vai_clip( $c->website, 34 ) ) . '</a>' : '' ) . '</td><td>' . $status . '</td><td>' . $role . '</td><td>' . esc_html( vai_riyadh( $c->last_login_at ) ) . '</td><td dir="ltr">' . ( isset( $c->source ) && 0 === strpos( (string) $c->source, 'app' ) ? 'التطبيق' : esc_html( $c->host ) ) . '</td><td><small>' . ( VAI_Hub::source_badge( isset( $c->source ) ? $c->source : '' ) ? '<img src="' . esc_url( VAI_Hub::source_badge( $c->source ) ) . '" alt="" style="height:20px;width:auto;vertical-align:middle;border-radius:4px;margin-inline-end:4px">' : '' ) . esc_html( VAI_Hub::source_label( isset( $c->source ) ? $c->source : '' ) ) . '</small></td><td style="white-space:nowrap">';
++			echo '<tr><td>' . ( $c->avatar_url ? '<img src="' . esc_url( $c->avatar_url ) . '" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover">' : '' ) . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '<br>' . esc_html( vai_phone_local( $c->phone_norm ?: $c->phone ) ) . '</td><td>' . $wa_badge( $c ) . '</td><td>' . ( 'company' === $c->member_type ? '<span style="background:#EDE4CF;border-radius:6px;padding:1px 6px;font-size:11px">🏢 شركة</span> ' : '' ) . esc_html( trim( $c->job_title . ( $c->company ? ' — ' . $c->company : '' ), ' —' ) ) . ( $c->persona ? '<br><small>' . esc_html( VAI_Hub::persona_label( $c->persona ) ) . '</small>' : '' ) . ( $c->website ? '<br><a dir="ltr" href="' . esc_url( $c->website ) . '" target="_blank" rel="noopener">' . esc_html( vai_clip( $c->website, 34 ) ) . '</a>' : '' ) . '</td><td>' . $status . '</td><td>' . $role . '</td><td>' . esc_html( vai_riyadh( $c->last_login_at ) ) . '</td><td dir="ltr">' . ( isset( $c->source ) && 0 === strpos( (string) $c->source, 'app' ) ? 'التطبيق' : esc_html( $c->host ) ) . '</td><td><small>' . ( VAI_Hub::source_badge( isset( $c->source ) ? $c->source : '' ) ? '<img src="' . esc_url( VAI_Hub::source_badge( $c->source ) ) . '" alt="" style="height:20px;width:auto;vertical-align:middle;border-radius:4px;margin-inline-end:4px">' : '' ) . esc_html( VAI_Hub::source_label( isset( $c->source ) ? $c->source : '' ) ) . '</small></td><td style="white-space:nowrap">';
+ 			$btn = function ( $act, $label, $confirm = '' ) use ( $c ) {
+ 				self::form_open( 'account_action' );
+ 				echo '<input type="hidden" name="id" value="' . (int) $c->id . '"><input type="hidden" name="act" value="' . esc_attr( $act ) . '"><button class="button button-small"' . ( $confirm ? ' onclick="return confirm(\'' . esc_js( $confirm ) . '\')"' : '' ) . '>' . esc_html( $label ) . '</button></form> ';
+diff -ruN vibes-ai-assistant/includes/class-vai-hub.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- vibes-ai-assistant/includes/class-vai-hub.php	2026-11-06 18:57:25.000000000 +0300
++++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-07 00:38:07.855078700 +0300
+@@ -5536,7 +5536,8 @@
+ 		return (array) $wpdb->get_results( "SELECT c.*, s.host FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE c.is_member=1 ORDER BY c.member_started_at DESC, c.id DESC LIMIT 500" );
+ 	}
+ 
+-	public static function accounts( $q = '', $limit = 300, $persona = '' ) {
++	/** 2.28.3 (M210): $wa = 'yes' lists the accounts whose current number received a WhatsApp code, 'no' the rest. */
++	public static function accounts( $q = '', $limit = 300, $persona = '', $wa = '' ) {
+ 		global $wpdb;
+ 		$ct   = self::t( 'contacts' );
+ 		$st   = self::t( 'sites' );
+@@ -5554,6 +5555,13 @@
+ 		} elseif ( 'none' === $persona ) {
+ 			$w .= " AND (c.persona IS NULL OR c.persona NOT IN ('neutral','entrepreneur','investor'))";
+ 		}
++		// 2.28.3 (M210, owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين»): a number is proven while it is
++		// the one that received a WhatsApp code (phone_is_verified); an account without a number counts as not proven.
++		if ( 'yes' === $wa ) {
++			$w .= " AND c.phone_norm<>'' AND c.phone_verified_norm=c.phone_norm";
++		} elseif ( 'no' === $wa ) {
++			$w .= " AND (c.phone_norm='' OR c.phone_verified_norm<>c.phone_norm)";
++		}
+ 		$sql = "SELECT c.*, s.host, s.trusted AS site_trusted FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE $w ORDER BY c.id DESC LIMIT " . (int) $limit;
+ 		return (array) ( $args ? $wpdb->get_results( $wpdb->prepare( $sql, $args ) ) : $wpdb->get_results( $sql ) );
+ 	}
+diff -ruN vibes-ai-assistant/readme.txt /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/readme.txt
+--- vibes-ai-assistant/readme.txt	2026-11-06 18:56:03.000000000 +0300
++++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/readme.txt	2026-11-07 00:41:54.160424600 +0300
+@@ -14,6 +14,9 @@
+ 
+ == سجل التغييرات ==
+ 
++= 2.28.3 =
++* M210 (owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين»): «الحسابات المسجّلة» shows per account whether the current number is WhatsApp-proven — a «WhatsApp» column with the badge «✅ موثّق عبر WhatsApp» or «⚠️ غير موثّق» in both the full list and the filtered view, plus a second pill row (counts of each, filter `wa=yes|no`) that combines with the فئة filter and survives the search. `VAI_Hub::accounts()` takes the filter as its fourth argument. No schema change.
++
+ = 2.28.2 =
+ * A Google or Apple sign-up can give its invite code with the profile: op_profile takes `referral` and `referral_kind` from the trusted app server, once, before any membership, and answers referred_by + referred_name. The admin mail that follows names the representative or the inviting member.
+ 
+diff -ruN vibes-ai-assistant/vibes-ai-assistant.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- vibes-ai-assistant/vibes-ai-assistant.php	2026-11-06 18:56:03.000000000 +0300
++++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-07 00:41:54.126597500 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
+- * Version:     2.28.2
++ * Version:     2.28.3
+  * Author:      Vibes Ventures
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.28.2' );
++define( 'VAI_VERSION', '2.28.3' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );
