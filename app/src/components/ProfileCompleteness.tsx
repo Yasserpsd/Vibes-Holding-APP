@@ -87,7 +87,8 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
     router.push('/profile-edit');
   };
 
-  if (!visible || percent >= 100) return null;
+  // M203: one popup at a time: confirming the number comes first.
+  if (!visible || percent >= 100 || me.phoneConfirmDue) return null;
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>

@@ -15,6 +15,8 @@ export type MockContact = {
   name: string;
   phone: string;
   phoneNorm: string;
+  /** M203 (hub 2.27.0): the number that received a WhatsApp code; a changed number stops matching. */
+  phoneVerified?: string;
   email: string;
   passHash: string;
   verified: boolean;

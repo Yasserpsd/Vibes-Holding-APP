@@ -74,7 +74,9 @@ export class MockHubClient implements HubClient {
         const account = this.findAccount(str(body, 'login', 190));
         if (!account) throw new HubError('not_found', 'لا يوجد حساب بهذا البريد أو الجوال — تأكد منه، أو سجّل حسابًا جديدًا', 404);
         account.resetPending = true;
-        return { ok: true, sent: true, sent_to: maskEmail(account.email), provider: '' };
+        // Plugin 2.27.0 (M203): `channel: whatsapp` names the number.
+        if (str(body, 'channel', 10) === 'whatsapp' && account.phone) return { ok: true, sent: true, sent_to: `•••${account.phone.slice(-3)}`, sent_via: 'whatsapp', provider: '' };
+        return { ok: true, sent: true, sent_to: maskEmail(account.email), sent_via: 'mail', provider: '' };
       }
       case 'reset_confirm':
         return this.resetConfirm(body);
@@ -204,7 +206,8 @@ export class MockHubClient implements HubClient {
     const phoneNorm = phoneIntl(country, str(body, 'phone', 40));
     if (!phoneNorm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص — اكتبه بدون مسافات وبدون رمز الدولة', 400);
     if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر فئتك: محايد، رائد أعمال، أو مستثمر', 400);
-    if (bio.length < 10) throw new HubError('invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل', 400);
+    // Plugin 2.27.0 (M203): the bio is asked later; a given one still has to say something.
+    if (bio && bio.length < 10) throw new HubError('invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل', 400);
     if (!email) throw new HubError('invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل', 400);
     if (!emailAllowed(email)) throw new HubError('email_domain', `${EMAIL_POLICY_TEXT} — هذا البريد غير مقبول`, 400);
     if (password.length < 6) throw new HubError('invalid', 'كلمة المرور 6 أحرف على الأقل', 400);
@@ -342,8 +345,13 @@ export class MockHubClient implements HubClient {
     if ('phone' in body) {
       const phone = str(body, 'phone', 40).replace(/\D+/g, '');
       if (phone.length < 7) throw new HubError('phone', 'رقم الجوال غير صحيح', 400);
-      contact.phone = phone.startsWith('966') ? `0${phone.slice(3)}` : phone;
+      const local = phone.startsWith('966') ? `0${phone.slice(3)}` : phone;
+      // Plugin 2.27.0 (M203): the same refusal as the hub, and a dry run stores nothing.
+      if ([...this.contacts.values()].some((other) => other.id !== contact.id && other.passHash && other.phone === local)) throw new HubError('exists', 'هذا الجوال مسجّل لحساب آخر', 400);
+      if (body.dry_run) return { ok: true, contact: this.publicContact(contact), phone_norm: local, phone_local: local };
+      contact.phone = local;
     }
+    if (body.phone_verified) contact.phoneVerified = contact.phone;
     if ('interests' in body) contact.interests = str(body, 'interests', 300);
     // M74: the in-app category switch (mirrors the planned hub op_profile persona support).
     if ('persona' in body) {
@@ -393,6 +401,7 @@ export class MockHubClient implements HubClient {
       name: contact.name,
       email: contact.email,
       phone: contact.phone,
+      phone_verified: contact.phone !== '' && contact.phoneVerified === contact.phone ? 1 : 0,
       stage: contact.verified ? (active ? 2 : 1) : 0,
       is_member: active ? 1 : 0,
       member_left: daysLeft,

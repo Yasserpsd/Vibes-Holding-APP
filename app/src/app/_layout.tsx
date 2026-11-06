@@ -19,6 +19,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
+import { PhoneConfirmAlert } from '@/components/PhoneConfirmAlert';
 import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
 import { RateUsPrompt } from '@/components/RateUsPrompt';
 import { RetiredBuildGate } from '@/components/RetiredBuildGate';
@@ -194,6 +195,8 @@ export default function RootLayout() {
                 <Stack.Screen name="auth/login" options={{ ...detailHeader(), title: t('nav.login') }} />
                 <Stack.Screen name="auth/register" options={{ ...detailHeader(), title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader(), title: t('nav.verify') }} />
+                <Stack.Screen name="auth/phone" options={{ ...detailHeader(), title: t('phoneCode.title') }} />
+                <Stack.Screen name="phone-confirm" options={{ ...detailHeader(), title: t('phoneCode.title') }} />
                 <Stack.Screen name="auth/reset" options={{ ...detailHeader(), title: t('nav.reset') }} />
                   </Stack>
                 </View>
@@ -216,6 +219,7 @@ export default function RootLayout() {
           <SplashFlash />
           {/* M147 (owner): a Google/Apple-born account completes its profile before anything else opens. */}
           <ProfileCompletionGate />
+          <PhoneConfirmAlert />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
           <AppLockGate />
           {/* M137: the preview build is retired — a TEST binary shows only the «download the store app» cover. */}

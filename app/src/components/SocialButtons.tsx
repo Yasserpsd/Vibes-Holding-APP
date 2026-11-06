@@ -2,7 +2,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { authApi, useAuthConfig } from '@/api/auth';
+import { authApi, phoneStepPath, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { availableSocialProvider, socialSignIn } from '@/auth/social';
@@ -40,6 +40,11 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
       // M140: an account with an authenticator app finishes on its code screen.
       if ('totp' in signedIn) {
         router.push(`/auth/totp?stepToken=${encodeURIComponent(signedIn.stepToken)}` as Href);
+        return;
+      }
+      // M203: Apple and Google pass the same WhatsApp code; a brand-new account gets no step, it has no number yet.
+      if ('phoneStep' in signedIn) {
+        router.push(phoneStepPath(signedIn) as Href);
         return;
       }
       await signIn(signedIn.token, signedIn.me);

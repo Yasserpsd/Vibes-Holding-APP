@@ -40,6 +40,11 @@ const envSchema = z.object({
   // Signs the hub's webhook to /api/webhooks/hub (hub settings «app_webhook_secret», shown once). Unset = the webhook answers 503.
   HUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),
+  // M203 (owner, 2026-11-06): WhatsApp code at every new sign-in. off = nothing asked; on = bundles that can draw the step;
+  // strict = older bundles are refused too (the owner decides when; a forced update cost members before, see M200).
+  PHONE_CODE_MODE: z.enum(['off', 'on', 'strict']).default('off'),
+  // M203: the store reviewers sign in with no code (docs/STORES.md promises e-mail + password, no 2FA). Comma list.
+  PHONE_CODE_EXEMPT: z.string().default('ceo@vibesholding.com,development+appledemo@vibesholding.com'),
   // Dashboard sign-in code by e-mail (M18): a second step after the hub password. Off until the mail delay is measured.
   // A code lives ADMIN_OTP_SECONDS; a dashboard session asks for a new code after ADMIN_SESSION_HOURS.
   ADMIN_OTP: z.enum(['0', '1']).default('0'),

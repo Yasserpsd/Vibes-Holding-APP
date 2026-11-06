@@ -2,7 +2,7 @@ import { Link, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Text } from 'react-native';
 
-import { authApi, useAuthConfig } from '@/api/auth';
+import { authApi, phoneStepPath, useAuthConfig } from '@/api/auth';
 import { ApiError, errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -51,6 +51,11 @@ export default function LoginScreen() {
       // M140: the account has an authenticator app — its code ends the sign-in.
       if ('totp' in result) {
         router.push(`/auth/totp?stepToken=${encodeURIComponent(result.stepToken)}` as Href);
+        return;
+      }
+      // M203: the password was right; the WhatsApp code ends the sign-in.
+      if ('phoneStep' in result) {
+        router.push(phoneStepPath(result) as Href);
         return;
       }
       await signIn(result.token, result.me);

@@ -1,15 +1,18 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { authApi, useAuthConfig, type ProfilePatch } from '@/api/auth';
+import { authApi, useAuthConfig, type PhoneStepResult, type ProfilePatch } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
+import { ChipRow } from '@/components/form/FormParts';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
 import { SupportLink } from '@/components/SupportLink';
@@ -21,6 +24,8 @@ import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function ProfileEditScreen() {
   const router = useRouter();
+  // M203: a sign-in that passed by e-mail lands here: the number on file never received its code.
+  const { fixPhone } = useLocalSearchParams<{ fixPhone?: string }>();
   const { me, setMe } = useAuth();
   const { data: config } = useAuthConfig();
   // The member changes the mobile number from here (owner, 2026-10-30); the e-mail stays the account's
@@ -41,6 +46,9 @@ export default function ProfileEditScreen() {
     bio: me?.bio ?? '',
     social: me?.social ?? '',
   });
+  // M203: asked later, here, instead of at sign-up.
+  const [memberType, setMemberType] = useState<'individual' | 'company' | ''>(me?.memberType ?? '');
+  const [step, setStep] = useState<PhoneStepResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -69,16 +77,22 @@ export default function ProfileEditScreen() {
       bio: form.bio.trim(),
       social: form.social.trim(),
     };
-    if (phoneChanged) {
-      patch.phone = phone.trim();
-      patch.country = countryCode;
-    }
+    if (memberType && memberType !== (me?.memberType ?? '')) patch.memberType = memberType;
     if (contactEmailChanged) patch.contactEmail = contactEmail.trim().toLowerCase();
     setBusy(true);
     setError(null);
     try {
       const { me: updated } = await authApi.updateMe(patch);
       setMe(updated);
+      // M203: a new number is saved only after its WhatsApp code.
+      if (phoneChanged) {
+        const started = await authApi.phoneStart(phone.trim(), countryCode);
+        if ('saved' in started) setMe(started.me);
+        else {
+          setStep(started);
+          return;
+        }
+      }
       router.back();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -95,8 +109,31 @@ export default function ProfileEditScreen() {
     );
   }
 
+  if (step) {
+    return (
+      <Screen title={t('phoneCode.title')} subtitle={t('phoneCode.subtitle')}>
+        <FadeInView delay={entranceDelay(0)}>
+          <PhoneCodeStep
+            step={step}
+            onBack={() => setStep(null)}
+            onSubmit={async (code) => {
+              const { me: updated } = await authApi.phoneConfirm(step.stepToken, code);
+              setMe(updated);
+              router.back();
+            }}
+          />
+        </FadeInView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen title={t('profile.title')} subtitle={t('profile.subtitle')}>
+      {fixPhone ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={t('phoneCode.fixPhone')} />
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(0)}>
         <VoiceFill
           fields={[
@@ -143,8 +180,17 @@ export default function ProfileEditScreen() {
           value={phone}
           onChangeText={setPhone}
           placeholder={country?.example ? country.example.replace(/^0+/, '') : undefined}
-          hint={`${t('profile.phoneHint')} ${t('auth.register.phoneWhatsapp')}`}
+          hint={`${t('profile.phoneHint')} ${t('phoneCode.phoneHint')}`}
         />
+      </FadeInView>
+      <FadeInView delay={entranceDelay(1)}>
+        <View style={styles.group}>
+          <Text style={styles.label}>{t('auth.register.memberType')}</Text>
+          <ChipRow>
+            <Chip label={t('auth.register.memberType.individual')} selected={memberType === 'individual'} onPress={() => setMemberType('individual')} />
+            <Chip label={t('auth.register.memberType.company')} selected={memberType === 'company'} onPress={() => setMemberType('company')} />
+          </ChipRow>
+        </View>
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />

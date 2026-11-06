@@ -106,6 +106,8 @@ The password stays with the owner and goes into App Store Connect → App Review
 Google Play → App access when the consoles are set up. Quick optional check: sign in with it in
 the vcmem.com widget. Note: the hub refuses a duplicate phone across accounts.
 
+**M203 (2026-11-06): every new sign-in needs a WhatsApp code, except the accounts in Railway `PHONE_CODE_EXEMPT` (default `ceo@vibesholding.com` and `development+appledemo@vibesholding.com`), so the notes in section 8 stay true. A change of demo account must change that variable too. A reviewer who tries Sign in with Apple meets the number step; «الرقم غلط أو ليس عليه واتساب» sends the code to the e-mail and the app opens.
+
 ## 5. Store consoles — checklists (owner signs in and clicks; Claude preps each step)
 
 ### App Store Connect (M7 iOS + M8)

@@ -17,7 +17,7 @@ import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService 
 import { fromDeletion, fromPersona } from '../requests/model.js';
 import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
-import { forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import { canPhoneCode, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
@@ -57,7 +57,8 @@ const registerSchema = z
     email: z.string().trim().min(5, 'البريد الإلكتروني مطلوب').max(190),
     password: passwordSchema,
     persona: personaSchema,
-    bio: z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600),
+    // M203: job, bio, interests, type and company are asked later in the profile; older bundles still send them.
+    bio: z.union([z.literal(''), z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600)]).optional(),
     // M156: the app's form requires the job and the interests; the server stays lenient here because the
     // sign-in gate (`profileMissing`) is the real wall — nothing opens until they exist.
     jobTitle: z.string().trim().max(150).optional(),
@@ -94,8 +95,12 @@ const adminTotpStepSchema = totpStepSchema.extend({ remember: rememberSchema });
 const adminTotpSetupSchema = totpSetupSchema.extend({ remember: rememberSchema });
 const totpCodeBodySchema = z.object({ code: totpCodeSchema });
 const totpSetupStartSchema = z.object({ code: totpCodeSchema.optional() });
-const resetRequestSchema = z.object({ login: loginFieldSchema, country: countrySchema });
-const resetConfirmSchema = resetRequestSchema.extend({ code: codeSchema, password: passwordSchema });
+// M203: the bundle that can name WhatsApp sends `channel`; `mail` is the member asking for the e-mail instead.
+const resetRequestSchema = z.object({ login: loginFieldSchema, country: countrySchema, channel: z.enum(['whatsapp', 'mail']).optional() });
+const phoneStepSchema = z.object({ stepToken: pendingTokenSchema, code: codeSchema });
+const phoneResendSchema = z.object({ stepToken: pendingTokenSchema, via: z.enum(['whatsapp', 'email']).default('whatsapp') });
+const phoneStartSchema = z.object({ phone: z.string().trim().min(5).max(40), country: z.string().trim().toLowerCase().max(5).default('sa') });
+const resetConfirmSchema = z.object({ login: loginFieldSchema, country: countrySchema, code: codeSchema, password: passwordSchema });
 const profileSchema = z
   .object({
     name: z.string().trim().min(2).max(120),
@@ -131,11 +136,13 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   // M168: every account answer is shaped for the bundle that asked — the completion wall never names a
   // field that bundle cannot draw (an older bundle used to see an empty card and stay locked out).
   const withEnglish = async (request: FastifyRequest, account: Awaited<ReturnType<AuthService['me']>>) => {
-    const me = forBundle(account, gateFieldsOf(request.headers['x-app-gate']));
+    const me = { ...forBundle(account, gateFieldsOf(request.headers['x-app-gate'])), phoneConfirmDue: service.phoneConfirmDue(account) };
     if (!meLocalizer) return me;
     const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
     return en ? { ...me, en } : me;
   };
+
+  const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']) });
 
   const limited = (name: string, limit: number, request: FastifyRequest, reply: FastifyReply): boolean => {
     if (limiter.hit(`${name}:${request.ip}`, limit, WINDOW)) return false;
@@ -198,7 +205,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(verifySchema, request.body, reply);
       if (!body) return;
       const result = await service.verify(body.pendingToken, body.code, request.ip);
-      return 'totp' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+      return 'totp' in result || 'phoneStep' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -208,8 +215,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('login', 12, request, reply)) return;
       const body = parse(loginSchema, request.body, reply);
       if (!body) return;
-      const result = await service.login(body.login, body.password, request.ip, body.country);
-      return result.pending || 'totp' in result ? result : { ...result, me: await withEnglish(request, result.me) };
+      const result = await service.login(body.login, body.password, request.ip, body.country, bundleOf(request));
+      return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 
@@ -221,8 +228,71 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(socialSchema, request.body, reply);
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
-      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request), sourceOf(request));
-      return 'totp' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+      const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request), sourceOf(request), bundleOf(request));
+      return 'totp' in result || 'phoneStep' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  // M203: the WhatsApp code ends a sign-in. Everything else about the step is the store's (one live step, hourly budget).
+  app.post(
+    '/api/auth/phone/verify',
+    guard(async (request, reply) => {
+      if (limited('phone-code', 20, request, reply)) return;
+      const body = parse(phoneStepSchema, request.body, reply);
+      if (!body) return;
+      const result = await service.phoneLogin(body.stepToken, body.code);
+      return { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  app.post(
+    '/api/auth/phone/resend',
+    guard(async (request, reply) => {
+      if (limited('phone-resend', 10, request, reply)) return;
+      const body = parse(phoneResendSchema, request.body, reply);
+      if (!body) return;
+      return service.resendPhoneCode(body.stepToken, body.via);
+    }),
+  );
+
+  // M203: a number is saved only after its code (completion gate, profile editor).
+  app.post(
+    '/api/me/phone/start',
+    guard(async (request, reply) => {
+      if (limited('phone-start', 10, request, reply)) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const body = parse(phoneStartSchema, request.body, reply);
+      if (!body) return;
+      void reply.header('cache-control', 'no-store');
+      const started = await service.startPhoneChange(auth.session, body.phone, body.country, sourceOf(request), langOf(request));
+      return 'me' in started ? { ...started, me: await withEnglish(request, started.me) } : started;
+    }),
+  );
+
+  // M203: the «أكّد رقمك» alert: the code goes to the registered number.
+  app.post(
+    '/api/me/phone/confirm',
+    guard(async (request, reply) => {
+      if (limited('phone-start', 10, request, reply)) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      void reply.header('cache-control', 'no-store');
+      return service.startPhoneConfirm(auth.session);
+    }),
+  );
+
+  app.post(
+    '/api/me/phone/verify',
+    guard(async (request, reply) => {
+      if (limited('phone-code', 20, request, reply)) return;
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      const body = parse(phoneStepSchema, request.body, reply);
+      if (!body) return;
+      void reply.header('cache-control', 'no-store');
+      const me = await service.confirmPhoneChange(auth.session, body.stepToken, body.code, sourceOf(request));
+      return { me: await withEnglish(request, me) };
     }),
   );
 
@@ -359,7 +429,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('reset', 6, request, reply)) return;
       const body = parse(resetRequestSchema, request.body, reply);
       if (!body) return;
-      const sent = await service.requestReset(body.login, request.ip, body.country);
+      const sent = await service.requestReset(body.login, request.ip, body.country, body.channel);
       return { ok: true, ...sent };
     }),
   );
@@ -403,6 +473,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const body = parse(profileSchema, request.body, reply);
       if (!body) return;
+      if (body.phone !== undefined && service.phonePatchClosed) {
+        return reply.code(403).send({ error: { code: 'phone_code_update', message: 'حدّث التطبيق لتغيير رقمك' } });
+      }
       // M101: members change the persona through the e-mailed-code flow below; the direct patch
       // stays for the club's admins only (they demo the three apps without the 30-day window).
       if (body.persona !== undefined) {

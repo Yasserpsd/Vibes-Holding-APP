@@ -24,6 +24,7 @@ import { NameTransliterator, NAMES_TRANSLATE_SYSTEM } from './auth/namesEnglish.
 import { PersonaChangeStore } from './auth/personaChange.js';
 import { PersonaRequestsService } from './auth/personaRequests.js';
 import { NameJudge } from './auth/name.js';
+import { PhoneCodeStore } from './auth/phoneCode.js';
 import { AuthService } from './auth/service.js';
 import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
@@ -344,7 +345,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const totp = new TotpStore(kv);
   // M156: the AI pass on display names (rules run without it); fails open on any model trouble.
   const nameJudge = config.OPENAI_API_KEY ? new NameJudge({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl }) : null;
-  const auth = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge });
+  // M203: the WhatsApp code at sign-in and on a new number; the e-mail carries it when Meta refuses or the member asks.
+  const phoneCodes = new PhoneCodeStore(kv, async (via, step, code) => {
+    if (via === 'email') return auth.mailPhoneCode(step.email, code, step.lang);
+    return (await whatsapp.sendCode({ phone: step.phone, lang: step.lang, code })).channel === 'whatsapp';
+  });
+  const auth: AuthService = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge, phoneCodes, whatsappEnabled: () => whatsapp.enabled });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   // M138: the member's receipt mail on every action and mail + push on every status change.

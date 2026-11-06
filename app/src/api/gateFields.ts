@@ -3,7 +3,9 @@
  * and the server lists only these in `profileMissing` — a bundle must never be walled behind a field it
  * cannot show (that locked members out on older bundles when M156 added the job, the real name and the
  * contact e-mail). Add a key here only together with its field in ProfileCompletionGate.
+ * M203: `phoneCode` is no field: it tells the server this bundle draws the WhatsApp code step. The job, bio,
+ * interests, member type and company moved to the profile (owner, 2026-11-06).
  */
-export const GATE_FIELDS = ['name', 'memberType', 'phone', 'persona', 'bio', 'jobTitle', 'interests', 'company', 'contactEmail'] as const;
+export const GATE_FIELDS = ['name', 'phone', 'persona', 'contactEmail', 'phoneCode'] as const;
 
 export type GateField = (typeof GATE_FIELDS)[number];

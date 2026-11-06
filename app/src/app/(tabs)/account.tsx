@@ -110,6 +110,8 @@ export default function AccountScreen() {
       {/* M79 (owner): «الحاجات اللي ليها علاقة ببعض لازم تتحط مع بعض» — the pile became titled groups. */}
       <FadeInView delay={entranceDelay(2, 90)}>
         <MenuGroup title={t('account.group.data')} icon="person-circle-outline">
+          {/* M203: stays here after «لاحقًا» on the alert, until the number is confirmed. */}
+          {me?.phoneConfirmDue ? <MenuRow icon="shield-checkmark-outline" label={t('phoneAlert.title')} onPress={() => router.push('/phone-confirm' as Href)} /> : null}
           <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
           <MenuRow icon="heart-outline" label={t('nav.interests')} onPress={() => router.push('/news/interests' as Href)} />
           {/* M101: the member changes his direction with an e-mailed code, once every 30 days. */}

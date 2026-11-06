@@ -24,6 +24,10 @@ export type Me = {
   phone: string;
   persona: Persona | '';
   personaLabel: string;
+  /** M203: the current number received a WhatsApp code; null on an older hub, none from an older server. */
+  phoneVerified?: boolean | null;
+  /** M203: the server asks the app to show the «أكّد رقمك» alert. */
+  phoneConfirmDue?: boolean;
   /** M147: what the sign-in gate still needs (empty = complete); an older server sends none. */
   profileMissing?: ProfileMissing[];
   /** M156: the real address given over an Apple «Hide My Email» relay ('' until given); an older server sends none. */
@@ -99,28 +103,29 @@ export type AuthConfig = {
 
 export type RegisterInput = {
   name: string;
-  /** M69: «فرد / شركة» — a company registration carries the company name. */
-  memberType: 'individual' | 'company';
-  companyName?: string;
   country: string;
   phone: string;
   email: string;
   password: string;
   persona: Persona;
-  bio: string;
-  jobTitle?: string;
   /** M32: another member's membership number; the hub checks and stores it. */
   inviteCode?: string;
-  /** M120: interest keys (and the «أخرى» text) — the hub's «عضو جديد» admin mail names them. */
-  interests?: string[];
-  interestsOther?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
 export type SignedInResult = { pending: false; token: string; me: Me; /** M157: the social sign-in just created the account. */ created?: boolean };
 /** M140: the account switched «حماية إضافية» on — the sign-in ends with its authenticator code. */
 export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
-export type LoginResult = PendingResult | SignedInResult | TotpStepResult;
+/** M203: the password (or the Apple/Google identity) was right; the session starts after the WhatsApp code. */
+export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: 'whatsapp' | 'email'; phone: string; email: string; seconds: number; resendAfter: number };
+export type LoginResult = PendingResult | SignedInResult | TotpStepResult | PhoneStepResult;
+
+/** The code screen of a sign-in that stopped at the WhatsApp code (login and the Apple/Google buttons). */
+export function phoneStepPath(step: PhoneStepResult): string {
+  const params: Record<string, string> = { stepToken: step.stepToken, via: step.via, phone: step.phone, email: step.email, seconds: String(step.seconds), resendAfter: String(step.resendAfter) };
+  const query = Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+  return `/auth/phone?${query}`;
+}
 export type TotpStatus = { enabled: boolean; enabledAt: string | null; backupLeft: number };
 export type TotpSetup = { setupToken: string; secret: string; uri: string; seconds: number };
 
@@ -182,9 +187,19 @@ export const authApi = {
     apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}) }, token: null }),
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
-    apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
-  resetRequest: (login: string, country?: string) =>
-    apiRequest<{ ok: true; sentTo?: string; provider?: string }>('POST', '/api/auth/reset/request', { body: { login, ...(country ? { country } : {}) }, token: null }),
+    apiRequest<SignedInResult | TotpStepResult | PhoneStepResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
+  // M203: the code that ends a sign-in. `fixPhone`: it came by e-mail, so the number is still unproven.
+  phoneVerify: (stepToken: string, code: string) => apiRequest<SignedInResult & { fixPhone?: boolean }>('POST', '/api/auth/phone/verify', { body: { stepToken, code }, token: null }),
+  phoneResend: (stepToken: string, via: 'whatsapp' | 'email') =>
+    apiRequest<{ via: 'whatsapp' | 'email'; seconds: number; resendAfter: number }>('POST', '/api/auth/phone/resend', { body: { stepToken, via }, token: null }),
+  // M203: a number is saved only after its code; with the switch off the server saves it at once (`saved`).
+  phoneStart: (phone: string, country: string) => apiRequest<PhoneStepResult | { saved: true; me: Me }>('POST', '/api/me/phone/start', { body: { phone, country } }),
+  // M203: the alert: the code goes to the registered number.
+  phoneCurrent: () => apiRequest<PhoneStepResult>('POST', '/api/me/phone/confirm', { body: {} }),
+  phoneConfirm: (stepToken: string, code: string) => apiRequest<{ me: Me }>('POST', '/api/me/phone/verify', { body: { stepToken, code } }),
+  // M203: `channel` = WhatsApp only (the e-mail when Meta refuses); `mail` = the member asked for the e-mail.
+  resetRequest: (login: string, country?: string, channel: 'whatsapp' | 'mail' = 'whatsapp') =>
+    apiRequest<{ ok: true; sentTo?: string; provider?: string; via?: string }>('POST', '/api/auth/reset/request', { body: { login, channel, ...(country ? { country } : {}) }, token: null }),
   resetConfirm: (login: string, code: string, password: string, country?: string) =>
     apiRequest<{ ok: true }>('POST', '/api/auth/reset/confirm', { body: { login, code, password, ...(country ? { country } : {}) }, token: null }),
   me: (token: string, fresh = false) => apiRequest<{ me: Me }>('GET', '/api/me', { token, params: fresh ? { fresh: 1 } : undefined }),

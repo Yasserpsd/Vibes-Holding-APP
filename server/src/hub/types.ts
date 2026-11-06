@@ -33,6 +33,8 @@ export type HubContact = {
   interests?: string;
   /** M156 (hub 2.26.0+): the real address of an Apple-relay account ('' until given); undefined on older hubs. */
   contact_email?: string;
+  /** M203 (hub 2.27.0+): 1 while the current number is the one that received a WhatsApp code; undefined on older hubs. */
+  phone_verified?: 0 | 1;
   /** M156 (hub 2.26.0+): the member's stored language ('ar' | 'en' | ''); undefined on older hubs. */
   lang?: string;
   city: string;
@@ -126,6 +128,11 @@ export type HubResponse = {
   sent?: boolean;
   /** `reset_request` since plugin 2.26.3 (M197): the inbox the code went to, masked, and the Apple/Google sign-up. */
   sent_to?: string;
+  /** `reset_request` since plugin 2.27.0 (M203): 'whatsapp' or 'mail'. */
+  sent_via?: string;
+  /** `profile` with dry_run since plugin 2.27.0 (M203): the number as the hub would store it. */
+  phone_norm?: string;
+  phone_local?: string;
   provider?: string;
   text?: string;
   contact?: HubContact | null;

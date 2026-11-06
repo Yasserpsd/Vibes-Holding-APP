@@ -12,6 +12,7 @@ import { nameProblem, nameRuleIssue, type NameJudge } from './name.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
+import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia } from './phoneCode.js';
 import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
@@ -87,11 +88,16 @@ export type Me = {
    * reports them (2.21.3+), so an older hub never blocks a member for a field it cannot show.
    */
   profileMissing: ProfileMissing[];
+  /** M203: the current number received a WhatsApp code; null on a hub older than 2.27.0. */
+  phoneVerified: boolean | null;
+  /** M203: the app shows the «أكّد رقمك» alert. Set per answer (`phoneConfirmDue`): it depends on the switch. */
+  phoneConfirmDue?: boolean;
 };
 
-export type ProfileMissing = 'name' | 'memberType' | 'phone' | 'persona' | 'bio' | 'jobTitle' | 'interests' | 'company' | 'contactEmail';
+/** M203 (owner, 2026-11-06, replaces the M147 + M156 list): sign-up gets shorter; job, bio, interests, type and company move to the profile. */
+export type ProfileMissing = 'name' | 'phone' | 'persona' | 'contactEmail';
 
-export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'memberType', 'phone', 'persona', 'bio', 'jobTitle', 'interests', 'company', 'contactEmail'];
+export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'phone', 'persona', 'contactEmail'];
 
 /**
  * M168 (owner, 2026-10-31, «كمية العملاء اللي بتشتكي مش عارفة تسجل غير طبيعي»): the fields EVERY
@@ -101,7 +107,15 @@ export const PROFILE_FIELDS: readonly ProfileMissing[] = ['name', 'memberType', 
  * EMPTY card (no field for it), voice-fill sent an empty field list (400 «البيانات غير مكتملة») and the
  * member was locked out with no way through. The wall must never name a field the bundle cannot show.
  */
-export const LEGACY_GATE_FIELDS: readonly ProfileMissing[] = ['memberType', 'phone', 'persona', 'bio', 'interests', 'company'];
+export const LEGACY_GATE_FIELDS: readonly ProfileMissing[] = ['phone', 'persona'];
+
+/** M203: the `x-app-gate` word of a bundle that can draw the WhatsApp code step. Older bundles sign in as before. */
+export const PHONE_CODE_CAPABILITY = 'phoneCode';
+
+export function canPhoneCode(header: unknown): boolean {
+  const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
+  return raw.split(',').some((item) => item.trim() === PHONE_CODE_CAPABILITY);
+}
 
 /**
  * The gate fields the calling bundle renders: the `x-app-gate` header (a comma list, sent since M168)
@@ -133,6 +147,11 @@ export function mailAddressOf(contact: { email: string; contact_email?: string }
   return real || String(contact.email ?? '').trim();
 }
 
+function phoneCodeProblem(result: { reason: 'cooldown'; waitSeconds: number } | { reason: 'send_failed' }): AuthError {
+  if (result.reason === 'cooldown') return new AuthError('otp_cooldown', `محاولات دخول كثيرة لهذا الحساب، حاول بعد ${Math.ceil(result.waitSeconds / 60)} دقيقة`, 429);
+  return new AuthError('phone_code_send_failed', 'تعذر إرسال الرمز الآن، حاول بعد قليل أو تواصل مع الدعم', 503);
+}
+
 /** M197: the hub's «no account» answer on a reset becomes `no_account`, the code the app already translates (M128). */
 function rethrowNoAccount(error: unknown): never {
   if (error instanceof HubError && error.code === 'not_found') throw new HubError('no_account', error.message, 404);
@@ -143,15 +162,8 @@ export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
   // M156 (owner): a kunya or a made-up name meets the gate too — the member writes a real first + family name.
   if (nameRuleIssue(String(contact.name ?? ''))) missing.push('name');
-  // Owner (2026-10-28): «فرد / شركة» is the first question — a social-born account never answered it.
-  if (contact.member_type !== 'individual' && contact.member_type !== 'company') missing.push('memberType');
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
   if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
-  if (String(contact.bio ?? '').trim().length < 10) missing.push('bio');
-  // M156 (owner, 2026-10-29: «مفيش حد يقدر يفتح التطبيق غير لما يكمل كل بياناته»): the job joins the rule.
-  if (!String(contact.job_title ?? '').trim()) missing.push('jobTitle');
-  if (contact.interests !== undefined && !String(contact.interests).trim()) missing.push('interests');
-  if (contact.member_type === 'company' && !String(contact.company ?? '').trim()) missing.push('company');
   // M156: an Apple-relay account must give a real address (only when the hub can store it, 2.26.0+).
   if (contact.contact_email !== undefined && isRelayEmail(contact.email) && !String(contact.contact_email).trim()) missing.push('contactEmail');
   return missing;
@@ -159,7 +171,7 @@ export function profileMissingOf(contact: HubContact): ProfileMissing[] {
 
 export type RegisterInput = {
   name: string;
-  /** M69: «فرد / شركة» — a company registration carries the company name. */
+  /** M69: «فرد / شركة»; M203: asked later in the profile, older bundles still send it. */
   memberType: 'individual' | 'company';
   companyName?: string;
   country: string;
@@ -167,7 +179,8 @@ export type RegisterInput = {
   email: string;
   password: string;
   persona: Persona;
-  bio: string;
+  /** M203: asked later in the profile, older bundles still send it. */
+  bio?: string;
   jobTitle?: string;
   /** M32: another member's membership number — resolved and stored by the hub, never by the client. */
   inviteCode?: string;
@@ -199,7 +212,11 @@ export type OtpResult = { pending: false; otp: true; challengeToken: string; ema
 export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
 /** M140: a dashboard account without an authenticator yet (ADMIN_TOTP=1) enrols one before its first session. */
 export type TotpSetupResult = { pending: false; totpSetup: true; setupToken: string; secret: string; uri: string; seconds: number };
-export type MemberLoginResult = LoginResult | TotpStepResult;
+/** M203: the password (or the Google/Apple identity) was right; the session starts after the WhatsApp code. */
+export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: PhoneCodeVia; phone: string; email: string; seconds: number; resendAfter: number };
+export type MemberLoginResult = LoginResult | TotpStepResult | PhoneStepResult;
+/** What one bundle can do at sign-in (the `x-app-gate` word). */
+export type SignInBundle = { canPhoneCode: boolean };
 export type AdminLoginResult = LoginResult | OtpResult | TotpStepResult | TotpSetupResult;
 /** The first dashboard sign-in after enrolment: the session plus the backup codes, shown once. */
 export type EnrolledResult = SignedInResult & { backupCodes: string[] };
@@ -257,10 +274,11 @@ export function toMe(contact: HubContact): Me {
     membership: membershipOf(contact),
     cardNumber: membershipNumber({ id: contact.id, persona: persona?.key ?? '' }),
     profileMissing: profileMissingOf(contact),
+    phoneVerified: contact.phone_verified === undefined ? null : contact.phone_verified === 1,
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null; /** M203: absent or disabled WhatsApp = no code step. */ phoneCodes?: PhoneCodeStore | null; whatsappEnabled?: () => boolean };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -306,7 +324,7 @@ export class AuthService {
       email: input.email,
       password: input.password,
       persona: input.persona,
-      bio: input.bio,
+      bio: input.bio ?? '',
       job_title: input.jobTitle ?? '',
       // M122: the hub stores the registration language (contacts.lang, hub 2.20.0) and every
       // member mail it sends — activation code, welcome, receipts — follows it.
@@ -342,7 +360,8 @@ export class AuthService {
     return this.signIn(pending.uuid, contact);
   }
 
-  async login(login: string, password: string, ip: string, country?: string): Promise<MemberLoginResult> {
+  async login(login: string, password: string, ip: string, country?: string, bundle: SignInBundle = { canPhoneCode: false }): Promise<MemberLoginResult> {
+    this.refuseOldBundle(bundle);
     const uuid = newUuid();
     // The login field takes a phone from ANY country (the app sends the picked country code);
     // normalised here because the hub's own vai_norm_phone only understands Saudi local forms.
@@ -364,7 +383,7 @@ export class AuthService {
       return { pending: true, pendingToken, email: contact.email, mailSent: result.mail_sent === 1, text: result.text ?? '' };
     }
     await this.gate(uuid, contact);
-    return this.signIn(uuid, contact);
+    return this.signIn(uuid, contact, bundle);
   }
 
   /**
@@ -388,7 +407,8 @@ export class AuthService {
    * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
    * verified, so there is no code step; the same test-environment gates as password login apply.
    */
-  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar', source: AppSource = 'app'): Promise<MemberLoginResult> {
+  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar', source: AppSource = 'app', bundle: SignInBundle = { canPhoneCode: false }): Promise<MemberLoginResult> {
+    this.refuseOldBundle(bundle);
     if (!identity.emailVerified) {
       throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
     }
@@ -420,7 +440,7 @@ export class AuthService {
     await this.gate(uuid, contact);
     // M157: tell the app when the hub created the account (first social sign-in), so it logs the registration event for ads attribution.
     const created = result.created === 1 || result.created === '1' || result.created === true;
-    const signed = await this.signIn(uuid, contact);
+    const signed = await this.signIn(uuid, contact, bundle);
     return created && 'token' in signed ? { ...signed, created: true } : signed;
   }
 
@@ -756,11 +776,13 @@ export class AuthService {
   }
 
   /** M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither. */
-  async requestReset(login: string, ip: string, country?: string): Promise<{ sentTo: string; provider: string }> {
-    const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip }).catch(rethrowNoAccount);
+  async requestReset(login: string, ip: string, country?: string, channel?: 'whatsapp' | 'mail'): Promise<{ sentTo: string; provider: string; via: string }> {
+    // M203: `channel` comes from a bundle that can name WhatsApp on its screen; an older one keeps both (hub 2.27.0).
+    const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip, ...(channel ? { channel } : {}) }).catch(rethrowNoAccount);
     const sentTo = typeof result.sent_to === 'string' ? result.sent_to : '';
     const provider = result.provider === 'apple' || result.provider === 'google' ? result.provider : '';
-    return { sentTo, provider };
+    const via = result.sent_via === 'whatsapp' ? 'whatsapp' : 'mail';
+    return { sentTo, provider, via };
   }
 
   async confirmReset(login: string, code: string, password: string, ip: string, country?: string): Promise<void> {
@@ -825,14 +847,177 @@ export class AuthService {
     throw new AuthError('admin_only', 'النسخة التجريبية متاحة لحسابات إدارة النادي فقط', 403);
   }
 
-  /** A member sign-in: straight to a session, unless the account switched the authenticator on (M140). */
-  private async signIn(uuid: string, contact: HubContact): Promise<MemberLoginResult> {
+  /**
+   * A member sign-in: straight to a session, unless the account switched the authenticator on (M140) or the WhatsApp
+   * code applies (M203). A fresh registration passes no bundle: it has just proven itself with its code.
+   */
+  private async signIn(uuid: string, contact: HubContact, bundle?: SignInBundle): Promise<MemberLoginResult> {
     const { totp } = this.deps;
     if (totp && (await totp.enabled(contact.id))) {
       const stepToken = await totp.beginStep(contact.id, uuid, 'app', false);
       return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
     }
+    if (bundle && this.needsPhoneCode(contact, bundle)) return this.beginPhoneStep(uuid, contact);
     return this.issueSession(uuid, contact, false, false);
+  }
+
+  // ---- M203: WhatsApp as the proof of identity.
+
+  private get phoneCodeOn(): boolean {
+    return this.deps.config.PHONE_CODE_MODE !== 'off' && Boolean(this.deps.phoneCodes) && (this.deps.whatsappEnabled?.() ?? false);
+  }
+
+  /** With `strict` a number changes only through its code; a direct profile save is refused. */
+  get phonePatchClosed(): boolean {
+    return this.phoneCodeOn && this.deps.config.PHONE_CODE_MODE === 'strict';
+  }
+
+  /** `strict`: an older bundle cannot draw the step, so it is told to update instead of passing without a code. */
+  private refuseOldBundle(bundle: SignInBundle): void {
+    if (this.phoneCodeOn && this.deps.config.PHONE_CODE_MODE === 'strict' && !bundle.canPhoneCode) {
+      throw new AuthError('phone_code_update', 'حدّث التطبيق لتسجيل الدخول', 403);
+    }
+  }
+
+  /**
+   * Every new sign-in, Apple and Google included: a session that stays open asks for nothing. No number yet = the
+   * completion gate asks for it with its code. Older hubs (no `phone_verified`) and the store reviewers pass straight.
+   */
+  private needsPhoneCode(contact: HubContact, bundle: SignInBundle): boolean {
+    if (!this.phoneCodeOn || !bundle.canPhoneCode) return false;
+    if (contact.phone_verified === undefined || !String(contact.phone ?? '').trim()) return false;
+    return !this.phoneCodeExempt(contact);
+  }
+
+  private phoneCodeExempt(contact: { email: string }): boolean {
+    const exempt = this.deps.config.PHONE_CODE_EXEMPT.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+    return exempt.includes(String(contact.email ?? '').trim().toLowerCase());
+  }
+
+  /** M203 (owner, 2026-11-06): any account with an unconfirmed number is told so, open session or not. */
+  phoneConfirmDue(me: Me): boolean {
+    return this.phoneCodeOn && me.phoneVerified === false && Boolean(String(me.phone ?? '').trim()) && !this.phoneCodeExempt(me);
+  }
+
+  /** M203: the registered number proves itself from an open session. */
+  async startPhoneConfirm(session: SessionRecord): Promise<PhoneStepResult> {
+    const contact = await this.contact(session);
+    if (!this.phoneCodeOn || !String(contact.phone ?? '').trim()) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
+    const email = mailAddressOf(contact);
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '' });
+    if (!begun.ok) throw phoneCodeProblem(begun);
+    return this.phoneStepAnswer(begun.token, begun.via, contact.phone, email);
+  }
+
+  private requirePhoneCodes(): PhoneCodeStore {
+    if (!this.deps.phoneCodes) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
+    return this.deps.phoneCodes;
+  }
+
+  private phoneStepAnswer(stepToken: string, via: PhoneCodeVia, phone: string, email: string): PhoneStepResult {
+    return { pending: false, phoneStep: true, stepToken, via, phone: maskNumber(phone), email: maskEmail(email), seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
+  }
+
+  private async beginPhoneStep(uuid: string, contact: HubContact): Promise<PhoneStepResult> {
+    const email = mailAddressOf(contact);
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'signin', uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '' });
+    if (!begun.ok) {
+      await this.dropVisitor(uuid);
+      throw phoneCodeProblem(begun);
+    }
+    return this.phoneStepAnswer(begun.token, begun.via, contact.phone, email);
+  }
+
+  /**
+   * The code ends the sign-in. A code that travelled on WhatsApp marks the number at the hub; one that went to the e-mail
+   * lets the member in but proves nothing about the number, so `fixPhone` sends the app to the number field.
+   */
+  async phoneLogin(stepToken: string, code: string): Promise<SignedInResult & { fixPhone: boolean }> {
+    const step = await this.checkPhoneCode(stepToken, code, 'signin');
+    const account = await this.deps.hub.call('account', { uuid: step.uuid });
+    let contact = account.contact;
+    if (!contact || !contact.has_account) throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    if (step.via === 'whatsapp' && contact.phone_verified !== 1) {
+      contact = requireContact(await this.deps.hub.call('profile', { uuid: step.uuid, phone_verified: 1 }));
+    }
+    const signed = await this.issueSession(step.uuid, contact, false, false);
+    return { ...signed, fixPhone: step.via === 'email' };
+  }
+
+  /** The completion gate and the profile editor: a number is saved only after its code. */
+  async startPhoneChange(session: SessionRecord, phone: string, country: string, source?: AppSource, lang: AppLang = 'ar'): Promise<PhoneStepResult | { saved: true; me: Me }> {
+    const contact = await this.contact(session);
+    // Switch off, an older hub or a store reviewer: the number is saved as it always was.
+    if (!this.phoneCodeOn || contact.phone_verified === undefined || this.phoneCodeExempt(contact)) {
+      return { saved: true, me: await this.updateProfile(session, { phone, country }, source, lang) };
+    }
+    const dry = await this.deps.hub.call('profile', { uuid: session.uuid, phone, country, dry_run: 1 });
+    const target = typeof dry.phone_local === 'string' && dry.phone_local ? dry.phone_local : phone;
+    const email = mailAddressOf(contact);
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: target, newPhone: phone, country, email, lang: contact.lang ?? '' });
+    if (!begun.ok) throw phoneCodeProblem(begun);
+    return this.phoneStepAnswer(begun.token, begun.via, target, email);
+  }
+
+  async confirmPhoneChange(session: SessionRecord, stepToken: string, code: string, source?: AppSource): Promise<Me> {
+    const owner = await this.requirePhoneCodes().peek(stepToken);
+    if (owner && owner.contactId !== session.contactId) throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    const step = await this.checkPhoneCode(stepToken, code, 'number');
+    // M203: no new number = the registered one confirming itself; a code that fell to the e-mail proves nothing about it.
+    if (step.newPhone === undefined) {
+      if (step.via !== 'whatsapp') return this.fetchMe(session.uuid);
+      return this.remember(session.uuid, requireContact(await this.deps.hub.call('profile', { uuid: session.uuid, phone_verified: 1 })));
+    }
+    const result = await this.deps.hub.call('profile', {
+      uuid: session.uuid,
+      phone: step.newPhone,
+      country: step.country ?? 'sa',
+      ...(step.via === 'whatsapp' ? { phone_verified: 1 } : {}),
+      ...(source ? { source } : {}),
+    });
+    return this.remember(session.uuid, requireContact(result));
+  }
+
+  async resendPhoneCode(stepToken: string, channel: PhoneCodeVia): Promise<{ via: PhoneCodeVia; seconds: number; resendAfter: number }> {
+    const result = await this.requirePhoneCodes().resend(stepToken, channel);
+    if (!result.ok) {
+      if (result.reason === 'too_soon') throw new AuthError('otp_wait', `انتظر ${result.waitSeconds} ثانية ثم اطلب رمزًا جديدًا`, 429);
+      if (result.reason === 'too_many') throw new AuthError('otp_resend_limit', 'تجاوزت عدد مرات إعادة الإرسال، ابدأ الدخول من جديد', 429);
+      if (result.reason === 'send_failed') throw new AuthError('phone_code_send_failed', 'تعذر إرسال الرمز الآن، حاول بعد قليل أو تواصل مع الدعم', 503);
+      throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    }
+    return { via: result.via, seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
+  }
+
+  private async checkPhoneCode(stepToken: string, code: string, purpose: PhoneCodePurpose) {
+    const result = await this.requirePhoneCodes().check(stepToken, code);
+    if (!result.ok) {
+      if (result.reason === 'bad_code') throw new AuthError('otp_bad_code', `الرمز غير صحيح، باقي ${result.attemptsLeft} محاولات`, 400);
+      if (result.reason === 'code_expired') throw new AuthError('otp_code_expired', 'انتهت صلاحية الرمز، اضغط «إعادة الإرسال»', 400);
+      if (result.reason === 'locked') throw new AuthError('otp_locked', 'محاولات خاطئة كثيرة، ابدأ الدخول من جديد', 429);
+      throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    }
+    if (result.step.purpose !== purpose) throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
+    return result.step;
+  }
+
+  /** The fallback copy of a sign-in or number code; the code travels in the mail body only. */
+  async mailPhoneCode(email: string, code: string, lang: string): Promise<boolean> {
+    const en = lang === 'en';
+    try {
+      await this.deps.mailer?.send({
+        to: [email],
+        subject: en ? 'Your Investors Club code' : 'رمز الدخول إلى Investors Club',
+        text: (en
+          ? [`Your code: ${code}`, 'It is valid for 10 minutes. If this was not you, change your password.']
+          : [`رمزك: ${code}`, 'صالح لمدة 10 دقائق. إذا لم تكن أنت فغيّر كلمة مرورك فورًا.']
+        ).join('\n'),
+      });
+      return Boolean(this.deps.mailer);
+    } catch (error) {
+      this.deps.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'phone code fallback was not mailed');
+      return false;
+    }
   }
 
   private async issueSession(uuid: string, contact: HubContact, adminVerified: boolean, totpVerified: boolean, remember = false): Promise<SignedInResult> {

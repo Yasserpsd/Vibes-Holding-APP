@@ -47,16 +47,16 @@ export default function VerifyScreen() {
     router.replace('/membership');
   };
 
-  const submit = async () => {
+  const submit = async (value = code) => {
     if (busy || !pendingToken) return;
-    if (!/^\d{4,6}$/.test(code)) {
+    if (!/^\d{4,6}$/.test(value)) {
       setError(t('auth.verify.codeRequired'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const result = await authApi.verify(pendingToken, code);
+      const result = await authApi.verify(pendingToken, value);
       // M140: an account with an authenticator app finishes on its code screen.
       if ('totp' in result) {
         router.push(`/auth/totp?stepToken=${encodeURIComponent(result.stepToken)}` as Href);
@@ -112,7 +112,13 @@ export default function VerifyScreen() {
           textContentType="oneTimeCode"
           maxLength={6}
           value={code}
-          onChangeText={(value) => setCode(value.replace(/\D/g, ''))}
+          autoFocus
+          onChangeText={(value) => {
+            // M203 (owner: seconds, not minutes): the hub's code has four digits; the mock's test code does not.
+            const digits = value.replace(/\D/g, '');
+            setCode(digits);
+            if (digits.length === 4 && !config?.testCode) void submit(digits);
+          }}
           onSubmitEditing={() => void submit()}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
