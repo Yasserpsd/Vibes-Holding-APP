@@ -9,6 +9,8 @@ export type AccountState = 'pending' | 'unpaid' | 'member' | 'expired' | 'lead';
 /** The filters of the members list: the states plus the two roles and «all» (which leaves the leads out). */
 export type AccountFilter = 'all' | 'pending' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
 export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor';
+/** M210: WhatsApp-proven number or not (hub 2.28.4+). */
+export type WaFilter = 'all' | 'yes' | 'no';
 
 export type Account = {
   id: number;
@@ -35,6 +37,8 @@ export type Account = {
   member_end: string;
   never_expires: 0 | 1;
   /** M205 (hub 2.28.0+): «عضوية شرفية» — no days, no end date; absent on an older hub. */
+  /** M210 (hub 2.28.4+): 1 while the current number is the one that received a WhatsApp code; absent on an older hub. */
+  phone_verified?: 0 | 1;
   honorary?: 0 | 1;
   honorary_since?: string;
   daily_limit: number;

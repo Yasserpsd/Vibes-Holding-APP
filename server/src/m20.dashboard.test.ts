@@ -161,7 +161,7 @@ test('accounts: states, search, counts, and the Projects Bank balance beside eve
   const all = await get('/api/admin/accounts?per_page=100', adminToken);
   const body = all.json();
   assert.ok(body.total >= 36 && body.items.every((item: { state: string }) => item.state !== 'lead'));
-  assert.deepEqual(Object.keys(body.counts).sort(), ['admin', 'all', 'expired', 'lead', 'member', 'pending', 'publisher', 'unpaid']);
+  assert.deepEqual(Object.keys(body.counts).sort(), ['admin', 'all', 'expired', 'lead', 'member', 'pending', 'publisher', 'unpaid', 'wa_no', 'wa_yes']);
   assert.equal(body.pbError, null);
   for (const item of body.items as { state: string; pb: { left: number; used: number; granted: number } | null }[]) {
     if (item.state === 'member') assert.deepEqual(Object.keys(item.pb ?? {}), ['left', 'used', 'granted']);
@@ -173,6 +173,16 @@ test('accounts: states, search, counts, and the Projects Bank balance beside eve
   const found = (await get(`/api/admin/accounts?q=${encodeURIComponent('m20.admin@gmail.com')}`, adminToken)).json();
   assert.deepEqual(found.items.map((item: { id: number }) => item.id), [adminId]);
   assert.equal((await get('/api/admin/accounts?state=nope', adminToken)).statusCode, 400);
+  // M210 (hub 2.28.4): every row says whether its number is WhatsApp-proven; wa=yes|no filters, the two counts ignore the filter.
+  assert.ok(body.items.every((item: { phone_verified?: number }) => item.phone_verified === 0 || item.phone_verified === 1));
+  assert.equal(body.counts.wa_yes + body.counts.wa_no, body.counts.all + body.counts.lead);
+  const proven = (await get('/api/admin/accounts?wa=yes&per_page=100', adminToken)).json();
+  assert.ok(proven.items.every((item: { phone_verified?: number }) => item.phone_verified === 1));
+  assert.equal(proven.counts.wa_yes, body.counts.wa_yes);
+  const unproven = (await get('/api/admin/accounts?wa=no&per_page=100', adminToken)).json();
+  assert.ok(unproven.items.every((item: { phone_verified?: number }) => item.phone_verified === 0));
+  assert.equal(proven.total + unproven.total, body.total);
+  assert.equal((await get('/api/admin/accounts?wa=maybe', adminToken)).statusCode, 400);
 
   const member = await someMember();
   const detail = (await get(`/api/admin/accounts/${member.id}`, adminToken)).json();

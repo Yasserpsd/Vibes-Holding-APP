@@ -1,4 +1,4 @@
-import type { AccountFilter, AccountsResult, Personas, PersonaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
+import type { AccountFilter, AccountsResult, Personas, PersonaFilter, WaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api-test.vibesholdingsa.com';
@@ -671,8 +671,8 @@ export const api = {
   downloads: () => call<Downloads>('GET', '/api/admin/downloads'),
   downloadsSnapshot: () => call<Downloads>('POST', '/api/admin/downloads/snapshot'),
   home: (days: number) => call<Home>('GET', `/api/admin/home${query({ days })}`),
-  accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter }) =>
-    call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona })}`),
+  accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter; wa?: WaFilter }) =>
+    call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona, wa: input.wa })}`),
   // M86: the members-by-category counts behind the persona buttons.
   personas: (state: 'member' | 'all') => call<Personas>('GET', `/api/admin/personas?state=${state}`),
   account: (id: number) => call<MemberDetail>('GET', `/api/admin/accounts/${id}`),

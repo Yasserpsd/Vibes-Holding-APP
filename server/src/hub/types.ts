@@ -192,6 +192,8 @@ export type HubAccount = {
   member_end: string;
   never_expires: 0 | 1;
   /** M205 (hub 2.28.0+): see HubContact; an honorary account also answers never_expires 1. */
+  /** M210 (hub 2.28.4+): 1 while the current number is the one that received a WhatsApp code; absent on an older hub. */
+  phone_verified?: 0 | 1;
   honorary?: 0 | 1;
   honorary_since?: string;
   daily_limit: number;

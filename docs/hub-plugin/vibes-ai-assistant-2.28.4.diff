@@ -1,6 +1,6 @@
-diff -ruN vibes-ai-assistant/includes/class-vai-admin.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-admin.php
---- vibes-ai-assistant/includes/class-vai-admin.php	2026-11-06 18:17:38.000000000 +0300
-+++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-07 00:41:33.091653700 +0300
+diff -ruN work/orig-2282/includes/class-vai-admin.php work/hub/vibes-ai-assistant/includes/class-vai-admin.php
+--- work/orig-2282/includes/class-vai-admin.php	2026-11-07 00:43:58.951133200 +0300
++++ work/hub/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-07 00:41:33.091653700 +0300
 @@ -629,46 +629,69 @@
  		$q       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
  		$persona = isset( $_GET['persona'] ) ? sanitize_key( wp_unslash( $_GET['persona'] ) ) : '';
@@ -97,9 +97,9 @@ diff -ruN vibes-ai-assistant/includes/class-vai-admin.php /c/Projects/vibes-test
  			$btn = function ( $act, $label, $confirm = '' ) use ( $c ) {
  				self::form_open( 'account_action' );
  				echo '<input type="hidden" name="id" value="' . (int) $c->id . '"><input type="hidden" name="act" value="' . esc_attr( $act ) . '"><button class="button button-small"' . ( $confirm ? ' onclick="return confirm(\'' . esc_js( $confirm ) . '\')"' : '' ) . '>' . esc_html( $label ) . '</button></form> ';
-diff -ruN vibes-ai-assistant/includes/class-vai-hub.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-hub.php
---- vibes-ai-assistant/includes/class-vai-hub.php	2026-11-06 18:57:25.000000000 +0300
-+++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-07 00:38:07.855078700 +0300
+diff -ruN work/orig-2282/includes/class-vai-hub.php work/hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- work/orig-2282/includes/class-vai-hub.php	2026-11-07 00:43:58.950124100 +0300
++++ work/hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-07 00:57:14.003490800 +0300
 @@ -5536,7 +5536,8 @@
  		return (array) $wpdb->get_results( "SELECT c.*, s.host FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE c.is_member=1 ORDER BY c.member_started_at DESC, c.id DESC LIMIT 500" );
  	}
@@ -124,28 +124,64 @@ diff -ruN vibes-ai-assistant/includes/class-vai-hub.php /c/Projects/vibes-test-r
  		$sql = "SELECT c.*, s.host, s.trusted AS site_trusted FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE $w ORDER BY c.id DESC LIMIT " . (int) $limit;
  		return (array) ( $args ? $wpdb->get_results( $wpdb->prepare( $sql, $args ) ) : $wpdb->get_results( $sql ) );
  	}
-diff -ruN vibes-ai-assistant/readme.txt /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/readme.txt
---- vibes-ai-assistant/readme.txt	2026-11-06 18:56:03.000000000 +0300
-+++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/readme.txt	2026-11-07 00:41:54.160424600 +0300
-@@ -14,6 +14,9 @@
+@@ -6016,6 +6024,7 @@
+ 			'intent'        => $score,
+ 			'intent_label'  => self::intent_label( $score ),
+ 			'has_password'  => ! empty( $c->pass_hash ) ? 1 : 0,
++			'phone_verified' => self::phone_is_verified( $c ) ? 1 : 0, // 2.28.4 (M210): the current number received a WhatsApp code
+ 			'referred_by'   => isset( $c->referred_by ) ? (int) $c->referred_by : 0,
+ 		);
+ 	}
+@@ -6349,7 +6358,13 @@
+ 		$state  = in_array( $state, $states, true ) ? $state : 'all';
+ 		list( $page, $per, $off ) = self::bridge_page( $d );
+ 		list( $qs, $qa )          = self::where_contact_q( vai_str( $d, 'q', 100 ) );
+-		$base = self::sql_state( 'all' ) . $qs;
++		// 2.28.4 (M210, owner, 2026-11-07): wa = yes|no keeps only the accounts whose current number is WhatsApp-proven (or not);
++		// the two counts are answered over the unfiltered base so the dashboard can show both pills.
++		$wa     = preg_replace( '/[^a-z]/', '', strtolower( vai_str( $d, 'wa', 5 ) ) );
++		$wa     = in_array( $wa, array( 'yes', 'no' ), true ) ? $wa : '';
++		$wa_yes = "(c.phone_norm<>'' AND c.phone_verified_norm=c.phone_norm)";
++		$base0  = self::sql_state( 'all' ) . $qs;
++		$base   = $base0 . ( 'yes' === $wa ? " AND $wa_yes" : ( 'no' === $wa ? " AND NOT $wa_yes" : '' ) );
+ 		$sum  = array();
+ 		foreach ( $states as $k ) {
+ 			$sum[] = 'SUM(CASE WHEN ' . self::sql_state( $k ) . ' THEN 1 ELSE 0 END) AS n_' . $k;
+@@ -6359,6 +6374,9 @@
+ 		foreach ( $states as $k ) {
+ 			$counts[ $k ] = isset( $crow[ 'n_' . $k ] ) ? (int) $crow[ 'n_' . $k ] : 0;
+ 		}
++		$wrow = (array) $wpdb->get_row( self::prep( "SELECT SUM(CASE WHEN $wa_yes THEN 1 ELSE 0 END) AS y, SUM(CASE WHEN NOT $wa_yes THEN 1 ELSE 0 END) AS n FROM $ct c WHERE $base0", $qa ), ARRAY_A );
++		$counts['wa_yes'] = isset( $wrow['y'] ) ? (int) $wrow['y'] : 0;
++		$counts['wa_no']  = isset( $wrow['n'] ) ? (int) $wrow['n'] : 0;
+ 		$sql  = "SELECT c.*, s.host AS site_host FROM $ct c LEFT JOIN $st s ON s.id=c.last_site_id WHERE " . self::sql_state( $state ) . " AND $base ORDER BY c.last_at DESC, c.id DESC LIMIT %d OFFSET %d";
+ 		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, array_merge( $qa, array( $per, $off ) ) ) );
+ 		return array( 'ok' => true, 'total' => $counts[ $state ], 'page' => $page, 'per_page' => $per, 'counts' => $counts, 'items' => self::account_rows( $rows ) );
+diff -ruN work/orig-2282/readme.txt work/hub/vibes-ai-assistant/readme.txt
+--- work/orig-2282/readme.txt	2026-11-07 00:43:58.953007700 +0300
++++ work/hub/vibes-ai-assistant/readme.txt	2026-11-07 00:58:09.886569500 +0300
+@@ -14,6 +14,12 @@
  
  == سجل التغييرات ==
  
++= 2.28.4 =
++* M210 for the app dashboard (owner, 2026-11-07: «وعايزها تظهر برده في داشبورد للأدمن»): the admin account shape (`admin_accounts`, `admin_member`) carries `phone_verified` (1 while the current number is the one that received a WhatsApp code); `admin_accounts` takes `wa=yes|no` as a filter and answers `counts.wa_yes` / `counts.wa_no` over the unfiltered base. No schema change.
++
 += 2.28.3 =
 +* M210 (owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين»): «الحسابات المسجّلة» shows per account whether the current number is WhatsApp-proven — a «WhatsApp» column with the badge «✅ موثّق عبر WhatsApp» or «⚠️ غير موثّق» in both the full list and the filtered view, plus a second pill row (counts of each, filter `wa=yes|no`) that combines with the فئة filter and survives the search. `VAI_Hub::accounts()` takes the filter as its fourth argument. No schema change.
 +
  = 2.28.2 =
  * A Google or Apple sign-up can give its invite code with the profile: op_profile takes `referral` and `referral_kind` from the trusted app server, once, before any membership, and answers referred_by + referred_name. The admin mail that follows names the representative or the inviting member.
  
-diff -ruN vibes-ai-assistant/vibes-ai-assistant.php /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/vibes-ai-assistant.php
---- vibes-ai-assistant/vibes-ai-assistant.php	2026-11-06 18:56:03.000000000 +0300
-+++ /c/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-07 00:41:54.126597500 +0300
+diff -ruN work/orig-2282/vibes-ai-assistant.php work/hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- work/orig-2282/vibes-ai-assistant.php	2026-11-07 00:43:58.953007700 +0300
++++ work/hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-07 00:58:09.853642500 +0300
 @@ -3,7 +3,7 @@
   * Plugin Name: Vibes AI Assistant
   * Plugin URI:  https://vcmem.com/
   * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
 - * Version:     2.28.2
-+ * Version:     2.28.3
++ * Version:     2.28.4
   * Author:      Vibes Ventures
   * Text Domain: vibes-ai
   * Requires PHP: 7.4
@@ -154,7 +190,7 @@ diff -ruN vibes-ai-assistant/vibes-ai-assistant.php /c/Projects/vibes-test-rig/w
  }
  
 -define( 'VAI_VERSION', '2.28.2' );
-+define( 'VAI_VERSION', '2.28.3' );
++define( 'VAI_VERSION', '2.28.4' );
  define( 'VAI_FILE', __FILE__ );
  define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
  define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

@@ -142,6 +142,7 @@ export class MockAdmin {
       ...this.intent(contact, state, rows.length),
       has_password: contact.passHash ? 1 : 0,
       referred_by: contact.referredBy,
+      phone_verified: view.phone_verified ?? 0,
     };
   }
 
@@ -269,14 +270,22 @@ export class MockAdmin {
     const threads = this.threadMap(now);
     const q = str(body, 'q', 120);
     const wanted = str(body, 'state', 20) || 'all';
+    // M210 (hub 2.28.4): WhatsApp-proven number or not; the two counts ignore the filter so both pills show.
+    const wa = str(body, 'wa', 5);
     const rows = [...this.deps.state.contacts.values()].filter((contact) => this.matches(contact, q)).map((contact) => this.account(contact, threads, now));
     const belongs = (row: HubAccount, state: string): boolean => {
       if (state === 'all') return row.state !== 'lead';
       if (state === 'admin' || state === 'publisher') return row.role === state && row.state !== 'lead' && row.state !== 'pending';
       return row.state === state;
     };
-    const counts = Object.fromEntries(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead'].map((state) => [state, rows.filter((row) => belongs(row, state)).length]));
-    const listed = rows.filter((row) => belongs(row, wanted)).sort((a, b) => b.id - a.id);
+    const proven = (row: HubAccount): boolean => row.phone_verified === 1;
+    const kept = wa === 'yes' ? rows.filter(proven) : wa === 'no' ? rows.filter((row) => !proven(row)) : rows;
+    const counts = {
+      ...Object.fromEntries(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead'].map((state) => [state, kept.filter((row) => belongs(row, state)).length])),
+      wa_yes: rows.filter(proven).length,
+      wa_no: rows.filter((row) => !proven(row)).length,
+    };
+    const listed = kept.filter((row) => belongs(row, wanted)).sort((a, b) => b.id - a.id);
     return { ok: true, ...paged(listed, body), counts };
   }
 

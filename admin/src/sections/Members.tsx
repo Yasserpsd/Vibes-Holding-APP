@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api';
 import { daysText, formatDay, formatNumber, formatRelative } from '../format';
-import type { Account, AccountFilter, AccountRow, PersonaFilter } from '../types';
+import type { Account, AccountFilter, AccountRow, PersonaFilter, WaFilter } from '../types';
 import { AsyncPage, Chips, ErrorCard, Pill, SearchBox, SectionHead, useDebounced, useLoad, useShell, type Tone } from '../ui';
 
 // M86 (owner): «اعرف كام مستثمر وكام رائد أعمال وكام محايد — بوتون أدوس عليها ويتفلتر لوحده».
@@ -11,6 +11,13 @@ const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
   { value: 'neutral', label: 'محايد' },
   { value: 'entrepreneur', label: 'رائد أعمال' },
   { value: 'investor', label: 'مستثمر' },
+];
+
+// M210 (owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين» — and in the dashboard for the admin).
+const WA_FILTERS: { value: WaFilter; label: string }[] = [
+  { value: 'all', label: 'الكل' },
+  { value: 'yes', label: 'موثّق عبر WhatsApp' },
+  { value: 'no', label: 'غير موثّق' },
 ];
 
 const PER_PAGE = 25;
@@ -45,6 +52,13 @@ export function StatePill({ account }: { account: Pick<Account, 'state' | 'role'
 }
 
 /** "باقي 120 يومًا" for a dated membership, the plain fact for one without an end. */
+/** M210: whether the account's CURRENT number is the one that received a WhatsApp code (hub 2.28.4+; nothing on an older hub). */
+export function WaPill({ account }: { account: Pick<Account, 'phone_verified' | 'phone'> }) {
+  if (account.phone_verified === undefined) return null;
+  if (account.phone_verified === 1) return <Pill tone="ok">موثّق عبر WhatsApp</Pill>;
+  return <Pill tone="danger">{account.phone ? 'غير موثّق' : 'غير موثّق — بدون جوال'}</Pill>;
+}
+
 export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end' | 'honorary'>): string {
   if (account.honorary) return 'شرفية بلا مدة';
   if (account.never_expires) return 'بلا تاريخ انتهاء';
@@ -74,6 +88,7 @@ function Row({ account }: { account: AccountRow }) {
           <span className="pills">
             {persona ? <Pill tone="muted">{persona}</Pill> : null}
             <StatePill account={account} />
+            <WaPill account={account} />
           </span>
         </span>
         <span className="muted member-contact">
@@ -116,14 +131,15 @@ function Row({ account }: { account: AccountRow }) {
 export function Members({ initial, stamp }: { initial: AccountFilter; stamp: number }) {
   const [filter, setFilter] = useState<AccountFilter>(initial);
   const [persona, setPersona] = useState<PersonaFilter>('all');
+  const [wa, setWa] = useState<WaFilter>('all');
   const [text, setText] = useState('');
   const [page, setPage] = useState(1);
   const q = useDebounced(text.trim());
-  const state = useLoad(() => api.accounts({ q, state: filter, persona, page, perPage: PER_PAGE }), [q, filter, persona, page, stamp]);
+  const state = useLoad(() => api.accounts({ q, state: filter, persona, wa, page, perPage: PER_PAGE }), [q, filter, persona, wa, page, stamp]);
   // M86: the category counts over ALL accounts — the buttons show them and a tap filters the list.
   const personas = useLoad(() => api.personas('all'), [stamp]);
 
-  useEffect(() => setPage(1), [q, filter, persona]);
+  useEffect(() => setPage(1), [q, filter, persona, wa]);
 
   const counts = state.data?.counts;
   const personaCount = (value: PersonaFilter): number | null =>
@@ -135,6 +151,10 @@ export function Members({ initial, stamp }: { initial: AccountFilter; stamp: num
         <SearchBox value={text} onChange={setText} placeholder="ابحث بالاسم أو البريد أو الجوال" />
         <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: counts?.[entry.value] ?? null }))} value={filter} onChange={setFilter} />
         <Chips label="الفئة" options={PERSONA_FILTERS.map((entry) => ({ ...entry, count: personaCount(entry.value) }))} value={persona} onChange={setPersona} />
+        {/* M210: shown only when the hub answers the WhatsApp counts (2.28.4+). */}
+        {counts && counts.wa_yes !== undefined ? (
+          <Chips label="توثيق WhatsApp" options={WA_FILTERS.map((entry) => ({ ...entry, count: entry.value === 'all' ? null : (counts[entry.value === 'yes' ? 'wa_yes' : 'wa_no'] ?? null) }))} value={wa} onChange={setWa} />
+        ) : null}
       </div>
       <AsyncPage state={state} onPage={setPage} rows={8} emptyText={q ? 'لا توجد حسابات تطابق البحث.' : 'لا توجد حسابات في هذه الحالة.'}>
         {(data) => (

@@ -211,16 +211,18 @@ export class DashboardService {
   /** The hub's list with the Projects Bank «رصيد» beside every active member, through one `balances` call. */
   async accounts(
     admin: AdminActor,
-    query: { q: string; state: string; page: number; perPage: number; persona?: string },
+    query: { q: string; state: string; page: number; perPage: number; persona?: string; wa?: string },
   ): Promise<Omit<HubResults['admin_accounts'], 'items'> & { items: (HubAccount & { pb: PbBeside | null })[]; pbError: SectionError | null }> {
     let result: HubResults['admin_accounts'];
+    // M210 (hub 2.28.4): the WhatsApp filter is the hub's own; an older hub ignores the key and sends no wa counts.
+    const wa = query.wa && query.wa !== 'all' ? { wa: query.wa } : {};
     if (query.persona && query.persona !== 'all') {
       // M86 (owner): the hub list has no persona filter yet, so the server sweeps it (pages of 100,
       // capped at 1000 like `personas()`), keeps the chosen category and pages the match locally.
       const matched: HubAccount[] = [];
       let counts: Record<string, number> = {};
       for (let page = 1; page <= 10; page += 1) {
-        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100 });
+        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100, ...wa });
         counts = slice.counts;
         matched.push(...slice.items.filter((account) => account.persona === query.persona));
         if (page * 100 >= slice.total) break;
@@ -228,7 +230,7 @@ export class DashboardService {
       const start = (query.page - 1) * query.perPage;
       result = { ok: true, total: matched.length, page: query.page, per_page: query.perPage, items: matched.slice(start, start + query.perPage), counts };
     } else {
-      result = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage });
+      result = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage, ...wa });
     }
     const members = result.items.filter((account) => account.state === 'member');
     let balances: Record<string, PbBalanceLite> = {};

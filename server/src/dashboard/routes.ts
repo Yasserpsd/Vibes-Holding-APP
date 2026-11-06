@@ -18,6 +18,8 @@ const accountsSchema = z.object({
   state: z.enum(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
   // M86 (owner): one tap filters the members by their category.
   persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor']).default('all'),
+  // M210 (owner): WhatsApp-proven number or not (hub 2.28.4+; an older hub ignores it).
+  wa: z.enum(['all', 'yes', 'no']).default('all'),
   ...paging,
 });
 const personasSchema = z.object({ state: z.enum(['member', 'all']).default('all') });
@@ -65,7 +67,7 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const query = parse(accountsSchema, request.query, reply);
       if (!query) return;
-      const answer = await service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona });
+      const answer = await service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona, wa: query.wa });
       // M116 (owner): the members list shows each account's interests beside the persona filter.
       if (!interests) return answer;
       const labels = await interests.labelsFor(answer.items.map((item) => item.id));
