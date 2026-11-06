@@ -556,7 +556,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!result.ok) {
         if (result.reason === 'cooldown') {
           // M109d: the owner's wording — the yearly change is used up; the dashboard request is the way.
-          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير صفتك مرة واحدة فقط خلال السنة — متبقٍ ${result.daysLeft} يومًا. يمكنك إرسال «طلب تغيير الصفة» إلى الإدارة.`, daysLeft: result.daysLeft } });
+          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير فئتك مرة واحدة فقط خلال السنة — متبقٍ ${result.daysLeft} يومًا. يمكنك إرسال «طلب تغيير الفئة» إلى الإدارة.`, daysLeft: result.daysLeft } });
         }
         if (result.reason === 'too_soon') {
           return reply.code(429).send({ error: { code: 'persona_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });

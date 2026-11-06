@@ -160,7 +160,7 @@ test('M109d: the yearly window and the dashboard-reviewed change request', async
   const again = await send('POST', '/api/me/persona/request', { persona: 'entrepreneur' }, memberToken);
   assert.equal(again.statusCode, 429);
   assert.equal(again.json().error.code, 'persona_cooldown');
-  assert.match(again.json().error.message, /طلب تغيير الصفة/);
+  assert.match(again.json().error.message, /طلب تغيير الفئة/);
 
   const state = await get('/api/me/persona/state', memberToken);
   assert.equal(state.statusCode, 200, state.body);
