@@ -1504,6 +1504,7 @@
   "wa.popup.doneButton": "Done",
   "wa.menu.title": "WhatsApp verification",
   "wa.menu.verified": "Verified",
+  "wa.menu.unverified": "Not verified",
   "badge.verified": "Verified WhatsApp number",
   "badge.member": "Verified member with an active membership"
 }

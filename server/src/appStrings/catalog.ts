@@ -1506,6 +1506,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "wa.popup.doneButton": "تم",
     "wa.menu.title": "توثيق WhatsApp",
     "wa.menu.verified": "موثّق",
+    "wa.menu.unverified": "غير موثّق",
     "badge.verified": "رقم واتساب موثّق",
     "badge.member": "عضو موثّق بعضوية فعّالة"
   },
@@ -3015,6 +3016,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "wa.popup.doneButton": "Done",
     "wa.menu.title": "WhatsApp verification",
     "wa.menu.verified": "Verified",
+    "wa.menu.unverified": "Not verified",
     "badge.verified": "Verified WhatsApp number",
     "badge.member": "Verified member with an active membership"
   },

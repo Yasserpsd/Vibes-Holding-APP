@@ -1504,6 +1504,7 @@
   "wa.popup.doneButton": "تم",
   "wa.menu.title": "توثيق WhatsApp",
   "wa.menu.verified": "موثّق",
+  "wa.menu.unverified": "غير موثّق",
   "badge.verified": "رقم واتساب موثّق",
   "badge.member": "عضو موثّق بعضوية فعّالة"
 }

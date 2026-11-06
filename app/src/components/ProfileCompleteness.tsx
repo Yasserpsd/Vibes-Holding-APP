@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Modal, Text, View } from 'react-native';
+import { I18nManager, Modal, Text, View } from 'react-native';
 
 import type { Me } from '@/api/auth';
 import { AppButton } from '@/components/AppButton';
@@ -14,13 +14,14 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
- * M103 «كمّل بياناتك»: a meter of golden dots around the member's avatar shows how complete his
+ * M103 «كمّل بياناتك»: a meter (golden dots, since M209e a gold arc) around the member's avatar shows how complete his
  * profile is, and a one-time popup (repeated gently every 7 days while incomplete) sends him to
  * the profile editor — the club knows its members better, and members find each other.
  */
 const NUDGE_KEY = 'investorsclub.profileNudgeAt';
 const NUDGE_DAYS = 7;
-const DOTS = 12;
+// Left/right style props mirror under RTL unless the app turned the swap off; the arc colours follow.
+const MIRRORED = I18nManager.isRTL && I18nManager.doLeftAndRightSwapInRTL;
 
 /** The profile fields that count, equally weighted: only what the member can fill in the app's editor. */
 export function profileCompletion(me: Me): number {
@@ -29,25 +30,48 @@ export function profileCompletion(me: Me): number {
   return Math.round((filled / fields.length) * 100);
 }
 
-/** Golden dots around the avatar — filled dots follow the completion, the rest stay quiet. */
+/**
+ * M209e (owner, 2026-11-07: the dots looked like «لمبات أفراح»): a thin continuous gold arc around the avatar
+ * follows the completion over a dim track. Pure Views, no SVG: two windows each clip one half of the frame,
+ * and inside each a full circle whose far half is transparent turns to reveal the sweep.
+ * Positions stay centred (RTL swaps left/right); the halves move by translateX, which never mirrors.
+ */
 export function CompletionMeter({ percent, size, children }: { percent: number; size: number; children: ReactNode }) {
-  const radius = size / 2 + 7;
-  const filled = Math.round((percent / 100) * DOTS);
-  const frame = size + 28;
+  const frame = size + 16;
+  const stroke = 3;
+  const quarter = frame / 4;
+  const sweep = Math.max(0, Math.min(100, percent)) * 3.6;
+  const halves = [
+    // The right half shows 0°–180° (from the top, clockwise); the left half the rest.
+    { key: 'right', shift: quarter, deg: Math.min(sweep, 180), base: 45 },
+    { key: 'left', shift: -quarter, deg: Math.max(0, sweep - 180), base: -135 },
+  ];
   return (
     <View style={{ width: frame, height: frame, alignItems: 'center', justifyContent: 'center' }}>
-      {Array.from({ length: DOTS }, (_, index) => {
-        const angle = (index / DOTS) * 2 * Math.PI - Math.PI / 2;
-        const x = frame / 2 + radius * Math.cos(angle) - 3;
-        const y = frame / 2 + radius * Math.sin(angle) - 3;
-        const on = index < filled;
-        return (
+      <View style={[styles.ring, { width: frame, height: frame, borderRadius: frame / 2, borderWidth: stroke }]} />
+      {halves.map(({ key, shift, deg, base }) =>
+        deg > 0 ? (
           <View
-            key={index}
-            style={[styles.dot, { left: x, top: y }, on ? styles.dotOn : null]}
-          />
-        );
-      })}
+            key={key}
+            pointerEvents="none"
+            style={[styles.half, { width: frame / 2, height: frame, left: quarter, transform: [{ translateX: shift }] }]}
+          >
+            <View
+              style={[
+                styles.arc,
+                {
+                  width: frame,
+                  height: frame,
+                  borderRadius: frame / 2,
+                  borderWidth: stroke,
+                  left: -quarter,
+                  transform: [{ translateX: -shift }, { rotate: `${base + deg}deg` }],
+                },
+              ]}
+            />
+          </View>
+        ) : null,
+      )}
       {children}
       {percent < 100 ? (
         <PopIn delay={320} style={styles.badgeWrap}>
@@ -111,8 +135,16 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
 }
 
 const styles = themedStyles(() => ({
-  dot: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
-  dotOn: { backgroundColor: colors.gold, boxShadow: shadows.glowGoldFaint },
+  ring: { position: 'absolute', borderColor: colors.border, opacity: 0.55 },
+  half: { position: 'absolute', top: 0, overflow: 'hidden' },
+  // The coloured half is bottom + left; when RTL swaps left/right the colours swap too, so name the mirror pair.
+  arc: {
+    position: 'absolute',
+    top: 0,
+    borderColor: colors.gold,
+    borderTopColor: 'transparent',
+    [MIRRORED ? 'borderLeftColor' : 'borderRightColor']: 'transparent',
+  },
   badgeWrap: { position: 'absolute', bottom: -2, alignSelf: 'center' },
   badge: {
     paddingHorizontal: spacing.sm,

@@ -114,7 +114,14 @@ export default function AccountScreen() {
               icon="logo-whatsapp"
               label={t('wa.menu.title')}
               onPress={me.phoneVerified ? () => undefined : showWhatsappVerify}
-              trailing={me.phoneVerified ? <Text style={styles.verifiedText}>{t('wa.menu.verified')}</Text> : undefined}
+              iconColor={me.phoneVerified ? WA_GREEN : colors.textMuted}
+              trailing={
+                me.phoneVerified ? (
+                  <Text style={styles.verifiedText}>{t('wa.menu.verified')}</Text>
+                ) : (
+                  <Text style={styles.unverifiedText}>{t('wa.menu.unverified')}</Text>
+                )
+              }
               hideChevron={me.phoneVerified}
             />
           ) : null}
@@ -188,6 +195,9 @@ export default function AccountScreen() {
     </Screen>
   );
 }
+
+// M209e (owner, 2026-11-07: «أخضر منوّر لما يكون موثّق»): the WhatsApp row's icon and «موثّق» light up in WhatsApp green.
+const WA_GREEN = '#25D366';
 
 function ProfileHeader({ me }: { me: Me }) {
   // M109e: the English app shows the member's own data in English (display only).
@@ -274,10 +284,19 @@ function MenuGroup({ title, icon, children }: { title: string; icon?: IoniconNam
   );
 }
 
-type MenuRowProps = { icon: IoniconName; label: string; onPress: () => void; danger?: boolean; trailing?: ReactNode; hideChevron?: boolean };
+type MenuRowProps = {
+  icon: IoniconName;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  trailing?: ReactNode;
+  hideChevron?: boolean;
+  /** M209e: a row may colour its icon itself (the WhatsApp row: bright green once verified, dimmed before). */
+  iconColor?: string;
+};
 
-function MenuRow({ icon, label, onPress, danger = false, trailing, hideChevron = false }: MenuRowProps) {
-  const color = danger ? colors.danger : colors.gold;
+function MenuRow({ icon, label, onPress, danger = false, trailing, hideChevron = false, iconColor }: MenuRowProps) {
+  const color = iconColor ?? (danger ? colors.danger : colors.gold);
   return (
     <PressScale onPress={onPress} style={styles.row}>
       {/* M84e: every menu icon pops into place — the reorganized groups read icon-first. */}
@@ -296,7 +315,8 @@ const styles = themedStyles(() => ({
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   badge: { position: 'absolute', bottom: -4, end: -6 },
-  verifiedText: { ...typography.caption, color: colors.success },
+  verifiedText: { ...typography.caption, color: WA_GREEN },
+  unverifiedText: { ...typography.caption, color: colors.textMuted, opacity: 0.7 },
   avatarRing: {
     width: 78,
     height: 78,
