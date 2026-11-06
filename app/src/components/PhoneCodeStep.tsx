@@ -41,7 +41,7 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel }: Props) {
 
   const submit = async (value = code) => {
     if (busy) return;
-    if (!/^\d{4,6}$/.test(value)) {
+    if (!/^\d{4}$/.test(value)) {
       setError(t('auth.verify.codeRequired'));
       return;
     }
@@ -83,12 +83,12 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel }: Props) {
         latin
         keyboardType="number-pad"
         textContentType="oneTimeCode"
-        maxLength={6}
+        maxLength={4}
         value={code}
         autoFocus
         onChangeText={(value) => {
           // M203 (owner: seconds, not minutes): four digits typed or pasted from WhatsApp finish the step by themselves.
-          const digits = value.replace(/\D/g, '');
+          const digits = value.replace(/\D/g, '').slice(0, 4);
           setCode(digits);
           if (digits.length === 4) void submit(digits);
         }}
