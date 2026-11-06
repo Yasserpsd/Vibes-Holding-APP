@@ -332,6 +332,8 @@ export class AuthService {
     if (badName) throw new AuthError('bad_name', badName, 400);
     // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
     const referral = input.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(input.inviteCode) : '';
+    // M206: hub 2.28.1 labels the member's source; older hubs ignore the field.
+    const representative = referral ? await this.deps.invites?.isRepresentative(referral) : false;
     // M120 (owner): the picked interests travel as Arabic labels so the hub's «عضو جديد» mail reads at a glance.
     const interests = (input.interests ?? [])
       .filter(isInterestKey)
@@ -357,7 +359,7 @@ export class AuthService {
       page_url: 'app://register',
       // M146: the hub stores it and the admin «عضو جديد» mail shows iPhone / Android (hub 2.21.1+; older hubs ignore it).
       source,
-      ...(referral ? { referral } : {}),
+      ...(referral ? { referral, ...(representative ? { referral_kind: 'representative' } : {}) } : {}),
       ...(interests ? { interests } : {}),
     });
     if (referral && this.deps.invites && result.contact) {

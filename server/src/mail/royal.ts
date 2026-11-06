@@ -8,6 +8,8 @@ import { SELLER } from '../payments/invoice.js';
  */
 export type RoyalLang = 'ar' | 'en';
 export type RoyalRow = { label: string; value: string; ltr?: boolean };
+/** M206: a small state pill on the admin mails. */
+export type RoyalStatus = { label: string; tone: 'good' | 'bad' | 'wait' };
 export type RoyalMail = {
   lang: RoyalLang;
   /** The small gold line above the title (defaults to the club's name). */
@@ -15,6 +17,7 @@ export type RoyalMail = {
   title: string;
   /** A one-line subtitle under the title, inside the navy header. */
   subtitle?: string;
+  status?: RoyalStatus;
   /** The greeting line («أهلًا بك يا …»). */
   greeting?: string;
   /** One or two short sentences; each item is a paragraph. */
@@ -33,6 +36,7 @@ const INK = '#111111';
 const IVORY = '#FBF7EC';
 const LINE = '#EADFC2';
 const GOLD_DARK = '#7A6320';
+const TONES = { good: ['#E6F4EA', '#1E6B34'], bad: ['#FCE8E6', '#B3261E'], wait: ['#FFF4DC', '#8A5A00'] } as const;
 const FONT = "font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif";
 /** The club logo as vcmem.com/app serves it (the original artwork; mail clients render PNG). */
 export const CLUB_LOGO_URL =
@@ -53,7 +57,7 @@ export function royalHtml(mail: RoyalMail): string {
     .map((row, index) => {
       const ltr = row.ltr ?? LATIN.test(row.value);
       const top = index ? `border-top:1px solid ${LINE};` : '';
-      return `<tr><td bgcolor="${IVORY}" style="${FONT};padding:9px 14px;font-size:13.5px;color:${GOLD_DARK} !important;white-space:nowrap;width:36%;vertical-align:top;background:${IVORY} !important;${top}">${escapeHtml(row.label)}</td><td bgcolor="${IVORY}"${ltr ? ' dir="ltr"' : ''} style="${FONT};padding:9px 14px;font-size:14.5px;color:${INK} !important;font-weight:600;vertical-align:top;background:${IVORY} !important;text-align:${start};${top}">${escapeHtml(row.value)}</td></tr>`;
+      return `<tr><td bgcolor="${IVORY}" style="${FONT};padding:9px 14px;font-size:13.5px;color:${GOLD_DARK} !important;${row.label.length > 22 ? '' : 'white-space:nowrap;'}width:36%;vertical-align:top;background:${IVORY} !important;${top}">${escapeHtml(row.label)}</td><td bgcolor="${IVORY}"${ltr ? ' dir="ltr"' : ''} style="${FONT};padding:9px 14px;font-size:14.5px;color:${INK} !important;font-weight:600;vertical-align:top;background:${IVORY} !important;text-align:${start};${top}">${escapeHtml(row.value)}</td></tr>`;
     })
     .join('');
   const paragraphs = (mail.lead ?? []).map((line) => `<p style="${FONT};margin:0 0 10px;font-size:15px;line-height:1.9;color:${INK} !important">${escapeHtml(line)}</p>`).join('');
@@ -69,9 +73,10 @@ ${mail.subtitle ? `<div style="${FONT};color:${GOLD} !important;font-size:15px;f
 </td></tr>
 <tr><td bgcolor="#ffffff" style="background:#ffffff !important;padding:24px 26px 8px;text-align:${start}">
 ${mail.sealUrl ? `<div style="text-align:center;margin:-2px 0 14px"><img src="${escapeHtml(mail.sealUrl)}" alt="" width="88" height="88" style="width:88px;height:88px;display:inline-block;border:0;opacity:.95"></div>` : ''}
+${mail.status ? `<div style="text-align:center;margin:0 0 14px"><span style="${FONT};display:inline-block;background:${TONES[mail.status.tone][0]} !important;color:${TONES[mail.status.tone][1]} !important;font-size:13.5px;font-weight:700;padding:6px 18px;border-radius:999px">${escapeHtml(mail.status.label)}</span></div>` : ''}
 ${mail.greeting ? `<p style="${FONT};margin:0 0 10px;font-size:17px;font-weight:700;color:${NAVY} !important;line-height:1.7">${escapeHtml(mail.greeting)}</p>` : ''}
 ${paragraphs}
-${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${IVORY}" style="margin:14px 0 6px;border:1px solid ${LINE};border-radius:14px;background:${IVORY} !important;border-collapse:separate">${rows}</table>` : ''}
+${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${IVORY}" style="margin:14px 0 6px;border:1px solid ${LINE};border-radius:14px;overflow:hidden;background:${IVORY} !important;border-collapse:separate">${rows}</table>` : ''}
 ${mail.cta ? `<div style="text-align:center;margin:20px 0 8px"><a href="${escapeHtml(mail.cta.url)}" style="${FONT};display:inline-block;background:${GOLD};color:${NAVY} !important;text-decoration:none;font-weight:700;padding:13px 30px;border-radius:999px;font-size:15px">${escapeHtml(mail.cta.label)}</a></div>` : ''}
 ${mail.note ? `<p style="${FONT};margin:10px 0 12px;font-size:12.5px;line-height:1.8;color:#555555 !important;text-align:center">${escapeHtml(mail.note)}</p>` : ''}
 </td></tr>

@@ -385,6 +385,8 @@ export class AffiliateService {
   constructor(private readonly deps: Deps) {
     // M198: a short code typed as «كود الدعوة» becomes the membership number before the hub call.
     deps.invites.setAliasResolver(async (raw) => (await this.findByShortCode(raw))?.code ?? null);
+    // M206: the «مصدر العضو» row of the admin mail says «ممثل» for an approved representative's code.
+    deps.invites.setRepresentativeCheck(async (contactId) => (await this.loadRecords()).some((record) => record.contactId === contactId && record.status === 'approved'));
   }
 
   /**

@@ -1,0 +1,292 @@
+diff -ruN --strip-trailing-cr work/orig-2280/includes/class-vai-admin.php work/hub/vibes-ai-assistant/includes/class-vai-admin.php
+--- work/orig-2280/includes/class-vai-admin.php	2026-11-06 18:16:40.543188900 +0300
++++ work/hub/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-06 18:17:38.926081900 +0300
+@@ -652,16 +652,16 @@
+ 		if ( $persona !== '' ) {
+ 			$titles = array( 'neutral' => 'المحايدون', 'entrepreneur' => 'رواد الأعمال', 'investor' => 'المستثمرون', 'none' => 'حسابات بدون فئة' );
+ 			echo '<h2 style="margin:4px 0 10px">' . esc_html( $titles[ $persona ] ) . ' <span dir="ltr">(' . count( $rows ) . ')</span></h2>';
+-			echo '<table class="vai-table"><thead><tr><th>#</th><th>الاسم</th><th>المهنة</th><th>الجوال</th><th>البريد</th><th>سجّل من</th><th>جاء عن طريق</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>';
++			echo '<table class="vai-table"><thead><tr><th>#</th><th>الاسم</th><th>المهنة</th><th>الجوال</th><th>البريد</th><th>سجّل من</th><th>المصدر</th><th>طريقة الدخول</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>';
+ 			if ( ! $rows ) {
+-				echo '<tr><td colspan="9" class="vai-empty">لا توجد حسابات في هذه الفئة.</td></tr>';
++				echo '<tr><td colspan="10" class="vai-empty">لا توجد حسابات في هذه الفئة.</td></tr>';
+ 			}
+ 			foreach ( $rows as $c ) {
+ 				$from   = VAI_Hub::source_parts( $c );
+ 				$job    = trim( (string) $c->job_title . ( $c->company ? ' — ' . $c->company : '' ), ' —' );
+ 				$status = $c->is_member ? ( VAI_Hub::member_active( $c ) ? '⭐ عضو مفعّل' : '⌛ عضوية منتهية' ) : ( ! (int) $c->verified ? '✉️ بانتظار التفعيل' : 'لم يدفع' );
+ 				$phone  = vai_phone_local( $c->phone_norm ?: $c->phone );
+-				echo '<tr><td dir="ltr">' . (int) $c->id . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td>' . ( $job !== '' ? esc_html( $job ) : '—' ) . '</td><td dir="ltr">' . ( $phone !== '' ? '<a href="tel:' . esc_attr( $c->phone_norm ?: $c->phone ) . '">' . esc_html( $phone ) . '</a>' : '—' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '</td><td>' . esc_html( $from['platform'] ) . '</td><td>' . esc_html( $from['via'] ) . '</td><td>' . esc_html( vai_riyadh( $c->created_at ) ) . '</td><td>' . $status . '</td></tr>';
++				echo '<tr><td dir="ltr">' . (int) $c->id . '</td><td><a href="' . esc_url( admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id ) ) . '"><strong>' . esc_html( $c->name ) . '</strong></a>' . ( $c->city ? '<br><small>' . esc_html( $c->city ) . '</small>' : '' ) . '</td><td>' . ( $job !== '' ? esc_html( $job ) : '—' ) . '</td><td dir="ltr">' . ( $phone !== '' ? '<a href="tel:' . esc_attr( $c->phone_norm ?: $c->phone ) . '">' . esc_html( $phone ) . '</a>' : '—' ) . '</td><td dir="ltr">' . esc_html( $c->email ) . '</td><td>' . esc_html( $from['platform'] ) . '</td><td>' . esc_html( $from['origin'] ) . '</td><td>' . esc_html( $from['login'] ) . '</td><td>' . esc_html( vai_riyadh( $c->created_at ) ) . '</td><td>' . $status . '</td></tr>';
+ 			}
+ 			echo '</tbody></table></div></div>';
+ 			return;
+diff -ruN --strip-trailing-cr work/orig-2280/includes/class-vai-hub.php work/hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- work/orig-2280/includes/class-vai-hub.php	2026-11-06 18:16:40.544450500 +0300
++++ work/hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-06 18:25:10.011976400 +0300
+@@ -13,7 +13,7 @@
+  */
+ class VAI_Hub {
+ 
+-	const DB_VERSION = '2.28.0';
++	const DB_VERSION = '2.28.1';
+ 
+ 	/** Source / reference of the next set_member() call (see member_context()). */
+ 	private static $member_ctx = null;
+@@ -167,6 +167,7 @@
+ 			pass_token_expires DATETIME NULL,
+ 			created_at DATETIME NULL,
+ 			referred_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
++			referred_rep TINYINT NOT NULL DEFAULT 0,
+ 			PRIMARY KEY  (id),
+ 			KEY phone_norm (phone_norm),
+ 			KEY email_norm (email_norm),
+@@ -1578,7 +1579,7 @@
+ 		$all   = admin_url( 'admin.php?page=vibes-ai-members' );
+ 		$head  = $renew ? '🔁 تجديد عضوية من لوحة الإدارة' : '⭐ تفعيل عضوية من لوحة الإدارة';
+ 		$state = $renew ? 'عضو مدفوع — بدأ عدّاد جديد من اليوم' : 'تحوّل إلى عضو مدفوع — لم يمر على المتجر ولا على Paymob';
+-		$html  = '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">'
++		$html  = '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">'
+ 			. '<style>:root{color-scheme:light only;supported-color-schemes:light only}body,table,td{color-scheme:light only}</style></head>'
+ 			. '<body bgcolor="#f4f3ef" style="margin:0;background:#f4f3ef !important;font-family:Tahoma,Arial,sans-serif;direction:rtl">'
+ 			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4f3ef" style="padding:24px 10px;background:#f4f3ef !important"><tr><td align="center">'
+@@ -1589,9 +1590,9 @@
+ 			. '<tr><td bgcolor="#ffffff" style="background:#ffffff !important;padding:22px 26px 6px;color:#111111 !important;font-size:15px;line-height:1.9">'
+ 			. '<div style="text-align:center;margin:0 0 14px"><span style="display:inline-block;background:#e7ad3f !important;color:#0d274a !important;font-weight:700;font-size:16px;padding:10px 22px;border-radius:999px;line-height:34px">يدوي من لوحة الإدارة</span></div>'
+ 			. '<div style="text-align:center;font-size:13.5px;color:#555;margin:0 0 16px">' . esc_html( $state ) . '</div>'
+-			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FBF7EC" style="border:1px solid #EADFC2;border-radius:14px;background:#FBF7EC !important;border-collapse:separate">';
++			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FBF7EC" style="border:1px solid #EADFC2;border-radius:14px;overflow:hidden;background:#FBF7EC !important;border-collapse:separate">';
+ 		foreach ( $rows as $i => $r ) {
+-			$cell  = 'padding:9px 14px;font-size:14.5px;color:#111111 !important;font-weight:600;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2' : '' );
++			$cell  = 'overflow-wrap:anywhere;word-break:break-word;padding:9px 14px;font-size:14.5px;color:#111111 !important;font-weight:600;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2;' : '' );
+ 			$latin = preg_match( '/^[\d+@A-Za-z.\-_ ]+$/', (string) $r[1] );
+ 			$html .= '<tr><td bgcolor="#FBF7EC" style="padding:9px 14px;font-size:14px;color:#7A6320 !important;white-space:nowrap;width:34%;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2' : '' ) . '">' . esc_html( $r[0] ) . '</td>'
+ 				. '<td bgcolor="#FBF7EC"' . ( $latin ? ' dir="ltr"' : '' ) . ' style="' . $cell . ( $latin ? 'text-align:right;' : '' ) . '">' . str_replace( "\n", "<br>", esc_html( (string) $r[1] ) ) . '</td></tr>';
+@@ -3203,6 +3204,8 @@
+ 		}
+ 		if ( $ref_id ) {
+ 			$fields['referred_by'] = $ref_id;
++			// 2.28.1 (M206): the representative list lives on the app server, so it tells the hub which code was his.
++			$fields['referred_rep'] = ( ! empty( $site->trusted ) && 'representative' === vai_str( $d, 'referral_kind', 20 ) ) ? 1 : 0;
+ 		}
+ 		$wpdb->update( $ct, $fields, array( 'id' => $c->id ) );
+ 		$c    = self::contact( $c->id );
+@@ -3382,7 +3385,95 @@
+ 			$ref  = self::contact( (int) $c->referred_by );
+ 			$via .= ' — دعوة من ' . ( $ref ? $ref->name : 'عضو' ) . ' (#' . (int) $c->referred_by . ')';
+ 		}
+-		return array( 'platform' => $platform, 'via' => $via );
++		$origin = self::origin_label( $c, '' === $src && ! empty( $c->site_trusted ) ? 'app' : $src );
++		return array( 'platform' => $platform, 'via' => $via, 'origin' => $origin !== '' ? $origin : '—', 'login' => self::login_label( $src ) );
++	}
++
++	/**
++	 * 2.28.1 (M206, owner): where a member came from. An invite code names its owner, a representative or a member;
++	 * with no code it is Organic plus the store of the app. A website sign-up has no such label and answers ''.
++	 */
++	public static function origin_label( $c, $src ) {
++		if ( isset( $c->referred_by ) && (int) $c->referred_by > 0 ) {
++			$ref = self::contact( (int) $c->referred_by );
++			return ( ! empty( $c->referred_rep ) ? 'ممثل: ' : 'دعوة من عضو: ' ) . ( $ref ? $ref->name : 'عضو' ) . ' (#' . (int) $c->referred_by . ')';
++		}
++		$src = (string) $src;
++		if ( 0 === strpos( $src, 'app-ios' ) ) {
++			return 'Organic Apple';
++		}
++		if ( 0 === strpos( $src, 'app-android' ) ) {
++			return 'Organic Google';
++		}
++		return 0 === strpos( $src, 'app' ) ? 'Organic' : '';
++	}
++
++	/** 2.28.1 (M206): how the account signs in; this is not where the member came from. */
++	public static function login_label( $src ) {
++		return preg_match( '/:(apple|google)$/', (string) $src, $m ) ? 'حساب ' . ( 'apple' === $m[1] ? 'Apple' : 'Google' ) : 'البريد الإلكتروني';
++	}
++
++	/**
++	 * 2.28.1 (M206, owner: «بدون ترتيب بدون شكل»): the admin mails that are written as lines go out in the club's card.
++	 * Lines are read in order: «label: value» runs become a table, «label: link» a button (a plain link when a mail has
++	 * many, like the digest), anything else a paragraph.
++	 */
++	public static function admin_html( $subject, $text ) {
++		$title = trim( (string) preg_replace( '/^\[[^\]]+\]\s*/u', '', (string) $subject ) );
++		$lines = explode( "\n", str_replace( "\r", '', (string) $text ) );
++		$urls  = count( preg_grep( '#^[^:：]{1,40}:\s*https?://\S+$#u', array_map( 'trim', $lines ) ) );
++		$body  = '';
++		$rows  = array();
++		$flush = function () use ( &$rows, &$body ) {
++			if ( ! $rows ) {
++				return;
++			}
++			$body .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FBF7EC" style="border:1px solid #EADFC2;border-radius:14px;overflow:hidden;background:#FBF7EC !important;border-collapse:separate;margin:10px 0">';
++			foreach ( $rows as $i => $r ) {
++				$top   = $i ? 'border-top:1px solid #EADFC2;' : '';
++				$latin = preg_match( '/^[\d+@A-Za-z.\-_ :\/]+$/', $r[1] );
++				$body .= '<tr><td bgcolor="#FBF7EC" style="padding:9px 14px;font-size:14px;color:#7A6320 !important;width:34%;vertical-align:top;background:#FBF7EC !important;' . $top . '">' . esc_html( $r[0] ) . '</td>'
++					. '<td bgcolor="#FBF7EC"' . ( $latin ? ' dir="ltr"' : '' ) . ' style="padding:9px 14px;font-size:14.5px;color:#111111 !important;font-weight:600;vertical-align:top;background:#FBF7EC !important;text-align:right;' . $top . '">' . esc_html( $r[1] ) . '</td></tr>';
++			}
++			$body .= '</table>';
++			$rows  = array();
++		};
++		foreach ( $lines as $line ) {
++			$line = trim( $line );
++			if ( $line === '' ) {
++				$flush();
++			} elseif ( preg_match( '#^([^:：]{1,40}):\s*(https?://\S+)$#u', $line, $m ) ) {
++				$flush();
++				$body .= $urls > 2
++					? '<div style="margin:0 0 10px;font-size:13px"><a href="' . esc_url( $m[2] ) . '" style="color:#7A6320">' . esc_html( $m[1] ) . '</a></div>'
++					: '<div style="text-align:center;margin:16px 0 6px"><a href="' . esc_url( $m[2] ) . '" style="display:inline-block;background:#e7ad3f;color:#0d274a;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:999px;font-size:15px">' . esc_html( $m[1] ) . '</a></div>';
++			} elseif ( preg_match( '/^([^:：]{1,40}):\s+(.+)$/u', $line, $m ) ) {
++				$rows[] = array( $m[1], $m[2] );
++			} else {
++				$flush();
++				$body .= '<p style="margin:0 0 10px;font-size:15px;line-height:1.9;color:#111111 !important">' . esc_html( $line ) . '</p>';
++			}
++		}
++		$flush();
++		return '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">'
++			. '<style>:root{color-scheme:light only;supported-color-schemes:light only}body,table,td{color-scheme:light only}</style></head>'
++			. '<body bgcolor="#f4f3ef" style="margin:0;background:#f4f3ef !important;font-family:Tahoma,Arial,sans-serif;direction:rtl">'
++			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4f3ef" style="padding:24px 10px;background:#f4f3ef !important"><tr><td align="center">'
++			. '<table role="presentation" width="560" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:560px;width:100%;background:#ffffff !important;border-radius:22px;overflow:hidden">'
++			. '<tr><td bgcolor="#0d274a" style="background:#0d274a !important;padding:24px;text-align:center;border-bottom:3px solid #e7ad3f">'
++			. '<div style="color:#F3E4B5;font-size:12px;letter-spacing:2px">INVESTORS CLUB — VIBES VENTURES</div>'
++			. '<div style="color:#ffffff;font-size:20px;font-weight:700;margin-top:6px;line-height:1.5">' . esc_html( $title ) . '</div></td></tr>'
++			. '<tr><td bgcolor="#ffffff" style="background:#ffffff !important;padding:20px 24px 12px;text-align:right">' . $body . '</td></tr>'
++			. '<tr><td bgcolor="#0d274a" style="background:#0d274a !important;color:#cfcac0 !important;padding:14px 20px;text-align:center;font-size:12px">نادي المستثمرين — Vibes Ventures</td></tr>'
++			. '</table></td></tr></table></body></html>';
++	}
++
++	/** 2.28.1 (M206): one admin mail in the card; answers like self::mail(). */
++	public static function admin_mail( $to, $subject, $text ) {
++		add_filter( 'wp_mail_content_type', array( __CLASS__, 'html_mail_type' ) );
++		$ok = self::mail( $to, $subject, self::admin_html( $subject, $text ) );
++		remove_filter( 'wp_mail_content_type', array( __CLASS__, 'html_mail_type' ) );
++		return $ok;
+ 	}
+ 
+ 	public static function source_label( $src ) {
+@@ -3453,11 +3544,6 @@
+ 		$src_label = self::source_label( $src );
+ 		// 2.26.3 (M197, owner): «جاء من: تطبيق Apple (حساب Apple)» splits into the platform chip, how he joined, and his language.
+ 		$platform  = 0 === strpos( $src, 'app-ios' ) ? 'iOS' : ( 0 === strpos( $src, 'app-android' ) ? 'Android' : 'التطبيق' );
+-		$via       = preg_match( '/:(apple|google)$/', $src, $vm ) ? 'حساب ' . ( 'apple' === $vm[1] ? 'Apple' : 'Google' ) : 'البريد الإلكتروني';
+-		if ( isset( $c->referred_by ) && (int) $c->referred_by > 0 ) {
+-			$ref  = self::contact( (int) $c->referred_by );
+-			$via .= ' — دعوة من ' . ( $ref ? $ref->name : 'عضو' ) . ' (#' . (int) $c->referred_by . ')';
+-		}
+ 		$is_app    = true;
+ 		$badge     = self::source_badge( $src );
+ 		$rows      = array(
+@@ -3470,7 +3556,8 @@
+ 			array( '🏷️ الفئة', self::persona_label( $c->persona ) ),
+ 			array( '🏢 النوع', 'company' === (string) $c->member_type ? 'شركة' . ( $c->company ? ' — ' . $c->company : '' ) : ( 'individual' === (string) $c->member_type ? 'فرد' : '' ) ),
+ 			array( '⭐ الاهتمامات', isset( $c->interests ) ? (string) $c->interests : '' ),
+-			array( '🔎 عرفنا عن طريق', $via ),
++			array( '🎯 مصدر العضو', self::origin_label( $c, $src ) ),
++			array( '🔑 طريقة الدخول', self::login_label( $src ) ),
+ 			array( '🌐 لغة العضو', self::lang_of( $c ) === 'en' ? 'English' : 'العربية' ),
+ 			array( '📝 نبذة', (string) $c->bio ),
+ 			array( '🕒 التاريخ', vai_riyadh( vai_now() ) . ' (الرياض)' ),
+@@ -3488,7 +3575,7 @@
+ 		$open  = admin_url( 'admin.php?page=vibes-ai&contact=' . (int) $c->id );
+ 		$all   = admin_url( 'admin.php?page=vibes-ai-accounts' );
+ 		$state = $completed ? '🎯 البيانات مكتملة — ' . ( (int) $c->is_member ? 'عضو مفعّل' : 'بانتظار دفع العضوية السنوية' ) : ( (int) $c->verified ? ( self::profile_complete( $c ) ? '✅ مفعّل — بانتظار دفع العضوية السنوية' : '✅ مفعّل — البيانات ناقصة، سيكملها من التطبيق' ) : '✉️ بانتظار تفعيل البريد' );
+-		$html  = '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">'
++		$html  = '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">'
+ 			. '<style>:root{color-scheme:light only;supported-color-schemes:light only}body,table,td{color-scheme:light only}</style></head>'
+ 			. '<body bgcolor="#f4f3ef" style="margin:0;background:#f4f3ef !important;font-family:Tahoma,Arial,sans-serif;direction:rtl">'
+ 			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4f3ef" style="padding:24px 10px;background:#f4f3ef !important"><tr><td align="center">'
+@@ -3499,9 +3586,9 @@
+ 			. '<tr><td bgcolor="#ffffff" style="background:#ffffff !important;padding:22px 26px 6px;color:#111111 !important;font-size:15px;line-height:1.9">'
+ 			. '<div style="text-align:center;margin:0 0 14px"><span style="display:inline-block;background:' . ( $is_app ? '#e7ad3f' : '#EDE4CF' ) . ' !important;color:#0d274a !important;font-weight:700;font-size:16px;padding:10px 22px;border-radius:999px;line-height:34px">منصة التسجيل: ' . esc_html( $platform ) . ( $badge ? ' <img src="' . esc_url( $badge ) . '" alt="" height="34" style="height:34px;width:auto;vertical-align:middle;border-radius:6px;margin-inline-start:8px">' : '' ) . '</span></div>'
+ 			. '<div style="text-align:center;font-size:13.5px;color:#555;margin:0 0 16px">' . esc_html( $state ) . '</div>'
+-			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FBF7EC" style="border:1px solid #EADFC2;border-radius:14px;background:#FBF7EC !important;border-collapse:separate">';
++			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FBF7EC" style="border:1px solid #EADFC2;border-radius:14px;overflow:hidden;background:#FBF7EC !important;border-collapse:separate">';
+ 		foreach ( $rows as $i => $r ) {
+-			$cell  = 'padding:9px 14px;font-size:14.5px;color:#111111 !important;font-weight:600;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2' : '' );
++			$cell  = 'overflow-wrap:anywhere;word-break:break-word;padding:9px 14px;font-size:14.5px;color:#111111 !important;font-weight:600;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2;' : '' );
+ 			$latin = preg_match( '/^[\d+@A-Za-z.\-_ ]+$/', (string) $r[1] );
+ 			$html .= '<tr><td bgcolor="#FBF7EC" style="padding:9px 14px;font-size:14px;color:#7A6320 !important;white-space:nowrap;width:34%;vertical-align:top;background:#FBF7EC !important;' . ( $i ? 'border-top:1px solid #EADFC2' : '' ) . '">' . esc_html( $r[0] ) . '</td>'
+ 				. '<td bgcolor="#FBF7EC"' . ( $latin ? ' dir="ltr"' : '' ) . ' style="' . $cell . ( $latin ? 'text-align:right;' : '' ) . '">' . str_replace( "\n", "<br>", esc_html( (string) $r[1] ) ) . '</td></tr>';
+@@ -3549,7 +3636,7 @@
+ 		$emails = array_filter( array_map( 'trim', explode( ',', (string) vai_opt( 'notify_email', get_option( 'admin_email' ) ) ) ) );
+ 		foreach ( $emails as $e ) {
+ 			if ( is_email( $e ) ) {
+-				self::mail( $e, '[Vibes AI] عضو جديد: ' . $c->name . ' — ' . self::site_display( $site ), implode( "\n", $lines ) );
++				self::admin_mail( $e, '[Vibes AI] عضو جديد: ' . $c->name . ' — ' . self::site_display( $site ), implode( "\n", $lines ) );
+ 			}
+ 		}
+ 	}
+@@ -4474,7 +4561,7 @@
+ 		$emails = array_filter( array_map( 'trim', explode( ',', (string) vai_opt( 'notify_email', get_option( 'admin_email' ) ) ) ) );
+ 		$sent   = 0;
+ 		foreach ( $emails as $to ) {
+-			if ( is_email( $to ) && self::mail( $to, '[Vibes Ventures] ⚠️ خطأ في المستشار الذكي (n8n)', ( $text !== '' ? $text : $msg ) . "\n\n— الهب " . vai_home_host() ) ) {
++			if ( is_email( $to ) && self::admin_mail( $to, '[Vibes Ventures] ⚠️ خطأ في المستشار الذكي (n8n)', ( $text !== '' ? $text : $msg ) . "\n\n— الهب " . vai_home_host() ) ) {
+ 				$sent++;
+ 			}
+ 		}
+@@ -5256,7 +5343,7 @@
+ 		$emails = array_filter( array_map( 'trim', explode( ',', (string) vai_opt( 'notify_email', '' ) ) ) );
+ 		foreach ( $emails as $e ) {
+ 			if ( is_email( $e ) ) {
+-				wp_mail( $e, '[Vibes AI] ' . $head . ' — ' . ( $c->name ?: $c->phone ), $body );
++				self::admin_mail( $e, '[Vibes AI] ' . $head . ' — ' . ( $c->name ?: $c->phone ), $body );
+ 			}
+ 		}
+ 		$hook = trim( (string) vai_opt( 'notify_webhook', '' ) );
+@@ -5958,7 +6045,7 @@
+ 		$emails = array_filter( array_map( 'trim', explode( ',', (string) vai_opt( 'notify_email', get_option( 'admin_email' ) ) ) ) );
+ 		foreach ( $emails as $e ) {
+ 			if ( is_email( $e ) ) {
+-				self::mail( $e, '[Vibes AI] حذف حساب من التطبيق: ' . $c->name, "حذف العضو حسابه بنفسه من تطبيق نادي المستثمرين.\n\n" . $label . "\nالتاريخ: " . vai_riyadh( vai_now() ) . " (الرياض)\n\nحُذفت بياناته الشخصية ومحادثاته؛ سجلات الدفع محفوظة كما هي." );
++				self::admin_mail( $e, '[Vibes AI] حذف حساب من التطبيق: ' . $c->name, "حذف العضو حسابه بنفسه من تطبيق نادي المستثمرين.\n\n" . $label . "\nالتاريخ: " . vai_riyadh( vai_now() ) . " (الرياض)\n\nحُذفت بياناته الشخصية ومحادثاته؛ سجلات الدفع محفوظة كما هي." );
+ 			}
+ 		}
+ 		return array( 'ok' => true );
+@@ -7018,7 +7105,7 @@
+ 		$ok   = false;
+ 		foreach ( $emails as $e ) {
+ 			if ( is_email( $e ) ) {
+-				$ok = wp_mail( $e, '[Vibes AI] تقرير ' . (int) $d['hours'] . ' ساعة — ' . (int) $d['chats'] . ' محادثة، ' . (int) $d['registered'] . ' تسجيل', $body ) || $ok;
++				$ok = self::admin_mail( $e, '[Vibes AI] تقرير ' . (int) $d['hours'] . ' ساعة — ' . (int) $d['chats'] . ' محادثة، ' . (int) $d['registered'] . ' تسجيل', $body ) || $ok;
+ 			}
+ 		}
+ 		update_option( 'vai_last_digest', array( 'at' => vai_now(), 'ok' => $ok ? 1 : 0, 'chats' => (int) $d['chats'] ), false );
+diff -ruN --strip-trailing-cr work/orig-2280/readme.txt work/hub/vibes-ai-assistant/readme.txt
+--- work/orig-2280/readme.txt	2026-11-06 18:16:40.544450500 +0300
++++ work/hub/vibes-ai-assistant/readme.txt	2026-11-06 18:17:38.926542200 +0300
+@@ -14,6 +14,9 @@
+ 
+ == سجل التغييرات ==
+ 
++= 2.28.1 =
++* Admin mails: the table of the new-member mail no longer loses its lines and alignment on Latin values (a missing semicolon). New rows «مصدر العضو» (representative or member by invite code, otherwise Organic Apple / Organic Google by store) and «طريقة الدخول». The plain admin mails (website registration, new lead, account deletion, assistant error, digest) go out in the club's card. contacts.referred_rep, DB version 2.28.1.
++
+ = 2.28.0 =
+ * M205 (owner, 2026-11-06): «عضوية شرفية» — only for an official partner in the founding contract of one of the Vibes Ventures companies. Given and taken back by an admin from the app dashboard only (`admin_grant` actions `honorary` / `honorary_revoke`, no days); no client op reads an `honorary` field. It has no duration: no days left, no end date, never in the «expiring» lists.
+ * Storage: contacts.honorary + honorary_at, and the paid clock kept aside in paid_is_member / paid_started_at / paid_days while the honorary membership is on (a store purchase or a Paymob payment counts there; taking the honorary membership back puts that clock in charge again). DB version 2.28.0 (dbDelta adds the five columns).
+diff -ruN --strip-trailing-cr work/orig-2280/vibes-ai-assistant.php work/hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- work/orig-2280/vibes-ai-assistant.php	2026-11-06 18:16:40.544450500 +0300
++++ work/hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-06 18:17:38.926542200 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
+- * Version:     2.28.0
++ * Version:     2.28.1
+  * Author:      Vibes Ventures
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.28.0' );
++define( 'VAI_VERSION', '2.28.1' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Mailer } from './mailer.js';
+import { adminRoyal } from './adminMail.js';
 import { royalHtml, royalText, type RoyalMail } from './royal.js';
 
 /**
@@ -163,13 +164,14 @@ export class Notifier {
   private dispatch(subject: string, lines: (string | null)[], html?: string): void {
     const fullSubject = `${SUBJECT_PREFIX}${this.deps.appEnv === 'test' ? ' [تجريبي]' : ''} ${subject}`;
     const body = lines.filter((line): line is string => line !== null);
-    const text = [...body, '', `التاريخ: ${riyadhDateTime(Date.now())} (الرياض)`, `المصدر: ${APP_NAME}`].join('\n');
+    const stamp = `${riyadhDateTime(Date.now())} (الرياض)`;
+    const text = [...body, '', `التاريخ: ${stamp}`, `المصدر: ${APP_NAME}`].join('\n');
     if (!this.recipients.length) {
       this.deps.log.info({ subject: fullSubject }, 'notification skipped: no recipients (NOTIFY_EMAIL or the dashboard list)');
       return;
     }
     this.deps.mailer
-      .send({ to: this.recipients, subject: fullSubject, text, ...(html ? { html } : {}) })
+      .send({ to: this.recipients, subject: fullSubject, text, html: html ?? royalHtml(adminRoyal(subject, body, stamp)) })
       .then((sent) => this.deps.log.info({ subject: fullSubject, sent }, 'notification'))
       .catch((error: unknown) => this.deps.log.error({ err: error, subject: fullSubject }, 'notification mail failed'));
   }

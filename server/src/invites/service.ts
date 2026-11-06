@@ -93,12 +93,25 @@ export class InvitesService {
   private chain: Promise<unknown> = Promise.resolve();
   private hubSupport: { ok: boolean; at: number } | null = null;
   private aliasResolver: ((raw: string) => Promise<string | null>) | null = null;
+  private representativeCheck: ((contactId: number) => Promise<boolean>) | null = null;
 
   constructor(private readonly deps: Deps) {}
 
   /** M198: the affiliate service maps a short alias («FAR-27») to the membership number it stands for. */
   setAliasResolver(resolver: (raw: string) => Promise<string | null>): void {
     this.aliasResolver = resolver;
+  }
+
+  /** M206: the representative list lives in the affiliate service; the hub only hears the answer. */
+  setRepresentativeCheck(check: (contactId: number) => Promise<boolean>): void {
+    this.representativeCheck = check;
+  }
+
+  /** The hub resolves a code by its digits (the contact id), so the same digits name the representative here. */
+  async isRepresentative(code: string): Promise<boolean> {
+    const contactId = Number.parseInt(code.replace(/\D+/g, ''), 10);
+    if (!contactId || !this.representativeCheck) return false;
+    return this.representativeCheck(contactId);
   }
 
   private async load(): Promise<InviteRecord[]> {
