@@ -5,7 +5,7 @@ import type { Mail, Mailer } from '../mail/mailer.js';
 import { MemoryKV } from '../store.js';
 import { WhatsappClient, type WaTemplate } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
-import { WhatsappService } from './service.js';
+import { fallbackMail, WhatsappService } from './service.js';
 import { buildBodyParams, fitParams, pickTemplate, planDelivery } from './templates.js';
 
 // M174: member messages on WhatsApp. The pure decisions (phone, template, fallback) and the service with a fake Graph API.
@@ -61,6 +61,11 @@ test('pickTemplate matches the language and prefers an approved one', () => {
   assert.equal(pickTemplate(list, 'en')?.language, 'en_US');
   assert.equal(pickTemplate(list, 'ar')?.language, 'ar');
   assert.equal(pickTemplate([], 'ar'), null);
+});
+
+test('M202: the affiliate link template takes the name, the code and the link', () => {
+  assert.deepEqual(buildBodyParams('affiliate_link', { name: 'فارس العتيبي', code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' }, 'ar'), ['فارس العتيبي', 'FAR2', 'https://api.vibesholdingsa.com/r/far2']);
+  assert.match(fallbackMail('affiliate_link', 'ar', { code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' }).text, /FAR2/);
 });
 
 test('planDelivery: WhatsApp only when enabled, phone present and the template approved and fitting', () => {

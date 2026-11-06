@@ -1,12 +1,12 @@
 import type { WaTemplate } from './client.js';
 
-export type WaKind = 'welcome' | 'receipt' | 'code';
+export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link';
 export type WaLang = 'ar' | 'en';
 
 /** The templates registered on the WABA (each exists in ar and en); `code` is the Authentication one. */
-export const TEMPLATE_NAMES: Record<WaKind, string> = { welcome: 'club_welcome', receipt: 'club_receipt', code: 'club_login_code' };
+export const TEMPLATE_NAMES: Record<WaKind, string> = { welcome: 'club_welcome', receipt: 'club_receipt', code: 'club_login_code', affiliate_link: 'club_affiliate_link' };
 
-export type TemplateVars = { code?: string | null; name?: string | null; amount?: number | null; service?: string | null; invoiceNo?: number | string | null };
+export type TemplateVars = { code?: string | null; name?: string | null; amount?: number | null; service?: string | null; invoiceNo?: number | string | null; link?: string | null };
 
 export type DeliveryPlan =
   | { use: 'whatsapp'; template: string; language: string; params: string[] }
@@ -31,6 +31,7 @@ export function formatAmount(amount: number | null | undefined): string {
 export function buildBodyParams(kind: WaKind, vars: TemplateVars, lang: WaLang): string[] {
   if (kind === 'code') return [cleanParam(vars.code, '-')];
   if (kind === 'welcome') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا')];
+  if (kind === 'affiliate_link') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
   return [formatAmount(vars.amount), cleanParam(vars.service, lang === 'en' ? 'Service' : 'خدمة'), cleanParam(vars.invoiceNo, '-')];
 }
 

@@ -35,6 +35,7 @@ const STATUS_ORDER: Record<string, number> = { accepted: 0, sent: 1, delivered: 
 export type SendInput = { phone: string | null | undefined; lang?: string | null; email?: string | null; ref?: string | null };
 export type WelcomeInput = SendInput & { name?: string | null };
 export type ReceiptInput = SendInput & { amount: number; service: string; invoiceNo: number | string };
+export type AffiliateLinkInput = SendInput & { name: string; code: string; link: string };
 export type CodeInput = { phone: string | null | undefined; lang?: string | null; code: string };
 
 /** A number gets at most this many codes an hour on WhatsApp; the e-mail copy always goes out. */
@@ -67,6 +68,11 @@ export class WhatsappService {
 
   sendReceipt(input: ReceiptInput): Promise<WaResult> {
     return this.deliver('receipt', input, { amount: input.amount, service: input.service, invoiceNo: input.invoiceNo });
+  }
+
+  /** M202: an affiliate's short code and link (Utility template). `ref` keeps one send per code. */
+  sendAffiliateLink(input: AffiliateLinkInput): Promise<WaResult> {
+    return this.deliver('affiliate_link', input, { name: input.name, code: input.code, link: input.link });
   }
 
   /**
@@ -129,7 +135,7 @@ export class WhatsappService {
   /** Dashboard view: both kinds with their live status and body text. Always asks Meta. */
   async templateOverview(): Promise<{ name: string; language: string; status: string; category: string | null; body: string }[]> {
     const rows: { name: string; language: string; status: string; category: string | null; body: string }[] = [];
-    for (const kind of ['welcome', 'receipt', 'code'] as const) {
+    for (const kind of ['welcome', 'receipt', 'code', 'affiliate_link'] as const) {
       for (const template of await this.templatesOf(kind, true)) {
         const body = template.components.find((component) => component.type.toUpperCase() === 'BODY')?.text ?? '';
         rows.push({ name: template.name, language: template.language, status: template.status, category: template.category ?? null, body });
@@ -299,6 +305,11 @@ export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { 
     return lang === 'en'
       ? { subject: 'Welcome to Investors Club', text: `Welcome${vars.name ? `, ${vars.name}` : ''}. Your membership is active. Open the app to see what is waiting for you.` }
       : { subject: 'أهلاً بك في Investors Club', text: `أهلاً بك${vars.name ? ` يا ${vars.name}` : ''}. تم تفعيل عضويتك، افتح التطبيق لتتعرف على ما ينتظرك.` };
+  }
+  if (kind === 'affiliate_link') {
+    return lang === 'en'
+      ? { subject: 'Your Investors Club affiliate code', text: `Your code: ${vars.code ?? '-'}. Your link: ${vars.link ?? '-'}.` }
+      : { subject: 'رمزك في برنامج ممثلي نادي المستثمرين', text: `رمزك: ${vars.code ?? '-'}. رابطك: ${vars.link ?? '-'}.` };
   }
   const amount = typeof vars.amount === 'number' ? vars.amount : 0;
   return lang === 'en'

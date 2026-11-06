@@ -112,12 +112,9 @@ export default function AffiliateScreen() {
             <View style={styles.linkBox}>
               <Text style={styles.linkLabel}>{t('affiliate.linkLabel')}</Text>
               {data.link ? <Text style={styles.link}>{`${LRM}${data.link}`}</Text> : null}
-              {/* M198 (owner): the short alias is the hero; the long membership number stays a footnote. */}
+              {/* M202 (owner): the short code alone; the long membership number is gone from this screen. */}
               <Text style={styles.codeLine}>{t('affiliate.codeLabel')}</Text>
               <Text style={styles.shortCode}>{`${LRM}${data.code ?? ''}`}</Text>
-              {data.membershipCode && data.membershipCode !== data.code ? (
-                <Text style={styles.codeLine}>{`${t('affiliate.membershipCodeLabel')}: ${LRM}${data.membershipCode}`}</Text>
-              ) : null}
             </View>
           </FadeInView>
 

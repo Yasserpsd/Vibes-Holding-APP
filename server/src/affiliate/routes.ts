@@ -90,6 +90,8 @@ const cycleSchema = z.object({
 });
 
 const contactIdSchema = z.object({ contactId: z.coerce.number().int().positive() });
+const shortCodeSchema = z.object({ code: z.string().trim().min(1, 'اكتب الرمز').max(20) });
+const sendLinksSchema = z.object({ contactId: z.number().int().positive().optional() });
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** What the member's own screen needs about his application (bank data comes back for prefill). */
@@ -160,7 +162,6 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       return {
         ...base,
         code,
-        membershipCode: record.code,
         link,
         shareText: config.shareText.replaceAll('{link}', link || code).replaceAll('{code}', code),
         // Owner (2026-11-04): the English app shows the referred people's names in Latin letters.
@@ -278,6 +279,34 @@ export const affiliateRoutes: FastifyPluginAsync<AffiliateRoutesOptions> = async
       const record = await service.decide(params.contactId, input.status, input.note, admin.me.name || admin.me.email);
       if (!record) return reply.code(404).send({ error: { code: 'not_found', message: 'الطلب غير موجود' } });
       return { affiliate: { ...record, stats: await service.balance(record.contactId) } };
+    }),
+  );
+
+  /** M202: a hand-picked alias when the generated one reads badly; the replaced one keeps working. */
+  app.post(
+    '/api/admin/affiliates/:contactId/code',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(contactIdSchema, request.params, reply);
+      if (!params) return;
+      const input = parse(shortCodeSchema, request.body, reply);
+      if (!input) return;
+      const record = await service.setShortCode(params.contactId, input.code);
+      if (!record) return reply.code(404).send({ error: { code: 'not_found', message: 'الممثل غير موجود' } });
+      return { affiliate: { ...record, stats: await service.balance(record.contactId), cycle: await service.cycleView(record.contactId) } };
+    }),
+  );
+
+  /** M202: the approved affiliates' code and link on WhatsApp (club_affiliate_link): one, or all when no id is sent. */
+  app.post(
+    '/api/admin/affiliates/send-links',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const input = parse(sendLinksSchema, request.body ?? {}, reply);
+      if (!input) return;
+      return { results: await service.sendLinks(input.contactId) };
     }),
   );
 

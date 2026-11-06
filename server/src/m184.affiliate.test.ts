@@ -191,14 +191,14 @@ test('the dashboard approval activates the affiliate and hands him his link', as
   assert.equal(mailer.sent.length, before + 1);
   assert.deepEqual(mail?.to, ['m184+member@gmail.com']);
   shortCode = approved.json().affiliate.shortCode as string;
-  assert.match(shortCode, /^MMT-\d+$/);
+  assert.match(shortCode, /^MMT[2-9]$/);
   assert.match(mail?.text ?? '', new RegExp(shortCode));
 
   const mine = await get('/api/affiliate', memberToken);
   assert.equal(mine.json().status, 'approved');
   assert.equal(mine.json().code, shortCode);
-  assert.equal(mine.json().membershipCode, memberCode);
-  assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${shortCode}`);
+  assert.equal(mine.json().membershipCode, undefined); // M202: the long number left the affiliate's screen.
+  assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${shortCode.toLowerCase()}`);
   assert.ok((mine.json().shareText as string).includes(shortCode));
   assert.equal(mine.json().balance.available, 0);
   // The mock hub hands this member an active membership: the member tier applies (M186).
@@ -268,7 +268,7 @@ test('the owner edits the program content from the dashboard', async () => {
   assert.equal(mine.json().balance.commissionBase, 300);
   assert.match(mine.json().introText as string, /300 ريال سعودي/);
   assert.equal(mine.json().heardOptions.length, 3);
-  assert.equal(mine.json().shareText, `سجّل من رابطي https://api-test.vibesholdingsa.com/r/${shortCode} بالرمز ${shortCode}.`);
+  assert.equal(mine.json().shareText, `سجّل من رابطي https://api-test.vibesholdingsa.com/r/${shortCode.toLowerCase()} بالرمز ${shortCode}.`);
 
   // Back to the default commission for the tests after this one.
   await send('POST', '/api/admin/affiliates/config', { commission: 250 }, adminToken);

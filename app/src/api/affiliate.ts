@@ -83,10 +83,8 @@ export type AffiliateOverview = {
   /** M195: the Saudi cities to pick from (value = key, label in the app's language), 'other' last; an older server sends none. */
   cities?: { value: string; label: string }[];
   application: AffiliateApplication | null;
-  /** Present only once the administration approved the affiliate. M198: `code` is the short alias («FAR-27»). */
+  /** Present only once the administration approved the affiliate. `code` is the short alias («FAR2»). */
   code?: string;
-  /** M198: the membership number behind the alias — still accepted as an invite code; an older server sends none. */
-  membershipCode?: string;
   link?: string;
   shareText?: string;
   referrals?: AffiliateReferral[];

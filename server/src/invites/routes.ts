@@ -7,7 +7,13 @@ import type { EnglishCache } from '../englishCache.js';
 import { langOf } from '../lang.js';
 import type { InvitesService } from './service.js';
 
-export type InvitesRoutesOptions = { service: InvitesService; auth: AuthService; english?: EnglishCache };
+export type InvitesRoutesOptions = {
+  service: InvitesService;
+  auth: AuthService;
+  english?: EnglishCache;
+  /** M202: an approved representative's short code, shown and shared instead of the membership number. */
+  shortCodeOf?: (contactId: number) => Promise<string | null>;
+};
 
 const configSchema = z
   .object({
@@ -19,12 +25,12 @@ const giftSchema = z.object({ note: z.string().trim().min(2, 'اكتب ما سل
 const idSchema = z.object({ id: z.string().uuid() });
 
 /**
- * M32: «الدعوات». The member's side is one read — his code is his membership number, the share
+ * M32: «الدعوات». The member's side is one read — his code is his membership number (a representative's short code, M202), the share
  * text and the gift wording come from the dashboard, and his nominees are listed with how far
  * each one got. The code itself is checked and stored by the hub during registration
  * (`/api/auth/register` + plugin 2.7.2), not here.
  */
-export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (app, { service, auth, english }) => {
+export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (app, { service, auth, english, shortCodeOf }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -38,11 +44,12 @@ export const invitesRoutes: FastifyPluginAsync<InvitesRoutesOptions> = async (ap
       // Owner (2026-11-04): the English app gets these dashboard texts in English (translated once, cached).
       const [giftText, shareTemplate] = english ? await english.texts([config.giftText, config.shareText], langOf(request)) : [config.giftText, config.shareText];
       const template = (shareTemplate ?? config.shareText).includes('{code}') ? (shareTemplate ?? config.shareText) : config.shareText;
+      const code = (await shortCodeOf?.(me.id)) ?? me.cardNumber;
       return {
-        code: me.cardNumber,
+        code,
         eligible: true, // M143: every signed-in (verified) account may invite; the membership gate is gone.
         giftText: giftText ?? config.giftText,
-        shareText: template.replaceAll('{code}', me.cardNumber),
+        shareText: template.replaceAll('{code}', code),
         invited: await service.mine(me.id),
       };
     }),

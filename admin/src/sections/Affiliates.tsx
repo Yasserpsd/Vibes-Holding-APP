@@ -24,6 +24,14 @@ const PAYOUT_STATES: Record<AffiliatePayoutRow['status'], { label: string; tone:
  * by hand, and the program's editable content (agreement, commission, options, texts).
  * M186: the commission tiers, the performance-cycle counter per affiliate and «تجديد الدورة».
  */
+/** M202: why a WhatsApp message did not go out, in words. */
+function sendFailure(error: string | null | undefined): string {
+  if (error === 'template_not_found' || error === 'template_not_approved') return 'قالب واتساب لم تعتمده Meta بعد';
+  if (error === 'whatsapp_disabled') return 'واتساب غير مفعّل على هذا السيرفر';
+  if (error === 'no_phone') return 'لا يوجد رقم جوال صحيح';
+  return error ?? 'غير معروف';
+}
+
 export function Affiliates() {
   const { signOut, notify } = useShell();
   const state = useLoad(() => api.affiliates(), []);
@@ -51,16 +59,43 @@ export function Affiliates() {
   }
 
   function decide(row: AffiliateRow, status: 'approved' | 'rejected') {
-    if (status === 'approved' && !window.confirm(`اعتماد «${row.name}» ممثلًا للنادي؟ سيصله بريد برابط الإحالة الخاص به.`)) return;
+    if (status === 'approved' && !window.confirm(`اعتماد «${row.name}» ممثلًا للنادي؟ سيصله بريد ورسالة واتساب برمزه ورابطه.`)) return;
     const note = status === 'rejected' ? (window.prompt('سبب الرفض (يظهر لمقدّم الطلب):')?.trim() ?? '') : '';
     if (status === 'rejected' && note === '' && !window.confirm('رفض الطلب دون ذكر سبب؟')) return;
-    void act(status === 'approved' ? 'اعتُمد الممثل وأُرسل إليه البريد.' : 'رُفض الطلب وأُبلغ مقدّمه.', () => api.affiliateDecision(row.contactId, status, note), `a:${row.contactId}`);
+    void act(status === 'approved' ? 'اعتُمد الممثل، ويصله البريد ورسالة واتساب.' : 'رُفض الطلب وأُبلغ مقدّمه.', () => api.affiliateDecision(row.contactId, status, note), `a:${row.contactId}`);
   }
 
   function decidePayout(row: AffiliatePayoutRow, status: 'paid' | 'rejected') {
     if (status === 'paid' && !window.confirm(`تأكيد أن مبلغ ${formatNumber(row.amount)} ريال حُوّل فعلًا إلى حساب «${row.name}»؟`)) return;
     const note = status === 'rejected' ? (window.prompt('سبب عدم اعتماد طلب السحب (يظهر للممثل):')?.trim() ?? '') : '';
     void act(status === 'paid' ? 'سُجّل التحويل وأُبلغ الممثل.' : 'رُفض طلب السحب وأُبلغ الممثل.', () => api.affiliatePayoutDecision(row.id, status, note), `p:${row.id}`);
+  }
+
+  /** M202: a hand-picked code; the old one keeps working, so nothing already shared breaks. */
+  function changeCode(row: AffiliateRow) {
+    const code = window.prompt(`رمز جديد لـ «${row.name}» (من 3 إلى 5 حروف لاتينية، ويمكن أن ينتهي برقم من 2 إلى 9):`, row.shortCode ?? '')?.trim();
+    if (!code || code.toUpperCase() === row.shortCode) return;
+    void act('حُفظ الرمز، والرمز السابق يظل يعمل.', () => api.affiliateShortCode(row.contactId, code), `k:${row.contactId}`);
+  }
+
+  /** M202: the code and link on WhatsApp (template club_affiliate_link), to one representative or to all. */
+  function sendLinks(row?: AffiliateRow) {
+    const who = row ? `«${row.name}»` : 'كل الممثلين المعتمدين';
+    if (!window.confirm(`إرسال الرمز والرابط على واتساب إلى ${who}؟ الرسالة تُحتسب على حساب واتساب، ولا تتكرر لنفس الرمز.`)) return;
+    void (async () => {
+      setBusyId(row ? `w:${row.contactId}` : 'w:all');
+      try {
+        const { results } = await api.affiliateSendLinks(row?.contactId);
+        const failed = results.filter((result) => result.channel !== 'whatsapp');
+        if (failed.length) notify('error', `أُرسلت ${formatNumber(results.length - failed.length)} من ${formatNumber(results.length)}. السبب: ${sendFailure(failed[0]?.error)}`);
+        else notify('ok', `أُرسلت ${formatNumber(results.length)} رسالة على واتساب.`);
+      } catch (failure) {
+        if (sessionOver(failure)) signOut();
+        notify('error', messageOf(failure));
+      } finally {
+        setBusyId(null);
+      }
+    })();
   }
 
   /** M186: renew the counter (or restart it early) — the defaults are the program's current terms. */
@@ -110,8 +145,7 @@ export function Affiliates() {
         busy={state.loading}
       />
       <p className="muted">
-        برنامج ممثلي نادي المستثمرين: العضو يقدّم طلبًا ببياناته كاملة، تصله الاتفاقية بالبريد ويوافق عليها من التطبيق، ولا يتفعّل إلا باعتمادكم هنا. رمز الإحالة هو رقم
-        عضويته، والعمولة تُستحق فقط عن عضو سجّل برمزه وسدّد العضوية فعلًا (من تأكيد السيرفر، لا من التطبيق). التحويل البنكي يدوي، ثم يُعلَّم طلب السحب «تم الدفع». العمولة 250 لغير المشترك و350 للمشترك في العضوية السنوية (حسب حالته وقت سداد العضو)، ولكل ممثل عدّاد دورة أداء: عند بلوغ الهدف داخل المدة يُضاف البدل إلى رصيده تلقائيًا، وعند انتهاء المدة يصلكم طلب تجديد بالبريد ويظهر هنا بزر «تجديد الدورة».
+        برنامج ممثلي نادي المستثمرين: العضو يقدّم طلبًا ببياناته كاملة، تصله الاتفاقية بالبريد ويوافق عليها من التطبيق، ولا يتفعّل إلا باعتمادكم هنا. لكل ممثل رمز قصير مثل FAR2 ورابط باسمه، والرموز والروابط السابقة تظل تعمل، والعمولة تُستحق فقط عن عضو سجّل برمزه وسدّد العضوية فعلًا (من تأكيد السيرفر، لا من التطبيق). التحويل البنكي يدوي، ثم يُعلَّم طلب السحب «تم الدفع». العمولة 250 لغير المشترك و350 للمشترك في العضوية السنوية (حسب حالته وقت سداد العضو)، ولكل ممثل عدّاد دورة أداء: عند بلوغ الهدف داخل المدة يُضاف البدل إلى رصيده تلقائيًا، وعند انتهاء المدة يصلكم طلب تجديد بالبريد ويظهر هنا بزر «تجديد الدورة».
       </p>
       <Async state={state} rows={5}>
         {(data) => (
@@ -166,6 +200,12 @@ export function Affiliates() {
               />
             ) : null}
 
+            {data.affiliates.some((row) => row.status === 'approved') ? (
+              <p>
+                <button type="button" disabled={busyId === 'w:all'} onClick={() => sendLinks()}>إرسال الرمز والرابط لكل الممثلين على واتساب</button>
+              </p>
+            ) : null}
+
             {data.affiliates.length === 0 ? (
               <p className="state-card empty">لم يقدّم أحد طلب انضمام بعد.</p>
             ) : (
@@ -181,7 +221,9 @@ export function Affiliates() {
                       <>
                         <MemberLink id={row.contactId} name={row.name || row.email} />{' '}
                         {/* M198: the short alias he shares, then the membership number the hub counts. */}
-                        {row.shortCode ? <strong><bdi dir="ltr" className="num">{row.shortCode}</bdi></strong> : null} <bdi dir="ltr" className="num">{row.code}</bdi>
+                        {row.shortCode ? <strong><bdi dir="ltr" className="num">{row.shortCode}</bdi></strong> : null} <bdi dir="ltr" className="num">{row.code}</bdi>{' '}
+                        <button type="button" className="ghost" disabled={busyId === `k:${row.contactId}`} onClick={() => changeCode(row)}>تغيير الرمز</button>
+                        {row.oldCodes?.length ? <div className="muted">{'رموز سابقة تعمل: '}<bdi dir="ltr" className="num">{row.oldCodes.join(' ، ')}</bdi></div> : null}
                       </>
                     ),
                   },
@@ -256,7 +298,10 @@ export function Affiliates() {
                           <button type="button" className="ghost" disabled={busyId === `a:${row.contactId}`} onClick={() => decide(row, 'rejected')}>رفض</button>
                         </span>
                       ) : row.status === 'approved' ? (
-                        <button type="button" className="ghost" disabled={busyId === `a:${row.contactId}`} onClick={() => decide(row, 'rejected')}>إيقاف الممثل</button>
+                        <span>
+                          <button type="button" disabled={busyId === `w:${row.contactId}`} onClick={() => sendLinks(row)}>واتساب</button>{' '}
+                          <button type="button" className="ghost" disabled={busyId === `a:${row.contactId}`} onClick={() => decide(row, 'rejected')}>إيقاف الممثل</button>
+                        </span>
                       ) : (
                         row.decidedBy ?? '—'
                       ),

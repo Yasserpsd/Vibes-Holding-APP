@@ -189,8 +189,10 @@ export type AffiliateRow = {
   email: string;
   phone: string;
   code: string;
-  /** M198: the short alias the member shares («FAR-27»); older records get it on the next load. */
+  /** M198 + M202: the short alias the member shares («FAR2»). */
   shortCode?: string;
+  /** M202: aliases he shared before; they keep working. */
+  oldCodes?: string[];
   status: AffiliateStatus;
   entityType: 'individual' | 'company';
   bankName: string;
@@ -652,6 +654,9 @@ export const api = {
     call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/decision`, { status, note }),
   affiliatePayoutDecision: (id: string, status: 'paid' | 'rejected', note: string) =>
     call<{ payout: AffiliatePayoutRow }>('POST', `/api/admin/affiliates/payouts/${id}/decision`, { status, note }),
+  affiliateShortCode: (contactId: number, code: string) => call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/code`, { code }),
+  affiliateSendLinks: (contactId?: number) =>
+    call<{ results: { contactId: number; name: string; code: string; channel: string; error: string | null }[] }>('POST', '/api/admin/affiliates/send-links', contactId === undefined ? {} : { contactId }),
   affiliateCycle: (contactId: number, input: { days: number; target: number; bonus: number }) =>
     call<{ affiliate: AffiliateRow }>('POST', `/api/admin/affiliates/${contactId}/cycle`, input),
   affiliateConfig: (input: Partial<AffiliateConfig>) => call<{ config: AffiliateConfig }>('POST', '/api/admin/affiliates/config', input),

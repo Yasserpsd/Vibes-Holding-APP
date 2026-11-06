@@ -32,7 +32,7 @@ const STATE_ICON: Record<InviteeState, keyof typeof Ionicons.glyphMap> = {
 };
 
 /**
- * M32: «دعوة عضو جديد» — the member's invite code is his membership number; he shares the
+ * M32: «دعوة عضو جديد» — the member's invite code is his membership number (a representative's short code, M202); he shares the
  * server-written invitation text, and sees how far each nominee got. The gift itself is the
  * administration's, delivered by hand; the wording here comes from the dashboard.
  */

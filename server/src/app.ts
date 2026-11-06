@@ -334,6 +334,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     publicUrl: config.PUBLIC_URL,
     push: autoPush ? push : undefined,
     muted: () => companion.mutedIds(),
+    whatsapp,
   });
   // M186: counters that run out file their renewal request on time, even when the affiliate never opens the app.
   const affiliateTimer = setInterval(() => void affiliate.sweep().then(() => affiliate.remind()).catch((error: unknown) => app.log.error({ err: error }, 'affiliate sweep failed')), 10 * 60_000);
@@ -664,7 +665,16 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(companionRoutes, { service: companion, auth });
   await app.register(payLinksRoutes, { service: paylinks, auth });
   await app.register(partnersRoutes, { service: partners, auth, sync });
-  await app.register(invitesRoutes, { service: invites, auth, english: englishCache });
+  await app.register(invitesRoutes, {
+    service: invites,
+    auth,
+    english: englishCache,
+    // M202 (owner, 2026-11-06): a representative who opens «دعوة عضو» shares his short code, never the long number.
+    shortCodeOf: async (id) => {
+      const record = await affiliate.find(id);
+      return record?.status === 'approved' ? AffiliateService.codeOf(record) : null;
+    },
+  });
   // Owner (2026-11-04): referred people's names in Latin letters for the English app (cached per name).
   const names = new NameTransliterator(
     kv,

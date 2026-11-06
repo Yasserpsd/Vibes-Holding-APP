@@ -319,7 +319,7 @@ export default function RegisterScreen() {
             value={form.inviteCode}
             onChangeText={set('inviteCode')}
             hint={t('auth.register.inviteCodeHint')}
-            placeholder="I-0000000000"
+            placeholder="FAR2"
           />
 
           {interestsList.data && interestsList.data.interests.length > 0 ? (

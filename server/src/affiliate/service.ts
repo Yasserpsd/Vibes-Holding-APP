@@ -10,7 +10,8 @@ import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 
 import { cityByKey, cityKeyOf, CITY_NAME, OTHER_CITY } from './cities.js';
-import { newShortCode, normalizeShortCode } from './shortCode.js';
+import type { WaResult, WhatsappService } from '../whatsapp/service.js';
+import { codeKey, isLegacyCode, newShortCode, normalizeShortCode } from './shortCode.js';
 
 /**
  * M184: «برنامج ممثلي نادي المستثمرين» — the in-app affiliate program. Any signed-in account applies with
@@ -59,11 +60,13 @@ export type AffiliateRecord = {
   /** The membership number — the referral code the hub verifies at registration (M32 channel). */
   code: string;
   /**
-   * M198: the short alias the member shares instead («FAR-27»: three Latin letters of his name + a
-   * number). The server maps it back to `code` before the hub ever sees it. Older records get theirs
+   * M198 + M202: the short alias the member shares instead («FAR2»: three Latin letters of his name + one
+   * digit). The server maps it back to `code` before the hub ever sees it. Older records get theirs
    * on the next load.
    */
   shortCode?: string;
+  /** M202: every alias he shared before; links and typed codes carrying them keep resolving to him. */
+  oldCodes?: string[];
   status: AffiliateStatus;
   /** The application form (owner, 2026-11-02: bank, IBAN, address, the source, and فرد/شركة are mandatory). */
   entityType: 'individual' | 'company';
@@ -367,6 +370,8 @@ type Deps = {
   notifier: Notifier;
   log: FastifyBaseLogger;
   publicUrl: string;
+  /** M202: optional so a server without WhatsApp, and the tests, simply skip the message. */
+  whatsapp?: Pick<WhatsappService, 'sendAffiliateLink'>;
   push?: AffiliatePush;
   /** Accounts that muted the advisor's daily push (M87b) hear no reminder either. */
   muted?: () => Promise<Set<number>>;
@@ -383,17 +388,19 @@ export class AffiliateService {
   }
 
   /**
-   * The records, every one with a short code: those saved before M198 get theirs here, in the order
-   * they applied (deterministic, so the alias is the same on every load), and the next write keeps it.
+   * The records, every one with a short code: those saved before M198 and the «FAR-27» aliases of M198
+   * get a new one here, in the order they applied (deterministic, so the alias is the same on every
+   * load), and the next write keeps it. The earlier alias moves to `oldCodes` and keeps working.
    */
   private async loadRecords(): Promise<AffiliateRecord[]> {
     const affiliates = (await this.deps.kv.get<{ affiliates: AffiliateRecord[] }>(AFFILIATES_KEY))?.affiliates ?? [];
-    const missing = affiliates.filter((record) => !record.shortCode);
+    const missing = affiliates.filter((record) => isLegacyCode(record.shortCode) && !record.oldCodes?.length);
     if (missing.length) {
-      const taken = new Set(affiliates.map((record) => record.shortCode ?? '').filter(Boolean));
+      const taken = AffiliateService.takenCodes(affiliates);
       for (const record of [...missing].sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))) {
-        record.shortCode = newShortCode(record.name, record.contactId, taken);
-        taken.add(record.shortCode);
+        if (record.shortCode) record.oldCodes = [record.shortCode];
+        record.shortCode = newShortCode(record.name, taken);
+        taken.push(record.shortCode);
       }
       if (!this.backfillQueued) {
         this.backfillQueued = true;
@@ -401,6 +408,11 @@ export class AffiliateService {
       }
     }
     return affiliates;
+  }
+
+  /** Every alias in use or ever shared, so a new one never lands on a link that is already out there. */
+  private static takenCodes(affiliates: AffiliateRecord[]): string[] {
+    return affiliates.flatMap((record) => [...(record.shortCode ? [record.shortCode] : []), ...(record.oldCodes ?? [])]);
   }
 
   /** The code the member shares and sees: the short alias, or the membership number before M198. */
@@ -699,25 +711,81 @@ export class AffiliateService {
 
   referralLink(code: string): string {
     const base = this.deps.publicUrl.replace(/\/+$/, '');
-    return base ? `${base}/r/${encodeURIComponent(code)}` : '';
+    return base ? `${base}/r/${encodeURIComponent(code.toLowerCase())}` : '';
   }
 
   async find(contactId: number): Promise<AffiliateRecord | null> {
     return (await this.loadRecords()).find((record) => record.contactId === contactId) ?? null;
   }
 
-  /** By the membership number OR the short alias (M198) — both forms of the link keep working. */
+  /** By the membership number OR any alias he ever held — every form of the link keeps working. */
   async findByCode(code: string): Promise<AffiliateRecord | null> {
     const wanted = code.trim().toUpperCase();
-    const short = normalizeShortCode(code);
-    return (await this.loadRecords()).find((record) => record.code.toUpperCase() === wanted || (short !== null && record.shortCode === short)) ?? null;
+    return (await this.loadRecords()).find((record) => record.code.toUpperCase() === wanted) ?? (await this.findByShortCode(code));
   }
 
-  /** By the short alias only («far 27» tolerated); null when the text is not a short code or nobody holds it. */
+  /**
+   * By an alias, current or old. The exact text wins; otherwise look-alikes are forgiven («far 2», «RlN2»,
+   * «f0x3») but only when they point at one person: a commission never lands on a guess.
+   */
   async findByShortCode(raw: string): Promise<AffiliateRecord | null> {
-    const short = normalizeShortCode(raw);
-    if (!short) return null;
-    return (await this.loadRecords()).find((record) => record.shortCode === short) ?? null;
+    const key = codeKey(raw);
+    if (!key) return null;
+    const records = await this.loadRecords();
+    const exact = normalizeShortCode(raw);
+    const holds = (record: AffiliateRecord, test: (code: string) => boolean): boolean => [record.shortCode ?? '', ...(record.oldCodes ?? [])].some((code) => code && test(code));
+    const found = exact ? records.find((record) => holds(record, (code) => code === exact)) : undefined;
+    if (found) return found;
+    const loose = records.filter((record) => holds(record, (code) => codeKey(code) === key));
+    return loose.length === 1 ? (loose[0] ?? null) : null;
+  }
+
+  /**
+   * M202: the dashboard picks an alias by hand when the generated one reads badly. The one it replaces
+   * stays in `oldCodes`, so anything already shared keeps working.
+   */
+  async setShortCode(contactId: number, raw: string): Promise<AffiliateRecord | null> {
+    const code = normalizeShortCode(raw);
+    if (!code || code.includes('-')) {
+      throw new RequestError('short_code', 'الرمز من 3 إلى 5 حروف لاتينية، ويمكن أن ينتهي برقم واحد من 2 إلى 9', 400);
+    }
+    return this.mutate((affiliates) => {
+      const existing = affiliates.find((entry) => entry.contactId === contactId);
+      if (!existing) return null;
+      const others = AffiliateService.takenCodes(affiliates.filter((entry) => entry !== existing));
+      if (others.some((taken) => codeKey(taken) === codeKey(code))) {
+        throw new RequestError('short_code_taken', 'هذا الرمز مستخدم لممثل آخر، أو يشبهه في الكتابة', 400);
+      }
+      if (existing.shortCode === code) return { ...existing };
+      existing.oldCodes = [...(existing.oldCodes ?? []), ...(existing.shortCode ? [existing.shortCode] : [])].filter((old) => old !== code);
+      existing.shortCode = code;
+      return { ...existing };
+    });
+  }
+
+  /** M202: his code and link on WhatsApp (club_affiliate_link). The ref stops a second send of the same code. */
+  private async sendLink(record: AffiliateRecord): Promise<WaResult> {
+    if (!this.deps.whatsapp) return { channel: 'none', error: 'whatsapp_disabled' };
+    const code = AffiliateService.codeOf(record);
+    return this.deps.whatsapp.sendAffiliateLink({
+      phone: record.phone,
+      lang: record.lang ?? 'ar',
+      name: record.name,
+      code,
+      link: this.referralLink(code),
+      ref: `affiliate-link:${record.contactId}:${code}`,
+    });
+  }
+
+  /** M202, dashboard only: sends the approved affiliates their code and link: one of them, or all. */
+  async sendLinks(contactId?: number): Promise<{ contactId: number; name: string; code: string; channel: string; error: string | null }[]> {
+    const approved = (await this.loadRecords()).filter((record) => record.status === 'approved' && (contactId === undefined || record.contactId === contactId));
+    const results: { contactId: number; name: string; code: string; channel: string; error: string | null }[] = [];
+    for (const record of approved) {
+      const sent = await this.sendLink(record);
+      results.push({ contactId: record.contactId, name: record.name, code: AffiliateService.codeOf(record), channel: sent.channel, error: sent.error ?? null });
+    }
+    return results;
   }
 
   /**
@@ -753,8 +821,9 @@ export class AffiliateService {
         email: member.email,
         phone: member.phone,
         code: member.code,
-        // M198: a re-application keeps the alias the member may already have shared.
-        shortCode: existing?.shortCode ?? newShortCode(member.name, member.contactId, affiliates.map((entry) => entry.shortCode ?? '')),
+        // M198: a re-application keeps the aliases the member may already have shared.
+        shortCode: existing?.shortCode ?? newShortCode(member.name, AffiliateService.takenCodes(affiliates)),
+        ...(existing?.oldCodes?.length ? { oldCodes: existing.oldCodes } : {}),
         status: 'agreement',
         entityType: form.entityType,
         bankName: form.bankName,
@@ -824,6 +893,8 @@ export class AffiliateService {
       return { ...existing };
     });
     if (record) this.deps.notifier.affiliateDecided(record, this.referralLink(AffiliateService.codeOf(record)));
+    // M202: a new affiliate gets his code and link on WhatsApp too. It never holds up the decision.
+    if (record?.status === 'approved') void this.sendLink(record);
     return record;
   }
 

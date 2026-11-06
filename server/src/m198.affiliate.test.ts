@@ -104,6 +104,7 @@ test('the prefix is the first three Latin letters of the name, the article dropp
   assert.equal(latinPrefix('Jo'), 'JOX');
   assert.equal(latinPrefix('   '), 'INV');
 
+  assert.equal(normalizeShortCode('far2'), 'FAR2');
   assert.equal(normalizeShortCode('far 27'), 'FAR-27');
   assert.equal(normalizeShortCode('FAR-027'), 'FAR-27');
   assert.equal(normalizeShortCode('far27'), 'FAR-27');
@@ -113,11 +114,11 @@ test('the prefix is the first three Latin letters of the name, the article dropp
   assert.equal(normalizeShortCode('FA-1'), null);
   assert.equal(normalizeShortCode(''), null);
 
-  // The number moves up until it is free, whatever the seed.
-  const first = newShortCode('فارس العتيبي', 27, []);
-  assert.equal(first, 'FAR-37');
-  assert.equal(newShortCode('فارس الدوسري', 27, [first]), 'FAR-38');
-  assert.equal(newShortCode('فارس الدوسري', 27, [first, 'far-38']), 'FAR-39');
+  // The digit moves up until it is free.
+  const first = newShortCode('فارس العتيبي', []);
+  assert.equal(first, 'FAR2');
+  assert.equal(newShortCode('فارس الدوسري', [first]), 'FAR3');
+  assert.equal(newShortCode('فارس الدوسري', [first, 'far3']), 'FAR4');
 });
 
 test('an approved affiliate gets a short code: unique, in his link, his share text and his mail', async () => {
@@ -128,20 +129,19 @@ test('an approved affiliate gets a short code: unique, in his link, his share te
     const approved = await send('POST', `/api/admin/affiliates/${affiliate.id}/decision`, { status: 'approved' }, adminToken);
     assert.equal(approved.statusCode, 200, approved.body);
     const row = approved.json().affiliate as AffiliateRecord;
-    assert.match(row.shortCode ?? '', /^FAR-\d{2,}$/);
+    assert.match(row.shortCode ?? '', /^FAR[2-9]$/);
     affiliate.shortCode = row.shortCode ?? '';
 
     const mine = await get('/api/affiliate', affiliate.token);
     assert.equal(mine.statusCode, 200, mine.body);
     assert.equal(mine.json().code, affiliate.shortCode);
-    assert.equal(mine.json().membershipCode, affiliate.cardNumber);
-    assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${affiliate.shortCode}`);
+    assert.equal(mine.json().link, `https://api-test.vibesholdingsa.com/r/${affiliate.shortCode.toLowerCase()}`);
     assert.ok((mine.json().shareText as string).includes(affiliate.shortCode));
     assert.ok(!(mine.json().shareText as string).includes(affiliate.cardNumber));
 
     // The decision mail names the short code (and the link carrying it).
     const mail = mailer.sent.at(-1);
-    assert.match(mail?.text ?? '', new RegExp(affiliate.shortCode));
+    assert.match(mail?.text ?? '', new RegExp(affiliate.shortCode, 'i'));
   }
   assert.notEqual(affiliates[0]?.shortCode, affiliates[1]?.shortCode);
 
@@ -158,13 +158,25 @@ test('an approved affiliate gets a short code: unique, in his link, his share te
 test('the referral page answers to the short code in any spelling and to the membership number', async () => {
   const [faris] = affiliates;
   assert.ok(faris);
-  for (const form of [faris.shortCode, faris.shortCode.toLowerCase(), faris.shortCode.replace('-', ''), faris.cardNumber]) {
+  for (const form of [faris.shortCode, faris.shortCode.toLowerCase(), `${faris.shortCode.slice(0, 3)}-${faris.shortCode.slice(3)}`, faris.cardNumber]) {
     const page = await get(`/r/${encodeURIComponent(form)}`);
     assert.equal(page.statusCode, 200, `${form}: ${page.statusCode}`);
     assert.match(page.body, new RegExp(`id="ref-code">${faris.shortCode}<`));
   }
   const unknown = await get('/r/ZZZ-99');
   assert.equal(unknown.statusCode, 302);
+});
+
+test('M202: «دعوة عضو» gives an approved representative his short code; a plain member keeps his number', async () => {
+  const [faris] = affiliates;
+  assert.ok(faris);
+  const invite = (await get('/api/invites', faris.token)).json() as { code: string; shareText: string };
+  assert.equal(invite.code, faris.shortCode);
+  assert.ok(invite.shareText.includes(faris.shortCode));
+  assert.ok(!invite.shareText.includes(faris.cardNumber));
+
+  const member = (await get('/api/invites', adminToken)).json() as { code: string };
+  assert.equal(member.code, (await get('/api/me', adminToken)).json().me.cardNumber);
 });
 
 test('a new member registers with the short code: the hub receives the membership number', async () => {
@@ -220,8 +232,8 @@ test('records saved before M198 get their short codes on the next load, and keep
 
   const first = await service.find(80);
   const second = await service.find(81);
-  assert.match(first?.shortCode ?? '', /^SAR-\d+$/);
-  assert.match(second?.shortCode ?? '', /^SAR-\d+$/);
+  assert.match(first?.shortCode ?? '', /^SAR[2-9]$/);
+  assert.match(second?.shortCode ?? '', /^SAR[2-9]$/);
   assert.notEqual(first?.shortCode, second?.shortCode);
   // The same alias on every load, and persisted by the queued write.
   assert.equal((await service.find(80))?.shortCode, first?.shortCode);
