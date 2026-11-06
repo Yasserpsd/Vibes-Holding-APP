@@ -275,7 +275,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!body) return;
       // M204: WhatsApp only. A bundle from before M204 still has the «send it to my e-mail» button.
       if (body.via === 'email') {
-        return reply.code(400).send({ error: { code: 'phone_code_whatsapp_only', message: 'الرمز يُرسل على واتساب فقط. إذا لم يصلك، راسل دعم النادي على واتساب.' } });
+        return reply.code(400).send({ error: { code: 'phone_code_whatsapp_only', message: 'الرمز يُرسل على واتساب فقط. إذا لم يصلك، تواصل مع دعم النادي على واتساب.' } });
       }
       return service.resendPhoneCode(body.stepToken);
     }),
@@ -556,7 +556,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!result.ok) {
         if (result.reason === 'cooldown') {
           // M109d: the owner's wording — the yearly change is used up; the dashboard request is the way.
-          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير صفتك مرة واحدة فقط خلال السنة — متبقٍ ${result.daysLeft} يومًا. يمكنك إرسال «طلب تغيير الصفة» إلى الإدارة.`, daysLeft: result.daysLeft } });
+          return reply.code(429).send({ error: { code: 'persona_cooldown', message: `يمكنك تغيير فئتك مرة واحدة فقط خلال السنة — متبقٍ ${result.daysLeft} يومًا. يمكنك إرسال «طلب تغيير الفئة» إلى الإدارة.`, daysLeft: result.daysLeft } });
         }
         if (result.reason === 'too_soon') {
           return reply.code(429).send({ error: { code: 'persona_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });

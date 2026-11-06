@@ -46,7 +46,7 @@ export type MemberRequest = {
 export type Recipient = { email: string; name: string; lang?: AppLang | null; contactEmail?: string | null; /** M204: the account's number; with it a status change goes on WhatsApp. */ phone?: string | null };
 
 export const KIND_LABEL: Record<RequestKind, { ar: string; en: string }> = {
-  card: { ar: 'توصيل كارت العضوية', en: 'Membership card delivery' },
+  card: { ar: 'توصيل بطاقة العضوية', en: 'Membership card delivery' },
   hq: { ar: 'حجز في مقر النادي', en: 'HQ booking' },
   service: { ar: 'طلب خدمة', en: 'Service request' },
   workshop: { ar: 'التسجيل في ورشة', en: 'Workshop registration' },
@@ -109,7 +109,7 @@ export function fromCard(request: CardPrintRequest): MemberRequest {
     id: request.id,
     contactId: request.contactId,
     // M162: pickup at the HQ or delivery to the address.
-    title: request.method === 'pickup' ? 'استلام كارت العضوية المطبوع من المقر' : 'توصيل كارت العضوية المطبوع',
+    title: request.method === 'pickup' ? 'استلام بطاقة العضوية المطبوعة من المقر' : 'توصيل بطاقة العضوية المطبوعة',
     titleEn: request.method === 'pickup' ? 'Printed membership card pickup at the HQ' : 'Printed membership card delivery',
     status: request.status,
     createdAt: request.createdAt,
@@ -120,8 +120,8 @@ export function fromCard(request: CardPrintRequest): MemberRequest {
       ...row('العنوان', 'Address', request.address),
       ...row('ملاحظتك', 'Your note', request.note),
       // M163: a new copy after a delivered card, and the member's own receipt mark.
-      ...row('نوع الطلب', 'Request type', request.replacement ? 'نسخة بديلة عن كارت سبق تسليمه' : ''),
-      ...row('تأكيد الاستلام', 'Receipt', request.memberConfirmedAt ? 'أكدت استلام الكارت بنفسك' : ''),
+      ...row('نوع الطلب', 'Request type', request.replacement ? 'نسخة بديلة عن بطاقة سبق تسليمها' : ''),
+      ...row('تأكيد الاستلام', 'Receipt', request.memberConfirmedAt ? 'أكدت استلام البطاقة بنفسك' : ''),
     ],
     note: request.adminNote ?? null,
     screen: '/card',

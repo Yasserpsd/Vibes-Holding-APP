@@ -29,7 +29,7 @@ export function receiptMail(entry: MemberRequest, customer: ReceiptCustomer, lan
     entry.kind === 'card'
       ? en
         ? `Receipt — membership card delivery (No. ${entry.number})`
-        : `إيصال طلب توصيل كارت العضوية (رقم ${entry.number})`
+        : `إيصال طلب توصيل بطاقة العضوية (رقم ${entry.number})`
       : en
         ? `We received your request — ${kind} (No. ${entry.number})`
         : `استلمنا طلبك — ${kind} (رقم ${entry.number})`;

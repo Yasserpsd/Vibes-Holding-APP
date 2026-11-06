@@ -83,7 +83,7 @@ test('a card delivery request mails the member a royal no-fee receipt at once', 
   const mails = memberMails();
   assert.equal(mails.length, before + 1);
   const receipt = mails.at(-1)!;
-  assert.match(receipt.subject, /إيصال طلب توصيل كارت العضوية/);
+  assert.match(receipt.subject, /إيصال طلب توصيل بطاقة العضوية/);
   assert.match(receipt.text, /بدون رسوم/);
   assert.doesNotMatch(receipt.text, /0\.00/);
   assert.match(receipt.html ?? '', /#1F3A6E/i, 'the M108 customer invoice look');

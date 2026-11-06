@@ -21,7 +21,7 @@ const requestSchema = z
   .superRefine((value, ctx) => {
     if (value.method !== 'delivery') return;
     if (value.city.length < 2) ctx.addIssue({ code: 'custom', path: ['city'], message: 'اكتب المدينة' });
-    if (value.address.length < 5) ctx.addIssue({ code: 'custom', path: ['address'], message: 'اكتب العنوان الذي يصل إليه الكارت' });
+    if (value.address.length < 5) ctx.addIssue({ code: 'custom', path: ['address'], message: 'اكتب العنوان الذي تصل إليه البطاقة' });
   });
 const idSchema = z.object({ id: z.string().uuid() });
 const statusSchema = z.object({ status: z.enum(['pending', 'in_progress', 'done', 'rejected']), note: z.string().trim().max(300).default('') });
