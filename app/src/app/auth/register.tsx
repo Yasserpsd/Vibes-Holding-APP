@@ -256,7 +256,7 @@ export default function RegisterScreen() {
             value={form.phone}
             onChangeText={(value) => set('phone')(value.replace(/\D+/g, '').replace(/^0+/, ''))}
             placeholder={phoneExample || undefined}
-            hint={phoneExample ? t('auth.register.phoneHint', { example: phoneExample }) : t('auth.register.phoneHintNoExample')}
+            hint={`${phoneExample ? t('auth.register.phoneHint', { example: phoneExample }) : t('auth.register.phoneHintNoExample')} ${t('auth.register.phoneWhatsapp')}`}
             error={errors.errors.phone}
             anchorRef={errors.anchor('phone')}
           />

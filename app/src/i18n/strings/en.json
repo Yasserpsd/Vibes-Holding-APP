@@ -321,6 +321,7 @@
   "auth.register.phone": "Mobile number",
   "auth.register.phoneHint": "No country code and no leading zero, for example: {example}",
   "auth.register.phoneHintNoExample": "No spaces, no country code and no leading zero",
+  "auth.register.phoneWhatsapp": "Enter your number correctly and make sure it has WhatsApp. Your welcome message and payment receipts are sent there.",
   "auth.register.countrySearch": "Search by name or dial code…",
   "auth.register.email": "Email",
   "auth.register.passwordHint": "At least 6 characters",

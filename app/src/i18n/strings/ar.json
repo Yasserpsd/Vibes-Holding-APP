@@ -321,6 +321,7 @@
   "auth.register.phone": "رقم الجوال",
   "auth.register.phoneHint": "بدون رمز الدولة وبدون الصفر الأول، مثال: {example}",
   "auth.register.phoneHintNoExample": "بدون مسافات وبدون رمز الدولة وبدون الصفر الأول",
+  "auth.register.phoneWhatsapp": "اكتب رقمك صحيحًا وتأكد أن عليه واتساب، لتصلك عليه رسالة الترحيب وإيصالات الدفع.",
   "auth.register.countrySearch": "ابحث بالاسم أو رمز الاتصال…",
   "auth.register.email": "البريد الإلكتروني",
   "auth.register.passwordHint": "6 أحرف على الأقل",

@@ -143,7 +143,7 @@ export default function ProfileEditScreen() {
           value={phone}
           onChangeText={setPhone}
           placeholder={country?.example ? country.example.replace(/^0+/, '') : undefined}
-          hint={t('profile.phoneHint')}
+          hint={`${t('profile.phoneHint')} ${t('auth.register.phoneWhatsapp')}`}
         />
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>

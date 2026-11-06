@@ -281,6 +281,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                   keyboardType="phone-pad"
                   textContentType="telephoneNumber"
                   placeholder={phoneExample || undefined}
+                  hint={t('auth.register.phoneWhatsapp')}
                 />
               </View>
             ) : null}
