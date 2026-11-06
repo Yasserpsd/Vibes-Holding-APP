@@ -15,7 +15,7 @@ export function profileComplete(me: Me): boolean {
 }
 
 export const PROFILE_GATE_MESSAGE =
-  'كمّل بياناتك أولًا لإتمام هذا الطلب: الوظيفة والشركة والمدينة والنبذة والموقع وحسابات التواصل — من «حسابي» ← «تعديل الملف الشخصي».';
+  'أكمل بياناتك أولًا لإتمام هذا الطلب: الوظيفة والشركة والمدينة والنبذة والموقع وحسابات التواصل — من «حسابي» ← «تعديل الملف الشخصي».';
 
 /** The booking/registration starters; reads and status polls stay open. */
 // M172 (owner, 2026-10-31, members could not book the AI workshop: «لو أنا عضو أضغط بس على زرار تأكيد
