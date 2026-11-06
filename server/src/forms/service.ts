@@ -184,7 +184,7 @@ export class FormsService {
       if (note.trim()) entry.adminNote = note.trim().slice(0, 300);
       return { entry, changed };
     });
-    if (changed && entry.contactId !== null) this.deps.notices?.changed(fromForm(entry), { email: entry.email, name: entry.name, lang: entry.lang });
+    if (changed && entry.contactId !== null) this.deps.notices?.changed(fromForm(entry), { email: entry.email, name: entry.name, lang: entry.lang, phone: entry.phone });
     return entry;
   }
 

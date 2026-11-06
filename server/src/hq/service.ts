@@ -481,7 +481,7 @@ export class HqService {
       status,
     );
     // M138: the decision mail (the push above already speaks of the barcode / the hours).
-    this.deps.notices?.changed(fromVisit(visit, mail.endTime), { email: visit.email, name: visit.name, lang: visit.lang }, { push: false });
+    this.deps.notices?.changed(fromVisit(visit, mail.endTime), { email: visit.email, name: visit.name, lang: visit.lang, phone: visit.phone }, { push: false });
     return this.toAdmin(visit, content, now);
   }
 

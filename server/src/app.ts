@@ -322,6 +322,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     client: config.WHATSAPP_TOKEN
       ? new WhatsappClient({ token: config.WHATSAPP_TOKEN, phoneId: config.WHATSAPP_PHONE_ID, wabaId: config.WHATSAPP_WABA_ID, log: app.log, fetchImpl })
       : null,
+    mailOff: new Set((config.WHATSAPP_MAIL_OFF ?? '').split(',').map((kind) => kind.trim()).filter((kind) => kind && kind !== 'invoice')),
+    // M204: Meta could not deliver a sign-in/number code; a new one goes to the account's e-mail by itself.
+    onCodeFailed: (messageId) => phoneCodes.deliveryFailed(messageId),
   });
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
@@ -345,16 +348,18 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const totp = new TotpStore(kv);
   // M156: the AI pass on display names (rules run without it); fails open on any model trouble.
   const nameJudge = config.OPENAI_API_KEY ? new NameJudge({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl }) : null;
-  // M203: the WhatsApp code at sign-in and on a new number; the e-mail carries it when Meta refuses or the member asks.
+  // M203: the WhatsApp code at sign-in and on a new number. M204: WhatsApp first; the e-mail carries it by itself only
+  // when Meta refuses the send or reports it undelivered (`onCodeFailed` above), never as the member's choice.
   const phoneCodes = new PhoneCodeStore(kv, async (via, step, code) => {
-    if (via === 'email') return auth.mailPhoneCode(step.email, code, step.lang);
-    return (await whatsapp.sendCode({ phone: step.phone, lang: step.lang, code })).channel === 'whatsapp';
+    if (via === 'email') return { sent: await auth.mailPhoneCode(step.email, code, step.lang) };
+    const out = await whatsapp.sendCode({ phone: step.phone, lang: step.lang, code });
+    return { sent: out.channel === 'whatsapp', ...(out.messageId ? { messageId: out.messageId } : {}) };
   });
   const auth: AuthService = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge, phoneCodes, whatsappEnabled: () => whatsapp.enabled });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   // M138: the member's receipt mail on every action and mail + push on every status change.
-  const notices = new MemberNotices({ notifier, push, log: app.log, publicUrl: config.PUBLIC_URL });
+  const notices = new MemberNotices({ notifier, push, log: app.log, publicUrl: config.PUBLIC_URL, whatsapp });
   const hq = new HqService({ kv, log: app.log, notifier, push, notices });
   const card = new CardService({ kv, notifier, notices });
   const contact = new ContactService({ kv, notifier, push });
@@ -454,6 +459,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   });
   const membership = new MembershipService({
     kv,
+    whatsapp,
     log: app.log,
     invites,
     hub: hubClient,
@@ -478,7 +484,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M136: edition pushes follow each account's news topics (unified interests, else the legacy per-topic prefs).
   news.useTopics(async (contactId) => (await interests.newsTopicsFor(contactId)) ?? (await news.prefs(contactId))?.topics ?? null);
   // «أجندة النادي» (M41): the year's events; a paid registration is confirmed only by the payments webhook.
-  const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices });
+  const agenda = new AgendaService({ kv, notifier, push, payments, discounts, interests, onChange: () => moved('content'), notices, whatsapp });
   // M191: workshop recordings play for members only, never through the public `/media/stream/` link.
   media.keepPrivate(
     async (id) => (await agenda.privateMedia()).videoIds.has(id),
@@ -504,7 +510,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const breakingNews = new BreakingNewsService({ kv, log: app.log, news, push, enabled: config.NEWS_BREAKING === '1' });
   payments.onSettled((payment) => agenda.paymentSettled(payment));
   // «روابط الدفع» (M44): dashboard-made Paymob links — the paid mail names the sale, a membership sale activates itself.
-  const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL });
+  const paylinks = new PayLinksService({ kv, hub: hubClient, payments, notifier, push, auth, invites, log: app.log, publicUrl: config.PUBLIC_URL, whatsapp });
   payments.onSettled((payment) => paylinks.settled(payment));
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
   // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,
@@ -637,7 +643,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices, whatsapp });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   // M142: voice-filled forms — the same key; the member still submits himself.

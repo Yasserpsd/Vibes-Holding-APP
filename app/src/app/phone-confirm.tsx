@@ -41,7 +41,6 @@ export default function PhoneConfirmScreen() {
         {step ? (
           <PhoneCodeStep
             step={step}
-            emailOut={false}
             onBack={() => router.replace('/profile-edit?fixPhone=1' as Href)}
             onSubmit={async (code) => {
               const { me } = await authApi.phoneConfirm(step.stepToken, code);

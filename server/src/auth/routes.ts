@@ -17,7 +17,9 @@ import { toAdminPersonaRequest, toMyPersonaRequest, type PersonaRequestsService 
 import { fromDeletion, fromPersona } from '../requests/model.js';
 import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
-import { canPhoneCode, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import type { WhatsappService } from '../whatsapp/service.js';
+import { maskNumber } from './phoneCode.js';
+import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
@@ -37,6 +39,8 @@ export type AuthRoutesOptions = {
   deletion?: AccountDeletionStore;
   /** M138: the member's receipt and status mails. */
   notices?: MemberNotices;
+  /** M204: the persona-change and deletion codes go on WhatsApp first. */
+  whatsapp?: WhatsappService;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -127,7 +131,7 @@ const profileSchema = z
 const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -136,13 +140,30 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   // M168: every account answer is shaped for the bundle that asked — the completion wall never names a
   // field that bundle cannot draw (an older bundle used to see an empty card and stay locked out).
   const withEnglish = async (request: FastifyRequest, account: Awaited<ReturnType<AuthService['me']>>) => {
-    const me = { ...forBundle(account, gateFieldsOf(request.headers['x-app-gate'])), phoneConfirmDue: service.phoneConfirmDue(account) };
+    const me = { ...forBundle(account, gateFieldsOf(request.headers['x-app-gate'])), phoneConfirmDue: await service.phoneConfirmDue(account) };
     if (!meLocalizer) return me;
     const en = await meLocalizer.english(me, langOf(request)).catch(() => null);
     return en ? { ...me, en } : me;
   };
 
   const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']) });
+
+  /**
+   * M204 (owner: «كله حاجه علي واتس اب»): the persona-change and deletion codes go to the account's PROVEN WhatsApp
+   * number when the bundle can say so; the e-mail carries the same code by itself when WhatsApp refuses it at once or
+   * Meta reports it undelivered later. An unproven number or an older bundle keeps the e-mail.
+   */
+  const sendActionCode = async (request: FastifyRequest, me: { phone: string; phoneVerified?: boolean | null }, code: string, mail: () => Promise<void>): Promise<'whatsapp' | 'email'> => {
+    if (whatsapp?.enabled && me.phoneVerified === true && bundleKnows(request.headers['x-app-gate'], ACTION_CODE_CAPABILITY)) {
+      const out = await whatsapp.sendCode({ phone: me.phone, lang: langOf(request), code });
+      if (out.channel === 'whatsapp' && out.messageId) {
+        whatsapp.holdMail(out.messageId, () => void mail().catch(() => undefined));
+        return 'whatsapp';
+      }
+    }
+    await mail();
+    return 'email';
+  };
 
   const limited = (name: string, limit: number, request: FastifyRequest, reply: FastifyReply): boolean => {
     if (limiter.hit(`${name}:${request.ip}`, limit, WINDOW)) return false;
@@ -251,7 +272,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('phone-resend', 10, request, reply)) return;
       const body = parse(phoneResendSchema, request.body, reply);
       if (!body) return;
-      return service.resendPhoneCode(body.stepToken, body.via);
+      // M204: WhatsApp only. A bundle from before M204 still has the «send it to my e-mail» button.
+      if (body.via === 'email') {
+        return reply.code(400).send({ error: { code: 'phone_code_whatsapp_only', message: 'الرمز يُرسل على واتساب فقط. إذا لم يصلك، راسل دعم النادي على واتساب.' } });
+      }
+      return service.resendPhoneCode(body.stepToken);
     }),
   );
 
@@ -508,15 +533,16 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       // M122: the member's code mail follows the app language the request came in.
       const en = langOf(request) === 'en';
       const label = (en ? personaEntry?.labelEn : personaEntry?.label) ?? body.persona;
+      let via: 'whatsapp' | 'email' = 'email';
       const result = await personaChange.request(me.id, body.persona, async (code) => {
         try {
-          await mailer?.send({
+          via = await sendActionCode(request, me, code, async () => void (await mailer?.send({
             to: [me.email],
             subject: en ? 'Your category change code — Investors Club' : 'رمز تغيير التوجه — نادي المستثمرين',
             text: en
               ? [`Your confirmation code for changing your category to "${label}": ${code}`, 'The code is valid for 10 minutes and for one use only.', '', 'You can change your category once per membership year.', 'If you did not ask for this change, ignore this message.'].join('\n')
               : [`رمز تأكيد تغيير توجهك إلى «${label}»: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', 'يمكنك تغيير توجهك مرة واحدة خلال سنة العضوية.', 'إذا لم تطلب هذا التغيير فتجاهل هذه الرسالة.'].join('\n'),
-          });
+          })));
         } catch (error) {
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'persona change code was not mailed');
           throw new Error('mail_failed');
@@ -536,7 +562,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         }
         return reply.code(429).send({ error: { code: 'persona_too_many', message: 'طلبات كثيرة، حاول لاحقًا' } });
       }
-      return { ok: true, email: me.email, seconds: result.seconds, days: PERSONA_CHANGE_DAYS };
+      return { ok: true, email: me.email, via, phone: maskNumber(me.phone), seconds: result.seconds, days: PERSONA_CHANGE_DAYS };
     }),
   );
 
@@ -699,15 +725,16 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       }
       // M122: the deletion code mail follows the app language the request came in.
       const en = langOf(request) === 'en';
+      let via: 'whatsapp' | 'email' = 'email';
       const result = await deletion.request(me.id, body.reason ?? '', async (code) => {
         try {
-          await mailer?.send({
+          via = await sendActionCode(request, me, code, async () => void (await mailer?.send({
             to: [me.email],
             subject: en ? 'Your account deletion code — Investors Club' : 'رمز تأكيد حذف الحساب — نادي المستثمرين',
             text: en
               ? [`Your account deletion confirmation code: ${code}`, 'The code is valid for 10 minutes and for one use only.', '', `After you confirm, your account stays active for ${DELETION_GRACE_DAYS} days and you can cancel at any time during them.`, 'If you did not ask to delete your account, ignore this message and change your password.'].join('\n')
               : [`رمز تأكيد حذف حسابك: ${code}`, 'الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.', '', `بعد التأكيد يبقى حسابك فعالًا ${DELETION_GRACE_DAYS} يومًا ويمكنك التراجع خلالها في أي وقت.`, 'إذا لم تطلب حذف حسابك فتجاهل هذه الرسالة وغيّر كلمة مرورك.'].join('\n'),
-          });
+          })));
         } catch (error) {
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'deletion code was not mailed');
           throw new Error('mail_failed');
@@ -721,7 +748,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         if (result.reason === 'too_soon') return reply.code(429).send({ error: { code: 'delete_too_soon', message: `انتظر ${result.waitSeconds} ثانية قبل طلب رمز جديد` } });
         return reply.code(429).send({ error: { code: 'delete_too_many', message: 'طلبات كثيرة، حاول لاحقًا' } });
       }
-      return { ok: true, email: me.email, seconds: result.seconds, word: result.word, days: DELETION_GRACE_DAYS };
+      return { ok: true, email: me.email, via, phone: maskNumber(me.phone), seconds: result.seconds, word: result.word, days: DELETION_GRACE_DAYS };
     }),
   );
 

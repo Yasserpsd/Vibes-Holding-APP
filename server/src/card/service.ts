@@ -161,7 +161,7 @@ export class CardService {
       if (note.trim()) request.adminNote = note.trim().slice(0, 300);
       return { request, changed };
     });
-    if (result?.changed) this.deps.notices?.changed(fromCard(result.request), { email: result.request.email, name: result.request.name, lang: result.request.lang });
+    if (result?.changed) this.deps.notices?.changed(fromCard(result.request), { email: result.request.email, name: result.request.name, lang: result.request.lang, phone: result.request.phone });
     return result?.request ?? null;
   }
 

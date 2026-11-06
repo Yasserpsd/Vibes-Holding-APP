@@ -621,8 +621,15 @@ export class PaymentsService {
           html: invoiceHtml(doc, invoiceNo, lang, this.deps.publicUrl),
         });
         // M174: never delays or fails the settle (the service swallows its own errors); `ref` makes a repeated gateway callback send once.
+        // M204: the invoice itself with its «عرض الفاتورة» button (club_invoice); the older receipt stands in wherever that
+        // template cannot go (not approved, or the TEST server, whose links its fixed address does not cover). The e-mail
+        // above always goes out too: the invoice is the owner's one exception to «WhatsApp only».
         if (this.deps.whatsapp && payment.phone.trim()) {
-          void this.deps.whatsapp.sendReceipt({ phone: payment.phone, lang, amount: payment.amount, service: doc.serviceTitle, invoiceNo, ref: `payment:${payment.id}` });
+          const whatsapp = this.deps.whatsapp;
+          const base = { phone: payment.phone, lang, amount: payment.amount, service: doc.serviceTitle, invoiceNo, ref: `payment:${payment.id}` };
+          void whatsapp
+            .sendInvoice({ ...base, currency: payment.currency, link: `${this.deps.publicUrl}/pay/invoice/${payment.id}` })
+            .then((result) => (result.channel === 'whatsapp' ? result : whatsapp.sendReceipt(base)));
         }
       }
     }

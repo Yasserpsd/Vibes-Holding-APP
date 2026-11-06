@@ -16,16 +16,14 @@ type Props = {
   onSubmit: (code: string) => Promise<void>;
   /** Back to the number field (the gate and the profile editor); a sign-in has no number to edit. */
   onBack?: () => void;
-  /** M203: the alert has nothing to give by e-mail: its way out is `onBack`. */
-  emailOut?: boolean;
 };
 
 /**
  * M203 (owner, 2026-11-06): the one code screen of the WhatsApp proof, used by the sign-in, the completion
- * gate and the profile editor. Meta reports a number without WhatsApp only after it accepted the message,
- * so the way out to the e-mail stays on screen from the first moment.
+ * form and the profile editor. M204 (owner, 2026-11-06): no e-mail button; the server mails the code by itself only
+ * when WhatsApp did not carry it (`via` then says `email`), and the support line stays under the error.
  */
-export function PhoneCodeStep({ step, onSubmit, onBack, emailOut = true }: Props) {
+export function PhoneCodeStep({ step, onSubmit, onBack }: Props) {
   const [via, setVia] = useState(step.via);
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(step.resendAfter);
@@ -56,12 +54,12 @@ export function PhoneCodeStep({ step, onSubmit, onBack, emailOut = true }: Props
     }
   };
 
-  const resend = async (channel: 'whatsapp' | 'email') => {
+  const resend = async () => {
     if (sending) return;
     setSending(true);
     setError(null);
     try {
-      const result = await authApi.phoneResend(step.stepToken, channel);
+      const result = await authApi.phoneResend(step.stepToken, 'whatsapp');
       setVia(result.via);
       setCode('');
       setCooldown(result.resendAfter);
@@ -102,9 +100,8 @@ export function PhoneCodeStep({ step, onSubmit, onBack, emailOut = true }: Props
         variant="outline"
         icon="logo-whatsapp"
         disabled={cooldown > 0 || sending}
-        onPress={() => void resend('whatsapp')}
+        onPress={() => void resend()}
       />
-      {via === 'whatsapp' && emailOut ? <AppButton label={t('phoneCode.noWhatsapp')} variant="outline" icon="mail-outline" disabled={sending} onPress={() => void resend('email')} /> : null}
       {onBack ? <AppButton label={t('phoneCode.changeNumber')} variant="outline" icon="create-outline" onPress={onBack} /> : null}
     </View>
   );

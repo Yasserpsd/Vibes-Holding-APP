@@ -41,6 +41,8 @@ export default function DeleteAccountScreen() {
   const [error, setError] = useState<string | null>(null);
   // Step 2 + 3: where the code went, and the word the member must type back.
   const [sentTo, setSentTo] = useState('');
+  /** M204: the masked number when the code went on WhatsApp; empty = it went to the e-mail. */
+  const [codePhone, setCodePhone] = useState('');
   const [word, setWord] = useState('');
   const [code, setCode] = useState('');
   const [typedWord, setTypedWord] = useState('');
@@ -72,6 +74,7 @@ export default function DeleteAccountScreen() {
     try {
       const answer = await authApi.deleteStart(password, reasonText());
       setSentTo(answer.email);
+      setCodePhone(answer.via === 'whatsapp' ? (answer.phone ?? '') : '');
       setWord(answer.word);
       setConfirming(false);
       setStep('code');
@@ -117,7 +120,7 @@ export default function DeleteAccountScreen() {
       <Screen title={t('deleteAccount.title')} subtitle={t('deleteAccount.codeSubtitle')}>
         <FadeInView>
           <GlassCard radius={radii.lg} style={styles.card}>
-            <Notice text={t('deleteAccount.codeSent', { email: sentTo })} />
+            <Notice text={codePhone ? t('phoneCode.sentWhatsapp', { phone: `‎${codePhone}‎` }) : t('deleteAccount.codeSent', { email: sentTo })} />
             <FormField
               label={t('deleteAccount.codeLabel')}
               value={code}

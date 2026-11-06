@@ -65,7 +65,7 @@ test('pickTemplate matches the language and prefers an approved one', () => {
 
 test('M202: the affiliate link template takes the name, the code and the link', () => {
   assert.deepEqual(buildBodyParams('affiliate_link', { name: 'فارس العتيبي', code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' }, 'ar'), ['فارس العتيبي', 'FAR2', 'https://api.vibesholdingsa.com/r/far2']);
-  assert.match(fallbackMail('affiliate_link', 'ar', { code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' }).text, /FAR2/);
+  assert.match(fallbackMail('affiliate_link', 'ar', { code: 'FAR2', link: 'https://api.vibesholdingsa.com/r/far2' })?.text ?? "", /FAR2/);
 });
 
 test('planDelivery: WhatsApp only when enabled, phone present and the template approved and fitting', () => {

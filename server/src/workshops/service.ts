@@ -118,7 +118,7 @@ export class WorkshopsService {
       if (note.trim()) entry.adminNote = note.trim().slice(0, 300);
       return { entry, changed };
     });
-    if (changed) this.deps.notices?.changed(fromWorkshop(entry), { email: entry.email, name: entry.name, lang: entry.lang });
+    if (changed) this.deps.notices?.changed(fromWorkshop(entry), { email: entry.email, name: entry.name, lang: entry.lang, phone: entry.phone });
     return entry;
   }
 }

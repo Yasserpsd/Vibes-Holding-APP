@@ -101,10 +101,6 @@ export default function AccountScreen() {
       <FadeInView delay={entranceDelay(1, 90)}>
         <MembershipStatusCard membership={me?.membership ?? null} texts={content?.statusTexts} activationNote={content?.activationNote} title={content?.title} subscribeCta />
       </FadeInView>
-      {/* Owner (2026-11-03, a customer from China could not reach us): the management's only WhatsApp line. */}
-      <FadeInView delay={entranceDelay(1, 120)}>
-        <SupportLink />
-      </FadeInView>
       {!hasSecureStorage() ? <Notice tone="warning" text={t('account.noSecureStorage')} /> : null}
 
       {/* M79 (owner): «الحاجات اللي ليها علاقة ببعض لازم تتحط مع بعض» — the pile became titled groups. */}
@@ -176,6 +172,8 @@ export default function AccountScreen() {
         </MenuGroup>
       </FadeInView>
 
+      {/* M204 (owner): the management's WhatsApp line is one small line at the very end, no longer a big card on top. */}
+      <SupportLink />
       <Text style={styles.footer}>{t(env.isProduction ? 'account.version' : 'account.versionPreview', { version: env.appVersion })}</Text>
     </Screen>
   );

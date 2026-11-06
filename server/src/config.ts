@@ -107,6 +107,10 @@ const envSchema = z.object({
   WHATSAPP_APP_SECRET: z.string().min(8).optional(),
   // '0' switches WhatsApp off even with a token.
   WHATSAPP_ENABLED: z.enum(['0', '1']).optional(),
+  // M204: the kinds whose member e-mail is switched off (comma list of membership, event_ticket, visit_update,
+  // request_update). A kind goes here only after the owner SAW its WhatsApp message arrive; the e-mail then goes out
+  // only when WhatsApp did not carry the message. Empty = both channels. The invoice is never listed (owner's exception).
+  WHATSAPP_MAIL_OFF: z.string().max(200).optional(),
   MAIL_FROM: z.string().min(3).optional(),
   NOTIFY_EMAIL: z.string().min(3).optional(),
   // Web dashboard origins allowed to call the API from a browser, comma separated (e.g. https://dashboard.example.com).

@@ -19,8 +19,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
-import { PhoneConfirmAlert } from '@/components/PhoneConfirmAlert';
-import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
+import { GentlePopups } from '@/components/GentlePopups';
 import { RateUsPrompt } from '@/components/RateUsPrompt';
 import { RetiredBuildGate } from '@/components/RetiredBuildGate';
 import { MembershipGateHost } from '@/components/MembershipGate';
@@ -217,9 +216,8 @@ export default function RootLayout() {
           <RateUsPrompt />
           {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
           <SplashFlash />
-          {/* M147 (owner): a Google/Apple-born account completes its profile before anything else opens. */}
-          <ProfileCompletionGate />
-          <PhoneConfirmAlert />
+          {/* M204 (owner): missing details and the unconfirmed number are weekly popups with «لاحقًا», never a wall. */}
+          <GentlePopups />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
           <AppLockGate />
           {/* M137: the preview build is retired — a TEST binary shows only the «download the store app» cover. */}

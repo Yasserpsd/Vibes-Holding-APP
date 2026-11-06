@@ -30,7 +30,7 @@ export default function ResetPasswordScreen() {
   const [sent, setSent] = useState<{ sentTo: string; provider: string; via: string }>({ sentTo: '', provider: '', via: '' });
   const [resent, setResent] = useState(false);
 
-  const request = async (again = false, channel: 'whatsapp' | 'mail' = 'whatsapp') => {
+  const request = async (again = false) => {
     if (busy) return;
     if (!identifierValid(identifier)) {
       setError(t('auth.reset.loginRequired'));
@@ -46,7 +46,7 @@ export default function ResetPasswordScreen() {
     setError(null);
     try {
       const { login, country } = identifierPayload(identifier);
-      const result = await authApi.resetRequest(login, country, channel);
+      const result = await authApi.resetRequest(login, country);
       setSent({ sentTo: result.sentTo ?? '', provider: result.provider ?? '', via: result.via ?? '' });
       setResent(again);
       setStep('confirm');
@@ -137,12 +137,8 @@ export default function ResetPasswordScreen() {
           <Pressable accessibilityRole="button" onPress={() => void request(true)} disabled={busy} style={styles.resend} hitSlop={8}>
             <Text style={styles.resendText}>{t('auth.reset.resend')}</Text>
           </Pressable>
-          {/* M203 (owner): WhatsApp only, and the e-mail is the member's own way out (no WhatsApp on the number). */}
-          {sent.via === 'whatsapp' ? (
-            <Pressable accessibilityRole="button" onPress={() => void request(true, 'mail')} disabled={busy} style={styles.resend} hitSlop={8}>
-              <Text style={styles.resendText}>{t('auth.reset.byMail')}</Text>
-            </Pressable>
-          ) : null}
+          {/* M204 (owner): WhatsApp only, with no e-mail way out; a member the code cannot reach writes to the support line. */}
+          <SupportLink problem={t('auth.reset.noCode')} />
         </FadeInView>
       )}
     </Screen>

@@ -13,6 +13,7 @@ import { showMembershipGate } from '@/components/MembershipGate';
 import { dealAmount, MonthlyDealBadge } from '@/components/MonthlyDeal';
 import { FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { WhatsappNote } from '@/components/WhatsappNote';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
@@ -208,6 +209,7 @@ export default function AgendaEventScreen() {
               <PopIn style={styles.confirmGlow}>
                 <Notice tone="success" text={`${t('agenda.confirmed')} — ${event.mine.attendance === 'hq' ? t('agenda.attHq') : t('agenda.attOnline')}`} />
               </PopIn>
+              <WhatsappNote kind="confirm" />
               {/* M107: the confirmed attendee's QR ticket. */}
               <AppButton label={t('agenda.ticket')} icon="qr-code-outline" onPress={() => router.push(`/agenda/ticket/${event.id}` as Href)} />
               {event.onlineUrl ? <AppButton label={t('agenda.onlineLink')} icon="videocam-outline" variant="outline" onPress={() => void openLink(event.onlineUrl as string)} /> : null}

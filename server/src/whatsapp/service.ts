@@ -4,9 +4,9 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Mailer } from '../mail/mailer.js';
 import type { KV } from '../store.js';
-import type { WaTemplate, WhatsappClient } from './client.js';
+import type { NewTemplate, WaTemplate, WhatsappClient } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
-import { pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, type DeliveryPlan, type TemplateVars, type WaKind, type WaLang } from './templates.js';
+import { amountText, firstName, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type TemplateVars, type WaKind, type WaLang } from './templates.js';
 
 /** What every send answers. `error` explains a fallback too (channel `email`/`none` + why WhatsApp was not used). */
 export type WaResult = { channel: 'whatsapp' | 'email' | 'none'; messageId?: string; error?: string };
@@ -36,6 +36,12 @@ export type SendInput = { phone: string | null | undefined; lang?: string | null
 export type WelcomeInput = SendInput & { name?: string | null };
 export type ReceiptInput = SendInput & { amount: number; service: string; invoiceNo: number | string };
 export type AffiliateLinkInput = SendInput & { name: string; code: string; link: string };
+/** M204: the five member messages that left the e-mail for WhatsApp. No `email` here: the caller owns the mail (see `orMail`). */
+export type MembershipInput = Omit<SendInput, 'email'> & { name?: string | null; until: string };
+export type EventTicketInput = Omit<SendInput, 'email'> & { event: string; date: string; ticket: string };
+export type VisitUpdateInput = Omit<SendInput, 'email'> & { status: string };
+export type RequestUpdateInput = Omit<SendInput, 'email'> & { service: string; status: string };
+export type InvoiceInput = Omit<SendInput, 'email'> & { invoiceNo: number | string; amount: number; currency?: string | null; service: string; link: string };
 export type CodeInput = { phone: string | null | undefined; lang?: string | null; code: string };
 
 /** A number gets at most this many codes an hour on WhatsApp; the e-mail copy always goes out. */
@@ -50,11 +56,20 @@ type Deps = {
   enabled: boolean;
   mailer?: Mailer;
   now?: () => number;
+  /**
+   * M204 (owner: the e-mail of a message goes off only once its template is Active and a send was SEEN arriving): the
+   * kinds whose member e-mail is switched off, from `WHATSAPP_MAIL_OFF`. Empty = every message still goes out both ways.
+   */
+  mailOff?: ReadonlySet<string>;
+  /** M204: Meta reported a `code` message as failed; the owner of the code sends it another way. */
+  onCodeFailed?: (messageId: string) => Promise<unknown>;
 };
 
 export class WhatsappService {
   private chain: Promise<unknown> = Promise.resolve();
   private readonly cache = new Map<string, { at: number; templates: WaTemplate[] }>();
+  /** The e-mails held back because WhatsApp took the message; one is sent if Meta reports the message failed. */
+  private readonly heldMail = new Map<string, { at: number; mail: () => void }>();
 
   constructor(private readonly deps: Deps) {}
 
@@ -73,6 +88,62 @@ export class WhatsappService {
   /** M202: an affiliate's short code and link (Utility template). `ref` keeps one send per code. */
   sendAffiliateLink(input: AffiliateLinkInput): Promise<WaResult> {
     return this.deliver('affiliate_link', input, { name: input.name, code: input.code, link: input.link });
+  }
+
+  /** M204: «تم تفعيل عضويتك… سارية حتى {{2}}». */
+  sendMembership(input: MembershipInput): Promise<WaResult> {
+    return this.deliver('membership', input, { name: firstName(input.name), date: input.until });
+  }
+
+  /** M204: the confirmed booking of an event; `ticket` is the short number, never the entry secret. */
+  sendEventTicket(input: EventTicketInput): Promise<WaResult> {
+    return this.deliver('event_ticket', input, { event: input.event, date: input.date, ticket: input.ticket });
+  }
+
+  sendVisitUpdate(input: VisitUpdateInput): Promise<WaResult> {
+    return this.deliver('visit_update', input, { status: input.status });
+  }
+
+  sendRequestUpdate(input: RequestUpdateInput): Promise<WaResult> {
+    return this.deliver('request_update', input, { service: input.service, status: input.status });
+  }
+
+  /** M204: the invoice with its «عرض الفاتورة» button. The owner's one exception: its e-mail ALWAYS goes out too. */
+  sendInvoice(input: InvoiceInput): Promise<WaResult> {
+    const lang = toLang(input.lang);
+    return this.deliver('invoice', input, { invoiceNo: input.invoiceNo, amount: input.amount, amountText: amountText(input.amount, input.currency, lang), service: input.service, buttonLink: input.link });
+  }
+
+  /**
+   * M204: the activation on WhatsApp, then the royal e-mail by `orMail`. No number, no end date or WhatsApp off = the
+   * e-mail alone, at once.
+   */
+  announceMembership(input: { phone: string | null | undefined; lang?: string | null; name?: string | null; expiresAt: string | null; ref: string }, mail: () => void): void {
+    const end = input.expiresAt ? Date.parse(input.expiresAt) : NaN;
+    if (!this.enabled || !String(input.phone ?? '').trim() || !Number.isFinite(end)) return mail();
+    const until = new Intl.DateTimeFormat(toLang(input.lang) === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Riyadh' }).format(new Date(end));
+    void this.sendMembership({ phone: input.phone, lang: input.lang, name: input.name, until, ref: input.ref }).then((result) => this.orMail('membership', result, mail));
+  }
+
+  /** M204: holds the e-mail copy of a message WhatsApp took; it goes out by itself only if Meta reports that message failed. */
+  holdMail(messageId: string, mail: () => void): void {
+    this.heldMail.set(messageId, { at: (this.deps.now ?? Date.now)(), mail });
+  }
+
+  /**
+   * M204: the member's e-mail next to a WhatsApp message. It is sent at once unless WhatsApp took the message AND this
+   * kind's e-mail is switched off (`mailOff`); then it is held for an hour and goes out by itself only if Meta reports
+   * the message failed (owner: «اي عملية متنفذتش واتس اب تتبعت ايميل»). Held in memory: a restart drops it.
+   */
+  orMail(kind: WaKind, result: WaResult | null | undefined, mail: () => void): void {
+    const now = (this.deps.now ?? Date.now)();
+    for (const [id, held] of this.heldMail) if (now - held.at > 3_600_000) this.heldMail.delete(id);
+    if (result?.channel === 'whatsapp' && result.messageId && result.error !== 'already_sent' && this.deps.mailOff?.has(kind)) {
+      this.heldMail.set(result.messageId, { at: now, mail });
+      return;
+    }
+    if (result?.error === 'already_sent') return;
+    mail();
   }
 
   /**
@@ -132,10 +203,32 @@ export class WhatsappService {
     return sent.messageId ? { channel: 'whatsapp', messageId: sent.messageId } : { channel: 'none', error: sent.error };
   }
 
+  /**
+   * M204: files one new template with Meta for review (nothing is sent to anyone). A name + language Meta already
+   * holds is left alone, so the local script can be run again after a partial failure. Never throws.
+   */
+  async createTemplate(input: NewTemplate): Promise<{ name: string; language: string; created: boolean; status: string; category: string | null; error?: string }> {
+    const base = { name: input.name, language: input.language };
+    const client = this.deps.client;
+    if (!client) return { ...base, created: false, status: 'none', category: null, error: 'whatsapp_disabled' };
+    try {
+      const existing = (await client.listTemplates(input.name)).find((template) => template.language === input.language);
+      if (existing) return { ...base, created: false, status: existing.status, category: existing.category ?? null, error: 'already_exists' };
+      const made = await client.createTemplate(input);
+      this.cache.delete(input.name);
+      this.deps.log.info({ template: input.name, language: input.language, status: made.status }, 'whatsapp template filed with Meta');
+      return { ...base, created: true, status: made.status, category: made.category };
+    } catch (error) {
+      const text = error instanceof Error ? error.message : 'error';
+      this.deps.log.warn({ template: input.name, language: input.language, err: text }, 'whatsapp template creation failed');
+      return { ...base, created: false, status: 'none', category: null, error: text };
+    }
+  }
+
   /** Dashboard view: both kinds with their live status and body text. Always asks Meta. */
   async templateOverview(): Promise<{ name: string; language: string; status: string; category: string | null; body: string }[]> {
     const rows: { name: string; language: string; status: string; category: string | null; body: string }[] = [];
-    for (const kind of ['welcome', 'receipt', 'code', 'affiliate_link'] as const) {
+    for (const kind of WA_KINDS) {
       for (const template of await this.templatesOf(kind, true)) {
         const body = template.components.find((component) => component.type.toUpperCase() === 'BODY')?.text ?? '';
         rows.push({ name: template.name, language: template.language, status: template.status, category: template.category ?? null, body });
@@ -167,7 +260,7 @@ export class WhatsappService {
 
       let reason: string = plan.use === 'fallback' ? plan.reason : '';
       if (plan.use === 'whatsapp' && phone) {
-        const sent = await this.sendPlanned(plan, { phone, kind, lang, ref });
+        const sent = await this.sendPlanned(plan, { phone, kind, lang, ref }, plan.button);
         if (sent.messageId) return { channel: 'whatsapp', messageId: sent.messageId };
         reason = sent.error;
       }
@@ -197,12 +290,13 @@ export class WhatsappService {
 
   private async fallback(kind: WaKind, lang: WaLang, vars: TemplateVars, email: string | null | undefined, reason: string, phone: string | null): Promise<WaResult> {
     const address = email?.trim();
-    if (!address || !this.deps.mailer) {
+    const mail = fallbackMail(kind, lang, vars);
+    if (!address || !this.deps.mailer || !mail) {
       this.deps.log.info({ kind, to: maskPhone(phone), reason }, 'whatsapp not sent and no e-mail fallback');
       return { channel: 'none', error: reason };
     }
     try {
-      const sent = await this.deps.mailer.send({ to: [address], ...fallbackMail(kind, lang, vars) });
+      const sent = await this.deps.mailer.send({ to: [address], ...mail });
       if (sent) return { channel: 'email', error: reason };
       return { channel: 'none', error: `${reason}; mail_not_configured` };
     } catch (error) {
@@ -267,12 +361,20 @@ export class WhatsappService {
       }
       if (!statuses.length && !inbound.length) return counts;
       const at = new Date((this.deps.now ?? Date.now)()).toISOString();
+      const failedCodes: string[] = [];
       await this.mutate((records) => {
         for (const status of statuses) {
           const record = records.find((entry) => entry.waMessageId === status.id);
           if (!record) {
             this.deps.log.info({ status: status.status, to: maskPhone(status.to) }, 'whatsapp status for an unknown message');
             continue;
+          }
+          if (status.status === 'failed' && record.kind === 'code' && record.status !== 'failed') failedCodes.push(status.id);
+          const held = this.heldMail.get(status.id);
+          if (held && status.status !== 'sent') {
+            this.heldMail.delete(status.id);
+            // Delivered or read: the e-mail is not needed. Failed: it goes out now.
+            if (status.status === 'failed') held.mail();
           }
           const forward = status.status === 'failed' || (STATUS_ORDER[status.status] ?? -1) > (STATUS_ORDER[record.status] ?? -1);
           if (forward) {
@@ -289,6 +391,9 @@ export class WhatsappService {
           counts.inbound += 1;
         }
       });
+      for (const messageId of failedCodes) {
+        await this.deps.onCodeFailed?.(messageId).catch((error: unknown) => this.deps.log.warn({ err: error instanceof Error ? error.message : 'error' }, 'undelivered code could not be re-sent'));
+      }
     } catch (error) {
       this.deps.log.warn({ err: error }, 'whatsapp webhook could not be stored');
     }
@@ -300,7 +405,9 @@ const asObject = (value: unknown): Record<string, unknown> | null => (value && t
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 /** The plain e-mail used when WhatsApp cannot carry the message (same facts as the templates). */
-export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { subject: string; text: string } {
+export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { subject: string; text: string } | null {
+  // M204: the five newer kinds have richer mails of their own, sent by their callers (`orMail`).
+  if (kind === 'membership' || kind === 'event_ticket' || kind === 'visit_update' || kind === 'request_update' || kind === 'invoice' || kind === 'code') return null;
   if (kind === 'welcome') {
     return lang === 'en'
       ? { subject: 'Welcome to Investors Club', text: `Welcome${vars.name ? `, ${vars.name}` : ''}. Your membership is active. Open the app to see what is waiting for you.` }

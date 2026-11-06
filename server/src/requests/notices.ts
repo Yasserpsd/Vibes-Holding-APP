@@ -2,10 +2,11 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Notifier } from '../mail/notify.js';
 import type { PushService } from '../push/service.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 import { changeMail, receiptMail } from './mail.js';
-import type { MemberRequest, Recipient } from './model.js';
+import { statusLabel, type MemberRequest, type Recipient } from './model.js';
 
-export type MemberNoticesDeps = { notifier: Notifier; push: PushService; log: FastifyBaseLogger; publicUrl?: string };
+export type MemberNoticesDeps = { notifier: Notifier; push: PushService; log: FastifyBaseLogger; publicUrl?: string; whatsapp?: WhatsappService };
 
 /**
  * M138 (owner, 2026-10-28: «لأي عملية يعملها العميل توصل على إيميله… وأي عملية تحصل لازم يوصله بيها إشعار»):
@@ -31,11 +32,30 @@ export class MemberNotices {
     this.deps.notifier.memberDocument(address, subject, html, text, `${entry.kind} receipt`);
   }
 
-  /** A status change: mail + push (the push is skipped where the store already sends its own). */
+  /**
+   * A status change: WhatsApp + mail + push (the push is skipped where the store already sends its own).
+   * M204: with the account's number the change goes on WhatsApp (club_visit_update for an HQ booking,
+   * club_request_update for the rest); the mail follows `orMail`: sent as before until this kind's e-mail is switched off,
+   * and after that only when WhatsApp did not carry the message.
+   */
   changed(entry: MemberRequest, to: Recipient, options: { push?: boolean } = {}): void {
     const lang = to.lang === 'en' ? 'en' : 'ar';
     const { subject, mail } = changeMail(entry, to.name, lang, this.appUrl);
-    this.deps.notifier.memberMail(MemberNotices.address(to), subject, mail, `${entry.kind} ${entry.status}`);
+    const sendMail = () => this.deps.notifier.memberMail(MemberNotices.address(to), subject, mail, `${entry.kind} ${entry.status}`);
+    const whatsapp = this.deps.whatsapp;
+    const phone = (to.phone ?? '').trim();
+    if (whatsapp?.enabled && phone) {
+      const ref = `${entry.kind}:${entry.id}:${entry.status}:${entry.updatedAt ?? ''}`;
+      const visit = entry.kind === 'hq';
+      // A confirmed HQ booking reads «تم» in the requests list; on WhatsApp it says what happened.
+      const status = visit && entry.status === 'done' ? (lang === 'en' ? 'Confirmed' : 'تم التأكيد') : statusLabel(entry.status, lang);
+      const sent = visit
+        ? whatsapp.sendVisitUpdate({ phone, lang, status, ref })
+        : whatsapp.sendRequestUpdate({ phone, lang, service: (lang === 'en' && entry.titleEn) || entry.title, status, ref });
+      void sent.then((result) => whatsapp.orMail(visit ? 'visit_update' : 'request_update', result, sendMail));
+    } else {
+      sendMail();
+    }
     if (options.push !== false) this.deps.push.requestChanged(entry);
   }
 }

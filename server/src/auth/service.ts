@@ -12,7 +12,7 @@ import { nameProblem, nameRuleIssue, type NameJudge } from './name.js';
 import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
-import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia } from './phoneCode.js';
+import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia, type PhoneCodeWaiver } from './phoneCode.js';
 import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
@@ -111,6 +111,14 @@ export const LEGACY_GATE_FIELDS: readonly ProfileMissing[] = ['phone', 'persona'
 
 /** M203: the `x-app-gate` word of a bundle that can draw the WhatsApp code step. Older bundles sign in as before. */
 export const PHONE_CODE_CAPABILITY = 'phoneCode';
+
+/** M204: the bundle shows «أرسلنا الرمز على واتساب» for the persona-change and deletion codes. */
+export const ACTION_CODE_CAPABILITY = 'waCodes';
+
+export function bundleKnows(header: unknown, word: string): boolean {
+  const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
+  return raw.split(',').some((item) => item.trim() === word);
+}
 
 export function canPhoneCode(header: unknown): boolean {
   const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
@@ -859,7 +867,7 @@ export class AuthService {
       const stepToken = await totp.beginStep(contact.id, uuid, 'app', false);
       return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
     }
-    if (bundle && this.needsPhoneCode(contact, bundle)) return this.beginPhoneStep(uuid, contact);
+    if (bundle && (await this.needsPhoneCode(contact, bundle))) return this.beginPhoneStep(uuid, contact);
     return this.issueSession(uuid, contact, false, false);
   }
 
@@ -883,12 +891,14 @@ export class AuthService {
 
   /**
    * Every new sign-in, Apple and Google included: a session that stays open asks for nothing. No number yet = the
-   * completion gate asks for it with its code. Older hubs (no `phone_verified`) and the store reviewers pass straight.
+   * completion gate asks for it with its code. Older hubs (no `phone_verified`) and the store reviewers pass straight,
+   * and so does an account whose number an admin vouched for (M204).
    */
-  private needsPhoneCode(contact: HubContact, bundle: SignInBundle): boolean {
+  private async needsPhoneCode(contact: HubContact, bundle: SignInBundle): Promise<boolean> {
     if (!this.phoneCodeOn || !bundle.canPhoneCode) return false;
     if (contact.phone_verified === undefined || !String(contact.phone ?? '').trim()) return false;
-    return !this.phoneCodeExempt(contact);
+    if (this.phoneCodeExempt(contact)) return false;
+    return (await this.deps.phoneCodes?.waiver(contact.id)) == null;
   }
 
   private phoneCodeExempt(contact: { email: string }): boolean {
@@ -897,8 +907,29 @@ export class AuthService {
   }
 
   /** M203 (owner, 2026-11-06): any account with an unconfirmed number is told so, open session or not. */
-  phoneConfirmDue(me: Me): boolean {
-    return this.phoneCodeOn && me.phoneVerified === false && Boolean(String(me.phone ?? '').trim()) && !this.phoneCodeExempt(me);
+  async phoneConfirmDue(me: Me): Promise<boolean> {
+    if (!this.phoneCodeOn || me.phoneVerified !== false || !String(me.phone ?? '').trim() || this.phoneCodeExempt(me)) return false;
+    return (await this.deps.phoneCodes?.waiver(me.id)) == null;
+  }
+
+  /**
+   * M204: the dashboard's «تأكيد الرقم يدويًا». A member the WhatsApp code cannot reach writes to the support line;
+   * the admin who checked him vouches for the number, and the account signs in without the code from then on.
+   */
+  async setPhoneWaiver(contactId: number, admin: string, on: boolean): Promise<PhoneCodeWaiver | null> {
+    const store = this.requirePhoneCodes();
+    if (!on) {
+      await store.unwaive(contactId);
+      this.deps.log.info({ contactId, admin }, 'phone code waiver removed');
+      return null;
+    }
+    const waiver = await store.waive(contactId, admin);
+    this.deps.log.info({ contactId, admin }, 'phone number vouched for by an admin');
+    return waiver;
+  }
+
+  async phoneWaiverOf(contactId: number): Promise<PhoneCodeWaiver | null> {
+    return (await this.deps.phoneCodes?.waiver(contactId)) ?? null;
   }
 
   /** M203: the registered number proves itself from an open session. */
@@ -980,8 +1011,8 @@ export class AuthService {
     return this.remember(session.uuid, requireContact(result));
   }
 
-  async resendPhoneCode(stepToken: string, channel: PhoneCodeVia): Promise<{ via: PhoneCodeVia; seconds: number; resendAfter: number }> {
-    const result = await this.requirePhoneCodes().resend(stepToken, channel);
+  async resendPhoneCode(stepToken: string): Promise<{ via: PhoneCodeVia; seconds: number; resendAfter: number }> {
+    const result = await this.requirePhoneCodes().resend(stepToken);
     if (!result.ok) {
       if (result.reason === 'too_soon') throw new AuthError('otp_wait', `انتظر ${result.waitSeconds} ثانية ثم اطلب رمزًا جديدًا`, 429);
       if (result.reason === 'too_many') throw new AuthError('otp_resend_limit', 'تجاوزت عدد مرات إعادة الإرسال، ابدأ الدخول من جديد', 429);
@@ -1003,19 +1034,23 @@ export class AuthService {
     return result.step;
   }
 
-  /** The fallback copy of a sign-in or number code; the code travels in the mail body only. */
+  /**
+   * M204: the copy of a sign-in or number code that goes out BY ITSELF when WhatsApp did not carry it (Meta refused the
+   * send, or reported it undelivered). Never the member's choice. The code travels in the mail body only.
+   */
   async mailPhoneCode(email: string, code: string, lang: string): Promise<boolean> {
     const en = lang === 'en';
+    if (!email || !this.deps.mailer) return false;
     try {
-      await this.deps.mailer?.send({
+      await this.deps.mailer.send({
         to: [email],
         subject: en ? 'Your Investors Club code' : 'رمز الدخول إلى Investors Club',
         text: (en
-          ? [`Your code: ${code}`, 'It is valid for 10 minutes. If this was not you, change your password.']
-          : [`رمزك: ${code}`, 'صالح لمدة 10 دقائق. إذا لم تكن أنت فغيّر كلمة مرورك فورًا.']
+          ? ['We could not reach your number on WhatsApp, so your code is here.', `Your code: ${code}`, 'It is valid for 10 minutes. If this was not you, change your password.']
+          : ['تعذّر وصول الرسالة إلى رقمك على واتساب، لذلك أرسلنا رمزك هنا.', `رمزك: ${code}`, 'صالح لمدة 10 دقائق. إذا لم تكن أنت فغيّر كلمة مرورك فورًا.']
         ).join('\n'),
       });
-      return Boolean(this.deps.mailer);
+      return true;
     } catch (error) {
       this.deps.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'phone code fallback was not mailed');
       return false;

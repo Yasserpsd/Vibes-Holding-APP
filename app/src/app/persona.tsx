@@ -42,6 +42,8 @@ export default function PersonaScreen() {
   const [stage, setStage] = useState<'pick' | 'code'>('pick');
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
+  /** M204: the masked number when the code went on WhatsApp; empty = it went to the e-mail. */
+  const [codePhone, setCodePhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState(false);
@@ -92,6 +94,7 @@ export default function PersonaScreen() {
       .personaRequest(picked)
       .then((answer) => {
         setEmail(answer.email);
+        setCodePhone(answer.via === 'whatsapp' ? (answer.phone ?? '') : '');
         setStage('code');
       })
       .catch((cause: unknown) => setError(errorMessage(cause)))
@@ -204,7 +207,7 @@ export default function PersonaScreen() {
         </>
       ) : (
         <FadeInView offset={10} style={styles.codeBlock}>
-          <Notice tone="success" text={t('persona.codeSent', { email })} />
+          <Notice tone="success" text={codePhone ? t('phoneCode.sentWhatsapp', { phone: `‎${codePhone}‎` }) : t('persona.codeSent', { email })} />
           <FormField label={t('persona.codeLabel')} value={code} onChangeText={setCode} latin keyboardType="number-pad" maxLength={6} />
           {error ? <Notice tone="warning" text={error} support /> : null}
           <AppButton label={busy ? t('persona.sending') : t('persona.confirm')} icon="checkmark-outline" loading={busy} onPress={() => (busy ? null : confirm())} />

@@ -8,13 +8,14 @@ import type { AppLang } from '../lang.js';
 import type { AppliedDiscount, DiscountsService } from '../discounts/service.js';
 import type { InterestsService } from '../interests/service.js';
 import { isInterestKey, type InterestKey } from '../interests/types.js';
-import type { Notifier } from '../mail/notify.js';
+import { arabicDay, englishDay, type Notifier } from '../mail/notify.js';
 import type { Payment, PaymentsService, PublicPayment } from '../payments/service.js';
 import type { PushService } from '../push/service.js';
-import { fromAgenda } from '../requests/model.js';
+import { fromAgenda, requestNumber, type Recipient } from '../requests/model.js';
 import type { MemberNotices } from '../requests/notices.js';
 import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 
 /**
  * M41 «أجندة النادي» (owner, 2026-09-23): the club's events across the whole year, added from the
@@ -150,7 +151,7 @@ export type PublicAgendaEvent = Pick<AgendaEvent, 'id' | 'title' | 'blurb' | 'da
 
 export type AdminAgendaEvent = AgendaEvent & { counts: { hq: number; online: number; confirmed: number; awaitingPayment: number } };
 
-type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; discounts?: DiscountsService; interests?: InterestsService; onChange?: () => void; notices?: MemberNotices };
+type Deps = { kv: KV; notifier: Notifier; push: PushService; payments: PaymentsService; discounts?: DiscountsService; interests?: InterestsService; onChange?: () => void; notices?: MemberNotices; whatsapp?: WhatsappService };
 
 const ATTENDANCE_LABEL: Record<AgendaAttendance, string> = { hq: 'حضوري في المقر', online: 'أونلاين' };
 const TICKET_PREFIX = 'VCEV';
@@ -180,6 +181,22 @@ export class AgendaService {
   private regsChain: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly deps: Deps) {}
+
+  /**
+   * M204: a confirmed booking goes on WhatsApp as a ticket (club_event_ticket); its number is the request number the
+   * member sees under «طلباتي», never the entry secret. The receipt e-mail follows `orMail`.
+   */
+  private ticketNotice(confirmed: AgendaRegistration, event: AgendaEvent, to: Recipient): void {
+    const mail = () => this.deps.notices?.received(fromAgenda(confirmed, event), to);
+    const whatsapp = this.deps.whatsapp;
+    if (!whatsapp?.enabled || !confirmed.phone.trim()) return mail();
+    const en = to.lang === 'en';
+    const day = en ? englishDay(event.date) : arabicDay(event.date);
+    const when = event.time ? (en ? `${day} at ${event.time}` : `${day} الساعة ${event.time}`) : day;
+    void whatsapp
+      .sendEventTicket({ phone: confirmed.phone, lang: to.lang, event: (en && event.en?.title) || event.title, date: when, ticket: requestNumber(confirmed.id), ref: `ticket:${confirmed.id}` })
+      .then((result) => whatsapp.orMail('event_ticket', result, mail));
+  }
 
   private async loadEvents(): Promise<AgendaEvent[]> {
     return (await this.deps.kv.get<{ events: AgendaEvent[] }>(AGENDA_EVENTS_KEY))?.events ?? [];
@@ -398,7 +415,7 @@ export class AgendaService {
     if (fee <= 0) {
       const confirmed = await confirm(null);
       this.deps.notifier.agendaRegistered(confirmed, event);
-      this.deps.notices?.received(fromAgenda(confirmed, event), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
+      this.ticketNotice(confirmed, event, { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
       return { registration: confirmed, payment: null };
     }
 
@@ -415,7 +432,7 @@ export class AgendaService {
       // A 100% code settled at zero on the spot (the payments push already told the member).
       const confirmed = await confirm(payment.id);
       this.deps.notifier.agendaRegistered(confirmed, event);
-      this.deps.notices?.received(fromAgenda(confirmed, event), { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
+      this.ticketNotice(confirmed, event, { email: me.email, contactEmail: me.contactEmail, name: me.name, lang });
       return { registration: confirmed, payment };
     }
     const pending = await this.mutateRegs((registrations) => {
@@ -445,7 +462,7 @@ export class AgendaService {
       const event = await this.event(confirmed.eventId);
       if (event) {
         this.deps.notifier.agendaRegistered(confirmed, event);
-        this.deps.notices?.received(fromAgenda(confirmed, event), { email: confirmed.email, name: confirmed.name, lang: confirmed.lang });
+        this.ticketNotice(confirmed, event, { email: confirmed.email, name: confirmed.name, lang: confirmed.lang });
         this.deps.push.agendaConfirmed(confirmed.contactId, event.title, event.id, event.en?.title ?? null);
       }
     })();

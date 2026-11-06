@@ -101,7 +101,7 @@ export class RequestsService {
     await this.mutate((entries) => {
       entries.push(entry);
     });
-    this.deps.notices?.received(fromLedger(entry), { email: entry.email, name: entry.name, lang: entry.lang });
+    this.deps.notices?.received(fromLedger(entry), { email: entry.email, name: entry.name, lang: entry.lang, phone: entry.phone });
     return entry;
   }
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
+import { PhoneCodeStore } from './auth/phoneCode.js';
 import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { Mail, Mailer } from './mail/mailer.js';
@@ -153,38 +154,75 @@ test('m203: the store reviewers sign in with no code', async () => {
   }
 });
 
-test('m203: wrong number or no WhatsApp: the e-mail code lets the member in, leaves the number unverified and asks him to fix it', async () => {
+test('m204: WhatsApp is the only channel: a bundle from before M204 asking for the e-mail is told so, and nothing is mailed', async () => {
   const account = await member();
   const step = (await call('POST', '/api/auth/login', { login: account.email, password: account.password })).json();
   mailer.sent.length = 0;
   const out = await call('POST', '/api/auth/phone/resend', { stepToken: step.stepToken, via: 'email' });
-  assert.equal(out.statusCode, 200, out.body);
-  assert.equal(out.json().via, 'email');
-  const code = /\b(\d{4})\b/.exec(mailer.sent.at(-1)?.text ?? '')?.[1] ?? '';
-  assert.match(code, /^\d{4}$/);
-  const right = await call('POST', '/api/auth/phone/verify', { stepToken: step.stepToken, code });
-  assert.equal(right.statusCode, 200, right.body);
-  assert.equal(right.json().fixPhone, true);
-  assert.equal(right.json().me.phoneVerified, false);
+  assert.equal(out.statusCode, 400, out.body);
+  assert.equal(out.json().error.code, 'phone_code_whatsapp_only');
+  assert.equal(mailer.sent.length, 0);
 });
 
-test('m203: Meta refused: the code falls to the e-mail at once', async () => {
+const mailedCode = (): string => /\d{4}/.exec(mailer.sent.at(-1)?.text ?? '')?.[0] ?? '';
+
+test('m204: Meta refused the send: the code goes to the e-mail by itself, signs in and proves nothing about the number', async () => {
   const account = await member();
   wa.refuse = true;
   mailer.sent.length = 0;
   const signIn = await call('POST', '/api/auth/login', { login: account.email, password: account.password });
   wa.refuse = false;
-  assert.equal(signIn.json().via, 'email', signIn.body);
+  assert.equal(signIn.statusCode, 200, signIn.body);
+  assert.equal(signIn.json().via, 'email');
+  assert.equal(signIn.json().token, undefined);
   assert.equal(mailer.sent.length, 1);
+  assert.deepEqual(mailer.sent[0]?.to, [account.email]);
+  const done = await call('POST', '/api/auth/phone/verify', { stepToken: signIn.json().stepToken, code: mailedCode() });
+  assert.equal(done.statusCode, 200, done.body);
+  assert.equal(done.json().fixPhone, true);
+  assert.equal(done.json().me.phoneVerified, false);
 });
 
-test('m203: the WhatsApp resend waits a minute; the e-mail never does', async () => {
+test('m204: Meta accepted the code and then reported it undelivered: a new code is mailed once and ends the sign-in', async () => {
+  const account = await member();
+  mailer.sent.length = 0;
+  const step = (await call('POST', '/api/auth/login', { login: account.email, password: account.password })).json();
+  assert.equal(step.via, 'whatsapp');
+  assert.equal(mailer.sent.length, 0);
+  const failed = JSON.stringify({ entry: [{ changes: [{ value: { statuses: [{ id: `wamid.${wa.codes.length}`, status: 'failed', recipient_id: wa.codes.at(-1)?.to, errors: [{ code: 131026, title: 'Message undeliverable' }] }] } }] }] });
+  const hook = () => app.inject({ method: 'POST', url: '/api/whatsapp/webhook', headers: { 'content-type': 'application/json' }, payload: failed });
+  assert.equal((await hook()).json().statuses, 1);
+  assert.equal(mailer.sent.length, 1);
+  assert.deepEqual(mailer.sent[0]?.to, [account.email]);
+  // Meta repeats a status: no second mail.
+  await hook();
+  assert.equal(mailer.sent.length, 1);
+  const done = await call('POST', '/api/auth/phone/verify', { stepToken: step.stepToken, code: mailedCode() });
+  assert.equal(done.statusCode, 200, done.body);
+  assert.equal(done.json().fixPhone, true);
+});
+
+test('m203: the WhatsApp resend waits a minute', async () => {
   const account = await member();
   const step = (await call('POST', '/api/auth/login', { login: account.email, password: account.password })).json();
   const soon = await call('POST', '/api/auth/phone/resend', { stepToken: step.stepToken });
   assert.equal(soon.statusCode, 429);
-  const mail = await call('POST', '/api/auth/phone/resend', { stepToken: step.stepToken, via: 'email' });
-  assert.equal(mail.statusCode, 200);
+});
+
+test('m204: a number an admin vouched for signs in with no code and raises no alert; taking the word back restores both', async () => {
+  const account = await member();
+  const id = (account.me as unknown as { id: number }).id;
+  const waivers = new PhoneCodeStore(kv, async () => ({ sent: true }));
+  await waivers.waive(id, 'مدير الاختبار');
+  assert.equal((await waivers.waiver(id))?.by, 'مدير الاختبار');
+  assert.equal((await call('GET', '/api/me', undefined, account.token)).json().me.phoneConfirmDue, false);
+  wa.codes.length = 0;
+  const signIn = await call('POST', '/api/auth/login', { login: account.email, password: account.password });
+  assert.ok(signIn.json().token, signIn.body);
+  assert.equal(wa.codes.length, 0, 'no paid message for a vouched number');
+  await waivers.unwaive(id);
+  assert.equal((await call('GET', '/api/me', undefined, account.token)).json().me.phoneConfirmDue, true);
+  assert.equal((await call('POST', '/api/auth/login', { login: account.email, password: account.password })).json().phoneStep, true);
 });
 
 test('m203: a new number is saved only after its code; another account\'s number is refused before a paid message', async () => {
@@ -241,4 +279,34 @@ test('m203: strict refuses a bundle that cannot draw the step', async () => {
   } finally {
     await strict.app.close();
   }
+});
+
+test('m204: the persona-change and deletion codes go to the proven WhatsApp number of a bundle that can say so; an older bundle keeps the e-mail', async () => {
+  const account = await member();
+  const step = (await call('POST', '/api/auth/login', { login: account.email, password: account.password })).json();
+  const session = (await call('POST', '/api/auth/phone/verify', { stepToken: step.stepToken, code: wa.codes.at(-1)?.code ?? '' })).json();
+  assert.equal(session.me.phoneVerified, true);
+  const NEWEST = `${NEW_BUNDLE},waCodes`;
+
+  wa.codes.length = 0;
+  mailer.sent.length = 0;
+  const persona = await call('POST', '/api/me/persona/request', { persona: 'entrepreneur' }, session.token, NEWEST);
+  assert.equal(persona.statusCode, 200, persona.body);
+  assert.equal(persona.json().via, 'whatsapp');
+  assert.match(persona.json().phone, /^•••\d{3}$/);
+  assert.equal(wa.codes.length, 1);
+  assert.equal(mailer.sent.length, 0);
+  // Meta reports that message undelivered: the SAME code goes to the e-mail by itself.
+  const failed = JSON.stringify({ entry: [{ changes: [{ value: { statuses: [{ id: 'wamid.1', status: 'failed', recipient_id: wa.codes[0]?.to, errors: [{ code: 131026, title: 'Message undeliverable' }] }] } }] }] });
+  await app.inject({ method: 'POST', url: '/api/whatsapp/webhook', headers: { 'content-type': 'application/json' }, payload: failed });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(mailer.sent.length, 1);
+  assert.ok(mailer.sent[0]?.text?.includes(wa.codes[0]?.code ?? 'none'));
+
+  mailer.sent.length = 0;
+  const removal = await call('POST', '/api/me/delete/start', { password: account.password }, session.token, NEW_BUNDLE);
+  assert.equal(removal.statusCode, 200, removal.body);
+  assert.equal(removal.json().via, 'email');
+  assert.equal(wa.codes.length, 1);
+  assert.equal(mailer.sent.length, 1);
 });

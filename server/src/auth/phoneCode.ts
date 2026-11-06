@@ -9,6 +9,7 @@ import { newToken } from './sessions.js';
  * `signin` = a member signing in; `number` = a signed-in member proving a new number.
  */
 export type PhoneCodePurpose = 'signin' | 'number';
+/** M204: WhatsApp first, always. `email` = WhatsApp did not carry this code, so it went to the account's address by itself. */
 export type PhoneCodeVia = 'whatsapp' | 'email';
 
 export type PhoneCodeStep = {
@@ -20,11 +21,17 @@ export type PhoneCodeStep = {
   /** `number` only: what the hub stores once the code is right. */
   newPhone?: string;
   country?: string;
-  /** Where the fallback code goes. */
+  /** The account's address: the code goes there only when WhatsApp did not carry it. */
   email: string;
   lang: string;
   via: PhoneCodeVia;
   codeHash: string;
+  /** Set when the code was replaced from Meta's webhook, where the step's token is not known. */
+  salt?: string;
+  /** Meta's id of the WhatsApp message that carries the live code. */
+  waMessageId?: string;
+  /** Meta reported this number unreachable: the next codes go straight to the e-mail. */
+  unreachable?: boolean;
   codeExpiresAt: string;
   attempts: number;
   sends: number;
@@ -32,8 +39,11 @@ export type PhoneCodeStep = {
   expiresAt: string;
 };
 
-/** Sends the code on one channel; false = it did not leave (nothing about the step changes on a false e-mail). */
-export type PhoneCodeSend = (via: PhoneCodeVia, step: Pick<PhoneCodeStep, 'phone' | 'email' | 'lang'>, code: string) => Promise<boolean>;
+/** Sends the code on one channel; `sent: false` = it did not leave. `messageId` = Meta's id, to follow its delivery. */
+export type PhoneCodeSend = (via: PhoneCodeVia, step: Pick<PhoneCodeStep, 'phone' | 'email' | 'lang'>, code: string) => Promise<{ sent: boolean; messageId?: string }>;
+
+/** M204: the dashboard vouched for this account's number; it signs in without the WhatsApp code. */
+export type PhoneCodeWaiver = { by: string; at: string };
 
 type PhoneCodeAccount = { windowStart: string; steps: number; wrong: number; liveKey: string | null };
 
@@ -54,6 +64,8 @@ const MAX_WRONG_PER_WINDOW = 10;
 
 const keyFor = (token: string): string => `phone-code:${createHash('sha256').update(token).digest('hex')}`;
 const accountKey = (contactId: number): string => `phone-code-account:${contactId}`;
+const waiverKey = (contactId: number): string => `phone-code-waived:${contactId}`;
+const messageKey = (messageId: string): string => `phone-code-message:${createHash('sha256').update(messageId).digest('hex')}`;
 const hashCode = (token: string, code: string): string => createHash('sha256').update(`${token}:${code}`).digest('hex');
 
 function sameHash(left: string, right: string): boolean {
@@ -62,16 +74,24 @@ function sameHash(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * The registered number confirming itself (the weekly popup) is the one step the e-mail cannot stand in for: a mailed
+ * code proves nothing about the number, so that step fails and the member reaches support instead.
+ */
+const mayMail = (step: Pick<PhoneCodeStep, 'purpose' | 'newPhone'>): boolean => step.purpose === 'signin' || step.newPhone !== undefined;
+
 /** `•••123`: what the app shows of a number. */
 export function maskNumber(phone: string): string {
   return `•••${String(phone).replace(/\D+/g, '').slice(-3)}`;
 }
 
 /**
- * The code is kept hashed, works once and dies after five wrong tries. It always goes to WhatsApp first; when Meta refuses
- * (or a number hit the three-an-hour limit) it goes to the e-mail, and the step remembers the channel, because only a code
- * that travelled on WhatsApp proves the number. An account has one live step and an hourly budget, so a right password
- * cannot buy endless paid messages. The code itself is never logged.
+ * The code is kept hashed, works once and dies after five wrong tries. M204 (owner, 2026-11-06: «خلي اوتوماتيك اي عملية
+ * عموما متنفذتش واتس اب تتبعت ايميل… في حالات ضيقة جدا»): it always goes to WhatsApp first and the member has no e-mail
+ * button; the e-mail carries it BY ITSELF only when Meta refuses the send or reports later that the message was not
+ * delivered (`deliveryFailed`). The step remembers the channel, because only a code that travelled on WhatsApp proves
+ * the number. An admin can also vouch for a number (`waive`). An account has one live step and an hourly budget, so a
+ * right password cannot buy endless paid messages. The code itself is never logged.
  */
 export class PhoneCodeStore {
   /** The KV has no atomic counter: parallel guesses must not share one attempt. */
@@ -88,17 +108,20 @@ export class PhoneCodeStore {
       if (account.steps >= MAX_STEPS_PER_WINDOW || account.wrong >= MAX_WRONG_PER_WINDOW) {
         return { ok: false, reason: 'cooldown', waitSeconds: Math.max(1, Math.ceil((Date.parse(account.windowStart) + ACCOUNT_WINDOW_MS - Date.now()) / 1000)) };
       }
-      if (account.liveKey) await this.kv.delete(account.liveKey);
+      if (account.liveKey) await this.drop(account.liveKey);
       const spent: PhoneCodeAccount = { ...account, steps: account.steps + 1, liveKey: null };
       await this.kv.set(accountKey(input.contactId), spent);
       const token = newToken();
       const code = this.newCode();
-      const via = await this.deliver('whatsapp', input, code);
-      if (!via) return { ok: false, reason: 'send_failed' };
+      const sent = await this.deliver(input, code);
+      if (!sent) return { ok: false, reason: 'send_failed' };
+      const via = sent.via;
       const now = Date.now();
+      if (sent.messageId) await this.kv.set(messageKey(sent.messageId), { key: keyFor(token) });
       await this.kv.set(keyFor(token), {
         ...input,
         via,
+        ...(sent.messageId ? { waMessageId: sent.messageId } : {}),
         codeHash: hashCode(token, code),
         codeExpiresAt: new Date(now + PHONE_CODE_SECONDS * 1000).toISOString(),
         attempts: 0,
@@ -111,22 +134,27 @@ export class PhoneCodeStore {
     });
   }
 
-  /** A new code replaces the old one. `email` is the member's own way out: wrong number, or no WhatsApp on it. */
-  async resend(token: string, channel: PhoneCodeVia): Promise<PhoneCodeResend> {
+  /** A new code replaces the old one: WhatsApp again, unless Meta already reported the number unreachable. */
+  async resend(token: string): Promise<PhoneCodeResend> {
     return this.exclusive(keyFor(token), async () => {
       const step = await this.load(token);
       if (!step) return { ok: false, reason: 'gone' };
       if (step.sends >= MAX_SENDS) return { ok: false, reason: 'too_many' };
-      // The gap guards the paid channel; a member leaving for the e-mail never waits.
+      // The gap guards the paid channel.
       const waitMs = Date.parse(step.lastSentAt) + PHONE_CODE_RESEND_SECONDS * 1000 - Date.now();
-      if (channel === 'whatsapp' && waitMs > 0) return { ok: false, reason: 'too_soon', waitSeconds: Math.ceil(waitMs / 1000) };
+      if (waitMs > 0) return { ok: false, reason: 'too_soon', waitSeconds: Math.ceil(waitMs / 1000) };
       const code = this.newCode();
-      const via = await this.deliver(channel, step, code);
-      if (!via) return { ok: false, reason: 'send_failed' };
+      const sent = await this.deliver(step, code);
+      if (!sent) return { ok: false, reason: 'send_failed' };
+      const via = sent.via;
       const now = Date.now();
+      if (step.waMessageId) await this.kv.delete(messageKey(step.waMessageId));
+      if (sent.messageId) await this.kv.set(messageKey(sent.messageId), { key: keyFor(token) });
+      const { salt: _salt, waMessageId: _old, ...kept } = step;
       await this.kv.set(keyFor(token), {
-        ...step,
+        ...kept,
         via,
+        ...(sent.messageId ? { waMessageId: sent.messageId } : {}),
         codeHash: hashCode(token, code),
         codeExpiresAt: new Date(now + PHONE_CODE_SECONDS * 1000).toISOString(),
         expiresAt: new Date(now + PHONE_CODE_SECONDS * 1000).toISOString(),
@@ -142,15 +170,15 @@ export class PhoneCodeStore {
       const step = await this.load(token);
       if (!step) return { ok: false, reason: 'gone' };
       if (Date.parse(step.codeExpiresAt) <= Date.now()) return { ok: false, reason: 'code_expired' };
-      if (sameHash(step.codeHash, hashCode(token, code))) {
-        await this.kv.delete(keyFor(token));
+      if (sameHash(step.codeHash, hashCode(step.salt ?? token, code))) {
+        await this.drop(keyFor(token));
         await this.updateAccount(step.contactId, (account) => ({ ...account, liveKey: null }));
         return { ok: true, step };
       }
       const account = await this.updateAccount(step.contactId, (current) => ({ ...current, wrong: current.wrong + 1 }));
       const attempts = step.attempts + 1;
       if (attempts >= MAX_ATTEMPTS || account.wrong >= MAX_WRONG_PER_WINDOW) {
-        await this.kv.delete(keyFor(token));
+        await this.drop(keyFor(token));
         return { ok: false, reason: 'locked' };
       }
       await this.kv.set(keyFor(token), { ...step, attempts });
@@ -163,10 +191,68 @@ export class PhoneCodeStore {
     return this.load(token);
   }
 
-  /** WhatsApp, then the e-mail; `email` goes straight there. Null = neither channel took it. */
-  private async deliver(channel: PhoneCodeVia, step: Pick<PhoneCodeStep, 'phone' | 'email' | 'lang'>, code: string): Promise<PhoneCodeVia | null> {
-    if (channel === 'whatsapp' && (await this.send('whatsapp', step, code))) return 'whatsapp';
-    return (await this.send('email', step, code)) ? 'email' : null;
+  /**
+   * Meta's webhook: the WhatsApp message with a live code was not delivered (no WhatsApp on the number, 131026…).
+   * A NEW code goes to the account's e-mail by itself and the step turns to `email`. True = a code was mailed.
+   */
+  async deliveryFailed(messageId: string): Promise<boolean> {
+    const link = await this.kv.get<{ key: string }>(messageKey(messageId));
+    if (!link) return false;
+    await this.kv.delete(messageKey(messageId));
+    return this.exclusive(link.key, async () => {
+      const step = await this.kv.get<PhoneCodeStep>(link.key);
+      if (!step || step.waMessageId !== messageId || Date.parse(step.expiresAt) <= Date.now()) return false;
+      const code = this.newCode();
+      const salt = newToken();
+      const { waMessageId: _old, ...kept } = step;
+      if (!mayMail(step) || !(await this.send('email', step, code)).sent) {
+        await this.kv.set(link.key, { ...kept, unreachable: true } satisfies PhoneCodeStep);
+        return false;
+      }
+      const now = Date.now();
+      await this.kv.set(link.key, {
+        ...kept,
+        via: 'email',
+        unreachable: true,
+        salt,
+        codeHash: hashCode(salt, code),
+        codeExpiresAt: new Date(now + PHONE_CODE_SECONDS * 1000).toISOString(),
+        expiresAt: new Date(now + PHONE_CODE_SECONDS * 1000).toISOString(),
+      } satisfies PhoneCodeStep);
+      return true;
+    });
+  }
+
+  /** WhatsApp first; the e-mail only when it refuses, or when Meta already said the number is unreachable. Null = nothing left. */
+  private async deliver(step: Pick<PhoneCodeStep, 'purpose' | 'newPhone' | 'phone' | 'email' | 'lang' | 'unreachable'>, code: string): Promise<{ via: PhoneCodeVia; messageId?: string } | null> {
+    if (!step.unreachable) {
+      const onWhatsapp = await this.send('whatsapp', step, code);
+      if (onWhatsapp.sent) return { via: 'whatsapp', ...(onWhatsapp.messageId ? { messageId: onWhatsapp.messageId } : {}) };
+    }
+    if (!mayMail(step)) return null;
+    return (await this.send('email', step, code)).sent ? { via: 'email' } : null;
+  }
+
+  /** Removes a step together with the link from its WhatsApp message. */
+  private async drop(key: string): Promise<void> {
+    const step = await this.kv.get<PhoneCodeStep>(key);
+    if (step?.waMessageId) await this.kv.delete(messageKey(step.waMessageId));
+    await this.kv.delete(key);
+  }
+
+  /** M204: a member the code cannot reach wrote to support; the admin who checked him vouches for the number. */
+  async waive(contactId: number, by: string): Promise<PhoneCodeWaiver> {
+    const waiver: PhoneCodeWaiver = { by, at: new Date().toISOString() };
+    await this.kv.set(waiverKey(contactId), waiver);
+    return waiver;
+  }
+
+  async unwaive(contactId: number): Promise<void> {
+    await this.kv.delete(waiverKey(contactId));
+  }
+
+  async waiver(contactId: number): Promise<PhoneCodeWaiver | null> {
+    return (await this.kv.get<PhoneCodeWaiver>(waiverKey(contactId))) ?? null;
   }
 
   private newCode(): string {

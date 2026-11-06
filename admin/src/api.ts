@@ -690,6 +690,7 @@ export const api = {
     call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/grant`, { action: input.action, ...(input.days !== null ? { days: input.days } : {}), note: input.note, requestId: input.requestId, confirm: true }),
   setRole: (id: number, input: { role: 'member' | 'publisher' } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/role`, { ...input, confirm: true }),
   pbGrant: (id: number, input: { amount: number } & WriteMeta) => call<{ ok: true; already: boolean; granted: number; left: number }>('POST', `/api/admin/accounts/${id}/pb-grant`, { ...input, confirm: true }),
+  phoneWaiver: (id: number, on: boolean) => call<{ phoneWaiver: { by: string; at: string } | null }>('POST', `/api/admin/accounts/${id}/phone-waiver`, { on, confirm: true }),
   audit: (limit = 100) => call<{ entries: AuditEntry[] }>('GET', `/api/admin/audit${query({ limit })}`),
   analytics: (days: number) => call<AnalyticsResult>('GET', `/api/admin/analytics${query({ days })}`),
   newsSources: () => call<NewsSourcesResult>('GET', '/api/admin/news/sources'),

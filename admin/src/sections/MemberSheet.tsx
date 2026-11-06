@@ -245,6 +245,47 @@ function Done({ text }: { text: string }) {
   return <p className="done" role="status" tabIndex={-1} ref={line}>{text}</p>;
 }
 
+/**
+ * M204 (owner, 2026-11-06): WhatsApp is the only channel for the sign-in code. A member the code cannot reach writes
+ * to the support line; after checking him there, the admin vouches for the number here and the account signs in
+ * without the code from then on.
+ */
+function PhoneWaiver({ contactId, phone, waiver, onStart, onChanged }: { contactId: number; phone: string; waiver: { by: string; at: string } | null; onStart: () => void; onChanged: (text: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (on: boolean) => {
+    const question = on
+      ? `تأكيد الرقم ${phone} يدويًا؟ بعدها يدخل هذا العضو بدون رمز واتساب. افعلها فقط بعد أن يراسل الدعم من الرقم نفسه.`
+      : 'إلغاء التأكيد اليدوي؟ سيُطلب من العضو رمز واتساب عند كل دخول جديد.';
+    if (busy || !window.confirm(question)) return;
+    onStart();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.phoneWaiver(contactId, on);
+      onChanged(on ? 'تم تأكيد الرقم يدويًا: يدخل العضو بدون رمز واتساب.' : 'أُلغي التأكيد اليدوي للرقم.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الحفظ الآن');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="sheet-block">
+      <h3>رمز واتساب عند الدخول</h3>
+      <p className="muted hint">
+        {waiver ? `الرقم مؤكَّد يدويًا من ${waiver.by} في ${formatDateTime(waiver.at)}: يدخل العضو بدون رمز واتساب.` : 'إذا لم يصل الرمز إلى العضو وراسل الدعم على واتساب من الرقم نفسه، أكّد رقمه من هنا ليدخل بدون رمز.'}
+      </p>
+      {error ? <p className="muted hint" role="alert">{error}</p> : null}
+      <div className="actions">
+        <button type="button" className={waiver ? 'danger' : undefined} disabled={busy} onClick={() => void run(!waiver)}>
+          {waiver ? 'إلغاء التأكيد اليدوي' : 'تأكيد الرقم يدويًا'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done: string | null; onStart: () => void; onChanged: (text: string) => void }) {
   const { openThread } = useShell();
   const [action, setAction] = useState<ActionKind | null>(null);
@@ -279,6 +320,8 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         </dl>
         {account.msg_count > 0 ? <button type="button" onClick={() => openThread(account.id)}>فتح المحادثة</button> : null}
       </section>
+
+      {account.phone && detail.phoneWaiver !== undefined ? <PhoneWaiver contactId={account.id} phone={account.phone} waiver={detail.phoneWaiver} onStart={onStart} onChanged={onChanged} /> : null}
 
       {everMember ? (
         <section className="sheet-block">

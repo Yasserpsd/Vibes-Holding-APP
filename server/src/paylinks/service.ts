@@ -5,7 +5,8 @@ import type { FastifyBaseLogger } from 'fastify';
 import { membershipNumber, type AuthService } from '../auth/service.js';
 import { hubCall, HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
-import type { Notifier } from '../mail/notify.js';
+import type { ActivationLike, Notifier } from '../mail/notify.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 import type { Payment, PaymentsService } from '../payments/service.js';
 import type { PushService } from '../push/service.js';
 import type { KV } from '../store.js';
@@ -61,7 +62,7 @@ export type PayLinkInput = {
   customer: { name: string; phone: string; email: string };
 };
 
-type Deps = { kv: KV; hub: HubClient; payments: PaymentsService; notifier: Notifier; push: PushService; auth: AuthService; invites?: InvitesService; log: FastifyBaseLogger; publicUrl: string };
+type Deps = { kv: KV; hub: HubClient; payments: PaymentsService; notifier: Notifier; push: PushService; auth: AuthService; invites?: InvitesService; log: FastifyBaseLogger; publicUrl: string; whatsapp?: WhatsappService };
 
 export class PayLinksService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -209,7 +210,7 @@ export class PayLinksService {
             this.deps.auth.forget(link.contactId);
             // M156 (owner): every membership purchase mails the member his royal confirmation at once.
             if (result.contact) {
-              this.deps.notifier.memberActivated({
+              const activation: ActivationLike = {
                 contactId: link.contactId,
                 name: result.contact.name,
                 email: result.contact.email,
@@ -223,7 +224,11 @@ export class PayLinksService {
                 days: link.days ?? 365,
                 expiresAt: memberEnd ? `${memberEnd}T00:00:00+03:00` : null,
                 environment: 'PRODUCTION',
-              });
+              };
+              const royal = () => this.deps.notifier.memberActivated(activation);
+              // M204: WhatsApp first; the e-mail follows `orMail`.
+              if (this.deps.whatsapp) this.deps.whatsapp.announceMembership({ phone: activation.phone, lang: activation.lang, name: result.contact.name, expiresAt: activation.expiresAt, ref: `membership:${link.contactId}:paylink:${payment.id}` }, royal);
+              else royal();
             }
             this.deps.push.membershipActivated(link.contactId, { expiresAt: null, pending: false });
             if (this.deps.invites) await this.deps.invites.onActivated(link.contactId);

@@ -13,6 +13,7 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { WhatsappNote } from '@/components/WhatsappNote';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
@@ -138,6 +139,7 @@ export default function HqScreen() {
       {status === 'signedIn' ? (
         <>
           <SectionHeader title={t('hq.myVisits')} />
+          {visits.data?.visits.length ? <WhatsappNote kind="updates" /> : null}
           {actionError ? <Notice tone="warning" text={actionError} support /> : null}
           {visits.data ? (
             visits.data.visits.length ? (

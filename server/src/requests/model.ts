@@ -43,7 +43,7 @@ export type MemberRequest = {
 };
 
 /** Where the mail goes and in which language. */
-export type Recipient = { email: string; name: string; lang?: AppLang | null; contactEmail?: string | null };
+export type Recipient = { email: string; name: string; lang?: AppLang | null; contactEmail?: string | null; /** M204: the account's number; with it a status change goes on WhatsApp. */ phone?: string | null };
 
 export const KIND_LABEL: Record<RequestKind, { ar: string; en: string }> = {
   card: { ar: 'توصيل كارت العضوية', en: 'Membership card delivery' },

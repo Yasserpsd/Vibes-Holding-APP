@@ -6,6 +6,7 @@ import { Animated, Text, View } from 'react-native';
 import { amountLabel, usePayment, type PaymentStatus } from '@/api/payments';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
+import { WhatsappNote } from '@/components/WhatsappNote';
 import { entranceDelay, FadeInView, PopIn, Sheen, usePulse } from '@/components/motion';
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
@@ -87,6 +88,7 @@ export default function PaymentScreen() {
           </PopIn>
           <Text style={[styles.stateTitle, { color: state.color }]}>{t(state.title)}</Text>
           <Text style={styles.stateText}>{t(state.text)}</Text>
+          {payment.status === 'paid' ? <WhatsappNote kind="invoice" /> : null}
           {payment.status === 'failed' && payment.failureReason ? <Text style={styles.reason}>{t('payment.gatewayReason', { reason: payment.failureReason })}</Text> : null}
           {payment.status === 'paid' && heroSize ? <Sheen width={heroSize.width} height={heroSize.height} /> : null}
         </View>

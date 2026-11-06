@@ -36,6 +36,8 @@ const grantSchema = z
   .refine((body) => body.action === 'revoke' || typeof body.days === 'number', 'اكتب عدد الأيام');
 const roleSchema = z.object({ role: z.enum(['member', 'publisher']), note, confirm, requestId });
 const pbGrantSchema = z.object({ amount: z.number().int().min(-50).max(50).refine((value) => value !== 0, 'اكتب عدد المشاريع المضافة أو المخصومة'), note, confirm, requestId });
+// M204: «تأكيد الرقم يدويًا» for a member the WhatsApp code cannot reach (he wrote to the support line).
+const phoneWaiverSchema = z.object({ on: z.boolean(), confirm });
 const replySchema = z.object({ text: z.string().trim().min(1, 'اكتب الرد أولًا').max(4000, 'الرد طويل، الحد 4000 حرف'), confirm, requestId });
 
 /** The dashboard's bridge v2 endpoints: all behind `dashboardGuard`, all `no-store` like every /api/ answer. */
@@ -87,11 +89,24 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      const detail = await service.account(admin, params.id);
+      const detail = { ...(await service.account(admin, params.id)), phoneWaiver: await auth.phoneWaiverOf(params.id) };
       // M116: the member sheet names the member's interests too.
       if (!interests) return detail;
       const labels = await interests.labelsFor([params.id]);
       return { ...detail, interests: labels[params.id] ?? [] };
+    }),
+  );
+
+  app.post(
+    '/api/admin/accounts/:id/phone-waiver',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(phoneWaiverSchema, request.body, reply);
+      if (!body) return;
+      return { phoneWaiver: await auth.setPhoneWaiver(params.id, admin.me.name || admin.me.email, body.on) };
     }),
   );
 

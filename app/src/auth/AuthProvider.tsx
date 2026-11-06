@@ -15,6 +15,11 @@ type AuthContextValue = {
   me: Me | null;
   /** Whether this device holds a saved session; `null` until the secure store has answered (read by the sign-in gate). */
   hasSession: boolean | null;
+  /**
+   * M204: the server answered for this account in this launch. The app opens on the saved account (M165) before that,
+   * and a 401 may still sign it out: nothing that opens by itself (a popup) may trust `me` until this is true.
+   */
+  confirmed: boolean;
   /** Stores the session after login or verification. */
   signIn: (token: string, me: Me) => Promise<void>;
   /** Ends the session on the server (best effort) and locally. */
@@ -32,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [me, setMeState] = useState<Me | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const tokenRef = useRef<string | null>(null);
 
   const clearLocal = useCallback(async () => {
@@ -40,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The store identity belongs to the account too (RevenueCat app user id).
     void resetPurchases();
     setMeState(null);
+    setConfirmed(false);
     setHasSession(false);
     setStatus('guest');
     await saveToken(null);
@@ -74,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { me: account } = await authApi.me(stored);
         if (cancelled) return;
         setMeState(account);
+        setConfirmed(true);
         setStatus('signedIn');
         void saveAccount(account);
       } catch (error) {
@@ -103,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenRef.current = token;
       setAuthToken(token);
       setMeState(account);
+      setConfirmed(true);
       setHasSession(true);
       setStatus('signedIn');
       await saveToken(token);
@@ -143,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { me: account } = await authApi.me(token, true);
       setMeState(account);
+      setConfirmed(true);
       setStatus('signedIn');
       void saveAccount(account);
       return account;
@@ -158,8 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, me, hasSession, signIn, signOut, refresh, setMe }),
-    [status, me, hasSession, signIn, signOut, refresh, setMe],
+    () => ({ status, me, hasSession, confirmed, signIn, signOut, refresh, setMe }),
+    [status, me, hasSession, confirmed, signIn, signOut, refresh, setMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

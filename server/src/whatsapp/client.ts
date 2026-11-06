@@ -99,4 +99,38 @@ export class WhatsappClient {
     const answer = await this.graph<{ data?: WaTemplate[] }>('GET', `${encodeURIComponent(this.options.wabaId)}/message_templates?${query.toString()}`);
     return (answer.data ?? []).filter((template) => template.name === name);
   }
+
+  /**
+   * M204: registers one template (one language) on the WABA; Meta reviews it before it can be sent.
+   * Meta wants a sample for every variable: `bodyExamples` in the order of {{1}}, {{2}}…, and the full sample
+   * address of a URL button that ends in {{1}}.
+   */
+  async createTemplate(input: NewTemplate): Promise<{ id: string; status: string; category: string | null }> {
+    const components: Record<string, unknown>[] = [
+      { type: 'BODY', text: input.body, ...(input.bodyExamples.length ? { example: { body_text: [input.bodyExamples] } } : {}) },
+    ];
+    if (input.footer) components.push({ type: 'FOOTER', text: input.footer });
+    if (input.urlButton) {
+      const { text, url, example } = input.urlButton;
+      components.push({ type: 'BUTTONS', buttons: [{ type: 'URL', text, url, ...(example ? { example: [example] } : {}) }] });
+    }
+    const answer = await this.graph<{ id?: string; status?: string; category?: string }>('POST', `${encodeURIComponent(this.options.wabaId)}/message_templates`, {
+      name: input.name,
+      language: input.language,
+      category: input.category,
+      components,
+    });
+    if (!answer.id) throw new WhatsappError('no template id in the answer', 200, null);
+    return { id: answer.id, status: answer.status ?? 'PENDING', category: answer.category ?? null };
+  }
 }
+
+export type NewTemplate = {
+  name: string;
+  language: string;
+  category: 'UTILITY' | 'MARKETING';
+  body: string;
+  bodyExamples: string[];
+  footer?: string;
+  urlButton?: { text: string; url: string; example?: string };
+};

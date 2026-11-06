@@ -208,7 +208,7 @@ export const authApi = {
   // The token travels explicitly: sign-out clears the module token before this call goes out.
   logout: (token: string) => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {}, token }),
   // M101 «تغيير التوجه»: the e-mailed code applies the change at the hub, once every 30 days (admins patch directly).
-  personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
+  personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; via?: 'whatsapp' | 'email'; phone?: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
   personaConfirm: (code: string) => apiRequest<{ me: Me }>('POST', '/api/me/persona/confirm', { body: { code } }),
   // M109d: the yearly window's state plus the member's latest «طلب تغيير الصفة».
   personaState: () => apiRequest<{ daysLeft: number; request: PersonaChangeRequest | null }>('GET', '/api/me/persona/state'),
@@ -219,7 +219,7 @@ export const authApi = {
   // M117: the three-step deletion — password starts it, the mailed code + the shown word confirm it,
   // and the request only SCHEDULES the deletion 30 days ahead (cancellable the whole time).
   deleteStart: (password: string, reason?: string) =>
-    apiRequest<{ ok: true; email: string; seconds: number; word: string; days: number }>('POST', '/api/me/delete/start', { body: { password, ...(reason ? { reason } : {}) } }),
+    apiRequest<{ ok: true; email: string; via?: 'whatsapp' | 'email'; phone?: string; seconds: number; word: string; days: number }>('POST', '/api/me/delete/start', { body: { password, ...(reason ? { reason } : {}) } }),
   deleteConfirm: (code: string, word: string) => apiRequest<{ ok: true; dueAt: string; daysLeft: number }>('POST', '/api/me/delete/confirm', { body: { code, word } }),
   deleteState: () => apiGet<{ scheduled: { dueAt: string; daysLeft: number } | null }>('/api/me/delete/state'),
   deleteCancel: () => apiRequest<{ ok: true; cancelled: boolean }>('POST', '/api/me/delete/cancel', { body: {} }),

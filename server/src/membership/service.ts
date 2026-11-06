@@ -7,6 +7,7 @@ import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
 import type { ActivationLike, Notifier } from '../mail/notify.js';
+import type { WhatsappService } from '../whatsapp/service.js';
 import type { PushService } from '../push/service.js';
 import { lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
@@ -116,6 +117,8 @@ type Deps = {
   fetchImpl?: typeof fetch;
   /** M32: marks the invitee «فعّل العضوية» on the invitations list. */
   invites?: InvitesService;
+  /** M204: the activation goes on WhatsApp (club_membership_active). */
+  whatsapp?: WhatsappService;
 };
 
 export class MembershipService {
@@ -344,7 +347,12 @@ export class MembershipService {
       }
       this.deps.auth.forget(contactId);
       // M156 (owner): the member's own royal confirmation goes out the same instant, then the admins' copy.
-      if (result.contact) this.deps.notifier.memberActivated(mail);
+      if (result.contact) {
+        const royal = () => this.deps.notifier.memberActivated(mail);
+        // M204: WhatsApp first; the e-mail follows `orMail`.
+        if (this.deps.whatsapp) this.deps.whatsapp.announceMembership({ phone: mail.phone, lang: mail.lang, name: result.contact.name, expiresAt: mail.expiresAt, ref: `membership:${contactId}:${mail.reference}` }, royal);
+        else royal();
+      }
       this.deps.notifier.membershipActivated(mail);
       this.deps.push.membershipActivated(contactId, { expiresAt: event.expiresAt, pending: false });
       if (this.deps.invites) await this.deps.invites.onActivated(contactId);

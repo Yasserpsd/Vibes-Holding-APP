@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { authApi, displayProfile, useAuthConfig, type Persona, type PhoneStepResult } from '@/api/auth';
+import { authApi, displayProfile, useAuthConfig, type Me, type Persona, type PhoneStepResult } from '@/api/auth';
 import { GATE_FIELDS } from '@/api/gateFields';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
@@ -40,20 +40,27 @@ const personaLabel = (item: { key: Persona; label: string }): string => tOptiona
  * M203 (owner, 2026-11-06, replaces the M147 list): name, phone, category, job, and the real address of an Apple
  * relay account. The number is saved only after its WhatsApp code; bio, interests, member type and company
  * are asked later in the profile (the 7-day «كمّل بياناتك» popup and the interests screen).
+ * M204 (owner, 2026-11-06: «اي بيانات ناقصة يطلعه بوب اب جميل كده ويقدر يدوس لاحقا عادي»): no wall any more. A weekly
+ * popup (GentlePopups) offers this form, and «لاحقًا» closes it at any moment.
  */
-export function ProfileCompletionGate() {
-  const { status, me } = useAuth();
-  // M168: a newer server may name a field this bundle has no input for — never wall the member behind it.
-  const missing = (me?.profileMissing ?? []).filter((key) => (GATE_FIELDS as readonly string[]).includes(key) && key !== 'phoneCode');
-  if (status !== 'signedIn' || !me || me.isAdmin || !missing.length) return null;
-  return <CompletionForm missing={missing} />;
+export function gateMissing(me: Me | null | undefined): Field[] {
+  // M168: a newer server may name a field this bundle has no input for — never ask the member for it.
+  if (!me || me.isAdmin) return [];
+  return (me.profileMissing ?? []).filter((key): key is Field => (ORDER as readonly string[]).includes(key) && (GATE_FIELDS as readonly string[]).includes(key));
 }
 
 type Field = 'name' | 'contactEmail' | 'phone' | 'persona' | 'jobTitle';
 const ORDER: Field[] = ['name', 'contactEmail', 'phone', 'persona', 'jobTitle'];
 
-function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof useAuth>['me']>['profileMissing'] }) {
+export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater: () => void }) {
   const { me, setMe } = useAuth();
+  useEffect(() => {
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      onLater();
+      return true;
+    });
+    return () => back.remove();
+  }, [onLater]);
   const insets = useSafeAreaInsets();
   const configQuery = useAuthConfig();
   const config = configQuery.data;
@@ -155,6 +162,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
                   setMe(updated);
                 }}
               />
+              <AppButton label={t('dataNudge.later')} variant="outline" onPress={onLater} />
             </FormCard>
           ) : null}
           {step ? null : (
@@ -274,6 +282,7 @@ function CompletionForm({ missing }: { missing: NonNullable<ReturnType<typeof us
 
             {error ? <Notice tone="warning" text={error} support /> : null}
             <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} disabled={waiting} onPress={() => void submit()} />
+            <AppButton label={t('dataNudge.later')} variant="outline" onPress={onLater} />
           </FormCard>
           )}
           <Text style={styles.foot}>{t('completeProfile.foot')}</Text>

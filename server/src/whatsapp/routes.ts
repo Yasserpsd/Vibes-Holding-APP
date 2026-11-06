@@ -35,6 +35,30 @@ const probeSchema = z.object({
   confirm: z.literal(true, { error: 'أكّد التكلفة بـ confirm: true' }),
 });
 
+const VARIABLES = /\{\{\s*(\d+)\s*\}\}/g;
+const variablesOf = (text: string): number => Math.max(0, ...[...text.matchAll(VARIABLES)].map((match) => Number(match[1])));
+
+/** M204: one new template for Meta's review. Only the club's own names, and a sample for every variable. */
+export const templateSchema = z
+  .object({
+    name: z.string().trim().regex(/^club_[a-z0-9_]{1,60}$/, 'اسم القالب يبدأ بـ club_'),
+    language: z.string().trim().regex(/^[a-z]{2}(_[A-Z]{2})?$/, 'رمز اللغة غير صحيح'),
+    category: z.enum(['UTILITY', 'MARKETING']).default('UTILITY'),
+    body: z.string().trim().min(10).max(1024),
+    bodyExamples: z.array(z.string().trim().min(1).max(200)).max(10).default([]),
+    footer: z.string().trim().min(1).max(60).optional(),
+    urlButton: z
+      .object({
+        text: z.string().trim().min(1).max(25),
+        url: z.string().trim().url().max(2000).startsWith('https://'),
+        example: z.string().trim().url().max(2000).optional(),
+      })
+      .optional(),
+    confirm: z.literal(true, { error: 'أكّد الإرسال إلى Meta بـ confirm: true' }),
+  })
+  .refine((body) => variablesOf(body.body) === body.bodyExamples.length, { message: 'لكل متغير في النص مثال واحد بالترتيب' })
+  .refine((body) => !body.urlButton || (variablesOf(body.urlButton.url) > 0) === (body.urlButton.example !== undefined), { message: 'رابط الزر المتغير يحتاج مثالًا كاملًا' });
+
 export function runSend(service: WhatsappService, body: SendBody): Promise<WaResult> {
   if (body.kind === 'code') return service.sendCode({ phone: body.phone, lang: body.lang, code: body.code ?? '' });
   const common = { phone: body.phone, lang: body.lang, email: body.email, ref: body.ref };
@@ -121,6 +145,19 @@ export const whatsappAdminRoutes: FastifyPluginAsync<WhatsappAdminOptions> = asy
       const body = parse(probeSchema, request.body, reply);
       if (!body) return;
       return service.sendProbe(body);
+    }),
+  );
+
+  // M204: files a template with Meta for review; no message leaves. `confirm: true` because it reaches Meta at once.
+  app.post(
+    '/api/admin/whatsapp/templates',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const body = parse(templateSchema, request.body, reply);
+      if (!body) return;
+      const { confirm: _confirm, ...template } = body;
+      return service.createTemplate(template);
     }),
   );
 

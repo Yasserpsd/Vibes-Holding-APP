@@ -7,6 +7,7 @@ import { useMyRequests, type MemberRequest, type RequestKind, type RequestStatus
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { LockedNotice } from '@/components/LockedNotice';
+import { WhatsappNote } from '@/components/WhatsappNote';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
@@ -57,6 +58,7 @@ export default function RequestsScreen() {
 
   return (
     <Screen title={t('requests.title')} subtitle={t('requests.subtitle')}>
+      {data?.requests.length ? <WhatsappNote kind="updates" /> : null}
       {data ? (
         data.requests.length ? (
           data.requests.map((request, index) => (

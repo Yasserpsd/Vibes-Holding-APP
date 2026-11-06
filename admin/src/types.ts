@@ -217,6 +217,8 @@ export type MemberDetail = {
   pbError: SectionError | null;
   /** M116: the member's interests as ready Arabic labels. */
   interests?: string[];
+  /** M204: an admin vouched for this account's number (it signs in without the WhatsApp code). Absent on an older server. */
+  phoneWaiver?: { by: string; at: string } | null;
 };
 export type ThreadDetail = { ok: true; account: Account; messages: ThreadMessage[]; has_more: boolean };
 

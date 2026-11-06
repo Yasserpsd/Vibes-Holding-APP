@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/lux';
 import { PopIn } from '@/components/motion';
 import { t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { claimAutoPopup } from '@/lib/popupGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -70,7 +71,8 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
     let alive = true;
     void loadSetting(NUDGE_KEY).then((seenAt) => {
       const last = seenAt ? Date.parse(seenAt) : 0;
-      if (alive && (!last || Date.now() - last > NUDGE_DAYS * 24 * 60 * 60_000)) setVisible(true);
+      // M204: it shares the M128 slot — one self-opening popup per launch; the basic details and the number come first.
+      if (alive && (!last || Date.now() - last > NUDGE_DAYS * 24 * 60 * 60_000) && claimAutoPopup()) setVisible(true);
     });
     return () => {
       alive = false;
@@ -88,7 +90,7 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
   };
 
   // M203: one popup at a time: confirming the number comes first.
-  if (!visible || percent >= 100 || me.phoneConfirmDue) return null;
+  if (!visible || percent >= 100 || me.phoneConfirmDue || (me.profileMissing ?? []).length > 0) return null;
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>
