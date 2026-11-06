@@ -353,22 +353,3 @@ test('m204: an account from before the WhatsApp sign-up signs in with no code an
     await kv.delete('legacy-accounts');
   }
 });
-
-test('m209: a bundle that says code6 gets six-digit codes at sign-in; older bundles keep four', async () => {
-  const sixBundle = `${NEW_BUNDLE},code6`;
-  const account = await member();
-  wa.codes.length = 0;
-  const signIn = await call('POST', '/api/auth/login', { login: account.email, password: account.password }, undefined, sixBundle);
-  assert.equal(signIn.statusCode, 200, signIn.body);
-  const step = signIn.json();
-  const code = wa.codes.pop()?.code ?? '';
-  assert.match(code, /^\d{6}$/);
-  const right = await call('POST', '/api/auth/phone/verify', { stepToken: step.stepToken, code }, undefined, sixBundle);
-  assert.equal(right.statusCode, 200, right.body);
-  assert.equal(right.json().me.phoneVerified, true);
-  // The old bundle (no code6) still gets four digits.
-  const other = await member();
-  wa.codes.length = 0;
-  await call('POST', '/api/auth/login', { login: other.email, password: other.password });
-  assert.match(wa.codes.pop()?.code ?? '', /^\d{4}$/);
-});

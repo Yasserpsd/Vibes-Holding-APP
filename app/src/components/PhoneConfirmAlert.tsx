@@ -26,7 +26,7 @@ type Props = {
 
 /**
  * M204 (owner, 2026-11-06: «اربطها بس بوب اب خفيف كده يطلع والشخص يقدر ياكد منه فورا»): the whole WhatsApp proof
- * inside one light popup. The button asks for the code (one paid message, only on the member's tap), the six digits
+ * inside one light popup. The button asks for the code (one paid message, only on the member's tap), the four digits
  * are typed here and finish by themselves, and «لاحقًا» is always there. Replaces the M203 alert + separate screen.
  */
 export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: Props) {
@@ -96,17 +96,17 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: 
                   style={styles.code}
                   value={code}
                   onChangeText={(value) => {
-                    const digits = value.replace(/\D/g, '').slice(0, 6);
+                    const digits = value.replace(/\D/g, '').slice(0, 4);
                     setCode(digits);
-                    if (digits.length === 6) void check(digits);
+                    if (digits.length === 4) void check(digits);
                   }}
                   keyboardType="number-pad"
                   textContentType="oneTimeCode"
                   autoComplete="sms-otp"
-                  maxLength={6}
+                  maxLength={4}
                   autoFocus
                   editable={!busy}
-                  placeholder="••••••"
+                  placeholder="••••"
                   placeholderTextColor={colors.textMuted}
                   selectionColor={colors.gold}
                   accessibilityLabel={t('auth.verify.code')}

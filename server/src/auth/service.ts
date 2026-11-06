@@ -133,11 +133,6 @@ export function bundleKnows(header: unknown, word: string): boolean {
   return raw.split(',').some((item) => item.trim() === word);
 }
 
-/** M209 (owner, 2026-11-06: «لازم يدخل 6»): the bundle says `code6`, so its WhatsApp codes have six digits; older bundles keep four. */
-export const SIX_DIGIT_CAPABILITY = 'code6';
-
-export const digitsFor = (header: unknown): 4 | 6 => (bundleKnows(header, SIX_DIGIT_CAPABILITY) ? 6 : 4);
-
 export function canPhoneCode(header: unknown): boolean {
   const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
   return raw.split(',').some((item) => item.trim() === PHONE_CODE_CAPABILITY);
@@ -248,7 +243,7 @@ export type TotpSetupResult = { pending: false; totpSetup: true; setupToken: str
 export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: PhoneCodeVia; phone: string; email: string; seconds: number; resendAfter: number };
 export type MemberLoginResult = LoginResult | TotpStepResult | PhoneStepResult;
 /** What one bundle can do at sign-in (the `x-app-gate` word). */
-export type SignInBundle = { canPhoneCode: boolean; /** M209: the bundle draws a six-digit code (`code6` in x-app-gate). */ code6?: boolean };
+export type SignInBundle = { canPhoneCode: boolean };
 export type AdminLoginResult = LoginResult | OtpResult | TotpStepResult | TotpSetupResult;
 /** The first dashboard sign-in after enrolment: the session plus the backup codes, shown once. */
 export type EnrolledResult = SignedInResult & { backupCodes: string[] };
@@ -924,7 +919,7 @@ export class AuthService {
       const stepToken = await totp.beginStep(contact.id, uuid, 'app', false);
       return { pending: false, totp: true, stepToken, seconds: TOTP_TOKEN_SECONDS };
     }
-    if (bundle && (await this.needsPhoneCode(contact, bundle))) return this.beginPhoneStep(uuid, contact, bundle.code6 ? 6 : 4);
+    if (bundle && (await this.needsPhoneCode(contact, bundle))) return this.beginPhoneStep(uuid, contact);
     return this.issueSession(uuid, contact, false, false);
   }
 
@@ -1007,11 +1002,11 @@ export class AuthService {
   }
 
   /** M203: the registered number proves itself from an open session. */
-  async startPhoneConfirm(session: SessionRecord, digits: 4 | 6 = 4): Promise<PhoneStepResult> {
+  async startPhoneConfirm(session: SessionRecord): Promise<PhoneStepResult> {
     const contact = await this.contact(session);
     if (!this.phoneCodeOn || !String(contact.phone ?? '').trim()) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
     const email = mailAddressOf(contact);
-    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '', digits });
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '' });
     if (!begun.ok) throw phoneCodeProblem(begun);
     return this.phoneStepAnswer(begun.token, begun.via, contact.phone, email);
   }
@@ -1025,9 +1020,9 @@ export class AuthService {
     return { pending: false, phoneStep: true, stepToken, via, phone: maskNumber(phone), email: maskEmail(email), seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
   }
 
-  private async beginPhoneStep(uuid: string, contact: HubContact, digits: 4 | 6 = 4): Promise<PhoneStepResult> {
+  private async beginPhoneStep(uuid: string, contact: HubContact): Promise<PhoneStepResult> {
     const email = mailAddressOf(contact);
-    const begun = await this.requirePhoneCodes().begin({ purpose: 'signin', uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '', digits });
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'signin', uuid, contactId: contact.id, phone: contact.phone, email, lang: contact.lang ?? '' });
     if (!begun.ok) {
       await this.dropVisitor(uuid);
       throw phoneCodeProblem(begun);
@@ -1052,7 +1047,7 @@ export class AuthService {
   }
 
   /** The completion gate and the profile editor: a number is saved only after its code. */
-  async startPhoneChange(session: SessionRecord, phone: string, country: string, source?: AppSource, lang: AppLang = 'ar', digits: 4 | 6 = 4): Promise<PhoneStepResult | { saved: true; me: Me }> {
+  async startPhoneChange(session: SessionRecord, phone: string, country: string, source?: AppSource, lang: AppLang = 'ar'): Promise<PhoneStepResult | { saved: true; me: Me }> {
     const contact = await this.contact(session);
     // Switch off, an older hub or a store reviewer: the number is saved as it always was.
     if (!this.phoneCodeOn || contact.phone_verified === undefined || this.phoneCodeExempt(contact)) {
@@ -1061,7 +1056,7 @@ export class AuthService {
     const dry = await this.deps.hub.call('profile', { uuid: session.uuid, phone, country, dry_run: 1 });
     const target = typeof dry.phone_local === 'string' && dry.phone_local ? dry.phone_local : phone;
     const email = mailAddressOf(contact);
-    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: target, newPhone: phone, country, email, lang: contact.lang ?? '', digits });
+    const begun = await this.requirePhoneCodes().begin({ purpose: 'number', uuid: session.uuid, contactId: contact.id, phone: target, newPhone: phone, country, email, lang: contact.lang ?? '' });
     if (!begun.ok) throw phoneCodeProblem(begun);
     return this.phoneStepAnswer(begun.token, begun.via, target, email);
   }

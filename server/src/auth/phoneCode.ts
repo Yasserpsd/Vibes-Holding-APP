@@ -25,8 +25,6 @@ export type PhoneCodeStep = {
   email: string;
   lang: string;
   via: PhoneCodeVia;
-  /** M209: how many digits this step's code has — 6 for a bundle that says `code6`, 4 for older ones (and steps from before M209). */
-  digits?: 4 | 6;
   codeHash: string;
   /** Set when the code was replaced from Meta's webhook, where the step's token is not known. */
   salt?: string;
@@ -106,7 +104,7 @@ export class PhoneCodeStore {
     private readonly send: PhoneCodeSend,
   ) {}
 
-  async begin(input: Pick<PhoneCodeStep, 'purpose' | 'uuid' | 'contactId' | 'phone' | 'newPhone' | 'country' | 'email' | 'lang' | 'digits'>): Promise<PhoneCodeBegin> {
+  async begin(input: Pick<PhoneCodeStep, 'purpose' | 'uuid' | 'contactId' | 'phone' | 'newPhone' | 'country' | 'email' | 'lang'>): Promise<PhoneCodeBegin> {
     return this.exclusive(accountKey(input.contactId), async () => {
       const account = await this.loadAccount(input.contactId);
       if (account.steps >= MAX_STEPS_PER_WINDOW || account.wrong >= MAX_WRONG_PER_WINDOW) {
@@ -116,7 +114,7 @@ export class PhoneCodeStore {
       const spent: PhoneCodeAccount = { ...account, steps: account.steps + 1, liveKey: null };
       await this.kv.set(accountKey(input.contactId), spent);
       const token = newToken();
-      const code = this.newCode(input.digits);
+      const code = this.newCode();
       const sent = await this.deliver(input, code);
       if (!sent) return { ok: false, reason: 'send_failed' };
       const via = sent.via;
@@ -147,7 +145,7 @@ export class PhoneCodeStore {
       // The gap guards the paid channel.
       const waitMs = Date.parse(step.lastSentAt) + PHONE_CODE_RESEND_SECONDS * 1000 - Date.now();
       if (waitMs > 0) return { ok: false, reason: 'too_soon', waitSeconds: Math.ceil(waitMs / 1000) };
-      const code = this.newCode(step.digits);
+      const code = this.newCode();
       const sent = await this.deliver(step, code);
       if (!sent) return { ok: false, reason: 'send_failed' };
       const via = sent.via;
@@ -206,7 +204,7 @@ export class PhoneCodeStore {
     return this.exclusive(link.key, async () => {
       const step = await this.kv.get<PhoneCodeStep>(link.key);
       if (!step || step.waMessageId !== messageId || Date.parse(step.expiresAt) <= Date.now()) return false;
-      const code = this.newCode(step.digits);
+      const code = this.newCode();
       const salt = newToken();
       const { waMessageId: _old, ...kept } = step;
       if (!mayMail(step) || !(await this.send('email', step, code)).sent) {
@@ -259,8 +257,8 @@ export class PhoneCodeStore {
     return (await this.kv.get<PhoneCodeWaiver>(waiverKey(contactId))) ?? null;
   }
 
-  private newCode(digits: 4 | 6 = 4): string {
-    return digits === 6 ? String(randomInt(100_000, 1_000_000)) : String(randomInt(1000, 10_000));
+  private newCode(): string {
+    return String(randomInt(1000, 10_000));
   }
 
   private async load(token: string): Promise<PhoneCodeStep | null> {
