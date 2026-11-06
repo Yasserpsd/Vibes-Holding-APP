@@ -325,6 +325,10 @@ export class MockHubClient implements HubClient {
   private profile(body: HubBody): HubResponse {
     const contact = this.byUuid(body);
     if (!contact || !contact.passHash) throw new HubError('no_account', 'سجّل الدخول أولًا', 401);
+    const referrer = this.resolveReferral(body);
+    if (referrer?.id === contact.id) throw new HubError('referral', 'كود الدعوة غير صحيح — راجعه مع من دعاك، أو امسحه وأكمل التسجيل', 400);
+    const referred = referrer && !contact.referredBy && !contact.isMember ? referrer : null;
+    if (referred) contact.referredBy = referred.id;
     if (str(body, 'name', 120)) contact.name = str(body, 'name', 120);
     const fields: [keyof MockContact & string, string, number][] = [
       ['jobTitle', 'job_title', 150],
@@ -365,7 +369,7 @@ export class MockHubClient implements HubClient {
       if (password.length < 6) throw new HubError('invalid', 'كلمة المرور 6 أحرف على الأقل', 400);
       contact.passHash = hash(password);
     }
-    return { ok: true, contact: this.publicContact(contact) };
+    return { ok: true, contact: this.publicContact(contact), ...(referred ? { referred_by: referred.id, referred_name: referred.name } : {}) };
   }
 
   private resetConfirm(body: HubBody): HubResponse {
@@ -401,6 +405,7 @@ export class MockHubClient implements HubClient {
     const honorary = typeof contact.honoraryAt === 'number';
     const active = honorary || paid;
     return {
+      referred_by: contact.referredBy ?? 0,
       honorary: honorary ? 1 : 0,
       honorary_since: honorary ? isoDate(contact.honoraryAt as number) : '',
       id: contact.id,

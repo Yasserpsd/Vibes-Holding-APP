@@ -6,6 +6,8 @@
 /** `public_contact()` in the plugin: the account as the hub exposes it to tenant sites. */
 export type HubContact = {
   id: number;
+  /** Hub 2.28.2 (M206): who invited this account, 0 = nobody; absent on an older hub. */
+  referred_by?: number;
   name: string;
   email: string;
   phone: string;

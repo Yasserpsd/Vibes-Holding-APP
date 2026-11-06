@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, displayProfile, useAuthConfig, type Me, type Persona, type PhoneStepResult } from '@/api/auth';
@@ -88,6 +88,9 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   const [countryCode, setCountryCode] = useState('sa');
   const [persona, setPersona] = useState<Persona | ''>('');
   const [jobTitle, setJobTitle] = useState(me?.jobTitle ?? '');
+  // M206: Google and Apple sign-ups skip the register screen, so this is where a representative's code is typed.
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
   /** M203: the code step of the number; the fields come back with «تغيير الرقم». */
   const [step, setStep] = useState<PhoneStepResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -117,6 +120,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
         ...(need('contactEmail') ? { contactEmail: contactEmail.trim().toLowerCase() } : {}),
         ...(need('persona') && persona ? { persona } : {}),
         ...(need('jobTitle') ? { jobTitle: jobTitle.trim() } : {}),
+        ...(me?.inviteOpen && inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
       };
       if (Object.keys(rest).length) setMe((await authApi.updateMe(rest)).me);
       // The number last: its code (or the switch being off) completes the account at the hub.
@@ -267,6 +271,25 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
               />
             ) : null}
 
+            {me?.inviteOpen ? (
+              showInvite ? (
+                <FormField
+                  label={t('auth.register.inviteCode')}
+                  latin
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  value={inviteCode}
+                  onChangeText={setInviteCode}
+                  hint={t('auth.register.inviteCodeHint')}
+                  placeholder="FAR2"
+                />
+              ) : (
+                <Pressable accessibilityRole="button" onPress={() => setShowInvite(true)} style={styles.invite} hitSlop={8}>
+                  <Text style={styles.inviteText}>{t('auth.register.haveInvite')}</Text>
+                </Pressable>
+              )
+            ) : null}
+
             {waiting && !failed ? (
               <View style={styles.loading}>
                 <ActivityIndicator color={brand.gold} />
@@ -297,6 +320,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.md, gap: spacing.md },
   emblem: { width: 110, height: 110, alignSelf: 'center' },
+  invite: { alignSelf: 'center', paddingVertical: spacing.xs },
+  inviteText: { ...typography.caption, color: brand.navy, textDecorationLine: 'underline' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: brand.navy, textAlign: 'center' },
   body: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 25, color: formPalettes.light.inkSoft, textAlign: 'center' },

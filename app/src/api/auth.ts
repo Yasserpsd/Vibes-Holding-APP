@@ -31,6 +31,8 @@ export type Me = {
   personaLabel: string;
   /** M203: the current number received a WhatsApp code; null on an older hub, none from an older server. */
   phoneVerified?: boolean | null;
+  /** M206: no membership and no invite code yet; absent on an older server. */
+  inviteOpen?: boolean;
   /** M203: the server asks the app to show the «أكّد رقمك» alert. */
   phoneConfirmDue?: boolean;
   /** M204: the number is unproven: a new dealing (booking, payment, request) asks for it first (lib/whatsappGate). */
@@ -142,7 +144,7 @@ export type TotpSetup = { setupToken: string; secret: string; uri: string; secon
 /** M156 adds `name` (a kunya or a made-up name), `jobTitle` and `contactEmail` (an Apple-relay account's real address). */
 export type ProfileMissing = GateField;
 
-export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
+export type ProfilePatch = { inviteCode?: string } & Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social'>> & {
   password?: string;
   /** M74: the neutral's in-app category switch; the hub stores it (one identity source). */
   persona?: Persona;

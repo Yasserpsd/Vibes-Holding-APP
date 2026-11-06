@@ -97,6 +97,8 @@ export type Me = {
   profileMissing: ProfileMissing[];
   /** M203: the current number received a WhatsApp code; null on a hub older than 2.27.0. */
   phoneVerified: boolean | null;
+  /** M206: no membership and no invite code yet, so the profile form may still take one. */
+  inviteOpen: boolean;
   /** M203: the app shows the «أكّد رقمك» alert. Set per answer (`phoneConfirmDue`): it depends on the switch. */
   phoneConfirmDue?: boolean;
   /** M204: the number is unproven and a new dealing (booking, payment, request) asks for it first. Set per answer. */
@@ -222,6 +224,8 @@ export type ProfilePatch = Partial<Pick<Me, 'name' | 'jobTitle' | 'company' | 'c
   interestsOther?: string;
   /** M156: the real address of an Apple-relay account (hub 2.26.0 `contact_email`). */
   contactEmail?: string;
+  /** M206: the invite code of an account that signed up with Google or Apple. */
+  inviteCode?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
@@ -277,6 +281,7 @@ export function toMe(contact: HubContact): Me {
   const persona = PERSONAS.find((item) => item.key === contact.persona);
   return {
     id: contact.id,
+    inviteOpen: !contact.is_member && contact.referred_by === 0,
     name: contact.name,
     email: contact.email,
     contactEmail: String(contact.contact_email ?? '').trim(),
@@ -791,8 +796,20 @@ export class AuthService {
         .map((key) => (key === 'other' && patch.interestsOther?.trim() ? `أخرى: ${patch.interestsOther.trim()}` : interestLabel(key)))
         .join('، ');
     }
+    const referral = patch.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(patch.inviteCode) : '';
+    if (referral) {
+      body.referral = referral;
+      if (await this.deps.invites?.isRepresentative(referral)) body.referral_kind = 'representative';
+    }
     const result = await this.deps.hub.call('profile', body);
     const contact = requireContact(result);
+    if (referral && this.deps.invites) {
+      // Hub 2.28.2+ answers who the code belongs to; no answer means the code was not stored.
+      const referredBy = Number(result.referred_by ?? 0);
+      if (!referredBy) throw new AuthError('invite_unavailable', 'تعذّر حفظ كود الدعوة — امسحه وأكمل، أو تواصل مع الإدارة', 409);
+      await this.deps.invites.recordFromRegister(contact, referredBy, String(result.referred_name ?? ''), referral);
+      await this.deps.invites.onVerified(contact);
+    }
     // A hub plugin older than the persona-aware op_profile silently drops the field: say so instead of pretending.
     if (patch.persona !== undefined && contact.persona !== patch.persona) {
       throw new AuthError('persona_unsupported', 'تغيير الفئة غير متاح حاليًا، حاول لاحقًا', 503);

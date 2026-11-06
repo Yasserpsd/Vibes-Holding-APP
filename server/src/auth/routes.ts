@@ -123,6 +123,8 @@ const profileSchema = z
     country: z.string().trim().toLowerCase().max(5),
     interests: z.array(z.string().trim().min(1).max(40)).max(10),
     interestsOther: z.string().trim().max(120),
+    // M206: a Google/Apple sign-up has no invite field, so the code comes with the profile form.
+    inviteCode: z.string().trim().max(30),
     // M156: the real address of an Apple-relay account.
     contactEmail: z.string().trim().toLowerCase().min(5, 'اكتب بريدك الإلكتروني').max(190).regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'اكتب بريدًا إلكترونيًا صحيحًا'),
   })
