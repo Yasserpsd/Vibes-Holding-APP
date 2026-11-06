@@ -20,6 +20,8 @@ import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
 import { GentlePopups } from '@/components/GentlePopups';
+import { IntroVideoPopup } from '@/components/IntroVideo';
+import { WhatsappVerifyHost } from '@/components/WhatsappVerify';
 import { WhatsappGateHost } from '@/components/WhatsappGateHost';
 import { RateUsPrompt } from '@/components/RateUsPrompt';
 import { RetiredBuildGate } from '@/components/RetiredBuildGate';
@@ -219,6 +221,10 @@ export default function RootLayout() {
           <SplashFlash />
           {/* M204 (owner): missing details and the unconfirmed number are weekly popups with «لاحقًا», never a wall. */}
           <GentlePopups />
+          {/* M209 (owner): the intro film plays once right after a registration (and once for an account that never saw it) — first in line. */}
+          <IntroVideoPopup />
+          {/* M209 (owner): every member with an unproven WhatsApp number gets one gentle popup ~5 s after landing, after the film and the details form. */}
+          <WhatsappVerifyHost />
           {/* M204 (owner): a new dealing of an account with an unproven number asks for the WhatsApp code first. */}
           <WhatsappGateHost />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}

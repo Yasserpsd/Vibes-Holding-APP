@@ -18,7 +18,6 @@ import { AffiliateHomeCard } from '@/components/AffiliateHomeCard';
 import { AgendaBlock } from '@/components/AgendaBlock';
 import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
-import { IntroVideoPopup } from '@/components/IntroVideo';
 import { WorkshopAdPopup } from '@/components/WorkshopAd';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
 import { MembershipHomeCard } from '@/components/MembershipGate';
@@ -332,8 +331,6 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
-      {/* M84: the one-time «تعرف علينا أكتر» film popup — first open only. */}
-      <IntroVideoPopup />
       {/* M177 (owner): the next workshop, once a day, in the day's AI-written words — the first thing every open shows. */}
       <WorkshopAdPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}

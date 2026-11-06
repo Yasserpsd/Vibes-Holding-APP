@@ -1491,5 +1491,19 @@
   "update.required.button": "تحديث من المتجر",
   "update.restart.title": "يرجى إعادة تشغيل تطبيق Investors Club",
   "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أغلق تطبيق Investors Club وافتحه من جديد لتظهر التحسينات.",
-  "update.restart.button": "إعادة التشغيل الآن"
+  "update.restart.button": "إعادة التشغيل الآن",
+  "wa.popup.title": "أكّد رقم واتساب",
+  "wa.popup.text": "نوثّق حسابك برمز يصلك على واتساب خلال ثوانٍ. اضغط «تأكيد» ليصل الرمز إلى رقمك المسجّل.",
+  "wa.popup.numberLabel": "رقمك المسجّل",
+  "wa.popup.confirm": "تأكيد",
+  "wa.popup.noNumberText": "لم تُضف رقم واتساب لحسابك بعد. اكتب رقمك ليصلك رمز التوثيق عليه.",
+  "wa.popup.send": "إرسال الرمز",
+  "wa.popup.confirmCode": "تأكيد الرمز",
+  "wa.popup.doneTitle": "تم توثيق رقمك",
+  "wa.popup.doneText": "أصبح رقم واتساب موثّقًا، وستصلك رسائل النادي وتفاصيل طلباتك عليه.",
+  "wa.popup.doneButton": "تم",
+  "wa.menu.title": "توثيق WhatsApp",
+  "wa.menu.verified": "موثّق",
+  "badge.verified": "رقم واتساب موثّق",
+  "badge.member": "عضو موثّق بعضوية فعّالة"
 }

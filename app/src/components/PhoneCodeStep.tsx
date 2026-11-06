@@ -16,6 +16,8 @@ type Props = {
   onSubmit: (code: string) => Promise<void>;
   /** Back to the number field (the gate and the profile editor); a sign-in has no number to edit. */
   onBack?: () => void;
+  /** M209: the confirm button's label (the popup says «تأكيد الرمز»); defaults to «تأكيد». */
+  submitLabel?: string;
 };
 
 /**
@@ -23,7 +25,7 @@ type Props = {
  * form and the profile editor. M204 (owner, 2026-11-06): no e-mail button; the server mails the code by itself only
  * when WhatsApp did not carry it (`via` then says `email`), and the support line stays under the error.
  */
-export function PhoneCodeStep({ step, onSubmit, onBack }: Props) {
+export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel }: Props) {
   const [via, setVia] = useState(step.via);
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(step.resendAfter);
@@ -94,7 +96,7 @@ export function PhoneCodeStep({ step, onSubmit, onBack }: Props) {
         error={error}
       />
       {error ? <Notice tone="warning" text={t('phoneCode.help')} support /> : null}
-      <AppButton label={t('auth.verify.submit')} icon="checkmark-circle-outline" loading={busy} onPress={() => void submit()} />
+      <AppButton label={submitLabel ?? t('auth.verify.submit')} icon="checkmark-circle-outline" loading={busy} onPress={() => void submit()} />
       <AppButton
         label={cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('phoneCode.resendWhatsapp')}
         variant="outline"

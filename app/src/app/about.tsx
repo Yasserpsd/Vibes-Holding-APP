@@ -9,6 +9,7 @@ import { entranceDelay, FadeInView, Floating, PressScale } from '@/components/mo
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SlotBanner } from '@/components/SlotBanner';
+import { IntroFilmCard } from '@/components/IntroVideo';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
@@ -52,6 +53,11 @@ export default function AboutScreen() {
 
       {/* M81 extension: the owner's about banner — shows only when he fills the slot. */}
       <SlotBanner slot="about.banner" />
+
+      {/* M209 (owner): the introduction film, playable any time (the one-time popup plays it right after registration). */}
+      <FadeInView delay={entranceDelay(1, 80)}>
+        <IntroFilmCard />
+      </FadeInView>
 
       {data.sections.map((section, index) => (
         <FadeInView key={section.key} delay={entranceDelay(index + 1, 80)}>

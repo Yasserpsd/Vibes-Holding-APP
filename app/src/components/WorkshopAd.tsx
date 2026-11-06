@@ -15,6 +15,7 @@ import { textStart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { formatEventDays, formatNumber } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { useAutoPopupFree, usePopupHold } from '@/lib/popupGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -51,12 +52,16 @@ const LRM = '‎';
 export function WorkshopAdPopup() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
+  // M209: it waits for the intro film / details popup to close instead of opening beside them, and holds the screen while up.
+  const free = useAutoPopupFree();
+  const [done, setDone] = useState(false);
+  usePopupHold(visible);
   const query = useQuery({ queryKey: ['workshop-ad'], queryFn: () => apiGet<{ ad: WorkshopAd | null }>('/api/workshop-ad'), staleTime: 30 * 60_000 });
   const hqPhoto = useHq().data?.photos?.[0] ?? null;
   const ad = query.data?.ad ?? null;
 
   useEffect(() => {
-    if (!ad) return;
+    if (!ad || !free || done) return;
     let alive = true;
     void Promise.all([loadSetting(SEEN_KEY), loadSetting(INTRO_SEEN_KEY)]).then(([seenDay, introSeen]) => {
       if (alive && introSeen && seenDay !== ad.day) setVisible(true);
@@ -64,13 +69,14 @@ export function WorkshopAdPopup() {
     return () => {
       alive = false;
     };
-  }, [ad]);
+  }, [ad, free, done]);
 
   if (!visible || !ad) return null;
 
   // Seen on ANY way out: tomorrow brings a new ad.
   const dismiss = () => {
     setVisible(false);
+    setDone(true);
     void saveSetting(SEEN_KEY, ad.day);
   };
   const open = () => {

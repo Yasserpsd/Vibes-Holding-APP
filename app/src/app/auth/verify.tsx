@@ -14,6 +14,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { markIntroDue } from '@/lib/introGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, shadows, spacing } from '@/theme/tokens';
 
@@ -66,6 +67,8 @@ export default function VerifyScreen() {
       // (the news tab) load them on their first request; a failure here must not block the account.
       const chosen = (interests ?? '').split(',').filter(Boolean);
       if (chosen.length > 0) await interestsApi.save({ keys: chosen, other: interestsOther || undefined }, result.token).catch(() => undefined);
+      // M209: a brand-new account owes the intro film once; marked BEFORE the session is announced.
+      if (flow === 'register') markIntroDue();
       await signIn(result.token, result.me);
       if (flow === 'register') trackRegistration('email');
       void queryClient.invalidateQueries({ queryKey: ['news'] });

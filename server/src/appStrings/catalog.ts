@@ -1493,7 +1493,21 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "update.required.button": "تحديث من المتجر",
     "update.restart.title": "يرجى إعادة تشغيل تطبيق Investors Club",
     "update.restart.body": "وصل تحديث جديد ولم يُطبَّق بعد. أغلق تطبيق Investors Club وافتحه من جديد لتظهر التحسينات.",
-    "update.restart.button": "إعادة التشغيل الآن"
+    "update.restart.button": "إعادة التشغيل الآن",
+    "wa.popup.title": "أكّد رقم واتساب",
+    "wa.popup.text": "نوثّق حسابك برمز يصلك على واتساب خلال ثوانٍ. اضغط «تأكيد» ليصل الرمز إلى رقمك المسجّل.",
+    "wa.popup.numberLabel": "رقمك المسجّل",
+    "wa.popup.confirm": "تأكيد",
+    "wa.popup.noNumberText": "لم تُضف رقم واتساب لحسابك بعد. اكتب رقمك ليصلك رمز التوثيق عليه.",
+    "wa.popup.send": "إرسال الرمز",
+    "wa.popup.confirmCode": "تأكيد الرمز",
+    "wa.popup.doneTitle": "تم توثيق رقمك",
+    "wa.popup.doneText": "أصبح رقم واتساب موثّقًا، وستصلك رسائل النادي وتفاصيل طلباتك عليه.",
+    "wa.popup.doneButton": "تم",
+    "wa.menu.title": "توثيق WhatsApp",
+    "wa.menu.verified": "موثّق",
+    "badge.verified": "رقم واتساب موثّق",
+    "badge.member": "عضو موثّق بعضوية فعّالة"
   },
   "en": {
     "tabs.home": "Home",
@@ -2988,7 +3002,21 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "update.required.button": "Update from the store",
     "update.restart.title": "Please restart the Investors Club app",
     "update.restart.body": "A new update has arrived and is not applied yet. Close the Investors Club app and open it again to get the improvements.",
-    "update.restart.button": "Restart now"
+    "update.restart.button": "Restart now",
+    "wa.popup.title": "Confirm your WhatsApp number",
+    "wa.popup.text": "We verify your account with a code that reaches you on WhatsApp within seconds. Tap «Confirm» and the code goes to your registered number.",
+    "wa.popup.numberLabel": "Your registered number",
+    "wa.popup.confirm": "Confirm",
+    "wa.popup.noNumberText": "No WhatsApp number is saved on your account yet. Enter your number and the verification code reaches you there.",
+    "wa.popup.send": "Send the code",
+    "wa.popup.confirmCode": "Confirm the code",
+    "wa.popup.doneTitle": "Your number is verified",
+    "wa.popup.doneText": "Your WhatsApp number is verified. Club messages and the details of your requests reach you there.",
+    "wa.popup.doneButton": "Done",
+    "wa.menu.title": "WhatsApp verification",
+    "wa.menu.verified": "Verified",
+    "badge.verified": "Verified WhatsApp number",
+    "badge.member": "Verified member with an active membership"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -3072,6 +3100,8 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "workshopAd": "إعلان الورشة اليومي (نافذة الافتتاح)",
     "affiliate": "برنامج ممثلي نادي المستثمرين",
     "update": "رسائل التحديث (إجباري / إعادة تشغيل)",
-    "theme": "مظهر التطبيق (فاتح وداكن)"
+    "theme": "مظهر التطبيق (فاتح وداكن)",
+    "wa": "نافذة وبند توثيق واتساب",
+    "badge": "شارة التوثيق"
   }
 };

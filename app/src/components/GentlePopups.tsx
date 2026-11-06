@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { usePathname, useRouter, type Href } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Text, View } from 'react-native';
 
@@ -7,23 +7,21 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn } from '@/components/motion';
-import { PhoneConfirmAlert } from '@/components/PhoneConfirmAlert';
 import { CompletionForm, gateMissing } from '@/components/ProfileCompletionGate';
 import { t } from '@/i18n';
-import { claimAutoPopup } from '@/lib/popupGate';
+import { claimAutoPopup, useAutoPopupFree, usePopupHold } from '@/lib/popupGate';
 import { useWeeklyNudge } from '@/lib/weeklyNudge';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /**
- * M204 (owner, 2026-11-06: «متخليش الناس تمل منك وتمسح التطبيق»): the two reminders of an account, as light popups
- * with «لاحقًا» instead of the M147/M203 wall and the every-launch alert. Missing basic details come first, then the
- * unconfirmed number; each sleeps a week after «لاحقًا». They share the M128 slot with every other self-opening
- * popup, so one launch never shows more than one of them.
+ * M204 (owner, 2026-11-06: «متخليش الناس تمل منك وتمسح التطبيق»): the missing-details reminder, as a light popup
+ * with «لاحقًا» instead of the M147/M203 wall; it sleeps a week after «لاحقًا» and shares the M128 slot with every other
+ * self-opening popup. M209: the unconfirmed-number reminder left for its own host (WhatsappVerifyHost), which opens
+ * AFTER this popup and the intro film; while this popup is up it holds the screen so that one waits.
  */
 export function GentlePopups() {
   const { status, me, confirmed } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   // `confirmed`: a popup opened from the saved account, then torn down mid-animation by a 401 sign-out, crashed Fabric
   // on Android («addViewAt: child already has a parent»); the saved copy may also be stale about the number.
@@ -31,14 +29,15 @@ export function GentlePopups() {
   const account = status === 'signedIn' && confirmed && me && !me.legacyAccount ? String(me.id) : null;
   const missing = gateMissing(account ? me : null);
   const data = useWeeklyNudge(account && missing.length ? `investorsclub.nudge.data.${account}` : null);
-  const phone = useWeeklyNudge(account && me?.phoneConfirmDue ? `investorsclub.nudge.phone.${account}` : null);
   /** The account that holds this launch's popup slot, and the one that already answered its popup. */
   const [slot, setSlot] = useState<string | null>(null);
   const [answered, setAnswered] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
   const quiet = pathname.startsWith('/auth') || pathname.startsWith('/profile-edit') || pathname.startsWith('/phone-confirm');
-  const candidate = account === null || quiet ? null : data.due ? 'data' : data.due === false && phone.due && !formOpen ? 'phone' : null;
+  const candidate = account === null || quiet ? null : data.due ? 'data' : null;
+  // The intro film (and any popup already up) goes first: the claim is retried when the screen frees.
+  const free = useAutoPopupFree();
 
   useEffect(() => {
     if (!candidate || !account || slot === account) return;
@@ -49,28 +48,16 @@ export function GentlePopups() {
     return () => {
       alive = false;
     };
-  }, [candidate, account, slot]);
+  }, [candidate, account, slot, free]);
 
   const show = account !== null && slot === account && answered !== account ? candidate : null;
+  usePopupHold(show !== null);
   if (!account || !show) return null;
   const close = (snooze: () => void) => {
     snooze();
     setFormOpen(false);
     setAnswered(account);
   };
-
-  if (show === 'phone') {
-    return (
-      <PhoneConfirmAlert
-        onLater={() => close(phone.snooze)}
-        onDone={() => setAnswered(account)}
-        onWrongNumber={() => {
-          setAnswered(account);
-          router.push('/profile-edit?fixPhone=1' as Href);
-        }}
-      />
-    );
-  }
 
   if (formOpen) return <CompletionForm missing={missing} onLater={() => close(data.snooze)} />;
   const fields = missing.map((key) => t(`dataNudge.field.${key}`)).join(t('dataNudge.separator'));

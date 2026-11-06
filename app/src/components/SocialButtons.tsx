@@ -11,6 +11,7 @@ import { GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { t } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { markIntroDue } from '@/lib/introGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -47,6 +48,8 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
         router.push(phoneStepPath(signedIn) as Href);
         return;
       }
+      // M209: a brand-new account owes the intro film once; marked BEFORE the session is announced.
+      if (signedIn.created) markIntroDue();
       await signIn(signedIn.token, signedIn.me);
       // M157: a first social sign-in is a registration for ads attribution (the server says `created`).
       if (signedIn.created) trackRegistration(result.provider);

@@ -1491,5 +1491,19 @@
   "update.required.button": "Update from the store",
   "update.restart.title": "Please restart the Investors Club app",
   "update.restart.body": "A new update has arrived and is not applied yet. Close the Investors Club app and open it again to get the improvements.",
-  "update.restart.button": "Restart now"
+  "update.restart.button": "Restart now",
+  "wa.popup.title": "Confirm your WhatsApp number",
+  "wa.popup.text": "We verify your account with a code that reaches you on WhatsApp within seconds. Tap «Confirm» and the code goes to your registered number.",
+  "wa.popup.numberLabel": "Your registered number",
+  "wa.popup.confirm": "Confirm",
+  "wa.popup.noNumberText": "No WhatsApp number is saved on your account yet. Enter your number and the verification code reaches you there.",
+  "wa.popup.send": "Send the code",
+  "wa.popup.confirmCode": "Confirm the code",
+  "wa.popup.doneTitle": "Your number is verified",
+  "wa.popup.doneText": "Your WhatsApp number is verified. Club messages and the details of your requests reach you there.",
+  "wa.popup.doneButton": "Done",
+  "wa.menu.title": "WhatsApp verification",
+  "wa.menu.verified": "Verified",
+  "badge.verified": "Verified WhatsApp number",
+  "badge.member": "Verified member with an active membership"
 }

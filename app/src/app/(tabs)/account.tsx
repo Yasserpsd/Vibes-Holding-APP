@@ -20,6 +20,8 @@ import { CompleteProfilePopup, CompletionMeter, profileCompletion } from '@/comp
 import { DeletionBanner } from '@/components/DeletionBanner';
 import { Screen } from '@/components/Screen';
 import { SupportLink } from '@/components/SupportLink';
+import { VerifiedBadge, badgeTierOf } from '@/components/VerifiedBadge';
+import { showWhatsappVerify } from '@/components/WhatsappVerify';
 import { WalletCard } from '@/components/WalletCard';
 import { env } from '@/config/env';
 import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
@@ -106,8 +108,16 @@ export default function AccountScreen() {
       {/* M79 (owner): «الحاجات اللي ليها علاقة ببعض لازم تتحط مع بعض» — the pile became titled groups. */}
       <FadeInView delay={entranceDelay(2, 90)}>
         <MenuGroup title={t('account.group.data')} icon="person-circle-outline">
-          {/* M203: stays here after «لاحقًا» on the alert, until the number is confirmed. */}
-          {me?.phoneConfirmDue ? <MenuRow icon="shield-checkmark-outline" label={t('phoneAlert.title')} onPress={() => router.push('/phone-confirm' as Href)} /> : null}
+          {/* M209 (owner): «توثيق WhatsApp» — opens the same one-tap code popup; shows «موثّق» once the number is proven. */}
+          {me && me.phoneVerified !== null && me.phoneVerified !== undefined ? (
+            <MenuRow
+              icon="logo-whatsapp"
+              label={t('wa.menu.title')}
+              onPress={me.phoneVerified ? () => undefined : showWhatsappVerify}
+              trailing={me.phoneVerified ? <Text style={styles.verifiedText}>{t('wa.menu.verified')}</Text> : undefined}
+              hideChevron={me.phoneVerified}
+            />
+          ) : null}
           <MenuRow icon="create-outline" label={t('account.menu.profile')} onPress={() => router.push('/profile-edit')} />
           <MenuRow icon="heart-outline" label={t('nav.interests')} onPress={() => router.push('/news/interests' as Href)} />
           {/* M101: the member changes his direction with an e-mailed code, once every 30 days. */}
@@ -185,19 +195,24 @@ function ProfileHeader({ me }: { me: Me }) {
   const initial = shown.name.trim().charAt(0) || (getLang() === 'en' ? '?' : '؟');
   // M103: the completion meter around the avatar — golden dots fill as the profile does.
   const percent = profileCompletion(me);
+  // M209: the verification rosette sits on the avatar's corner — grey while only the number is proven, gold with a glow once a membership is active.
+  const tier = badgeTierOf(me);
   return (
     <View style={styles.header}>
-      <CompletionMeter percent={percent} size={78}>
-        <GoldGradient style={styles.avatarRing}>
-          {me.avatarUrl ? (
-            <Image source={{ uri: me.avatarUrl }} style={styles.avatar} accessibilityLabel={me.name} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text style={styles.avatarInitial}>{initial}</Text>
-            </View>
-          )}
-        </GoldGradient>
-      </CompletionMeter>
+      <View>
+        <CompletionMeter percent={percent} size={78}>
+          <GoldGradient style={styles.avatarRing}>
+            {me.avatarUrl ? (
+              <Image source={{ uri: me.avatarUrl }} style={styles.avatar} accessibilityLabel={me.name} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarInitial}>{initial}</Text>
+              </View>
+            )}
+          </GoldGradient>
+        </CompletionMeter>
+        {tier ? <VerifiedBadge tier={tier} size={28} style={styles.badge} /> : null}
+      </View>
       <View style={styles.headerText}>
         <View style={styles.nameRow}>
           <Text style={styles.name}>{shown.name}</Text>
@@ -259,9 +274,9 @@ function MenuGroup({ title, icon, children }: { title: string; icon?: IoniconNam
   );
 }
 
-type MenuRowProps = { icon: IoniconName; label: string; onPress: () => void; danger?: boolean };
+type MenuRowProps = { icon: IoniconName; label: string; onPress: () => void; danger?: boolean; trailing?: ReactNode; hideChevron?: boolean };
 
-function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
+function MenuRow({ icon, label, onPress, danger = false, trailing, hideChevron = false }: MenuRowProps) {
   const color = danger ? colors.danger : colors.gold;
   return (
     <PressScale onPress={onPress} style={styles.row}>
@@ -270,7 +285,8 @@ function MenuRow({ icon, label, onPress, danger = false }: MenuRowProps) {
         <Ionicons name={icon} size={22} color={color} />
       </PopIn>
       <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
-      <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />
+      {trailing}
+      {hideChevron ? null : <Ionicons name={chevronForward()} size={18} color={colors.textMuted} />}
     </PressScale>
   );
 }
@@ -279,6 +295,8 @@ const styles = themedStyles(() => ({
   loading: { flex: 1, backgroundColor: colors.black, padding: spacing.lg, justifyContent: 'center' },
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  badge: { position: 'absolute', bottom: -4, end: -6 },
+  verifiedText: { ...typography.caption, color: colors.success },
   avatarRing: {
     width: 78,
     height: 78,
