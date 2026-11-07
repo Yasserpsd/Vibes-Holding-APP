@@ -1,4 +1,4 @@
-import { useRouter, type Href } from 'expo-router';
+import { usePathname, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -22,6 +22,7 @@ import { colors, spacing, typography } from '@/theme/tokens';
  */
 export function SocialButtons({ onError }: { onError: (message: string) => void }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { signIn } = useAuth();
   const { data: config } = useAuthConfig();
   const [busy, setBusy] = useState(false);
@@ -48,9 +49,13 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
         router.push(phoneStepPath(signedIn) as Href);
         return;
       }
-      // M211: a first sign-in has no account yet: the number comes first, on its own screen.
+      // M211: a first sign-in has no account yet. M212 (owner, 2026-11-07: «نفس صفحة التسجيل عادي جدا»): the ordinary
+      // sign-up form opens, filled with the provider's name and e-mail, and its WhatsApp button proves the number.
       if ('phoneFirst' in signedIn) {
-        router.push(`/auth/social-phone?signupToken=${encodeURIComponent(signedIn.signupToken)}&provider=${result.provider}` as Href);
+        const params = new URLSearchParams({ signupToken: signedIn.signupToken, provider: result.provider, name: signedIn.name, email: signedIn.email });
+        const target = `/auth/register?${params.toString()}` as Href;
+        if (pathname === '/auth/register') router.replace(target);
+        else router.push(target);
         return;
       }
       // M209: a brand-new account owes the intro film once; marked BEFORE the session is announced.

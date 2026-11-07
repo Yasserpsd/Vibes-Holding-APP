@@ -107,7 +107,15 @@ const phoneStepSchema = z.object({ stepToken: pendingTokenSchema, code: codeSche
 const phoneResendSchema = z.object({ stepToken: pendingTokenSchema, via: z.enum(['whatsapp', 'email']).default('whatsapp') });
 const phoneStartSchema = z.object({ phone: z.string().trim().min(5).max(40), country: z.string().trim().toLowerCase().max(5).default('sa') });
 const phoneProofConfirmSchema = z.object({ stepToken: pendingTokenSchema, code: codeSchema });
-const socialCompleteSchema = z.object({ signupToken: pendingTokenSchema, phoneProof: pendingTokenSchema });
+// M212: the sign-up form's own fields come with the proof; the M211 bundle sends none of them.
+const socialCompleteSchema = z.object({
+  signupToken: pendingTokenSchema,
+  phoneProof: pendingTokenSchema,
+  name: z.string().trim().min(2).max(120).optional(),
+  persona: personaSchema.optional(),
+  jobTitle: z.string().trim().max(150).optional(),
+  inviteCode: z.string().trim().max(30).optional(),
+});
 const resetConfirmSchema = z.object({ login: loginFieldSchema, country: countrySchema, code: codeSchema, password: passwordSchema });
 const profileSchema = z
   .object({
@@ -292,7 +300,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('social', 12, request, reply)) return;
       const body = parse(socialCompleteSchema, request.body, reply);
       if (!body) return;
-      const result = await service.completeSocialSignup(body.signupToken, body.phoneProof, request.ip);
+      const { signupToken, phoneProof, ...profile } = body;
+      const result = await service.completeSocialSignup(signupToken, phoneProof, request.ip, profile);
       return { ...result, me: await withEnglish(request, result.me) };
     }),
   );

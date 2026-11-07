@@ -248,8 +248,11 @@ export type TotpStepResult = { pending: false; totp: true; stepToken: string; se
 export type TotpSetupResult = { pending: false; totpSetup: true; setupToken: string; secret: string; uri: string; seconds: number };
 /** M203: the password (or the Google/Apple identity) was right; the session starts after the WhatsApp code. */
 export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: PhoneCodeVia; phone: string; email: string; seconds: number; resendAfter: number };
-/** M211: a first Google/Apple sign-in: no account until the number is proven on WhatsApp. */
-export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number };
+/** M211: a first Google/Apple sign-in: no account until the number is proven on WhatsApp. M212: the provider's name and
+ * e-mail ride along so the sign-up form opens filled. */
+export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number; name: string; email: string };
+/** M212: what the sign-up form adds to a first Google/Apple sign-in (all optional: the M211 bundle sends only the number). */
+export type SocialSignupProfile = { name?: string; persona?: Persona; jobTitle?: string; inviteCode?: string };
 export type MemberLoginResult = LoginResult | TotpStepResult | PhoneStepResult;
 /** What one bundle can do at sign-in (the `x-app-gate` words). */
 export type SignInBundle = { canPhoneCode: boolean; canPhoneFirst?: boolean };
@@ -512,16 +515,22 @@ export class AuthService {
   private async holdSocialSignup(identity: SocialIdentity, lang: AppLang, source: AppSource, bundle: SignInBundle): Promise<PhoneFirstResult> {
     if (!bundle.canPhoneFirst) throw new AuthError('phone_first_reopen', 'أغلق التطبيق وافتحه من جديد لإكمال التسجيل', 403);
     const signupToken = await this.requirePhoneCodes().holdSocialSignup({ identity: { provider: identity.provider, sub: identity.sub, email: identity.email, name: identity.name }, lang, source });
-    return { pending: false, phoneFirst: true, signupToken, seconds: PHONE_PROOF_SECONDS };
+    return { pending: false, phoneFirst: true, signupToken, seconds: PHONE_PROOF_SECONDS, name: identity.name, email: identity.email };
   }
 
-  /** M211: the number is proven, so the account is born now, with that number already marked at the hub. */
-  async completeSocialSignup(signupToken: string, phoneProof: string, ip: string): Promise<SignedInResult> {
+  /**
+   * M211: the number is proven, so the account is born now, with that number already marked at the hub.
+   * M212 (owner, 2026-11-07: «نفس صفحة التسجيل عادي جدا»): the ordinary sign-up form fills the rest (name, category, job,
+   * invite code) in the same breath; an invalid invite code is refused BEFORE the account exists.
+   */
+  async completeSocialSignup(signupToken: string, phoneProof: string, ip: string, profile: SocialSignupProfile = {}): Promise<SignedInResult> {
     const store = this.requirePhoneCodes();
     const held = await store.socialSignup(signupToken);
     if (!held) throw new AuthError('otp_expired', 'انتهت مهلة التسجيل، ابدأ من جديد', 410);
     const proof = await store.proof(phoneProof);
     if (!proof) throw new AuthError('phone_proof_required', 'أكّد رقمك عبر واتساب لإكمال التسجيل', 400);
+    const referral = profile.inviteCode?.trim() && this.deps.invites ? await this.deps.invites.prepare(profile.inviteCode) : '';
+    const representative = referral ? await this.deps.invites?.isRepresentative(referral) : false;
     const uuid = newUuid();
     const result = await this.deps.hub.call('social_login', {
       uuid,
@@ -539,7 +548,23 @@ export class AuthService {
     let contact = requireContact(result);
     await this.gate(uuid, contact);
     const created = result.created === 1 || result.created === '1' || result.created === true;
-    if (created) contact = requireContact(await this.deps.hub.call('profile', { uuid, phone: proof.phone, country: proof.country, phone_verified: 1 }));
+    if (created) {
+      const patch = await this.deps.hub.call('profile', {
+        uuid,
+        phone: proof.phone,
+        country: proof.country,
+        phone_verified: 1,
+        ...(profile.name ? { name: profile.name } : {}),
+        ...(profile.persona ? { persona: profile.persona } : {}),
+        ...(profile.jobTitle ? { job_title: profile.jobTitle } : {}),
+        ...(referral ? { referral, ...(representative ? { referral_kind: 'representative' } : {}) } : {}),
+      });
+      contact = requireContact(patch);
+      if (referral && this.deps.invites) {
+        await this.deps.invites.recordFromRegister(contact, Number(patch.referred_by ?? 0), String(patch.referred_name ?? ''), referral);
+        await this.deps.invites.onVerified(contact);
+      }
+    }
     await store.dropSocialSignup(signupToken);
     await store.dropProof(phoneProof);
     const signed = await this.signIn(uuid, contact);

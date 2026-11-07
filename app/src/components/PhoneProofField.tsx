@@ -20,13 +20,16 @@ type Props = {
   onChange: (state: PhoneProofState) => void;
   /** Paints the number's own error and answers whether a code may leave for it. */
   check: () => boolean;
+  /** M212: the button shows only once the number is complete and right; before that nothing is drawn. */
+  ready: boolean;
 };
 
 /**
  * M211 (owner, 2026-11-07: «لما ادخل رقمي يظهرلي تأكيد ويوصلني وااكد من نفس الصفحة»): the number is confirmed on the page
  * that asks for it, before any account exists. The parent locks the number while a code is live or once it is proven.
+ * M212 (owner, 2026-11-07: «تظهر فقط لما اكتب الرقم صحيح… بمجرد ما اكتب آخر رقم تظهر»): the button is hidden until then.
  */
-export function PhoneProofField({ phone, country, state, onChange, check }: Props) {
+export function PhoneProofField({ phone, country, state, onChange, check, ready }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +71,8 @@ export function PhoneProofField({ phone, country, state, onChange, check }: Prop
       />
     );
   }
+
+  if (!ready) return null;
 
   return (
     <View style={styles.wrap}>

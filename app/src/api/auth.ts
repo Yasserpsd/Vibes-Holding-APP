@@ -135,8 +135,11 @@ export type TotpStepResult = { pending: false; totp: true; stepToken: string; se
 /** M203: the password (or the Apple/Google identity) was right; the session starts after the WhatsApp code. */
 export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: 'whatsapp' | 'email'; phone: string; email: string; seconds: number; resendAfter: number };
 export type LoginResult = PendingResult | SignedInResult | TotpStepResult | PhoneStepResult;
-/** M211: a first Google/Apple sign-in: the account is created once the number is proven. */
-export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number };
+/** M211: a first Google/Apple sign-in: the account is created once the number is proven. M212: the provider's name and
+ * e-mail fill the sign-up form. */
+export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number; name: string; email: string };
+/** M212: the sign-up form's own fields, sent with the proof of a first Google/Apple sign-in. */
+export type SocialSignupProfile = { name: string; persona: Persona; jobTitle: string; inviteCode?: string };
 
 /** The code screen of a sign-in that stopped at the WhatsApp code (login and the Apple/Google buttons). */
 export function phoneStepPath(step: PhoneStepResult): string {
@@ -193,7 +196,8 @@ export const authApi = {
   // M211: the number is proven on the form itself; nothing exists at the hub until the sign-up is sent.
   phoneProofStart: (phone: string, country: string) => apiRequest<PhoneStepResult>('POST', '/api/auth/phone-proof/start', { body: { phone, country }, token: null }),
   phoneProofConfirm: (stepToken: string, code: string) => apiRequest<{ proof: string; seconds: number }>('POST', '/api/auth/phone-proof/confirm', { body: { stepToken, code }, token: null }),
-  socialComplete: (signupToken: string, phoneProof: string) => apiRequest<SignedInResult>('POST', '/api/auth/social/complete', { body: { signupToken, phoneProof }, token: null }),
+  socialComplete: (signupToken: string, phoneProof: string, profile: SocialSignupProfile) =>
+    apiRequest<SignedInResult>('POST', '/api/auth/social/complete', { body: { signupToken, phoneProof, ...profile }, token: null }),
   resend: (pendingToken: string) => apiRequest<{ mailSent: boolean; text: string }>('POST', '/api/auth/resend', { body: { pendingToken }, token: null }),
   verify: (pendingToken: string, code: string) => apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
   // M140: the authenticator code (or a backup code) that ends a sign-in answered with `totp: true`.

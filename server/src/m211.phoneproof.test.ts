@@ -168,18 +168,25 @@ test('m211: a first Google sign-in creates nothing until its number is proven', 
   assert.equal(first.statusCode, 200, first.body);
   assert.equal(first.json().phoneFirst, true);
   assert.equal(first.json().token, undefined);
+  // M212: the sign-up form opens with the provider's name and e-mail.
+  assert.equal(first.json().email, email);
+  assert.ok(first.json().name);
 
   const noProof = await call('/api/auth/social/complete', { signupToken: first.json().signupToken, phoneProof: 'x'.repeat(40) });
   assert.equal(noProof.json().error.code, 'phone_proof_required');
 
   const phone = nextPhone();
   const phoneProof = await prove(phone);
-  const done = await call('/api/auth/social/complete', { signupToken: first.json().signupToken, phoneProof });
+  // M212: the form's own fields come with the proof and land on the new account.
+  const done = await call('/api/auth/social/complete', { signupToken: first.json().signupToken, phoneProof, name: 'سعود الحربي', persona: 'investor', jobTitle: 'مدير استثمار' });
   assert.equal(done.statusCode, 200, done.body);
   assert.ok(done.json().token);
   assert.equal(done.json().created, true);
   assert.equal(done.json().me.phoneVerified, true);
   assert.ok(String(done.json().me.phone).endsWith(phone));
+  assert.equal(done.json().me.name, 'سعود الحربي');
+  assert.equal(done.json().me.persona, 'investor');
+  assert.equal(done.json().me.jobTitle, 'مدير استثمار');
 
   // The account now exists: the next Google sign-in is an ordinary one, with the WhatsApp code of every sign-in.
   const next = await call('/api/auth/social', { provider: 'google', token: googleToken(email) });

@@ -198,7 +198,6 @@ export default function RootLayout() {
                 <Stack.Screen name="auth/register" options={{ ...detailHeader(), title: t('nav.register') }} />
                 <Stack.Screen name="auth/verify" options={{ ...detailHeader(), title: t('nav.verify') }} />
                 <Stack.Screen name="auth/phone" options={{ ...detailHeader(), title: t('phoneCode.title') }} />
-                <Stack.Screen name="auth/social-phone" options={{ ...detailHeader(), title: t('phoneCode.title') }} />
                 <Stack.Screen name="phone-confirm" options={{ ...detailHeader(), title: t('phoneCode.title') }} />
                 <Stack.Screen name="auth/reset" options={{ ...detailHeader(), title: t('nav.reset') }} />
                   </Stack>

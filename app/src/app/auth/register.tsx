@@ -51,15 +51,29 @@ const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'person
  * the number on WhatsApp; bio, interests, member type and company are asked later in the profile.
  * M211 (owner, 2026-11-07): the number is confirmed right here, before the account exists, and the form does not go
  * through without it.
+ * M212 (owner, 2026-11-07: Â«ÙÙØ³ ØµÙØ­Ø© Ø§ÙØªØ³Ø¬ÙÙ Ø¹Ø§Ø¯Ù Ø¬Ø¯Ø§â¦ Ø¨Ø³ ÙÙØ§ ÙÙÙÙ ÙÙ Ø¨ÙØªÙÙ ÙØ£ÙØ¯ Ø±ÙÙ ÙØ§ØªØ³ Ø§Ø¨Â»): a first Google/Apple
+ * sign-in lands on this same form (name and e-mail filled by the provider, no password), and the WhatsApp button
+ * appears only once the number is complete and right.
  */
 export default function RegisterScreen() {
   const router = useRouter();
   // M128: arriving from a failed sign-in with no account behind it — say so, plainly.
   // M203: an invite link fills the code and shows the field; otherwise it waits behind a small button.
-  const { fromLogin, invite } = useLocalSearchParams<{ fromLogin?: string; invite?: string }>();
+  const { fromLogin, invite, signupToken, provider, name: socialName, email: socialEmail } = useLocalSearchParams<{
+    fromLogin?: string;
+    invite?: string;
+    signupToken?: string;
+    provider?: string;
+    name?: string;
+    email?: string;
+  }>();
+  // M212: the first Google/Apple sign-in that brought the member here; its identity waits on the server for half an hour.
+  const social = signupToken
+    ? { token: signupToken, provider: provider === 'apple' ? ('apple' as const) : ('google' as const), label: provider === 'apple' ? 'Apple' : 'Google' }
+    : null;
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
   const scrollRef = useRef<ScrollView | null>(null);
-  const [form, setForm] = useState<Form>({ ...EMPTY, inviteCode: invite?.trim().slice(0, 30) ?? '' });
+  const [form, setForm] = useState<Form>({ ...EMPTY, name: socialName?.trim() ?? '', email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' });
   const [showInvite, setShowInvite] = useState(Boolean(invite?.trim()));
   const errors = useFormErrors<Field>(scrollRef);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -73,6 +87,8 @@ export default function RegisterScreen() {
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
   /** The verdict on one field of a draft — null when it is fine. */
   const issueOf = (key: Field, draft: Form): string | null => {
+    // M212: the provider vouches for the e-mail and there is no password to set.
+    if (social && (key === 'email' || key === 'password')) return null;
     switch (key) {
       // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
       case 'name':
@@ -113,9 +129,10 @@ export default function RegisterScreen() {
       const message = issueOf(key, form);
       if (message) next[key] = message;
     }
-    if (config?.phoneProofRequired && proof?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
+    if ((config?.phoneProofRequired || social) && proof?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
     return next;
   };
+  const phoneReady = issueOf('phone', form) === null;
 
   const submit = async () => {
     if (busy) return;
@@ -123,6 +140,24 @@ export default function RegisterScreen() {
     if (errors.fail(validate(), ORDER) || !form.persona) return;
     setBusy(true);
     try {
+      // M212: the account of a first Google/Apple sign-in is born here, with the form's fields and the proven number.
+      if (social) {
+        if (proof?.kind !== 'done') return;
+        const result = await authApi.socialComplete(social.token, proof.token, {
+          name: form.name.trim(),
+          persona: form.persona,
+          jobTitle: form.jobTitle.trim(),
+          inviteCode: form.inviteCode.trim() || undefined,
+        });
+        if (result.created) markIntroDue();
+        await signIn(result.token, result.me);
+        if (result.created) trackRegistration(social.provider);
+        void queryClient.invalidateQueries({ queryKey: ['news'] });
+        void queryClient.invalidateQueries({ queryKey: ['interests'] });
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/membership');
+        return;
+      }
       const result = await authApi.register({
         name: form.name.trim(),
         country: form.country,
@@ -180,15 +215,17 @@ export default function RegisterScreen() {
   }
 
   return (
-    <Screen title={t('auth.register.title')} subtitle={t('auth.register.subtitle')} scrollRef={scrollRef}>
+    <Screen title={t('auth.register.title')} subtitle={social ? t('auth.register.socialSubtitle') : t('auth.register.subtitle')} scrollRef={scrollRef}>
       {fromLogin ? (
         <FadeInView delay={entranceDelay(0)}>
           <Notice tone="warning" text={t('auth.register.fromLogin')} />
         </FadeInView>
       ) : null}
-      <FadeInView delay={entranceDelay(0)}>
-        <SocialButtons onError={setSubmitError} />
-      </FadeInView>
+      {social ? null : (
+        <FadeInView delay={entranceDelay(0)}>
+          <SocialButtons onError={setSubmitError} />
+        </FadeInView>
+      )}
       <FadeInView delay={entranceDelay(1)}>
         {/* Owner (2026-11-06): the white form of the profile gate is the one look for sign-up too. */}
         <FormCard tone="light">
@@ -223,11 +260,12 @@ export default function RegisterScreen() {
             anchorRef={errors.anchor('phone')}
             onBlur={blur('phone')}
           />
-          {config.phoneProofRequired ? (
+          {config.phoneProofRequired || social ? (
             <PhoneProofField
               phone={form.phone}
               country={form.country}
               state={proof}
+              ready={phoneReady}
               onChange={(next) => {
                 setProof(next);
                 if (next) errors.clear('phone');
@@ -247,11 +285,14 @@ export default function RegisterScreen() {
             autoCorrect={false}
             textContentType="emailAddress"
             value={form.email}
+            editable={!social}
+            hint={social ? t('auth.register.socialEmailHint', { provider: social.label }) : undefined}
             onChangeText={set('email')}
             error={errors.errors.email}
             anchorRef={errors.anchor('email')}
             onBlur={blur('email')}
           />
+          {social ? null : (
           <FormField
             label={t('common.password')}
             latin
@@ -266,6 +307,7 @@ export default function RegisterScreen() {
             anchorRef={errors.anchor('password')}
             onBlur={blur('password')}
           />
+          )}
 
           <FieldGroup label={t('auth.register.persona')} error={errors.errors.persona} anchorRef={errors.anchor('persona')}>
             <ChipRow>
