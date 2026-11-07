@@ -13,6 +13,42 @@ const GENERIC_LOCAL = /^\d{5,12}$/;
 /** Loose client-side pattern sent to the app for countries without a strict rule. */
 export const GENERIC_PATTERN = '^0*\\d{5,12}$';
 
+/** Countries whose national number really starts with 0, so the digit after the dial code is never a slip. */
+const KEEPS_ZERO = new Set(['39', '225', '229', '241', '242']);
+const DIALS = [...new Set(COUNTRY_ROWS.map((country) => country.dial))].sort((a, b) => b.length - a.length);
+
+/** International digits with a stray trunk zero after the dial code («20 0100…» → «20 100…»). */
+export function dropTrunkZero(digits: string): string {
+  const dial = DIALS.find((code) => digits.startsWith(code));
+  if (!dial || KEEPS_ZERO.has(dial) || digits[dial.length] !== '0') return digits;
+  return dial + digits.slice(dial.length).replace(/^0+/, '');
+}
+
+/**
+ * What a member typed → the national digits: Arabic-Indic digits folded, signs and spaces dropped, the dial code and
+ * every stray leading zero gone (owner, 2026-11-07: a zero typed by mistake is cleaned, never rejected). '' when no digit.
+ */
+export function nationalDigits(typed: string, countryCode?: string): string {
+  const raw = typed
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/\D+/g, '');
+  const digits = raw.replace(/^0+/, '');
+  const dial = countryByCode(countryCode)?.dial;
+  if (!dial || !digits.startsWith(dial)) return digits;
+  return raw.startsWith('00') || digits.length > dial.length + 7 ? digits.slice(dial.length).replace(/^0+/, '') : digits;
+}
+
+/** The two countries the hub keeps as 05…; every other strict rule there refuses a leading zero. */
+const ZERO_FIRST = new Set(['sa', 'ae']);
+
+/** The number as the hub takes it: clean national digits, with the one leading zero of the 05… countries; as typed when it holds no digit, so the hub answers. */
+export function hubNumber(typed: string, countryCode?: string): string {
+  const digits = nationalDigits(typed, countryCode);
+  if (!digits) return typed;
+  return ZERO_FIRST.has((countryCode ?? 'sa').toLowerCase()) ? `0${digits}` : digits;
+}
+
 export const PHONE_POLICY_TEXT = 'التسجيل متاح من أي دولة في العالم. اختر دولتك من القائمة واكتب رقم الجوال بدون مسافات وبدون رمز الدولة وبدون الصفر الأول — في السعودية مثلًا: 512345678.';
 export const EMAIL_POLICY_TEXT = 'نقبل التسجيل بأي بريد إلكتروني صحيح، شخصي أو بريد عمل — يصلك عليه رمز التفعيل';
 
@@ -24,16 +60,10 @@ export function countryByCode(code: string | undefined): Country | undefined {
 export function phoneIntl(countryCode: string | undefined, local: string): string {
   const country = countryByCode(countryCode);
   if (!country) return '';
-  let digits = local.replace(/\D+/g, '');
-  if (digits.startsWith(`00${country.dial}`)) digits = digits.slice(2 + country.dial.length);
-  else if (digits.startsWith(country.dial) && digits.length > country.dial.length + 7) digits = digits.slice(country.dial.length);
-  if (country.local) {
-    if (!country.local.test(digits)) return '';
-    return country.dial + digits.replace(/^0+/, '');
-  }
-  const generic = digits.replace(/^0+/, '');
-  if (!GENERIC_LOCAL.test(generic) || (country.dial + generic).length > 15) return '';
-  return country.dial + generic;
+  const digits = nationalDigits(local, countryCode);
+  if (country.local) return country.local.test(digits) ? country.dial + digits : '';
+  if (!GENERIC_LOCAL.test(digits) || (country.dial + digits).length > 15) return '';
+  return country.dial + digits;
 }
 
 /** Display form: Saudi numbers as 05XXXXXXXX; other countries as plain digits. */
@@ -53,7 +83,7 @@ export function normPhone(input: string): string {
   if (digits.startsWith('00')) digits = digits.slice(2);
   if (digits.length === 10 && digits.startsWith('0')) digits = `966${digits.slice(1)}`;
   else if (digits.length === 9 && digits.startsWith('5')) digits = `966${digits}`;
-  return digits;
+  return dropTrunkZero(digits);
 }
 
 /**

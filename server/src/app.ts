@@ -519,7 +519,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
   // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,
   // the project brief, the websites' feed and the hub hand-over of published posts.
-  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp });
+  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier });
   const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
   const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
   // M170 «مشروع اليوم»: one AI-chosen project a day to every device, at/after 12:00 Riyadh; the tick retries until it goes out.

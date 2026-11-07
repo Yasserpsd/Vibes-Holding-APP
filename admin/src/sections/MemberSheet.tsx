@@ -51,9 +51,9 @@ function summary(draft: Draft, name: string): string {
     case 'pb':
       return draft.amount > 0 ? `يزيد رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(draft.amount, 'مشروعين')}.` : `ينقص رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(-draft.amount, 'مشروعين')}.`;
     case 'honorary':
-      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
+      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق، ويصل الإدارة بريد بالإجراء. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
     case 'unhonorary':
-      return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures.`;
+      return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ويصل الإدارة بريد بالإجراء.`;
     case 'publisher':
       return `سيصبح «${name}» موديريتور: يدخل اللوحة وينشر «رسائل الإدارة» فقط، بلا أي تحكم آخر.`;
     case 'unpublisher':
@@ -76,7 +76,8 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
   const [amount, setAmount] = useState(days ? '365' : kind === 'pb' ? '1' : '');
   // A phone's numeric keypad has no minus key: taking «رصيد» away is a choice, not a typed sign.
   const [direction, setDirection] = useState<'add' | 'cut'>('add');
-  const [note, setNote] = useState('');
+  // M215: the honorary actions come with their note written; it stays editable. The same sentences live in server dashboard/service.ts.
+  const [note, setNote] = useState(kind === 'honorary' ? 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures' : kind === 'unhonorary' ? 'سحب العضوية الشرفية' : '');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

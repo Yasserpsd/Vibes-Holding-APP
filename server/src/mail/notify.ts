@@ -513,6 +513,19 @@ export class Notifier {
     );
   }
 
+  /** M215 (owner, 2026-11-07): the management hears of every honorary membership given or taken back. */
+  honoraryChanged(record: { on: boolean; name: string; phone: string; email: string; contactId: number; by: string; note: string }): void {
+    const action = record.on ? 'منح العضوية الشرفية' : 'سحب العضوية الشرفية';
+    this.dispatch(`${action}: ${record.name || record.email}`, [
+      record.on ? 'مُنح هذا العضو العضوية الشرفية من لوحة التحكم.' : 'سُحبت العضوية الشرفية من هذا العضو من لوحة التحكم.',
+      '',
+      ...personLines(record),
+      `رقم الحساب: ${record.contactId}`,
+      `نفّذ الإجراء: ${record.by || '—'}`,
+      `الملاحظة: ${record.note}`,
+    ]);
+  }
+
   /** M8: the web deletion page (legal/) — the deletion itself stays a verified manual step, never automatic. */
   accountDeletionRequested(request: { email: string; name: string; phone: string; note: string; ip: string }): void {
     this.dispatch(`طلب حذف حساب من صفحة الويب: ${request.email}`, [

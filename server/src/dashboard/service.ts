@@ -7,6 +7,7 @@ import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
+import type { Notifier } from '../mail/notify.js';
 import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
 import type { MembershipService } from '../membership/service.js';
 import type { PaymentStats, PaymentsService } from '../payments/service.js';
@@ -32,6 +33,9 @@ const HUB_V2 = [2, 7, 0];
 const PB_V2 = [39, 0];
 const UPGRADE_HUB = 'حدّث إضافة الهب إلى 2.7.0';
 const UPGRADE_HUB_HONORARY = 'العضوية الشرفية تحتاج تحديث إضافة الهب إلى 2.28.0 أو أحدث';
+// M215: the same two sentences prefill the note in admin/src/sections/MemberSheet.tsx.
+const HONORARY_NOTE_GRANT = 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures';
+const HONORARY_NOTE_REVOKE = 'سحب العضوية الشرفية';
 
 export type SectionError = { code: string; message: string };
 export type BridgeInfo = { hub: { version: string | null; ok: boolean }; pb: { version: string | null; ok: boolean } };
@@ -96,7 +100,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -427,10 +431,12 @@ export class DashboardService {
    * of a revoke on WhatsApp (the same words by e-mail when WhatsApp cannot carry them) and in the app.
    */
   honorary(admin: AdminActor, contactId: number, input: { on: boolean; note: string; requestId: string | null }) {
-    return this.write(admin, 'honorary', contactId, { params: { on: input.on }, note: input.note, requestId: input.requestId }, async () => {
+    // M215: the note writes itself; an admin who types one keeps those words.
+    const note = input.note.trim() || (input.on ? HONORARY_NOTE_GRANT : HONORARY_NOTE_REVOKE);
+    return this.write(admin, 'honorary', contactId, { params: { on: input.on }, note, requestId: input.requestId }, async () => {
       let result: HubResults['admin_grant'];
       try {
-        result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: input.on ? 'honorary' : 'honorary_revoke', days: 0, note: input.note }, false);
+        result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: input.on ? 'honorary' : 'honorary_revoke', days: 0, note }, false);
       } catch (error) {
         if (error instanceof HubError && error.code === 'invalid' && (await this.hubBefore(HUB_HONORARY_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_HONORARY, 501);
         throw error;
@@ -445,6 +451,7 @@ export class DashboardService {
       const email = String(contact.contact_email ?? '').trim() || contact.email;
       void this.deps.whatsapp?.sendHonorary({ phone: contact.phone, lang: contact.lang, name: contact.name, email, ref: `honorary:${contactId}:${event.id}` }, !input.on);
       this.deps.push.honoraryChanged(contactId, input.on);
+      this.deps.notifier?.honoraryChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
       return { ok: true as const, contact: result.contact, event: result.event };
     });
   }

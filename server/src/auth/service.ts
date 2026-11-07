@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
-import { COUNTRIES, normLogin } from '../hub/phone.js';
+import { COUNTRIES, hubNumber, nationalDigits, normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { isHonorary } from '../membership/honorary.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
@@ -349,7 +349,7 @@ export class AuthService {
     // M211 (owner, 2026-11-07: «ما يمشي التسجيل بدون تأكيد رقم واتس اب»): a bundle that draws the confirm button must bring
     // the proof of THIS number. An older bundle cannot; the hub then opens the account with a WhatsApp code only (2.29.0).
     const proof = input.phoneProof ? ((await this.deps.phoneCodes?.proof(input.phoneProof)) ?? null) : null;
-    const proven = Boolean(proof && proof.country === input.country && proof.phone === plainNumber(input.phone));
+    const proven = Boolean(proof && proof.country === input.country && proof.phone === plainNumber(input.phone, input.country));
     if (this.phoneProofRequired && bundle.canPhoneFirst && !proven) {
       throw new AuthError('phone_proof_required', 'أكّد رقمك عبر واتساب لإكمال التسجيل', 400);
     }
@@ -371,7 +371,7 @@ export class AuthService {
       member_type: input.memberType,
       company_name: input.memberType === 'company' ? (input.companyName ?? '') : '',
       country: input.country,
-      phone: input.phone,
+      phone: hubNumber(input.phone, input.country),
       email: input.email,
       password: input.password,
       persona: input.persona,
@@ -879,7 +879,7 @@ export class AuthService {
     // M147: phone + interests from the completion gate (the hub validates the phone against the country).
     if (patch.memberType !== undefined) body.member_type = patch.memberType;
     if (patch.phone !== undefined) {
-      body.phone = patch.phone;
+      body.phone = hubNumber(patch.phone, patch.country ?? 'sa');
       body.country = patch.country ?? 'sa';
     }
     if (patch.interests !== undefined) {
@@ -1034,8 +1034,8 @@ export class AuthService {
   async startPhoneProof(phone: string, country: string, lang: AppLang): Promise<PhoneStepResult> {
     if (!this.phoneProofRequired) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
     const store = this.requirePhoneCodes();
-    const digits = plainNumber(phone);
-    const known = await this.deps.hub.call('phone_check', { phone: digits, country }).catch((error: unknown) => {
+    const digits = plainNumber(phone, country);
+    const known =await this.deps.hub.call('phone_check', { phone: digits, country }).catch((error: unknown) => {
       if (error instanceof HubError && error.code === 'hub_not_supported') return null;
       throw error;
     });
@@ -1176,7 +1176,8 @@ export class AuthService {
   }
 
   /** The completion gate and the profile editor: a number is saved only after its code. */
-  async startPhoneChange(session: SessionRecord, phone: string, country: string, source?: AppSource, lang: AppLang = 'ar'): Promise<PhoneStepResult | { saved: true; me: Me }> {
+  async startPhoneChange(session: SessionRecord, typed: string, country: string, source?: AppSource, lang: AppLang = 'ar'): Promise<PhoneStepResult | { saved: true; me: Me }> {
+    const phone = hubNumber(typed, country);
     const contact = await this.contact(session);
     // Switch off, an older hub or a store reviewer: the number is saved as it always was.
     if (!this.phoneCodeOn || contact.phone_verified === undefined || this.phoneCodeExempt(contact)) {
@@ -1282,9 +1283,9 @@ function newUuid(): string {
   return `app-${randomUUID()}`;
 }
 
-/** M211: a number as the form holds it: digits, no leading zero. */
-function plainNumber(phone: string): string {
-  return phone.replace(/D+/g, '').replace(/^0+/, '');
+/** M211: a number as the form holds it: national digits, no stray zero; left as typed when it holds no digit, so the hub answers. */
+function plainNumber(phone: string, country: string | undefined): string {
+  return nationalDigits(phone, country) || phone;
 }
 
 function requireContact(result: HubResponse): HubContact {
