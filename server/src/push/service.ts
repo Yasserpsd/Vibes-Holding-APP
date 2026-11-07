@@ -495,7 +495,7 @@ export class PushService {
           : { title: 'Your Honorary Membership has ended', body: 'Honorary Membership is reserved for official partners under the articles of association of the Vibes Ventures companies. Any active annual membership you hold is not affected.', data };
       }
       return on
-        ? { title: 'مُنحتم العضوية الشرفية', body: 'يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، وهي مفتوحة المدة.', data }
+        ? { title: 'مُنحتم العضوية الشرفية', body: 'يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، وهي مفتوحة.', data }
         : { title: 'انتهت العضوية الشرفية', body: 'العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ولا يؤثر انتهاؤها في أي عضوية سنوية سارية لديكم.', data };
     });
   }

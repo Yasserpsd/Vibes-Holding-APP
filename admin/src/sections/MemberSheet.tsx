@@ -51,7 +51,7 @@ function summary(draft: Draft, name: string): string {
     case 'pb':
       return draft.amount > 0 ? `يزيد رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(draft.amount, 'مشروعين')}.` : `ينقص رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(-draft.amount, 'مشروعين')}.`;
     case 'honorary':
-      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة المدة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
+      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
     case 'unhonorary':
       return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures.`;
     case 'publisher':
@@ -380,7 +380,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             ))}
           </div>
         ) : null}
-        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة المدة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
+        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
         {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
         {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
         {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}
