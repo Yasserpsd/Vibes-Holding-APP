@@ -26,7 +26,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 1.1.0 (M27 stage 4): the first binary with the native modules added since M1 (secure store, notifications,
   // RevenueCat) and without a forced layout direction; its runtime gets its own updates.
   // 1.2.0 (M151): adds expo-document-picker (the advisor's PDF button); new runtime, new OTA branch.
-  version: '1.3.1',
+  // 1.3.2 (M217): SKAdNetwork ids + AppsFlyer postback copies in Info.plist (iOS-only change).
+  version: '1.3.2',
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -48,6 +49,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       CFBundleAllowMixedLocalizations: true,
       // App Store export compliance: standard HTTPS only, no custom encryption.
       ITSAppUsesNonExemptEncryption: false,
+      // M217: Apple's privacy-safe install signals (SKAN / AdAttributionKit) for the ad networks we buy on, so a
+      // campaign learns from iPhones whose owner declined tracking. Sources (2026-11-08): Google's 3p SKAN list
+      // (Google, Meta = Facebook + Instagram, Pangle = TikTok's network), Snap 424m5254lk (ironSource Snap guide +
+      // Snap postbacks), TikTok's second ByteDance id 238da6jt44. X has no published id (its SKAN data reaches the
+      // MMP by API); LinkedIn runs no app-install ads.
+      SKAdNetworkItems: [
+        'cstr6suwn9', // Google Ads
+        'v9wttpbfk9', // Meta 1/2
+        'n38lu8286q', // Meta 2/2
+        '424m5254lk', // Snap
+        '22mmun2rn5', // TikTok / Pangle
+        '238da6jt44', // TikTok / Pangle (2)
+      ].map((id) => ({ SKAdNetworkIdentifier: `${id}.skadnetwork` })),
+      // Copies of every winning SKAN / AdAttributionKit postback go to AppsFlyer (iOS 15+).
+      NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
+      AdAttributionKit: { AttributionCopyEndpoint: 'https://appsflyer-skadnetwork.com/' },
     },
   },
   android: {
