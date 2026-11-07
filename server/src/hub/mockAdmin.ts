@@ -463,6 +463,19 @@ export class MockAdmin {
     return { ok: true, contact: this.deps.publicContact(contact) };
   }
 
+  /** M216: as the plugin: the row stays, emptied, and nothing personal is left on it. */
+  deleteAccount(body: HubBody): HubResults['admin_delete'] {
+    const admin = this.requireRole(body, ['admin']);
+    const contact = this.target(body);
+    if (contact.name === 'حساب محذوف' && !contact.email) return { ok: true, already: true };
+    if (contact.id === admin.id) throw new HubError('self_delete', 'لا يمكن حذف حسابك من لوحة التحكم', 403);
+    if (contact.role === 'admin') throw new HubError('admin_account', 'لا يمكن حذف حساب مدير', 403);
+    const email = contact.contactEmail || contact.email;
+    Object.assign(contact, { name: 'حساب محذوف', email: '', phone: '', passHash: '', contactEmail: '', isMember: false, memberDays: 0, memberStartedAt: null, honoraryAt: null, verified: false, role: 'member', persona: '' });
+    this.event(contact.id, 'deleted', { source: 'admin', actorId: admin.id, note: str(body, 'note', 300) });
+    return { ok: true, already: false, email, lang: 'ar' };
+  }
+
   changes(body: HubBody): HubResults['changes'] {
     const since = int(body, 'since_id', 0, 0, Number.MAX_SAFE_INTEGER);
     const limit = int(body, 'limit', 30, 1, 100);

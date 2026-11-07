@@ -137,6 +137,15 @@ export class PushService {
     });
   }
 
+  /** M216: a deleted account's devices receive nothing more. */
+  async forgetContact(contactId: number): Promise<void> {
+    await this.mutate((tokens) => {
+      for (let index = tokens.length - 1; index >= 0; index -= 1) {
+        if (tokens[index]?.contactId === contactId) tokens.splice(index, 1);
+      }
+    });
+  }
+
   async tokensFor(contactId: number): Promise<string[]> {
     return (await this.load()).filter((entry) => entry.contactId === contactId).map((entry) => entry.token);
   }

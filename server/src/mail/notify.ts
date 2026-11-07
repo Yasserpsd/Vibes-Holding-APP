@@ -11,6 +11,7 @@ import { royalHtml, royalText, type RoyalMail } from './royal.js';
  */
 const SUBJECT_PREFIX = '[Vibes Ventures]';
 const APP_NAME = 'تطبيق نادي المستثمرين';
+const DASHBOARD_URL = 'https://dashboard.vibesholdingsa.com';
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 const riyadhFormat = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {
@@ -523,6 +524,44 @@ export class Notifier {
       `رقم الحساب: ${record.contactId}`,
       `نفّذ الإجراء: ${record.by || '—'}`,
       `الملاحظة: ${record.note}`,
+    ]);
+  }
+
+  /** M216: the management's copy of a deletion from the dashboard. */
+  accountDeletedByAdmin(record: { name: string; phone: string; email: string; contactId: number; by: string; note: string; told: boolean }): void {
+    this.dispatch(`حذف حساب من لوحة التحكم: ${record.name || record.email}`, [
+      'حُذف هذا الحساب نهائيًا من لوحة التحكم، وأُغلقت جلساته على جميع الأجهزة. الفواتير وسجلات الدفع محفوظة.',
+      '',
+      ...personLines(record),
+      `رقم الحساب: ${record.contactId}`,
+      `نفّذ الإجراء: ${record.by || '—'}`,
+      `السبب: ${record.note}`,
+      `إبلاغ صاحب الحساب بالبريد: ${record.told ? 'نعم' : 'لا'}`,
+    ]);
+  }
+
+  /** M216: one short notice to the owner of a deleted account, when the admin chose to send it. */
+  tellAccountDeleted(to: string, lang: 'ar' | 'en', name: string): void {
+    const ar = lang === 'ar';
+    const mail: RoyalMail = {
+      lang,
+      title: ar ? 'تم حذف حسابك' : 'Your account has been deleted',
+      greeting: ar ? `السلام عليكم ${name}` : `Dear ${name}`,
+      lead: ar
+        ? ['نفيدكم بأن إدارة Investors Club حذفت حسابكم، ولم يعد الدخول إليه متاحًا.', 'إذا كان لديكم اشتراك عبر Apple أو Google فيمكنكم إلغاؤه من إعدادات المتجر، إذ لا يتوقف تلقائيًا بحذف الحساب.']
+        : ['The Investors Club management has deleted your account, and it can no longer be accessed.', 'If you hold a subscription through Apple or Google, you can cancel it from the store settings: deleting the account does not stop it.'],
+    };
+    this.memberMail(to, ar ? 'حذف حسابك في Investors Club' : 'Your Investors Club account has been deleted', mail, 'account deleted notice');
+  }
+
+  /** M216: a member's 30 days ended; the deletion is executed from the member's sheet in the dashboard. */
+  accountDeletionDue(row: { contactId: number; name: string; phone: string; email: string; requestedAt: string }): void {
+    this.dispatch(`حان موعد حذف حساب: ${row.name || row.email}`, [
+      `انتهت مهلة الثلاثين يومًا لطلب حذف الحساب (الطلب بتاريخ ${row.requestedAt.slice(0, 10)}).`,
+      'نفّذوا الحذف من بطاقة العضو في لوحة التحكم:',
+      `${DASHBOARD_URL}/#members@${row.contactId}`,
+      '',
+      ...personLines(row),
     ]);
   }
 

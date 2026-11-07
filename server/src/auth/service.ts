@@ -782,6 +782,12 @@ export class AuthService {
     return this.deps.sessions.getSession(token);
   }
 
+  /** M216: the account was deleted by an admin: no device of his stays signed in, not even for a moment. */
+  async endSessions(contactId: number): Promise<void> {
+    await this.deps.sessions.endAll(contactId);
+    this.forget(contactId);
+  }
+
   /** Drops the cached account of a contact (membership changed outside a session, for example a store purchase). */
   forget(contactId: number): void {
     for (const [uuid, entry] of this.meCache) {

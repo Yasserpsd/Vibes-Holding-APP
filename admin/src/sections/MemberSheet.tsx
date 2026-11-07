@@ -6,9 +6,9 @@ import type { Account, GrantAction, MemberDetail, MemberEvent } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
 import { dailyLeft, memberLeft, personaLabel, StatePill, WaPill } from './Members';
 
-type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary';
+type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'delete';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
-type Draft = { kind: ActionKind; amount: number; note: string; requestId: string };
+type Draft = { kind: ActionKind; amount: number; note: string; requestId: string; tellMember: boolean };
 
 const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: boolean }> = {
   activate: { button: 'تفعيل العضوية', title: 'تفعيل العضوية' },
@@ -18,6 +18,7 @@ const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: bool
   // M205: only for official partners in the founding contract of a Vibes Ventures company — the administration gives it and takes it back, nobody else.
   honorary: { button: 'منح العضوية الشرفية', title: 'منح العضوية الشرفية' },
   unhonorary: { button: 'سحب العضوية الشرفية', title: 'سحب العضوية الشرفية', danger: true },
+  delete: { button: 'حذف الحساب', title: 'حذف الحساب نهائيًا', danger: true },
   publisher: { button: 'ترقية إلى موديريتور', title: 'صلاحية النشر (موديريتور)' },
   unpublisher: { button: 'سحب صلاحية الموديريتور', title: 'سحب صلاحية الموديريتور', danger: true },
 };
@@ -28,7 +29,20 @@ const EVENT_SOURCES: Record<string, string> = { paymob: 'بيموب', store: 'ا
 /** A membership the hub gives no end for: its flag says so, and so does a member with no days-left figure. */
 const openEnded = (account: Account): boolean => account.state === 'member' && (Boolean(account.never_expires) || account.member_left === null);
 
+/** M216: the emptied row the hub keeps after a deletion, so payments still point somewhere. */
+const deletedAccount = (account: Account): boolean => account.name === 'حساب محذوف' && !account.email;
+/** The typed word that unlocks the final button: a deletion cannot be undone. */
+const DELETE_WORD = 'حذف';
+
 function actionsFor(account: Account): ActionKind[] {
+  if (deletedAccount(account)) return [];
+  const list = membershipActions(account);
+  // M216: any account can go, pending or lead too, except a manager's (the server and the hub refuse it as well).
+  if (account.role !== 'admin') list.push('delete');
+  return list;
+}
+
+function membershipActions(account: Account): ActionKind[] {
   // The hub refuses every grant and role change until the e-mail is confirmed: offering one ends in an error and a failed row in the audit log.
   if (account.state === 'lead' || account.state === 'pending') return [];
   // A membership with no end date has nothing to extend: the hub would start a dated period from today and so put an end to it.
@@ -54,6 +68,8 @@ function summary(draft: Draft, name: string): string {
       return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق، ويصل الإدارة بريد بالإجراء. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
     case 'unhonorary':
       return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ويصل الإدارة بريد بالإجراء.`;
+    case 'delete':
+      return `سيُحذف حساب «${name}» نهائيًا الآن: تُمسح بياناته ومحادثاته وعضويته، وتُغلق جلساته على جميع الأجهزة، ويفقد ما فتحه في بنك المشاريع. لا يمكن التراجع عن ذلك، وتبقى الفواتير وسجلات الدفع محفوظة.`;
     case 'publisher':
       return `سيصبح «${name}» موديريتور: يدخل اللوحة وينشر «رسائل الإدارة» فقط، بلا أي تحكم آخر.`;
     case 'unpublisher':
@@ -63,6 +79,7 @@ function summary(draft: Draft, name: string): string {
 
 function run(contactId: number, draft: Draft) {
   const meta = { note: draft.note, requestId: draft.requestId };
+  if (draft.kind === 'delete') return api.deleteAccount(contactId, { tellMember: draft.tellMember, ...meta });
   if (draft.kind === 'pb') return api.pbGrant(contactId, { amount: draft.amount, ...meta });
   if (draft.kind === 'honorary' || draft.kind === 'unhonorary') return api.honorary(contactId, { on: draft.kind === 'honorary', ...meta });
   if (draft.kind === 'publisher' || draft.kind === 'unpublisher') return api.setRole(contactId, { role: draft.kind === 'publisher' ? 'publisher' : 'member', ...meta });
@@ -79,6 +96,9 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
   // M215: the honorary actions come with their note written; it stays editable. The same sentences live in server dashboard/service.ts.
   const [note, setNote] = useState(kind === 'honorary' ? 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures' : kind === 'unhonorary' ? 'سحب العضوية الشرفية' : '');
   const [draft, setDraft] = useState<Draft | null>(null);
+  // M216: an active member is told by default; a spam or test account is not.
+  const [tellMember, setTellMember] = useState(account.state === 'member');
+  const [word, setWord] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = account.name || account.email || `حساب رقم ${account.id}`;
@@ -91,7 +111,8 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
     if (kind === 'pb' && (!Number.isInteger(typed) || typed < 1 || typed > 50)) return setError('اكتب عدد المشاريع من 1 إلى 50.');
     if (note.trim().length < 3) return setError('اكتب ملاحظة توضّح سبب الإجراء: تُحفظ في سجل الإجراءات.');
     setError(null);
-    setDraft({ kind, amount: value, note: note.trim(), requestId: newRequestId() });
+    setWord('');
+    setDraft({ kind, amount: value, note: note.trim(), requestId: newRequestId(), tellMember: kind === 'delete' && tellMember });
   }
 
   async function confirm() {
@@ -100,7 +121,7 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
     setError(null);
     try {
       const result = await run(account.id, draft);
-      onDone(result.already ? 'سبق تنفيذ هذا الإجراء، ولم يتكرر.' : 'تم تنفيذ الإجراء وحُفظ في السجل.');
+      onDone(result.already ? 'سبق تنفيذ هذا الإجراء، ولم يتكرر.' : kind === 'delete' ? 'حُذف الحساب وأُغلقت جلساته، وحُفظ الإجراء في السجل.' : 'تم تنفيذ الإجراء وحُفظ في السجل.');
     } catch (failure) {
       if (sessionOver(failure)) signOut();
       setError(messageOf(failure));
@@ -114,9 +135,19 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
         <h3>تأكيد: {ACTIONS[kind].title}</h3>
         <p>{summary(draft, name)}</p>
         <p className="muted">الملاحظة: {draft.note}</p>
+        {kind === 'delete' ? (
+          <>
+            {account.state === 'member' && !account.honorary ? <p className="warn">هذا العضو له عضوية سارية. الاشتراك عبر Apple أو Google لا يتوقف بالحذف، ويلغيه صاحبه من المتجر، ولا يُرد المبلغ تلقائيًا.</p> : null}
+            <p className="muted">{draft.tellMember ? 'يصل صاحب الحساب إشعار بالبريد.' : 'لن يصل صاحب الحساب أي إشعار.'}</p>
+            <label>
+              اكتب كلمة «{DELETE_WORD}» للتأكيد
+              <input value={word} onChange={(event) => setWord(event.target.value)} autoComplete="off" />
+            </label>
+          </>
+        ) : null}
         {error ? <p className="error" role="alert">{error}</p> : null}
         <div className="actions">
-          <button className={ACTIONS[kind].danger ? 'danger solid' : 'primary'} type="button" disabled={busy} onClick={() => void confirm()}>{busy ? 'جارٍ التنفيذ…' : 'تأكيد التنفيذ'}</button>
+          <button className={ACTIONS[kind].danger ? 'danger solid' : 'primary'} type="button" disabled={busy || (kind === 'delete' && word.trim() !== DELETE_WORD)} onClick={() => void confirm()}>{busy ? 'جارٍ التنفيذ…' : 'تأكيد التنفيذ'}</button>
           <button type="button" disabled={busy} onClick={() => setDraft(null)}>رجوع للتعديل</button>
         </div>
       </div>
@@ -147,8 +178,13 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
       ) : null}
       <label>
         ملاحظة (مطلوبة)
-        <textarea rows={2} maxLength={300} value={note} onChange={(event) => setNote(event.target.value)} placeholder="سبب الإجراء، مثال: دفع بتحويل بنكي" required />
+        <textarea rows={2} maxLength={300} value={note} onChange={(event) => setNote(event.target.value)} placeholder={kind === 'delete' ? 'سبب الحذف، مثال: مخالفة شروط الاستخدام' : 'سبب الإجراء، مثال: دفع بتحويل بنكي'} required />
       </label>
+      {kind === 'delete' ? (
+        <label className="check">
+          <input type="checkbox" checked={tellMember} onChange={(event) => setTellMember(event.target.checked)} /> إبلاغ صاحب الحساب بالبريد
+        </label>
+      ) : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
       <div className="actions">
         <button className="primary" type="submit">متابعة</button>
@@ -353,6 +389,12 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
       <section className="sheet-block">
         <h3>الإجراءات</h3>
         {done ? <Done text={done} /> : null}
+        {detail.deletionRequest ? (
+          <p className="warn">
+            طلب العضو حذف حسابه في {formatDay(detail.deletionRequest.requestedAt.slice(0, 10))}، وموعد الحذف {formatDay(detail.deletionRequest.dueAt.slice(0, 10))}.
+            {detail.deletionRequest.reason ? ` السبب: ${detail.deletionRequest.reason}` : ''}
+          </p>
+        ) : null}
         {open ? (
           <ActionPanel
             key={open}

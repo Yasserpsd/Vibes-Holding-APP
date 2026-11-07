@@ -28,6 +28,8 @@ export type PendingRecord = {
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const PENDING_MINUTES = 30;
 const TOUCH_INTERVAL_MS = 60 * 60_000;
+/** M216: contacts deleted from the dashboard; their sessions end on the spot. Ids never return (the hub keeps the emptied row). */
+const ENDED_CONTACTS_KEY = 'session:endedContacts';
 
 export function newToken(): string {
   return randomBytes(32).toString('base64url');
@@ -43,6 +45,25 @@ export class SessionStore {
     private readonly kv: KV,
     private readonly sessionDays: number,
   ) {}
+
+  private endedContacts: Promise<Set<number>> | null = null;
+  private ended(): Promise<Set<number>> {
+    this.endedContacts ??= this.kv.get<number[]>(ENDED_CONTACTS_KEY).then(
+      (ids) => new Set(ids ?? []),
+      (error: unknown) => {
+        this.endedContacts = null;
+        throw error;
+      },
+    );
+    return this.endedContacts;
+  }
+
+  /** M216: every session of this contact stops working now, on every device. */
+  async endAll(contactId: number): Promise<void> {
+    const ids = await this.ended();
+    ids.add(contactId);
+    await this.kv.set(ENDED_CONTACTS_KEY, [...ids]);
+  }
 
   async createSession(uuid: string, contactId: number, adminVerified = false, totpVerified = false, remember = false): Promise<string> {
     const token = newToken();
@@ -66,7 +87,7 @@ export class SessionStore {
     const key = keyFor('session', token);
     const record = await this.kv.get<SessionRecord>(key);
     if (!record) return null;
-    if (Date.parse(record.expiresAt) <= Date.now()) {
+    if (Date.parse(record.expiresAt) <= Date.now() || (await this.ended()).has(record.contactId)) {
       await this.kv.delete(key);
       return null;
     }

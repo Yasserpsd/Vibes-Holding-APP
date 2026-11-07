@@ -223,6 +223,8 @@ export type MemberDetail = {
   events: MemberEvent[];
   pb: PbBalance | null;
   pbError: SectionError | null;
+  /** M216: the member's own 30-day deletion request, executed from this sheet. Absent on an older server. */
+  deletionRequest?: { requestedAt: string; dueAt: string; reason: string } | null;
   /** M116: the member's interests as ready Arabic labels. */
   interests?: string[];
   /** M204: an admin vouched for this account's number (it signs in without the WhatsApp code). Absent on an older server. */
@@ -312,7 +314,7 @@ export type NewsSourceRow = {
 };
 export type NewsSourcesResult = { sources: NewsSourceRow[]; updatedAt: string | null; lastError: string | null; running: boolean; visibleByLang: { ar: number; en: number }; classifier: string };
 
-export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary';
+export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'delete';
 export type AuditEntry = {
   id: string;
   at: string;

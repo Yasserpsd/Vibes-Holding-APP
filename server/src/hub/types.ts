@@ -113,6 +113,7 @@ export type HubOp =
   | 'admin_mail'
   | 'admin_grant'
   | 'admin_set_role'
+  | 'admin_delete'
   | 'changes'
   | 'publish'
   | 'send_mail'
@@ -364,6 +365,8 @@ export type HubResults = {
   payment_get: { ok: true; payment: HubPayment & { lang?: string } };
   admin_grant: { ok: true; contact: HubContact; event: HubEvent };
   admin_set_role: { ok: true; contact: HubContact };
+  /** M216 (hub 2.30.0): `email` + `lang` are read before the wipe, for the notice to the member; absent when `already`. */
+  admin_delete: { ok: true; already: boolean; email?: string; lang?: string };
   activate_member: { ok: true; contact: HubContact; already: boolean };
   member_status: { ok: true; found?: boolean; is_member?: 0 | 1; source?: string; contact?: HubContact | null };
   changes: { ok: true; cursor: number; items: HubChange[] };

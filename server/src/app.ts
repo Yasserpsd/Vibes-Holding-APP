@@ -519,7 +519,9 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const appScheme = config.APP_ENV === 'production' ? 'investorsclub' : 'investorsclub-preview';
   // Bridge v2 (docs/BRIDGE_V2.md 4): the dashboard over the hub's admin ops, the members' Projects Bank «رصيد»,
   // the project brief, the websites' feed and the hub hand-over of published posts.
-  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier });
+  // M117: the three-step, 30-day account deletion; the due-day sweep (below) mails the management to execute.
+  const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
+  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier, deletion });
   const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
   const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
   // M170 «مشروع اليوم»: one AI-chosen project a day to every device, at/after 12:00 Riyadh; the tick retries until it goes out.
@@ -607,8 +609,6 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
   registerProfileGate(app, auth);
 
-  // M117: the three-step, 30-day account deletion; the due-day sweep (below) mails the management to execute.
-  const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   // M109d: the dashboard-reviewed persona requests once the yearly change is used up.
   const personaRequests = new PersonaRequestsService(kv);
   // M138 «متابعة طلباتي»: one timeline over every store, and the ledger of service requests + golden interests.
@@ -627,13 +627,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const deletionSweep = async (): Promise<void> => {
     for (const row of await deletion.due()) {
-      notifier.accountDeletionRequested({
-        email: row.email,
-        name: row.name,
-        phone: row.phone,
-        note: `انتهت مهلة الثلاثين يومًا (طلب ${row.requestedAt.slice(0, 10)}) — نفّذوا حذف الحساب من لوحة vcmem الآن.`,
-        ip: 'scheduler',
-      });
+      notifier.accountDeletionDue(row);
       await deletion.markReminded(row.contactId);
     }
   };

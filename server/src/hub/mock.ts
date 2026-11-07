@@ -138,6 +138,8 @@ export class MockHubClient implements HubClient {
         return answer(this.admin.grant(body));
       case 'admin_set_role':
         return answer(this.admin.setRole(body));
+      case 'admin_delete':
+        return answer(this.admin.deleteAccount(body));
       case 'changes':
         return answer(this.admin.changes(body));
       case 'publish':

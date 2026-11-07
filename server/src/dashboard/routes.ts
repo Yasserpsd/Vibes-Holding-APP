@@ -40,6 +40,8 @@ const grantSchema = z
 const roleSchema = z.object({ role: z.enum(['member', 'publisher']), note, confirm, requestId });
 // M205 «عضوية شرفية»: on = give, off = take back. No days: it has no duration.
 const honorarySchema = z.strictObject({ on: z.boolean(), note, confirm, requestId });
+// M216 «حذف فوري للحساب»: the reason is required; it stays in the audit log and reaches the management.
+const deleteSchema = z.strictObject({ note: z.string().trim().min(3, 'اكتب سبب الحذف').max(300), tellMember: z.boolean().default(false), confirm, requestId });
 const pbGrantSchema = z.object({ amount: z.number().int().min(-50).max(50).refine((value) => value !== 0, 'اكتب عدد المشاريع المضافة أو المخصومة'), note, confirm, requestId });
 // M204: «تأكيد الرقم يدويًا» for a member the WhatsApp code cannot reach (he wrote to the support line).
 const phoneWaiverSchema = z.object({ on: z.boolean(), confirm });
@@ -243,6 +245,19 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       const body = parse(honorarySchema, request.body, reply);
       if (!body) return;
       return service.honorary(admin, params.id, { on: body.on, note: body.note, requestId: body.requestId ?? null });
+    }),
+  );
+
+  app.post(
+    '/api/admin/accounts/:id/delete',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(deleteSchema, request.body, reply);
+      if (!body) return;
+      return service.deleteAccount(admin, params.id, { note: body.note, tellMember: body.tellMember, requestId: body.requestId ?? null });
     }),
   );
 

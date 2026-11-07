@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { FastifyBaseLogger } from 'fastify';
 
+import type { AccountDeletionStore } from '../auth/deletion.js';
 import { RequestError } from '../auth/guard.js';
 import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me } from '../auth/service.js';
@@ -32,6 +33,8 @@ const BRIDGE_RETRY_MS = 60_000;
 const HUB_V2 = [2, 7, 0];
 const PB_V2 = [39, 0];
 const UPGRADE_HUB = 'حدّث إضافة الهب إلى 2.7.0';
+const HUB_DELETE_VERSION = [2, 30, 0];
+const UPGRADE_HUB_DELETE = 'حذف الحساب يحتاج تحديث إضافة الهب إلى 2.30.0 أو أحدث';
 const UPGRADE_HUB_HONORARY = 'العضوية الشرفية تحتاج تحديث إضافة الهب إلى 2.28.0 أو أحدث';
 // M215: the same two sentences prefill the note in admin/src/sections/MemberSheet.tsx.
 const HONORARY_NOTE_GRANT = 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures';
@@ -45,7 +48,7 @@ export type AuditEntry = {
   id: string;
   at: string;
   actor: { id: number; name: string; email: string };
-  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary';
+  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'delete';
   contactId: number;
   params: Record<string, unknown>;
   note: string;
@@ -100,7 +103,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -253,7 +256,7 @@ export class DashboardService {
     return { ...result, items: result.items.map((account) => ({ ...account, pb: beside(account) })), pbError };
   }
 
-  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null }> {
+  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null; deletionRequest: { requestedAt: string; dueAt: string; reason: string } | null }> {
     const result = await this.hub(admin, 'admin_member', { contact_id: contactId });
     let pb: PbBalance | null = null;
     let pbError: SectionError | null = null;
@@ -265,7 +268,9 @@ export class DashboardService {
         pbError = sectionError(error);
       }
     }
-    return { ...result, pb, pbError };
+    // M216: the member's own 30-day request shows on the sheet, where the deletion is executed.
+    const scheduled = await this.deps.deletion?.scheduledOf(contactId);
+    return { ...result, pb, pbError, deletionRequest: scheduled ? { requestedAt: scheduled.requestedAt, dueAt: scheduled.dueAt, reason: scheduled.reason } : null };
   }
 
   /**
@@ -453,6 +458,38 @@ export class DashboardService {
       this.deps.push.honoraryChanged(contactId, input.on);
       this.deps.notifier?.honoraryChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
       return { ok: true as const, contact: result.contact, event: result.event };
+    });
+  }
+
+  /**
+   * M216 «حذف فوري للحساب» (owner, 2026-11-07): an admin session, `confirm: true`, a reason and one audit entry; the hub
+   * wipes the account (`admin_delete`, 2.30.0) and its row stays emptied, so payments and invoices keep pointing at it.
+   * Every session and push token of the account ends here, and his 30-day request, if any, is closed. An admin account
+   * and the actor's own are refused here and again on the hub. A store subscription lives at Apple or Google: the
+   * dashboard says so before the confirm, and the hub refuses a later renewal on the emptied row.
+   */
+  async deleteAccount(admin: AdminActor, contactId: number, input: { note: string; tellMember: boolean; requestId: string | null }) {
+    const { account } = await this.hub(admin, 'admin_member', { contact_id: contactId }, false);
+    return this.write(admin, 'delete', contactId, { params: { name: account.name, state: account.state, tellMember: input.tellMember }, note: input.note, requestId: input.requestId }, async () => {
+      if (contactId === admin.me.id) throw new HubError('self_delete', 'لا يمكن حذف حسابك من لوحة التحكم', 403);
+      if (account.role === 'admin') throw new HubError('admin_account', 'لا يمكن حذف حساب مدير', 403);
+      let result: HubResults['admin_delete'];
+      try {
+        result = await this.hub(admin, 'admin_delete', { contact_id: contactId, note: input.note }, false);
+      } catch (error) {
+        if (error instanceof HubError && error.code === 'not_found' && (await this.hubBefore(HUB_DELETE_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_DELETE, 501);
+        throw error;
+      }
+      await this.deps.auth.endSessions(contactId);
+      await this.deps.push.forgetContact(contactId);
+      await this.deps.deletion?.cancel(contactId);
+      this.bust('hub', 'pb');
+      if (!result.already) {
+        const email = result.email || account.email;
+        if (input.tellMember) this.deps.notifier?.tellAccountDeleted(email, result.lang === 'en' ? 'en' : 'ar', account.name);
+        this.deps.notifier?.accountDeletedByAdmin({ name: account.name, phone: account.phone, email, contactId, by: admin.me.name || admin.me.email, note: input.note, told: input.tellMember });
+      }
+      return { ok: true as const };
     });
   }
 
