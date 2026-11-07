@@ -24,6 +24,9 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 import { withoutMediaLines } from '@/components/StructuredText';
 
+// M214 (owner, 2026-11-07: «لازم كل خبر معاه صورة جنبه»): no row without a picture — the club emblem stands in.
+const clubEmblem = require('../../../assets/images/club-emblem.png');
+
 /**
  * M75 «الإشعارات» (owner): ONE fixed center for every persona — admin messages, workshops and
  * events, new bank projects and new «شخصية ومسيرة» profiles, merged newest first. Opening the
@@ -88,7 +91,7 @@ export default function InboxScreen() {
       out.push({ id: `person:${person.id}`, kind: 'person', title: person.name, subtitle: person.title || null, time: null, image: person.photo, route: { pathname: '/people/[id]', params: { id: String(person.id) } } });
     }
     for (const tip of (tips.data?.tips ?? []).slice(1)) {
-      out.push({ id: tip.id, kind: 'tip', title: tip.title, subtitle: tip.body, time: `${tip.day}T11:00:00+03:00`, image: null, route: tip.route as Href });
+      out.push({ id: tip.id, kind: 'tip', title: tip.title, subtitle: tip.body, time: `${tip.day}T11:00:00+03:00`, image: tip.image ?? null, route: tip.route as Href });
     }
     // Events sort by WHEN they happen (soonest of the upcoming first), everything else by newest.
     const events = out.filter((item) => item.kind === 'event');
@@ -114,6 +117,8 @@ export default function InboxScreen() {
         <PopIn>
           <PressScale onPress={() => router.push(todayTip.route as Href)} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={todayTip.title}>
             <GlassCard golden style={styles.tipCard}>
+              {/* M214: the day's suggestion opens on the picture of what it offers. */}
+              <Image source={todayTip.image ? { uri: todayTip.image } : clubEmblem} style={[styles.tipImage, !todayTip.image && styles.tipImageEmblem]} resizeMode={todayTip.image ? 'cover' : 'contain'} accessibilityIgnoresInvertColors />
               <View style={styles.tipHead}>
                 <Ionicons name="bulb" size={18} color={colors.goldLight} />
                 <Text style={styles.tipEyebrow}>{t('inbox.tipToday')}</Text>
@@ -169,7 +174,13 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
             </Text>
           ) : null}
         </View>
-        {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} resizeMode="cover" /> : null}
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.thumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.thumb, styles.thumbEmblem]}>
+            <Image source={clubEmblem} style={styles.emblem} resizeMode="contain" />
+          </View>
+        )}
       </GlassCard>
     </PressScale>
   );
@@ -178,6 +189,8 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
 const styles = themedStyles(() => ({
   // M176: today's personal suggestion — golden, on top of the tab.
   tipCard: { gap: spacing.xs, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
+  tipImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: radii.md, backgroundColor: colors.surfaceElevated, marginBottom: spacing.xs },
+  tipImageEmblem: { aspectRatio: 16 / 7 },
   tipHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   tipEyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight, textAlign: textStart },
   tipTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 27, color: colors.textPrimary, textAlign: textStart },
@@ -201,4 +214,6 @@ const styles = themedStyles(() => ({
   title: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   thumb: { width: 54, height: 54, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
+  thumbEmblem: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldSoft },
+  emblem: { width: 36, height: 36 },
 }));

@@ -78,3 +78,31 @@ test('M177: the daily workshop ad names the next open workshop, keeps the copy r
   const noKey = new WorkshopAdService({ kv: new MemoryKV(), log: { warn: () => undefined } as never, agenda, model: 'x' });
   assert.ok((await noKey.today('en', NOV))?.headline.includes('ورشة'), 'the template names the workshop without a key');
 });
+
+test('M214: every tip carries the picture of what it offers, from the uploaded photos and banners', async () => {
+  const { CompanionService } = await import('./companion/service.js');
+  const { IMAGES_KEY } = await import('./content/images.js');
+  const kv = new MemoryKV();
+  await kv.set(IMAGES_KEY, { 'service.studio': 'https://cdn/studio.jpg', 'service.theater.1': 'https://cdn/theater.jpg', 'home.banner': 'https://cdn/home.jpg', 'membership.banner': 'https://cdn/membership.jpg', 'golden.opportunity': 'https://cdn/opportunity.jpg' });
+  const service = new CompanionService({
+    kv,
+    log: { warn: () => undefined, info: () => undefined, error: () => undefined } as never,
+    config: {} as never,
+    push: {} as never,
+    agenda: {} as never,
+    projects: { list: () => ({ items: [{ title: 'مشروع النخبة', sector: { name: 'التقنية' } }] }) } as never,
+  });
+  const seen: Record<string, string | null> = {};
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+    for (const tip of await service.tipsFor({ id: seed, name: 'سارة العتيبي', persona: 'entrepreneur', member: true }, 'ar', 14)) seen[tip.key] = tip.image;
+    for (const tip of await service.tipsFor({ id: seed, name: 'سارة العتيبي', persona: 'investor', member: false }, 'ar', 14)) seen[tip.key] = tip.image;
+  }
+  assert.ok(Object.keys(seen).length >= 8, Object.keys(seen).join(','));
+  for (const [key, image] of Object.entries(seen)) assert.ok(image, `${key} has a picture`);
+  assert.equal(seen.studio, 'https://cdn/studio.jpg');
+  assert.equal(seen.theater, 'https://cdn/theater.jpg');
+  assert.equal(seen.membership, 'https://cdn/membership.jpg');
+  if (seen.project !== undefined) assert.equal(seen.project, 'https://cdn/opportunity.jpg');
+  // A service without an uploaded photo falls to the home banner, never to nothing.
+  assert.equal(seen['meeting-room'], 'https://cdn/home.jpg');
+});

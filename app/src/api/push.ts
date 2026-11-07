@@ -2,7 +2,8 @@ import { apiRequest } from './client';
 
 // Mirrors server/src/push/routes.ts: one Expo push token per device, owned by the signed-in account.
 /** M176: one personal daily suggestion — mirrors server/src/companion/tips.ts. */
-export type CompanionTip = { id: string; key: string; title: string; body: string; route: string; day: string };
+/** M214: `image` = the picture of what the tip sells (an older server sends none). */
+export type CompanionTip = { id: string; key: string; title: string; body: string; route: string; day: string; image?: string | null };
 
 export type PushRegistration = { token: string; platform: 'ios' | 'android'; deviceName?: string; appVersion?: string };
 

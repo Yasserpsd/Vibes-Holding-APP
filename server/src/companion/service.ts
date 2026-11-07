@@ -4,6 +4,7 @@ import type { AgendaService } from '../agenda/service.js';
 import type { Config } from '../config.js';
 import type { DiscountsService } from '../discounts/service.js';
 import { getGoldenContent } from '../content/golden.js';
+import { bannerImages, opportunityImage, serviceImages } from '../content/images.js';
 import type { ProjectsService } from '../projectsBank/service.js';
 import type { PushMessage, PushService } from '../push/service.js';
 import { riyadhDay } from '../riyadh.js';
@@ -223,17 +224,36 @@ export class CompanionService {
     };
   }
 
-  /** M176: the member's tips of the last days, newest first — the «مقترح لك» rows of the notifications tab. */
-  async tipsFor(me: { id: number; name: string; persona: string | null; member: boolean; nameEn?: string | null }, lang: 'ar' | 'en', days = 5, now = Date.now()): Promise<(Tip & { id: string; day: string })[]> {
+  /**
+   * M176: the member's tips of the last days, newest first — the «مقترح لك» rows of the notifications tab.
+   * M214 (owner, 2026-11-07: «لازم كل خبر معاه صورة جنبه»): every tip carries the picture of what it sells — the
+   * service's uploaded photo, the Vibes Ventures opportunity photo for the Projects Bank, the membership or home
+   * banner otherwise. Null only while the owner has uploaded nothing for that slot (the app then shows the emblem).
+   */
+  async tipsFor(me: { id: number; name: string; persona: string | null; member: boolean; nameEn?: string | null }, lang: 'ar' | 'en', days = 5, now = Date.now()): Promise<(Tip & { id: string; day: string; image: string | null })[]> {
     const context = await this.context(now);
     const today = tipDayIndex(now);
     const name = firstName(lang === 'en' ? (me.nameEn ?? '') : me.name);
-    const out: (Tip & { id: string; day: string })[] = [];
+    const pictures = await this.tipPictures();
+    const out: (Tip & { id: string; day: string; image: string | null })[] = [];
     for (let back = 0; back < days; back += 1) {
       const tip = tipFor({ persona: me.persona, member: me.member, name, lang, seed: me.id }, today - back, context);
-      if (tip) out.push({ ...tip, id: `tip:${today - back}`, day: riyadhDay(now - back * 86_400_000) });
+      if (tip) out.push({ ...tip, id: `tip:${today - back}`, day: riyadhDay(now - back * 86_400_000), image: pictures(tip) });
     }
     return out;
+  }
+
+  /** M214: the picture a tip is drawn with, from the dashboard's uploaded photos and banners. */
+  private async tipPictures(): Promise<(tip: Tip) => string | null> {
+    const [services, banners, opportunity] = await Promise.all([serviceImages(this.deps.kv), bannerImages(this.deps.kv), opportunityImage(this.deps.kv)]);
+    const home = banners['home.banner'] ?? Object.values(services)[0] ?? null;
+    return (tip) => {
+      const service = /^\/service\/([^/?]+)/.exec(tip.route)?.[1];
+      if (service) return services[service] ?? home;
+      if (tip.route === '/projects') return opportunity ?? home;
+      if (tip.route === '/membership') return banners['membership.banner'] ?? home;
+      return home;
+    };
   }
 
   /** Today's three messages — the day's template, filled from live data; a template missing its data falls to the next. */
