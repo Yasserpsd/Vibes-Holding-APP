@@ -6,9 +6,10 @@ import { newToken } from './sessions.js';
 /**
  * M203 (owner, 2026-11-06): WhatsApp is the proof of identity. A code step stands between a right
  * password (or a Google/Apple identity) and the session, and before a new number is saved.
- * `signin` = a member signing in; `number` = a signed-in member proving a new number.
+ * `signin` = a member signing in; `number` = a signed-in member proving a new number; `signup` = M211: somebody with no
+ * account yet proving the number he is about to register with.
  */
-export type PhoneCodePurpose = 'signin' | 'number';
+export type PhoneCodePurpose = 'signin' | 'number' | 'signup';
 /** M204: WhatsApp first, always. `email` = WhatsApp did not carry this code, so it went to the account's address by itself. */
 export type PhoneCodeVia = 'whatsapp' | 'email';
 
@@ -49,6 +50,12 @@ type PhoneCodeAccount = { windowStart: string; steps: number; wrong: number; liv
 
 export type PhoneCodeBegin = { ok: true; token: string; via: PhoneCodeVia } | { ok: false; reason: 'cooldown'; waitSeconds: number } | { ok: false; reason: 'send_failed' };
 export type PhoneCodeResend = { ok: true; via: PhoneCodeVia } | { ok: false; reason: 'gone' | 'too_many' | 'send_failed' } | { ok: false; reason: 'too_soon'; waitSeconds: number };
+/** M211: a number proven before the account exists. The sign-up carries the token; it dies with the account's creation. */
+export type PhoneProof = { phone: string; country: string; local: string; expiresAt: string };
+
+/** M211: a first Google/Apple sign-in, held until its number is proven. The account does not exist yet. */
+export type SocialSignup = { identity: { provider: string; sub: string; email: string; name: string }; lang: string; source: string; expiresAt: string };
+
 export type PhoneCodeCheck = { ok: true; step: PhoneCodeStep } | { ok: false; reason: 'gone' | 'locked' | 'code_expired' } | { ok: false; reason: 'bad_code'; attemptsLeft: number };
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -61,9 +68,14 @@ const MAX_SENDS = 4;
 const ACCOUNT_WINDOW_MS = 60 * 60_000;
 const MAX_STEPS_PER_WINDOW = 6;
 const MAX_WRONG_PER_WINDOW = 10;
+/** M211: time to finish the form after the number is proven. */
+export const PHONE_PROOF_SECONDS = 30 * 60;
 
 const keyFor = (token: string): string => `phone-code:${createHash('sha256').update(token).digest('hex')}`;
 const accountKey = (contactId: number): string => `phone-code-account:${contactId}`;
+const proofKey = (token: string): string => `phone-proof:${createHash('sha256').update(token).digest('hex')}`;
+const socialSignupKey = (token: string): string => `social-signup:${createHash('sha256').update(token).digest('hex')}`;
+const dailyKey = (): string => `phone-proof-day:${new Date().toISOString().slice(0, 10)}`;
 const waiverKey = (contactId: number): string => `phone-code-waived:${contactId}`;
 const messageKey = (messageId: string): string => `phone-code-message:${createHash('sha256').update(messageId).digest('hex')}`;
 const hashCode = (token: string, code: string): string => createHash('sha256').update(`${token}:${code}`).digest('hex');
@@ -240,6 +252,56 @@ export class PhoneCodeStore {
     const step = await this.kv.get<PhoneCodeStep>(key);
     if (step?.waMessageId) await this.kv.delete(messageKey(step.waMessageId));
     await this.kv.delete(key);
+  }
+
+  /** M211: the code was right; this token stands for the number until the account is created. */
+  async issueProof(proof: Omit<PhoneProof, 'expiresAt'>): Promise<string> {
+    const token = newToken();
+    await this.kv.set(proofKey(token), { ...proof, expiresAt: new Date(Date.now() + PHONE_PROOF_SECONDS * 1000).toISOString() } satisfies PhoneProof);
+    return token;
+  }
+
+  async proof(token: string): Promise<PhoneProof | null> {
+    if (!TOKEN_PATTERN.test(token)) return null;
+    const proof = await this.kv.get<PhoneProof>(proofKey(token));
+    if (!proof) return null;
+    if (Date.parse(proof.expiresAt) > Date.now()) return proof;
+    await this.kv.delete(proofKey(token));
+    return null;
+  }
+
+  async dropProof(token: string): Promise<void> {
+    await this.kv.delete(proofKey(token));
+  }
+
+  async holdSocialSignup(signup: Omit<SocialSignup, 'expiresAt'>): Promise<string> {
+    const token = newToken();
+    await this.kv.set(socialSignupKey(token), { ...signup, expiresAt: new Date(Date.now() + PHONE_PROOF_SECONDS * 1000).toISOString() } satisfies SocialSignup);
+    return token;
+  }
+
+  async socialSignup(token: string): Promise<SocialSignup | null> {
+    if (!TOKEN_PATTERN.test(token)) return null;
+    const signup = await this.kv.get<SocialSignup>(socialSignupKey(token));
+    if (!signup) return null;
+    if (Date.parse(signup.expiresAt) > Date.now()) return signup;
+    await this.kv.delete(socialSignupKey(token));
+    return null;
+  }
+
+  async dropSocialSignup(token: string): Promise<void> {
+    await this.kv.delete(socialSignupKey(token));
+  }
+
+  /** M211: nobody is signed in when these codes leave, so the day has a ceiling. False = today's ceiling is reached. */
+  async spendDaily(cap: number): Promise<boolean> {
+    return this.exclusive(dailyKey(), async () => {
+      const key = dailyKey();
+      const spent = (await this.kv.get<number>(key)) ?? 0;
+      if (spent >= cap) return false;
+      await this.kv.set(key, spent + 1);
+      return true;
+    });
   }
 
   /** M204: a member the code cannot reach wrote to support; the admin who checked him vouches for the number. */

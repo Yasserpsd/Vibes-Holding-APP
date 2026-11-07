@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, Text, type ScrollView } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
-import { errorMessage } from '@/api/client';
+import { ApiError, errorMessage } from '@/api/client';
+import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
@@ -13,10 +15,13 @@ import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { PhoneProofField, type PhoneProofState } from '@/components/PhoneProofField';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
+import { trackRegistration } from '@/lib/adsAttribution';
+import { markIntroDue } from '@/lib/introGate';
 import { isEmail, nameIssue, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -44,6 +49,8 @@ const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'person
  * borders and messages under the fields, a red summary on top and an automatic scroll to the first error.
  * M203 (owner, 2026-11-06): the short form: name, country, phone, e-mail, password, category, job. The code proves
  * the number on WhatsApp; bio, interests, member type and company are asked later in the profile.
+ * M211 (owner, 2026-11-07): the number is confirmed right here, before the account exists, and the form does not go
+ * through without it.
  */
 export default function RegisterScreen() {
   const router = useRouter();
@@ -57,6 +64,9 @@ export default function RegisterScreen() {
   const errors = useFormErrors<Field>(scrollRef);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [proof, setProof] = useState<PhoneProofState>(null);
+  const { signIn } = useAuth();
+  const queryClient = useQueryClient();
 
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
   // M126 (owner): the dial code is right there, so the number never shows a leading zero.
@@ -93,6 +103,8 @@ export default function RegisterScreen() {
     if (!issueOf(key, draft)) errors.clear(key);
     // The number's rule follows the country.
     if (key === 'country' && draft.phone && !issueOf('phone', draft)) errors.clear('phone');
+    // M211: the proof belongs to one number in one country.
+    if (key === 'country') setProof(null);
   };
   const blur = (key: Field) => () => errors.check(key, issueOf(key, form));
   const validate = () => {
@@ -101,6 +113,7 @@ export default function RegisterScreen() {
       const message = issueOf(key, form);
       if (message) next[key] = message;
     }
+    if (config?.phoneProofRequired && proof?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
     return next;
   };
 
@@ -119,12 +132,26 @@ export default function RegisterScreen() {
         persona: form.persona,
         jobTitle: form.jobTitle.trim(),
         inviteCode: form.inviteCode.trim() || undefined,
+        phoneProof: proof?.kind === 'done' ? proof.token : undefined,
       });
-      router.push({
-        pathname: '/auth/verify',
-        params: { flow: 'register', pendingToken: result.pendingToken, email: result.email, text: result.text },
-      });
+      if (result.pending) {
+        router.push({
+          pathname: '/auth/verify',
+          params: { flow: 'register', pendingToken: result.pendingToken, email: result.email, text: result.text },
+        });
+        return;
+      }
+      // M211: the number was proven here, so the account is open already. M209: the intro film is marked BEFORE the session.
+      markIntroDue();
+      await signIn(result.token, result.me);
+      trackRegistration('email');
+      void queryClient.invalidateQueries({ queryKey: ['news'] });
+      void queryClient.invalidateQueries({ queryKey: ['interests'] });
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/membership');
     } catch (cause) {
+      // M211: the proof outlived its half hour: the button comes back.
+      if (cause instanceof ApiError && cause.code === 'phone_proof_required') setProof(null);
       setSubmitError(errorMessage(cause));
     } finally {
       setBusy(false);
@@ -187,6 +214,7 @@ export default function RegisterScreen() {
             keyboardType="phone-pad"
             textContentType="telephoneNumber"
             value={form.phone}
+            editable={!proof}
             onChangeText={(value) => set('phone')(value.replace(/\D+/g, '').replace(/^0+/, ''))}
             placeholder={phoneExample || undefined}
             hint={t('auth.register.phoneWhatsapp')}
@@ -195,6 +223,22 @@ export default function RegisterScreen() {
             anchorRef={errors.anchor('phone')}
             onBlur={blur('phone')}
           />
+          {config.phoneProofRequired ? (
+            <PhoneProofField
+              phone={form.phone}
+              country={form.country}
+              state={proof}
+              onChange={(next) => {
+                setProof(next);
+                if (next) errors.clear('phone');
+              }}
+              check={() => {
+                const issue = issueOf('phone', form);
+                errors.check('phone', issue);
+                return issue === null;
+              }}
+            />
+          ) : null}
           <FormField
             label={t('auth.register.email')}
             latin

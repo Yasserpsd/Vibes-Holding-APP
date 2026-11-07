@@ -58,6 +58,13 @@ export class MockHubClient implements HubClient {
         return this.verify(body);
       case 'login':
         return this.login(body);
+      case 'phone_check': {
+        // Plugin 2.29.0 (M211): the number's spellings and whether an active account owns it; nothing is stored.
+        const norm = phoneIntl(str(body, 'country', 5).toLowerCase() || 'sa', str(body, 'phone', 40));
+        if (!norm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص', 400);
+        const taken = [...this.contacts.values()].some((contact) => contact.verified && contact.phoneNorm === norm);
+        return { ok: true, taken: taken ? 1 : 0, phone_norm: norm, phone_local: phoneLocal(norm) };
+      }
       case 'social_login':
         return this.socialLogin(body);
       case 'logout':
@@ -237,6 +244,14 @@ export class MockHubClient implements HubClient {
     if (referrer && referrer.id !== contact.id) contact.referredBy = referrer.id;
     if (!existing) this.admin.event(contact.id, 'registered');
     this.visitors.set(uuid, contact.id);
+    // Plugin 2.29.0 (M211): the app server proved the number first; the account opens here with no code.
+    if (body.phone_proven) {
+      contact.verified = true;
+      contact.verifiedAt = Date.now();
+      contact.phoneVerified = contact.phone;
+      this.admin.event(contact.id, 'verified');
+      return { ok: true, proven: 1, contact: this.publicContact(contact) };
+    }
     return {
       ok: true,
       pending: true,

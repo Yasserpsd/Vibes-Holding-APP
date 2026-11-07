@@ -48,6 +48,11 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
         router.push(phoneStepPath(signedIn) as Href);
         return;
       }
+      // M211: a first sign-in has no account yet: the number comes first, on its own screen.
+      if ('phoneFirst' in signedIn) {
+        router.push(`/auth/social-phone?signupToken=${encodeURIComponent(signedIn.signupToken)}&provider=${result.provider}` as Href);
+        return;
+      }
       // M209: a brand-new account owes the intro film once; marked BEFORE the session is announced.
       if (signedIn.created) markIntroDue();
       await signIn(signedIn.token, signedIn.me);

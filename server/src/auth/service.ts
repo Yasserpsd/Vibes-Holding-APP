@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from '../config.js';
-import { normLogin } from '../hub/phone.js';
+import { COUNTRIES, normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { isHonorary } from '../membership/honorary.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
@@ -14,7 +14,7 @@ import type { InvitesService } from '../invites/service.js';
 import type { Mailer } from '../mail/mailer.js';
 import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOtp.js';
 import type { LegacyAccounts } from './legacy.js';
-import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia, type PhoneCodeWaiver } from './phoneCode.js';
+import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, PHONE_PROOF_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia, type PhoneCodeWaiver } from './phoneCode.js';
 import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
@@ -125,12 +125,19 @@ export const LEGACY_GATE_FIELDS: readonly ProfileMissing[] = ['phone', 'persona'
 /** M203: the `x-app-gate` word of a bundle that can draw the WhatsApp code step. Older bundles sign in as before. */
 export const PHONE_CODE_CAPABILITY = 'phoneCode';
 
+/** M211: the bundle confirms the number on the sign-up form, before the account exists. */
+export const PHONE_FIRST_CAPABILITY = 'phoneFirst';
+
 /** M204: the bundle shows «أرسلنا الرمز على واتساب» for the persona-change and deletion codes. */
 export const ACTION_CODE_CAPABILITY = 'waCodes';
 
 export function bundleKnows(header: unknown, word: string): boolean {
   const raw = Array.isArray(header) ? header.join(',') : typeof header === 'string' ? header : '';
   return raw.split(',').some((item) => item.trim() === word);
+}
+
+export function canPhoneFirst(header: unknown): boolean {
+  return bundleKnows(header, PHONE_FIRST_CAPABILITY);
 }
 
 export function canPhoneCode(header: unknown): boolean {
@@ -241,9 +248,11 @@ export type TotpStepResult = { pending: false; totp: true; stepToken: string; se
 export type TotpSetupResult = { pending: false; totpSetup: true; setupToken: string; secret: string; uri: string; seconds: number };
 /** M203: the password (or the Google/Apple identity) was right; the session starts after the WhatsApp code. */
 export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: PhoneCodeVia; phone: string; email: string; seconds: number; resendAfter: number };
+/** M211: a first Google/Apple sign-in: no account until the number is proven on WhatsApp. */
+export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number };
 export type MemberLoginResult = LoginResult | TotpStepResult | PhoneStepResult;
-/** What one bundle can do at sign-in (the `x-app-gate` word). */
-export type SignInBundle = { canPhoneCode: boolean };
+/** What one bundle can do at sign-in (the `x-app-gate` words). */
+export type SignInBundle = { canPhoneCode: boolean; canPhoneFirst?: boolean };
 export type AdminLoginResult = LoginResult | OtpResult | TotpStepResult | TotpSetupResult;
 /** The first dashboard sign-in after enrolment: the session plus the backup codes, shown once. */
 export type EnrolledResult = SignedInResult & { backupCodes: string[] };
@@ -330,9 +339,16 @@ export class AuthService {
     return this.deps.config.APP_ENV !== 'production' && this.deps.config.AUTH_ADMIN_ONLY === '1';
   }
 
-  async register(input: RegisterInput, ip: string, lang: AppLang = 'ar', source: AppSource = 'app'): Promise<PendingResult> {
+  async register(input: RegisterInput & { phoneProof?: string }, ip: string, lang: AppLang = 'ar', source: AppSource = 'app', bundle: SignInBundle = { canPhoneCode: false }): Promise<MemberLoginResult> {
     if (!this.registrationOpen) {
       throw new AuthError('registration_closed', 'التسجيل غير متاح في النسخة التجريبية حاليًا. سجّل الدخول بحساب الإدارة.', 403);
+    }
+    // M211 (owner, 2026-11-07: «ما يمشي التسجيل بدون تأكيد رقم واتس اب»): a bundle that draws the confirm button must bring
+    // the proof of THIS number. An older bundle cannot; the hub then opens the account with a WhatsApp code only (2.29.0).
+    const proof = input.phoneProof ? ((await this.deps.phoneCodes?.proof(input.phoneProof)) ?? null) : null;
+    const proven = Boolean(proof && proof.country === input.country && proof.phone === plainNumber(input.phone));
+    if (this.phoneProofRequired && bundle.canPhoneFirst && !proven) {
+      throw new AuthError('phone_proof_required', 'أكّد رقمك عبر واتساب لإكمال التسجيل', 400);
     }
     // M207 (owner, 2026-11-06): an odd name no longer stops the sign-up; the app shows a warning and lets him through.
     // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
@@ -366,9 +382,18 @@ export class AuthService {
       source,
       ...(referral ? { referral, ...(representative ? { referral_kind: 'representative' } : {}) } : {}),
       ...(interests ? { interests } : {}),
+      ...(proven ? { phone_proven: 1 } : {}),
     });
     if (referral && this.deps.invites && result.contact) {
       await this.deps.invites.recordFromRegister(result.contact, Number(result.referred_by ?? 0), String(result.referred_name ?? ''), referral);
+    }
+    // M211: the hub opened the account on the proof: same steps as a right code, no second WhatsApp message.
+    if (proven && result.pending !== true && result.contact?.has_account) {
+      const contact = requireContact(result);
+      if (this.deps.invites) await this.deps.invites.onVerified(contact);
+      await this.gate(uuid, contact);
+      if (input.phoneProof) await this.deps.phoneCodes?.dropProof(input.phoneProof);
+      return this.signIn(uuid, contact);
     }
     const email = result.contact?.email || input.email;
     const pendingToken = await this.deps.sessions.createPending(uuid, email);
@@ -439,7 +464,7 @@ export class AuthService {
    * finds or creates the contact by the verified e-mail (rule 2 — one identity source), already
    * verified, so there is no code step; the same test-environment gates as password login apply.
    */
-  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar', source: AppSource = 'app', bundle: SignInBundle = { canPhoneCode: false }): Promise<MemberLoginResult> {
+  async socialLogin(identity: SocialIdentity, ip: string, lang: AppLang = 'ar', source: AppSource = 'app', bundle: SignInBundle = { canPhoneCode: false }): Promise<MemberLoginResult | PhoneFirstResult> {
     this.refuseOldBundle(bundle);
     if (!identity.emailVerified) {
       throw new AuthError('social_email', 'بريد هذا الحساب غير موثّق لدى المزوّد — سجّل بالبريد وكلمة المرور', 403);
@@ -456,12 +481,16 @@ export class AuthService {
         email: identity.email,
         email_verified: 1,
         name: identity.name,
-        allow_create: this.registrationOpen ? 1 : 0,
+        // M211: while the number comes first, this call only finds an existing account; a new one is created by completeSocialSignup.
+        allow_create: this.registrationOpen && !this.phoneProofRequired ? 1 : 0,
         // M122: a first-time social registration stores the app's language at the hub (2.20.0).
         lang,
         page_url: 'app://social',
       });
     } catch (error) {
+      if (this.phoneProofRequired && error instanceof HubError && error.code === 'registration_closed') {
+        return this.holdSocialSignup(identity, lang, source, bundle);
+      }
       if (error instanceof HubError && error.code === 'hub_not_supported') {
         // The hub plugin is older than 2.8.0: say so instead of a generic failure.
         throw new AuthError('social_unsupported', 'الدخول بحساب جوجل أو أبل غير متاح حاليًا — سجّل بالبريد وكلمة المرور', 503);
@@ -474,6 +503,48 @@ export class AuthService {
     const created = result.created === 1 || result.created === '1' || result.created === true;
     const signed = await this.signIn(uuid, contact, bundle);
     return created && 'token' in signed ? { ...signed, created: true } : signed;
+  }
+
+  /**
+   * M211: a first Google/Apple sign-in waits here. A fresh install runs its embedded bundle on the first launch and the
+   * update applies on the next one, so that bundle is told to reopen the app instead of getting an account with no number.
+   */
+  private async holdSocialSignup(identity: SocialIdentity, lang: AppLang, source: AppSource, bundle: SignInBundle): Promise<PhoneFirstResult> {
+    if (!bundle.canPhoneFirst) throw new AuthError('phone_first_reopen', 'أغلق التطبيق وافتحه من جديد لإكمال التسجيل', 403);
+    const signupToken = await this.requirePhoneCodes().holdSocialSignup({ identity: { provider: identity.provider, sub: identity.sub, email: identity.email, name: identity.name }, lang, source });
+    return { pending: false, phoneFirst: true, signupToken, seconds: PHONE_PROOF_SECONDS };
+  }
+
+  /** M211: the number is proven, so the account is born now, with that number already marked at the hub. */
+  async completeSocialSignup(signupToken: string, phoneProof: string, ip: string): Promise<SignedInResult> {
+    const store = this.requirePhoneCodes();
+    const held = await store.socialSignup(signupToken);
+    if (!held) throw new AuthError('otp_expired', 'انتهت مهلة التسجيل، ابدأ من جديد', 410);
+    const proof = await store.proof(phoneProof);
+    if (!proof) throw new AuthError('phone_proof_required', 'أكّد رقمك عبر واتساب لإكمال التسجيل', 400);
+    const uuid = newUuid();
+    const result = await this.deps.hub.call('social_login', {
+      uuid,
+      ip,
+      source: held.source,
+      provider: held.identity.provider,
+      sub: held.identity.sub,
+      email: held.identity.email,
+      email_verified: 1,
+      name: held.identity.name,
+      allow_create: this.registrationOpen ? 1 : 0,
+      lang: held.lang,
+      page_url: 'app://social',
+    });
+    let contact = requireContact(result);
+    await this.gate(uuid, contact);
+    const created = result.created === 1 || result.created === '1' || result.created === true;
+    if (created) contact = requireContact(await this.deps.hub.call('profile', { uuid, phone: proof.phone, country: proof.country, phone_verified: 1 }));
+    await store.dropSocialSignup(signupToken);
+    await store.dropProof(phoneProof);
+    const signed = await this.signIn(uuid, contact);
+    if (!('token' in signed)) throw new AuthError('otp_expired', 'انتهت مهلة التسجيل، ابدأ من جديد', 410);
+    return created ? { ...signed, created: true } : signed;
   }
 
   /** Dashboard sessions need the e-mailed code (M18). Off by default: the owner turns it on once the mail delay is known. */
@@ -929,6 +1000,39 @@ export class AuthService {
     return this.deps.config.PHONE_CODE_MODE !== 'off' && Boolean(this.deps.phoneCodes) && (this.deps.whatsappEnabled?.() ?? false);
   }
 
+  /** M211: the sign-up confirms the number before the account exists. */
+  get phoneProofRequired(): boolean {
+    return this.registrationOpen && this.phoneCodeOn;
+  }
+
+  /** M211: «تأكيد الرقم» on the sign-up form. WhatsApp only: a mailed code proves nothing about a number. */
+  async startPhoneProof(phone: string, country: string, lang: AppLang): Promise<PhoneStepResult> {
+    if (!this.phoneProofRequired) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
+    const store = this.requirePhoneCodes();
+    const digits = plainNumber(phone);
+    const known = await this.deps.hub.call('phone_check', { phone: digits, country }).catch((error: unknown) => {
+      if (error instanceof HubError && error.code === 'hub_not_supported') return null;
+      throw error;
+    });
+    if (known?.taken === 1) throw new AuthError('exists', 'يوجد حساب بهذا الرقم، سجّل الدخول أو استخدم «نسيت كلمة المرور»', 409);
+    const dial = COUNTRIES.find((item) => item.code === country)?.dial.replace(/\D+/g, '') ?? '';
+    const target = typeof known?.phone_local === 'string' && known.phone_local ? known.phone_local : `${dial}${digits}`;
+    if (!(await store.spendDaily(this.deps.config.PHONE_PROOF_DAILY_CAP))) {
+      this.deps.log.warn('sign-up WhatsApp codes reached the daily ceiling');
+      throw new AuthError('phone_proof_busy', 'تعذر إرسال الرمز الآن، حاول لاحقًا أو تواصل مع الدعم', 503);
+    }
+    // No account yet: the store's hourly budget hangs on the number itself, as a negative id no contact can have.
+    const begun = await store.begin({ purpose: 'signup', uuid: newUuid(), contactId: -Number(`${dial}${digits}`.slice(-15)), phone: target, newPhone: digits, country, email: '', lang });
+    if (!begun.ok) throw phoneCodeProblem(begun);
+    return { pending: false, phoneStep: true, stepToken: begun.token, via: 'whatsapp', phone: maskNumber(target), email: '', seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
+  }
+
+  async confirmPhoneProof(stepToken: string, code: string): Promise<{ proof: string; seconds: number }> {
+    const step = await this.checkPhoneCode(stepToken, code, 'signup');
+    const proof = await this.requirePhoneCodes().issueProof({ phone: step.newPhone ?? '', country: step.country ?? 'sa', local: step.phone });
+    return { proof, seconds: PHONE_PROOF_SECONDS };
+  }
+
   /** With `strict` a number changes only through its code; a direct profile save is refused. */
   get phonePatchClosed(): boolean {
     return this.phoneCodeOn && this.deps.config.PHONE_CODE_MODE === 'strict';
@@ -1085,6 +1189,10 @@ export class AuthService {
     if (!result.ok) {
       if (result.reason === 'too_soon') throw new AuthError('otp_wait', `انتظر ${result.waitSeconds} ثانية ثم اطلب رمزًا جديدًا`, 429);
       if (result.reason === 'too_many') throw new AuthError('otp_resend_limit', 'تجاوزت عدد مرات إعادة الإرسال، ابدأ الدخول من جديد', 429);
+      // M211: Meta reported the number has no WhatsApp; the sign-up has no other road, so the member is told so.
+      if (result.reason === 'send_failed' && (await this.requirePhoneCodes().peek(stepToken))?.unreachable) {
+        throw new AuthError('phone_no_whatsapp', 'هذا الرقم غير مفعّل على واتساب، اكتب رقمًا مفعّلًا لإكمال التسجيل', 400);
+      }
       if (result.reason === 'send_failed') throw new AuthError('phone_code_send_failed', 'تعذر إرسال الرمز الآن، حاول بعد قليل أو تواصل مع الدعم', 503);
       throw new AuthError('otp_expired', 'انتهت مهلة الدخول، ابدأ من جديد', 410);
     }
@@ -1147,6 +1255,11 @@ function totpFailure(reason: 'gone' | 'bad_code' | 'locked'): AuthError {
 
 function newUuid(): string {
   return `app-${randomUUID()}`;
+}
+
+/** M211: a number as the form holds it: digits, no leading zero. */
+function plainNumber(phone: string): string {
+  return phone.replace(/D+/g, '').replace(/^0+/, '');
 }
 
 function requireContact(result: HubResponse): HubContact {

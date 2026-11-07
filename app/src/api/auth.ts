@@ -105,6 +105,8 @@ export type AuthConfig = {
   phonePolicy: string;
   emailPolicy: string;
   registrationOpen: boolean;
+  /** M211: the sign-up confirms the number on WhatsApp before the account exists. */
+  phoneProofRequired?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };
@@ -122,6 +124,8 @@ export type RegisterInput = {
   jobTitle: string;
   /** M32: another member's membership number; the hub checks and stores it. */
   inviteCode?: string;
+  /** M211: the token of the number proven on this form. */
+  phoneProof?: string;
 };
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
@@ -131,6 +135,8 @@ export type TotpStepResult = { pending: false; totp: true; stepToken: string; se
 /** M203: the password (or the Apple/Google identity) was right; the session starts after the WhatsApp code. */
 export type PhoneStepResult = { pending: false; phoneStep: true; stepToken: string; via: 'whatsapp' | 'email'; phone: string; email: string; seconds: number; resendAfter: number };
 export type LoginResult = PendingResult | SignedInResult | TotpStepResult | PhoneStepResult;
+/** M211: a first Google/Apple sign-in: the account is created once the number is proven. */
+export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number };
 
 /** The code screen of a sign-in that stopped at the WhatsApp code (login and the Apple/Google buttons). */
 export function phoneStepPath(step: PhoneStepResult): string {
@@ -183,7 +189,11 @@ export type MembershipContent = {
 };
 
 export const authApi = {
-  register: (input: RegisterInput) => apiRequest<PendingResult>('POST', '/api/auth/register', { body: input, token: null }),
+  register: (input: RegisterInput) => apiRequest<PendingResult | SignedInResult>('POST', '/api/auth/register', { body: input, token: null }),
+  // M211: the number is proven on the form itself; nothing exists at the hub until the sign-up is sent.
+  phoneProofStart: (phone: string, country: string) => apiRequest<PhoneStepResult>('POST', '/api/auth/phone-proof/start', { body: { phone, country }, token: null }),
+  phoneProofConfirm: (stepToken: string, code: string) => apiRequest<{ proof: string; seconds: number }>('POST', '/api/auth/phone-proof/confirm', { body: { stepToken, code }, token: null }),
+  socialComplete: (signupToken: string, phoneProof: string) => apiRequest<SignedInResult>('POST', '/api/auth/social/complete', { body: { signupToken, phoneProof }, token: null }),
   resend: (pendingToken: string) => apiRequest<{ mailSent: boolean; text: string }>('POST', '/api/auth/resend', { body: { pendingToken }, token: null }),
   verify: (pendingToken: string, code: string) => apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/verify', { body: { pendingToken, code }, token: null }),
   // M140: the authenticator code (or a backup code) that ends a sign-in answered with `totp: true`.
@@ -199,7 +209,7 @@ export const authApi = {
     apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}) }, token: null }),
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
-    apiRequest<SignedInResult | TotpStepResult | PhoneStepResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
+    apiRequest<SignedInResult | TotpStepResult | PhoneStepResult | PhoneFirstResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
   // M203: the code that ends a sign-in. `fixPhone`: it came by e-mail, so the number is still unproven.
   phoneVerify: (stepToken: string, code: string) => apiRequest<SignedInResult & { fixPhone?: boolean }>('POST', '/api/auth/phone/verify', { body: { stepToken, code }, token: null }),
   phoneResend: (stepToken: string, via: 'whatsapp' | 'email') =>

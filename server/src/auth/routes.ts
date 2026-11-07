@@ -19,7 +19,7 @@ import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { maskNumber } from './phoneCode.js';
-import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
@@ -67,6 +67,8 @@ const registerSchema = z
     // sign-in gate (`profileMissing`) is the real wall — nothing opens until they exist.
     jobTitle: z.string().trim().max(150).optional(),
     inviteCode: z.string().trim().max(30).optional(),
+    // M211: the token of a number already proven on WhatsApp.
+    phoneProof: z.string().trim().min(32).max(128).optional(),
     // M120 (owner): the registration interests reach the hub's «عضو جديد» admin mail.
     interests: z.array(z.string().trim().max(60)).max(6).optional(),
     interestsOther: z.string().trim().max(120).optional(),
@@ -104,6 +106,8 @@ const resetRequestSchema = z.object({ login: loginFieldSchema, country: countryS
 const phoneStepSchema = z.object({ stepToken: pendingTokenSchema, code: codeSchema });
 const phoneResendSchema = z.object({ stepToken: pendingTokenSchema, via: z.enum(['whatsapp', 'email']).default('whatsapp') });
 const phoneStartSchema = z.object({ phone: z.string().trim().min(5).max(40), country: z.string().trim().toLowerCase().max(5).default('sa') });
+const phoneProofConfirmSchema = z.object({ stepToken: pendingTokenSchema, code: codeSchema });
+const socialCompleteSchema = z.object({ signupToken: pendingTokenSchema, phoneProof: pendingTokenSchema });
 const resetConfirmSchema = z.object({ login: loginFieldSchema, country: countrySchema, code: codeSchema, password: passwordSchema });
 const profileSchema = z
   .object({
@@ -149,7 +153,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     return en ? { ...me, en } : me;
   };
 
-  const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']) });
+  const bundleOf = (request: FastifyRequest) => ({ canPhoneCode: canPhoneCode(request.headers['x-app-gate']), canPhoneFirst: canPhoneFirst(request.headers['x-app-gate']) });
 
   /**
    * M204 (owner: «كله حاجه علي واتس اب»): the persona-change and deletion codes go to the account's PROVEN WhatsApp
@@ -195,6 +199,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     phonePolicy: PHONE_POLICY_TEXT,
     emailPolicy: EMAIL_POLICY_TEXT,
     registrationOpen: service.registrationOpen,
+    // M211: the sign-up form confirms the number itself, before the account exists.
+    phoneProofRequired: service.phoneProofRequired,
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,
@@ -208,7 +214,29 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('register', 6, request, reply)) return;
       const body = parse(registerSchema, request.body, reply);
       if (!body) return;
-      return service.register(body, request.ip, langOf(request), sourceOf(request));
+      const result = await service.register(body, request.ip, langOf(request), sourceOf(request), bundleOf(request));
+      return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  // M211: «تأكيد الرقم» on the sign-up form: a WhatsApp code before any account exists. Paid messages, so the limits are tight.
+  app.post(
+    '/api/auth/phone-proof/start',
+    guard(async (request, reply) => {
+      if (limited('phone-proof', 12, request, reply)) return;
+      const body = parse(phoneStartSchema, request.body, reply);
+      if (!body) return;
+      return service.startPhoneProof(body.phone, body.country, langOf(request));
+    }),
+  );
+
+  app.post(
+    '/api/auth/phone-proof/confirm',
+    guard(async (request, reply) => {
+      if (limited('phone-proof-code', 20, request, reply)) return;
+      const body = parse(phoneProofConfirmSchema, request.body, reply);
+      if (!body) return;
+      return service.confirmPhoneProof(body.stepToken, body.code);
     }),
   );
 
@@ -253,7 +281,19 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!body) return;
       const identity = await social.verify(body.provider, body.token);
       const result = await service.socialLogin({ ...identity, name: identity.name || body.name?.trim() || '' }, request.ip, langOf(request), sourceOf(request), bundleOf(request));
-      return 'totp' in result || 'phoneStep' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+      return 'totp' in result || 'phoneStep' in result || 'phoneFirst' in result || result.pending ? result : { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  // M211: a first Google/Apple sign-in ends here, once its number is proven; before that no account exists.
+  app.post(
+    '/api/auth/social/complete',
+    guard(async (request, reply) => {
+      if (limited('social', 12, request, reply)) return;
+      const body = parse(socialCompleteSchema, request.body, reply);
+      if (!body) return;
+      const result = await service.completeSocialSignup(body.signupToken, body.phoneProof, request.ip);
+      return { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 

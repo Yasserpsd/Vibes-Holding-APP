@@ -87,6 +87,7 @@ export type HubOp =
   | 'login'
   // Plugin 2.8.0 (M46): server-verified Google/Apple sign-in — find-or-create the contact by the verified e-mail.
   | 'social_login'
+  | 'phone_check'
   | 'logout'
   | 'account'
   | 'profile'
@@ -127,6 +128,10 @@ export type HubResponse = {
   pending?: boolean;
   already?: boolean;
   mail_sent?: 0 | 1;
+  /** Plugin 2.29.0 (M211): `register` opened the account on the proven number. */
+  proven?: 1;
+  /** Plugin 2.29.0 (M211) `phone_check`: an active account owns this number. */
+  taken?: 0 | 1;
   /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
   referred_by?: number;
   referred_name?: string;
