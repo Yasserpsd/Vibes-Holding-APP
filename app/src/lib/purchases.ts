@@ -2,7 +2,7 @@ import { NativeModules, Platform } from 'react-native';
 
 import type { StoreConfig } from '@/api/membership';
 import { t } from '@/i18n';
-import { trackMembershipPurchase } from '@/lib/adsAttribution';
+import { trackMembershipCheckout, trackMembershipPurchase } from '@/lib/adsAttribution';
 
 type PurchasesModule = typeof import('react-native-purchases');
 type PurchasesPackage = import('react-native-purchases').PurchasesPackage;
@@ -139,6 +139,7 @@ export async function purchaseMembership(config: StoreConfig, offer: StoreOffer)
   const purchases = loadPurchases();
   if (!purchases) return { status: 'failed', message: t('store.error.unsupported') };
   try {
+    trackMembershipCheckout(offer.product);
     const result = offer.kind === 'package' ? await purchases.default.purchasePackage(offer.pkg) : await purchases.default.purchaseStoreProduct(offer.product);
     // M157: the ad networks learn about the bought membership (price + currency, no member data).
     trackMembershipPurchase(offer.product);

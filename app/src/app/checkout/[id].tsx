@@ -9,7 +9,7 @@ import { SarText } from '@/components/SarText';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { trackServicePurchase } from '@/lib/adsAttribution';
+import { trackServiceCheckout, trackServicePurchase } from '@/lib/adsAttribution';
 import { appScheme, openCheckout, paymentReturnUrl } from '@/lib/checkout';
 import { loadWebView } from '@/lib/player';
 import { themedStyles } from '@/theme/styles';
@@ -43,6 +43,11 @@ export default function CheckoutScreen() {
     const timer = setInterval(() => void refetch(), 5000);
     return () => clearInterval(timer);
   }, [status, refetch]);
+
+  useEffect(() => {
+    // M217: the checkout opened for a real, unpaid payment — the intent signal.
+    if (status === 'created' && payment) trackServiceCheckout(payment);
+  }, [status, payment]);
 
   useEffect(() => {
     // M157: the server flipped this payment to paid while the checkout was open — one conversion.

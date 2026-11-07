@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Image, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
@@ -16,6 +16,7 @@ import { StarsRow } from '@/components/Stars';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { isRTL, textStart } from '@/i18n/direction';
+import { trackProjectView } from '@/lib/adsAttribution';
 import { formatNumber } from '@/lib/format';
 import { topicIcon, type IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -35,6 +36,11 @@ export default function ProjectScreen() {
   const advisorContext = project ? ({ type: 'project', id: project.id, title: project.title } as const) : null;
   // The floating «اسأل المستشار» button opens the advisor with this project as the context.
   useAdvisorScreen(advisorContext);
+  // M217: one «content view» signal per opened opportunity (the id only).
+  const viewedId = project?.id;
+  useEffect(() => {
+    if (viewedId) trackProjectView(String(viewedId));
+  }, [viewedId]);
   // Keeps the last card (the unlock button) clear of that floating button.
   const clearance = useAskAdvisorClearance();
   const imageWidth = width - spacing.md * 2;

@@ -166,6 +166,44 @@ export function trackMembershipPurchase(product: { identifier: string; price: nu
   });
 }
 
+/** M217: the store's purchase sheet is about to open (intent signal for the ad networks, no member data). */
+export function trackMembershipCheckout(product: { identifier: string; price: number; currencyCode: string }): void {
+  logEvent('af_initiated_checkout', {
+    af_price: product.price,
+    af_currency: product.currencyCode,
+    af_content_id: product.identifier,
+    af_content_type: 'membership',
+  });
+}
+
+const checkedOut = new Set<string>();
+
+/** M217: a real-world service checkout opened. Once per payment per launch. */
+export function trackServiceCheckout(payment: { id: string; serviceKey: string; amount: number; currency: string }): void {
+  if (checkedOut.has(payment.id)) return;
+  checkedOut.add(payment.id);
+  logEvent('af_initiated_checkout', {
+    af_price: payment.amount,
+    af_currency: payment.currency,
+    af_content_id: payment.serviceKey,
+    af_content_type: 'service',
+  });
+}
+
+const viewedProjects = new Set<string>();
+
+/** M217: a Projects Bank opportunity was opened (once per project per launch; the id only, no founder data). */
+export function trackProjectView(projectId: string): void {
+  if (!projectId || viewedProjects.has(projectId)) return;
+  viewedProjects.add(projectId);
+  logEvent('af_content_view', { af_content_id: projectId, af_content_type: 'project' });
+}
+
+/** M217: the member unlocked a project's founder contact (the club's core action). */
+export function trackProjectUnlock(projectId: string): void {
+  logEvent('project_unlock', { af_content_id: projectId, af_content_type: 'project' });
+}
+
 const trackedPayments = new Set<string>();
 
 /** A real-world service was paid (Moyasar callback confirmed on the server). Once per payment per launch. */

@@ -17,6 +17,7 @@ import { Notice } from '@/components/Notice';
 import { isProfileGate, ProfileGateNotice } from '@/components/ProfileGate';
 import { hubText, t } from '@/i18n';
 import { arrowForward, chevronForward, textStart } from '@/i18n/direction';
+import { trackProjectUnlock } from '@/lib/adsAttribution';
 import { formatNumber } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
@@ -83,6 +84,7 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
     setError(null);
     try {
       const result = await projectsApi.unlock(projectId);
+      if (!result.already) trackProjectUnlock(projectId);
       // The answer goes where the access answer lives, so both leave the memory together.
       queryClient.setQueryData<ProjectAccess>(projectAccessKey(projectId, account ?? ''), (previous) => ({
         state: 'unlocked',
