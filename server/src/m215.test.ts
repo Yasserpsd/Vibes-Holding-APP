@@ -34,6 +34,8 @@ test('the forms clean what the member typed', () => {
   assert.equal(nationalDigits('055 162 3111', 'sa'), '551623111');
   assert.equal(nationalDigits('0100 123 4567', 'eg'), '1001234567');
   assert.equal(nationalDigits('abc', 'sa'), '');
+  assert.equal(nationalDigits('9123456789', 'in'), '9123456789');
+  assert.equal(nationalDigits('+91 91234 56789', 'in'), '9123456789');
   assert.equal(hubNumber('00551623111', 'sa'), '0551623111');
   assert.equal(hubNumber('551623111', 'sa'), '0551623111');
   assert.equal(hubNumber('0 51234567', 'kw'), '51234567');

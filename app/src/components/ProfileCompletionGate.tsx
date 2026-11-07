@@ -18,7 +18,7 @@ import { Notice } from '@/components/Notice';
 import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, tOptional } from '@/i18n';
-import { isEmail, nameIssue, phoneIssue } from '@/lib/validation';
+import { isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { brand, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
 const PERSONAS: Persona[] = ['neutral', 'entrepreneur', 'investor'];
@@ -269,7 +269,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 <FormField
                   label={t('auth.register.phone')}
                   value={phone}
-                  onChangeText={(value) => field('phone', setPhone)(value.replace(/\D+/g, '').replace(/^0+/, ''))}
+                  onChangeText={(value) => field('phone', setPhone)(localPhoneDigits(value, country))}
                   error={form.errors.phone}
                   anchorRef={form.anchor('phone')}
                   onBlur={blur('phone')}

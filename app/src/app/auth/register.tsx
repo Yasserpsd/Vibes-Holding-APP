@@ -22,7 +22,7 @@ import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
 import { markIntroDue } from '@/lib/introGate';
-import { isEmail, nameIssue, phoneIssue } from '@/lib/validation';
+import { isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -252,7 +252,7 @@ export default function RegisterScreen() {
             textContentType="telephoneNumber"
             value={form.phone}
             editable={!proof}
-            onChangeText={(value) => set('phone')(value.replace(/\D+/g, '').replace(/^0+/, ''))}
+            onChangeText={(value) => set('phone')(localPhoneDigits(value, country))}
             placeholder={phoneExample || undefined}
             hint={t('auth.register.phoneWhatsapp')}
             hintOnFocus

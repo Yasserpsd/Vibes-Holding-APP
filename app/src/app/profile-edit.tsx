@@ -18,7 +18,7 @@ import { VoiceFill } from '@/components/VoiceFill';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { phoneIssue } from '@/lib/validation';
+import { localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -30,10 +30,11 @@ export default function ProfileEditScreen() {
   const { data: config } = useAuthConfig();
   // The member changes the mobile number from here (owner, 2026-10-30); the e-mail stays the account's
   // identity and only the club's admins change it. The number is sent only when it was actually edited.
-  const [phone, setPhone] = useState(me?.phone ?? '');
+  // M215: the +966 picker already stands beside the field, so the saved 05… shows without its zero; an untouched number is not sent.
+  const [phone, setPhone] = useState(localPhoneDigits(me?.phone ?? ''));
   const [countryCode, setCountryCode] = useState('sa');
   const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
-  const phoneChanged = phone.trim() !== (me?.phone ?? '').trim();
+  const phoneChanged = phone !== localPhoneDigits(me?.phone ?? '');
   // M161 (owner): the contact e-mail (invoices, club mails) is the member's to change; the sign-in e-mail is not.
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const contactEmailChanged = contactEmail.trim().toLowerCase() !== (me?.contactEmail ?? '').trim().toLowerCase();
@@ -178,7 +179,7 @@ export default function ProfileEditScreen() {
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={(value) => setPhone(localPhoneDigits(value, country))}
           placeholder={country?.example ? country.example.replace(/^0+/, '') : undefined}
           hint={`${t('profile.phoneHint')} ${t('phoneCode.phoneHint')}`}
         />

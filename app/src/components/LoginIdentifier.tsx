@@ -5,7 +5,7 @@ import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
-import { isEmail, phoneIssue } from '@/lib/validation';
+import { isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -42,11 +42,6 @@ export function identifierPhoneProblem(identifier: Identifier, countries: Countr
   if (phoneIssue(identifier.value, country) === null) return null;
   const format = country?.example?.replace(/^0+/, '') || t('auth.login.phonePlaceholder');
   return t('auth.phone.check', { format });
-}
-
-/** Digits only, and never a leading zero — the country code next to the field already covers it. */
-export function localPhoneDigits(value: string): string {
-  return value.replace(/\D+/g, '').replace(/^0+/, '');
 }
 
 type Props = {
@@ -106,7 +101,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               autoCorrect={false}
               editable={editable}
               value={value.value}
-              onChangeText={(text) => onChange({ ...value, value: localPhoneDigits(text) })}
+              onChangeText={(text) => onChange({ ...value, value: localPhoneDigits(text, country) })}
               placeholder={placeholder}
               hint={t('auth.login.phoneHint')}
               error={phoneBad ? t('auth.phone.check', { format: placeholder }) : undefined}

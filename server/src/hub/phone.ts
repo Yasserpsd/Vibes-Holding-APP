@@ -34,8 +34,10 @@ export function nationalDigits(typed: string, countryCode?: string): string {
     .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
     .replace(/\D+/g, '');
   const digits = raw.replace(/^0+/, '');
-  const dial = countryByCode(countryCode)?.dial;
-  if (!dial || !digits.startsWith(dial)) return digits;
+  const country = countryByCode(countryCode);
+  // A local number that merely starts like the dial code stays whole (an Indian 91…).
+  if (!country || !digits.startsWith(country.dial) || country.local?.test(digits)) return digits;
+  const dial = country.dial;
   return raw.startsWith('00') || digits.length > dial.length + 7 ? digits.slice(dial.length).replace(/^0+/, '') : digits;
 }
 

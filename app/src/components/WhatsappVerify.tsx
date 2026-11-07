@@ -17,7 +17,7 @@ import { VerifiedBadge, badgeTierOf } from '@/components/VerifiedBadge';
 import { t } from '@/i18n';
 import { saveSetting } from '@/lib/deviceStore';
 import { autoPopupHeld, autoPopupsBlocked, markAutoPopupUsed, useAutoPopupFree, usePopupHold } from '@/lib/popupGate';
-import { phoneIssue } from '@/lib/validation';
+import { localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
@@ -188,7 +188,7 @@ function Body({ onClose }: { onClose: () => void }) {
                 label={t('auth.register.phone')}
                 value={phone}
                 onChangeText={(value) => {
-                  setPhone(value.replace(/\D+/g, '').replace(/^0+/, ''));
+                  setPhone(localPhoneDigits(value, country));
                   setPhoneError(null);
                 }}
                 error={phoneError}

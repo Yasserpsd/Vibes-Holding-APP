@@ -4,7 +4,23 @@ export function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim().toLowerCase());
 }
 
-export type PhoneRules = { pattern?: string; min?: number; max?: number; starts?: string[] };
+export type PhoneRules = { dial?: string; pattern?: string; min?: number; max?: number; starts?: string[] };
+
+/**
+ * M215 (owner, 2026-11-07): what is typed in a number field is cleaned as it is typed: Arabic-Indic digits folded, signs
+ * dropped, every stray zero gone, and a pasted dial code removed once the number is too long to be a local one (so an
+ * Indian 91… stays whole). The server applies the same cleaning for older bundles.
+ */
+export function localPhoneDigits(value: string, rules?: PhoneRules): string {
+  const raw = value
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/\D+/g, '');
+  const digits = raw.replace(/^0+/, '');
+  const dial = rules?.dial;
+  if (!dial || !digits.startsWith(dial) || digits.length <= (rules?.max ?? 12)) return digits;
+  return digits.slice(dial.length).replace(/^0+/, '');
+}
 
 /**
  * M128: checks a local mobile number against the country's rules (length + leading digits).
@@ -12,7 +28,7 @@ export type PhoneRules = { pattern?: string; min?: number; max?: number; starts?
  * or complete but failing the server pattern), 'short' while still typing, null when valid.
  */
 export function phoneIssue(value: string, rules: PhoneRules | undefined): 'bad' | 'short' | null {
-  const digits = value.replace(/\D+/g, '').replace(/^0+/, '');
+  const digits = localPhoneDigits(value, rules);
   const min = rules?.min ?? 8;
   const max = rules?.max ?? 12;
   const starts = rules?.starts ?? [];
