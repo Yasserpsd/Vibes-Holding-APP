@@ -51,7 +51,7 @@ function summary(draft: Draft, name: string): string {
     case 'pb':
       return draft.amount > 0 ? `يزيد رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(draft.amount, 'مشروعين')}.` : `ينقص رصيد «${name}» في بنك المشاريع بمقدار ${formatProjects(-draft.amount, 'مشروعين')}.`;
     case 'honorary':
-      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة بلا مدة ولا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
+      return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة المدة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
     case 'unhonorary':
       return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures.`;
     case 'publisher':
@@ -339,7 +339,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
           <dl className="fields">
             {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
             <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
-            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'لا تنتهي' : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
+            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
             {account.state === 'member' ? <Field label="رصيد المستشار اليوم">{dailyLeft(account)}</Field> : null}
             <Field label="رصيد بنك المشاريع">{pb ? `المتبقي ${formatProjects(pb.left)}` : '—'}</Field>
             {pb ? <Field label="تفاصيل الرصيد">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
@@ -380,7 +380,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             ))}
           </div>
         ) : null}
-        {account.honorary ? <p className="muted hint">عضوية شرفية: بلا مدة ولا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
+        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة المدة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
         {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
         {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
         {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}

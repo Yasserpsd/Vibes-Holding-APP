@@ -491,11 +491,11 @@ export class PushService {
     this.background(contactId, (lang) => {
       if (lang === 'en') {
         return on
-          ? { title: 'You have been granted Honorary Membership', body: 'Your Honorary Membership of Investors Club is active, with no end date.', data }
+          ? { title: 'You have been granted Honorary Membership', body: 'Your Honorary Membership of Investors Club is active and open-ended.', data }
           : { title: 'Your Honorary Membership has ended', body: 'Honorary Membership is reserved for official partners under the articles of association of the Vibes Ventures companies. Any active annual membership you hold is not affected.', data };
       }
       return on
-        ? { title: 'مُنحتم العضوية الشرفية', body: 'يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، وهي سارية دون مدة محددة.', data }
+        ? { title: 'مُنحتم العضوية الشرفية', body: 'يسرّنا إبلاغكم بمنحكم العضوية الشرفية في نادي المستثمرين، وهي مفتوحة المدة.', data }
         : { title: 'انتهت العضوية الشرفية', body: 'العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ولا يؤثر انتهاؤها في أي عضوية سنوية سارية لديكم.', data };
     });
   }

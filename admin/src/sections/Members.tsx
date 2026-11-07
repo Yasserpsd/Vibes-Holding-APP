@@ -60,7 +60,7 @@ export function WaPill({ account }: { account: Pick<Account, 'phone_verified' | 
 }
 
 export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end' | 'honorary'>): string {
-  if (account.honorary) return 'شرفية بلا مدة';
+  if (account.honorary) return 'شرفية مفتوحة المدة';
   if (account.never_expires) return 'بلا تاريخ انتهاء';
   if (account.member_left === null) return '—';
   return `باقي ${daysText(account.member_left)}`;
