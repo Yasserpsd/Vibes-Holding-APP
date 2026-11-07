@@ -26,8 +26,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 1.1.0 (M27 stage 4): the first binary with the native modules added since M1 (secure store, notifications,
   // RevenueCat) and without a forced layout direction; its runtime gets its own updates.
   // 1.2.0 (M151): adds expo-document-picker (the advisor's PDF button); new runtime, new OTA branch.
-  // 1.3.2 (M217): SKAdNetwork ids + AppsFlyer postback copies in Info.plist (iOS-only change).
-  version: '1.3.2',
+  // M217: 1.3.1 stays (its review was withdrawn for a new iOS build with SKAN ids); same runtime, OTAs unchanged.
+  version: '1.3.1',
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
