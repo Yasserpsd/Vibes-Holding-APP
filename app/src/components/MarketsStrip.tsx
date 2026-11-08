@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMarkets, type MarketQuote } from '@/api/markets';
 import { PressScale } from '@/components/motion';
@@ -16,23 +16,50 @@ const HOME_COUNT = 3;
 // One width for every tile (owner, 2026-11-01: «كلهم نفس المقاس»); the row stretches them to the tallest.
 const QUOTE_WIDTH = 124;
 
-// Owner (2026-11-02): every quote wears its own face — the Saudi flag on TASI, gold and silver as
-// metal, the oil drum on brent/WTI, each currency's flag, Bitcoin's own logo. Emoji render in color
-// inside Text on both platforms, so no asset and no native module (OTA-safe on the 1.1.0 binary).
-const QUOTE_EMOJI: Record<string, string> = {
-  gold: '🥇',
-  silver: '🥈',
-  brent: '🛢️',
-  wti: '🛢️',
-  usd: '🇺🇸',
-  aed: '🇦🇪',
-  eur: '🇪🇺',
-  gbp: '🇬🇧',
+// Owner (2026-11-02, then 2026-11-08 «عايز العلم الأصلي يظهر حقيقي»): every quote wears its real face —
+// the coin's own logo (spothq/cryptocurrency-icons, CC0), the country's real flag (flagcdn, public
+// domain), drawn bars for gold and silver, an oil drum for brent/WTI. Bundled PNGs through the plain
+// RN Image: no native module, so the set ships by OTA; eas update uploads the assets with the bundle.
+const COIN_LOGO: Record<string, number> = {
+  btc: require('../../assets/images/markets/btc.png'),
+  eth: require('../../assets/images/markets/eth.png'),
+  usdt: require('../../assets/images/markets/usdt.png'),
+  bnb: require('../../assets/images/markets/bnb.png'),
+  xrp: require('../../assets/images/markets/xrp.png'),
+  sol: require('../../assets/images/markets/sol.png'),
+  ada: require('../../assets/images/markets/ada.png'),
+};
+const FLAG: Record<string, number> = {
+  tasi: require('../../assets/images/markets/tasi.png'),
+  usd: require('../../assets/images/markets/usd.png'),
+  aed: require('../../assets/images/markets/aed.png'),
+  eur: require('../../assets/images/markets/eur.png'),
+  gbp: require('../../assets/images/markets/gbp.png'),
+};
+const COMMODITY: Record<string, number> = {
+  gold: require('../../assets/images/markets/gold.png'),
+  silver: require('../../assets/images/markets/silver.png'),
+  brent: require('../../assets/images/markets/oil.png'),
+  wti: require('../../assets/images/markets/oil.png'),
 };
 
 export function QuoteIcon({ quote, size = 15 }: { quote: MarketQuote; size?: number }) {
-  if (quote.key === 'btc') return <Ionicons name="logo-bitcoin" size={size} color={colors.gold} />;
-  const emoji = QUOTE_EMOJI[quote.key] ?? (quote.group === 'crypto' ? '🪙' : '📈');
+  const coin = COIN_LOGO[quote.key];
+  if (coin) return <Image source={coin} style={{ width: size + 2, height: size + 2, borderRadius: (size + 2) / 2 }} />;
+  const flag = FLAG[quote.key];
+  // Flags keep their rectangle (a real flag, not a badge): 3:2 inside a soft-cornered frame, hairline edge for the pale ones.
+  if (flag) {
+    return (
+      <Image
+        source={flag}
+        resizeMode="cover"
+        style={{ width: Math.round(size * 1.5), height: size, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+      />
+    );
+  }
+  const commodity = COMMODITY[quote.key];
+  if (commodity) return <Image source={commodity} style={{ width: size + 4, height: size + 4 }} />;
+  const emoji = quote.group === 'crypto' ? '🪙' : '📈';
   return <Text style={{ fontSize: size - 1, lineHeight: size + 5 }}>{emoji}</Text>;
 }
 

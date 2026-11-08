@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
@@ -195,17 +195,19 @@ function NumberOfDayCard() {
       accessibilityLabel={`${t('news.numberOfDay')}: ${number.text}`}
       wrapStyle={styles.numberWrap}
     >
-      <GlassCard golden style={styles.numberCard}>
-        {/* Owner (2026-11-02, «خلي الرقم اكبر شئ وراه خلفية مميزة»): the figure is the hero — huge, dark ink on the lit gold slab. */}
-        <View style={styles.numberSide}>
+      {/* Owner (2026-11-08, «الرقم نفسه يكون مميز أكتر ومعاه صورة شيك»): the story's own photo fills the card
+          under a dark shade, the figure glows in gold on top of it, the headline and source sit beneath. */}
+      <View style={styles.numberCard}>
+        {number.item.image ? <Image source={{ uri: sized(number.item.image, 640) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+        <View style={[StyleSheet.absoluteFill, number.item.image ? styles.numberShade : styles.numberPlain]} />
+        <View style={styles.numberPill}>
+          <Ionicons name="sparkles" size={12} color={colors.goldInk} />
           <Text style={styles.numberEyebrow}>{t('news.numberOfDay')}</Text>
-          <Text style={styles.numberValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{number.text}</Text>
         </View>
-        <View style={styles.numberTexts}>
-          <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{number.item.title}</Text>
-          <Text style={styles.numberSource} numberOfLines={1}>{number.item.source.name}</Text>
-        </View>
-      </GlassCard>
+        <Text style={styles.numberValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{number.text}</Text>
+        <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{number.item.title}</Text>
+        <Text style={styles.numberSource} numberOfLines={1}>{number.item.source.name}</Text>
+      </View>
     </PressScale>
   );
 }
@@ -252,25 +254,47 @@ const styles = themedStyles(() => ({
   title: { ...typography.subtitle, fontSize: 17, lineHeight: 27, minHeight: 54, color: colors.textPrimary, textAlign: textStart },
   snippet: { ...typography.body, fontSize: 14, lineHeight: 22, minHeight: 44, color: colors.textSecondary, textAlign: textStart },
   numberWrap: { marginTop: spacing.sm },
-  numberCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  numberSide: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-    minWidth: 112,
-    maxWidth: 160,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
+  numberCard: {
+    minHeight: 176,
+    justifyContent: 'flex-end',
+    gap: 2,
+    padding: spacing.md,
     borderRadius: radii.lg,
-    backgroundColor: colors.gold,
-    experimental_backgroundImage: gradients.gold,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: '#0E0E14',
     boxShadow: shadows.glowGold,
   },
+  // The photo stays readable under the gold figure: light at the top, near-black where the text sits.
+  numberShade: { experimental_backgroundImage: 'linear-gradient(180deg, rgba(8, 8, 12, 0.22) 0%, rgba(8, 8, 12, 0.6) 45%, rgba(8, 8, 12, 0.92) 100%)' },
+  // No photo: a golden dusk over the dark slab, so the card still reads as a photo card.
+  numberPlain: { experimental_backgroundImage: 'linear-gradient(135deg, rgba(217, 168, 60, 0.38) 0%, rgba(14, 14, 20, 1) 62%)' },
+  numberPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginBottom: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+  },
   numberEyebrow: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
-  numberValue: { fontFamily: fonts.bold, fontSize: 32, lineHeight: 46, color: colors.goldInk },
-  numberTexts: { flex: 1, gap: 2 },
-  numberTitle: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.textPrimary, textAlign: textStart },
-  numberSource: { ...typography.caption, fontSize: 11, color: colors.textMuted, textAlign: textStart },
+  numberValue: {
+    fontFamily: fonts.bold,
+    fontSize: 46,
+    lineHeight: 60,
+    color: colors.onPhotoGold,
+    textAlign: textStart,
+    textShadowColor: 'rgba(255, 216, 101, 0.55)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
+  },
+  numberTitle: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.onPhoto, textAlign: textStart },
+  numberSource: { ...typography.caption, fontSize: 11, color: colors.onPhotoSoft, textAlign: textStart },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderGoldSoft },
   dotOn: { width: 18, backgroundColor: colors.gold },
