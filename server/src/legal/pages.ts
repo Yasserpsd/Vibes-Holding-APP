@@ -2,11 +2,13 @@
  * M8 store readiness: the public legal pages (privacy policy, terms, account deletion).
  * Server-rendered static HTML in the app's dark/gold style, Arabic first with an English
  * section below (store reviewers read English). The wording must stay in sync with the
- * store data-safety forms (docs/STORES.md) — above all the M33 first-party analytics line.
+ * store data-safety forms (docs/STORES.md) — above all the first-party analytics and the
+ * AppsFlyer advertising-measurement lines.
  */
 
 const BRAND_GOLD = '#C9A227';
 const EFFECTIVE_DATE = '2026-10-16';
+const PRIVACY_EFFECTIVE_DATE = '2026-11-10';
 const CONTACT_EMAIL = 'info@vibesholding.com';
 
 function escape(value: string): string {
@@ -42,7 +44,7 @@ button{display:block;width:100%;margin-top:18px;padding:12px 18px;border-radius:
 export function privacyPage(): string {
   const body = `
 <h1>سياسة الخصوصية — تطبيق نادي المستثمرين</h1>
-<p class="meta">تاريخ السريان: ${EFFECTIVE_DATE}</p>
+<p class="meta">تاريخ السريان: ${PRIVACY_EFFECTIVE_DATE}</p>
 
 <h2>من نحن</h2>
 <p>تطبيق «نادي المستثمرين» تصدره شركة المجتمع الافتراضي للاستثمار (vcmem.com) ضمن منظومة Vibes Ventures. هذه السياسة تشرح البيانات التي يجمعها التطبيق وكيف نستخدمها. للتواصل: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
@@ -56,7 +58,11 @@ export function privacyPage(): string {
 <li>مدفوعات الخدمات الأخرى داخل التطبيق تتم عبر مزود الدفع Paymob؛ بيانات البطاقة تُدخل لدى المزود مباشرة ولا تمر بخوادمنا ولا نخزنها. نحتفظ بحالة الطلب والمبلغ والخدمة.</li>
 </ul>
 <h3>استخدام التطبيق (تحليلات طرف أول)</h3>
-<p>يرسل التطبيق أسماء الشاشات التي تُفتح مع معرّف جهاز عشوائي إلى خادمنا نحن فقط، لنعرف أكثر الصفحات استخدامًا كأعداد يومية مجمعة. لا نستخدم أي أداة تحليلات خارجية، ولا نبني سجل تصفح لكل عضو، والمعرّف العشوائي لا يكشف هويتك.</p>
+<p>يرسل التطبيق أسماء الشاشات التي تُفتح مع معرّف جهاز عشوائي إلى خادمنا نحن فقط، لنعرف أكثر الصفحات استخدامًا كأعداد يومية مجمعة. لا نبني من ذلك سجل تصفح لكل عضو، والمعرّف العشوائي لا يكشف هويتك.</p>
+<h3>قياس الإعلانات</h3>
+<p>نستخدم خدمة AppsFlyer لقياس أثر حملاتنا الإعلانية. تستقبل AppsFlyer من التطبيق معرّفات الجهاز، ومعرّف الإعلان إذا سمحت بذلك، وبيانات تقنية عن الجهاز، وموقعًا تقريبيًا مستنتجًا من عنوان IP، ورقم عضويتك الرقمي، والأحداث داخل التطبيق مثل التسجيل والاشتراك وعمليات الشراء وقيمتها. لا نرسل إليها اسمك ولا بريدك الإلكتروني ولا رقم جوالك.</p>
+<p>قد تصل نتائج هذا القياس إلى شبكات الإعلان التي نعلن عليها، وهي حاليًا Snapchat وTikTok وApple Ads، لقياس فاعلية الإعلانات وتحسينها.</p>
+<p>على iPhone يطلب التطبيق إذنك بالتتبع. إذا لم تسمح فلن يُستخدم معرّف الإعلان، وتصل البيانات إلى شبكات الإعلان بصورة مجمعة وغير مرتبطة بهويتك. يمكنك تغيير اختيارك في أي وقت من إعدادات الجهاز، وعلى Android من إعدادات الإعلانات في الجهاز.</p>
 <h3>الإشعارات</h3>
 <p>عند سماحك بالإشعارات نحفظ رمز جهازك ونرسل الإشعارات عبر خدمة Expo.</p>
 <h3>المستشار الذكي</h3>
@@ -69,11 +75,12 @@ export function privacyPage(): string {
 <li>تقديم خدمات النادي وتفعيل العضوية وإدارة الحساب.</li>
 <li>التواصل معك بخصوص طلباتك وحجوزاتك وعضويتك.</li>
 <li>تحسين التطبيق بأرقام استخدام مجمعة.</li>
+<li>قياس أداء حملاتنا الإعلانية وتحسينها.</li>
 </ul>
-<p>لا نبيع بياناتك ولا نشاركها لأغراض إعلانية.</p>
+<p>لا نبيع بياناتك، ولا نشارك اسمك أو بريدك الإلكتروني أو رقم جوالك لأغراض إعلانية. ويقتصر ما يصل إلى شركاء الإعلان على ما ورد في قسم «قياس الإعلانات».</p>
 
 <h2>مع من نشارك البيانات</h2>
-<p>نشارك الحد الأدنى اللازم مع مزودي التشغيل: Apple وGoogle (شراء العضوية من المتجر)، RevenueCat (حالة الاشتراك)، Paymob (مدفوعات الخدمات)، Expo (توصيل الإشعارات)، ومزود معالجة لغوية لتوليد ردود المستشار. ولا يتلقى أي منهم أكثر مما تتطلبه مهمته.</p>
+<p>نشارك الحد الأدنى اللازم مع مزودي التشغيل: Apple وGoogle (شراء العضوية من المتجر)، RevenueCat (حالة الاشتراك)، Paymob (مدفوعات الخدمات)، Expo (توصيل الإشعارات)، ومزود معالجة لغوية لتوليد ردود المستشار، وAppsFlyer وشبكات الإعلان المذكورة في قسم «قياس الإعلانات». ولا يتلقى أي منهم أكثر مما تتطلبه مهمته.</p>
 
 <h2>الاحتفاظ بالبيانات وحذف الحساب</h2>
 <p>نحتفظ ببياناتك ما دام حسابك قائمًا. يمكنك حذف حسابك نهائيًا من داخل التطبيق (تبويب «حسابي» ← «حذف الحساب») أو عبر <a href="/legal/account-deletion">صفحة طلب حذف الحساب</a>. عند الحذف تُزال بيانات حسابك وملفك الشخصي ورموز إشعاراتك؛ وقد نحتفظ بسجلات المدفوعات للمدد التي تفرضها الأنظمة المالية، وتبقى أرقام الاستخدام المجمعة لأنها لا ترتبط بهوية أحد.</p>
@@ -87,20 +94,21 @@ export function privacyPage(): string {
 <div class="divider"></div>
 <div class="en">
 <h2>Privacy Policy — Investors Club (English summary)</h2>
-<p>Effective date: ${EFFECTIVE_DATE}. The Investors Club app («نادي المستثمرين») is published by the Virtual Community Investment Company (vcmem.com), part of the Vibes Ventures ecosystem. Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+<p>Effective date: ${PRIVACY_EFFECTIVE_DATE}. The Investors Club app («نادي المستثمرين») is published by the Virtual Community Investment Company (vcmem.com), part of the Vibes Ventures ecosystem. Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 <h3>Data we collect</h3>
 <ul>
 <li><b>Account data</b>: name, e-mail, phone number, member category and country, stored on our own vcmem.com accounts platform.</li>
 <li><b>Membership and payments</b>: the annual membership is purchased through the App Store / Google Play (we never see your card); RevenueCat manages the subscription state. Other in-app services are paid through the Paymob gateway; card details are entered with the provider and never stored by us.</li>
-<li><b>First-party analytics</b>: the app sends the names of opened screens together with a random device identifier to our own server only. We keep daily aggregate counts, use no third-party analytics SDK, and build no per-member browsing history.</li>
+<li><b>First-party analytics</b>: the app sends the names of opened screens together with a random device identifier to our own server only. We keep daily aggregate counts and build no per-member browsing history from them.</li>
+<li><b>Advertising measurement</b>: we use AppsFlyer to measure our advertising campaigns. AppsFlyer receives device identifiers, the advertising identifier if you allow it, technical device data, an approximate location inferred from the IP address, your numeric member id, and in-app events such as registration, subscription and purchases with their value. We do not send it your name, e-mail or phone number. Measurement results may reach the ad networks we advertise on, currently Snapchat, TikTok and Apple Ads. On iPhone the app asks for your tracking permission; if you decline, the advertising identifier is not used and data reaches ad networks in aggregated form, not linked to your identity. You can change your choice at any time in the device settings, and on Android in the device's ad settings.</li>
 <li><b>Notifications</b>: your device push token, delivered through Expo's push service.</li>
 <li><b>Advisor chat</b>: messages you send to the in-app advisor are processed automatically to generate replies.</li>
 <li><b>Bookings and forms</b>: HQ visit bookings, workshop registrations and service requests are stored and e-mailed to the club's management.</li>
 </ul>
 <h3>How we use it</h3>
-<p>To provide the club's services, activate memberships, respond to your requests, and improve the app with aggregate numbers. We do not sell your data and we do not share it for advertising.</p>
+<p>To provide the club's services, activate memberships, respond to your requests, improve the app with aggregate numbers, and measure and improve our advertising campaigns. We do not sell your data, and we do not share your name, e-mail or phone number for advertising.</p>
 <h3>Sharing</h3>
-<p>Minimal data is shared with our processors: Apple/Google (store purchase), RevenueCat (subscription state), Paymob (service payments), Expo (push delivery), and a language-model provider (advisor replies).</p>
+<p>Minimal data is shared with our processors: Apple/Google (store purchase), RevenueCat (subscription state), Paymob (service payments), Expo (push delivery), a language-model provider (advisor replies), and AppsFlyer and the ad networks named above (advertising measurement).</p>
 <h3>Retention and deletion</h3>
 <p>You can permanently delete your account inside the app (Account tab → Delete account) or through the <a href="/legal/account-deletion">account deletion page</a>. Account and profile data and push tokens are removed; payment records may be retained as required by financial regulations; aggregate usage counts are not linked to any identity.</p>
 <h3>Security and eligibility</h3>

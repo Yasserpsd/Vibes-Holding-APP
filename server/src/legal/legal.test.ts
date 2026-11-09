@@ -31,7 +31,12 @@ test('legal pages are public Arabic HTML and declare the first-party analytics',
   // M33 analytics must be declared (M8), in Arabic and in the English summary.
   assert.ok(privacy.body.includes('معرّف جهاز عشوائي'));
   assert.ok(privacy.body.includes('random device identifier'));
-  assert.ok(privacy.body.includes('no third-party analytics SDK'));
+  // The AppsFlyer ads measurement and the ad networks are declared, never denied.
+  assert.ok(privacy.body.includes('AppsFlyer'));
+  assert.ok(privacy.body.includes('قياس الإعلانات'));
+  assert.ok(privacy.body.includes('Snapchat, TikTok and Apple Ads'));
+  assert.ok(!privacy.body.includes('no third-party analytics SDK'));
+  assert.ok(!privacy.body.includes('ولا نشاركها لأغراض إعلانية'));
   const terms = await app.inject({ method: 'GET', url: '/legal/terms' });
   assert.ok(terms.body.includes('ضمانًا لعوائد'));
 });

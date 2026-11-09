@@ -21,8 +21,8 @@ production — every go-live step needs the owner's explicit word.
 The API server serves its own store-facing pages (`server/src/legal/`, Arabic + English):
 
 - `GET /legal/privacy` — privacy policy; **declares the M33 first-party analytics** (opened
-  screen names + a random device id to our own server, daily aggregates, no third-party SDK,
-  no per-member browsing history).
+  screen names + a random device id to our own server, daily aggregates, no per-member
+  browsing history) and the AppsFlyer advertising measurement (Snapchat, TikTok, Apple Ads).
 - `GET /legal/terms` — terms of use (membership auto-renewal wording, «ليست عرضًا تعاقديًا أو ضمانًا لعوائد»).
 - `GET /legal/account-deletion` — Google-required public deletion page: explains in-app
   deletion (حسابي ← حذف الحساب) and takes a request form → mails the management
@@ -133,7 +133,9 @@ the vcmem.com widget. Note: the hub refuses a duplicate phone across accounts.
 - [ ] Webhook → `https://<prod-domain>/api/webhooks/revenuecat`, Authorization header = production `REVENUECAT_WEBHOOK_AUTH`.
 - [ ] Railway production: `REVENUECAT_PUBLIC_KEY_ANDROID` (`goog_…`), `REVENUECAT_PUBLIC_KEY_IOS` (`appl_…`), optional `REVENUECAT_SECRET_KEY`.
 
-## 6. Data safety / App Privacy — FINAL answers (match `/legal/privacy`; completed 2026-10-18)
+## 6. Data safety / App Privacy — answers of 2026-10-18 (OUTDATED on tracking)
+
+> Since M157 (2026-10-30) the app carries AppsFlyer + the ATT prompt, and both stores declare tracking / advertising data. The live labels and `/legal/privacy` (updated 2026-11-10) override the «no ads, no tracking, no third-party SDK» answers below.
 
 Common facts: data encrypted in transit (HTTPS); account deletion in-app + web page; **no
 ads, no tracking across apps, no third-party analytics SDK**; the M33 analytics id is a
