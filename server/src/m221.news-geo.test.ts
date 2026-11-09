@@ -7,7 +7,6 @@ import { geoOf, type Geo } from './news/geo.js';
 import { NEWS_PICKS_KEY, NEWS_SNAPSHOT_KEY, NewsService, PICKS_RULE, newsIdOf, type PicksState } from './news/service.js';
 import { NEWS_SEED_VERSION, NEWS_SOURCES_KEY, NEWS_SOURCES_SEED, mergeSeed } from './news/sources.js';
 import type { NewsItem, NewsSnapshot, SourceTier, TopicKey } from './news/types.js';
-import type { PushMessage, PushService } from './push/service.js';
 import { DAY_MS, riyadhDay } from './riyadh.js';
 import { MemoryKV } from './store.js';
 
@@ -101,7 +100,7 @@ const story = (slug: string, title: string, topics: TopicKey[], hours: number, o
   ...over,
 });
 
-test('M221: the home, the feed, «رقم اليوم» and the push carry Saudi and world-market stories, never another country’s local news', async () => {
+test('M221: the home, the feed and «رقم اليوم» carry Saudi and world-market stories, never another country’s local news', async () => {
   const kv = new MemoryKV();
   const pushed: PicksState = {
     editions: [2, 1].map((slot) => ({ day: today, slot, filledAt: new Date().toISOString(), picks: { ar: [], en: [] }, pushedAt: new Date().toISOString() })),
@@ -121,15 +120,7 @@ test('M221: the home, the feed, «رقم اليوم» and the push carry Saudi a
   await kv.set(NEWS_SOURCES_KEY, { sources: [], updatedAt: new Date().toISOString(), seedVersion: NEWS_SEED_VERSION });
   await kv.set(NEWS_PICKS_KEY, pushed);
   await kv.set(NEWS_SNAPSHOT_KEY, { version: 1, items, updatedAt: new Date().toISOString() } satisfies NewsSnapshot);
-  const waves: PushMessage[] = [];
-  const push = {
-    broadcastEach: async (choose: (device: { contactId: number; persona: string | null; lang: string | null }) => Promise<PushMessage | null> | PushMessage | null) => {
-      const message = await choose({ contactId: 1, persona: null, lang: 'ar' });
-      if (message) waves.push(message);
-      return { sent: message ? 1 : 0, failed: 0 };
-    },
-  } as unknown as PushService;
-  const news = new NewsService({ kv, config, log: silentLog, classifier: new KeywordClassifier(), push });
+  const news = new NewsService({ kv, config, log: silentLog, classifier: new KeywordClassifier() });
   await news.start();
   await news.runEditions(morning);
 
@@ -142,8 +133,6 @@ test('M221: the home, the feed, «رقم اليوم» and the push carry Saudi a
 
   assert.equal(news.numberOfDay('ar', morning)?.text, '100 مليار', 'the Egyptian 900 billion is not the club’s number');
   assert.equal(news.status().visible, 4, 'the three foreign stories are stored but never shown');
-  assert.equal(waves.length, 1);
-  assert.equal(waves[0]?.body, ARAMCO, 'the push is the best Saudi story');
 });
 
 test('M221: three off-target feeds are switched off once; the owner’s other switches stay', () => {

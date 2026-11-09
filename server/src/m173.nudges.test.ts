@@ -70,7 +70,7 @@ function rig(events: AgendaEvent[], registrations: AgendaRegistration[] = []) {
   return { service: new WorkshopNudgeService({ kv, log: silentLog, agenda, push }), sent, kv };
 }
 
-test('the slots: nothing before 09:00, the morning slot once, the evening slot once', async () => {
+test('one reminder a day: nothing before 09:00, once in the morning, silence until the next morning', async () => {
   const { service, sent } = rig([event({})]);
   assert.equal(slotOf(at(8)), null);
   assert.equal(await service.run(at(8)), null);
@@ -83,21 +83,25 @@ test('the slots: nothing before 09:00, the morning slot once, the evening slot o
   assert.equal(await service.run(at(NUDGE_HOURS[0] + 3)), null, 'the morning slot is spent');
   assert.equal(sent.length, 3);
 
-  const evening = await service.run(at(NUDGE_HOURS[1]));
-  assert.ok(evening);
-  assert.equal(sent.length, 6);
+  assert.equal(await service.run(at(21)), null, 'the old evening slot is gone');
   assert.equal(await service.run(at(23)), null);
+  assert.equal(sent.length, 3);
   // The next morning is a new slot.
   assert.ok(await service.run(at(NUDGE_HOURS[0], 1)));
-  assert.equal(sent.length, 9);
+  assert.equal(sent.length, 6);
+});
+
+test('M222: a day that already had the old 21:00 reminder gets no second one after the deploy', async () => {
+  const { service, sent, kv } = rig([event({})]);
+  const day = slotOf(at(NUDGE_HOURS[0]))!.slice(0, 10);
+  await kv.set(NUDGES_KEY, { lastSlot: `${day}#21`, lastEventId: null, lastAt: null, counts: {}, enabled: true } satisfies NudgesState);
+  assert.equal(await service.run(at(22)), null);
+  assert.equal(sent.length, 0);
 });
 
 test('every send uses a different wording, the push opens the event, and the fee line names the membership', async () => {
   const { service, sent } = rig([event({})]);
-  for (let day = 0; day < 4; day += 1) {
-    await service.run(at(NUDGE_HOURS[0], day));
-    await service.run(at(NUDGE_HOURS[1], day));
-  }
+  for (let day = 0; day < 8; day += 1) await service.run(at(NUDGE_HOURS[0], day));
   const arabic = sent.filter((entry) => entry.device.lang === 'ar' && entry.device.contactId === 10).map((entry) => entry.message);
   assert.equal(arabic.length, 8);
   assert.equal(new Set(arabic.map((message) => message.title)).size, 8, 'eight sends, eight titles');
@@ -126,9 +130,9 @@ test('confirmed attendees are skipped; a closed or finished workshop is never nu
   assert.equal(first?.eventId, 'soon', 'the soonest workshop first');
   assert.deepEqual(sent.map((entry) => entry.device.contactId), [10, 12], 'the confirmed attendee 11 is skipped, the unpaid 12 still hears');
 
-  const second = await service.run(at(NUDGE_HOURS[1]));
+  const second = await service.run(at(NUDGE_HOURS[0], 1));
   assert.equal(second?.eventId, 'later', 'then the other workshop takes its turn');
-  const third = await service.run(at(NUDGE_HOURS[0], 1));
+  const third = await service.run(at(NUDGE_HOURS[0], 2));
   assert.equal(third?.eventId, 'soon');
   assert.ok(!sent.some((entry) => entry.message.data?.eventId === 'closed'));
 });

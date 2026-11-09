@@ -9,15 +9,15 @@ import { eventDays, type AgendaEvent, type AgendaRegistration } from './service.
 
 /**
  * M173 (owner, 2026-10-31: «عايز تذكير كل 12 ساعة أوتوماتيك يوصل على نوتيفيكيشن لأي ورشة موجودة، وكل مرة
- * بصيغة مختلفة»): twice a day — at/after 09:00 and 21:00 Riyadh — every device that has NOT confirmed a seat
+ * بصيغة مختلفة»), once a day since M222: at/after NUDGE_HOURS Riyadh, every device that has NOT confirmed a seat
  * gets one push about an upcoming open workshop, and the wording changes every time (a bank of templates,
  * rotated per event). With several upcoming workshops the slots rotate through them, one per slot, so nobody
  * gets two pushes at once. Confirmed attendees are skipped (they get the M107 day-before reminder instead).
  * State lives in kv: the last slot served, how many nudges each event got (= which wording comes next).
  */
 export const NUDGES_KEY = 'agenda:nudges';
-/** Riyadh hours of the two daily slots (news editions are 10:00/19:00, the daily project 12:00). */
-export const NUDGE_HOURS = [9, 21] as const;
+/** M222 (owner, 2026-11-09): one reminder a day, in the morning; the daily projects go out at 12:00 and 20:00. */
+export const NUDGE_HOURS = [9] as const;
 
 export type NudgesState = {
   /** `YYYY-MM-DD#HH` of the last slot that went out (or was found empty). */
@@ -154,7 +154,8 @@ export class WorkshopNudgeService {
     try {
       const state = await this.load();
       const slot = slotOf(now);
-      if (!state.enabled || !slot || state.lastSlot === slot) return null;
+      // Compared by day: a state saved under the old 21:00 slot must not earn a second reminder that day.
+      if (!state.enabled || !slot || state.lastSlot?.startsWith(`${riyadhDay(now)}#`)) return null;
       return await this.send(now, slot);
     } catch (error) {
       this.deps.log.error({ err: error }, 'workshop nudge failed');

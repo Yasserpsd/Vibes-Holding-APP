@@ -31,7 +31,7 @@ const seeded = {
   newsSources: await ensureNewsSourcesSeed(kv),
   partners: await ensurePartnersSeed(kv),
 };
-const { app, projects, golden, news, videos, media, sync, analytics, companion, marketAlerts, breakingNews, englishSweep, postsEnglish, projectsEnglish } = await buildApp({ config, kv });
+const { app, projects, golden, news, videos, media, sync, analytics, englishSweep, postsEnglish, projectsEnglish } = await buildApp({ config, kv });
 // A newer seed (for example the membership copy) is content the app should fetch again.
 if (Object.values(seeded).some(Boolean)) await sync.bump('content');
 
@@ -44,9 +44,7 @@ await news.start();
 await videos.start();
 media.start();
 analytics.start();
-companion.start();
-marketAlerts.start();
-breakingNews.start();
+// M222 (owner, 2026-11-09): the advisor's daily push and the market alerts are off; they stay parked, never started.
 englishSweep.start();
 postsEnglish.start();
 
@@ -57,9 +55,6 @@ const shutdown = async (signal: string): Promise<void> => {
   news.stop();
   videos.stop();
   media.stop();
-  companion.stop();
-  marketAlerts.stop();
-  breakingNews.stop();
   englishSweep.stop();
   postsEnglish.stop();
   projectsEnglish.stop();

@@ -36,7 +36,6 @@ const envSchema = z.object({
   // M179: the advisor's market-move alerts (push when a quote moves sharply); '0' kills it cold. Thresholds live in the dashboard.
   MARKET_ALERTS: z.enum(['0', '1']).default('1'),
   /** M182b: the breaking-news push (money story with a hard-hitting headline); '0' kills it. */
-  NEWS_BREAKING: z.enum(['0', '1']).default('1'),
   // Signs the hub's webhook to /api/webhooks/hub (hub settings «app_webhook_secret», shown once). Unset = the webhook answers 503.
   HUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(180),

@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { api } from '../api';
 import { formatNumber, formatRelative } from '../format';
 import type { NewsSourceRow } from '../types';
-import { NewsBreaking } from './NewsBreaking';
 import { Async, Chips, Pill, SectionHead, messageOf, useLoad, useShell } from '../ui';
 
 type LangFilter = 'ar' | 'en';
@@ -57,7 +56,7 @@ function SourceRow({ source, busy, onToggle }: { source: NewsSourceRow; busy: bo
 }
 
 /**
- * M170 «مشروع اليوم»: the daily project push — today's pick, the switch, and «ابعت دلوقتي». The AI only
+ * M170/M222 «مشروع اليوم»: the two daily project pushes — today's pick, the switch, and «ابعت دلوقتي». The AI only
  * chooses the project; the push shows the project's own public fields (rule 4 enforced on the server).
  */
 function DailyProjectCard() {
@@ -69,7 +68,7 @@ function DailyProjectCard() {
     setBusy(true);
     try {
       await api.setDailyProject(next);
-      notify('ok', next ? 'تم تشغيل «مشروع اليوم»: مشروع واحد كل يوم الساعة 12 ظهرًا بتوقيت الرياض لكل الأجهزة.' : 'تم إيقاف «مشروع اليوم». لا يُرسل شيء حتى تشغّله من جديد.');
+      notify('ok', next ? 'تم تشغيل «مشروع اليوم»: مشروعان كل يوم بتوقيت الرياض لكل الأجهزة، مشروع ذهبي الساعة 12 ظهرًا ومشروع من باقي البنك الساعة 8 مساءً.' : 'تم إيقاف «مشروع اليوم». لا يُرسل شيء حتى تشغّله من جديد.');
       state.reload();
     } catch (failure) {
       notify('error', messageOf(failure));
@@ -79,7 +78,7 @@ function DailyProjectCard() {
   };
 
   const sendNow = async () => {
-    if (!window.confirm('إرسال مشروع اليوم الآن لكل الأجهزة المسجلة؟ (يختار الذكاء الاصطناعي مشروعًا لم يُعرض مؤخرًا)')) return;
+    if (!window.confirm('إرسال مشروع إضافي الآن لكل الأجهزة المسجلة؟ (يختار الذكاء الاصطناعي مشروعًا لم يُعرض مؤخرًا، والإشعاران اليوميان يبقيان في موعدهما)')) return;
     setBusy(true);
     try {
       const result = await api.pushDailyProject();
@@ -99,10 +98,10 @@ function DailyProjectCard() {
           <div className="row">
             <strong>مشروع اليوم من بنك المشاريع</strong>
             <span className="pills">
-              <Pill tone={state.data?.enabled === false ? 'muted' : 'ok'}>{state.data?.enabled === false ? 'متوقف' : 'يعمل يوميًا 12 ظهرًا'}</Pill>
+              <Pill tone={state.data?.enabled === false ? 'muted' : 'ok'}>{state.data?.enabled === false ? 'متوقف' : 'مشروعان يوميًا'}</Pill>
             </span>
           </div>
-          <span className="muted hint">كل يوم يختار الذكاء الاصطناعي مشروعًا واحدًا (لا يتكرر خلال 60 اختيارًا) ويصل إشعاره لكل الأعضاء: محايد ورائد أعمال ومستثمر. الإشعار يفتح صفحة المشروع، وبيانات تواصل المؤسس لا تخرج أبدًا.</span>
+          <span className="muted hint">كل يوم يختار الذكاء الاصطناعي مشروعين: مشروعًا ذهبيًا الساعة 12 ظهرًا ومشروعًا من باقي البنك الساعة 8 مساءً، ويصل إشعارهما لكل الأعضاء: محايد ورائد أعمال ومستثمر. الإشعار يفتح صفحة المشروع، وبيانات تواصل المؤسس لا تخرج أبدًا.</span>
           {state.data ? (
             <span className="muted hint num">
               {state.data.project ? `آخر مشروع: «${state.data.project}»` : 'لم يُرسل مشروع بعد.'}
@@ -115,7 +114,7 @@ function DailyProjectCard() {
         </div>
         <div className="pills">
           <button type="button" className="pick" onClick={() => void sendNow()} disabled={busy || state.loading}>
-            إرسال مشروع اليوم الآن
+            إرسال مشروع إضافي الآن
           </button>
           <button
             type="button"
@@ -182,8 +181,6 @@ export function News() {
           return (
             <div className="stack">
               <DailyProjectCard />
-              {/* M182c: the breaking-news push lives with the news it reads. */}
-              <NewsBreaking />
               <section className="card">
                 <div className="row">
                   <dl className="strip three">

@@ -2,13 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { loadConfig } from './config.js';
-import { BreakingNewsService } from './news/breaking.js';
 import { KeywordClassifier, moneyGuard } from './news/classify.js';
-import { NEWS_PUSH_DAILY_CAP } from './news/pushCap.js';
 import { NEWS_PICKS_KEY, NEWS_SNAPSHOT_KEY, NewsService, PICKS_RULE, cleanImage, newsIdOf, type PicksState } from './news/service.js';
 import { NEWS_SEED_VERSION, NEWS_SOURCES_KEY } from './news/sources.js';
 import type { NewsItem, NewsSnapshot, TopicKey } from './news/types.js';
-import type { PushMessage, PushService } from './push/service.js';
 import { DAY_MS, riyadhDay } from './riyadh.js';
 import { MemoryKV } from './store.js';
 
@@ -22,8 +19,6 @@ const today = riyadhDay(Date.now());
 const tomorrow = riyadhDay(Date.now() + DAY_MS);
 const at = (time: string) => Date.parse(`${tomorrow}T${time}+03:00`);
 const morning = at('10:30:00.000');
-const noon = at('12:00:00.000');
-const evening = at('19:30:00.000');
 const doneToday = (): PicksState => ({
   editions: [2, 1].map((slot) => ({ day: today, slot, filledAt: new Date().toISOString(), picks: { ar: [], en: [] }, pushedAt: new Date().toISOString() })),
   pickedIds: [],
@@ -52,21 +47,14 @@ const story = (slug: string, over: Partial<NewsItem> = {}): NewsItem => ({
   ...over,
 });
 
-async function serviceWith(items: NewsItem[], waves: PushMessage[]): Promise<{ news: NewsService; push: PushService; kv: MemoryKV }> {
+async function serviceWith(items: NewsItem[]): Promise<{ news: NewsService }> {
   const kv = new MemoryKV();
   await kv.set(NEWS_SOURCES_KEY, { sources: [], updatedAt: new Date().toISOString(), seedVersion: NEWS_SEED_VERSION });
   await kv.set(NEWS_PICKS_KEY, doneToday());
   await kv.set(NEWS_SNAPSHOT_KEY, { version: 1, items, updatedAt: new Date().toISOString() } satisfies NewsSnapshot);
-  const push = {
-    broadcastEach: async (choose: (device: { contactId: number; persona: string | null; lang: string | null }) => Promise<PushMessage | null> | PushMessage | null) => {
-      const message = await choose({ contactId: 1, persona: null, lang: 'ar' });
-      if (message) waves.push(message);
-      return { sent: message ? 1 : 0, failed: 0 };
-    },
-  } as unknown as PushService;
-  const news = new NewsService({ kv, config, log: silentLog, classifier: new KeywordClassifier(), push });
+  const news = new NewsService({ kv, config, log: silentLog, classifier: new KeywordClassifier() });
   await news.start();
-  return { news, push, kv };
+  return { news };
 }
 
 const feedOf = (news: NewsService) => news.feed({ page: 1, limit: 50, lang: 'ar' }, { prefs: null, persona: '' }).items.map((item) => item.url.replace('https://news.example.test/', ''));
@@ -124,37 +112,9 @@ test('M219: only money stories with a photo of their own are shown', async () =>
       story('campus', { title: 'جامعة الملك سعود تعلن موعد التقديم', topics: ['economy', 'finance'], decision: true }),
       story('sports', { title: 'الهلال يحسم ديربي الرياض', topics: ['sports'] }),
     ],
-    [],
   );
   await news.runEditions(morning);
   assert.deepEqual(feedOf(news), ['photo']);
   assert.equal(news.decisions({ page: 1, limit: 50, lang: 'ar' }).total, 0, 'a civic «decision» is not a decision of the club');
   assert.equal(news.status().visible, 1);
-});
-
-test('M219: two news pushes a day in all — the editions and breaking share one budget', async () => {
-  const waves: PushMessage[] = [];
-  const { news, push, kv } = await serviceWith(
-    [
-      story('markets-1', { relevance: 90 }),
-      story('markets-2', { title: 'مؤشر السوق السعودية يرتفع بدعم البنوك', relevance: 70 }),
-      story('hot', { title: 'أرامكو تعلن أرباحًا قياسية بـ 120 مليار دولار في صفقة تاريخية', topics: ['oil'], publishedAt: new Date(noon - 30 * 60_000).toISOString() }),
-    ],
-    waves,
-  );
-  const breaking = new BreakingNewsService({ kv, log: silentLog, news, push, enabled: true });
-
-  await news.runEditions(morning);
-  assert.equal(waves.length, 1, 'the morning edition');
-  assert.equal(await breaking.tick(noon), true);
-  assert.equal(waves.length, 2, 'one breaking story');
-  assert.match(waves[1]?.title ?? '', /عاجل/);
-
-  // The evening edition has a fresh pick, but the day's two pushes are spent: it shows in the feed and stays silent.
-  await news.runEditions(evening);
-  await news.runEditions(evening + 3_600_000);
-  assert.equal(await breaking.tick(evening + 2 * 3_600_000), false);
-  assert.equal(waves.length, NEWS_PUSH_DAILY_CAP, 'never a third news push in a day');
-  assert.equal(await news.pushCap.sentToday(evening), NEWS_PUSH_DAILY_CAP);
-  assert.ok(feedOf(news).includes('markets-2'), 'the evening pick still reaches the feed');
 });

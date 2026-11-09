@@ -91,7 +91,7 @@ after(async () => {
   await app.close();
 });
 
-test('two editions a day, one story per topic each: the feed shows the picks only and every device gets one push per edition, by interest', async () => {
+test('two editions a day, one story per topic each: the feed shows the picks only, and M222: no edition ever sends a push', async () => {
   await kv.set(NEWS_PICKS_KEY, doneToday());
   await kv.set(NEWS_SNAPSHOT_KEY, {
     version: 1,
@@ -111,18 +111,9 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
   await built.news.runEditions(at(tomorrow, '03:30:00.000'));
   assert.equal(pushBatches.length, before, 'no edition before 10:00');
 
-  // 10:30 — the morning edition: one story per topic (eco-3 finds no free topic), one push per device.
+  // 10:30 — the morning edition: one story per topic (eco-3 finds no free topic), and silence on every device.
   await built.news.runEditions(morning);
-  const first = pushBatches.slice(before).flat();
-  assert.equal(first.filter((message) => message.to === ARABIC).length, 1, JSON.stringify(first));
-  assert.equal(first.filter((message) => message.to === ENGLISH).length, 1, JSON.stringify(first));
-  // M166: the base sections (markets…) ride along with his sports pick, so the edition's best match wins.
-  const arabicPush = first.find((message) => message.to === ARABIC)!;
-  assert.equal(arabicPush.body, 'أرباح الشركات السعودية ترتفع في الربع الثالث', 'sports + the base sections: the best pick among them');
-  const englishPush = first.find((message) => message.to === ENGLISH)!;
-  assert.equal(englishPush.body, 'Saudi market closes higher', 'no English sports story: the edition\'s best English story instead');
-  assert.ok(englishPush.title.includes('Top business story'), englishPush.title);
-  for (const message of first) assert.match(message.data.screen ?? '', /^\/news\/[a-f0-9]{16}$/);
+  assert.equal(pushBatches.length, before, 'the morning edition reaches the feed only');
 
   // The feed is the picks only: a guest sees every topic (two stories at most per topic), the member his interests.
   const guest = await app.inject({ method: 'GET', url: '/api/news/feed' });
@@ -136,27 +127,14 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
   const english = await app.inject({ method: 'GET', url: '/api/news/feed?lang=en' });
   assert.deepEqual(urls(english.json()), ['en-1']);
 
-  // The same edition again: nothing more goes out.
-  const afterMorning = pushBatches.length;
-  await built.news.runEditions(morning + 60_000);
-  assert.equal(pushBatches.length, afterMorning);
-
-  // 19:30 — the evening edition: the next story per topic (eco-3 under economy); the member has no new sports story, so he gets the edition's best.
+  // 19:30 — the evening edition: the next story per topic (eco-3 under economy), and still silence.
   await built.news.runEditions(evening);
-  const second = pushBatches.slice(afterMorning).flat();
-  assert.equal(second.filter((message) => message.to === ARABIC).length, 1, JSON.stringify(second));
-  assert.equal(second.filter((message) => message.to === ENGLISH).length, 1, 'an English device with no English pick hears the Arabic one');
-  for (const message of second) assert.equal(message.body, 'الصادرات غير النفطية تنمو');
+  assert.equal(pushBatches.length, before, 'the evening edition reaches the feed only');
   const evening2 = await app.inject({ method: 'GET', url: '/api/news/feed' });
   assert.deepEqual(urls(evening2.json()).sort(), ['eco-1', 'eco-2', 'eco-3'], 'the day shows both editions: two stories per topic at most');
 
-  // Nothing else all day, and both editions are recorded as sent.
-  const afterEvening = pushBatches.length;
   await built.news.runEditions(at(tomorrow, '23:30:00.000'));
-  assert.equal(pushBatches.length, afterEvening, 'two pushes a day per device, never more');
-  const state = await kv.get<PicksState>(NEWS_PICKS_KEY);
-  const sent = state?.editions.filter((edition) => edition.day === tomorrow).map((edition) => [edition.slot, edition.pushedAt !== null]);
-  assert.deepEqual(sent?.sort(), [[1, true], [2, true]]);
+  assert.equal(pushBatches.length, before, 'no news push all day');
 });
 
 test('an edition with nothing fresh is not recorded, so the next poll retries it', async () => {

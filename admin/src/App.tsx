@@ -21,7 +21,6 @@ import { Posts } from './sections/Posts';
 import { Ratings } from './sections/Ratings';
 import { Security } from './sections/Security';
 import { Threads } from './sections/Threads';
-import { Companion } from './sections/Companion';
 import { Content } from './sections/Content';
 import { News } from './sections/News';
 import { Stats } from './sections/Stats';
@@ -59,7 +58,6 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'wording', label: 'نصوص التطبيق', icon: 'wording' },
   { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
   { key: 'news', label: 'مصادر الأخبار', icon: 'news' },
-  { key: 'companion', label: 'المستشار اليومي', icon: 'companion' },
   { key: 'security', label: 'أمان الحساب', icon: 'security' },
 ];
 /** M140: what a moderator's dashboard holds besides the posts. */
@@ -300,7 +298,6 @@ export function App() {
             {section === 'content' ? <Content /> : null}
             {section === 'news' ? <News /> : null}
             {section === 'security' ? <Security /> : null}
-            {section === 'companion' ? <Companion /> : null}
           </Boundary>
         </main>
 

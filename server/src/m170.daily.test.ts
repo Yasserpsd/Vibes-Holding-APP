@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { AppLang } from './lang.js';
-import { DAILY_PROJECT_HOUR, DAILY_PROJECT_KEY, DailyProjectService, type DailyProjectState, messageOf } from './projectsBank/daily.js';
+import { DAILY_PROJECT_HOURS, DAILY_PROJECT_KEY, DailyProjectService, type DailyProjectState, messageOf } from './projectsBank/daily.js';
 import type { PublicProject } from './projectsBank/types.js';
 import type { PushMessage } from './push/service.js';
 import { riyadhDayStart, riyadhDay } from './riyadh.js';
 import { MemoryKV } from './store.js';
+
+const NOON = DAILY_PROJECT_HOURS[0];
+const EVENING = DAILY_PROJECT_HOURS[1];
 
 // M170 «مشروع اليوم»: one project of the Projects Bank a day, chosen by the model (or the rules), pushed to every
 // device at/after 12:00 Riyadh with the public fields only — never twice, never a founder's contact.
@@ -98,10 +101,10 @@ const at = (hour: number, dayOffset = 0) => riyadhDayStart(today) + dayOffset * 
 
 test('nothing goes out before the hour; at the hour every device gets one push that opens the project screen', async () => {
   const { service, sent, kv } = rig();
-  assert.equal(await service.run(at(DAILY_PROJECT_HOUR - 1)), null);
+  assert.equal(await service.run(at(NOON - 1)), null);
   assert.equal(sent.length, 0);
 
-  const result = await service.run(at(DAILY_PROJECT_HOUR));
+  const result = await service.run(at(NOON));
   assert.ok(result);
   // Without a key the rules choose: pictured + described projects first, then the most viewed.
   assert.equal(result.projectId, 1);
@@ -123,7 +126,7 @@ test('nothing goes out before the hour; at the hour every device gets one push t
   assert.deepEqual(state.recentIds, [1]);
 
   // The same day again: silence.
-  assert.equal(await service.run(at(DAILY_PROJECT_HOUR + 3)), null);
+  assert.equal(await service.run(at(NOON + 3)), null);
   assert.equal(sent.length, 3);
 });
 
@@ -137,26 +140,26 @@ test('the founder\'s contact data never leaves in the push body (rule 4)', () =>
 
 test('the next day picks a project not shown lately; a forced send goes out again today with a fresh pick', async () => {
   const { service, sent } = rig();
-  const first = await service.run(at(DAILY_PROJECT_HOUR));
-  const second = await service.run(at(DAILY_PROJECT_HOUR, 1));
+  const first = await service.run(at(NOON));
+  const second = await service.run(at(NOON, 1));
   assert.ok(first && second);
   assert.notEqual(second.projectId, first.projectId);
   assert.equal(sent.length, 6);
 
-  const forced = await service.sendNow(at(DAILY_PROJECT_HOUR + 1, 1));
+  const forced = await service.sendNow(at(NOON + 1, 1));
   assert.ok(forced);
   assert.notEqual(forced.projectId, second.projectId);
   assert.notEqual(forced.projectId, first.projectId);
   assert.equal(sent.length, 9);
 
   // Every project shown once: the rotation starts over instead of falling silent.
-  const again = await service.run(at(DAILY_PROJECT_HOUR, 2));
+  const again = await service.run(at(NOON, 2));
   assert.ok(again);
 });
 
 test('with a key the model chooses one id of the shortlist; an id outside it falls back to the rules', async () => {
   const chosen = rig({ apiKey: 'sk-test-0123456789abcdef', answer: { id: 2, reason: 'فكرة واضحة' } });
-  const result = await chosen.service.run(at(DAILY_PROJECT_HOUR));
+  const result = await chosen.service.run(at(NOON));
   assert.equal(result?.projectId, 2);
   assert.equal(result?.reason, 'فكرة واضحة');
   const payload = chosen.calls[0] as { messages: { content: string }[] };
@@ -165,7 +168,7 @@ test('with a key the model chooses one id of the shortlist; an id outside it fal
   assert.doesNotMatch(JSON.stringify(shortlist), /example\.com|0501234567/, 'the model never sees a contact either');
 
   const wrong = rig({ apiKey: 'sk-test-0123456789abcdef', answer: { id: 999 } });
-  const fallback = await wrong.service.run(at(DAILY_PROJECT_HOUR));
+  const fallback = await wrong.service.run(at(NOON));
   assert.equal(fallback?.projectId, 1);
   assert.equal(fallback?.reason, null);
 });
@@ -173,15 +176,52 @@ test('with a key the model chooses one id of the shortlist; an id outside it fal
 test('the switch off keeps the day silent; a pick that reached nobody is retried on the next tick', async () => {
   const off = rig();
   await off.service.setEnabled(false);
-  assert.equal(await off.service.run(at(DAILY_PROJECT_HOUR)), null);
+  assert.equal(await off.service.run(at(NOON)), null);
   assert.equal(off.sent.length, 0);
 
   const nobody = rig({ devices: [] });
-  const first = await nobody.service.run(at(DAILY_PROJECT_HOUR));
+  const first = await nobody.service.run(at(NOON));
   assert.equal(first?.sent, 0);
   const state = (await nobody.kv.get<DailyProjectState>(DAILY_PROJECT_KEY))!;
   assert.equal(state.pushedAt, null);
   // Still today, the same pick is tried again (no second project is burned).
-  const retry = await nobody.service.run(at(DAILY_PROJECT_HOUR + 1));
+  const retry = await nobody.service.run(at(NOON + 1));
   assert.equal(retry?.projectId, first?.projectId);
+});
+
+// M222: two projects a day — a golden one at noon, one of the rest of the bank in the evening, never a third.
+const goldenA = project({ id: 7, title: 'مشروع ذهبي أول', isGolden: true, image: 'https://img/7.jpg', excerpt: 'مشروع ذهبي.' });
+const goldenB = project({ id: 8, title: 'مشروع ذهبي ثان', isGolden: true, excerpt: 'مشروع ذهبي آخر.' });
+
+test('M222: noon carries a golden project, the evening one of the rest, and the day stops at two', async () => {
+  const { service, sent } = rig({ projects: [...all, goldenA, goldenB], devices: [devices[0]!] });
+  const noon = await service.run(at(NOON));
+  assert.equal(noon?.projectId, 7);
+  assert.equal(sent[0]?.message.title, 'مشروع ذهبي من بنك المشاريع');
+  assert.equal(await service.run(at(NOON + 3)), null);
+
+  const evening = await service.run(at(EVENING));
+  assert.ok(evening);
+  assert.ok(![7, 8].includes(evening.projectId), 'the evening project comes from the rest of the bank');
+  assert.equal(sent[1]?.message.title, 'مشروع اليوم من بنك المشاريع');
+  assert.equal(await service.run(at(23)), null);
+  assert.equal(sent.length, 2);
+
+  // The next noon moves to the other golden project; the rest of the golden list keeps its place in the rotation.
+  assert.equal((await service.run(at(NOON, 1)))?.projectId, 8);
+  assert.equal((await service.run(at(NOON, 2)))?.projectId, 7, 'all golden shown: the one shown longest ago returns');
+});
+
+test('M222: with no golden project the noon slot still sends one of the bank', async () => {
+  const { service } = rig();
+  assert.equal((await service.run(at(NOON)))?.projectId, 1);
+});
+
+test('M222: a day whose noon push ran before the deploy sends only the evening one', async () => {
+  const { service, sent, kv } = rig({ devices: [devices[0]!] });
+  await kv.set(DAILY_PROJECT_KEY, { day: today, projectId: 1, pushedAt: new Date().toISOString(), reason: null, recentIds: [1], enabled: true });
+  assert.equal(await service.run(at(NOON + 2)), null);
+  assert.equal(sent.length, 0);
+  assert.ok(await service.run(at(EVENING)));
+  assert.equal(sent.length, 1);
 });
