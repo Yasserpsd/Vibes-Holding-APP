@@ -83,6 +83,8 @@ test('M219: a headline must speak money — municipal, campus and inspection ite
     ['البلديات تلاحق مخالفات محلات الخياطة', ['economy']],
     ['الهلال يحسم ديربي الرياض', ['sports']],
     ['وادي الغر.. أيقونة سياحية تجسد تنوع البيئة', ['tourism']],
+    // M221: seen on the test server's home on 2026-11-09 — «مؤشرات الأداء» is a KPI review, not a market index.
+    ['محافظ جدة يطلع على مؤشرات الأداء الاستراتيجي لتعليم جدة', ['economy']],
   ];
   for (const [title, topics] of dropped) assert.equal(moneyGuard(title, topics), false, title);
   const kept: [string, TopicKey[]][] = [
@@ -92,6 +94,8 @@ test('M219: a headline must speak money — municipal, campus and inspection ite
     ['أسعار الذهب تسجل أعلى مستوى في شهر', ['metals']],
     ['أديس تفوز بعقود لمنصتين في الهند بقيمة 439.6 مليون ريال', ['energy']],
     ['الأمانة العامة لأوبك تتوقع ارتفاع الطلب على النفط', ['oil']],
+    ['مؤشر تاسي يرتفع 1.2% بدعم أسهم البنوك', ['markets']],
+    ['مؤشرات الأسهم الأميركية تغلق على ارتفاع', ['markets']],
     ['Gold plunges to a one-year low as silver slides', ['metals']],
     ['Federal Reserve holds interest rates steady', ['markets']],
   ];
