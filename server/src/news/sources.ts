@@ -22,7 +22,7 @@ function spa(categoryId: number, lang: NewsLang = 'ar'): string {
  * English sources (M27, checked on 2026-09-22) feed the English version only: Saudi news as foreign and Saudi
  * English outlets wrote it, never translated (rule 7). Outlets whose article pages refuse the server stay disabled.
  */
-export const NEWS_SOURCES_SEED: NewsSource[] = [
+const SEED_ROWS: NewsSource[] = [
   { id: 'spa-economy', name: 'واس', url: spa(3), tier: 'official', lang: 'ar', enabled: true, hint: 'وكالة الأنباء السعودية — القسم الاقتصادي' },
   { id: 'spa-general', name: 'واس', url: spa(1), tier: 'official', lang: 'ar', enabled: true, hint: 'وكالة الأنباء السعودية — القسم العام (قرارات الجهات الحكومية)' },
   { id: 'spa-political', name: 'واس', url: spa(2), tier: 'official', lang: 'ar', enabled: true, hint: 'وكالة الأنباء السعودية — القسم السياسي (جلسات مجلس الوزراء)' },
@@ -119,6 +119,19 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
 ];
 
 /**
+ * M219 (owner, 2026-11-09: «أخبار عند بلدية وحاجات متهمش … أي أخبار تانية تتشال بشكل كامل»): the feeds that carry
+ * no money news are switched off — every sports feed and the SPA general, political, tourism and tech wires. The
+ * rows stay for the dashboard toggle; a story they would bring is filtered anyway (moneyGuard), this only stops
+ * paying for the page fetches and the labels.
+ */
+const MONEY_ONLY_OFF = [
+  'arriyadiyah', 'kooora', 'goal-saudi', 'okaz-sports', 'beinsports-ar', 'alriyadh-sports', 'almarssad-sports', 'yallakora', 'filgoal',
+  'spa-general', 'spa-political', 'spa-tourism', 'spa-tech', 'spa-en-general', 'spa-en-political',
+];
+
+export const NEWS_SOURCES_SEED: NewsSource[] = SEED_ROWS.map((row) => (MONEY_ONLY_OFF.includes(row.id) ? { ...row, enabled: false } : row));
+
+/**
  * Revision of the seed. A stored list (dashboard-editable) is never replaced: a newer revision only adds the
  * seed rows it does not have yet and applies that revision's one-time switches, so the owner's edits stay.
  * 2 = M27: the English sources; Arab News and Saudi Gazette turned on and read for their Saudi stories; the SPA
@@ -130,8 +143,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = [
  * 5 = M134 (owner, 2026-10-27, «نزود الأخبار الرياضية»): four more Arabic sports sources (probed the same day).
  * 6 = M166 (owner, 2026-10-31): the base sections (crypto, gold and silver, oil, markets) — global market sources, Arabic and English.
  * 7 = M176 (owner, 2026-11-01): nine more economy, gold and oil feeds (mostly Arabic), probed the same day.
+ * 8 = M219 (owner, 2026-11-09): money news only — the sports feeds and the non-economy SPA wires off (MONEY_ONLY_OFF).
  */
-export const NEWS_SEED_VERSION = 7;
+export const NEWS_SEED_VERSION = 8;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -160,6 +174,7 @@ const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = 
     albilad: { enabled: false },
     'mubasher-sa': { enabled: false },
   },
+  8: Object.fromEntries(MONEY_ONLY_OFF.map((id) => [id, { enabled: false }])),
 };
 
 /** Outlets behind aggregator links, by domain: the app names the outlet, never the aggregator. */

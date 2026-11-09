@@ -134,7 +134,8 @@ const FEED_B = `<rss version="2.0"><channel>
 
 const fakeFetch: typeof fetch = async (input) => {
   const url = String(input);
-  const html = (title: string) => `<html><head><meta property="og:title" content="${title}"><meta property="og:description" content="وصف الصفحة"></head></html>`;
+  // M219: every page carries a photo of its own — a story without one is never shown.
+  const html = (title: string) => `<html><head><meta property="og:title" content="${title}"><meta property="og:description" content="وصف الصفحة"><meta property="og:image" content="${url}/photo.jpg"></head></html>`;
   if (url === 'https://feed.test/a') return new Response(FEED_A, { headers: { 'content-type': 'application/rss+xml' } });
   if (url === 'https://feed.test/b') return new Response(FEED_B, { headers: { 'content-type': 'application/rss+xml' } });
   if (url === 'https://feed.test/broken') return new Response('nope', { status: 500 });
@@ -173,12 +174,12 @@ test('refresh keeps only verified, on-topic items and reports source failures', 
   const status = news.status();
   assert.equal(status.classifier, 'keywords');
   assert.equal(status.count, 4, 'missing page is never stored');
-  assert.equal(status.visible, 4, 'M61: sports is visible without a money angle');
+  assert.equal(status.visible, 3, 'M219: money news only — the sports story is stored but never shown');
   assert.equal(status.decisions, 1);
   assert.equal(status.sources.find((source) => source.id === 'broken')?.ok, false);
   assert.equal(status.sources.find((source) => source.id === 'off'), undefined);
   const health = await app.inject({ method: 'GET', url: '/health' });
-  assert.equal(health.json().news.visible, 4);
+  assert.equal(health.json().news.visible, 3);
 });
 
 test('serves the fixed decisions section and the general feed to guests', async () => {
@@ -190,13 +191,14 @@ test('serves the fixed decisions section and the general feed to guests', async 
   assert.equal(decisions.json().items[0].source.tierLabel, 'مصدر رسمي');
 
   const feed = await app.inject({ method: 'GET', url: '/api/news/feed' });
-  assert.equal(feed.json().total, 4);
+  assert.equal(feed.json().total, 3);
   assert.equal(feed.json().personalized, false);
-  assert.ok(feed.json().items.some((item: { url: string }) => item.url.includes('/sports')), 'M61: sports rides the feed');
+  assert.ok(!feed.json().items.some((item: { url: string }) => item.url.includes('/sports')), 'M219: sports left the feed');
+  for (const item of feed.json().items as { image: string | null }[]) assert.match(item.image ?? '', /^https:\/\/.+\/photo\.jpg$/, 'M219: every shown story has its photo');
   const decisionItem = feed.json().items.find((item: { url: string }) => item.url.endsWith('/decision'));
   assert.equal(decisionItem.snippet, 'وافق المجلس', 'the feed snippet is the source text');
 
-  const topic = await app.inject({ method: 'GET', url: '/api/news/feed?topic=startups' });
+  const topic = await app.inject({ method: 'GET', url: '/api/news/feed?topic=finance' });
   assert.deepEqual(topic.json().items.map((item: { url: string }) => item.url), ['https://news.test/startup']);
   assert.equal((await app.inject({ method: 'GET', url: '/api/news/feed?topic=nope' })).statusCode, 400);
 });
@@ -205,7 +207,8 @@ test('returns one item and rejects unknown ids', async () => {
   const id = newsIdOf('https://news.test/startup');
   const res = await app.inject({ method: 'GET', url: `/api/news/${id}` });
   assert.equal(res.statusCode, 200);
-  assert.ok(res.json().item.topics.some((topic: { key: string }) => topic.key === 'startups'));
+  assert.ok(res.json().item.topics.some((topic: { key: string }) => topic.key === 'finance'));
+  assert.ok(!res.json().item.topics.some((topic: { key: string }) => topic.key === 'startups'), 'M219: only the money sections are kept');
   assert.equal((await app.inject({ method: 'GET', url: '/api/news/0000000000000000' })).statusCode, 404);
   assert.equal((await app.inject({ method: 'GET', url: '/api/news/not-an-id' })).statusCode, 400);
 });
@@ -229,8 +232,8 @@ test('interests need a session, personalize the feed and reach the advisor conte
   const personaFeed = await app.inject({ method: 'GET', url: '/api/news/feed', headers });
   assert.equal(personaFeed.json().personalized, true);
 
-  const saved = await app.inject({ method: 'PUT', url: '/api/news/prefs', headers, payload: { topics: ['startups', 'bogus', 'startups'] } });
-  assert.deepEqual(saved.json().topics, ['startups']);
+  const saved = await app.inject({ method: 'PUT', url: '/api/news/prefs', headers, payload: { topics: ['finance', 'bogus', 'finance'] } });
+  assert.deepEqual(saved.json().topics, ['finance']);
   const feed = await app.inject({ method: 'GET', url: '/api/news/feed', headers });
   assert.equal(feed.json().items[0].url, 'https://news.test/startup', 'interest match ranks first');
 
@@ -248,5 +251,5 @@ test('the base sections (crypto, gold and silver, oil, markets) are tagged and n
   assert.ok(classifyByKeywords({ ...input('سعر الذهب يتراجع'), lang: 'ar' as const }).topics.includes('metals'));
   const offered = topicsFor('ar').map((topic) => topic.key);
   for (const key of CORE_TOPICS) assert.ok(!offered.includes(key), `${key} is not a choice`);
-  assert.ok(offered.includes('economy') && offered.includes('sports'));
+  assert.ok(offered.includes('economy') && !offered.includes('sports') && !offered.includes('tourism'), 'M219: money sections only');
 });

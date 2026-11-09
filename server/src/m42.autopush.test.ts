@@ -6,14 +6,14 @@ import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubBody, HubClient, HubOp, HubResponse } from './hub/types.js';
 import { LogMailer } from './mail/mailer.js';
-import { NEWS_PUSH_KEY, NEWS_SNAPSHOT_KEY, newsIdOf } from './news/service.js';
+import { NEWS_SNAPSHOT_KEY, newsIdOf } from './news/service.js';
 import { NEWS_SEED_VERSION, NEWS_SOURCES_KEY } from './news/sources.js';
 import type { NewsItem, NewsSnapshot } from './news/types.js';
 import { MemoryKV } from './store.js';
 
 // M42 (owner: «بمجرد ما انشر اي رسالة كل الناس يجيلها اشعار فورا… والأخبار برده»): the FIRST publish of a
 // post notifies its audience by itself, a new open agenda event notifies every device, and every NEW
-// Saudi decision notifies with the source's own title, capped per day.
+// Saudi decision notified with the source's own title (M219 removed that last part: see the news test below).
 const config = loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', NOTIFY_EMAIL: 'admin@vcmem.com' });
 
 class LeveledHub implements HubClient {
@@ -164,35 +164,14 @@ test('a new open agenda event notifies every device; a closed one stays silent',
   assert.equal(pushBatches.length, before + 1);
 });
 
-test('news: the first run only records the existing decisions; a NEW decision notifies with its own title', async () => {
-  await kv.set(NEWS_SNAPSHOT_KEY, { version: 1, items: [decision(1, 60)], updatedAt: new Date().toISOString() } satisfies NewsSnapshot);
-  await built.news.start();
-  const before = pushBatches.length;
-  await built.news.refresh();
-  assert.equal(pushBatches.length, before, 'baseline run must not notify');
-  const baseline = await kv.get<{ seen: string[] }>(NEWS_PUSH_KEY);
-  assert.equal(baseline?.seen.length, 1);
-
-  // The same decision counts as NEW once the state forgets it — the push carries the source's own title.
-  await kv.set(NEWS_PUSH_KEY, { seen: [], day: '2020-01-01', sentToday: 0 });
-  await built.news.refresh();
-  assert.equal(pushBatches.length, before + 1);
-  assert.match(pushBatches.at(-1)?.[0]?.title ?? '', /قرارات وأنظمة المملكة/);
-  assert.equal(pushBatches.at(-1)?.[0]?.body, 'قرار حكومي جديد رقم 1 يخص الاستثمار');
-});
-
-test('news: no more than 3 decision notifications per day, and the skipped ones are never sent stale', async () => {
+// M219 (owner, 2026-11-09: «الأخبار اللي يوصل بيها نوتفكيشن تكون 2 فقط في اليوم»): the per-decision pushes are gone —
+// a new Saudi decision no longer notifies by itself, however many arrive.
+test('news: new decisions never notify by themselves any more', async () => {
   await kv.set(NEWS_SNAPSHOT_KEY, { version: 1, items: [1, 2, 3, 4, 5].map((index) => decision(index, index * 10)), updatedAt: new Date().toISOString() } satisfies NewsSnapshot);
   await built.news.start();
-  await kv.set(NEWS_PUSH_KEY, { seen: [], day: '2020-01-01', sentToday: 0 });
   const before = pushBatches.length;
   await built.news.refresh();
-  assert.equal(pushBatches.length, before + 3);
-  const state = await kv.get<{ seen: string[]; sentToday: number }>(NEWS_PUSH_KEY);
-  assert.equal(state?.sentToday, 3);
-  assert.equal(state?.seen.length, 5, 'every new decision is recorded, sent or skipped');
-
-  // Another run finds nothing new: nothing more goes out.
   await built.news.refresh();
-  assert.equal(pushBatches.length, before + 3);
+  const titles = pushBatches.slice(before).flat().map((message) => message.title);
+  assert.equal(titles.filter((title) => /قرارات وأنظمة المملكة/.test(title)).length, 0);
 });

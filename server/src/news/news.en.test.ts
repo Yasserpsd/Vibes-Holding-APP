@@ -24,7 +24,8 @@ const FEED_SAUDI_EN = `<rss version="2.0"><channel>
 <item><title>Cabinet approves new investment law</title><link>https://saudi-en.test/cabinet</link><description>RIYADH: The Saudi Cabinet approved the law on Tuesday.</description><pubDate>${now}</pubDate></item>
 </channel></rss>`;
 const SPA_API = 'https://portalapi.spa.gov.sa/api/v1/news';
-const spaRow = (uuid: string, locale: string, title: string) => ({ uuid, locale, title, published_at: Math.floor(Date.now() / 1000), image: null });
+// M219: every story carries a photo of its own — one without is never shown.
+const spaRow = (uuid: string, locale: string, title: string) => ({ uuid, locale, title, published_at: Math.floor(Date.now() / 1000), image: { path: `https://cdn.spa.test/${uuid}.jpg` } });
 
 const fetched: { url: string; lang: string }[] = [];
 const fakeFetch: typeof fetch = async (input, init) => {
@@ -41,7 +42,7 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (url === `${SPA_API}/N9`) return Response.json({ data: { content: '<p>Riyadh, September 21, 2026, SPA -- Non-oil exports rose 12% in the second quarter, the statistics authority said.</p>' } });
   if (url === `${SPA_API}/N8`) return Response.json({ data: { content: '<p>الرياض 09 ربيع الآخر 1448 هـ واس</p><p>ارتفعت الصادرات غير النفطية 12% في الربع الثاني.</p>' } });
   if (/^https:\/\/(ar|global|saudi-en)\.test\/|^https:\/\/www\.spa\.gov\.sa\//.test(url)) {
-    return new Response('<html><head><meta property="og:description" content="page text"></head></html>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    return new Response(`<html><head><meta property="og:description" content="page text"><meta property="og:image" content="${url}/photo.jpg"></head></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
   }
   throw new Error(`unexpected fetch ${url}`);
 };
@@ -96,7 +97,8 @@ test('each language gets its own feed, labels and decisions title', async () => 
   const pif = english.json().items.find((item: { url: string }) => item.url === 'https://global.test/pif');
   assert.equal(pif.title, "Saudi Arabia's PIF invests $2 billion in AI startup", 'the source title, untouched');
   assert.equal(pif.source.tierLabel, 'International media');
-  assert.ok(pif.topics.some((topic: { key: string; label: string }) => topic.key === 'tech' && topic.label === 'Technology & AI'));
+  assert.ok(pif.topics.some((topic: { key: string; label: string }) => topic.key === 'economy' && topic.label === 'Economy & Business'));
+  assert.ok(!pif.topics.some((topic: { key: string }) => topic.key === 'tech'), 'M219: only the money sections are kept');
 
   assert.equal(english.json().items[0].url, 'https://global.test/pif', 'foreign outlets lead the English feed');
 

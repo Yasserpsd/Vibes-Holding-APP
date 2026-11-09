@@ -1,4 +1,4 @@
-import type { Classification, ClassifierMode, NewsLang, SourceTier, TopicKey } from './types.js';
+import { MONEY_TOPICS, type Classification, type ClassifierMode, type NewsLang, type SourceTier, type TopicKey } from './types.js';
 
 /** What the classifier sees: the source's own title and snippet, never the full page. */
 export type ClassifyInput = {
@@ -62,6 +62,45 @@ const BUSINESS = pattern(['مليون', 'مليار', 'ريال', 'دولار', 
 const NOISE = pattern(['اهتمامات الصحف', 'الصحف', 'ترقية', 'ترقيات', 'تعيين', 'تكليف', 'يجتمع', 'اجتمع', 'يبحث', 'سفير', 'سفارة', 'يختتم', 'اختتام', 'مركز الملك سلمان للإغاثة', 'يوزع', 'يوزّع', 'يضخ', 'يفتتح', 'افتتح', 'يرعى', 'يدشن', 'يدشّن', 'اتصالًا هاتفيًا', 'اتصالاً هاتفياً', 'اتصالا هاتفيا', 'يتلقى رسالة', 'يتلقى برقية', 'يبعث برقية', 'يهنئ', 'يعزي', 'تعزية', 'يستقبل', 'استقبل', 'يلتقي', 'التقى', 'يودع', 'يصل إلى', 'إغاثة', 'الإغاثة', 'سلة غذائية', 'سلال غذائية', 'كرتون', 'طقس', 'أمطار', 'الأرصاد', 'درجات الحرارة', 'قوات الاحتلال', 'استشهاد', 'إصابة', 'هجمات', 'مسيّرة', 'قصف', 'مقتل', 'حادث', 'وفاة', 'يدين', 'تدين', 'إدانة', 'مباراة', 'condol', 'congratulat', 'phone call', 'receives', 'weather', 'rain', 'killed', 'injur', 'attack', 'condemn']);
 const SPORTS = pattern(['دوري', 'كرة القدم', 'لاعب', 'مدرب', 'مباراة', 'بطولة', 'كأس العالم', 'كأس آسيا', 'الهلال', 'النصر', 'أولمبي', 'منتخب', 'صفقة انتقال', 'football', 'soccer', 'league', 'player', 'coach', 'match', 'tournament', 'olympic', 'transfer']);
 const MONEY = pattern(['استحواذ', 'رعاية', 'راعي', 'حقوق البث', 'صفقة', 'مليون', 'مليار', 'ريال', 'دولار', 'استثمار', 'عقد', 'إيرادات', 'تمويل', 'acquisition', 'sponsor', 'broadcast', 'rights', 'deal', 'million', 'billion', 'revenue', 'invest', 'contract']);
+
+/**
+ * M219 (owner, 2026-11-09: «أخبار عند بلدية وحاجات متهمش ولا تفرق مع مستثمر … أي أخبار تانية تتشال بشكل
+ * كامل»): what a HEADLINE must say to be club news — money, markets, gold, oil, the economy. The labels
+ * alone let civic items through (a university's admissions tagged «economy, finance»), so the headline
+ * itself has to speak money, whatever the model answered.
+ */
+const FINANCE = pattern([
+  'نفط', 'بترول', 'برنت', 'أوبك', 'أرامكو', 'الطاقة', 'الغاز', 'ذهب', 'فضة', 'أونصة', 'سبائك', 'معادن',
+  'أسهم', 'سهم', 'بورصة', 'تداول', 'تاسي', 'مؤشر', 'سوق', 'أسواق', 'اكتتاب', 'طرح عام', 'صكوك', 'سندات',
+  'أرباح', 'خسائر', 'إيرادات', 'توزيعات', 'النتائج المالية', 'نتائج مالية', 'تضخم', 'فائدة', 'الفيدرالي',
+  'بنك', 'مصرف', 'تمويل', 'قرض', 'قروض', 'ائتمان', 'ديون', 'ميزانية', 'موازنة', 'عجز', 'فائض', 'الناتج المحلي',
+  'اقتصاد', 'استثمار', 'مستثمر', 'صندوق', 'استحواذ', 'اندماج', 'صفقة', 'دولار', 'ريال', 'يورو', 'عملة', 'عملات',
+  'سعر صرف', 'دينار', 'درهم', 'جنيه', 'يوان', 'روبل', 'إسترليني', 'النقد', 'نقدي', 'بيتكوين', 'بتكوين', 'إيثريوم', 'كريبتو', 'مشفرة', 'ضريبة', 'ضرائب', 'الزكاة', 'جمرك', 'جمارك',
+  'صادرات', 'واردات', 'تجارة', 'التبادل التجاري', 'الميزان التجاري', 'أسعار', 'سعر', 'تأمين', 'رأس المال', 'سيولة',
+  'oil', 'crude', 'brent', 'opec', 'aramco', 'energy', 'lng', 'gold', 'silver', 'bullion',
+  'stock', 'shares', 'equit', 'market', 'tadawul', 'tasi', 'ipo', 'bond', 'sukuk', 'dividend', 'profit', 'earnings', 'revenue',
+  'inflation', 'interest rate', 'rate cut', 'rate hike', 'fed ', 'federal reserve', 'central bank', 'bank', 'lender', 'loan', 'debt', 'credit',
+  'financ', 'fund', 'invest', 'budget', 'deficit', 'surplus', 'gdp', 'econom', 'acquisition', 'acquire', 'merger', 'takeover', 'stake',
+  'billion', 'dollar', 'riyal', 'currency', 'forex', 'bitcoin', 'crypto', 'ethereum', 'stablecoin', 'tax', 'tariff', 'customs',
+  'exports', 'imports', 'trade', 'price', 'insurance', 'public investment fund', 'pif', 'valuation',
+]);
+/** Municipal, campus, pilgrimage and inspection headlines: never club news, even when they mention money. */
+const CIVIC = pattern([
+  'بلدية', 'بلديات', 'البلدي', 'جامعة', 'كلية', 'طلبة', 'طلاب', 'مدرسة', 'مدارس', 'الدراسات العليا', 'بكالوريوس', 'دبلوم',
+  'أولمبياد', 'مهرجان', 'إتلاف', 'جولة رقابية', 'جولات رقابية', 'الحرمين', 'ضيوف الرحمن', 'حجاج', 'مسجد', 'مساجد',
+  'الأمن البيئي', 'الدفاع المدني', 'المرور', 'مرورية', 'مستشفى', 'مستشفيات', 'وزارة الصحة', 'النحل', 'ريال مدريد', 'ملعب', 'رياضي', 'رياضة',
+  'municipal', 'university', 'college', 'student', 'school', 'festival', 'hospital', 'pilgrim', 'mosque', 'traffic', 'real madrid', 'stadium', 'sport',
+]);
+/** «أمانة جدة», «امانة عسير» — a city's municipality; «الأمانة العامة» (a secretariat) is not one. */
+const AMANA = /(?<!\p{L})(?:و|ب|ل)?[أا]مانة\s+(?!ال?عامة)/u;
+
+/** Whether an item is club news at all: a money section, a headline that speaks money, no civic noise. */
+export function moneyGuard(title: string, topics: readonly TopicKey[]): boolean {
+  if (!topics.some((key) => MONEY_TOPICS.includes(key))) return false;
+  if (!FINANCE.test(title)) return false;
+  if (CIVIC.test(title) || AMANA.test(title) || SPORTS.test(title)) return false;
+  return !(NOISE.test(title) && !BUSINESS.test(title));
+}
 
 /** A decision needs an act (verb) and an instrument (noun) in the title, plus an authority in the title or snippet. */
 const DECISION_VERB = pattern(['يوافق', 'توافق', 'وافق', 'وافقت', 'موافقة', 'يقر', 'تقر', 'أقر', 'أقرت', 'أقرّ', 'إقرار', 'يعتمد', 'تعتمد', 'اعتمد', 'اعتمدت', 'اعتماد', 'يصدر', 'تصدر', 'أصدر', 'أصدرت', 'إصدار', 'يعدل', 'تعدل', 'تعديل', 'تمديد', 'يمدد', 'تمدد', 'تحدّث', 'تحدث', 'تحديث', 'إلزام', 'يلزم', 'تلزم', 'يحظر', 'تحظر', 'حظر', 'إلغاء', 'يلغي', 'تلغي', 'فرض', 'يفرض', 'تفرض', 'بدء تطبيق', 'يبدأ تطبيق', 'يدخل حيز', 'تدخل حيز', 'سريان', 'إيقاف', 'تعليق', 'يمنح', 'تمنح', 'منح', 'يحدد', 'تحدد', 'تحديد', 'يقرر', 'تقرر', 'قرر', 'قررت', 'يطلق', 'تطلق', 'أطلق', 'أطلقت', 'إطلاق', 'يحسم', 'تحسم', 'يشترط', 'تشترط', 'approv', 'issue', 'amend', 'extend', 'enforce', 'impose', 'suspend', 'ban', 'mandat', 'licens', 'regulat', 'grant', 'launch', 'set']);

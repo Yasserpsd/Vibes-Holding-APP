@@ -80,9 +80,21 @@ export function topicLabel(key: TopicKey, lang: NewsLang): string {
  */
 export const CORE_TOPICS: readonly TopicKey[] = ['crypto', 'metals', 'oil', 'markets'];
 
+/**
+ * M219 (owner, 2026-11-09: «الأخبار اللي ليها علاقة فقط بالاقتصاد وأسعار الذهب والنفط والمال … وأي أخبار
+ * تانية تتشال بشكل كامل»): the only sections the club carries. A stored item keeps these keys only, and an
+ * item left with none is never shown (see moneyGuard in classify.ts). The other keys stay in NEWS_TOPICS
+ * so old saved interests and labels still parse.
+ */
+export const MONEY_TOPICS: readonly TopicKey[] = ['economy', 'markets', 'finance', 'metals', 'oil', 'crypto', 'energy'];
+
+export function moneyTopics(topics: readonly TopicKey[]): TopicKey[] {
+  return topics.filter((key) => MONEY_TOPICS.includes(key));
+}
+
 /** The interests list in one language, as the app shows it (the always-on base sections are not choices). */
 export function topicsFor(lang: NewsLang): { key: TopicKey; label: string }[] {
-  return NEWS_TOPICS.filter((topic) => !CORE_TOPICS.includes(topic.key)).map((topic) => ({ key: topic.key, label: topicLabel(topic.key, lang) }));
+  return NEWS_TOPICS.filter((topic) => MONEY_TOPICS.includes(topic.key) && !CORE_TOPICS.includes(topic.key)).map((topic) => ({ key: topic.key, label: topicLabel(topic.key, lang) }));
 }
 
 export function isTopicKey(value: unknown): value is TopicKey {

@@ -33,7 +33,12 @@ export type BreakingSettings = {
   minSpark: number;
 };
 
-export const BREAKING_DEFAULTS: BreakingSettings = { enabled: true, dailyCap: 2, quietFrom: 23, quietTo: 7, minSpark: 20 };
+export const BREAKING_DEFAULTS: BreakingSettings = { enabled: true, dailyCap: 1, quietFrom: 23, quietTo: 7, minSpark: 20 };
+/**
+ * M219 (owner, 2026-11-09: «2 فقط في اليوم»): breaking draws from the same daily budget as the two editions
+ * (NewsService.pushCap) and may use ONE slot of it at most, whatever the dashboard card saved before.
+ */
+const BREAKING_MAX_PER_DAY = 1;
 
 const settingsSchema = z.object({
   enabled: z.boolean(),
@@ -89,7 +94,8 @@ export class BreakingNewsService {
 
   async settings(): Promise<BreakingSettings> {
     const saved = await this.deps.kv.get<Partial<BreakingSettings>>(SETTINGS_KEY);
-    return { ...BREAKING_DEFAULTS, ...saved };
+    const merged = { ...BREAKING_DEFAULTS, ...saved };
+    return { ...merged, dailyCap: Math.min(merged.dailyCap, BREAKING_MAX_PER_DAY) };
   }
 
   async save(patch: Partial<BreakingSettings>): Promise<BreakingSettings> {
@@ -126,6 +132,7 @@ export class BreakingNewsService {
       const arPick = this.deps.news.breaking('ar', now, undefined, settings.minSpark).find((item) => !state.ids.includes(item.id)) ?? null;
       const enPick = this.deps.news.breaking('en', now, undefined, settings.minSpark).find((item) => !state.ids.includes(item.id)) ?? null;
       if (!arPick && !enPick) return false;
+      if (!(await this.deps.news.pushCap.take(now))) return false; // M219: the day's two news pushes are spent
       // The mark lands BEFORE the sends: a crash mid-way never double-messages the members.
       const ids = [arPick?.id, enPick?.id].filter((id): id is string => Boolean(id));
       await this.deps.kv.set(STATE_KEY, { day, sent: state.sent + 1, ids: [...state.ids, ...ids] });
@@ -133,6 +140,7 @@ export class BreakingNewsService {
         const pick = device.lang === 'en' ? enPick : arPick;
         return pick ? breakingMessage(pick) : null;
       });
+      if (outcome.sent === 0) await this.deps.news.pushCap.refund(now);
       this.deps.log.info({ ar: arPick?.id ?? null, en: enPick?.id ?? null, ...outcome }, 'breaking news push');
       return true;
     } finally {

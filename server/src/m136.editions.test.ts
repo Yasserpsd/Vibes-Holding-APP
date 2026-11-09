@@ -5,7 +5,7 @@ import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
 import { MOCK_CODE } from './hub/mock.js';
 import { LogMailer } from './mail/mailer.js';
-import { NEWS_PICKS_KEY, NEWS_SNAPSHOT_KEY, newsIdOf, type PicksState } from './news/service.js';
+import { NEWS_PICKS_KEY, NEWS_SNAPSHOT_KEY, PICKS_RULE, newsIdOf, type PicksState } from './news/service.js';
 import { NEWS_SEED_VERSION, NEWS_SOURCES_KEY } from './news/sources.js';
 import type { NewsItem, NewsSnapshot, TopicKey } from './news/types.js';
 import { DAY_MS, riyadhDay } from './riyadh.js';
@@ -35,6 +35,7 @@ const evening = at(tomorrow, '19:30:00.000');
 const doneToday = (): PicksState => ({
   editions: [2, 1].map((slot) => ({ day: today, slot, filledAt: new Date().toISOString(), picks: { ar: [], en: [] }, pushedAt: new Date().toISOString() })),
   pickedIds: [],
+  rule: PICKS_RULE,
 });
 
 const story = (slug: string, over: Partial<NewsItem> = {}): NewsItem => ({
@@ -46,7 +47,7 @@ const story = (slug: string, over: Partial<NewsItem> = {}): NewsItem => ({
   title: `خبر ${slug}`,
   snippet: 'الموجز كما أورده المصدر.',
   url: `https://news.example.test/${slug}`,
-  image: null,
+  image: `https://news.example.test/photos/${slug}.jpg`,
   publishedAt: new Date(morning - 2 * 3_600_000).toISOString(),
   verifiedAt: new Date().toISOString(),
   classifiedBy: 'keywords',
@@ -125,10 +126,10 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
 
   // The feed is the picks only: a guest sees every topic (two stories at most per topic), the member his interests.
   const guest = await app.inject({ method: 'GET', url: '/api/news/feed' });
-  assert.deepEqual(urls(guest.json()).sort(), ['eco-1', 'eco-2', 'sports-1'], 'eco-3 is the third economy/markets story: not today');
-  assert.equal(guest.json().total, 3);
+  assert.deepEqual(urls(guest.json()).sort(), ['eco-1', 'eco-2'], 'eco-3 is the third economy/markets story: not today; M219: the sports story is never shown');
+  assert.equal(guest.json().total, 2);
   const mine = await app.inject({ method: 'GET', url: '/api/news/feed', headers: { authorization: `Bearer ${token}` } });
-  assert.deepEqual(urls(mine.json()).sort(), ['eco-1', 'eco-2', 'sports-1'], 'his sports pick plus the base sections (M166)');
+  assert.deepEqual(urls(mine.json()).sort(), ['eco-1', 'eco-2'], 'M219: every member sees the money sections; sports is gone');
   assert.equal(mine.json().personalized, true);
   const markets = await app.inject({ method: 'GET', url: '/api/news/feed?topic=markets' });
   assert.deepEqual(urls(markets.json()).sort(), ['eco-1', 'eco-2'], 'a topic chip shows the picks of the day that carry it, two at most');
@@ -147,7 +148,7 @@ test('two editions a day, one story per topic each: the feed shows the picks onl
   assert.equal(second.filter((message) => message.to === ENGLISH).length, 1, 'an English device with no English pick hears the Arabic one');
   for (const message of second) assert.equal(message.body, 'الصادرات غير النفطية تنمو');
   const evening2 = await app.inject({ method: 'GET', url: '/api/news/feed' });
-  assert.deepEqual(urls(evening2.json()).sort(), ['eco-1', 'eco-2', 'eco-3', 'sports-1'], 'the day shows both editions: two stories per topic at most');
+  assert.deepEqual(urls(evening2.json()).sort(), ['eco-1', 'eco-2', 'eco-3'], 'the day shows both editions: two stories per topic at most');
 
   // Nothing else all day, and both editions are recorded as sent.
   const afterEvening = pushBatches.length;

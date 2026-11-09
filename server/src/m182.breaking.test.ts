@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { BreakingNewsService, breakingMessage } from './news/breaking.js';
 import { biggestFigure } from './news/service.js';
+import { NewsPushCap } from './news/pushCap.js';
 import type { NewsService } from './news/service.js';
 import type { NewsItem } from './news/types.js';
 import type { PushMessage, PushService } from './push/service.js';
@@ -28,7 +29,8 @@ const fakePush = (devices: Device[], sent: { to: number; message: PushMessage }[
     },
   }) as unknown as PushService;
 
-const newsWith = (ar: NewsItem[], en: NewsItem[] = []): NewsService => ({ breaking: (lang: string) => (lang === 'en' ? en : ar) }) as unknown as NewsService;
+const newsWith = (ar: NewsItem[], en: NewsItem[] = [], pushCap = new NewsPushCap(new MemoryKV())): NewsService =>
+  ({ breaking: (lang: string) => (lang === 'en' ? en : ar), pushCap }) as unknown as NewsService;
 
 // 11:00 Riyadh (08:00 UTC) — outside the quiet hours; 23:30 Riyadh is inside them.
 const DAY_MS = Date.parse('2026-11-02T08:00:00.000Z');
@@ -69,13 +71,19 @@ test('M182b: one wave per tick in each language, once per item, capped per day, 
 
   assert.equal(await service.tick(DAY_MS + 5 * 60_000), false, 'the same items never send twice');
 
-  // A second fresh story sends (cap 2)…
-  service = new BreakingNewsService({ kv, log: silentLog, news: newsWith([item({ id: 'a2' })]), push: fakePush(devices, sent), enabled: true });
-  assert.equal(await service.tick(DAY_MS + 10 * 60_000), true);
-  // …and a third one waits for tomorrow.
+  // M219: one breaking wave a day — a second fresh story waits for tomorrow.
   service = new BreakingNewsService({ kv, log: silentLog, news: newsWith([item({ id: 'a3' })]), push: fakePush(devices, sent), enabled: true });
   assert.equal(await service.tick(DAY_MS + 20 * 60_000), false, 'the daily cap holds');
   assert.equal(await service.tick(DAY_MS + 24 * 3_600_000), true, 'a new Riyadh day starts fresh');
+
+  // M219: breaking shares the day's budget of two news pushes with the editions — a full day sends nothing.
+  const cap = new NewsPushCap(new MemoryKV());
+  const fullDay = DAY_MS + 48 * 3_600_000;
+  assert.equal(await cap.take(fullDay), true);
+  assert.equal(await cap.take(fullDay), true);
+  assert.equal(await cap.take(fullDay), false, 'the third news push of a day is refused');
+  const capped = new BreakingNewsService({ kv, log: silentLog, news: newsWith([item({ id: 'a7' })], [], cap), push: fakePush(devices, sent), enabled: true });
+  assert.equal(await capped.tick(fullDay), false, 'two news pushes already went out today');
 
   const off = new BreakingNewsService({ kv, log: silentLog, news: newsWith([item({ id: 'a9' })]), push: fakePush(devices, sent), enabled: false });
   assert.equal(await off.tick(DAY_MS + 25 * 3_600_000), false, 'NEWS_BREAKING=0 kills it');

@@ -6,15 +6,18 @@ import type { Config } from '../config.js';
 import type { PushService } from '../push/service.js';
 import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
-import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, type Classifier, type ClassifyInput } from './classify.js';
+import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, moneyGuard, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
 import { fetchArticle, type PageMeta } from './page.js';
+import { NewsPushCap } from './pushCap.js';
 import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
 import { getNewsSources, outletNameFor } from './sources.js';
 import { fetchSpaSnippet } from './spa.js';
 import {
   CORE_TOPICS,
+  MONEY_TOPICS,
   TOPIC_KEYS,
+  moneyTopics,
   tierLabel,
   topicLabel,
   type NewsItem,
@@ -46,10 +49,10 @@ const RECENCY_HALF_LIFE_H = 14;
 
 /** Interests assumed from the persona until the member picks their own. */
 const PERSONA_TOPICS: Record<string, TopicKey[]> = {
-  // M61: sports sits in every persona's defaults (owner, 2026-10-04: «الناس تحب الأخبار الرياضية»).
-  neutral: ['economy', 'markets', 'tech', 'sports'],
-  entrepreneur: ['startups', 'economy', 'tech', 'retail', 'finance', 'sports'],
-  investor: ['markets', 'economy', 'realestate', 'finance', 'energy', 'sports'],
+  // M219: money sections only (the owner dropped sports and every non-money section, 2026-11-09).
+  neutral: ['economy', 'markets', 'finance'],
+  entrepreneur: ['economy', 'finance', 'markets'],
+  investor: ['markets', 'economy', 'finance', 'energy'],
 };
 
 /** `lang` picks the feed: Arabic sources for the Arabic app, English sources for the English one (never translated, rule 7). */
@@ -60,7 +63,7 @@ export type ListQuery = { topic?: TopicKey; page: number; limit: number; lang?: 
  * والعملات الرقمية … وخصوصا الأخبار الشقية اوي»): the home carousel shows money news only, and the
  * stories with teeth first. Selection and ranking only — rule 7 holds, the words stay the source's.
  */
-const HOME_TOPICS: ReadonlySet<TopicKey> = new Set(['economy', 'markets', 'finance', 'crypto', 'metals', 'oil', 'energy', 'realestate', 'startups', 'tech', 'industry', 'retail']);
+const HOME_TOPICS: ReadonlySet<TopicKey> = new Set(MONEY_TOPICS);
 /** The spice: numbers that shock, deals, crashes, records — the headlines that make people open the app. */
 const SPARK = [
   /مليار|تريليون|قياسي|تاريخي|استحواذ|اندماج|صفقة|اكتتاب|إفلاس|انهيار|يقفز|قفز|صاروخي|هبوط حاد|تراجع حاد|يتجاوز|لأول مرة|عقوبات|غرامة|تحذير|يحذر|مفاجئ|مفاجأة|أعلى مستوى|أدنى مستوى|خسائر|أرباح قياسية|ملياردير|ثروة/u,
@@ -98,17 +101,35 @@ function sparkOf(item: NewsItem): number {
 }
 export type Audience = { prefs: NewsPrefs | null; persona: string };
 
+/**
+ * M219 (owner, 2026-11-09: «تختار ديما الأخبار اللي ليها صورة … ودي قاعدة ثابتة»): only a story with a real
+ * photo of its own is ever shown or pushed. What went wrong before: Bing thumbnails arrived as http://
+ * (phones refuse cleartext), some URLs kept the feed's «&amp;», and outlets answer with a «no image» file
+ * or their logo when the article has no photo.
+ */
+const PLACEHOLDER_IMAGE = /no[-_]?image|placeholder|default[-_.]|logo|argaam-plus/i;
+/** The same file on this many stored items is the outlet's brand image, not a photo. */
+const BRAND_IMAGE_USES = 3;
+
+export function cleanImage(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const fixed = url.trim().replace(/&amp;/gi, '&').replace(/^http:\/\//i, 'https://');
+  try {
+    const parsed = new URL(fixed);
+    if (parsed.protocol !== 'https:' || PLACEHOLDER_IMAGE.test(parsed.pathname)) return null;
+  } catch {
+    return null;
+  }
+  return fixed;
+}
+
 type Indexed = { item: NewsItem; tokens: Set<string> };
 type Fresh = { source: NewsSource; entry: FeedEntry };
 type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; classifier: Classifier; fetchImpl?: FetchImpl; /** Called after a run that stored new items (/api/sync). */ onChange?: () => void; /** M42: a NEW Saudi decision notifies every device (capped per day). */ push?: PushService };
 /** M136: the news topics an account chose (unified interests, else legacy prefs), null when it never saved any. */
 export type TopicsResolver = (contactId: number) => Promise<TopicKey[] | null>;
 
-/** M42: which decisions were already announced, and how many went out today (Riyadh). */
-export const NEWS_PUSH_KEY = 'push:news:decisions';
-const NEWS_PUSH_DAILY_MAX = 3;
 const NEWS_PUSH_SEEN_MAX = 600;
-type NewsPushState = { seen: string[]; day: string; sentToday: number };
 
 /**
  * M136 (owner, 2026-10-28: «العملاء اشتكوا من كتر الأخبار — خبرين فقط في اليوم لكل مجال، حسب اهتماماته»)
@@ -126,7 +147,9 @@ const MAX_PER_TOPIC_PER_DAY = PICKS_PER_TOPIC_PER_EDITION * EDITION_HOURS.length
 const PICKED_IDS_MAX = 600;
 export type EditionPick = { topic: TopicKey; id: string };
 export type Edition = { day: string; slot: number; filledAt: string; picks: Record<NewsLang, EditionPick[]>; pushedAt: string | null };
-export type PicksState = { editions: Edition[]; pickedIds: string[] };
+export type PicksState = { editions: Edition[]; pickedIds: string[]; /** The selection rules the picks were made under (PICKS_RULE). */ rule?: number };
+/** M219: money-only, photo-only picks. Editions picked under an older rule are picked again once (never pushed again). */
+export const PICKS_RULE = 2;
 /** M134: the admin send-now remembers what it pushed so nothing repeats. */
 export const NEWS_DAILY_PUSH_KEY = 'push:news:daily';
 type DigestPushState = { day: string; pushedIds: string[] };
@@ -134,7 +157,6 @@ type DigestSlug = 'top' | 'sports';
 const TOP_DIGEST = { slug: 'top' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Top business story today 📈' : 'أهم أخبار اليوم 📈') };
 const SPORTS_DIGEST = { slug: 'sports' as DigestSlug, title: (lang: NewsLang) => (lang === 'en' ? 'Sports today ⚽' : 'أخبار الرياضة اليوم ⚽') };
 const DIGESTS = [TOP_DIGEST, SPORTS_DIGEST];
-const digestTitleFor = (item: NewsItem, lang: NewsLang): string => (item.topics.includes('sports') ? SPORTS_DIGEST : TOP_DIGEST).title(lang);
 
 export function newsIdOf(url: string): string {
   return createHash('sha1').update(url).digest('hex').slice(0, 16);
@@ -160,8 +182,14 @@ export class NewsService {
   /** M136: the day's editions (latest first), kept in memory so the feed answers synchronously. */
   private picks: PicksState = { editions: [], pickedIds: [] };
   private topicsResolver: TopicsResolver | null = null;
+  /** M219: how many stored items carry each image — a file shared by several is a brand image. */
+  private imageUse = new Map<string, number>();
+  /** M219: the ONE daily budget of automatic news pushes (editions and breaking both draw from it). */
+  readonly pushCap: NewsPushCap;
 
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) {
+    this.pushCap = new NewsPushCap(deps.kv);
+  }
 
   /** M136: wired after the interests service exists (app.ts) — edition pushes follow each account's interests. */
   useTopics(resolver: TopicsResolver): void {
@@ -172,8 +200,12 @@ export class NewsService {
     const snapshot = await this.deps.kv.get<NewsSnapshot>(NEWS_SNAPSHOT_KEY);
     if (snapshot?.items) this.load(snapshot.items, snapshot.updatedAt);
     const picks = await this.deps.kv.get<PicksState>(NEWS_PICKS_KEY);
-    if (picks?.editions) this.picks = { editions: picks.editions, pickedIds: picks.pickedIds ?? [] };
+    if (picks?.editions) this.picks = { editions: picks.editions, pickedIds: picks.pickedIds ?? [], rule: picks.rule };
     this.loadBoosts(await getNewsSources(this.deps.kv));
+    if (this.picks.rule !== PICKS_RULE) await this.repick();
+    // M219: the editions already announced today count against the day's budget from the first minute.
+    const day = riyadhDay(Date.now());
+    await this.pushCap.seed(this.picks.editions.filter((edition) => edition.day === day && edition.pushedAt).length);
     await this.runEditions();
     const minutes = this.deps.config.NEWS_REFRESH_MINUTES;
     if (minutes <= 0) {
@@ -200,8 +232,27 @@ export class NewsService {
   }
 
   private load(items: NewsItem[], updatedAt: string | null): void {
-    this.items = new Map(items.map((item) => [item.id, { item, tokens: titleTokens(item.title) }]));
+    // M219: the stored items obey today's rules too — money sections only, cleaned image URLs.
+    this.items = new Map(
+      items.map((stored) => {
+        const topics = moneyTopics(stored.topics);
+        const hidden = stored.hidden || !moneyGuard(stored.title, topics);
+        const item: NewsItem = { ...stored, topics, hidden, decision: stored.decision && !hidden, image: cleanImage(stored.image) };
+        return [item.id, { item, tokens: titleTokens(item.title) }];
+      }),
+    );
     this.updatedAt = updatedAt;
+    this.countImages();
+  }
+
+  private countImages(): void {
+    this.imageUse = new Map();
+    for (const { item } of this.items.values()) if (item.image) this.imageUse.set(item.image, (this.imageUse.get(item.image) ?? 0) + 1);
+  }
+
+  /** The story's own photo, or null when it has none (or carries only the outlet's brand image). */
+  private photoOf(item: NewsItem): string | null {
+    return item.image && (this.imageUse.get(item.image) ?? 0) < BRAND_IMAGE_USES ? item.image : null;
   }
 
   private loadBoosts(sources: NewsSource[]): void {
@@ -229,11 +280,11 @@ export class NewsService {
         added += 1;
       }
       this.prune(cutoff);
+      this.countImages();
       this.updatedAt = new Date().toISOString();
       this.lastError = null;
       await this.persist();
       if (added > 0) this.deps.onChange?.();
-      await this.pushNewDecisions();
       await this.runEditions();
       this.deps.log.info(
         { sources: sources.length, fresh: fresh.length, verified: verified.length, added, total: this.items.size, classifier: this.deps.classifier.mode },
@@ -320,7 +371,7 @@ export class NewsService {
       url: entry.url,
       // Sites with a JSON detail (SPA) put their logo in og:image: only the entry's own image counts as the photo,
       // but the logo is kept as the brand fallback (owner, 2026-10-17: every item must show an image).
-      image: entry.image ?? (entry.detailUrl ? null : page.image),
+      image: cleanImage(entry.image) ?? (entry.detailUrl ? null : cleanImage(page.image)),
       brandImage: entry.detailUrl ? page.image : null,
       publishedAt: entry.publishedAt ?? page.publishedAt ?? now,
       verifiedAt: now,
@@ -351,10 +402,12 @@ export class NewsService {
       const label = labels[index];
       const input = inputs[index];
       if (!label || !input) return { ...item, hidden: true };
-      const decision = label.decision && decisionGuard(input, label.topics);
-      // M61: sports items are shown on their own merit (owner, 2026-10-04); only off-topic items stay hidden.
-      const offTopic = !decision && label.relevance < MIN_RELEVANCE;
-      return { ...item, ...label, decision, hidden: offTopic };
+      // M219: money news only — the other sections are dropped and a headline that does not speak money stays hidden.
+      const topics = moneyTopics(label.topics);
+      const money = moneyGuard(item.title, topics);
+      const decision = money && label.decision && decisionGuard(input, topics);
+      const offTopic = !money || (!decision && label.relevance < MIN_RELEVANCE);
+      return { ...item, ...label, topics, decision, hidden: offTopic };
     });
   }
 
@@ -398,10 +451,15 @@ export class NewsService {
     return best ? { text: best.text, item: toPublic(best.item) } : null;
   }
 
+  /** M219: what may be shown or pushed at all — not hidden, not a duplicate, and with a photo of its own. */
+  private shown(item: NewsItem): boolean {
+    return !item.hidden && !item.duplicateOf && this.photoOf(item) !== null;
+  }
+
   /** Shown items, of one language when given. */
   private visible(lang?: NewsLang): NewsItem[] {
     const rows: NewsItem[] = [];
-    for (const { item } of this.items.values()) if (!item.hidden && !item.duplicateOf && (!lang || item.lang === lang)) rows.push(item);
+    for (const { item } of this.items.values()) if (this.shown(item) && (!lang || item.lang === lang)) rows.push(item);
     return rows;
   }
 
@@ -476,17 +534,10 @@ export class NewsService {
       .map((pick) => ({ item: pick.item, score: scoreOf(pick.item, wanted, now) + (this.boosts.get(pick.item.sourceId) ?? 0) }))
       .sort((a, b) => b.score - a.score || b.item.publishedAt.localeCompare(a.item.publishedAt))
       .map(({ item }) => item);
-    // A story shows under every interest it carries, but no interest ever shows more than two stories a day.
-    const topics = query.topic ? [query.topic] : wanted.size ? [...wanted] : null;
-    const count = new Map<TopicKey, number>();
-    const rows = !topics
-      ? ranked
-      : ranked.filter((item) => {
-          const mine = topics.filter((topic) => item.topics.includes(topic));
-          if (!mine.some((topic) => (count.get(topic) ?? 0) < MAX_PER_TOPIC_PER_DAY)) return false;
-          for (const topic of mine) count.set(topic, (count.get(topic) ?? 0) + 1);
-          return true;
-        });
+    // M219: the seven money sections are the whole feed, so everyone sees every pick of the day (the editions
+    // already hold a section to two stories a day); the interests only rank. A section chip shows its two.
+    const topic = query.topic;
+    const rows = topic ? ranked.filter((item) => item.topics.includes(topic)).slice(0, MAX_PER_TOPIC_PER_DAY) : ranked;
     return paginate(rows, query, this.updatedAt, wanted.size > 0);
   }
 
@@ -498,7 +549,7 @@ export class NewsService {
     for (const edition of editions) {
       for (const pick of edition.picks[lang] ?? []) {
         const item = this.items.get(pick.id)?.item;
-        if (item && !item.hidden && !item.duplicateOf) rows.push({ ...pick, item });
+        if (item && this.shown(item)) rows.push({ ...pick, item });
       }
     }
     return rows;
@@ -529,6 +580,26 @@ export class NewsService {
     return picks;
   }
 
+  /**
+   * M219: the editions on show were picked under older rules (every section, photo or not) — pick them again
+   * under today's, once. `pushedAt` is kept as it was, so an edition already announced is never announced twice.
+   */
+  private async repick(now = Date.now()): Promise<void> {
+    const onShow = this.picks.editions.slice(0, 2).reverse();
+    const own = new Set(onShow.flatMap((edition) => [...edition.picks.ar, ...edition.picks.en].map((pick) => pick.id)));
+    const exclude = new Set(this.picks.pickedIds.filter((id) => !own.has(id)));
+    for (const edition of onShow) {
+      for (const lang of ['ar', 'en'] as const) {
+        const picks = this.choosePicks(lang, now, exclude, PICKS_PER_TOPIC_PER_EDITION);
+        edition.picks[lang] = picks.map((pick) => ({ topic: pick.topic, id: pick.id }));
+        for (const pick of picks) exclude.add(pick.id);
+      }
+    }
+    this.picks.pickedIds = [...exclude].slice(-PICKED_IDS_MAX);
+    this.picks.rule = PICKS_RULE;
+    await this.deps.kv.set(NEWS_PICKS_KEY, this.picks satisfies PicksState);
+  }
+
   /** M136: fills every edition whose hour has passed today (one story per topic, both languages), then sends the unsent ones. */
   async runEditions(now = Date.now()): Promise<void> {
     try {
@@ -548,6 +619,7 @@ export class NewsService {
         }
         if (!picks.ar.length && !picks.en.length) return; // nothing fresh yet: the next poll retries this edition
         this.picks.editions.unshift({ day, slot, filledAt: new Date(now).toISOString(), picks, pushedAt: null });
+        this.picks.rule = PICKS_RULE;
         this.picks.editions = this.picks.editions.slice(0, 6);
         this.picks.pickedIds = [...this.picks.pickedIds, ...picks.ar.map((pick) => pick.id), ...picks.en.map((pick) => pick.id)].slice(-PICKED_IDS_MAX);
         changed = true;
@@ -559,7 +631,11 @@ export class NewsService {
     }
   }
 
-  /** Each unsent edition of today: one push per device — the best pick among the account's interests, else the edition's best story. */
+  /**
+   * Each unsent edition of today: one push per device — the best pick among the account's interests, else the
+   * edition's best story. M219: every wave first takes a slot of the day's shared budget (pushCap); a full day
+   * sends nothing more.
+   */
   private async pushEditions(now: number): Promise<void> {
     const push = this.deps.push;
     if (!push) return;
@@ -571,10 +647,12 @@ export class NewsService {
         ranked[lang] = edition.picks[lang]
           .flatMap((pick) => {
             const item = this.items.get(pick.id)?.item;
-            return item ? [{ ...pick, item }] : [];
+            return item && this.shown(item) ? [{ ...pick, item }] : [];
           })
           .sort((a, b) => scoreOf(b.item, new Set(), now) - scoreOf(a.item, new Set(), now));
       }
+      if (!ranked.ar.length && !ranked.en.length) continue;
+      if (!(await this.pushCap.take(now))) return; // the day's two news pushes are spent
       const topicsCache = new Map<number, Promise<TopicKey[] | null>>();
       const topicsOf = (contactId: number): Promise<TopicKey[] | null> => {
         let pending = topicsCache.get(contactId);
@@ -593,49 +671,14 @@ export class NewsService {
         const pick = (wanted.size ? pool.find((entry) => entry.item.topics.some((topic) => wanted.has(topic))) : undefined) ?? pool[0];
         if (!pick) return null;
         const item = pick.item;
-        return { title: digestTitleFor(item, lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
+        return { title: TOP_DIGEST.title(lang), body: item.title, data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` } };
       });
-      if (outcome.sent === 0) continue; // nobody reached: the next poll retries
+      if (outcome.sent === 0) {
+        await this.pushCap.refund(now); // nobody reached: the slot goes back and the next poll retries
+        continue;
+      }
       edition.pushedAt = new Date(now).toISOString();
       await this.deps.kv.set(NEWS_PICKS_KEY, this.picks satisfies PicksState);
-    }
-  }
-
-  /**
-   * M42 (owner: «عايز الأخبار برده ترسل اشعار»): every NEW item of «قرارات وأنظمة المملكة» notifies all
-   * devices with the source's own title (rule 7: nothing is written by us), capped per Riyadh day so the
-   * feed's volume never becomes noise. The first run only records what already exists.
-   */
-  private async pushNewDecisions(): Promise<void> {
-    const push = this.deps.push;
-    if (!push) return;
-    try {
-      const current = this.visible('ar').filter((item) => item.decision);
-      const stored = await this.deps.kv.get<NewsPushState>(NEWS_PUSH_KEY);
-      const today = riyadhDay(Date.now());
-      if (!stored) {
-        await this.deps.kv.set(NEWS_PUSH_KEY, { seen: current.map((item) => item.id), day: today, sentToday: 0 } satisfies NewsPushState);
-        return;
-      }
-      const seen = new Set(stored.seen);
-      const fresh = current.filter((item) => !seen.has(item.id)).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-      if (fresh.length === 0) return;
-      let sentToday = stored.day === today ? stored.sentToday : 0;
-      for (const item of fresh) {
-        if (sentToday >= NEWS_PUSH_DAILY_MAX) break;
-        const outcome = await push.broadcast({
-          title: `${DECISIONS_TITLE} 🇸🇦`,
-          body: item.title,
-          data: { type: 'news', newsId: item.id, screen: `/news/${item.id}` },
-        });
-        if (outcome.sent === 0) break;
-        sentToday += 1;
-      }
-      // Everything new is recorded either way: a decision beyond today's cap is skipped, never sent stale later.
-      const nextSeen = [...stored.seen, ...fresh.map((item) => item.id)].slice(-NEWS_PUSH_SEEN_MAX);
-      await this.deps.kv.set(NEWS_PUSH_KEY, { seen: nextSeen, day: today, sentToday } satisfies NewsPushState);
-    } catch (error) {
-      this.deps.log.error({ err: error }, 'news decision notifications failed');
     }
   }
 
