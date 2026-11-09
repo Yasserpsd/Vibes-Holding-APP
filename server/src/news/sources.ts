@@ -129,7 +129,15 @@ const MONEY_ONLY_OFF = [
   'spa-general', 'spa-political', 'spa-tourism', 'spa-tech', 'spa-en-general', 'spa-en-political',
 ];
 
-export const NEWS_SOURCES_SEED: NewsSource[] = SEED_ROWS.map((row) => (MONEY_ONLY_OFF.includes(row.id) ? { ...row, enabled: false } : row));
+/**
+ * M221 (owner, 2026-11-09: «في كمية أخبار عن المغرب والسودان … عايز أخبار سعودية أو عالمية تمس السوق السعودي»):
+ * three feeds measured that day carried other countries' local news and next to no Saudi economy story — مباشر
+ * (the general feed; «مباشر — الأسواق» stays), الجزيرة نت and اندبندنت عربية. Off; the rows stay for the dashboard toggle.
+ */
+const OFF_TARGET_OFF = ['mubasher-sa', 'aljazeera-economy', 'independentarabia'];
+const SEED_OFF = [...MONEY_ONLY_OFF, ...OFF_TARGET_OFF];
+
+export const NEWS_SOURCES_SEED: NewsSource[] = SEED_ROWS.map((row) => (SEED_OFF.includes(row.id) ? { ...row, enabled: false } : row));
 
 /**
  * Revision of the seed. A stored list (dashboard-editable) is never replaced: a newer revision only adds the
@@ -144,8 +152,9 @@ export const NEWS_SOURCES_SEED: NewsSource[] = SEED_ROWS.map((row) => (MONEY_ONL
  * 6 = M166 (owner, 2026-10-31): the base sections (crypto, gold and silver, oil, markets) — global market sources, Arabic and English.
  * 7 = M176 (owner, 2026-11-01): nine more economy, gold and oil feeds (mostly Arabic), probed the same day.
  * 8 = M219 (owner, 2026-11-09): money news only — the sports feeds and the non-economy SPA wires off (MONEY_ONLY_OFF).
+ * 9 = M221 (owner, 2026-11-09): Saudi and world-market news — three off-target feeds off (OFF_TARGET_OFF).
  */
-export const NEWS_SEED_VERSION = 8;
+export const NEWS_SEED_VERSION = 9;
 const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = {
   2: {
     arabnews: { enabled: true, saudiOnly: true },
@@ -175,6 +184,7 @@ const CHANGES_BY_VERSION: Record<number, Record<string, Partial<NewsSource>>> = 
     'mubasher-sa': { enabled: false },
   },
   8: Object.fromEntries(MONEY_ONLY_OFF.map((id) => [id, { enabled: false }])),
+  9: Object.fromEntries(OFF_TARGET_OFF.map((id) => [id, { enabled: false }])),
 };
 
 /** Outlets behind aggregator links, by domain: the app names the outlet, never the aggregator. */

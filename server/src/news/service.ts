@@ -8,6 +8,7 @@ import { riyadhDay, riyadhHour } from '../riyadh.js';
 import type { KV } from '../store.js';
 import { MIN_RELEVANCE, decisionGuard, mentionsSaudi, moneyGuard, type Classifier, type ClassifyInput } from './classify.js';
 import { findDuplicate, preferred, tierRank, titleTokens } from './dedupe.js';
+import { GEO_BOOST, geoFor } from './geo.js';
 import { fetchArticle, type PageMeta } from './page.js';
 import { NewsPushCap } from './pushCap.js';
 import { fetchFeed, type FeedEntry, type FetchImpl } from './rss.js';
@@ -149,7 +150,7 @@ export type EditionPick = { topic: TopicKey; id: string };
 export type Edition = { day: string; slot: number; filledAt: string; picks: Record<NewsLang, EditionPick[]>; pushedAt: string | null };
 export type PicksState = { editions: Edition[]; pickedIds: string[]; /** The selection rules the picks were made under (PICKS_RULE). */ rule?: number };
 /** M219: money-only, photo-only picks. Editions picked under an older rule are picked again once (never pushed again). */
-export const PICKS_RULE = 2;
+export const PICKS_RULE = 3;
 /** M134: the admin send-now remembers what it pushed so nothing repeats. */
 export const NEWS_DAILY_PUSH_KEY = 'push:news:daily';
 type DigestPushState = { day: string; pushedIds: string[] };
@@ -451,9 +452,12 @@ export class NewsService {
     return best ? { text: best.text, item: toPublic(best.item) } : null;
   }
 
-  /** M219: what may be shown or pushed at all — not hidden, not a duplicate, and with a photo of its own. */
+  /**
+   * M219: what may be shown or pushed at all — not hidden, not a duplicate, and with a photo of its own.
+   * M221: and never another country's local story (geo.ts) — the home, «رقم اليوم», the feed and every push read this.
+   */
   private shown(item: NewsItem): boolean {
-    return !item.hidden && !item.duplicateOf && this.photoOf(item) !== null;
+    return !item.hidden && !item.duplicateOf && geoFor(item) !== 'foreign' && this.photoOf(item) !== null;
   }
 
   /** Shown items, of one language when given. */
@@ -747,7 +751,8 @@ function scoreOf(item: NewsItem, wanted: Set<TopicKey>, now: number): number {
   const ageHours = Math.max(0, now - Date.parse(item.publishedAt)) / 3_600_000;
   const recency = 55 * Math.pow(0.5, ageHours / RECENCY_HALF_LIFE_H);
   const interest = item.topics.some((topic) => wanted.has(topic)) ? 25 : 0;
-  return feedTierRank(item) * 8 + recency + item.relevance * 0.3 + interest;
+  // M221: Saudi stories lead by a wide margin, then world markets, then the Gulf (geo.ts).
+  return feedTierRank(item) * 8 + recency + item.relevance * 0.3 + interest + GEO_BOOST[geoFor(item)];
 }
 
 function paginate(rows: NewsItem[], query: { page: number; limit: number }, updatedAt: string | null, personalized: boolean): NewsPage {
