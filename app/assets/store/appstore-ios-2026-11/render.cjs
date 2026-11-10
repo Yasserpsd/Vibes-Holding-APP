@@ -7,6 +7,7 @@ const BOLD = `${FONTS}/700Bold/IBMPlexSansArabic_700Bold.ttf`;
 const REG = `${FONTS}/400Regular/IBMPlexSansArabic_400Regular.ttf`;
 const EMBLEM = 'C:/Projects/vibes-club-app/app/assets/images/club-emblem.png';
 const W = 1206, H = Number(process.env.OUT_H || 2622);
+const CH = Math.max(H, 2900); // draw tall, crop to H (Play needs 9:16)
 const OUT = process.env.OUT_DIR || 'store-out';
 
 const SHOTS = [
@@ -25,7 +26,7 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const text = (t, file, family, size, color, width) =>
   sharp({ text: { text: `<span foreground="${color}">${esc(t)}</span>`, font: `${family} ${size}`, fontfile: file, rgba: true, align: 'centre', width, dpi: 72, wrap: 'word', spacing: Math.round(size * 0.35) } }).png().toBuffer();
 
-const bg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+const bg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${CH}">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#10224A"/><stop offset="0.45" stop-color="#081431"/><stop offset="1" stop-color="#040A1A"/></linearGradient>
     <radialGradient id="r" cx="0.5" cy="0.3" r="0.55"><stop offset="0" stop-color="#D4AF37" stop-opacity="0.22"/><stop offset="1" stop-color="#D4AF37" stop-opacity="0"/></radialGradient>
