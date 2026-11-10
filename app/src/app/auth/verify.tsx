@@ -70,7 +70,7 @@ export default function VerifyScreen() {
       // M209: a brand-new account owes the intro film once; marked BEFORE the session is announced.
       if (flow === 'register') markIntroDue();
       await signIn(result.token, result.me);
-      if (flow === 'register') trackRegistration('email');
+      if (flow === 'register') trackRegistration('email', result.me);
       void queryClient.invalidateQueries({ queryKey: ['news'] });
       void queryClient.invalidateQueries({ queryKey: ['interests'] });
       finish();

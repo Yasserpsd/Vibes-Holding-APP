@@ -1518,7 +1518,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "wa.menu.verified": "موثّق",
     "wa.menu.unverified": "غير موثّق",
     "badge.verified": "رقم واتساب موثّق",
-    "badge.member": "عضو موثّق بعضوية فعّالة"
+    "badge.member": "عضو موثّق بعضوية فعّالة",
+    "ads.attPrimer.title": "قبل أن تبدأ",
+    "ads.attPrimer.body": "سيطلب منك جهازك الآن السماح بالتتبع. موافقتك تساعدنا على معرفة الإعلان الذي عرّفك بالنادي، فنصل إلى المهتمين بعالم الأعمال بتكلفة أقل. يمكنك تغيير اختيارك في أي وقت من إعدادات الجهاز.",
+    "ads.attPrimer.continue": "متابعة"
   },
   "en": {
     "tabs.home": "Home",
@@ -3038,7 +3041,10 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "wa.menu.verified": "Verified",
     "wa.menu.unverified": "Not verified",
     "badge.verified": "Verified WhatsApp number",
-    "badge.member": "Verified member with an active membership"
+    "badge.member": "Verified member with an active membership",
+    "ads.attPrimer.title": "Before you start",
+    "ads.attPrimer.body": "Your phone will now ask whether to allow tracking. Allowing it helps us know which ad introduced you to the club, so we reach people interested in business at a lower cost. You can change this at any time in your device settings.",
+    "ads.attPrimer.continue": "Continue"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",
@@ -3125,6 +3131,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "update": "رسائل التحديث (إجباري / إعادة تشغيل)",
     "theme": "مظهر التطبيق (فاتح وداكن)",
     "wa": "نافذة وبند توثيق واتساب",
-    "badge": "شارة التوثيق"
+    "badge": "شارة التوثيق",
+    "ads": "الإعلانات والتتبع"
   }
 };

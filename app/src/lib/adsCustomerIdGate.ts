@@ -7,6 +7,8 @@ export type CustomerIdGate = {
   setConsent(allowed: boolean): void;
   markReady(): void;
   setCustomerId(id: string): void;
+  /** Forgets the member (sign-out): nothing pending, and the same id is sent again after a new sign-in. */
+  reset(): void;
 };
 
 export function createCustomerIdGate(send: (id: string) => void): CustomerIdGate {
@@ -33,6 +35,10 @@ export function createCustomerIdGate(send: (id: string) => void): CustomerIdGate
     setCustomerId(id) {
       pending = id;
       flush();
+    },
+    reset() {
+      pending = null;
+      sent = null;
     },
   };
 }

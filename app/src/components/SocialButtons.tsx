@@ -62,7 +62,7 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
       if (signedIn.created) markIntroDue();
       await signIn(signedIn.token, signedIn.me);
       // M157: a first social sign-in is a registration for ads attribution (the server says `created`).
-      if (signedIn.created) trackRegistration(result.provider);
+      if (signedIn.created) trackRegistration(result.provider, signedIn.me);
       if (router.canDismiss()) router.dismissAll();
       else router.replace('/account');
     } catch (cause) {

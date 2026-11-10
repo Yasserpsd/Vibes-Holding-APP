@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { identifyAdsUser, startAdsAttribution } from '@/lib/adsAttribution';
+import { forgetAdsUser, identifyAdsUser, startAdsAttribution } from '@/lib/adsAttribution';
+import { piiFromMe } from '@/lib/adsUserPii';
 
 /**
  * M157: starts the ads-attribution SDK once per launch (install + session, after the iOS tracking
@@ -11,15 +12,23 @@ import { identifyAdsUser, startAdsAttribution } from '@/lib/adsAttribution';
 export function AdsAttribution() {
   const { status, me } = useAuth();
   const contactId = me?.id ?? null;
+  const email = me?.email;
+  const phone = me?.phone;
+  const contactEmail = me?.contactEmail;
 
   useEffect(() => {
     void startAdsAttribution();
   }, []);
 
   useEffect(() => {
+    if (status === 'guest') forgetAdsUser();
+  }, [status]);
+
+  useEffect(() => {
     if (status !== 'signedIn' || contactId === null) return;
-    identifyAdsUser(contactId);
-  }, [status, contactId]);
+    // Owner 2026-11-10: hashed e-mail + mobile for ad matching (Snap/TikTok/Meta), behind the same consent gate.
+    identifyAdsUser(contactId, piiFromMe({ email, phone, contactEmail }));
+  }, [status, contactId, email, phone, contactEmail]);
 
   return null;
 }

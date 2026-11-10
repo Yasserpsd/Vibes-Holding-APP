@@ -151,7 +151,7 @@ export default function RegisterScreen() {
         });
         if (result.created) markIntroDue();
         await signIn(result.token, result.me);
-        if (result.created) trackRegistration(social.provider);
+        if (result.created) trackRegistration(social.provider, result.me);
         void queryClient.invalidateQueries({ queryKey: ['news'] });
         void queryClient.invalidateQueries({ queryKey: ['interests'] });
         if (router.canDismiss()) router.dismissAll();
@@ -179,7 +179,7 @@ export default function RegisterScreen() {
       // M211: the number was proven here, so the account is open already. M209: the intro film is marked BEFORE the session.
       markIntroDue();
       await signIn(result.token, result.me);
-      trackRegistration('email');
+      trackRegistration('email', result.me);
       void queryClient.invalidateQueries({ queryKey: ['news'] });
       void queryClient.invalidateQueries({ queryKey: ['interests'] });
       if (router.canDismiss()) router.dismissAll();

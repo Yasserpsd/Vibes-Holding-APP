@@ -27,7 +27,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // RevenueCat) and without a forced layout direction; its runtime gets its own updates.
   // 1.2.0 (M151): adds expo-document-picker (the advisor's PDF button); new runtime, new OTA branch.
   // M217: 1.3.1 stays (its review was withdrawn for a new iOS build with SKAN ids); same runtime, OTAs unchanged.
-  version: '1.3.1',
+  // 1.3.2 (owner, 2026-11-10): new store build for the relationship screenshots + ad-platform readiness; new runtime.
+  version: '1.3.2',
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
   icon: './assets/images/icon.png',

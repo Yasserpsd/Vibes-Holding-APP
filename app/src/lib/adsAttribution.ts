@@ -1,8 +1,10 @@
 import { requireOptionalNativeModule } from 'expo';
-import { InteractionManager, NativeModules, Platform, TurboModuleRegistry } from 'react-native';
+import { Alert, AppState, InteractionManager, NativeModules, Platform, TurboModuleRegistry } from 'react-native';
 
 import { env } from '@/config/env';
 import { createCustomerIdGate } from '@/lib/adsCustomerIdGate';
+import { piiFromMe, type AdsUserPii } from '@/lib/adsUserPii';
+import { t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 
 /**
@@ -10,8 +12,9 @@ import { loadSetting, saveSetting } from '@/lib/deviceStore';
  * ads on accepts (TikTok, Meta, X, LinkedIn, Google Ads). The SDK is native, so binaries built before
  * 1.3.0 do not contain it: the native registry is checked before the package is required (the same
  * pattern as lib/purchases.ts and auth/social.ts) and every function here is a no-op there, which
- * keeps OTA updates safe. Event names leave the device, and the member's numeric id only after the
- * iOS tracking permission is granted — never a name, phone or e-mail. The dev key is a public app key
+ * keeps OTA updates safe. Event names leave the device; the member's numeric id, and since 2026-11-10
+ * (owner) the e-mail and mobile HASHED by the SDK (lib/adsUserPii.ts), only after the iOS tracking
+ * permission is granted (Android has no such prompt). Never a name. The dev key is a public app key
  * (EXPO_PUBLIC_APPSFLYER_DEV_KEY).
  */
 
@@ -27,9 +30,13 @@ type AppsFlyerSdk = {
   enableDebug(params: { enabled: boolean }): Promise<void>;
   logEvent(params: { eventName: string; eventValues?: Record<string, unknown> | null }): Promise<void>;
   setCustomerUserId(params: { customerId: string }): Promise<void>;
+  /** SDK 7: hashed-PII setters (the SDK hashes on the device before sending). */
+  setUserEmail?(params: { email: string }): Promise<void>;
+  setUserPhone?(params: { countryCode: string; phoneNumber: string }): Promise<void>;
+  clearUserPii?(): Promise<void>;
 };
 
-type TrackingModule = Pick<typeof import('expo-tracking-transparency'), 'requestTrackingPermissionsAsync'>;
+type TrackingModule = Pick<typeof import('expo-tracking-transparency'), 'requestTrackingPermissionsAsync' | 'getTrackingPermissionsAsync'>;
 
 let sdk: AppsFlyerSdk | null | undefined;
 let starting: Promise<void> | null = null;
@@ -37,6 +44,15 @@ let started = false;
 
 const customerIdGate = createCustomerIdGate((customerId) => {
   void loadSdk()?.setCustomerUserId({ customerId }).catch(warn);
+});
+
+// The hashed e-mail/phone ride the same consent rule as the member id (the gate dedupes by the JSON key).
+const piiGate = createCustomerIdGate((json) => {
+  const current = loadSdk();
+  if (!current) return;
+  const pii = JSON.parse(json) as AdsUserPii;
+  if (pii.email && current.setUserEmail) void current.setUserEmail({ email: pii.email }).catch(warn);
+  if (pii.phone && current.setUserPhone) void current.setUserPhone(pii.phone).catch(warn);
 });
 
 function loadSdk(): AppsFlyerSdk | null {
@@ -70,6 +86,15 @@ async function askTrackingPermission(): Promise<boolean> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const tracking = require('expo-tracking-transparency') as TrackingModule;
+    const current = await tracking.getTrackingPermissionsAsync();
+    if (current.status !== 'undetermined' || !current.canAskAgain) return current.granted;
+    // 2026-11-10 audit: a short, honest explanation first (one «متابعة» button, no reward, the system
+    // prompt always follows), so fewer members refuse a dialog they do not understand.
+    await new Promise<void>((resolve) =>
+      Alert.alert(t('ads.attPrimer.title'), t('ads.attPrimer.body'), [{ text: t('ads.attPrimer.continue'), onPress: () => resolve() }], {
+        cancelable: false,
+      }),
+    );
     const permission = await tracking.requestTrackingPermissionsAsync();
     return permission.granted;
   } catch {
@@ -87,29 +112,46 @@ async function askTrackingPermission(): Promise<boolean> {
  */
 const GUARD_KEY = 'adsAttribution.launchGuard';
 
-function guardValue(state: 'pending' | 'ok' | 'off'): string {
+function guardValue(state: 'pending' | 'retry' | 'ok' | 'off'): string {
   return `${env.appVersion}:${state}`;
 }
 
-async function launchGuardAllows(): Promise<boolean> {
-  let marker: string | null = null;
+async function readGuard(): Promise<string | null> {
   try {
-    marker = await loadSetting(GUARD_KEY);
+    return await loadSetting(GUARD_KEY);
   } catch {
-    marker = null;
+    return null;
   }
+}
+
+/**
+ * 2026-11-10 audit: the marker used to turn «pending» at the very start, BEFORE the 1.5 s wait and the
+ * tracking prompt, so a newcomer who closed the app before answering it (typical for an ad install)
+ * was taken for a crash and lost attribution for good on that version. Now the marker is armed only
+ * right before the native calls, and two unproven launches in a row are needed to switch the SDK off.
+ */
+async function armLaunchGuard(): Promise<boolean> {
+  const marker = await readGuard();
+  if (marker === guardValue('ok')) return true;
   if (marker === guardValue('off')) return false;
-  if (marker === guardValue('pending')) {
+  if (marker === guardValue('retry')) {
     await saveSetting(GUARD_KEY, guardValue('off')).catch(() => undefined);
     return false;
   }
-  if (marker !== guardValue('ok')) await saveSetting(GUARD_KEY, guardValue('pending')).catch(() => undefined);
+  const next = marker === guardValue('pending') ? 'retry' : 'pending';
+  await saveSetting(GUARD_KEY, guardValue(next)).catch(() => undefined);
   return true;
 }
 
+let launchOk = false;
 function markLaunchOk(): void {
+  if (launchOk) return;
+  launchOk = true;
   void saveSetting(GUARD_KEY, guardValue('ok')).catch(() => undefined);
 }
+
+// Events logged before start() (a sign-up in the first minute) wait here instead of reaching a cold SDK.
+const queued: { eventName: string; eventValues: Record<string, unknown> }[] = [];
 
 /**
  * Starts the SDK once per launch in the order the SDK 7 migration guide prescribes: the tracking
@@ -124,21 +166,34 @@ export function startAdsAttribution(): Promise<void> {
   const current = loadSdk();
   if (!current) return Promise.resolve();
   starting = (async () => {
-    if (!(await launchGuardAllows())) return;
+    if ((await readGuard()) === guardValue('off')) return;
     await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => setTimeout(resolve, 1500)));
-    // The app is still alive 15 s after the native calls = no launch crash, whatever the session did.
-    const survived = setTimeout(markLaunchOk, 15000);
     const begin = async () => {
       if (started) return;
       started = true;
       customerIdGate.markReady();
+      piiGate.markReady();
       await current.start();
       clearTimeout(survived);
       markLaunchOk();
+      for (const event of queued.splice(0)) void current.logEvent(event).catch(warn);
     };
+    let survived: ReturnType<typeof setTimeout> | undefined;
     try {
+      const consent = await askTrackingPermission();
+      customerIdGate.setConsent(consent);
+      piiGate.setConsent(consent);
+      // The guard covers the native calls only (the 1.3.0 (5) crash was inside init).
+      if (!(await armLaunchGuard())) return;
+      // Alive 15 s after the native calls, or sent to the background = no launch crash.
+      survived = setTimeout(markLaunchOk, 15000);
+      const background = AppState.addEventListener('change', (state) => {
+        if (state === 'background') {
+          markLaunchOk();
+          background.remove();
+        }
+      });
       if (!env.isProduction) await current.enableDebug({ enabled: true }).catch(() => undefined);
-      customerIdGate.setConsent(await askTrackingPermission());
       const initialized = current.init({ devKey: env.appsflyerDevKey, appId: Platform.OS === 'ios' ? IOS_APP_ID : null });
       const listening = current.registerSessionReadyListener(() => void begin().catch(warn)).catch(warn);
       await initialized;
@@ -155,20 +210,40 @@ export function startAdsAttribution(): Promise<void> {
  * Ties this device's events to the member (numeric id only) so the dashboard dedupes across devices.
  * The id waits in the gate and is never sent while iOS tracking is refused or undecided.
  */
-export function identifyAdsUser(contactId: number): void {
+export function identifyAdsUser(contactId: number, pii?: AdsUserPii): void {
   if (!loadSdk()) return;
   customerIdGate.setCustomerId(String(contactId));
+  if (pii && (pii.email || pii.phone)) piiGate.setCustomerId(JSON.stringify(pii));
 }
 
 function logEvent(eventName: string, eventValues: Record<string, unknown>): void {
   const current = loadSdk();
   if (!current) return;
+  if (!started) {
+    if (queued.length < 30) queued.push({ eventName, eventValues });
+    return;
+  }
   void current.logEvent({ eventName, eventValues }).catch(warn);
 }
 
 /** A new account finished its e-mail code (the server created the member). */
-export function trackRegistration(method: 'email' | 'google' | 'apple'): void {
+export function trackRegistration(
+  method: 'email' | 'google' | 'apple',
+  me?: { id: number; email?: string; phone?: string; contactEmail?: string },
+): void {
+  // 2026-11-10 audit: name the member (and the hashed contact) BEFORE the sign-up event, so the event
+  // itself carries them; the root component's effect only runs after React commits the new session.
+  if (me) identifyAdsUser(me.id, piiFromMe(me));
   logEvent('af_complete_registration', { af_registration_method: method });
+}
+
+/** Sign-out or account deletion: the next person on this phone must not inherit this member's match keys. */
+export function forgetAdsUser(): void {
+  const current = loadSdk();
+  if (!current) return;
+  customerIdGate.reset();
+  piiGate.reset();
+  if (started && current.clearUserPii) void current.clearUserPii().catch(warn);
 }
 
 /** The store's purchase sheet closed with a bought annual membership (the server activates it later). */

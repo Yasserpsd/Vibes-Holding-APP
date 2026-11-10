@@ -1516,5 +1516,8 @@
   "wa.menu.verified": "Verified",
   "wa.menu.unverified": "Not verified",
   "badge.verified": "Verified WhatsApp number",
-  "badge.member": "Verified member with an active membership"
+  "badge.member": "Verified member with an active membership",
+  "ads.attPrimer.title": "Before you start",
+  "ads.attPrimer.body": "Your phone will now ask whether to allow tracking. Allowing it helps us know which ad introduced you to the club, so we reach people interested in business at a lower cost. You can change this at any time in your device settings.",
+  "ads.attPrimer.continue": "Continue"
 }
