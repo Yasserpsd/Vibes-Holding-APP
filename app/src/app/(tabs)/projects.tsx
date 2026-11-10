@@ -12,6 +12,7 @@ import { Chip } from '@/components/Chip';
 import { entranceDelay, FadeInView, PressScale, useCountUp } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
+import { ActiveSectorBanner, SectorStrip } from '@/components/SectorStrip';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { markSeen } from '@/lib/seen';
@@ -59,6 +60,9 @@ export default function ProjectsScreen() {
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   const sorts = filters.data?.sorts ?? DEFAULT_SORTS;
+  const sectorOptions = filters.data?.sectors ?? [];
+  const chosenSector = sector ? sectorOptions.find((option) => option.slug === sector) : undefined;
+  const allSectorsCount = sectorOptions.length > 0 ? sectorOptions.reduce((sum, option) => sum + option.count, 0) : undefined;
   // M128 (owner, 2026-10-26: «محفظة Vibes Ventures تختفي تمامًا»): the pinned M121b showcase card
   // left the list. Vibes companies will appear as REGULAR bank entries, lightly marked (next milestone).
   const rows: PublicProject[] = items;
@@ -125,13 +129,17 @@ export default function ProjectsScreen() {
         </ScrollView>
       </FadeInView>
 
-      {sector || stage ? (
-        // The chosen filters stay visible as removable chips.
+      {/* Owner, 2026-11-10: the sectors on the screen itself, titled, with icons and counts. */}
+      <FadeInView delay={entranceDelay(3)}>
+        <SectorStrip sectors={sectorOptions} sector={sector} onSector={setSector} total={allSectorsCount} />
+      </FadeInView>
+
+      {chosenSector ? <ActiveSectorBanner option={chosenSector} total={total} onClear={() => setSector(undefined)} /> : null}
+
+      {stage ? (
+        // The chosen stage stays visible as a removable chip.
         <FadeInView offset={6}>
           <View style={styles.activeFilters}>
-            {sector ? (
-              <Chip label={`${filters.data?.sectors.find((option) => option.slug === sector)?.name ?? sector} ✕`} selected onPress={() => setSector(undefined)} />
-            ) : null}
             {stage ? (
               <Chip label={`${filters.data?.stages.find((option) => option.slug === stage)?.name ?? stage} ✕`} selected onPress={() => setStage(undefined)} />
             ) : null}
