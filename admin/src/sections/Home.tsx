@@ -45,21 +45,22 @@ function Tiles({ hub }: { hub: HubStats }) {
   return (
     <div className="tiles">
       {/* M230: «المسجّلون» and «الأعضاء المشتركون» moved up into the first card's story, so they are not counted twice on one screen. */}
-      <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open('unpaid')} />
-      <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
-      <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />
-      <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} />
       {/* M112 (owner): how the accounts split across the three personas — needs hub 2.19.0+. */}
+      {/* M231 (owner, 2026-11-12): the categories come first, named without the article, in the standing order
+          محايد ثم رائد أعمال ثم مستثمر ثم بدون فئة; «لم يدفعوا بعد» closes the row. */}
       {totals.persona_investor !== undefined ? (
-        // The standing order rule: المحايد ثم رائد الأعمال ثم المستثمر, everywhere.
         <>
-          <Tile label="المحايد" value={totals.persona_neutral ?? 0} onOpen={open('all')} />
-          <Tile label="رائد الأعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open('all')} />
-          <Tile label="المستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open('all')} />
+          <Tile label="محايد" value={totals.persona_neutral ?? 0} onOpen={open('all')} />
+          <Tile label="رائد أعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open('all')} />
+          <Tile label="مستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open('all')} />
           {/* M230: the three above add up to the accounts that chose a category; this is the rest, so the sum is the registered number. */}
           {withoutCategory > 0 ? <Tile label="بدون فئة" value={withoutCategory} onOpen={open('all')} /> : null}
         </>
       ) : null}
+      <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
+      <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />
+      <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} />
+      <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open('unpaid')} />
     </div>
   );
 }
@@ -77,23 +78,50 @@ function Today({ data }: { data: HomeData }) {
         { label: 'محادثات', value: formatNumber(today.conversations) },
         { label: 'رسائل', value: formatNumber(today.messages) },
         { label: 'عملاء محتملون', value: formatNumber(today.leads) },
-        { label: 'مدفوعات الهب', value: `${formatNumber(today.payments_count)} · ${formatCents(today.payments_cents)}` },
         { label: 'ردود المستشار', value: formatNumber(data.hub?.ai.replies_today) },
       ]
     : [];
   items.push({ label: 'خدمات التطبيق المدفوعة', value: `${formatNumber(data.app.payments.today.paid)} · ${formatCents(data.app.payments.today.cents)}` });
   if (data.pb.unlocksToday !== null) items.push({ label: 'مشاريع فُتحت من بنك المشاريع', value: formatNumber(data.pb.unlocksToday) });
+  // M231 (owner, 2026-11-12: «ديما صفر»): the day turns at midnight Riyadh, so the first hours read zero everywhere.
+  // The day before stands under it, from the same daily series the chart draws (its last row is today).
+  const before = data.hub && data.hub.series.length > 1 ? data.hub.series[data.hub.series.length - 2] : undefined;
+  const paidBefore = before ? data.app.payments.series.find((row) => row.day === before.day) : undefined;
+  const yesterday: { label: string; value: string }[] = before
+    ? [
+        { label: 'تسجيلات بدأت', value: formatNumber(before.signups) },
+        { label: 'تسجيلات اكتملت', value: formatNumber(before.verified) },
+        { label: 'تفعيلات', value: formatNumber(before.activations) },
+        { label: 'تجديدات', value: formatNumber(before.renewals) },
+        { label: 'محادثات', value: formatNumber(before.conversations) },
+        { label: 'رسائل', value: formatNumber(before.messages) },
+        { label: 'عملاء محتملون', value: formatNumber(before.leads) },
+        ...(paidBefore ? [{ label: 'خدمات التطبيق المدفوعة', value: `${formatNumber(paidBefore.paid)} · ${formatCents(paidBefore.cents)}` }] : []),
+      ]
+    : [];
+  const strip = (rows: { label: string; value: string }[]) => (
+    <dl className="strip">
+      {rows.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd className="num">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
   return (
     <section className="card" aria-labelledby="today-title">
-      <h2 id="today-title">اليوم</h2>
-      <dl className="strip">
-        {items.map((item) => (
-          <div key={item.label}>
-            <dt>{item.label}</dt>
-            <dd className="num">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <div className="row">
+        <h2 id="today-title">اليوم</h2>
+        <span className="muted">يبدأ اليوم عند منتصف الليل بتوقيت الرياض</span>
+      </div>
+      {strip(items)}
+      {before ? (
+        <>
+          <h3 className="muted num">أمس · {formatDay(before.day)}</h3>
+          {strip(yesterday)}
+        </>
+      ) : null}
     </section>
   );
 }
