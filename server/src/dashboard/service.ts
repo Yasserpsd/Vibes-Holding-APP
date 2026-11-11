@@ -233,9 +233,12 @@ export class DashboardService {
         all.push(...slice.items.filter((account) => !query.persona || query.persona === 'all' || account.persona === query.persona));
         if (!slice.items.length || page * 100 >= slice.total) break;
       }
-      all.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id);
+      // M230: the hub pages by offset over a list it orders by activity, so an account that becomes active while the pages
+      // are read pushes another one onto the next page too. One row per account, whatever the sweep saw.
+      const unique = [...new Map(all.map((account) => [account.id, account])).values()];
+      unique.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id);
       const start = (query.page - 1) * query.perPage;
-      result = { ok: true, total: all.length, page: query.page, per_page: query.perPage, items: all.slice(start, start + query.perPage), counts };
+      result = { ok: true, total: unique.length, page: query.page, per_page: query.perPage, items: unique.slice(start, start + query.perPage), counts };
     } else if (query.persona && query.persona !== 'all') {
       // M86 (owner): the hub list has no persona filter yet, so the server sweeps it (pages of 100,
       // capped at 1000 like `personas()`), keeps the chosen category and pages the match locally.

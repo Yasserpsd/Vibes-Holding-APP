@@ -117,15 +117,20 @@ test('store downloads follow the range, with the all-time number beside it (M228
   const month = await service.read(now, 30);
   assert.deepEqual([month.stores.apple.installs, month.stores.apple.allTime], [15, 15]);
   assert.deepEqual([month.stores.google.installs, month.stores.google.allTime], [18, 129], 'the lifetime total of Google beats the stored days');
+  assert.equal(month.stores.google.since, null, 'M230: a lifetime total is not dated by the first stored day');
   assert.deepEqual(month.installs, { total: 33, allTime: 144, complete: true });
   assert.equal(month.stores.apple.since, day(20), 'since = the first day with a download, not the first stored day');
   assert.equal(month.stores.apple.latest, day(2));
   const week = await service.read(now, 7);
   assert.deepEqual([week.stores.apple.installs, week.stores.google.installs, week.installs.total], [10, 16, 26]);
   assert.equal(week.series.length, 7);
-  // The trend is the downloads per day; a day a store has not written counts 0.
+  // The trend is the downloads per day; a day a store has not written is null, never a zero (M230).
   const at = (offset: number) => week.series.find((point) => point.day === day(offset))!;
-  assert.deepEqual([at(3), at(2), at(1)].map((point) => [point.android, point.ios]), [[7, 4], [9, 6], [0, 0]]);
+  assert.deepEqual([at(3), at(2), at(1), at(5)].map((point) => [point.android, point.ios]), [[7, 4], [9, 6], [null, null], [null, null]]);
+  // M230: when the stored days account for Google's whole lifetime total, the first of them is its start day.
+  await local.set(DAILY_KEY, { [day(3)]: { android: 1, ios: 1, storeAndroid: 7, playTotal: 7 }, [day(2)]: { android: 1, ios: 1, storeAndroid: 9, playTotal: 16 } } satisfies DailyDoc);
+  const whole = (await service.read(now, 30)).stores.google;
+  assert.deepEqual([whole.allTime, whole.since, whole.latest], [16, day(3), day(2)]);
 });
 
 test('a store that has not answered stays null with its reason: no device count in its place, no mixed total (M228)', async () => {

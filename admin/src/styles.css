@@ -428,18 +428,41 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .downloads-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .royal-chip, .chip.royal-chip { border-color: rgba(231, 173, 63, 0.6); color: var(--royal-gold); background: rgba(231, 173, 63, 0.1); }
 .chip.royal-chip:hover:not(:disabled) { background: rgba(231, 173, 63, 0.2); }
-.store-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
-.store-col, .store-total { display: grid; justify-items: center; align-content: center; gap: 4px; padding: 14px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); text-align: center; min-width: 0; }
-.store-total { padding-inline: 22px; background: linear-gradient(180deg, rgba(231, 173, 63, 0.26), rgba(231, 173, 63, 0.08)); border-color: rgba(231, 173, 63, 0.55); }
-.store-mark { display: block; color: #fff; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35)); }
-.store-name { color: rgba(246, 239, 226, 0.8); font-size: 0.82rem; }
-.store-value { font-size: 2.1rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: #fff; }
-.store-value.big { font-size: 2.8rem; color: var(--royal-gold); }
-.store-caption { color: rgba(246, 239, 226, 0.65); font-size: 0.74rem; }
-.store-value.off { font-size: 1.25rem; font-weight: 600; color: rgba(246, 239, 226, 0.75); letter-spacing: 0; padding-block: 8px; }
-.store-sub { margin-block-start: 6px; padding-block-start: 8px; border-block-start: 1px solid rgba(255, 255, 255, 0.12); color: rgba(246, 239, 226, 0.9); font-size: 0.86rem; }
-.store-sub strong { font-size: 1.05rem; color: #fff; margin-inline-start: 4px; }
-.store-error { color: rgba(246, 239, 226, 0.55); font-size: 0.74rem; overflow-wrap: anywhere; }
+.royal-sub { margin: 4px 0 0; color: rgba(246, 239, 226, 0.7); font-size: 0.85rem; }
+/* M230 (owner, firm: the store logos are never dimmed, in any state): while the home asks again every block dims except this card. */
+.stale:has(> .stack > .downloads) { opacity: 1; }
+.stale > .stack:has(> .downloads) > :not(.downloads) { opacity: 0.55; transition: opacity 0.15s; }
+/* M230: the story in three numbers (downloaded, registered, subscribed), then one line per store. */
+.funnel { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: stretch; }
+.funnel-step { display: grid; align-content: start; justify-items: center; gap: 4px; padding: 18px 12px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; color: inherit; font: inherit; min-width: 0; }
+button.funnel-step { cursor: pointer; transition: border-color 0.15s, background-color 0.15s; }
+button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rgba(255, 255, 255, 0.08); }
+.funnel-step.gold { background: linear-gradient(180deg, rgba(231, 173, 63, 0.3), rgba(231, 173, 63, 0.08)); border-color: rgba(231, 173, 63, 0.6); }
+.funnel-step.outline { border-color: rgba(231, 173, 63, 0.45); }
+.funnel-label { color: rgba(246, 239, 226, 0.88); font-size: 0.92rem; font-weight: 600; }
+.funnel-value { font-size: 2.7rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: #fff; }
+.funnel-step.gold .funnel-value { color: var(--royal-gold); }
+.funnel-note { color: rgba(246, 239, 226, 0.7); font-size: 0.78rem; line-height: 1.5; }
+.funnel-arrow { display: grid; place-items: center; color: rgba(231, 173, 63, 0.85); }
+.funnel-marks { display: flex; align-items: center; justify-content: center; gap: 12px; margin-block: 4px 2px; }
+.funnel-logo { display: grid; place-items: center; }
+.funnel-logo .store-mark { block-size: 26px; inline-size: auto; }
+.funnel-plus { color: rgba(246, 239, 226, 0.6); font-weight: 600; line-height: 1; }
+.store-rows { display: grid; gap: 8px; }
+.store-row { display: grid; grid-template-columns: minmax(130px, 0.8fr) 1.4fr 1fr; gap: 8px 16px; align-items: center; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }
+.store-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.store-mark { display: block; flex: none; color: #fff; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35)); }
+.store-name { color: #fff; font-size: 0.98rem; font-weight: 600; }
+.store-figure { display: grid; gap: 1px; min-width: 0; }
+.store-num { font-size: 1.7rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: #fff; }
+.store-num.small { font-size: 1.3rem; font-weight: 600; }
+.store-num.off { color: rgba(246, 239, 226, 0.5); }
+.store-caption { color: rgba(246, 239, 226, 0.68); font-size: 0.78rem; }
+/* The stores' own request is still loading or failed: the three numbers above stay, this strip stands in for the store lines. */
+.store-wait { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; border: 1px dashed rgba(246, 239, 226, 0.28); color: rgba(246, 239, 226, 0.82); font-size: 0.86rem; }
+.card.royal .skeleton span { background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.04) 75%); background-size: 200% 100%; }
+.store-trend-title { color: rgba(246, 239, 226, 0.85); font-size: 0.86rem; font-weight: 600; }
+.store-legend-wait { color: rgba(246, 239, 226, 0.6); }
 .store-trend { margin: 0; display: grid; gap: 6px; }
 .store-trend svg { display: block; inline-size: 100%; block-size: 150px; direction: ltr; overflow: visible; }
 .store-trend-base { stroke: rgba(246, 239, 226, 0.25); }
@@ -458,7 +481,10 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .store-foot { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 0; color: rgba(246, 239, 226, 0.7); font-size: 0.8rem; }
 .store-foot > span { display: inline-flex; align-items: center; gap: 6px; }
 .store-foot > span + span::before { content: ""; display: inline-block; inline-size: 5px; block-size: 5px; border-radius: 50%; background: var(--royal-gold); opacity: 0.8; margin-inline: 10px 6px; }
-@media (max-width: 560px) {
-  .store-grid { grid-template-columns: 1fr 1fr; }
-  .store-total { grid-column: 1 / -1; order: -1; }
+@media (max-width: 720px) {
+  .funnel { grid-template-columns: 1fr; }
+  .funnel-arrow { transform: rotate(-90deg); }
+  .funnel-value { font-size: 2.3rem; }
+  .store-row { grid-template-columns: 1fr 1fr; }
+  .store-id { grid-column: 1 / -1; }
 }

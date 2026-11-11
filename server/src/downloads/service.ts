@@ -14,6 +14,8 @@ import type { PlayStoreClient } from './playStore.js';
  */
 export const DAILY_KEY = 'downloads:daily';
 const KEEP_DAYS = 400;
+/** How far back Google's first installs report is looked for, while no Google day is stored yet. */
+const FIRST_FILL_DAYS = 180;
 const DAY_MS = 86_400_000;
 
 export type DailyRow = {
@@ -35,7 +37,7 @@ export type StoreAnswer = {
   installs: number | null;
   /** Store downloads since the first one. */
   allTime: number | null;
-  /** The day of the first download the store reported. */
+  /** The day of the first download the store reported; null when `allTime` reaches back before the stored days (Google's lifetime total). */
   since: string | null;
   /** The last day the store has published a number for. */
   latest: string | null;
@@ -55,7 +57,7 @@ export type DownloadsAnswer = {
   installs: { total: number | null; allTime: number | null; complete: boolean };
   /** Signed-in devices and accounts per platform (push tokens) — a separate unit, never added to installs. */
   devices: { android: number; ios: number; total: number; accounts: { android: number; ios: number; total: number } };
-  /** Store downloads per Riyadh day of the range; null for a store that has never answered. */
+  /** Store downloads per Riyadh day of the range; null on a day the store has no stored number for (it never stands in as a zero). */
   series: { day: string; android: number | null; ios: number | null }[];
   snapshotAt: string | null;
 };
@@ -91,13 +93,21 @@ export class DownloadsService {
     const row: DailyRow = { ...doc[today], android: platforms.devices.android, ios: platforms.devices.ios };
     await this.fillStores(doc, row, now);
     doc[today] = row;
+    // Old device snapshots leave the document, but never a store number: «منذ الإطلاق» is the sum of the stored days
+    // (Apple has no lifetime figure of its own), so a pruned day would quietly lower it.
     const cutoff = riyadhDayStart(today) - KEEP_DAYS * DAY_MS;
-    for (const day of Object.keys(doc)) if (riyadhDayStart(day) < cutoff) delete doc[day];
+    for (const day of Object.keys(doc)) {
+      if (riyadhDayStart(day) >= cutoff) continue;
+      if (doc[day]!.storeIos === undefined && doc[day]!.storeAndroid === undefined) delete doc[day];
+    }
     await this.deps.kv.set(DAILY_KEY, doc);
     return row;
   }
 
-  /** Yesterday's store numbers land today (both stores publish a day late); earlier gaps of the last 30 days are backfilled once. */
+  /**
+   * Yesterday's store numbers land today (both stores publish a day late); earlier gaps of the last 30 days are backfilled once.
+   * Google's very first report is looked for further back (FIRST_FILL_DAYS), and every day of a month that was read is kept.
+   */
   private async fillStores(doc: DailyDoc, today: DailyRow, now: number): Promise<void> {
     const days = lastRiyadhDays(31, now).slice(0, 30);
     // Apple writes a day's report by the next Pacific morning (≈ 16:00 Riyadh): from two Riyadh days later a 404
@@ -122,14 +132,20 @@ export class DownloadsService {
     if (this.deps.google) {
       const google = this.deps.google;
       try {
-        const months = Array.from(new Set(days.map((day) => day.slice(0, 7).replace('-', ''))));
+        // M230: Google can write its first file weeks after the first install (the Play Console had numbers long before
+        // any report existed). Until one Google day is stored, the months are asked from further back, and every day of
+        // a month that was read is kept (never today's), so the days of the launch are not lost to the 30-day window.
+        const started = Object.values(doc).some((row) => row.storeAndroid !== undefined);
+        const span = started ? days : lastRiyadhDays(FIRST_FILL_DAYS + 1, now).slice(0, FIRST_FILL_DAYS);
+        const months = Array.from(new Set(span.map((day) => day.slice(0, 7).replace('-', ''))));
+        const yesterday = days[days.length - 1]!;
         let found = 0;
         for (const month of months) {
           const rows = await google.month(month);
           if (!rows) continue;
           found += 1;
           for (const entry of rows) {
-            if (!days.includes(entry.day)) continue;
+            if (entry.day > yesterday) continue;
             const base = doc[entry.day] ?? { android: 0, ios: 0 };
             doc[entry.day] = { ...base, storeAndroid: entry.installs, ...(entry.total !== null ? { playTotal: entry.total } : {}) };
           }
@@ -179,9 +195,13 @@ export class DownloadsService {
     };
     const apple = store(Boolean(this.deps.apple), (row) => row.storeIos, this.errors.apple);
     const google = store(Boolean(this.deps.google), (row) => row.storeAndroid, this.errors.google);
-    // The lifetime total Google reports beats the sum of the days we happened to store.
+    // The lifetime total Google reports beats the sum of the days we happened to store. Those days then no longer account
+    // for the whole figure, so it has no start day among them (M230: the card says «منذ الإطلاق» instead of dating a lifetime number).
     const playTotal = [...known].reverse().map((day) => doc[day]!.playTotal).find((value) => value !== undefined);
-    if (playTotal !== undefined && google.allTime !== null) google.allTime = Math.max(playTotal, google.allTime);
+    if (playTotal !== undefined && google.allTime !== null && playTotal > google.allTime) {
+      google.allTime = playTotal;
+      google.since = null;
+    }
     const answered = [apple, google].filter((entry) => entry.installs !== null);
     const add = (pick: (entry: StoreAnswer) => number | null): number | null => (answered.length ? answered.reduce((sum, entry) => sum + (pick(entry) ?? 0), 0) : null);
     return {
@@ -189,11 +209,9 @@ export class DownloadsService {
       stores: { apple, google },
       installs: { total: add((entry) => entry.installs), allTime: add((entry) => entry.allTime), complete: answered.length === 2 },
       devices,
-      series: days.map((day) => ({
-        day,
-        android: google.installs === null ? null : (doc[day]?.storeAndroid ?? 0),
-        ios: apple.installs === null ? null : (doc[day]?.storeIos ?? 0),
-      })),
+      // M230: a day the store has no number for (not published yet, before its first stored day, a store that never
+      // answered) is null, never a zero: the card draws only the days that exist.
+      series: days.map((day) => ({ day, android: doc[day]?.storeAndroid ?? null, ios: doc[day]?.storeIos ?? null })),
       snapshotAt: known.length ? known[known.length - 1]! : null,
     };
   }

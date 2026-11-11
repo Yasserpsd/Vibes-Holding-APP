@@ -41,10 +41,10 @@ function Tiles({ hub }: { hub: HubStats }) {
   const { openMembers } = useShell();
   const open = (state: AccountFilter) => () => openMembers(state);
   const { totals, expiring } = hub;
+  const withoutCategory = Math.max(0, totals.accounts - (totals.persona_neutral ?? 0) - (totals.persona_entrepreneur ?? 0) - (totals.persona_investor ?? 0));
   return (
     <div className="tiles">
-      <Tile label="المسجّلون" value={totals.accounts} note={`${formatNumber(hub.today.signups)} اليوم`} onOpen={open('all')} />
-      <Tile label="الأعضاء المشتركون" value={totals.members_active} tone="gold" note={[totals.members_no_expiry ? `منهم ${formatNumber(totals.members_no_expiry)} بلا تاريخ انتهاء` : '', totals.members_honorary ? `${formatNumber(totals.members_honorary)} عضوية شرفية` : ''].filter(Boolean).join(' · ') || undefined} onOpen={open('member')} />
+      {/* M230: «المسجّلون» and «الأعضاء المشتركون» moved up into the first card's story, so they are not counted twice on one screen. */}
       <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open('unpaid')} />
       <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
       <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />
@@ -56,6 +56,8 @@ function Tiles({ hub }: { hub: HubStats }) {
           <Tile label="المحايد" value={totals.persona_neutral ?? 0} onOpen={open('all')} />
           <Tile label="رائد الأعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open('all')} />
           <Tile label="المستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open('all')} />
+          {/* M230: the three above add up to the accounts that chose a category; this is the rest, so the sum is the registered number. */}
+          {withoutCategory > 0 ? <Tile label="بدون فئة" value={withoutCategory} onOpen={open('all')} /> : null}
         </>
       ) : null}
     </div>
@@ -66,7 +68,10 @@ function Today({ data }: { data: HomeData }) {
   const today = data.hub?.today;
   const items: { label: string; value: string }[] = today
     ? [
-        { label: 'تسجيلات', value: formatNumber(today.signups) },
+        // M230: two names for two numbers. A sign-up counts as started when the form is sent and as completed once the
+        // account is confirmed; the second one is the «منها اليوم» of the first card.
+        { label: 'تسجيلات بدأت', value: formatNumber(today.signups) },
+        { label: 'تسجيلات اكتملت', value: formatNumber(today.verified) },
         { label: 'تفعيلات', value: formatNumber(today.activations) },
         { label: 'تجديدات', value: formatNumber(today.renewals) },
         { label: 'محادثات', value: formatNumber(today.conversations) },
@@ -161,16 +166,18 @@ function Expiring({ hub }: { hub: HubStats }) {
   );
 }
 
-/** Shown on the home; the list is asked a little wider because the hub orders it by activity, not strictly by sign-up time. */
+/** Shown on the home; the server orders the whole list by sign-up time (`sort: 'newest'`, M229) because the hub orders it by activity. */
 const LATEST_SHOWN = 8;
 
 /**
  * M228 (owner, 2026-11-11: «نشاط المواقع ملوش داعي… نحط آخر الأعضاء المسجّلين»): the newest sign-ups in place of the
  * per-site chat activity, each row opening the member.
+ * M230: `token` is the stamp of the hub numbers on the same screen, so the list is asked again whenever they are fresh
+ * (the refresh button, a write from a member's sheet) and never contradicts the counts beside it.
  */
-function LatestMembers() {
+function LatestMembers({ token }: { token: string }) {
   const { openMember, openMembers } = useShell();
-  const state = useLoad(() => api.accounts({ perPage: LATEST_SHOWN, sort: 'newest' }), []);
+  const state = useLoad(() => api.accounts({ perPage: LATEST_SHOWN, sort: 'newest' }), [token]);
   const items = state.data?.items ?? [];
   return (
     <section className="card" aria-labelledby="latest-title">
@@ -241,15 +248,18 @@ function Bridge({ data }: { data: HomeData }) {
   );
 }
 
-/** The owner's first look: where the club stands, what happened today, and what needs him. */
-export function Home() {
+/** The owner's first look: where the club stands, what happened today, and what needs him. `stamp` moves after a write from a member's sheet, so the numbers follow it. */
+export function Home({ stamp: written }: { stamp: number }) {
   const [range, setRange] = useState<Range>('30');
-  const state = useLoad(() => api.home(Number(range)), [range]);
+  // One press asks for everything on the home again: its own answer and, through the same count, the downloads card's stores request.
+  const [turn, setTurn] = useState(0);
+  const reload = () => setTurn((value) => value + 1);
+  const state = useLoad(() => api.home(Number(range)), [range, written, turn]);
   const days = RANGES.find((entry) => entry.value === range)?.label ?? '';
   const stamp = state.data?.hub ? `آخر تحديث ${formatDateTime(state.data.hub.generated_at)} · الأيام بتوقيت الرياض` : 'الأيام بتوقيت الرياض';
   return (
     <>
-      <SectionHead title="الرئيسية" hint={stamp} onReload={state.reload} busy={state.loading}>
+      <SectionHead title="الرئيسية" hint={stamp} onReload={reload} busy={state.loading}>
         <Chips label="الفترة" options={RANGES} value={range} onChange={setRange} />
       </SectionHead>
       <Async state={state} rows={6}>
@@ -259,15 +269,15 @@ export function Home() {
           return (
             <div className="stack">
               {/* M158 (owner): the downloads counter comes first, before anything else. */}
-              {part(<DownloadsCard days={Number(range)} label={days} />)}
-              {data.hub ? part(<Tiles hub={data.hub} />) : data.errors.hub ? <ErrorCard error={data.errors.hub} onRetry={state.reload} /> : null}
+              {part(<DownloadsCard days={Number(range)} hub={data.hub} stamp={`${written}:${turn}`} onRefresh={reload} />)}
+              {data.hub ? part(<Tiles hub={data.hub} />) : data.errors.hub ? <ErrorCard error={data.errors.hub} onRetry={reload} /> : null}
               {part(<Today data={data} />)}
               {data.hub ? part(<Daily hub={data.hub} days={days} />) : null}
               {part(<AppPayments data={data} days={days} />)}
               {data.hub ? (
                 <div className="columns">
                   {part(<Expiring hub={data.hub} />)}
-                  {part(<LatestMembers />)}
+                  {part(<LatestMembers token={data.hub.generated_at} />)}
                 </div>
               ) : null}
               <div className="columns">

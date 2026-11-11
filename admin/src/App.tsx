@@ -268,7 +268,7 @@ export function App() {
           ) : null}
           {/* A section that throws while drawing shows a card in its place: the bars around it keep working, and another address tries again. */}
           <Boundary key={section} watch={route.thread}>
-            {section === 'home' ? <Home /> : null}
+            {section === 'home' ? <Home stamp={stamp} /> : null}
             {section === 'stats' ? <Stats /> : null}
             {section === 'members' ? <Members key={memberFilter.turn} initial={memberFilter.state} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
