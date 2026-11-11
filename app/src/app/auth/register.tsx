@@ -15,7 +15,7 @@ import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
-import { PhoneProofField, type PhoneProofState } from '@/components/PhoneProofField';
+import { PhoneProofField, type PhoneProofHandle, type PhoneProofState } from '@/components/PhoneProofField';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
@@ -79,6 +79,9 @@ export default function RegisterScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [proof, setProof] = useState<PhoneProofState>(null);
+  // M227: the sign-up button was pressed before the number was proven; the proof then finishes the sign-up by itself.
+  const [autoProof, setAutoProof] = useState(false);
+  const proofRef = useRef<PhoneProofHandle | null>(null);
   const { signIn } = useAuth();
   const queryClient = useQueryClient();
 
@@ -123,27 +126,38 @@ export default function RegisterScreen() {
     if (key === 'country') setProof(null);
   };
   const blur = (key: Field) => () => errors.check(key, issueOf(key, form));
-  const validate = () => {
+  const validate = (proven: PhoneProofState = proof) => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {
       const message = issueOf(key, form);
       if (message) next[key] = message;
     }
-    if ((config?.phoneProofRequired || social) && proof?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
+    if ((config?.phoneProofRequired || social) && proven?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
     return next;
   };
   const phoneReady = issueOf('phone', form) === null;
 
-  const submit = async () => {
+  /** `proven` is the proof that has just arrived, before the state caught up with it. */
+  const submit = async (proven: PhoneProofState = proof) => {
     if (busy) return;
     setSubmitError(null);
-    if (errors.fail(validate(), ORDER) || !form.persona) return;
+    // M227 (owner, 2026-11-11: a member pressed the button without confirming and did not understand a code was due):
+    // a right number that is not proven yet gets its code at once, the page goes up to the code field, and the
+    // sign-up finishes by itself when the code is right.
+    if ((config?.phoneProofRequired || social) && proven?.kind !== 'done' && phoneReady) {
+      setAutoProof(true);
+      errors.clear('phone');
+      proofRef.current?.request();
+      setTimeout(() => errors.scrollTo('phone'), 50);
+      return;
+    }
+    if (errors.fail(validate(proven), ORDER) || !form.persona) return;
     setBusy(true);
     try {
       // M212: the account of a first Google/Apple sign-in is born here, with the form's fields and the proven number.
       if (social) {
-        if (proof?.kind !== 'done') return;
-        const result = await authApi.socialComplete(social.token, proof.token, {
+        if (proven?.kind !== 'done') return;
+        const result = await authApi.socialComplete(social.token, proven.token, {
           name: form.name.trim(),
           persona: form.persona,
           jobTitle: form.jobTitle.trim(),
@@ -167,7 +181,7 @@ export default function RegisterScreen() {
         persona: form.persona,
         jobTitle: form.jobTitle.trim(),
         inviteCode: form.inviteCode.trim() || undefined,
-        phoneProof: proof?.kind === 'done' ? proof.token : undefined,
+        phoneProof: proven?.kind === 'done' ? proven.token : undefined,
       });
       if (result.pending) {
         router.push({
@@ -266,9 +280,14 @@ export default function RegisterScreen() {
               country={form.country}
               state={proof}
               ready={phoneReady}
+              ref={proofRef}
+              auto={autoProof}
               onChange={(next) => {
                 setProof(next);
                 if (next) errors.clear('phone');
+                if (next?.kind === 'code') return;
+                setAutoProof(false);
+                if (next && autoProof) void submit(next);
               }}
               check={() => {
                 const issue = issueOf('phone', form);

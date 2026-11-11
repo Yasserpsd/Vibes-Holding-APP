@@ -383,6 +383,7 @@
   "phoneProof.confirm": "Confirm number on WhatsApp",
   "phoneProof.submit": "Confirm code",
   "phoneProof.required": "Confirm your number on WhatsApp to complete sign-up",
+  "phoneProof.autoSent": "One step left: we sent a verification code to your WhatsApp. Enter it here and your sign-up completes automatically.",
   "phoneProof.done": "Your number is confirmed on WhatsApp",
   "phoneProof.help": "If the code does not arrive, check that the number is active on WhatsApp, then resend it or change the number.",
   "phoneAlert.title": "Confirm your number",

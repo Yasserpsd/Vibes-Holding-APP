@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { Pressable, Text, View, type TextInput } from 'react-native';
 
 import { authApi, type PhoneStepResult } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -22,16 +22,23 @@ type Props = {
   check: () => boolean;
   /** M212: the button shows only once the number is complete and right; before that nothing is drawn. */
   ready: boolean;
+  /** M227: the member pressed the sign-up button first, so the code left by itself and one line says what to do. */
+  auto?: boolean;
+  ref?: Ref<PhoneProofHandle>;
 };
+
+/** M227: what the sign-up button asks for when the number is not proven yet. */
+export type PhoneProofHandle = { request: () => void };
 
 /**
  * M211 (owner, 2026-11-07: «لما ادخل رقمي يظهرلي تأكيد ويوصلني وااكد من نفس الصفحة»): the number is confirmed on the page
  * that asks for it, before any account exists. The parent locks the number while a code is live or once it is proven.
  * M212 (owner, 2026-11-07: «تظهر فقط لما اكتب الرقم صحيح… بمجرد ما اكتب آخر رقم تظهر»): the button is hidden until then.
  */
-export function PhoneProofField({ phone, country, state, onChange, check, ready }: Props) {
+export function PhoneProofField({ phone, country, state, onChange, check, ready, auto = false, ref }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const codeInput = useRef<TextInput | null>(null);
 
   const start = async () => {
     if (busy || !check()) return;
@@ -46,6 +53,14 @@ export function PhoneProofField({ phone, country, state, onChange, check, ready 
     }
   };
 
+  // M227 (owner, 2026-11-11: «لو داس بدون ما يأكد… يروح الكود فورا»): no code yet sends one; a waiting code gets the cursor back.
+  useImperativeHandle(ref, () => ({
+    request: () => {
+      if (state?.kind === 'code') codeInput.current?.focus();
+      else if (!state) void start();
+    },
+  }));
+
   if (state?.kind === 'done') {
     return (
       <View style={styles.wrap}>
@@ -59,7 +74,10 @@ export function PhoneProofField({ phone, country, state, onChange, check, ready 
 
   if (state?.kind === 'code') {
     return (
+      <View style={styles.wrap}>
+        {auto ? <Notice text={t('phoneProof.autoSent')} /> : null}
       <PhoneCodeStep
+        inputRef={codeInput}
         step={state.step}
         submitLabel={t('phoneProof.submit')}
         helpText={t('phoneProof.help')}
@@ -69,6 +87,7 @@ export function PhoneProofField({ phone, country, state, onChange, check, ready 
           onChange({ kind: 'done', token: proof });
         }}
       />
+      </View>
     );
   }
 

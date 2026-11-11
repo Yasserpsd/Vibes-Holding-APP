@@ -91,5 +91,5 @@ export function useFormErrors<K extends string>(scrollRef?: RefObject<ScrollView
   /** One field turns red on its own (a fourth interest tapped) without touching the others. */
   const set = useCallback((key: K, message: string) => setErrors((current) => ({ ...current, [key]: message })), []);
 
-  return { errors, anchor, clear, fail, reset, set, check, count: Object.values(errors).filter(Boolean).length };
+  return { errors, anchor, clear, fail, reset, set, check, scrollTo, count: Object.values(errors).filter(Boolean).length };
 }

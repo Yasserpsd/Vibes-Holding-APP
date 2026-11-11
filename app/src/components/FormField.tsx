@@ -20,13 +20,15 @@ type Props = TextInputProps & {
   latin?: boolean;
   /** M195: the row the screen scrolls to when this field holds the first error (useFormErrors.anchor). */
   anchorRef?: Ref<View>;
+  /** M227: the input itself, for a screen that must put the cursor here (the sign-up's code field). */
+  inputRef?: Ref<TextInput>;
 };
 
 /**
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, hintOnFocus = false, warning, error, latin = false, anchorRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus = false, warning, error, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // M85: inside a PaperCard the field wears the light palette on its own.
   const paper = usePaper();
@@ -43,6 +45,7 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, la
     <View ref={anchorRef} style={styles.field} collapsable={false}>
       <Text style={[styles.label, paper && styles.paperLabel, form ? { color: error ? form.danger : form.inkSoft } : null]}>{label}</Text>
       <TextInput
+        ref={inputRef}
         placeholderTextColor={form ? form.placeholder : paper ? colors.paperFaint : colors.textFaint}
         selectionColor={form ? form.fieldFocus : paper ? colors.paperGold : colors.gold}
         multiline={multiline}

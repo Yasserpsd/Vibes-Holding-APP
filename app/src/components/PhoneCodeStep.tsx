@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState, type Ref } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { authApi, type PhoneStepResult } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -20,6 +20,8 @@ type Props = {
   submitLabel?: string;
   /** M211: the line under an error; the sign-up has no e-mail fallback to promise. */
   helpText?: string;
+  /** M227: the code input, so the sign-up can bring the cursor back to it. */
+  inputRef?: Ref<TextInput>;
 };
 
 /**
@@ -27,7 +29,7 @@ type Props = {
  * form and the profile editor. M204 (owner, 2026-11-06): no e-mail button; the server mails the code by itself only
  * when WhatsApp did not carry it (`via` then says `email`), and the support line stays under the error.
  */
-export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText }: Props) {
+export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText, inputRef }: Props) {
   const [via, setVia] = useState(step.via);
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(step.resendAfter);
@@ -88,6 +90,7 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText }:
         maxLength={4}
         value={code}
         autoFocus
+        inputRef={inputRef}
         onChangeText={(value) => {
           // M203 (owner: seconds, not minutes): four digits typed or pasted from WhatsApp finish the step by themselves.
           const digits = value.replace(/\D/g, '').slice(0, 4);
