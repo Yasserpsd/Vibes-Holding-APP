@@ -15,13 +15,13 @@ const RANGES: { value: Range; label: string }[] = [
   { value: '90', label: '90 يومًا' },
 ];
 
-type MetricKey = 'signups' | 'activations' | 'renewals' | 'payments' | 'conversations';
+// M231 (owner): no hub payments metric — the hub takes no payments; app payments have their own card below.
+type MetricKey = 'signups' | 'activations' | 'renewals' | 'conversations';
 type Metric = { value: MetricKey; label: string; noun: string; pick: (day: StatsDay) => number; details: (day: StatsDay) => ChartPoint['details']; format?: (value: number) => string };
 const METRICS: Metric[] = [
   { value: 'signups', label: 'التسجيلات', noun: 'حساب جديد', pick: (day) => day.signups, details: (day) => [{ label: 'أكّدوا البريد', value: formatNumber(day.verified) }] },
   { value: 'activations', label: 'التفعيلات', noun: 'عضوية مفعّلة', pick: (day) => day.activations, details: () => [] },
   { value: 'renewals', label: 'التجديدات', noun: 'تجديد', pick: (day) => day.renewals, details: () => [] },
-  { value: 'payments', label: 'المدفوعات', noun: 'مدفوعات ناجحة', pick: (day) => day.payments_cents / 100, details: (day) => [{ label: 'عدد العمليات', value: formatNumber(day.payments_count) }], format: (value) => formatMoney(value) },
   { value: 'conversations', label: 'المحادثات', noun: 'محادثة', pick: (day) => day.conversations, details: (day) => [{ label: 'الرسائل', value: formatNumber(day.messages) }] },
 ];
 
