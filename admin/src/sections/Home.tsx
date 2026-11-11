@@ -163,7 +163,6 @@ function Expiring({ hub }: { hub: HubStats }) {
 
 /** Shown on the home; the list is asked a little wider because the hub orders it by activity, not strictly by sign-up time. */
 const LATEST_SHOWN = 8;
-const LATEST_ASKED = 50;
 
 /**
  * M228 (owner, 2026-11-11: «نشاط المواقع ملوش داعي… نحط آخر الأعضاء المسجّلين»): the newest sign-ups in place of the
@@ -171,8 +170,8 @@ const LATEST_ASKED = 50;
  */
 function LatestMembers() {
   const { openMember, openMembers } = useShell();
-  const state = useLoad(() => api.accounts({ perPage: LATEST_ASKED }), []);
-  const items = [...(state.data?.items ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, LATEST_SHOWN);
+  const state = useLoad(() => api.accounts({ perPage: LATEST_SHOWN, sort: 'newest' }), []);
+  const items = state.data?.items ?? [];
   return (
     <section className="card" aria-labelledby="latest-title">
       <div className="row">

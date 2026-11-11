@@ -671,8 +671,8 @@ export const api = {
   downloads: (days: number) => call<Downloads>('GET', `/api/admin/downloads?days=${days}`),
   downloadsSnapshot: (days: number) => call<Downloads>('POST', `/api/admin/downloads/snapshot?days=${days}`),
   home: (days: number) => call<Home>('GET', `/api/admin/home${query({ days })}`),
-  accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter; wa?: WaFilter }) =>
-    call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona, wa: input.wa })}`),
+  accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter; wa?: WaFilter; sort?: 'activity' | 'newest' }) =>
+    call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona, wa: input.wa, sort: input.sort })}`),
   // M86: the members-by-category counts behind the persona buttons.
   personas: (state: 'member' | 'all') => call<Personas>('GET', `/api/admin/personas?state=${state}`),
   account: (id: number) => call<MemberDetail>('GET', `/api/admin/accounts/${id}`),

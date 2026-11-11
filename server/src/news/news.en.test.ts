@@ -47,6 +47,7 @@ const fakeFetch: typeof fetch = async (input, init) => {
   throw new Error(`unexpected fetch ${url}`);
 };
 
+const riyadhNow = new Date(Date.now() + 3 * 3_600_000);
 const kv = new MemoryKV();
 const config = loadConfig({ LOG_LEVEL: 'silent', NEWS_REFRESH_MINUTES: '0' });
 let app: Awaited<ReturnType<typeof buildApp>>['app'];
@@ -69,6 +70,9 @@ before(async () => {
   news = built.news;
   await news.start();
   await news.refresh();
+  // The feed shows the filled editions (10:00 and 19:00 Riyadh, one story per section each), so a run between the
+  // two used to see half the stories. Fill both of today's editions whatever the hour the suite runs at.
+  await news.runEditions(Date.UTC(riyadhNow.getUTCFullYear(), riyadhNow.getUTCMonth(), riyadhNow.getUTCDate(), 19 - 3, 30));
 });
 
 after(async () => {

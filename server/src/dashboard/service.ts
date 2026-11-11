@@ -218,12 +218,25 @@ export class DashboardService {
   /** The hub's list with the Projects Bank «رصيد» beside every active member, through one `balances` call. */
   async accounts(
     admin: AdminActor,
-    query: { q: string; state: string; page: number; perPage: number; persona?: string; wa?: string },
+    query: { q: string; state: string; page: number; perPage: number; persona?: string; wa?: string; sort?: 'activity' | 'newest' },
   ): Promise<Omit<HubResults['admin_accounts'], 'items'> & { items: (HubAccount & { pb: PbBeside | null })[]; pbError: SectionError | null }> {
     let result: HubResults['admin_accounts'];
     // M210 (hub 2.28.4): the WhatsApp filter is the hub's own; an older hub ignores the key and sends no wa counts.
     const wa = query.wa && query.wa !== 'all' ? { wa: query.wa } : {};
-    if (query.persona && query.persona !== 'all') {
+    if (query.sort === 'newest') {
+      // M229: the hub orders by activity, so the sign-up order needs the whole list: sweep it (pages of 100, cached, up to 20,000), newest first.
+      const all: HubAccount[] = [];
+      let counts: Record<string, number> = {};
+      for (let page = 1; page <= 200; page += 1) {
+        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100, ...wa });
+        counts = slice.counts;
+        all.push(...slice.items.filter((account) => !query.persona || query.persona === 'all' || account.persona === query.persona));
+        if (!slice.items.length || page * 100 >= slice.total) break;
+      }
+      all.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id);
+      const start = (query.page - 1) * query.perPage;
+      result = { ok: true, total: all.length, page: query.page, per_page: query.perPage, items: all.slice(start, start + query.perPage), counts };
+    } else if (query.persona && query.persona !== 'all') {
       // M86 (owner): the hub list has no persona filter yet, so the server sweeps it (pages of 100,
       // capped at 1000 like `personas()`), keeps the chosen category and pages the match locally.
       const matched: HubAccount[] = [];
