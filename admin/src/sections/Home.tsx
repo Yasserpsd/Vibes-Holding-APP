@@ -2,10 +2,11 @@ import { useState, type ReactNode } from 'react';
 
 import { api } from '../api';
 import { BarChart, type ChartPoint } from '../Chart';
-import { daysText, formatCents, formatDateTime, formatDay, formatMoney, formatNumber } from '../format';
+import { daysText, formatCents, formatDateTime, formatDay, formatMoney, formatNumber, formatRelative } from '../format';
 import type { AccountFilter, BridgeSide, Home as HomeData, HubStats, StatsDay } from '../types';
 import { Async, Boundary, Chips, ErrorCard, Pill, SectionHead, useLoad, useShell } from '../ui';
 import { DownloadsCard } from './Downloads';
+import { personaLabel } from './Members';
 
 type Range = '7' | '30' | '90';
 const RANGES: { value: Range; label: string }[] = [
@@ -160,23 +161,37 @@ function Expiring({ hub }: { hub: HubStats }) {
   );
 }
 
-function Sites({ hub, days }: { hub: HubStats; days: string }) {
-  const most = Math.max(1, ...hub.per_site.map((site) => site.conversations));
+/** Shown on the home; the list is asked a little wider because the hub orders it by activity, not strictly by sign-up time. */
+const LATEST_SHOWN = 8;
+const LATEST_ASKED = 50;
+
+/**
+ * M228 (owner, 2026-11-11: «نشاط المواقع ملوش داعي… نحط آخر الأعضاء المسجّلين»): the newest sign-ups in place of the
+ * per-site chat activity, each row opening the member.
+ */
+function LatestMembers() {
+  const { openMember, openMembers } = useShell();
+  const state = useLoad(() => api.accounts({ perPage: LATEST_ASKED }), []);
+  const items = [...(state.data?.items ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, LATEST_SHOWN);
   return (
-    <section className="card" aria-labelledby="sites-title">
+    <section className="card" aria-labelledby="latest-title">
       <div className="row">
-        <h2 id="sites-title">نشاط المواقع</h2>
-        <span className="muted">آخر {days}</span>
+        <h2 id="latest-title">آخر الأعضاء المسجّلين</h2>
+        <button type="button" className="chip" onClick={() => openMembers('all')}>عرض الكل</button>
       </div>
-      {hub.per_site.length === 0 ? <p className="muted">لا توجد محادثات في هذه الفترة.</p> : null}
+      {state.error && !state.loading ? <ErrorCard error={state.error} onRetry={state.reload} /> : null}
+      {!state.data && !state.error ? <p className="muted">جارٍ التحميل…</p> : null}
+      {state.data && items.length === 0 ? <p className="muted">لا توجد حسابات مسجّلة بعد.</p> : null}
       <ul className="list">
-        {hub.per_site.map((site) => (
-          <li key={site.host} className="meter-row">
-            <div className="row">
-              <span>{site.name || site.host} <bdi dir="ltr" className="muted hint">{site.host}</bdi></span>
-              <span className="num">المحادثات {formatNumber(site.conversations)} · الرسائل {formatNumber(site.messages)}</span>
-            </div>
-            <span className="meter" aria-hidden="true"><i style={{ inlineSize: `${(site.conversations / most) * 100}%` }} /></span>
+        {items.map((item) => (
+          <li key={item.id}>
+            <button type="button" className="list-row" onClick={() => openMember(item.id)}>
+              <span className="list-main">
+                <strong>{item.name || item.email || `حساب رقم ${item.id}`}</strong>
+                <span className="muted">{[personaLabel(item.persona), item.city, formatRelative(item.created_at)].filter(Boolean).join(' · ')}</span>
+              </span>
+              {item.is_member ? <Pill tone="gold">عضو مشترك</Pill> : <Pill tone="muted">لم يشترك بعد</Pill>}
+            </button>
           </li>
         ))}
       </ul>
@@ -245,7 +260,7 @@ export function Home() {
           return (
             <div className="stack">
               {/* M158 (owner): the downloads counter comes first, before anything else. */}
-              {part(<DownloadsCard />)}
+              {part(<DownloadsCard days={Number(range)} label={days} />)}
               {data.hub ? part(<Tiles hub={data.hub} />) : data.errors.hub ? <ErrorCard error={data.errors.hub} onRetry={state.reload} /> : null}
               {part(<Today data={data} />)}
               {data.hub ? part(<Daily hub={data.hub} days={days} />) : null}
@@ -253,7 +268,7 @@ export function Home() {
               {data.hub ? (
                 <div className="columns">
                   {part(<Expiring hub={data.hub} />)}
-                  {part(<Sites hub={data.hub} days={days} />)}
+                  {part(<LatestMembers />)}
                 </div>
               ) : null}
               <div className="columns">

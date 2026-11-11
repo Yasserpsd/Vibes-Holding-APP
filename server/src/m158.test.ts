@@ -5,7 +5,7 @@ import { after, before, test } from 'node:test';
 import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
 import { type AppStoreClient, appStoreToken, parseSalesReport } from './downloads/appStore.js';
-import { bucketName, parseInstallsCsv, playAssertion } from './downloads/playStore.js';
+import { bucketName, parseInstallsCsv, playAssertion, type PlayStoreClient } from './downloads/playStore.js';
 import { DAILY_KEY, DownloadsService, type DailyDoc } from './downloads/service.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { LogMailer } from './mail/mailer.js';
@@ -69,20 +69,23 @@ test('the downloads endpoint needs a dashboard session', async () => {
   assert.equal((await get('/api/admin/downloads')).statusCode, 401);
 });
 
-test('without store keys the card shows signed-in devices per platform, honestly labelled by mode', async () => {
+test('without store keys the card has no store number at all: devices stay a separate unit (M228)', async () => {
   const response = await get('/api/admin/downloads', adminToken);
   assert.equal(response.statusCode, 200, response.body);
   assert.equal(response.headers['cache-control'], 'no-store');
   const body = response.json();
-  assert.equal(body.mode, 'devices');
-  assert.deepEqual({ android: body.android, ios: body.ios, total: body.total }, { android: 2, ios: 1, total: 3 });
+  assert.equal(body.range, 30);
+  assert.deepEqual(body.installs, { total: null, allTime: null, complete: false });
+  assert.deepEqual({ android: body.devices.android, ios: body.devices.ios, total: body.devices.total }, { android: 2, ios: 1, total: 3 });
   assert.deepEqual(body.devices.accounts, { android: 2, ios: 1, total: 2 });
-  assert.deepEqual(body.stores.apple, { configured: false, installs: null, since: null });
-  assert.deepEqual(body.stores.google, { configured: false, installs: null, since: null });
+  assert.deepEqual(body.stores.apple, { configured: false, installs: null, allTime: null, since: null, latest: null });
+  assert.deepEqual(body.stores.google, { configured: false, installs: null, allTime: null, since: null, latest: null });
   assert.equal(body.series.length, 30);
-  const today = body.series[29];
-  assert.equal(today.day, riyadhDay(Date.now()));
-  assert.deepEqual({ android: today.android, ios: today.ios }, { android: 2, ios: 1 });
+  assert.deepEqual(body.series[29], { day: riyadhDay(Date.now()), android: null, ios: null });
+  // The range chips: 7 and 90 are honoured, anything else falls back to 30.
+  assert.equal((await get('/api/admin/downloads?days=7', adminToken)).json().series.length, 7);
+  assert.equal((await get('/api/admin/downloads?days=90', adminToken)).json().range, 90);
+  assert.equal((await get('/api/admin/downloads?days=5000', adminToken)).json().range, 30);
 });
 
 test('the snapshot job writes one row per Riyadh day and keeps the trend accumulating', async () => {
@@ -97,25 +100,13 @@ test('the snapshot job writes one row per Riyadh day and keeps the trend accumul
   assert.equal(Object.keys((await kv.get<DailyDoc>(DAILY_KEY)) ?? {}).length, 1);
 });
 
-test('older snapshots feed the series and gaps repeat the last known day', async () => {
-  const local = new MemoryKV();
-  const now = Date.now();
-  const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
-  await local.set(DAILY_KEY, { [day(5)]: { android: 1, ios: 0 }, [day(2)]: { android: 3, ios: 2 } } satisfies DailyDoc);
-  const push = new PushService({ kv: local, log: app.log });
-  const service = new DownloadsService({ kv: local, push, log: app.log });
-  const answer = await service.read(now);
-  const at = (offset: number) => answer.series.find((point) => point.day === day(offset))!;
-  assert.deepEqual([at(6).android, at(5).android, at(3).android, at(2).ios, at(1).ios], [0, 1, 1, 2, 2]);
-  assert.deepEqual([at(0).android, at(0).ios], [0, 0], 'today = live device counts, not the stored row');
-  assert.equal(answer.mode, 'devices');
-});
-
-test('store installs switch the card to stores mode: Apple summed from the stored days, Google from its lifetime total', async () => {
+test('store downloads follow the range, with the all-time number beside it (M228)', async () => {
   const local = new MemoryKV();
   const now = Date.now();
   const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
   const doc: DailyDoc = {
+    [day(40)]: { android: 0, ios: 0, storeIos: 0 },
+    [day(20)]: { android: 1, ios: 1, storeIos: 5, storeAndroid: 2, playTotal: 100 },
     [day(3)]: { android: 1, ios: 1, storeIos: 4, storeAndroid: 7, playTotal: 120 },
     [day(2)]: { android: 1, ios: 1, storeIos: 6, storeAndroid: 9, playTotal: 129 },
     [day(1)]: { android: 1, ios: 1 },
@@ -123,28 +114,42 @@ test('store installs switch the card to stores mode: Apple summed from the store
   await local.set(DAILY_KEY, doc);
   const push = new PushService({ kv: local, log: app.log });
   const service = new DownloadsService({ kv: local, push, log: app.log });
-  const answer = await service.read(now);
-  assert.equal(answer.mode, 'stores');
-  assert.deepEqual({ android: answer.android, ios: answer.ios, total: answer.total }, { android: 129, ios: 10, total: 139 });
-  assert.equal(answer.stores.apple.since, day(3));
-  assert.equal(answer.stores.google.since, null);
-  // Stores mode: the trend is the stores' installs per day, a day a store has not written counts 0.
-  const at = (offset: number) => answer.series.find((point) => point.day === day(offset))!;
+  const month = await service.read(now, 30);
+  assert.deepEqual([month.stores.apple.installs, month.stores.apple.allTime], [15, 15]);
+  assert.deepEqual([month.stores.google.installs, month.stores.google.allTime], [18, 129], 'the lifetime total of Google beats the stored days');
+  assert.deepEqual(month.installs, { total: 33, allTime: 144, complete: true });
+  assert.equal(month.stores.apple.since, day(20), 'since = the first day with a download, not the first stored day');
+  assert.equal(month.stores.apple.latest, day(2));
+  const week = await service.read(now, 7);
+  assert.deepEqual([week.stores.apple.installs, week.stores.google.installs, week.installs.total], [10, 16, 26]);
+  assert.equal(week.series.length, 7);
+  // The trend is the downloads per day; a day a store has not written counts 0.
+  const at = (offset: number) => week.series.find((point) => point.day === day(offset))!;
   assert.deepEqual([at(3), at(2), at(1)].map((point) => [point.android, point.ios]), [[7, 4], [9, 6], [0, 0]]);
 });
 
-test('a store that has not answered yet keeps its device count beside the other store’s installs', async () => {
+test('a store that has not answered stays null with its reason: no device count in its place, no mixed total (M228)', async () => {
   const local = new MemoryKV();
   const now = Date.now();
   const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
   await local.set(DAILY_KEY, { [day(2)]: { android: 1, ios: 1, storeIos: 6 } } satisfies DailyDoc);
   const push = new PushService({ kv: local, log: app.log });
-  const service = new DownloadsService({ kv: local, push, log: app.log });
+  let listed = 0;
+  const google = { month: async () => null, list: async () => { listed += 1; return ['stats/installs/installs_other.app_202611_overview.csv']; } } as unknown as PlayStoreClient;
+  const service = new DownloadsService({ kv: local, push, log: app.log, google });
+  await service.snapshot(now);
   const answer = await service.read(now);
-  assert.equal(answer.mode, 'stores');
-  assert.equal(answer.ios, 6);
-  assert.equal(answer.android, answer.devices.android, 'Google has no number yet → the Android column keeps the device count');
+  assert.equal(listed, 1);
   assert.equal(answer.stores.google.installs, null);
+  assert.match(answer.stores.google.error ?? '', /no installs report .* holds 1 files: installs_other\.app_202611_overview\.csv/);
+  assert.equal(answer.stores.apple.installs, 6);
+  assert.deepEqual(answer.installs, { total: 6, allTime: 6, complete: false });
+  assert.equal(answer.series.every((point) => point.android === null), true);
+  // A refused read keeps the store answer as the reason; the next good read clears it.
+  const refused = { month: async () => { throw new Error('Cloud Storage answered 403 for 202611: no storage.objects.get access'); }, list: async () => [] } as unknown as PlayStoreClient;
+  const second = new DownloadsService({ kv: local, push, log: app.log, google: refused });
+  await second.snapshot(now);
+  assert.match((await second.read(now)).stores.google.error ?? '', /answered 403/);
 });
 
 test('Apple’s «no sales» 404 settles older days as 0 and leaves yesterday to be asked again', async () => {

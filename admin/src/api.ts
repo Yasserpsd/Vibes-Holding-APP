@@ -668,8 +668,8 @@ export const api = {
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),
   notifyPost: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/posts/${id}/notify`),
   // M158: the downloads card and its «حدّث الآن».
-  downloads: () => call<Downloads>('GET', '/api/admin/downloads'),
-  downloadsSnapshot: () => call<Downloads>('POST', '/api/admin/downloads/snapshot'),
+  downloads: (days: number) => call<Downloads>('GET', `/api/admin/downloads?days=${days}`),
+  downloadsSnapshot: (days: number) => call<Downloads>('POST', `/api/admin/downloads/snapshot?days=${days}`),
   home: (days: number) => call<Home>('GET', `/api/admin/home${query({ days })}`),
   accounts: (input: Paging & { state?: AccountFilter; persona?: PersonaFilter; wa?: WaFilter }) =>
     call<AccountsResult>('GET', `/api/admin/accounts${query({ ...paging(input), state: input.state, persona: input.persona, wa: input.wa })}`),

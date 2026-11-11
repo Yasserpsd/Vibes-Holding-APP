@@ -436,6 +436,10 @@ button.pick { border-color: var(--gold); color: var(--gold); }
 .store-value { font-size: 2.1rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: #fff; }
 .store-value.big { font-size: 2.8rem; color: var(--royal-gold); }
 .store-caption { color: rgba(246, 239, 226, 0.65); font-size: 0.74rem; }
+.store-value.off { font-size: 1.25rem; font-weight: 600; color: rgba(246, 239, 226, 0.75); letter-spacing: 0; padding-block: 8px; }
+.store-sub { margin-block-start: 6px; padding-block-start: 8px; border-block-start: 1px solid rgba(255, 255, 255, 0.12); color: rgba(246, 239, 226, 0.9); font-size: 0.86rem; }
+.store-sub strong { font-size: 1.05rem; color: #fff; margin-inline-start: 4px; }
+.store-error { color: rgba(246, 239, 226, 0.55); font-size: 0.74rem; overflow-wrap: anywhere; }
 .store-trend { margin: 0; display: grid; gap: 6px; }
 .store-trend svg { display: block; inline-size: 100%; block-size: 150px; direction: ltr; overflow: visible; }
 .store-trend-base { stroke: rgba(246, 239, 226, 0.25); }

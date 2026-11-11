@@ -101,6 +101,15 @@ export class PlayStoreClient {
     return json.access_token;
   }
 
+  /** Names under `stats/installs/` — tells «no report written yet» from «wrong package name» when a month answers 404. */
+  async list(): Promise<string[]> {
+    const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(this.bucket)}/o?prefix=${encodeURIComponent('stats/installs/')}&fields=items(name)&maxResults=200`;
+    const response = await this.fetchImpl(url, { headers: { authorization: `Bearer ${await this.accessToken()}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!response.ok) throw new Error(`Cloud Storage answered ${response.status} for the installs folder: ${await responseDetail(response)}`);
+    const json = (await response.json()) as { items?: { name?: string }[] };
+    return (json.items ?? []).map((item) => item.name ?? '').filter(Boolean);
+  }
+
   /** The overview export of one month (YYYYMM); `null` when the Play Console has not written it yet (404). */
   async month(yyyymm: string): Promise<PlayDay[] | null> {
     const object = encodeURIComponent(`stats/installs/installs_${this.config.packageName}_${yyyymm}_overview.csv`);

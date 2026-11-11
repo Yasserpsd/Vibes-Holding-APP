@@ -181,18 +181,16 @@ export type PaymentTotals = { count: number; cents: number; paid: number };
 export type BridgeSide = { version: string | null; ok: boolean };
 
 /** Never fails as a whole: a part that could not load is null with its entry in `errors`. */
-/** M158: the home downloads card — devices per platform until the store keys exist, then real installs. */
+/** One store on the downloads card: null numbers = the store has not answered (never a device count). */
+export type StoreDownloads = { configured: boolean; installs: number | null; allTime: number | null; since: string | null; latest: string | null; error?: string };
+
+/** M158 + M228: store downloads per store (range and all-time) and, as a separate unit, the signed-in devices. */
 export type Downloads = {
-  mode: 'devices' | 'stores';
-  android: number;
-  ios: number;
-  total: number;
+  range: number;
+  stores: { apple: StoreDownloads; google: StoreDownloads };
+  installs: { total: number | null; allTime: number | null; complete: boolean };
   devices: { android: number; ios: number; total: number; accounts: { android: number; ios: number; total: number } };
-  stores: {
-    apple: { configured: boolean; installs: number | null; since: string | null; error?: string };
-    google: { configured: boolean; installs: number | null; since: string | null; error?: string };
-  };
-  series: { day: string; android: number; ios: number }[];
+  series: { day: string; android: number | null; ios: number | null }[];
   snapshotAt: string | null;
 };
 

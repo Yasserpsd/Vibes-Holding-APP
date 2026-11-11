@@ -2,14 +2,17 @@ import { useId, useState } from 'react';
 
 import { api } from '../api';
 import { formatDay, formatNumber } from '../format';
-import type { Downloads as DownloadsData } from '../types';
+import type { Downloads as DownloadsData, StoreDownloads } from '../types';
 import { ErrorCard, Skeleton, useLoad } from '../ui';
 
 /**
  * M158 (owner, 2026-10-30): «أعرف كام عميل حمّل التطبيق… أول لما أفتح… جراف… بشكل ملكي خاص جدًا بلوجو Google وiOS…
  * كام هنا وكام هنا والإجمالي». The first card on the home: Google Play and App Store marks, a number under each,
- * the total, and the 30-day line. Honest by mode — signed-in devices until the store keys are set on Railway,
- * the stores' own installs afterwards (the devices then move to the small line).
+ * the total, and the trend line.
+ * M228 (owner, 2026-11-11: «الأرقام غير صحيحة… عايز رقم لكل اللي حمّلوا حتى لو ما سجّلوش، ورقم للي سجّلوا»): two units
+ * that never mix. The big number of each store is its own downloads for the chosen range, or «غير متاح» with the
+ * reason when the store has not answered — never a device count in its place. The registered accounts sit under it
+ * on their own line, and the total adds downloads only.
  */
 
 /** The Apple mark, the same path the official App Store badge carries (server/src/legal/badges.ts). */
@@ -34,24 +37,37 @@ function PlayMark() {
   );
 }
 
-function StoreColumn({ mark, name, value, caption }: { mark: React.ReactNode; name: string; value: number; caption: string }) {
+/** Why a store shows no number, in plain Arabic (the store answer itself goes to the foot line). */
+function reason(store: StoreDownloads): string {
+  if (!store.configured) return 'مفاتيح المتجر غير مضبوطة على الخادم';
+  const error = store.error ?? '';
+  if (!error) return 'لم يصل رد المتجر بعد';
+  if (/\b(401|403)\b/.test(error)) return 'المتجر رفض القراءة: صلاحية حساب الخدمة غير مفعّلة';
+  if (/no installs report/.test(error)) return 'المتجر لم يُصدر ملف التحميلات بعد';
+  return 'تعذّر الاتصال بالمتجر';
+}
+
+function StoreColumn({ mark, name, store, accounts, label }: { mark: React.ReactNode; name: string; store: StoreDownloads; accounts: number; label: string }) {
   return (
     <div className="store-col">
       {mark}
       <span className="store-name">{name}</span>
-      <strong className="store-value num">{formatNumber(value)}</strong>
-      <span className="store-caption">{caption}</span>
+      {store.installs !== null ? <strong className="store-value num">{formatNumber(store.installs)}</strong> : <strong className="store-value off">غير متاح</strong>}
+      <span className="store-caption">{store.installs !== null ? `تحميل من المتجر · آخر ${label}` : reason(store)}</span>
+      <span className="store-sub">الحسابات المسجّلة <strong className="num">{formatNumber(accounts)}</strong></span>
     </div>
   );
 }
 
-/** The 30-day line: devices (or installs) per platform, gold = total, two thin lines for the stores. */
-function Trend({ series }: { series: DownloadsData['series'] }) {
+/** The trend of the range: store downloads per day. A store that has not answered has no line; gold = the sum when both answered. */
+function Trend({ series, label }: { series: DownloadsData['series']; label: string }) {
   const id = useId();
   const width = 560;
   const height = 120;
   const pad = { x: 6, top: 10, bottom: 22 };
-  const totals = series.map((point) => point.android + point.ios);
+  const hasAndroid = series.some((point) => point.android !== null);
+  const hasIos = series.some((point) => point.ios !== null);
+  const totals = series.map((point) => (point.android ?? 0) + (point.ios ?? 0));
   const max = Math.max(1, ...totals);
   const stepX = series.length > 1 ? (width - pad.x * 2) / (series.length - 1) : 0;
   const y = (value: number) => pad.top + (height - pad.top - pad.bottom) * (1 - value / max);
@@ -61,11 +77,12 @@ function Trend({ series }: { series: DownloadsData['series'] }) {
   const last = series[series.length - 1];
   const endX = (pad.x + (series.length - 1) * stepX).toFixed(1);
   const endY = y(totals[totals.length - 1]!).toFixed(1);
+  const both = hasAndroid && hasIos;
   return (
     <figure className="store-trend">
       {/* The drawing stretches to the card's width at a fixed height (phones would otherwise get a 70px strip);
           strokes never scale, and the end dot is a round-capped zero-length stroke so it stays round. */}
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="اتجاه آخر 30 يومًا">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={`تحميلات المتاجر يوميًا خلال آخر ${label}`}>
         <defs>
           <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#e7ad3f" stopOpacity="0.45" />
@@ -74,8 +91,8 @@ function Trend({ series }: { series: DownloadsData['series'] }) {
         </defs>
         <line x1={pad.x} x2={width - pad.x} y1={height - pad.bottom} y2={height - pad.bottom} className="store-trend-base" vectorEffect="non-scaling-stroke" />
         <path d={area} fill={`url(#${id}-fill)`} />
-        <path d={line((index) => series[index]!.android)} className="store-trend-line android" vectorEffect="non-scaling-stroke" />
-        <path d={line((index) => series[index]!.ios)} className="store-trend-line ios" vectorEffect="non-scaling-stroke" />
+        {both ? <path d={line((index) => series[index]!.android ?? 0)} className="store-trend-line android" vectorEffect="non-scaling-stroke" /> : null}
+        {both ? <path d={line((index) => series[index]!.ios ?? 0)} className="store-trend-line ios" vectorEffect="non-scaling-stroke" /> : null}
         <path d={line((index) => totals[index]!)} className="store-trend-line total" vectorEffect="non-scaling-stroke" />
         {last ? (
           <>
@@ -89,21 +106,46 @@ function Trend({ series }: { series: DownloadsData['series'] }) {
         <span>{last ? formatDay(last.day, 'short') : ''}</span>
       </div>
       <figcaption className="store-legend">
-        <span><i className="swatch total" /> الإجمالي</span>
-        <span><i className="swatch android" /> Google Play</span>
-        <span><i className="swatch ios" /> App Store</span>
+        {both ? (
+          <>
+            <span><i className="swatch total" /> إجمالي التحميلات</span>
+            <span><i className="swatch android" /> Google Play</span>
+            <span><i className="swatch ios" /> App Store</span>
+          </>
+        ) : (
+          <span><i className="swatch total" /> تحميلات {hasIos ? 'App Store' : 'Google Play'} يوميًا</span>
+        )}
       </figcaption>
     </figure>
   );
 }
 
-export function DownloadsCard() {
-  const state = useLoad(() => api.downloads(), []);
+/** One foot line per store: the all-time downloads when it answered, the reason (and the store answer) when not. */
+function StoreFoot({ name, store }: { name: string; store: StoreDownloads }) {
+  if (store.allTime === null) {
+    return (
+      <span>
+        {name}: {reason(store)}
+        {store.error ? <bdi dir="ltr" className="store-error">{store.error}</bdi> : null}
+      </span>
+    );
+  }
+  return (
+    <span>
+      {name}: <bdi className="num">{formatNumber(store.allTime)}</bdi> تحميلًا
+      {store.since ? ` منذ أول تحميل في ${formatDay(store.since, 'short')}` : ''}
+      {store.latest ? `، آخر يوم منشور ${formatDay(store.latest, 'short')}` : ''}
+    </span>
+  );
+}
+
+export function DownloadsCard({ days, label }: { days: number; label: string }) {
+  const state = useLoad(() => api.downloads(days), [days]);
   const [busy, setBusy] = useState(false);
   const refresh = async () => {
     setBusy(true);
     try {
-      await api.downloadsSnapshot();
+      await api.downloadsSnapshot(days);
       state.reload();
     } finally {
       setBusy(false);
@@ -112,51 +154,37 @@ export function DownloadsCard() {
   if (state.error && !state.loading) return <ErrorCard error={state.error} onRetry={state.reload} />;
   const data = state.data;
   if (!data) return <Skeleton rows={4} />;
-  const stores = data.mode === 'stores';
-  // In stores mode a store that has not answered yet still shows its device count — captioned as such.
-  const caption = (installs: number | null) => (stores && installs !== null ? 'تحميل من المتجر' : 'جهاز مسجّل');
-  const both = stores && data.stores.google.installs !== null && data.stores.apple.installs !== null;
-  const pending = [!data.stores.google.configured ? 'Google Play' : null, !data.stores.apple.configured ? 'App Store' : null].filter(Boolean);
+  const { apple, google } = data.stores;
+  const answered = [apple.installs !== null ? 'App Store' : null, google.installs !== null ? 'Google Play' : null].filter(Boolean);
+  const totalCaption = data.installs.complete ? `من المتجرين · آخر ${label}` : answered.length ? `${answered[0]} فقط · آخر ${label}` : 'لا توجد أرقام من المتجرين بعد';
   return (
     <section className="card royal downloads" aria-labelledby="downloads-title">
       <header className="downloads-head">
         <div>
           <p className="royal-kicker">Investors Club</p>
-          <h2 id="downloads-title">{stores ? 'تحميلات التطبيق من المتجرين' : 'الأجهزة المسجّلة في التطبيق'}</h2>
+          <h2 id="downloads-title">تحميلات التطبيق من المتجرين</h2>
         </div>
         <button type="button" className="chip royal-chip" onClick={() => void refresh()} disabled={busy || state.loading}>
           {busy ? 'جارٍ التحديث…' : 'حدّث الآن'}
         </button>
       </header>
       <div className="store-grid">
-        <StoreColumn mark={<PlayMark />} name="Google Play" value={data.android} caption={caption(data.stores.google.installs)} />
+        <StoreColumn mark={<PlayMark />} name="Google Play" store={google} accounts={data.devices.accounts.android} label={label} />
         <div className="store-total">
-          <span className="store-name">الإجمالي</span>
-          <strong className="store-value big num">{formatNumber(data.total)}</strong>
-          <span className="store-caption">{both ? 'تحميل من المتجرين' : stores ? 'متجر + أجهزة' : 'جهاز مسجّل الآن'}</span>
+          <span className="store-name">إجمالي التحميلات</span>
+          {data.installs.total !== null ? <strong className="store-value big num">{formatNumber(data.installs.total)}</strong> : <strong className="store-value off">غير متاح</strong>}
+          <span className="store-caption">{totalCaption}</span>
+          <span className="store-sub">الحسابات المسجّلة <strong className="num">{formatNumber(data.devices.accounts.total)}</strong></span>
         </div>
-        <StoreColumn mark={<AppleMark />} name="App Store" value={data.ios} caption={caption(data.stores.apple.installs)} />
+        <StoreColumn mark={<AppleMark />} name="App Store" store={apple} accounts={data.devices.accounts.ios} label={label} />
       </div>
-      <Trend series={data.series} />
-      {/* One quiet line under the card: where each store number comes from, and the signed-in devices beside it. */}
+      {answered.length ? <Trend series={data.series} label={label} /> : null}
+      {/* Under the card: the all-time number of each store (or why it is missing), then what the second unit means. */}
       <p className="store-foot">
-        {stores ? (
-          <>
-            {data.stores.apple.installs !== null && data.stores.apple.since ? <span>App Store محسوب منذ {formatDay(data.stores.apple.since, 'short')}</span> : null}
-            {data.stores.apple.installs === null ? <span>{data.stores.apple.configured ? 'App Store قيد التفعيل، يظهر تلقائيًا خلال يوم' : 'App Store غير مضبوط بعد'}</span> : null}
-            {data.stores.google.installs === null ? <span>{data.stores.google.configured ? 'Google Play قيد التفعيل، يظهر تلقائيًا خلال يوم' : 'Google Play غير مضبوط بعد'}</span> : null}
-            <span>
-              الأجهزة المسجّلة الآن: <bdi className="num">{formatNumber(data.devices.android)}</bdi> Android · <bdi className="num">{formatNumber(data.devices.ios)}</bdi> iPhone
-            </span>
-          </>
-        ) : (
-          <>
-            <span>
-              أجهزة سجّلت دخولها في التطبيق، ليست أرقام المتاجر: حسابات <bdi className="num">{formatNumber(data.devices.accounts.android)}</bdi> من Android و <bdi className="num">{formatNumber(data.devices.accounts.ios)}</bdi> من iPhone
-            </span>
-            {pending.length ? <span>أرقام المتاجر تظهر بعد ضبط مفاتيح {pending.join(' و')}</span> : null}
-          </>
-        )}
+        <StoreFoot name="App Store" store={apple} />
+        <StoreFoot name="Google Play" store={google} />
+        <span>أرقام المتاجر تُنشر بتأخير يوم تقريبًا</span>
+        <span>الحسابات المسجّلة = حسابات سجّلت دخولها على جهاز من هذا النظام، وتُعرض منفصلة ولا تُجمع مع التحميلات</span>
       </p>
     </section>
   );

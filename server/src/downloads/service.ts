@@ -8,7 +8,7 @@ import type { PlayStoreClient } from './playStore.js';
 
 /**
  * M158 (owner, 2026-10-30: «أعرف كام عميل حمّل التطبيق… أول لما أفتح… كام هنا وكام هنا والإجمالي»).
- * Two honest layers: what the server knows today — signed-in devices and accounts per platform from the
+ * Two honest layers (M228: never mixed in one number): what the server knows today — signed-in devices and accounts per platform from the
  * push tokens — and, once the store credentials are set on Railway, the stores' own install numbers.
  * One kv document holds a snapshot per Riyadh day so the home card's trend accumulates from the first boot.
  */
@@ -28,25 +28,51 @@ export type DailyRow = {
 };
 export type DailyDoc = Record<string, DailyRow>;
 
+/** The numbers of one store. `installs` is null until the store has answered at least once — never a device count. */
+export type StoreAnswer = {
+  configured: boolean;
+  /** Store downloads inside the asked range. */
+  installs: number | null;
+  /** Store downloads since the first one. */
+  allTime: number | null;
+  /** The day of the first download the store reported. */
+  since: string | null;
+  /** The last day the store has published a number for. */
+  latest: string | null;
+  /** Why the store did not answer on the last attempt (the store answer itself, no secrets). */
+  error?: string;
+};
+
+/**
+ * M228 (owner, 2026-11-11: «عايز الرقم الحقيقي لكل اللي حمّلوا حتى لو ما سجّلوش… والأرقام دي للناس اللي سجّلت»).
+ * Two units that never mix: `stores` + `installs` are store downloads only; `devices` is who is signed in.
+ */
 export type DownloadsAnswer = {
-  /** `stores` once at least one store client is configured and answered; else `devices`. */
-  mode: 'devices' | 'stores';
-  android: number;
-  ios: number;
-  total: number;
+  /** Days the store numbers cover (7, 30 or 90). */
+  range: number;
+  stores: { apple: StoreAnswer; google: StoreAnswer };
+  /** Sum of the stores that answered; `complete` only when both did. */
+  installs: { total: number | null; allTime: number | null; complete: boolean };
+  /** Signed-in devices and accounts per platform (push tokens) — a separate unit, never added to installs. */
   devices: { android: number; ios: number; total: number; accounts: { android: number; ios: number; total: number } };
-  stores: {
-    apple: { configured: boolean; installs: number | null; since: string | null; error?: string };
-    google: { configured: boolean; installs: number | null; since: string | null; error?: string };
-  };
-  /** Last 30 Riyadh days: signed-in devices per platform (devices mode) or the stores' installs on that day (stores mode). */
-  series: { day: string; android: number; ios: number }[];
+  /** Store downloads per Riyadh day of the range; null for a store that has never answered. */
+  series: { day: string; android: number | null; ios: number | null }[];
   snapshotAt: string | null;
 };
+
+export const RANGES = [7, 30, 90] as const;
+
+/** A store failure as one short line for the dashboard. */
+function errorText(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).replace(/\s+/g, ' ').trim().slice(0, 300);
+}
 
 type Deps = { kv: KV; push: PushService; log: FastifyBaseLogger; apple?: AppStoreClient; google?: PlayStoreClient };
 
 export class DownloadsService {
+  /** The failure of the last attempt per store (cleared by the next success) so the card can say why a number is missing. */
+  private readonly errors: { apple?: string; google?: string } = {};
+
   constructor(private readonly deps: Deps) {}
 
   get configured(): { apple: boolean; google: boolean } {
@@ -87,7 +113,9 @@ export class DownloadsService {
           doc[day] = { ...(doc[day] ?? { android: 0, ios: 0 }), storeIos: installs ?? 0 };
         }
         today.storeIos = doc[riyadhDay(now)]?.storeIos ?? today.storeIos;
+        delete this.errors.apple;
       } catch (error) {
+        this.errors.apple = errorText(error);
         this.deps.log.warn({ err: error }, 'app store installs failed');
       }
     }
@@ -95,9 +123,11 @@ export class DownloadsService {
       const google = this.deps.google;
       try {
         const months = Array.from(new Set(days.map((day) => day.slice(0, 7).replace('-', ''))));
+        let found = 0;
         for (const month of months) {
           const rows = await google.month(month);
           if (!rows) continue;
+          found += 1;
           for (const entry of rows) {
             if (!days.includes(entry.day)) continue;
             const base = doc[entry.day] ?? { android: 0, ios: 0 };
@@ -106,17 +136,26 @@ export class DownloadsService {
         }
         const latest = doc[riyadhDay(now)];
         if (latest) Object.assign(today, { storeAndroid: latest.storeAndroid, playTotal: latest.playTotal });
+        if (found) {
+          delete this.errors.google;
+        } else {
+          // Every month answered 404: say whether the folder is empty or holds the files of another package.
+          const names = (await google.list()).map((name) => name.replace(/^stats\/installs\//, ''));
+          this.errors.google = `no installs report for months ${months.join(', ')}; the installs folder holds ${names.length} files${names.length ? `: ${names.slice(0, 4).join(', ')}` : ''}`.slice(0, 300);
+          this.deps.log.warn({ months, files: names.length }, 'google play installs report not found');
+        }
       } catch (error) {
+        this.errors.google = errorText(error);
         this.deps.log.warn({ err: error }, 'google play installs failed');
       }
     }
   }
 
-  /** The home card's answer: today's counts, the store totals when known, and the 30-day series. */
-  async read(now = Date.now()): Promise<DownloadsAnswer> {
+  /** The home card: store downloads per store for the range and since the first one, and the signed-in devices beside them. */
+  async read(now = Date.now(), range = 30): Promise<DownloadsAnswer> {
     const doc = await this.load();
     const platforms = await this.deps.push.platforms();
-    const days = lastRiyadhDays(30, now);
+    const days = lastRiyadhDays(range, now);
     const known = Object.keys(doc).sort();
     const devices = {
       android: platforms.devices.android,
@@ -124,50 +163,37 @@ export class DownloadsService {
       total: platforms.devices.android + platforms.devices.ios,
       accounts: { android: platforms.accounts.android, ios: platforms.accounts.ios, total: platforms.accounts.total },
     };
-    const sum = (pick: (row: DailyRow) => number | undefined): { installs: number | null; since: string | null } => {
-      let installs: number | null = null;
+    const store = (configured: boolean, pick: (row: DailyRow) => number | undefined, error: string | undefined): StoreAnswer => {
+      let allTime: number | null = null;
       let since: string | null = null;
+      let latest: string | null = null;
       for (const day of known) {
         const value = pick(doc[day]!);
         if (value === undefined) continue;
-        installs = (installs ?? 0) + value;
-        since ??= day;
+        allTime = (allTime ?? 0) + value;
+        latest = day;
+        if (value > 0) since ??= day;
       }
-      return { installs, since };
+      const installs = allTime === null ? null : days.reduce((sum, day) => sum + (doc[day] ? (pick(doc[day]!) ?? 0) : 0), 0);
+      return { configured, installs, allTime, since, latest, ...(error ? { error } : {}) };
     };
-    const appleSum = sum((row) => row.storeIos);
-    const googleSum = sum((row) => row.storeAndroid);
-    // Google's own lifetime total beats the sum of the days we happened to store.
+    const apple = store(Boolean(this.deps.apple), (row) => row.storeIos, this.errors.apple);
+    const google = store(Boolean(this.deps.google), (row) => row.storeAndroid, this.errors.google);
+    // The lifetime total Google reports beats the sum of the days we happened to store.
     const playTotal = [...known].reverse().map((day) => doc[day]!.playTotal).find((value) => value !== undefined);
-    const google = { configured: Boolean(this.deps.google), installs: playTotal ?? googleSum.installs, since: playTotal !== undefined ? null : googleSum.since };
-    const apple = { configured: Boolean(this.deps.apple), installs: appleSum.installs, since: appleSum.since };
-    const storesMode = apple.installs !== null || google.installs !== null;
-    const today = riyadhDay(now);
-    let series: DownloadsAnswer['series'];
-    if (storesMode) {
-      // Stores mode: the stores' own installs per day (a day a store has not written yet counts 0 for it).
-      series = days.map((day) => ({ day, android: doc[day]?.storeAndroid ?? 0, ios: doc[day]?.storeIos ?? 0 }));
-    } else {
-      // Devices mode: the trend carries the device counts; a day without a snapshot repeats the last known one so the line never drops to zero.
-      let last: { android: number; ios: number } = { android: 0, ios: 0 };
-      series = days.map((day) => {
-        const row = doc[day];
-        if (row) last = { android: row.android, ios: row.ios };
-        return { day, ...last };
-      });
-      if (series.length) series[series.length - 1] = { day: today, android: devices.android, ios: devices.ios };
-    }
-    // A store that has not answered yet keeps its device count (the card captions each column by what it holds).
-    const android = storesMode ? (google.installs ?? devices.android) : devices.android;
-    const ios = storesMode ? (apple.installs ?? devices.ios) : devices.ios;
+    if (playTotal !== undefined && google.allTime !== null) google.allTime = Math.max(playTotal, google.allTime);
+    const answered = [apple, google].filter((entry) => entry.installs !== null);
+    const add = (pick: (entry: StoreAnswer) => number | null): number | null => (answered.length ? answered.reduce((sum, entry) => sum + (pick(entry) ?? 0), 0) : null);
     return {
-      mode: storesMode ? 'stores' : 'devices',
-      android,
-      ios,
-      total: android + ios,
-      devices,
+      range,
       stores: { apple, google },
-      series,
+      installs: { total: add((entry) => entry.installs), allTime: add((entry) => entry.allTime), complete: answered.length === 2 },
+      devices,
+      series: days.map((day) => ({
+        day,
+        android: google.installs === null ? null : (doc[day]?.storeAndroid ?? 0),
+        ios: apple.installs === null ? null : (doc[day]?.storeIos ?? 0),
+      })),
       snapshotAt: known.length ? known[known.length - 1]! : null,
     };
   }

@@ -2,11 +2,17 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { dashboardGuard, guard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
-import type { DownloadsService } from './service.js';
+import { RANGES, type DownloadsService } from './service.js';
 
 export type DownloadsRoutesOptions = { service: DownloadsService; auth: AuthService };
 
 /** M158: the dashboard's downloads card — admin-only, `no-store` like every /api/ answer. */
+/** `?days=7|30|90` (the range chips of the home); anything else is 30. */
+function rangeOf(query: unknown): number {
+  const days = Number((query as { days?: string } | undefined)?.days);
+  return (RANGES as readonly number[]).includes(days) ? days : 30;
+}
+
 export const downloadsRoutes: FastifyPluginAsync<DownloadsRoutesOptions> = async (app, { service, auth }) => {
   const requireAdmin = dashboardGuard(auth);
 
@@ -15,7 +21,7 @@ export const downloadsRoutes: FastifyPluginAsync<DownloadsRoutesOptions> = async
     guard(async (request, reply) => {
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
-      return service.read();
+      return service.read(Date.now(), rangeOf(request.query));
     }),
   );
 
@@ -26,7 +32,7 @@ export const downloadsRoutes: FastifyPluginAsync<DownloadsRoutesOptions> = async
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
       await service.snapshot();
-      return service.read();
+      return service.read(Date.now(), rangeOf(request.query));
     }),
   );
 };
