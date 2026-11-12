@@ -19,6 +19,7 @@ import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
+import { AdminPopup } from '@/components/AdminPopup';
 import { GentlePopups } from '@/components/GentlePopups';
 import { IntroVideoPopup } from '@/components/IntroVideo';
 import { WhatsappVerifyHost } from '@/components/WhatsappVerify';
@@ -221,6 +222,8 @@ export default function RootLayout() {
           <SplashFlash />
           {/* M204 (owner): missing details and the unconfirmed number are weekly popups with «لاحقًا», never a wall. */}
           <GentlePopups />
+          {/* M232 (owner): a popup published from the dashboard («أدوات التواصل») — once per device, never over another popup. */}
+          <AdminPopup />
           {/* M209 (owner): the intro film plays once right after a registration (and once for an account that never saw it) — first in line. */}
           <IntroVideoPopup />
           {/* M209 (owner): every member with an unproven WhatsApp number gets one gentle popup ~5 s after landing, after the film and the details form. */}

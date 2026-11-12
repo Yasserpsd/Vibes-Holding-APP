@@ -218,9 +218,12 @@ function fits(tip: TipDef, audience: TipAudience, context: Record<string, string
   return (tip.needs ?? []).every((key) => context[key] != null);
 }
 
-/** First word of a display name; empty names read naturally without it. */
+const NAME_PREFIX = /^(عبد|عبدال|أبو|ابو|أم|ام|abdul|abdel|abd|abu|umm)$/i;
+
+/** First word of a display name; empty names read naturally without it. M232: a compound first name («عبد الله», «أبو بكر») stays whole. */
 export function firstName(name: string | null | undefined): string {
-  return (name ?? '').trim().split(/\s+/)[0] ?? '';
+  const [first = '', second] = (name ?? '').trim().split(/\s+/);
+  return second && NAME_PREFIX.test(first) ? `${first} ${second}` : first;
 }
 
 /**

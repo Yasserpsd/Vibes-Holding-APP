@@ -46,7 +46,7 @@ export default function PostScreen() {
           <View style={styles.meta}>
             <PopIn style={styles.badge}>
               <Ionicons name={event ? 'calendar' : isPoll ? 'stats-chart' : 'megaphone-outline'} size={14} color={colors.goldInk} />
-              <Text style={styles.badgeText}>{event ? t('posts.event') : isPoll ? t('poll.badge') : t('nav.posts')}</Text>
+              <Text style={styles.badgeText}>{event ? t('posts.event') : isPoll ? t('poll.badge') : t('inbox.kind.post')}</Text>
             </PopIn>
             {audienceBadge(post) ? (
               <PopIn delay={80} style={styles.badge}>

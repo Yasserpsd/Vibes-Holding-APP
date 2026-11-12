@@ -488,3 +488,6 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
   .store-row { grid-template-columns: 1fr 1fr; }
   .store-id { grid-column: 1 / -1; }
 }
+
+/* M232: a hidden field stays hidden even where a rule gives it a display (label.check). */
+[hidden] { display: none !important; }

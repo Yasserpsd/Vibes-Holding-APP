@@ -471,6 +471,8 @@ export class DashboardService {
       const { contact, event } = result;
       const email = String(contact.contact_email ?? '').trim() || contact.email;
       void this.deps.whatsapp?.sendHonorary({ phone: contact.phone, lang: contact.lang, name: contact.name, email, ref: `honorary:${contactId}:${event.id}` }, !input.on);
+      // M232: his devices leave (or rejoin) every broadcast at once; the one push about the membership itself still goes.
+      await this.deps.push.setHonorary(contactId, input.on).catch(() => undefined);
       this.deps.push.honoraryChanged(contactId, input.on);
       this.deps.notifier?.honoraryChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
       return { ok: true as const, contact: result.contact, event: result.event };

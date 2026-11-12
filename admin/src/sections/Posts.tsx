@@ -20,7 +20,7 @@ function HubSync({ post }: { post: Post }) {
   const sync = post.hubSync;
   if (post.status !== 'published') return null;
   // A targeted message is private, and a poll cannot be voted on a website: both stay in the app.
-  if (audienceOf(post).type !== 'all' || post.kind === 'poll') return <Pill tone="muted">داخل التطبيق فقط</Pill>;
+  if (audienceOf(post).type !== 'all' || post.kind === 'poll' || post.kind === 'popup') return <Pill tone="muted">داخل التطبيق فقط</Pill>;
   if (!sync) return null;
   if (sync.state === 'ok') return <Pill tone="ok">وصل للمواقع والمستشار</Pill>;
   if (sync.state === 'unsupported') return <Pill tone="muted">المواقع تحتاج إضافة الهب 2.7.0</Pill>;
@@ -139,7 +139,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
           setEditing(null);
           if (!post) return;
           setSaved((current) => [post, ...current.filter((entry) => entry.id !== post.id)]);
-          notify('ok', post.kind === 'event' ? 'تم حفظ الفعالية.' : post.kind === 'poll' ? 'تم حفظ الاستفتاء.' : 'تم حفظ المنشور.');
+          notify('ok', post.kind === 'event' ? 'تم حفظ الفعالية.' : post.kind === 'poll' ? 'تم حفظ الاستفتاء.' : post.kind === 'popup' ? 'تم حفظ البوب أب.' : 'تم حفظ رسالة الإدارة.');
           state.reload();
         }}
       />
@@ -148,11 +148,11 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
 
   return (
     <>
-      <SectionHead title="المنشورات" hint={state.data ? `الأجهزة المسجلة للإشعارات: ${formatNumber(devices)}` : undefined} onReload={state.reload} busy={state.loading}>
-        <button className="primary" type="button" onClick={() => setEditing('new')}>منشور جديد</button>
+      <SectionHead title="أدوات التواصل" hint={state.data ? `الأجهزة المسجلة للإشعارات: ${formatNumber(devices)}` : undefined} onReload={state.reload} busy={state.loading}>
+        <button className="primary" type="button" onClick={() => setEditing('new')}>أداة جديدة</button>
       </SectionHead>
       {state.data && devices === 0 ? <p className="muted">زر «إرسال إشعار» متوقف الآن لأن أي جهاز لم يسجّل بعد. يبدأ التسجيل بعد تثبيت نسخة التطبيق التي تدعم الإشعارات وتسجيل الدخول منها.</p> : null}
-      <Async state={state} rows={5} empty={() => posts.length === 0} emptyText="لا توجد منشورات بعد.">
+      <Async state={state} rows={5} empty={() => posts.length === 0} emptyText="لا توجد أدوات تواصل بعد.">
         {() => (
           <ul className="posts">
             {posts.map((post) => (
@@ -162,6 +162,8 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                   <span className="pills">
                     {post.kind === 'event' ? <Pill tone="gold">فعالية</Pill> : null}
                     {post.kind === 'poll' ? <Pill tone="gold">استفتاء</Pill> : null}
+                    {post.kind === 'popup' ? <Pill tone="gold">بوب أب</Pill> : null}
+                    {(post.kind ?? 'post') === 'post' ? <Pill tone="muted">رسالة الإدارة</Pill> : null}
                     <AudiencePill post={post} />
                     <span className={post.status === 'published' ? 'badge on' : 'badge'}>{post.status === 'published' ? 'منشور' : 'مسودة'}</span>
                   </span>
@@ -169,6 +171,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 {post.kind === 'event' && post.event ? <p className="event-line">{formatEventDate(post.event.date)}{post.event.place ? ` · ${post.event.place}` : ''}{post.event.onlineUrl ? ' · حضور عن بُعد' : ''}</p> : null}
                 <p className="muted">
                   {post.status === 'published' ? `نُشر: ${formatDateTime(post.publishedAt)}` : `آخر تعديل: ${formatDateTime(post.updatedAt)}`}
+                  {post.kind === 'popup' ? ` · ${post.popup?.until ? `يظهر حتى ${formatEventDate(post.popup.until)}` : 'يظهر حتى إلغاء نشره'}` : ''}
                   {post.notifiedAt ? ` · إشعار: ${formatDateTime(post.notifiedAt)}` : ''}
                   {post.images.length > 0 ? ` · صور: ${post.images.length}` : ''}
                   {post.video ? ' · فيديو مرفوع' : ''}
@@ -177,7 +180,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 <PollResults post={post} />
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
-                  <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>
+                  {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>}
                   <button className="danger" type="button" onClick={() => void remove(post)} disabled={busyId === post.id}>حذف</button>
                 </div>
               </li>

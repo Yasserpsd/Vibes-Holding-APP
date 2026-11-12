@@ -35,7 +35,7 @@ export class PostsHubSync {
     // M29: a targeted message is private to its member or persona — the websites and the assistant
     // never hear it, and one that was public before the edit is pulled off them like a draft.
     // M31: a poll is the app's alone too — the websites cannot vote.
-    if (post.status === 'published' && audienceOf(post).type === 'all' && post.kind !== 'poll') {
+    if (post.status === 'published' && audienceOf(post).type === 'all' && post.kind !== 'poll' && post.kind !== 'popup') {
       const error = await this.call(adminUuid, {
         key: post.id,
         kind: post.kind ?? 'post',
@@ -55,7 +55,7 @@ export class PostsHubSync {
   }
 
   private async afterRemove(post: Post, adminUuid: string): Promise<void> {
-    if (post.hubSync?.published || (post.status === 'published' && audienceOf(post).type === 'all' && post.kind !== 'poll')) {
+    if (post.hubSync?.published || (post.status === 'published' && audienceOf(post).type === 'all' && post.kind !== 'poll' && post.kind !== 'popup')) {
       const error = await this.call(adminUuid, { key: post.id, remove: true });
       // The post is gone, so the removal is remembered on its own and tried again on the next edit of any post.
       if (error && error !== 'hub_not_supported') await this.remember(post.id);

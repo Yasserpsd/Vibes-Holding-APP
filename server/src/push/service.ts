@@ -31,6 +31,11 @@ export type PushToken = {
   name?: string | null;
   nameEn?: string | null;
   member?: boolean | null;
+  /**
+   * M232: the account holds the honorary membership — its devices hear nothing the club broadcasts (management
+   * messages, category pushes, daily pushes); only answers to its own acts still reach it. Absent = not asked yet.
+   */
+  honorary?: boolean | null;
   platform: string;
   deviceName: string | null;
   appVersion: string | null;
@@ -44,6 +49,8 @@ export type PushOutcome = { sent: number; failed: number; dropped: number };
 type Ticket = { status: 'ok'; id?: string } | { status: 'error'; message?: string; details?: { error?: string } };
 
 export type PushDeps = { kv: KV; log: FastifyBaseLogger; fetchImpl?: typeof fetch; accessToken?: string };
+/** M232: asks the hub whether an account is honorary; throws when the hub cannot say. */
+export type HonoraryLookup = (contactId: number) => Promise<boolean>;
 
 export function isExpoPushToken(value: string): boolean {
   return TOKEN_PATTERN.test(value);
@@ -58,7 +65,57 @@ export class PushService {
   private lastError: string | null = null;
   private lastSentAt: string | null = null;
 
+  private honoraryLookup: HonoraryLookup | null = null;
+
   constructor(private readonly deps: PushDeps) {}
+
+  /** M232: wired after the hub client exists; fills the honorary flag of tokens registered before it was stored. */
+  setHonoraryLookup(lookup: HonoraryLookup): void {
+    this.honoraryLookup = lookup;
+  }
+
+  /** M232: the dashboard gave or took back the honorary membership — the account's devices follow at once. */
+  async setHonorary(contactId: number, on: boolean): Promise<void> {
+    await this.mutate((tokens) => {
+      for (const entry of tokens) if (entry.contactId === contactId) entry.honorary = on;
+    });
+  }
+
+  /**
+   * M232 (owner: «عزل كامل»): the devices a broadcast may reach — every token except the honorary members'. A token
+   * that never said (registered before M232) is asked about once, through the hub, and the answer is stored.
+   */
+  private async reach(): Promise<PushToken[]> {
+    let tokens = await this.load();
+    const unknown = [...new Set(tokens.filter((entry) => entry.honorary == null).map((entry) => entry.contactId))];
+    if (unknown.length && this.honoraryLookup) {
+      const lookup = this.honoraryLookup;
+      const answers = new Map<number, boolean>();
+      for (let start = 0; start < unknown.length; start += 8) {
+        await Promise.all(
+          unknown.slice(start, start + 8).map(async (contactId) => {
+            try {
+              answers.set(contactId, await lookup(contactId));
+            } catch {
+              /* the hub could not say: asked again on the next broadcast */
+            }
+          }),
+        );
+      }
+      if (answers.size) {
+        await this.mutate((stored) => {
+          for (const entry of stored) if (entry.honorary == null && answers.has(entry.contactId)) entry.honorary = answers.get(entry.contactId) ?? null;
+        });
+        tokens = await this.load();
+      }
+    }
+    return tokens.filter((entry) => entry.honorary !== true);
+  }
+
+  /** M232: how many devices a broadcast to everyone would reach (honorary members' devices stay out). */
+  async reachable(): Promise<number> {
+    return (await this.reach()).length;
+  }
 
   status(): { tokens: number; sent: number; failed: number; lastError: string | null; lastSentAt: string | null; authenticated: boolean } {
     return { tokens: this.known, sent: this.sent, failed: this.failed, lastError: this.lastError, lastSentAt: this.lastSentAt, authenticated: Boolean(this.deps.accessToken) };
@@ -96,7 +153,7 @@ export class PushService {
     persona: string | null = null,
     lang: AppLang | null = null,
     now = Date.now(),
-    profile: { name?: string | null; nameEn?: string | null; member?: boolean | null } | null = null,
+    profile: { name?: string | null; nameEn?: string | null; member?: boolean | null; honorary?: boolean | null } | null = null,
   ): Promise<{ tokens: number }> {
     const token = input.token.trim();
     if (!isExpoPushToken(token)) throw new RequestError('invalid', 'رمز الإشعارات غير صالح');
@@ -115,6 +172,7 @@ export class PushService {
           existing.name = profile?.name ?? null;
           existing.nameEn = profile?.nameEn ?? null;
           existing.member = profile?.member ?? null;
+          existing.honorary = profile?.honorary ?? null;
         }
         existing.contactId = contactId;
         existing.platform = platform;
@@ -122,7 +180,7 @@ export class PushService {
         existing.appVersion = appVersion ?? existing.appVersion;
         existing.updatedAt = stamp;
       } else {
-        tokens.push({ token, contactId, persona, lang, ...(profile ? { name: profile.name ?? null, nameEn: profile.nameEn ?? null, member: profile.member ?? null } : {}), platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
+        tokens.push({ token, contactId, persona, lang, ...(profile ? { name: profile.name ?? null, nameEn: profile.nameEn ?? null, member: profile.member ?? null, honorary: profile.honorary ?? null } : {}), platform, deviceName, appVersion, createdAt: stamp, updatedAt: stamp });
       }
     });
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId).length;
@@ -152,7 +210,7 @@ export class PushService {
 
   /** M29: devices whose account carried this persona at the last registration. */
   async tokensForPersona(persona: string, exclude?: Set<number>): Promise<string[]> {
-    return (await this.load())
+    return (await this.reach())
       .filter((entry) => entry.persona === persona && !exclude?.has(entry.contactId))
       .map((entry) => entry.token);
   }
@@ -189,13 +247,13 @@ export class PushService {
 
   /** One message to every registered device (admin posts). */
   async broadcast(message: PushMessage): Promise<PushOutcome> {
-    const tokens = (await this.load()).map((entry) => entry.token);
+    const tokens = (await this.reach()).map((entry) => entry.token);
     return this.deliver(tokens, message, { broadcast: true });
   }
 
   /** M107: a broadcast narrowed per account (interest targeting); devices whose account fails the test stay quiet. */
   async broadcastWhere(message: PushMessage, keep: (contactId: number) => boolean): Promise<PushOutcome> {
-    const tokens = (await this.load()).filter((entry) => keep(entry.contactId)).map((entry) => entry.token);
+    const tokens = (await this.reach()).filter((entry) => keep(entry.contactId)).map((entry) => entry.token);
     return this.deliver(tokens, message, { targeted: true });
   }
 
@@ -206,7 +264,7 @@ export class PushService {
 
   /** M134: a broadcast in two languages — each device hears the language its app last ran in (M122); `messageOf` returning null skips that language. */
   async broadcastLocalized(messageOf: (lang: AppLang) => PushMessage | null): Promise<PushOutcome> {
-    const tokens = await this.load();
+    const tokens = await this.reach();
     const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
     for (const lang of ['ar', 'en'] as const) {
       const batch = tokens.filter((entry) => (entry.lang === 'en') === (lang === 'en')).map((entry) => entry.token);
@@ -225,7 +283,7 @@ export class PushService {
   async broadcastEach(
     choose: (device: { contactId: number; persona: string | null; lang: AppLang | null; name: string | null; nameEn: string | null; member: boolean | null }) => Promise<PushMessage | null> | PushMessage | null,
   ): Promise<PushOutcome> {
-    const tokens = await this.load();
+    const tokens = await this.reach();
     const groups = new Map<string, { message: PushMessage; tokens: string[] }>();
     for (const entry of tokens) {
       const message = await choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null, name: entry.name ?? null, nameEn: entry.nameEn ?? null, member: entry.member ?? null });
@@ -245,14 +303,33 @@ export class PushService {
     return outcome;
   }
 
-  private async deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {
+  /**
+   * M232: a message written per device (the reader's own name in it), sent in full batches whatever the wording —
+   * a hundred members with a hundred names are still one request. Honorary members' devices stay out.
+   */
+  async broadcastPersonal(
+    choose: (device: { contactId: number; persona: string | null; lang: AppLang | null; name: string | null; nameEn: string | null }) => PushMessage | null,
+  ): Promise<PushOutcome> {
+    const items: { to: string; message: PushMessage }[] = [];
+    for (const entry of await this.reach()) {
+      const message = choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null, name: entry.name ?? null, nameEn: entry.nameEn ?? null });
+      if (message) items.push({ to: entry.token, message });
+    }
+    return this.deliverItems(items, { personal: true, devices: items.length });
+  }
+
+  private deliver(tokens: string[], message: PushMessage, context: Record<string, unknown>): Promise<PushOutcome> {
+    return this.deliverItems(tokens.map((to) => ({ to, message })), context);
+  }
+
+  private async deliverItems(items: { to: string; message: PushMessage }[], context: Record<string, unknown>): Promise<PushOutcome> {
     const outcome: PushOutcome = { sent: 0, failed: 0, dropped: 0 };
-    if (!tokens.length) return outcome;
+    if (!items.length) return outcome;
     const dead: string[] = [];
     const fetchImpl = this.deps.fetchImpl ?? fetch;
-    for (let start = 0; start < tokens.length; start += CHUNK) {
-      const batch = tokens.slice(start, start + CHUNK);
-      const messages = batch.map((to) => ({ to, title: message.title, body: message.body, data: message.data ?? {}, sound: 'default', priority: 'high', channelId: 'default' }));
+    for (let start = 0; start < items.length; start += CHUNK) {
+      const batch = items.slice(start, start + CHUNK);
+      const messages = batch.map(({ to, message }) => ({ to, title: message.title, body: message.body, data: message.data ?? {}, sound: 'default', priority: 'high', channelId: 'default' }));
       try {
         const response = await fetchImpl(EXPO_PUSH_URL, {
           method: 'POST',
@@ -274,7 +351,7 @@ export class PushService {
           outcome.failed += 1;
           const reason = ticket.details?.error ?? ticket.message ?? 'unknown';
           this.lastError = reason;
-          if (ticket.details?.error === 'DeviceNotRegistered') dead.push(batch[index] as string);
+          if (ticket.details?.error === 'DeviceNotRegistered') dead.push((batch[index] as { to: string }).to);
           this.deps.log.warn({ ...context, reason }, 'push ticket error');
         });
       } catch (error) {
@@ -295,7 +372,7 @@ export class PushService {
     this.sent += outcome.sent;
     this.failed += outcome.failed;
     if (outcome.sent) this.lastSentAt = new Date().toISOString();
-    this.deps.log.info({ ...context, ...outcome, title: message.title }, 'push');
+    this.deps.log.info({ ...context, ...outcome, title: items[0]?.message.title }, 'push');
     return outcome;
   }
 

@@ -40,7 +40,7 @@ export const pushRoutes: FastifyPluginAsync<PushRoutesOptions> = async (app, { s
       const me = await auth.me(current.session).catch(() => null);
       const persona = me?.persona || null;
       // M176: the first name and membership ride on the token for the personal daily tip.
-      const profile = me ? { name: firstName(me.name) || null, nameEn: firstName(me.en?.name) || null, member: isActiveMember(me) } : null;
+      const profile = me ? { name: firstName(me.name) || null, nameEn: firstName(me.en?.name) || null, member: isActiveMember(me), honorary: me.membership.kind === 'honorary' } : null;
       // M122: the device's app language rides on the token, so member pushes speak it.
       const result = await service.register(current.session.contactId, input, persona, langOf(request), Date.now(), profile);
       return { ok: true, ...result };

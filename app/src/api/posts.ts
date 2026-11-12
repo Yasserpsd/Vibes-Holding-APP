@@ -88,6 +88,20 @@ export function usePost(id: string | undefined) {
   });
 }
 
+/** M232: a popup the management published from the dashboard — title, text, first image and first link as its button. */
+export type AdminPopupItem = { id: string; title: string; body: string; image: string | null; link: { label: string; url: string } | null; publishedAt: string | null; until: string | null };
+
+/** The popups waiting for this viewer (the server already left out what is not his); the device shows each once. */
+export function usePopups(account: string, enabled = true) {
+  return useQuery({
+    // The account is part of the key: signing in or out asks again, since a category popup follows the member.
+    queryKey: ['popups', account],
+    queryFn: () => apiGet<{ popups: AdminPopupItem[] }>('/api/popups'),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
 // M29: the admin composer inside the app (mirrors server /api/admin/app/*; admins only).
 export type MessageAudience = { type: 'all' } | { type: 'persona'; persona: 'neutral' | 'entrepreneur' | 'investor' } | { type: 'member'; contactId: number; name: string };
 export type MemberHit = { id: number; name: string; email: string; persona: string; personaLabel: string };

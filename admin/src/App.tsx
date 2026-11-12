@@ -30,6 +30,8 @@ import { Boundary, Broken, Icon, ShellContext, Sheet, type IconName, type Sectio
 
 const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'home', label: 'الرئيسية', icon: 'home' },
+  // M232 (owner): «أدوات التواصل» — the first thing after the home.
+  { key: 'posts', label: 'أدوات التواصل', icon: 'posts' },
   { key: 'stats', label: 'الإحصائيات', icon: 'stats' },
   { key: 'members', label: 'الأعضاء', icon: 'members' },
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
@@ -54,7 +56,6 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'threads', label: 'المحادثات', icon: 'threads' },
   { key: 'mail', label: 'البريد', icon: 'mail' },
   { key: 'audit', label: 'سجل الإجراءات', icon: 'audit' },
-  { key: 'posts', label: 'المنشورات', icon: 'posts' },
   { key: 'wording', label: 'نصوص التطبيق', icon: 'wording' },
   { key: 'content', label: 'محتوى التطبيق', icon: 'content' },
   { key: 'news', label: 'مصادر الأخبار', icon: 'news' },
@@ -64,7 +65,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
 const MODERATOR_SECTIONS: SectionKey[] = ['posts', 'security'];
 /** A phone's bar holds four sections and «المزيد»; a desk's rail lists them all. */
 const BAR: SectionKey[] = ['home', 'members', 'payments', 'threads'];
-const LEAVE_EDITOR = 'لم تحفظ المنشور بعد. هل تترك الصفحة وتفقد ما كتبته؟';
+const LEAVE_EDITOR = 'لم تحفظ ما كتبته بعد. هل تترك الصفحة وتفقده؟';
 const NOTICE_MS = 6000;
 
 /** `#threads/45@12`: the section, the open conversation, and the member whose sheet is up. The phone's back button walks them. */

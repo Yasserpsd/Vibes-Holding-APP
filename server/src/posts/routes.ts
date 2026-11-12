@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../auth/guard.js';
 import { PERSONAS, type AuthService } from '../auth/service.js';
+import { firstName } from '../companion/tips.js';
 import { hubCall, type HubClient } from '../hub/types.js';
 import { langOf, type AppLang } from '../lang.js';
 import { MediaService } from '../media/service.js';
@@ -20,6 +21,22 @@ const listSchema = z.object({
   before: z.string().max(40).optional(),
 });
 const idSchema = z.object({ id: z.string().uuid() });
+
+/**
+ * M232 (owner: «توصله بإسمه بحيث الناس تحس بالخصوصية»): a management message opens with the reader's own name. The
+ * English app greets with the English name when the account has one.
+ */
+export function greeting(lang: AppLang, name: string | null | undefined, nameEn?: string | null): string {
+  if (lang === 'en') {
+    const shown = (nameEn || name || '').trim();
+    return shown ? `Dear ${shown},` : '';
+  }
+  const shown = (name || '').trim();
+  return shown ? `الأستاذ/ ${shown}،` : '';
+}
+
+const HONORARY_MEMBER = { error: { code: 'honorary', message: 'هذا العضو يحمل العضوية الشرفية، ولا تصله رسائل الإدارة ولا إشعاراتها' } };
+const POPUP_NO_PUSH = { error: { code: 'popup', message: 'البوب أب يظهر داخل التطبيق عند فتحه، ولا يُرسل معه إشعار' } };
 
 const NOT_FOUND = { error: { code: 'not_found', message: 'المنشور غير موجود' } };
 
@@ -69,19 +86,27 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   /** Who is reading: a guest — or a member the hub cannot confirm right now — sees only what is for everyone (M29). */
   const viewerOf = async (request: FastifyRequest): Promise<PostViewer> => {
     const current = await maybeSession(request);
-    return current?.me ? { contactId: current.me.id, persona: current.me.persona } : null;
+    if (!current?.me) return null;
+    const me = current.me;
+    return { contactId: me.id, persona: me.persona, honorary: me.membership.kind === 'honorary', name: firstName(me.name), nameEn: firstName(me.en?.name) };
   };
 
   /** M31: the post as the app reads it, with the poll block as THIS viewer may see it. */
   const viewerPost = async (post: Post, viewer: PostViewer, lang: AppLang = 'ar') => ({
-    ...publicPost(post, lang),
+    ...personal(publicPost(post, lang), viewer, lang),
     ...(post.kind === 'poll' ? { poll: localPoll(post, await polls.view(post, viewer?.contactId ?? null), lang) } : {}),
   });
 
-  /** How many registered devices the post's audience holds right now. */
+  /** M232: a plain management message («رسالة الإدارة») reads as written to this member: his name opens it. */
+  const personal = <T extends { kind: string; body: string }>(shown: T, viewer: PostViewer, lang: AppLang): T => {
+    const hello = shown.kind === 'post' && viewer ? greeting(lang, viewer.name, viewer.nameEn) : '';
+    return hello ? { ...shown, body: shown.body ? `${hello}\n\n${shown.body}` : hello } : shown;
+  };
+
+  /** How many registered devices the post's audience holds right now (M232: honorary members' devices never count). */
   const audienceDevices = async (post: Post): Promise<number> => {
     const audience = audienceOf(post);
-    if (audience.type === 'all') return (await push.summary()).total;
+    if (audience.type === 'all') return push.reachable();
     if (audience.type === 'persona') return (await push.tokensForPersona(audience.persona)).length;
     return (await push.tokensFor(audience.contactId)).length;
   };
@@ -89,21 +114,25 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
   const pushPost = async (post: Post) => {
     // M180: an English app hears the message in English (the stored English; the Arabic only until it exists).
-    const messageIn = (lang: AppLang) => {
+    const messageIn = (lang: AppLang, name: string | null, nameEn: string | null) => {
       const en = lang === 'en' ? post.en : null;
       const text = (en?.body || post.body).replace(/\s+/g, ' ').trim();
       const fallback = lang === 'en' ? 'A new message from the club management' : 'رسالة جديدة من إدارة النادي';
+      // M232: the notification of a management message carries the member's name too.
+      const hello = (post.kind ?? 'post') === 'post' ? greeting(lang, name, nameEn) : '';
+      const line = text.length > 140 ? `${text.slice(0, 139)}…` : text || fallback;
       return {
         title: en?.title || post.title,
-        body: text.length > 140 ? `${text.slice(0, 139)}…` : text || fallback,
+        body: hello ? `${hello} ${line}` : line,
         data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
       };
     };
     const audience = audienceOf(post);
-    const outcome = await push.broadcastEach((device) => {
+    // M232: every device hears its own wording; honorary members' devices are left out by the push service itself.
+    const outcome = await push.broadcastPersonal((device) => {
       if (audience.type === 'persona' && device.persona !== audience.persona) return null;
       if (audience.type === 'member' && device.contactId !== audience.contactId) return null;
-      return messageIn(device.lang === 'en' ? 'en' : 'ar');
+      return messageIn(device.lang === 'en' ? 'en' : 'ar', device.name, device.nameEn);
     });
     if (outcome.sent > 0) await service.markNotified(post.id);
     return outcome;
@@ -137,6 +166,21 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const lang = langOf(request);
       const { posts, more } = await service.listPublished(query.limit, query.before, viewer);
       return { posts: await Promise.all(posts.map((post) => viewerPost(post, viewer, lang))), more };
+    }),
+  );
+
+  /** M232: the popups waiting for this viewer — the app opens the newest one it has not shown yet, once. */
+  app.get(
+    '/api/popups',
+    guard(async (request, reply) => {
+      const viewer = await viewerOf(request);
+      const lang = langOf(request);
+      void reply.header('cache-control', 'no-store');
+      const popups = (await service.listPopups(viewer)).slice(0, 5).map((post) => {
+        const shown = publicPost(post, lang);
+        return { id: shown.id, title: shown.title, body: shown.body, image: shown.images[0] ?? null, link: shown.links[0] ?? null, publishedAt: shown.publishedAt, until: post.popup?.until ?? null };
+      });
+      return { popups };
     }),
   );
 
@@ -206,6 +250,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
           return await reply.code(403).send(MODERATOR_TARGETED);
         }
         if (admin.level !== 'admin' && (isPoll(input) || isPoll(before))) return await reply.code(403).send(MODERATOR_POLL);
+        // M232: an honorary member is kept apart from the management's messages — say so instead of sending into nothing.
+        if (input.audience.type === 'member' && (await auth.honoraryOf(input.audience.contactId))) return await reply.code(409).send(HONORARY_MEMBER);
         await checkMedia(input);
         // A copy: the stored post object is changed in place by the update.
         const previous = before ? { ...before, images: [...before.images] } : null;
@@ -226,7 +272,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         await english?.ensure(post.id);
         // M42 (owner: «بمجرد ما انشر اي رسالة كل الناس يجيلها اشعار فورا»): the FIRST publish notifies
         // its audience by itself; edits never re-notify, and the manual button stays for reminders.
-        if (autoPush && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
+        // M232: a popup opens inside the app by itself and sends no notification.
+        if (autoPush && post.kind !== 'popup' && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
           void pushPost((await service.get(post.id)) ?? post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
         }
         return await reply.code(mode === 'create' ? 201 : 200).send({ post: (await service.get(post.id)) ?? post });
@@ -270,6 +317,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (!post) return reply.code(404).send(NOT_FOUND);
       if (admin.level !== 'admin' && audienceOf(post).type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
       if (admin.level !== 'admin' && isPoll(post)) return reply.code(403).send(MODERATOR_POLL);
+      if (post.kind === 'popup') return reply.code(409).send(POPUP_NO_PUSH);
       if (post.status !== 'published') {
         return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
       }
@@ -312,6 +360,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (!admin) return;
       const input = parse(composeSchema, request.body, reply);
       if (!input) return;
+      if (input.audience.type === 'member' && (await auth.honoraryOf(input.audience.contactId))) return reply.code(409).send(HONORARY_MEMBER);
       const post = await service.create(
         { title: input.title, body: input.body, links: [], images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, audience: input.audience },
         admin.me.name ?? admin.me.email ?? null,

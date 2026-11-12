@@ -56,9 +56,11 @@ export const postInputSchema = z
     videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
     status: z.enum(['draft', 'published']).default('draft'),
     pinned: z.boolean().default(false),
-    kind: z.enum(['post', 'event', 'poll']).default('post'),
+    kind: z.enum(['post', 'event', 'poll', 'popup']).default('post'),
     event: z.object({ date: eventDate, place: z.string().trim().max(200).default(''), onlineUrl: httpUrl.nullish() }).nullish(),
     poll: pollInputSchema.nullish(),
+    /** M232: a popup's last day or moment; absent = it shows until it is unpublished. */
+    popup: z.object({ until: eventDate.nullish() }).nullish(),
     audience: audienceSchema.default({ type: 'all' }),
     /** M43: the dashboard's own English wording; absent or empty = the automatic translation stands. */
     english: z.object({ title: z.string().trim().max(140).default(''), body: z.string().trim().max(6000).default('') }).nullish(),
@@ -90,6 +92,8 @@ export type Post = {
   audience?: PostAudience;
   /** M31: the poll behind a `kind: 'poll'` post; votes live in their own document (polls/service.ts). */
   poll?: PostPoll | null;
+  /** M232: the window of a `kind: 'popup'` post — it opens once per device, over the app, until `until`. */
+  popup?: PostPopup | null;
   /** How the last hand-over to the hub went; `published` = the hub holds a card for this post. */
   hubSync?: PostHubSync;
   /** M43: the English of the owner's words, written once by AI and editable from the dashboard. */
@@ -101,7 +105,15 @@ export type Post = {
 /** M180: `links`/`options` follow the post's link and poll-option order; `hash` = the Arabic they were written from. */
 export type PostEnglish = { title: string; body: string; place: string | null; links?: string[]; options?: string[]; hash?: string };
 
-export type PostKind = 'post' | 'event' | 'poll';
+export type PostKind = 'post' | 'event' | 'poll' | 'popup';
+export type PostPopup = { until: string | null };
+
+/** M232: a popup past its last moment is over; a bare day lasts until that day ends in Riyadh. */
+export function popupOver(popup: PostPopup | null | undefined, now = Date.now()): boolean {
+  if (!popup?.until) return false;
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(popup.until) ? Date.parse(`${popup.until}T23:59:59+03:00`) : Date.parse(popup.until);
+  return !Number.isNaN(end) && end <= now;
+}
 export type PostEvent = { date: string; place: string; onlineUrl: string | null };
 export type PostPollOption = { id: string; label: string };
 export type PostPoll = { options: PostPollOption[]; closesAt: string | null; resultsVisible: boolean };
@@ -113,8 +125,11 @@ export function pollClosed(poll: PostPoll, now = Date.now()): boolean {
 export type PostAudience = { type: 'all' } | { type: 'persona'; persona: Persona } | { type: 'member'; contactId: number; name: string };
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 
-/** Who is reading the feed; null is a guest. */
-export type PostViewer = { contactId: number; persona: string } | null;
+/**
+ * Who is reading the feed; null is a guest. M232: `honorary` = «عضوية شرفية» — such a member is kept apart from
+ * everything the management sends, whatever his category; `name` / `nameEn` greet the reader of a message by name.
+ */
+export type PostViewer = { contactId: number; persona: string; honorary?: boolean; name?: string; nameEn?: string } | null;
 
 export function audienceOf(post: Pick<Post, 'audience'>): PostAudience {
   return post.audience ?? { type: 'all' };
@@ -123,6 +138,8 @@ export function audienceOf(post: Pick<Post, 'audience'>): PostAudience {
 /** M29: a post for everyone is for guests too; a targeted one only for its persona or its member. */
 export function canSee(post: Pick<Post, 'audience'>, viewer: PostViewer): boolean {
   const audience = audienceOf(post);
+  // M232 (owner: «عزل كامل»): an honorary member reads nothing the management sends — not even what is for everyone.
+  if (viewer?.honorary) return false;
   if (audience.type === 'all') return true;
   if (!viewer) return false;
   return audience.type === 'persona' ? viewer.persona === audience.persona : viewer.contactId === audience.contactId;
@@ -202,6 +219,10 @@ export class PostsService {
     return { options, closesAt: input.poll.closesAt ?? null, resultsVisible: input.poll.resultsVisible };
   }
 
+  private static popup(input: PostInput): PostPopup | null {
+    return input.kind === 'popup' ? { until: input.popup?.until ?? null } : null;
+  }
+
   private static videoFile(input: PostInput): Post['video'] {
     return input.videoFile ? { url: input.videoFile.url, poster: input.videoFile.poster ?? null } : null;
   }
@@ -212,10 +233,16 @@ export class PostsService {
 
   /** Published posts the viewer may read: pinned first, then newest; `before` pages by publishedAt. */
   async listPublished(limit: number, before?: string, viewer: PostViewer = null): Promise<{ posts: Post[]; more: boolean }> {
-    const published = (await this.load()).filter((post) => post.status === 'published' && canSee(post, viewer));
+    // M232: a popup is not a message in the inbox; it opens by itself (listPopups).
+    const published = (await this.load()).filter((post) => post.status === 'published' && post.kind !== 'popup' && canSee(post, viewer));
     const ordered = [...published.filter((post) => post.pinned), ...published.filter((post) => !post.pinned)];
     const from = before ? ordered.filter((post) => !post.pinned && (post.publishedAt ?? '') < before) : ordered;
     return { posts: from.slice(0, limit), more: from.length > limit };
+  }
+
+  /** M232: the popups this viewer may see right now, newest first. */
+  async listPopups(viewer: PostViewer = null, now = Date.now()): Promise<Post[]> {
+    return (await this.load()).filter((post) => post.status === 'published' && post.kind === 'popup' && !popupOver(post.popup, now) && canSee(post, viewer));
   }
 
   async get(id: string): Promise<Post | null> {
@@ -243,6 +270,7 @@ export class PostsService {
       kind: input.kind,
       event: PostsService.event(input),
       poll: PostsService.poll(input, null),
+      popup: PostsService.popup(input),
       audience: input.audience,
     };
     await this.mutate((posts) => void posts.push(post));
@@ -255,7 +283,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), poll: PostsService.poll(input, post), audience: input.audience, updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), poll: PostsService.poll(input, post), popup: PostsService.popup(input), audience: input.audience, updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;

@@ -68,6 +68,7 @@ import type { HubClient } from './hub/types.js';
 import { FallbackMailer, HubMailer, LogMailer, parseRecipients, SmtpMailer, type Mailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
 import { NotifyRecipients } from './mail/recipients.js';
+import { isHonorary } from './membership/honorary.js';
 import { membershipRoutes } from './membership/routes.js';
 import { MembershipService } from './membership/service.js';
 import { KeywordClassifier, type Classifier } from './news/classify.js';
@@ -694,6 +695,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const imageVariants = await ImageVariants.create(mediaStore, app.log);
   await app.register(mediaRoutes, { service: media, auth, variants: imageVariants });
   await app.register(backupRoutes, { service: backup, auth });
+  // M232: tokens stored before the honorary flag existed learn it from the hub, once, on the next broadcast.
+  push.setHonoraryLookup(async (contactId) => {
+    const found = await hubClient.call('member_status', { contact_id: contactId });
+    return found.contact?.id === contactId && isHonorary(found.contact);
+  });
   await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests, legacy });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.

@@ -158,6 +158,8 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [pollDay, setPollDay] = useState(() => eventFields(post?.poll?.closesAt ? { date: post.poll.closesAt, place: '', onlineUrl: null } : null).day);
   const [pollTime, setPollTime] = useState(() => eventFields(post?.poll?.closesAt ? { date: post.poll.closesAt, place: '', onlineUrl: null } : null).time);
   const [resultsVisible, setResultsVisible] = useState(post?.poll?.resultsVisible ?? true);
+  // M232: a popup's last day; empty = it shows until it is unpublished.
+  const [popupDay, setPopupDay] = useState(() => eventFields(post?.popup?.until ? { date: post.popup.until, place: '', onlineUrl: null } : null).day);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<UploadConfig>(DEFAULT_UPLOAD_CONFIG);
@@ -307,7 +309,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
       return;
     }
     if (!title.trim()) {
-      setError('اكتب عنوان المنشور أولًا.');
+      setError('اكتب العنوان أولًا.');
       return;
     }
     const cleanLinks = links.filter((link) => link.label.trim() || link.url.trim());
@@ -338,7 +340,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
     const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
     const pollInput: PostPollInput | null = kind === 'poll' ? { options: cleanOptions, closesAt: pollDay ? (pollTime ? `${pollDay}T${pollTime}:00+03:00` : pollDay) : null, resultsVisible } : null;
-    const input: PostInput = { title: title.trim(), body: body.trim(), english: enTitle.trim() || enBody.trim() ? { title: enTitle.trim(), body: enBody.trim() } : null, links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned, kind, event: eventInput, poll: pollInput, audience };
+    const input: PostInput = { title: title.trim(), body: body.trim(), english: enTitle.trim() || enBody.trim() ? { title: enTitle.trim(), body: enBody.trim() } : null, links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned: kind === 'popup' ? false : pinned, kind, event: eventInput, poll: pollInput, popup: kind === 'popup' ? { until: popupDay || null } : null, audience };
     setBusy(true);
     setError(null);
     try {
@@ -383,20 +385,31 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   return (
     <div className="editor-shell">
       <header className="top">
-        <strong>{post ? 'تعديل منشور' : 'منشور جديد'}</strong>
+        <strong>{post ? 'تعديل أداة تواصل' : 'أداة تواصل جديدة'}</strong>
         <button className="link" type="button" onClick={() => onClose(null)}>رجوع بدون حفظ</button>
       </header>
       <div className="page">
         <form className="card editor" onSubmit={(event) => void save(event, post?.status ?? 'draft')}>
           <fieldset>
-            <legend>نوع المنشور</legend>
-            <div className="chips" role="group" aria-label="نوع المنشور">
-              <button type="button" className={kind === 'post' ? 'chip on' : 'chip'} aria-pressed={kind === 'post'} onClick={() => setKind('post')}>رسالة</button>
+            <legend>نوع الأداة</legend>
+            <div className="chips" role="group" aria-label="نوع الأداة">
+              <button type="button" className={kind === 'post' ? 'chip on' : 'chip'} aria-pressed={kind === 'post'} onClick={() => setKind('post')}>رسائل الإدارة</button>
               <button type="button" className={kind === 'event' ? 'chip on' : 'chip'} aria-pressed={kind === 'event'} onClick={() => setKind('event')}>فعالية</button>
               {isAdmin ? (
                 <button type="button" className={kind === 'poll' ? 'chip on' : 'chip'} aria-pressed={kind === 'poll'} onClick={() => setKind('poll')}>استفتاء</button>
               ) : null}
+              <button type="button" className={kind === 'popup' ? 'chip on' : 'chip'} aria-pressed={kind === 'popup'} onClick={() => setKind('popup')}>بوب أب</button>
             </div>
+            {kind === 'post' ? <p className="muted hint">تصل الرسالة إلى «بريد وارد» لدى كل عضو باسمه تلقائيًا: تبدأ بـ «الأستاذ/ [اسمه]،» في التطبيق وفي الإشعار، فلا تكتب الاسم بنفسك.</p> : null}
+            {kind === 'popup' ? (
+              <>
+                <label>
+                  يظهر حتى يوم (اختياري)
+                  <input type="date" dir="ltr" value={popupDay} onChange={(e) => setPopupDay(e.target.value)} />
+                </label>
+                <p className="muted hint">يظهر البوب أب مرة واحدة لكل عضو عند فتح التطبيق: العنوان والنص، وأول صورة، وأول رابط كزر. لا يُرسل معه إشعار ولا يظهر في المواقع. بدون تاريخ يبقى حتى تلغي نشره.</p>
+              </>
+            ) : null}
             {kind === 'poll' ? (
               <>
                 <div className="poll-options">
@@ -476,6 +489,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                   onPick={(member) => setAudience({ type: 'member', contactId: member?.id ?? 0, name: member?.name ?? '' })}
                 />
               ) : null}
+              <p className="muted hint">أصحاب العضوية الشرفية معزولون تمامًا: لا تصلهم رسائل الإدارة ولا البوب أب ولا إشعاراتها، أيًّا كانت فئتهم.</p>
               {audience.type !== 'all' ? <p className="muted hint">الرسالة الموجّهة تصل داخل التطبيق فقط إلى صاحبها، ولا تظهر في المواقع ولا يعرفها المستشار.</p> : null}
             </fieldset>
           ) : null}
@@ -582,7 +596,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             <p className="muted hint">حتى {MAX_IMAGES} صور، وحجم الصورة حتى {megabytes(config.images.maxBytes)} ميجابايت ({typeNames(config.images.types)}).</p>
           </fieldset>
 
-          <fieldset>
+          <fieldset hidden={kind === 'popup'}>
             <legend>الفيديو</legend>
             {videoFile ? (
               <div className="video-preview">
@@ -627,7 +641,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             </label>
           </fieldset>
 
-          <label className="check">
+          <label className="check" hidden={kind === 'popup'}>
             <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
             تثبيت في أعلى الرسائل
           </label>
