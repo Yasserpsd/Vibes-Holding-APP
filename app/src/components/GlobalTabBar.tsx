@@ -20,7 +20,7 @@ const TABS: TabDefinition[] = [
   { key: 'home', path: '/', title: 'tabs.home', icon: 'home', iconOutline: 'home-outline' },
   { key: 'projects', path: '/projects', title: 'tabs.projects', icon: 'briefcase', iconOutline: 'briefcase-outline' },
   { key: 'advisor', path: '/advisor', title: 'tabs.advisor', icon: 'sparkles', iconOutline: 'sparkles-outline' },
-  { key: 'news', path: '/news', title: 'tabs.inbox', icon: 'notifications', iconOutline: 'notifications-outline' },
+  { key: 'news', path: '/news', title: 'tabs.inbox', icon: 'mail', iconOutline: 'mail-outline' },
   { key: 'account', path: '/account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
 

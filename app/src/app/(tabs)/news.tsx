@@ -113,6 +113,22 @@ export default function InboxScreen() {
       subtitle={t('inbox.subtitle')}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
     >
+      {/* M75c (owner): the unread count sits right beside «رسائل الإدارة». */}
+      <FadeInView>
+        <SectionHeader title={t('nav.posts')} badge={unreadPosts} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
+      </FadeInView>
+      {loading ? (
+        <SkeletonCards count={5} />
+      ) : items.length === 0 ? (
+        <Text style={styles.empty}>{t('inbox.empty')}</Text>
+      ) : (
+        items.map((item, index) => (
+          <FadeInView key={item.id} delay={entranceDelay(Math.min(index, 8), 60)}>
+            <InboxRow item={item} fresh={Boolean(item.time && Date.parse(item.time) > seen.inbox)} onPress={() => router.push(item.route)} />
+          </FadeInView>
+        ))
+      )}
+      {/* M232 (owner): «بريد وارد» opens on the management's messages; the day's suggestion comes after them. */}
       {todayTip ? (
         <PopIn>
           <PressScale onPress={() => router.push(todayTip.route as Href)} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={todayTip.title}>
@@ -129,21 +145,6 @@ export default function InboxScreen() {
           </PressScale>
         </PopIn>
       ) : null}
-      {/* M75c (owner): the unread count sits right beside «رسائل الإدارة». */}
-      <FadeInView>
-        <SectionHeader title={t('nav.posts')} badge={unreadPosts} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
-      </FadeInView>
-      {loading ? (
-        <SkeletonCards count={5} />
-      ) : items.length === 0 ? (
-        <Text style={styles.empty}>{t('inbox.empty')}</Text>
-      ) : (
-        items.map((item, index) => (
-          <FadeInView key={item.id} delay={entranceDelay(Math.min(index, 8), 60)}>
-            <InboxRow item={item} fresh={Boolean(item.time && Date.parse(item.time) > seen.inbox)} onPress={() => router.push(item.route)} />
-          </FadeInView>
-        ))
-      )}
     </Screen>
   );
 }

@@ -26,7 +26,8 @@ const TABS: TabDefinition[] = [
   { name: 'projects', title: 'tabs.projects', icon: 'briefcase', iconOutline: 'briefcase-outline' },
   { name: 'advisor', title: 'tabs.advisor', icon: 'sparkles', iconOutline: 'sparkles-outline' },
   // M75 (owner): the news tab became the fixed «الإشعارات» center for every persona.
-  { name: 'news', title: 'tabs.inbox', icon: 'notifications', iconOutline: 'notifications-outline' },
+  // M232 (owner): it is the member's «بريد وارد» / Inbox — an envelope, with the management's messages first.
+  { name: 'news', title: 'tabs.inbox', icon: 'mail', iconOutline: 'mail-outline' },
   { name: 'account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
 
