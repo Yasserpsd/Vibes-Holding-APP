@@ -61,7 +61,8 @@ export function UpdateGate() {
 
 function ForcedUpdate({ message, storeUrls }: { message: string; storeUrls?: AppStatus['storeUrls'] }) {
   const insets = useSafeAreaInsets();
-  const url = Platform.OS === 'ios' ? storeUrls?.ios : storeUrls?.android;
+  // M239: a 426 can raise the cover before the status has answered — the button is there all the same.
+  const url = Platform.OS === 'ios' ? (storeUrls?.ios ?? 'https://apps.apple.com/app/id6825963092') : (storeUrls?.android ?? 'https://play.google.com/store/apps/details?id=com.vcmem.investorsclub');
   return (
     <Modal visible animationType="fade" statusBarTranslucent onRequestClose={() => undefined}>
     <View style={[styles.cover, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xl }]} accessibilityViewIsModal>

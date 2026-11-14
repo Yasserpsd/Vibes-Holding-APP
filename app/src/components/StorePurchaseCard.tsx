@@ -11,7 +11,7 @@ import { FadeInView, PopIn, PressScale, Sheen } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
 import { SupportLink } from '@/components/SupportLink';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import {
@@ -217,11 +217,17 @@ function Progress({ text }: { text: string }) {
   );
 }
 
+/** M239 (owner, 2026-11-14): the server's own /legal/ pages open in the app's language; an external override URL is left as is. */
+export function legalUrl(url: string): string {
+  if (!url.includes('/legal/')) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}lang=${getLang()}`;
+}
+
 function LinkText({ label, url }: { label: string; url: string }) {
   const router = useRouter();
   // M116d (owner): club pages open INSIDE the app — the hosting domain never shows.
   return (
-    <PressScale onPress={() => router.push({ pathname: '/webpage', params: { url, title: label } } as Href)} accessibilityRole="link">
+    <PressScale onPress={() => router.push({ pathname: '/webpage', params: { url: legalUrl(url), title: label } } as Href)} accessibilityRole="link">
       <Text style={styles.link}>{label}</Text>
     </PressScale>
   );

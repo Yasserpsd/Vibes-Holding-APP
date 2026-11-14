@@ -149,3 +149,29 @@ test('M122: the English app reads videos through their stored translation', asyn
   const arabic = await service.list({ page: 1, limit: 10 }, 'ar');
   assert.equal(arabic.items[0]?.title, 'عنوان عربي');
 });
+
+test('M239: the English app never shows Arabic hashtag lines from a video description', async () => {
+  const videosKv = new MemoryKV();
+  const video = { id: 'WF2X6_lXmRo', title: 'Sky Talk', description: 'Our CEO on the market.\n\n#وديني_سكاي #Investing\n#نادي_المستثمرين', publishedAt: '2026-01-01T00:00:00Z', thumbnail: 'https://i.ytimg.com/vi/WF2X6_lXmRo/hqdefault.jpg', firstSeenAt: '2026-01-01T00:00:00Z' };
+  await videosKv.set(VIDEOS_SNAPSHOT_KEY, { channel: null, mode: 'rss', fetchedAt: '2026-01-01T00:00:00Z', lastError: null, videos: [video] });
+  const service = new VideosService({ kv: videosKv, config, log: app.log, blurbs: new TemplateBlurbWriter() });
+  await service.start();
+  const english = await service.list({ page: 1, limit: 10 }, 'en');
+  assert.equal(english.items[0]?.description, 'Our CEO on the market.\n\n#Investing');
+  const arabic = await service.list({ page: 1, limit: 10 }, 'ar');
+  assert.match(arabic.items[0]?.description ?? '', /#وديني_سكاي/u);
+});
+
+test('M239: the Arabic app reads English-only videos through their stored Arabic translation', async () => {
+  const videosKv = new MemoryKV();
+  const video = { id: 'BBBBBBBBBBB', title: 'Market Outlook', description: 'Our CEO on the market.', publishedAt: '2026-01-01T00:00:00Z', thumbnail: 'https://i.ytimg.com/vi/BBBBBBBBBBB/hqdefault.jpg', firstSeenAt: '2026-01-01T00:00:00Z' };
+  await videosKv.set(VIDEOS_SNAPSHOT_KEY, { channel: null, mode: 'rss', fetchedAt: '2026-01-01T00:00:00Z', lastError: null, videos: [video] });
+  const translatorAr: Translator = { mode: 'openai', translate: async (texts) => texts.map((text) => (text ? 'نص عربي' : '')) };
+  const quiet = { ...config, VIDEOS_REFRESH_MINUTES: 0 };
+  const service = new VideosService({ kv: videosKv, config: quiet, log: app.log, blurbs: new TemplateBlurbWriter(), translatorAr });
+  await service.start();
+  assert.equal((await service.list({ page: 1, limit: 10 }, 'ar')).items[0]?.title, 'Market Outlook');
+  await (service as unknown as { writeArabic(v: unknown[]): Promise<void> }).writeArabic([{ ...video }]);
+  assert.equal((await service.list({ page: 1, limit: 10 }, 'ar')).items[0]?.title, 'نص عربي');
+  assert.equal((await service.list({ page: 1, limit: 10 }, 'en')).items[0]?.title, 'Market Outlook');
+});

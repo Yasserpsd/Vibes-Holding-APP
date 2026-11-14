@@ -12,6 +12,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard, GoldGradient } from '@/components/lux';
+import { legalUrl } from '@/components/StorePurchaseCard';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -183,8 +184,8 @@ export default function AccountScreen() {
         <MenuGroup title={t('account.group.more')} icon="ellipsis-horizontal-outline">
           <MenuRow icon="information-circle-outline" label={t('account.menu.about')} onPress={() => router.push('/about')} />
           {/* M116d (owner): legal pages render INSIDE the app — no browser bar, no hosting domain on show. */}
-          {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.termsUrl ?? '', title: t('store.terms') } })} /> : null}
-          {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => router.push({ pathname: '/webpage', params: { url: store.privacyUrl ?? '', title: t('store.privacy') } })} /> : null}
+          {store?.termsUrl ? <MenuRow icon="document-text-outline" label={t('store.terms')} onPress={() => router.push({ pathname: '/webpage', params: { url: legalUrl(store.termsUrl ?? ''), title: t('store.terms') } })} /> : null}
+          {store?.privacyUrl ? <MenuRow icon="shield-outline" label={t('store.privacy')} onPress={() => router.push({ pathname: '/webpage', params: { url: legalUrl(store.privacyUrl ?? ''), title: t('store.privacy') } })} /> : null}
           {/* M118d (owner): deletion left «المزيد» — it lives deep inside الأمان ← إعدادات أمان إضافية. */}
         </MenuGroup>
       </FadeInView>

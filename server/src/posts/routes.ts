@@ -28,8 +28,12 @@ const idSchema = z.object({ id: z.string().uuid() });
  */
 export function greeting(lang: AppLang, name: string | null | undefined, nameEn?: string | null): string {
   if (lang === 'en') {
-    const shown = (nameEn || name || '').trim();
-    return shown ? `Dear ${shown},` : '';
+    // M239 (owner, 2026-11-14): never an Arabic name in English text — no English form yet means a neutral greeting.
+    const english = (nameEn || '').trim();
+    const own = (name || '').trim();
+    const shown = english && !/[؀-ۿ]/.test(english) ? english : /[؀-ۿ]/.test(own) ? '' : own;
+    if (!english && !own) return '';
+    return shown ? `Dear ${shown},` : 'Dear member,';
   }
   const shown = (name || '').trim();
   return shown ? `الأستاذ/ ${shown}،` : '';

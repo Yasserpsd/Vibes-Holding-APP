@@ -75,15 +75,30 @@ export function formatAmount(amount: number | null | undefined): string {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
 
+const ARABIC_LETTERS = /[؀-ۿ]/;
+
+/**
+ * M239 (owner, 2026-11-14): an Arabic name never reaches an English text. The English form of a member's name
+ * (the hub profile's English block) is used when the caller has it; an Arabic-script name otherwise gives nothing,
+ * so the template's own «Member» default speaks. Arabic texts keep the name as it is.
+ */
+export function nameFor(name: string | null | undefined, lang: WaLang, nameEn?: string | null): string {
+  const own = String(name ?? '').trim();
+  if (lang !== 'en') return own;
+  const english = String(nameEn ?? '').trim();
+  if (english && !ARABIC_LETTERS.test(english)) return english;
+  return ARABIC_LETTERS.test(own) ? '' : own;
+}
+
 /** The values for {{1}}, {{2}}… in the order the templates define them (receipt: amount SAR, service, invoice number). */
 export function buildBodyParams(kind: WaKind, vars: TemplateVars, lang: WaLang): string[] {
   if (kind === 'code') return [cleanParam(vars.code, '-')];
   if (NOTICE_KINDS.has(kind)) return (vars.list ?? []).map((value) => cleanParam(value, '-'));
-  if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا')];
-  if (kind === 'affiliate_link') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
+  if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا')];
+  if (kind === 'affiliate_link') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
   const service = cleanParam(vars.service, lang === 'en' ? 'Service' : 'خدمة');
   // M204, in the order the templates were filed.
-  if (kind === 'membership') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.date, '-')];
+  if (kind === 'membership') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.date, '-')];
   if (kind === 'event_ticket') return [cleanParam(vars.event, lang === 'en' ? 'the event' : 'الفعالية'), cleanParam(vars.date, '-'), cleanParam(vars.ticket, '-')];
   if (kind === 'visit_update') return [cleanParam(vars.status, '-')];
   if (kind === 'request_update') return [service, cleanParam(vars.status, '-')];

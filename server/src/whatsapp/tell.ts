@@ -1,9 +1,23 @@
 import { hubCall, type HubClient } from '../hub/types.js';
 import type { PushService } from '../push/service.js';
 import type { WhatsappService } from './service.js';
-import type { NoticeKind } from './templates.js';
+import { nameFor, toLang, type NoticeKind } from './templates.js';
 
-export type TellDeps = { hub: HubClient; push: Pick<PushService, 'langOf'>; whatsapp?: Pick<WhatsappService, 'sendNotice' | 'enabled'> };
+export type TellDeps = {
+  hub: HubClient;
+  push: Pick<PushService, 'langOf'> & Partial<Pick<PushService, 'nameEnOf'>>;
+  whatsapp?: Pick<WhatsappService, 'sendNotice' | 'enabled'>;
+  /** M239: another source of the English form of an account's name; the member's own device (push.nameEnOf) is asked otherwise. */
+  englishName?: (contactId: number) => Promise<string | null>;
+};
+
+/** M239 (owner, 2026-11-14): the name an English notice may carry — English form, else none (never Arabic script). */
+async function nameIn(deps: TellDeps, contactId: number, name: string | null | undefined, lang: string | null | undefined): Promise<string | null> {
+  if (toLang(lang) !== 'en') return name ?? null;
+  const source = deps.englishName ?? ((id: number) => deps.push.nameEnOf?.(id) ?? Promise.resolve(null));
+  const english = await source(contactId).catch(() => null);
+  return nameFor(name, 'en', english) || null;
+}
 
 /**
  * M235: one WhatsApp notice to an account known only by its id. The number and the name are the hub's (rule 2); the
@@ -15,7 +29,7 @@ export async function tellMember(deps: TellDeps, contactId: number, kind: Notice
     const { contact } = await deps.hub.call('member_status', { contact_id: contactId });
     if (!contact || contact.id !== contactId || !String(contact.phone ?? '').trim()) return;
     const lang = (await deps.push.langOf(contactId).catch(() => null)) ?? contact.lang ?? null;
-    await deps.whatsapp.sendNotice(kind, { phone: contact.phone, lang, name: contact.name, ref }, values);
+    await deps.whatsapp.sendNotice(kind, { phone: contact.phone, lang, name: await nameIn(deps, contactId, contact.name, lang), ref }, values);
   } catch {
     // The message in the app and its notification already went out.
   }
@@ -46,7 +60,7 @@ export async function tellAudience(deps: TellDeps & { log?: { info: (data: objec
         }
         seen.add(phone);
         const lang = await deps.push.langOf(account.id).catch(() => null);
-        const result = await deps.whatsapp.sendNotice('admin_message', { phone, lang, name: account.name, ref: `${input.ref}:${account.id}` });
+        const result = await deps.whatsapp.sendNotice('admin_message', { phone, lang, name: await nameIn(deps, account.id, account.name, lang), ref: `${input.ref}:${account.id}` });
         if (result.channel === 'whatsapp' && result.error !== 'already_sent') out.sent += 1;
         else out.skipped += 1;
       }

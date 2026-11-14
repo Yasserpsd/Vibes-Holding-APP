@@ -69,3 +69,26 @@ test('deletion requests validate the e-mail, honeypot and rate limit', async () 
   const limited = await form('email=member9%40example.com');
   assert.equal(limited.statusCode, 429);
 });
+
+test('M239: an explicit language renders one language only, the bare URL stays combined', async () => {
+  const combined = await app.inject({ method: 'GET', url: '/legal/terms' });
+  assert.ok(combined.body.includes('dir="rtl"') && combined.body.includes('Terms of Use'));
+  const en = await app.inject({ method: 'GET', url: '/legal/terms?lang=en' });
+  assert.ok(en.body.includes('<html lang="en" dir="ltr">'));
+  assert.ok(!/[؀-ۿ]/.test(en.body), 'no Arabic letters in the English page');
+  const viaHeader = await app.inject({ method: 'GET', url: '/legal/privacy', headers: { 'x-app-lang': 'en' } });
+  assert.ok(viaHeader.body.includes('<html lang="en" dir="ltr">') && !/[؀-ۿ]/.test(viaHeader.body));
+  assert.ok(viaHeader.body.includes('/legal/account-deletion?lang=en'));
+  const ar = await app.inject({ method: 'GET', url: '/legal/privacy?lang=ar' });
+  assert.ok(ar.body.includes('dir="rtl"') && !ar.body.includes('Privacy Policy'));
+  const del = await app.inject({ method: 'GET', url: '/legal/account-deletion?lang=en' });
+  assert.ok(del.body.includes('lang="en"') && !/[؀-ۿ]/.test(del.body));
+  const bad = await app.inject({
+    method: 'POST',
+    url: '/legal/account-deletion?lang=en',
+    payload: 'email=nope',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  });
+  assert.equal(bad.statusCode, 400);
+  assert.ok(bad.body.includes('valid e-mail') && !/[؀-ۿ]/.test(bad.body));
+});

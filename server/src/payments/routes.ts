@@ -6,7 +6,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
-import { langOf } from '../lang.js';
+import { langOf, type AppLang } from '../lang.js';
 import type { AuthService } from '../auth/service.js';
 import { getServicesContent } from '../content/services.js';
 import type { EnglishCache } from '../englishCache.js';
@@ -56,6 +56,31 @@ function flatQuery(query: unknown): Record<string, string> {
   return out;
 }
 
+/**
+ * M239 (owner, 2026-11-14): the English app shows the service title AND the request answers (labels
+ * and free-text values) in English, same mechanism as the invoice. Display-only; status is untouched.
+ */
+export async function englishPayments<T extends { serviceTitle: string; answers: { label: string; value: string }[] }>(
+  english: Pick<EnglishCache, 'texts'> | undefined,
+  payments: T[],
+  lang: AppLang,
+): Promise<T[]> {
+  if (!english || lang !== 'en' || !payments.length) return payments;
+  const texts = payments.flatMap((payment) => [payment.serviceTitle, ...payment.answers.flatMap((answer) => [answer.label, answer.value])]);
+  const shown = await english.texts(texts, lang).catch(() => texts);
+  let at = 0;
+  return payments.map((payment) => {
+    const serviceTitle = shown[at++] ?? payment.serviceTitle;
+    // `original` keeps what the member typed so Retry re-posts it, not the AI text.
+    const answers = payment.answers.map((answer) => {
+      const label = shown[at++] ?? answer.label;
+      const value = shown[at++] ?? answer.value;
+      return value === answer.value ? { ...answer, label, value } : { ...answer, label, value, original: answer.value };
+    });
+    return { ...payment, serviceTitle, answers };
+  });
+}
+
 /** Payments need a session; the Paymob callback and the browser pages are public (HMAC-checked). */
 export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (app, { service, auth, kv, appScheme, smtpHost, smtpPort, english }) => {
   const requireSession = sessionGuard(auth);
@@ -84,7 +109,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       if (!current) return;
       const payments = await service.list(current.session.contactId);
       // Owner (2026-11-04): the service name reads in English in the English app (translated once, cached).
-      return { payments: english ? await english.rows(payments, ['serviceTitle'], langOf(request)) : payments };
+      return { payments: await englishPayments(english, payments, langOf(request)) };
     }),
   );
 
@@ -96,7 +121,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
       const payment = await service.get(current.session.contactId, params.id);
-      return { payment: english && payment ? ((await english.rows([payment], ['serviceTitle'], langOf(request)))[0] ?? payment) : payment };
+      return { payment: payment ? ((await englishPayments(english, [payment], langOf(request)))[0] ?? payment) : payment };
     }),
   );
 

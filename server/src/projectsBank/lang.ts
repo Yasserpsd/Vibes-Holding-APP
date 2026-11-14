@@ -61,6 +61,9 @@ export function stageName(term: StageTerm | null, lang: AppLang): string | null 
 /** The English mark of an estimated stage, as `stageName` writes it, for texts that quote the Arabic one. */
 export const estimatedMark = (lang: AppLang): string => (lang === 'en' ? ESTIMATED_MARK_EN : ESTIMATED_MARK);
 
+/** M239 (owner, 2026-11-14): a founder's «English» field that holds Arabic letters is not English; treat it as empty. */
+export const latin = (value: string | null | undefined): string | null => (value && !/[؀-ۿ]/.test(value) ? value : null);
+
 type AiEnglish = { lookup(project: PublicProject): ProjectEnglish | null; sector(name: string): string | null };
 let aiEnglish: AiEnglish | null = null;
 
@@ -76,7 +79,7 @@ export function useProjectsEnglish(source: AiEnglish | null): void {
 export function localizeProject(project: PublicProject, lang: AppLang): PublicProject {
   if (lang !== 'en') return project;
   const ai = aiEnglish?.lookup(project) ?? {};
-  const pick = (english: string | null, arabic: string | null, auto?: string): [string | null, string | null] => [english || auto || arabic, null];
+  const pick = (english: string | null, arabic: string | null, auto?: string): [string | null, string | null] => [latin(english) || auto || arabic, null];
   const [title, titleEn] = pick(project.titleEn, project.title, ai.title);
   const [companyName, companyNameEn] = pick(project.companyNameEn, project.companyName, ai.companyName);
   const [founderName, founderNameEn] = pick(project.founderNameEn, project.founderName, ai.founderName);

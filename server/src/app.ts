@@ -39,7 +39,8 @@ import { affiliateRoutes } from './affiliate/routes.js';
 import { AffiliateService } from './affiliate/service.js';
 import { invitesRoutes } from './invites/routes.js';
 import { appLinkRoutes } from './legal/applink.js';
-import { appVersionRoutes, installAppVersionGate } from './appVersion.js';
+import { appVersionEnabled, appVersionRoutes, BASELINE_FLOOR, installAppVersionGate, STORE_APP_VERSION, STORE_MIN_OS } from './appVersion.js';
+import { VersionStats } from './appVersionStats.js';
 import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { EnglishSweep } from './content/englishSweep.js';
@@ -120,13 +121,14 @@ import { AccountDeletionStore } from './auth/deletion.js';
 import { ratingsRoutes } from './ratings/routes.js';
 import { RatingsService } from './ratings/service.js';
 import type { KV } from './store.js';
+import { StoreVersions } from './storeVersions.js';
 import { OffTranslator, OpenAITranslator, type Translator } from './translate.js';
 import { FeedService } from './sync/feed.js';
 import { syncRoutes } from './sync/routes.js';
 import { SyncService, type SyncKey } from './sync/service.js';
 import { OpenAIBlurbWriter, TemplateBlurbWriter, type BlurbWriter } from './videos/blurbs.js';
 import { videosRoutes } from './videos/routes.js';
-import { VideosService } from './videos/service.js';
+import { VIDEOS_ARABIC_SYSTEM, VideosService } from './videos/service.js';
 import { webhookRoutes } from './webhooks/routes.js';
 import { WhatsappClient } from './whatsapp/client.js';
 import { tellAudience, tellMember } from './whatsapp/tell.js';
@@ -189,7 +191,26 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
 
   // M195: the forced-update floor (dashboard value or MIN_APP_VERSION) — an app binary below it gets 426 on every
   // /api call. Installed here, before any route plugin, so every context inherits the hook.
-  installAppVersionGate(app, { kv, envMinVersion: config.MIN_APP_VERSION, requireHeader: config.APP_REQUIRE_VERSION === '1', enabled: config.APP_VERSION_GATE === '1' });
+  // M239: it judges proof only, and each platform's floor follows the version really live in its store (asked hourly;
+  // never in mock mode — tests and the local server stay off the network).
+  const versionStats = new VersionStats(kv);
+  const storeVersions = new StoreVersions({
+    kv,
+    log: app.log,
+    appId: 'com.vcmem.investorsclub',
+    graceHours: config.APP_FLOOR_GRACE_HOURS,
+    baseline: BASELINE_FLOOR,
+    known: STORE_APP_VERSION,
+    knownMinOs: STORE_MIN_OS,
+    reach: async (platform, version) => (await versionStats.reached(platform, version)).reached,
+  });
+  const appVersionGate = { kv, enabled: appVersionEnabled(config), stores: storeVersions, stats: versionStats, log: app.log };
+  installAppVersionGate(app, appVersionGate);
+  if (appVersionGate.enabled && config.HUB_MODE !== 'mock') {
+    const watchStores = () => void storeVersions.refresh().catch((error: unknown) => app.log.error({ err: error }, 'store version watch failed'));
+    setTimeout(watchStores, 15_000).unref();
+    setInterval(watchStores, 3_600_000).unref();
+  }
 
   // The web dashboard lives on its own origin and signs in with Bearer tokens (no cookies): answer only listed origins.
   const adminOrigins = new Set((config.ADMIN_ORIGINS ?? '').split(',').map(trimOrigin).filter(Boolean));
@@ -285,7 +306,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const blurbWriter: BlurbWriter =
     blurbs ?? (config.OPENAI_API_KEY ? new OpenAIBlurbWriter({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log }) : new TemplateBlurbWriter());
   // M122: the same translator turns each video's Arabic lines English once (owner: zero Arabic in the English app).
-  const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, translator, fetchImpl });
+  // M239: and the other way — a video the channel wrote in English only gets its Arabic once, for the Arabic app.
+  const translatorAr: Translator = config.OPENAI_API_KEY
+    ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: VIDEOS_ARABIC_SYSTEM })
+    : new OffTranslator();
+  const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, translator, translatorAr, fetchImpl });
   // Owner (2026-11-04): short texts with no English copy (request answers, workshop file titles, invite texts) — translated once, cached.
   const englishCache = new EnglishCache(kv, translator);
   // M122: the English sweep — finds Arabic showing in the English content and translates it by itself.
@@ -619,7 +644,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(discountsRoutes, { service: discounts, auth });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep, requests });
   await app.register(appStringsRoutes, { kv, auth, sync });
-  await app.register(appVersionRoutes, { kv, auth, envMinVersion: config.MIN_APP_VERSION, requireHeader: config.APP_REQUIRE_VERSION === '1', enabled: config.APP_VERSION_GATE === '1' });
+  await app.register(appVersionRoutes, { ...appVersionGate, auth });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
   const deletionSweep = async (): Promise<void> => {

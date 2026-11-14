@@ -11,7 +11,8 @@ export type Payment = {
   id: string;
   serviceKey: string;
   serviceTitle: string;
-  answers: { key: string; label: string; value: string }[];
+  /** M239: `original` is the member's own text when `value` is its English for display. */
+  answers: { key: string; label: string; value: string; original?: string }[];
   amount: number;
   currency: string;
   memberPrice: boolean;

@@ -1,3 +1,4 @@
+import { isArabic } from '../content/i18n.js';
 import type { AppLang } from '../lang.js';
 
 /**
@@ -231,6 +232,12 @@ export function firstName(name: string | null | undefined): string {
  * rotation walks every service over the days without two members marching in step.
  */
 export function tipFor(audience: TipAudience & { name: string; lang: AppLang; seed: number }, day: number, context: Record<string, string | null>): Tip | null {
+  // M239 (owner, 2026-11-14): English copy never prints an Arabic word. A context value or name still in Arabic is
+  // dropped, so a tip that needs it leaves the pool and one without the name loses it.
+  if (audience.lang === 'en') {
+    context = Object.fromEntries(Object.entries(context).map(([key, value]) => [key, value != null && isArabic(value) ? null : value]));
+    if (isArabic(audience.name)) audience = { ...audience, name: '' };
+  }
   const pool = TIPS.filter((tip) => fits(tip, audience, context));
   if (!pool.length) return null;
   const tip = pool[(day + audience.seed) % pool.length] as TipDef;

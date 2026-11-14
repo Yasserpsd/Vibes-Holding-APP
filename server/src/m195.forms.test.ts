@@ -230,24 +230,26 @@ test('the forced-update floor: an older binary gets 426 on app calls, the status
 
   const current = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android', 'x-app-version': '1.3.0' });
   assert.equal(current.statusCode, 200, current.body);
-  // No version header (a bundle older than M195) is blocked by default (owner: nothing older than the store opens); the dashboard (no platform header) always passes.
+  // M239: a bundle that says nothing about its binary (older than M195) is never judged — that rule told people on
+  // the latest build to update (M200); the dashboard (no platform header) always passes.
   const unversioned = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android' });
-  assert.equal(unversioned.statusCode, 426, unversioned.body);
+  assert.equal(unversioned.statusCode, 200, unversioned.body);
   const dashboard = await get('/api/affiliate', memberToken, { 'x-app-version': '0.1.0' });
   assert.equal(dashboard.statusCode, 200, dashboard.body);
 
-  const status = await get('/api/app/status?version=1.2.0');
+  const status = await get('/api/app/status?version=1.2.0', undefined, { 'x-app-platform': 'ios' });
   assert.equal(status.statusCode, 200, status.body);
   assert.equal(status.json().updateRequired, true);
   assert.equal(status.json().minVersion, '1.3.0');
   assert.match(status.json().storeUrls.ios as string, /apps\.apple\.com/);
-  const fresh = await get('/api/app/status?version=1.3.0');
+  const fresh = await get('/api/app/status?version=1.3.0', undefined, { 'x-app-platform': 'ios' });
   assert.equal(fresh.json().updateRequired, false);
 
   // The dashboard raises the floor; the environment value gives way.
   const raised = await send('PUT', '/api/admin/app/min-version', { minVersion: '1.4.0' }, adminToken);
   assert.equal(raised.statusCode, 200, raised.body);
-  const blocked = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android', 'x-app-version': '1.3.0' });
+  // M239: from 1.3.0 on only the binary's own version is proof (a bundle's number is not); the typed 1.4.0 is held at 1.3.2.
+  const blocked = await get('/api/affiliate', memberToken, { 'x-app-platform': 'android', 'x-app-version': '1.3.2', 'x-app-binary': '1.3.0' });
   assert.equal(blocked.statusCode, 426, blocked.body);
   const cleared = await send('PUT', '/api/admin/app/min-version', { minVersion: '' }, adminToken);
   assert.equal(cleared.json().minVersion, '1.3.0');

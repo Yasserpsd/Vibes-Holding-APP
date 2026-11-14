@@ -18,11 +18,19 @@ import { fetchUploadsViaApi, fetchVideoFeed, isVideoId, resolveChannel, thumbnai
 export const VIDEOS_SNAPSHOT_KEY = 'videos:snapshot';
 export const VIDEO_BLURBS_KEY = 'content:videos:blurbs';
 export const VIDEO_ENGLISH_KEY = 'content:videos:english';
+export const VIDEO_ARABIC_KEY = 'content:videos:arabic';
+
+/** M239 (owner, 2026-11-14): system prompt for the English-to-Arabic translator the app wires into `translatorAr`. */
+export const VIDEOS_ARABIC_SYSTEM =
+  'You translate English YouTube video titles and descriptions of an investors-club app into formal Modern Standard Arabic with a Saudi business tone, never colloquial. Keep personal, company and brand names in Latin letters (Vibes Ventures and Investors Club stay Latin); keep numbers, dates, hashtags, emojis and URLs exactly as they are. Never write the Arabic word for "free"; use "بدون رسوم". Use an en-dash between numbers in a range. Never add, drop or embellish information. Reply ONLY with JSON {"texts": string[]} of the same length and order as the input; empty strings stay empty.';
 
 export type Blurb = { text: string; source: 'ai' | 'template' | 'dashboard'; at: string };
 
 /** M122: the English of one video's Arabic lines, written once by AI; `hash` detects a changed source. */
 export type VideoEnglish = { title: string; description: string; blurb: string; hash: string; at: string };
+
+/** M239: the Arabic of one video whose original title and description are English; `hash` detects a changed source. */
+export type VideoArabic = { title: string; description: string; hash: string; at: string };
 
 export type StoredVideo = VideoEntry & { firstSeenAt: string };
 
@@ -59,7 +67,7 @@ export type VideosPage = {
   updatedAt: string | null;
 };
 
-type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; blurbs: BlurbWriter; translator?: Translator; fetchImpl?: FetchImpl };
+type Deps = { kv: KV; config: Config; log: FastifyBaseLogger; blurbs: BlurbWriter; translator?: Translator; translatorAr?: Translator; fetchImpl?: FetchImpl };
 
 const EMPTY: VideosSnapshot = { channel: null, mode: null, fetchedAt: null, lastError: null, videos: [] };
 
@@ -71,11 +79,32 @@ function englishHash(video: { title: string; description: string }, blurb: strin
   return String(hash);
 }
 
+/**
+ * M239 (owner, 2026-11-14): English mode never shows Arabic. YouTube descriptions carry Arabic hashtag
+ * lines (#وديني_سكاي ...): the tokens go, and a hashtag line that still holds Arabic words goes whole.
+ */
+const ARABIC_HASHTAG = /#[\p{L}\p{N}_]*[؀-ۿ][\p{L}\p{N}_]*/gu;
+export function stripArabicHashtags(text: string): string {
+  const lines = text.split('\n').flatMap((line) => {
+    if (!/#[\p{L}\p{N}_]*[؀-ۿ]/u.test(line)) return [line];
+    const rest = line.replace(ARABIC_HASHTAG, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+    return rest && !isArabic(rest) ? [rest] : [];
+  });
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** English-mode field: the first candidate without Arabic once hashtags are stripped; else the cleaned first. */
+function englishField(...candidates: string[]): string {
+  const cleaned = candidates.filter(Boolean).map(stripArabicHashtags);
+  return cleaned.find((text) => !isArabic(text)) ?? cleaned[0] ?? '';
+}
+
 export class VideosService {
   private snapshot: VideosSnapshot = EMPTY;
   private blurbs: Record<string, Blurb> = {};
   private english: Record<string, VideoEnglish> = {};
-  private timer: NodeJS.Timeout | null = null;
+  private arabic: Record<string, VideoArabic> = {};
+  private timer:NodeJS.Timeout | null = null;
   private running = false;
 
   constructor(private readonly deps: Deps) {}
@@ -84,7 +113,8 @@ export class VideosService {
     this.snapshot = (await this.deps.kv.get<VideosSnapshot>(VIDEOS_SNAPSHOT_KEY)) ?? EMPTY;
     this.blurbs = (await this.deps.kv.get<Record<string, Blurb>>(VIDEO_BLURBS_KEY)) ?? {};
     this.english = (await this.deps.kv.get<Record<string, VideoEnglish>>(VIDEO_ENGLISH_KEY)) ?? {};
-    const minutes = this.deps.config.VIDEOS_REFRESH_MINUTES;
+    this.arabic = (await this.deps.kv.get<Record<string, VideoArabic>>(VIDEO_ARABIC_KEY)) ?? {};
+    const minutes =this.deps.config.VIDEOS_REFRESH_MINUTES;
     if (minutes <= 0) return;
     void this.refresh();
     this.timer = setInterval(() => void this.refresh(), minutes * 60_000);
@@ -140,6 +170,7 @@ export class VideosService {
       const videos = [...known.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
       await this.writeBlurbs(videos);
       await this.writeEnglish(videos);
+      await this.writeArabic(videos);
       this.snapshot = { channel: { ...channel, title }, mode, fetchedAt: now, lastError: null, videos };
       await this.deps.kv.set(VIDEOS_SNAPSHOT_KEY, this.snapshot);
       log.info({ mode, count: videos.length, fresh: entries.length }, 'videos refreshed');
@@ -196,16 +227,40 @@ export class VideosService {
     this.deps.log.info({ translated: jobs.length }, 'video lines translated to English');
   }
 
+  /**
+   * M239 (owner, 2026-11-14): the Arabic app never shows English titles or descriptions. Videos whose original
+   * lines hold no Arabic letters are translated once to formal Arabic (same bounded batch and hash check as English).
+   */
+  private async writeArabic(videos: StoredVideo[]): Promise<void> {
+    const translator = this.deps.translatorAr;
+    if (!translator || translator.mode === 'off') return;
+    const jobs = videos
+      .map((video) => ({ video, hash: englishHash(video, '') }))
+      .filter(({ video, hash }) => this.arabic[video.id]?.hash !== hash && !isArabic(video.title) && !isArabic(video.description))
+      .slice(0, 20);
+    if (!jobs.length) return;
+    const out = await translator.translate(jobs.flatMap(({ video }) => [video.title, video.description]));
+    if (!out) return;
+    const at = new Date().toISOString();
+    jobs.forEach(({ video, hash }, index) => {
+      this.arabic[video.id] = { title: out[index * 2] || video.title, description: out[index * 2 + 1] || video.description, hash, at };
+    });
+    await this.deps.kv.set(VIDEO_ARABIC_KEY, this.arabic);
+    this.deps.log.info({ translated: jobs.length }, 'video lines translated to Arabic');
+  }
+
   private toPublic(video: StoredVideo, featuredLabel: string | null = null, lang: AppLang = 'ar'): PublicVideo {
     const en = lang === 'en' ? this.english[video.id] : undefined;
+    const ar = lang === 'ar' ? this.arabic[video.id] : undefined;
+    const blurb = this.blurbs[video.id]?.text ?? '';
     return {
       id: video.id,
-      title: en?.title || video.title,
-      description: en?.description || video.description,
+      title: lang === 'en' ? englishField(en?.title ?? '', video.title) : ar?.title || video.title,
+      description: lang === 'en' ? englishField(en?.description ?? '', video.description) : ar?.description || video.description,
       publishedAt: video.publishedAt,
       thumbnail: video.thumbnail,
       url: videoUrl(video.id),
-      blurb: en?.blurb || (this.blurbs[video.id]?.text ?? ''),
+      blurb: lang === 'en' ? englishField(en?.blurb ?? '', blurb) : blurb,
       featuredLabel,
     };
   }

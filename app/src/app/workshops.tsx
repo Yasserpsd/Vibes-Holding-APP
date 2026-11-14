@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 
 import { useGuide, useMyWorkshops, useRegisterWorkshop, type GuideWorkshop } from '@/api/guide';
 import { useAuth } from '@/auth/AuthProvider';
+import { ClampText } from '@/components/ClampText';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
@@ -101,7 +102,7 @@ function WorkshopCard({
           </Text>
         </View>
       </View>
-      <Text style={[styles.blurb, closed && styles.blurbClosed]}>{workshop.blurb}</Text>
+      <ClampText style={[styles.blurb, closed && styles.blurbClosed]} text={workshop.blurb} />
       <View style={styles.scheduleRow}>
         <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
         <Text style={styles.schedule}>{workshop.schedule}</Text>

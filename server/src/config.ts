@@ -27,12 +27,14 @@ const envSchema = z.object({
   AUTH_ADMIN_ONLY: z.enum(['0', '1']).default('0'),
   // M87: the advisor's daily persona push; '0' kills it cold.
   COMPANION_PUSH: z.enum(['0', '1']).default('1'),
-  // M195: the lowest app binary allowed; older ones get 426 update_required on every call. Empty = the store version (STORE_APP_VERSION in appVersion.ts).
+  // M195, IGNORED since M239: the floor is the owner's baseline, then the version live in each store; his own floor is typed through the admin API under a new key. Kept so an old Railway variable does not fail the boot.
   MIN_APP_VERSION: z.string().trim().default(''),
-  // M195: '1' (default, owner: nothing older than the store opens) also blocks app requests with no x-app-version header (bundles older than M195); '0' lets them through.
+  // M195, IGNORED since M239: a request with no version is never judged (that rule told people on the latest build to update, M200). Kept so an old Railway variable does not fail the boot.
   APP_REQUIRE_VERSION: z.enum(['0', '1']).default('1'),
-  // M200 (owner, 2026-11-05: the forced-update message made members delete the app): the whole gate is OFF unless this is '1'.
-  APP_VERSION_GATE: z.enum(['0', '1']).default('0'),
+  // M239 (owner, 2026-11-14: anyone below 1.3.0 must update, and every new store build retires the one before it): the gate judges only a binary PROVEN older than the floor. Unset = ON for the production app and OFF on the test server (its preview builds are older binaries by design); '0' switches it off anywhere (M200), '1' forces it on.
+  APP_VERSION_GATE: z.enum(['0', '1']).optional(),
+  // M239: hours a new version must have been live in a store before it becomes that platform's floor (review, staged rollout and store caches settle first).
+  APP_FLOOR_GRACE_HOURS: z.coerce.number().min(12).max(24 * 30).catch(24),
   // M179: the advisor's market-move alerts (push when a quote moves sharply); '0' kills it cold. Thresholds live in the dashboard.
   MARKET_ALERTS: z.enum(['0', '1']).default('1'),
   /** M182b: the breaking-news push (money story with a hard-hitting headline); '0' kills it. */

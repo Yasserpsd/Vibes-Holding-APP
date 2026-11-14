@@ -4,7 +4,13 @@
  * section below (store reviewers read English). The wording must stay in sync with the
  * store data-safety forms (docs/STORES.md) — above all the first-party analytics and the
  * AppsFlyer advertising-measurement lines.
+ *
+ * M239 (owner, 2026-11-14): with an explicit `lang` a page renders ONE language (lang/dir set, no
+ * other-language text); without it the combined Arabic + English page stays, because the store
+ * consoles register the bare URLs as the public policy links and reviewers read English.
  */
+
+export type PageLang = 'ar' | 'en';
 
 const BRAND_GOLD = '#C9A227';
 const EFFECTIVE_DATE = '2026-10-16';
@@ -16,8 +22,9 @@ function escape(value: string): string {
 }
 
 /** Long-form article page (the payments htmlPage is a centered card; legal text needs a document layout). */
-export function articlePage(input: { title: string; body: string }): string {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(input.title)}</title>
+export function articlePage(input: { title: string; body: string; lang?: PageLang }): string {
+  const en = input.lang === 'en';
+  return `<!doctype html><html lang="${en ? 'en' : 'ar'}" dir="${en ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(input.title)}</title>
 <style>
 body{margin:0;background:#0B0B0B;color:#EDEDED;font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;line-height:1.9}
 main{max-width:760px;margin:0 auto;padding:40px 20px 60px}
@@ -38,11 +45,21 @@ textarea{min-height:90px;resize:vertical}
 button{display:block;width:100%;margin-top:18px;padding:12px 18px;border-radius:12px;border:none;background:${BRAND_GOLD};color:#0B0B0B;font-weight:700;font-size:16px;font-family:inherit;cursor:pointer}
 .hp{position:absolute;left:-9999px;top:-9999px}
 .brand{margin-top:40px;font-size:12px;color:#7A7A7A;text-align:center}
-</style></head><body><main>${input.body}<div class="brand">تطبيق نادي المستثمرين — شركة المجتمع الافتراضي للاستثمار</div></main></body></html>`;
+</style></head><body><main>${input.body}<div class="brand">${en ? 'Investors Club app — Virtual Community Investment Company' : 'تطبيق نادي المستثمرين — شركة المجتمع الافتراضي للاستثمار'}</div></main></body></html>`;
 }
 
-export function privacyPage(): string {
-  const body = `
+/** Both languages (no explicit lang), or just the asked one; the English block takes an h1 when alone. */
+function compose(lang: PageLang | undefined, ar: string, en: (heading: 'h1' | 'h2') => string): string {
+  if (lang === 'ar') return ar;
+  if (lang === 'en') return `<div class="en">${en('h1')}</div>`;
+  return `${ar}
+<div class="divider"></div>
+<div class="en">${en('h2')}</div>`;
+}
+
+export function privacyPage(lang?: PageLang): string {
+  const q = lang ? `?lang=${lang}` : '';
+  const ar = `
 <h1>سياسة الخصوصية — تطبيق نادي المستثمرين</h1>
 <p class="meta">تاريخ السريان: ${PRIVACY_EFFECTIVE_DATE}</p>
 
@@ -83,18 +100,16 @@ export function privacyPage(): string {
 <p>نشارك الحد الأدنى اللازم مع مزودي التشغيل: Apple وGoogle (شراء العضوية من المتجر)، RevenueCat (حالة الاشتراك)، Paymob (مدفوعات الخدمات)، Expo (توصيل الإشعارات)، ومزود معالجة لغوية لتوليد ردود المستشار، وAppsFlyer وشبكات الإعلان المذكورة في قسم «قياس الإعلانات». ولا يتلقى أي منهم أكثر مما تتطلبه مهمته.</p>
 
 <h2>الاحتفاظ بالبيانات وحذف الحساب</h2>
-<p>نحتفظ ببياناتك ما دام حسابك قائمًا. يمكنك حذف حسابك نهائيًا من داخل التطبيق (تبويب «حسابي» ← «حذف الحساب») أو عبر <a href="/legal/account-deletion">صفحة طلب حذف الحساب</a>. عند الحذف تُزال بيانات حسابك وملفك الشخصي ورموز إشعاراتك؛ وقد نحتفظ بسجلات المدفوعات للمدد التي تفرضها الأنظمة المالية، وتبقى أرقام الاستخدام المجمعة لأنها لا ترتبط بهوية أحد.</p>
+<p>نحتفظ ببياناتك ما دام حسابك قائمًا. يمكنك حذف حسابك نهائيًا من داخل التطبيق (تبويب «حسابي» ← «حذف الحساب») أو عبر <a href="/legal/account-deletion${q}">صفحة طلب حذف الحساب</a>. عند الحذف تُزال بيانات حسابك وملفك الشخصي ورموز إشعاراتك؛ وقد نحتفظ بسجلات المدفوعات للمدد التي تفرضها الأنظمة المالية، وتبقى أرقام الاستخدام المجمعة لأنها لا ترتبط بهوية أحد.</p>
 
 <h2>الأمان والأهلية</h2>
 <p>تُنقل البيانات مشفّرة عبر HTTPS وتُقيّد صلاحيات الوصول إليها. خدمات النادي موجهة لمن أتموا 18 عامًا.</p>
 
 <h2>التغييرات على هذه السياسة</h2>
-<p>عند أي تعديل جوهري ننشر النسخة المحدثة في هذه الصفحة مع تاريخ سريان جديد.</p>
-
-<div class="divider"></div>
-<div class="en">
-<h2>Privacy Policy — Investors Club (English summary)</h2>
-<p>Effective date: ${PRIVACY_EFFECTIVE_DATE}. The Investors Club app («نادي المستثمرين») is published by the Virtual Community Investment Company (vcmem.com), part of the Vibes Ventures ecosystem. Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+<p>عند أي تعديل جوهري ننشر النسخة المحدثة في هذه الصفحة مع تاريخ سريان جديد.</p>`;
+  const en = (h: 'h1' | 'h2') => `
+<${h}>Privacy Policy — Investors Club (English summary)</${h}>
+<p>Effective date: ${PRIVACY_EFFECTIVE_DATE}. The Investors Club app${lang === 'en' ? '' : ' («نادي المستثمرين»)'} is published by the Virtual Community Investment Company (vcmem.com), part of the Vibes Ventures ecosystem. Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 <h3>Data we collect</h3>
 <ul>
 <li><b>Account data</b>: name, e-mail, phone number, member category and country, stored on our own vcmem.com accounts platform.</li>
@@ -110,15 +125,15 @@ export function privacyPage(): string {
 <h3>Sharing</h3>
 <p>Minimal data is shared with our processors: Apple/Google (store purchase), RevenueCat (subscription state), Paymob (service payments), Expo (push delivery), a language-model provider (advisor replies), and AppsFlyer and the ad networks named above (advertising measurement).</p>
 <h3>Retention and deletion</h3>
-<p>You can permanently delete your account inside the app (Account tab → Delete account) or through the <a href="/legal/account-deletion">account deletion page</a>. Account and profile data and push tokens are removed; payment records may be retained as required by financial regulations; aggregate usage counts are not linked to any identity.</p>
+<p>You can permanently delete your account inside the app (Account tab → Delete account) or through the <a href="/legal/account-deletion${q}">account deletion page</a>. Account and profile data and push tokens are removed; payment records may be retained as required by financial regulations; aggregate usage counts are not linked to any identity.</p>
 <h3>Security and eligibility</h3>
-<p>Data travels over HTTPS with restricted access. The club's services are intended for adults aged 18 or older.</p>
-</div>`;
-  return articlePage({ title: 'سياسة الخصوصية — نادي المستثمرين', body });
+<p>Data travels over HTTPS with restricted access. The club's services are intended for adults aged 18 or older.</p>`;
+  return articlePage({ title: lang === 'en' ? 'Privacy Policy — Investors Club' : 'سياسة الخصوصية — نادي المستثمرين', body: compose(lang, ar, en), lang });
 }
 
-export function termsPage(): string {
-  const body = `
+export function termsPage(lang?: PageLang): string {
+  const q = lang ? `?lang=${lang}` : '';
+  const ar = `
 <h1>شروط الاستخدام — تطبيق نادي المستثمرين</h1>
 <p class="meta">تاريخ السريان: ${EFFECTIVE_DATE}</p>
 
@@ -139,11 +154,9 @@ export function termsPage(): string {
 <p>المحتوى وفرص الشراكات المعروضة في التطبيق لا تمثل نصيحة استثمارية، وأي قرار تتخذه بناءً عليها مسؤوليتك. أي تقييمات أو أرقام معروضة معلومات تعريفية وليست عرضًا تعاقديًا أو ضمانًا لعوائد.</p>
 
 <h2>التواصل</h2>
-<p>للاستفسارات: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. راجع أيضًا <a href="/legal/privacy">سياسة الخصوصية</a>.</p>
-
-<div class="divider"></div>
-<div class="en">
-<h2>Terms of Use — Investors Club (English summary)</h2>
+<p>للاستفسارات: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. راجع أيضًا <a href="/legal/privacy${q}">سياسة الخصوصية</a>.</p>`;
+  const en = (h: 'h1' | 'h2') => `
+<${h}>Terms of Use — Investors Club (English summary)</${h}>
 <p>Effective date: ${EFFECTIVE_DATE}. Investors Club is a business club published by the Virtual Community Investment Company (vcmem.com), part of the Vibes Ventures ecosystem. The app is not a financial intermediary and provides no investment advice; all information is descriptive and is neither a contractual offer nor a guarantee of returns.</p>
 <ul>
 <li>Accounts are personal and for adults aged 18 or older.</li>
@@ -151,12 +164,14 @@ export function termsPage(): string {
 <li>Some in-app services are paid through a payment provider; the club's team contacts you to deliver them.</li>
 <li>Misuse, unauthorized access and impersonation are prohibited; violating accounts may be suspended.</li>
 </ul>
-<p>Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> — see also the <a href="/legal/privacy">privacy policy</a>.</p>
-</div>`;
-  return articlePage({ title: 'شروط الاستخدام — نادي المستثمرين', body });
+<p>Contact: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> — see also the <a href="/legal/privacy${q}">privacy policy</a>.</p>`;
+  return articlePage({ title: lang === 'en' ? 'Terms of Use — Investors Club' : 'شروط الاستخدام — نادي المستثمرين', body: compose(lang, ar, en), lang });
 }
 
-export function accountDeletionPage(state: 'form' | 'sent' | 'rate_limited' | 'invalid'): string {
+export function accountDeletionPage(state: 'form' | 'sent' | 'rate_limited' | 'invalid', lang?: PageLang): string {
+  const q = lang ? `?lang=${lang}` : '';
+  // M239: the English-only page carries its own English notice and form (the combined page keeps the Arabic form).
+  if (lang === 'en') return accountDeletionPageEn(state, q);
   const notice =
     state === 'sent'
       ? '<div class="card" style="border-color:#2E9E6B"><p style="color:#2E9E6B;font-weight:700">استلمنا طلبك.</p><p>سيتحقق فريق النادي من ملكية الحساب عبر بريدك المسجل ثم يحذف الحساب خلال 30 يومًا كحد أقصى، ويصلك تأكيد بالبريد.</p></div>'
@@ -170,7 +185,7 @@ export function accountDeletionPage(state: 'form' | 'sent' | 'rate_limited' | 'i
       ? ''
       : `
 <div class="card">
-<form method="post" action="/legal/account-deletion">
+<form method="post" action="/legal/account-deletion${q}">
 <label for="email">البريد الإلكتروني المسجل في الحساب (مطلوب)</label>
 <input id="email" name="email" type="email" required maxlength="200" dir="ltr">
 <label for="name">الاسم (اختياري)</label>
@@ -183,7 +198,7 @@ export function accountDeletionPage(state: 'form' | 'sent' | 'rate_limited' | 'i
 <button type="submit">أرسل طلب حذف الحساب</button>
 </form>
 </div>`;
-  const body = `
+  const ar = `
 <h1>حذف الحساب — تطبيق نادي المستثمرين</h1>
 <p class="meta">التطبيق: نادي المستثمرين — الناشر: شركة المجتمع الافتراضي للاستثمار (vcmem.com)، منظومة Vibes Ventures</p>
 ${notice}
@@ -198,15 +213,57 @@ ${form}
 <ul>
 <li><b>يُحذف:</b> حسابك في منصة vcmem.com وبيانات ملفك الشخصي وفئتك ورموز إشعارات أجهزتك.</li>
 <li><b>قد يبقى:</b> سجلات المدفوعات والفواتير للمدد التي تفرضها الأنظمة المالية والمحاسبية، وأرقام الاستخدام المجمعة لأنها لا ترتبط بهوية أحد (معرّف الجهاز العشوائي لا يُربط بالحساب).</li>
-</ul>
-
-<div class="divider"></div>
-<div class="en">
-<h2>Account deletion — Investors Club (English)</h2>
+</ul>`;
+  const en = (h: 'h1' | 'h2') => `
+<${h}>Account deletion — Investors Club (English)</${h}>
 <p>App: Investors Club («نادي المستثمرين») — developer: Virtual Community Investment Company (vcmem.com), Vibes Ventures ecosystem.</p>
 <p><b>Fastest way:</b> inside the app, open the Account tab → Delete account, and confirm with your password. The account is deleted immediately.</p>
 <p><b>Or request deletion here:</b> submit the form above with your registered e-mail; the club's team verifies ownership through that e-mail and completes the deletion within 30 days at most.</p>
-<p><b>Deleted:</b> your vcmem.com account, profile data and push tokens. <b>May be retained:</b> payment records for legally required periods, and aggregate usage counts which are not linked to any identity.</p>
+<p><b>Deleted:</b> your vcmem.com account, profile data and push tokens. <b>May be retained:</b> payment records for legally required periods, and aggregate usage counts which are not linked to any identity.</p>`;
+  return articlePage({ title: 'حذف الحساب — نادي المستثمرين', body: compose(lang, ar, en), lang });
+}
+
+function accountDeletionPageEn(state: 'form' | 'sent' | 'rate_limited' | 'invalid', q: string): string {
+  const notice =
+    state === 'sent'
+      ? '<div class="card" style="border-color:#2E9E6B"><p style="color:#2E9E6B;font-weight:700">We received your request.</p><p>The club team will verify ownership of the account through your registered e-mail and delete it within 30 days at most; you will receive a confirmation by e-mail.</p></div>'
+      : state === 'rate_limited'
+        ? '<div class="card" style="border-color:#D14343"><p style="color:#D14343">We received too many requests from this device. Please try again in an hour.</p></div>'
+        : state === 'invalid'
+          ? '<div class="card" style="border-color:#D14343"><p style="color:#D14343">Enter a valid e-mail address (the one registered on your account).</p></div>'
+          : '';
+  const form =
+    state === 'sent'
+      ? ''
+      : `
+<div class="card">
+<form method="post" action="/legal/account-deletion${q}">
+<label for="email">E-mail registered on the account (required)</label>
+<input id="email" name="email" type="email" required maxlength="200" dir="ltr">
+<label for="name">Name (optional)</label>
+<input id="name" name="name" type="text" maxlength="120">
+<label for="phone">Registered mobile number (optional, helps us verify)</label>
+<input id="phone" name="phone" type="tel" maxlength="30" dir="ltr">
+<label for="note">Note (optional)</label>
+<textarea id="note" name="note" maxlength="1000"></textarea>
+<input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<button type="submit">Send account deletion request</button>
+</form>
 </div>`;
-  return articlePage({ title: 'حذف الحساب — نادي المستثمرين', body });
+  const body = `<div class="en">
+<h1>Account deletion — Investors Club</h1>
+<p class="meta">App: Investors Club — developer: Virtual Community Investment Company (vcmem.com), Vibes Ventures ecosystem.</p>
+${notice}
+<h2>Fastest way: inside the app</h2>
+<p>Open the Account tab → Delete account, and confirm with your password. The account is deleted immediately.</p>
+<h2>Or request deletion here</h2>
+<p>If you cannot sign in to the app, submit the form below with your registered e-mail; the club's team verifies ownership through that e-mail and completes the deletion within 30 days at most.</p>
+${form}
+<h2>What is deleted and what remains</h2>
+<ul>
+<li><b>Deleted:</b> your vcmem.com account, profile data, category and push tokens of your devices.</li>
+<li><b>May be retained:</b> payment and invoice records for legally required periods, and aggregate usage counts which are not linked to any identity (the random device identifier is not tied to the account).</li>
+</ul>
+</div>`;
+  return articlePage({ title: 'Account deletion — Investors Club', body, lang: 'en' });
 }

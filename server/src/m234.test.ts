@@ -71,7 +71,8 @@ test('the honorary notice speaks the language the member runs the app in', async
   assert.equal((await waitFor('club_honorary_membership', '966558323402')).language, 'ar');
   const notice = await waitFor('club_honorary_membership', '966558323403');
   assert.equal(notice.language, 'en');
-  assert.deepEqual(notice.params, ['سلطان']);
+  // M239 (owner, 2026-11-14): an Arabic name never reaches an English notice; the template's own default speaks.
+  assert.deepEqual(notice.params, ['Member']);
 });
 
 test('a membership given from the dashboard reaches WhatsApp; a revoke does not', async () => {

@@ -92,6 +92,26 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     if (out) await service.setEnglish(event.id, { title: out[0] || event.title, blurb: out[1] || event.blurb, place: event.place ? out[2] || event.place : null }, true);
   };
 
+  /** M239: events saved without English (translator was off, or created before M43) get it once; never touches the owner's own wording (enAuto false). */
+  let backfillRunning = false;
+  let backfillAt = 0;
+  const backfillEnglish = async (): Promise<void> => {
+    if (backfillRunning || !translator || translator.mode === 'off' || Date.now() - backfillAt < 600_000) return;
+    backfillRunning = true;
+    backfillAt = Date.now();
+    try {
+      for (const event of await service.missingEnglish()) {
+        const out = await translator.translate([event.title, event.blurb, event.place]);
+        if (out) await service.fillEnglish(event.id, { title: event.title, blurb: event.blurb, place: event.place }, { title: out[0] || event.title, blurb: out[1] || event.blurb, place: event.place ? out[2] || event.place : null });
+      }
+    } catch (error) {
+      app.log.warn({ err: error }, 'agenda: English backfill failed');
+    } finally {
+      backfillRunning = false;
+    }
+  };
+  setTimeout(() => void backfillEnglish(), 60_000).unref();
+
   /** M191: a recording joins an event only once Bunny has it playable; ones already on the event pass as they are. M192: the same for the slides. */
   const checkAttachments = async (input: { recordings?: { videoId: string; image?: string | null }[]; files?: { url: string }[] }, previous: AgendaEvent | null): Promise<void> => {
     const knownVideos = new Set((previous?.recordings ?? []).map((recording) => recording.videoId));
@@ -112,6 +132,7 @@ export const agendaRoutes: FastifyPluginAsync<AgendaRoutesOptions> = async (app,
     guard(async (request) => {
       const who = await whoIs(request);
       const lang = langOf(request);
+      if (lang === 'en') void backfillEnglish();
       const events = await service.forViewer(who?.me ?? null, lang);
       return { events: await Promise.all(events.map((event) => englishParts(event, lang))) };
     }),

@@ -1,7 +1,8 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { guard } from '../auth/guard.js';
+import { isAppLang, langOf, type AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import { accountDeletionPage, privacyPage, termsPage } from './pages.js';
 
@@ -15,6 +16,17 @@ const deletionSchema = z.object({
   // Honeypot: humans never see it; a filled value gets a fake success and no mail.
   website: z.string().max(200).optional().default(''),
 });
+
+/**
+ * M239 (owner, 2026-11-14): a single-language page only when the language is explicit (`?lang=` or the app's
+ * x-app-lang header). The bare URLs are the store-registered policy links and stay the complete combined page.
+ */
+function explicitLang(request: FastifyRequest): AppLang | undefined {
+  const query = (request.query ?? {}) as Record<string, unknown>;
+  const header = request.headers['x-app-lang'];
+  const value = (Array.isArray(header) ? header[0] : header)?.trim().toLowerCase();
+  return isAppLang(query.lang) || isAppLang(value) ? langOf(request) : undefined;
+}
 
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -35,16 +47,16 @@ export const legalRoutes: FastifyPluginAsync<LegalRoutesOptions> = async (app, {
     void reply.send(html);
   };
 
-  app.get('/legal/privacy', (_request, reply) => {
-    sendHtml(reply, privacyPage());
+  app.get('/legal/privacy', (request, reply) => {
+    sendHtml(reply, privacyPage(explicitLang(request)));
   });
 
-  app.get('/legal/terms', (_request, reply) => {
-    sendHtml(reply, termsPage());
+  app.get('/legal/terms', (request, reply) => {
+    sendHtml(reply, termsPage(explicitLang(request)));
   });
 
-  app.get('/legal/account-deletion', (_request, reply) => {
-    sendHtml(reply, accountDeletionPage('form'));
+  app.get('/legal/account-deletion', (request, reply) => {
+    sendHtml(reply, accountDeletionPage('form', explicitLang(request)));
   });
 
   // In-memory per-IP counter: enough against mindless form spam, resets on deploy by design.
@@ -52,17 +64,18 @@ export const legalRoutes: FastifyPluginAsync<LegalRoutesOptions> = async (app, {
   app.post(
     '/legal/account-deletion',
     guard(async (request, reply) => {
+      const lang = explicitLang(request);
       const parsed = deletionSchema.safeParse(request.body);
-      if (!parsed.success) return sendHtml(reply.code(400), accountDeletionPage('invalid'));
+      if (!parsed.success) return sendHtml(reply.code(400), accountDeletionPage('invalid', lang));
       const body = parsed.data;
-      if (body.website) return sendHtml(reply, accountDeletionPage('sent'));
+      if (body.website) return sendHtml(reply, accountDeletionPage('sent', lang));
       const now = Date.now();
       const recent = (hits.get(request.ip) ?? []).filter((at) => now - at < RATE_WINDOW_MS);
-      if (recent.length >= RATE_LIMIT) return sendHtml(reply.code(429), accountDeletionPage('rate_limited'));
+      if (recent.length >= RATE_LIMIT) return sendHtml(reply.code(429), accountDeletionPage('rate_limited', lang));
       recent.push(now);
       hits.set(request.ip, recent);
       notifier.accountDeletionRequested({ email: body.email, name: body.name, phone: body.phone, note: body.note, ip: request.ip });
-      return sendHtml(reply, accountDeletionPage('sent'));
+      return sendHtml(reply, accountDeletionPage('sent', lang));
     }),
   );
 };

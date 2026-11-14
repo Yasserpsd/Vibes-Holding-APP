@@ -5,7 +5,11 @@ import type { Config } from '../config.js';
 import type { DiscountsService } from '../discounts/service.js';
 import { getGoldenContent } from '../content/golden.js';
 import { bannerImages, opportunityImage, serviceImages } from '../content/images.js';
+import { isArabic } from '../content/i18n.js';
+import type { AppLang } from '../lang.js';
+import { localizeProject } from '../projectsBank/lang.js';
 import type { ProjectsService } from '../projectsBank/service.js';
+import type { PublicProject } from '../projectsBank/types.js';
 import type { PushMessage, PushService } from '../push/service.js';
 import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
@@ -187,7 +191,7 @@ export class CompanionService {
     // The mark lands BEFORE the sends: a crash mid-way never double-messages the members.
     await this.deps.kv.set(SENT_KEY, { day: today });
     const drafts = await this.drafts(now);
-    const context = await this.context(now);
+    const contexts = { ar: await this.context(now, 'ar'), en: await this.context(now, 'en') };
     const day = tipDayIndex(now);
     // M87b: members who muted the daily message are skipped.
     const muted = new Set(await this.mutedList());
@@ -202,7 +206,7 @@ export class CompanionService {
         const draft = drafts[persona];
         return { title: name ? `${name}، ${draft.title}` : draft.title, body: draft.body, data: { screen: '/advisor', type: 'companion' } };
       }
-      const tip = tipFor({ persona, member: Boolean(device.member), name, lang, seed: device.contactId }, day, context);
+      const tip = tipFor({ persona, member: Boolean(device.member), name, lang, seed: device.contactId }, day, contexts[lang === 'en' ? 'en' : 'ar']);
       if (!tip) return null;
       return { title: tip.title, body: tip.body, data: { screen: tip.route, type: 'companion', tip: tip.key } };
     });
@@ -211,10 +215,23 @@ export class CompanionService {
   }
 
   /** The live values the tips may name: the day's bank pick and this month's automatic code. */
-  private async context(now: number): Promise<Record<string, string | null>> {
+  private async context(now: number, lang: AppLang = 'ar'): Promise<Record<string, string | null>> {
     const index = dayIndex(now);
     const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12 });
-    const bankPick = bank.items.length ? bank.items[index % bank.items.length] : null;
+    // M239 (owner, 2026-11-14): the English tip names the project and sector in English. The day's pick walks on to the
+    // next project whose English title and sector are clean; none clean = no name (the project tip leaves the pool).
+    let bankPick: PublicProject | null = null;
+    if (lang === 'en') {
+      for (let offset = 0; offset < bank.items.length; offset += 1) {
+        const shown = localizeProject(bank.items[(index + offset) % bank.items.length] as PublicProject, lang);
+        if (shown.title && !isArabic(shown.title) && !(shown.sector?.name && isArabic(shown.sector.name))) {
+          bankPick = shown;
+          break;
+        }
+      }
+    } else {
+      bankPick = bank.items.length ? (bank.items[index % bank.items.length] ?? null) : null;
+    }
     const deal = this.deps.discounts ? await this.deps.discounts.activeMonthly(now).catch(() => null) : null;
     return {
       project: bankPick?.title ?? null,
@@ -231,7 +248,7 @@ export class CompanionService {
    * banner otherwise. Null only while the owner has uploaded nothing for that slot (the app then shows the emblem).
    */
   async tipsFor(me: { id: number; name: string; persona: string | null; member: boolean; nameEn?: string | null }, lang: 'ar' | 'en', days = 5, now = Date.now()): Promise<(Tip & { id: string; day: string; image: string | null })[]> {
-    const context = await this.context(now);
+    const context = await this.context(now, lang);
     const today = tipDayIndex(now);
     const name = firstName(lang === 'en' ? (me.nameEn ?? '') : me.name);
     const pictures = await this.tipPictures();

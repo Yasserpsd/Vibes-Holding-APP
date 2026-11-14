@@ -311,6 +311,11 @@ export class AgendaService {
     return this.toPublic(event, mine, me, lang, lastDay(event) < riyadhDay(Date.now()));
   }
 
+  /** M239: events that never got an English version and whose English the owner did not write (enAuto !== false). */
+  async missingEnglish(): Promise<AgendaEvent[]> {
+    return (await this.loadEvents()).filter((event) => !event.en && event.enAuto !== false);
+  }
+
   /** M43: the English of the event — `auto: false` records the owner's own wording and stops retranslation. */
   async setEnglish(id: string, en: AgendaEnglish | null, auto: boolean): Promise<AgendaEvent | null> {
     return this.mutateEvents((events) => {
@@ -319,6 +324,18 @@ export class AgendaService {
       event.en = en;
       event.enAuto = auto;
       return event;
+    });
+  }
+
+  /** M239: backfill write — inside the events chain, only while the event still has no English, the owner did not write it and the Arabic is the text that was translated. */
+  async fillEnglish(id: string, source: { title: string; blurb: string; place: string }, en: AgendaEnglish): Promise<boolean> {
+    return this.mutateEvents((events) => {
+      const event = events.find((entry) => entry.id === id);
+      if (!event || event.en || event.enAuto === false) return false;
+      if (event.title !== source.title || event.blurb !== source.blurb || event.place !== source.place) return false;
+      event.en = en;
+      event.enAuto = true;
+      return true;
     });
   }
 
@@ -651,14 +668,25 @@ export class AgendaService {
     // M70: a multi-day workshop announces its span in words (never a hyphen between two numbers).
     const days = eventDays(event);
     const when = days.length > 1 ? `من ${days[0]} إلى ${days.at(-1)}` : event.date;
-    const message = {
-      title: 'أجندة النادي 📅',
-      body: `${event.title}${when ? ` — ${when}` : ''}${event.time ? ` ${event.time}` : ''}. سجّل حضورك من التطبيق.`,
-      data: { type: 'agenda', screen: `/agenda/${event.id}` },
+    // M239 (owner, 2026-11-14): each device hears its own app language; an untranslated event never leaks Arabic into the English push.
+    const data = { type: 'agenda', screen: `/agenda/${event.id}` };
+    const whenEn = days.length > 1 ? `from ${englishDay(days[0] ?? event.date)} to ${englishDay(days.at(-1) ?? event.date)}` : englishDay(event.date);
+    const titleEn = event.en?.title && !/[؀-ۿ]/.test(event.en.title) ? event.en.title : 'A new workshop at the club';
+    const messages = {
+      ar: {
+        title: 'أجندة النادي 📅',
+        body: `${event.title}${when ? ` — ${when}` : ''}${event.time ? ` ${event.time}` : ''}. سجّل حضورك من التطبيق.`,
+        data,
+      },
+      en: {
+        title: 'Club Agenda 📅',
+        body: `${titleEn}${whenEn ? ` — ${whenEn}` : ''}${event.time ? ` ${event.time}` : ''}. Register from the app.`,
+        data,
+      },
     };
     // M107: a tagged event reaches the members who picked a matching interest — and everyone who never picked any.
     const tags = (event.interests ?? []).filter(isInterestKey);
-    let outcome;
+    let keep: (contactId: number) => boolean = () => true;
     if (tags.length > 0 && this.deps.interests) {
       const wanted = new Set<number>();
       let savedAny = new Set<number>();
@@ -667,10 +695,9 @@ export class AgendaService {
         for (const id of sets.picked) wanted.add(id);
         savedAny = sets.savedAny;
       }
-      outcome = await this.deps.push.broadcastWhere(message, (contactId) => wanted.has(contactId) || !savedAny.has(contactId));
-    } else {
-      outcome = await this.deps.push.broadcast(message);
+      keep = (contactId) => wanted.has(contactId) || !savedAny.has(contactId);
     }
+    const outcome = await this.deps.push.broadcastEach((device) => (keep(device.contactId) ? messages[device.lang === 'en' ? 'en' : 'ar'] : null));
     if (outcome.sent === 0) throw new RequestError('no_devices', 'لا توجد أجهزة مسجلة للإشعارات بعد', 409);
     return outcome;
   }

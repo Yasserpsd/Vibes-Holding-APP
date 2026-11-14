@@ -72,6 +72,8 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   // M168: the completion-gate fields this bundle draws — the server's wall names only these.
   // M195: the binary version rides along so the server can refuse a build that is too old (426 update_required).
   const headers: Record<string, string> = { accept: 'application/json', 'x-app-lang': getLang(), 'x-app-platform': Platform.OS, 'x-app-gate': GATE_FIELDS.join(','), 'x-app-version': env.appVersion };
+  // M239: the installed binary's own version — the server's forced-update floor judges this, never the bundle's number.
+  if (env.binaryVersion) headers['x-app-binary'] = env.binaryVersion;
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
 

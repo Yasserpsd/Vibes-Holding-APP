@@ -1,3 +1,5 @@
 {
-  "NSUserTrackingUsageDescription": "This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose."
+  "NSUserTrackingUsageDescription": "This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.",
+  "NSMicrophoneUsageDescription": "The app uses the microphone to record your voice question for the advisor.",
+  "NSFaceIDUsageDescription": "The app uses Face ID to unlock the app when the security lock is on."
 }

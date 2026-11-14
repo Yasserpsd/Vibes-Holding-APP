@@ -7,6 +7,19 @@ const APP_ENV: AppEnv = process.env.APP_ENV === 'production' ? 'production' : 't
 const IS_PRODUCTION = APP_ENV === 'production';
 
 const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
+// The version of the binary this tree builds. Bump it with every store build (ASC never attaches a lower one).
+const APP_VERSION = '1.3.3';
+// OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
+// M239: the server's forced-update floor relies on two facts, so they are enforced here — a store build never
+// takes the override (its runtime is always its own version), and a bundle is never published to a runtime NEWER
+// than the tree it is built from (roll back by republishing the older update, not by publishing from an older tree).
+const OTA_RUNTIME = process.env.EAS_BUILD ? '' : (process.env.OTA_RUNTIME_VERSION ?? '').trim();
+const versionParts = (value: string): number[] => value.split('.').map((part) => Number(part) || 0);
+if (OTA_RUNTIME) {
+  const [runtime, own] = [versionParts(OTA_RUNTIME), versionParts(APP_VERSION)];
+  const ahead = [0, 1, 2, 3].map((i) => (runtime[i] ?? 0) - (own[i] ?? 0)).find((diff) => diff !== 0) ?? 0;
+  if (ahead > 0) throw new Error(`OTA_RUNTIME_VERSION=${OTA_RUNTIME} is newer than this tree (${APP_VERSION}): publish from the current tree instead.`);
+}
 const BASE_APP_ID = 'com.vcmem.investorsclub';
 const APP_ID = IS_PRODUCTION ? BASE_APP_ID : `${BASE_APP_ID}.preview`;
 const BRAND_BLACK = '#0B0B0B';
@@ -16,6 +29,10 @@ const BRAND_GOLD = '#C9A227';
 const GOOGLE_SERVICES = process.env.GOOGLE_SERVICES_JSON;
 // Public value: the test API. Production gets its URL from EXPO_PUBLIC_API_URL only.
 const TEST_API_URL = 'https://api-test.vibesholdingsa.com';
+// M239 (owner, 2026-11-14): iOS permission prompts follow the phone's language. The plugin values below are the
+// default-locale (English) Info.plist text; locales/ar.json + en.json carry the per-language InfoPlist.strings.
+const MIC_EN = 'The app uses the microphone to record your voice question for the advisor.';
+const FACE_ID_EN = 'The app uses Face ID to unlock the app when the security lock is on.';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -28,7 +45,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 1.2.0 (M151): adds expo-document-picker (the advisor's PDF button); new runtime, new OTA branch.
   // M217: 1.3.1 stays (its review was withdrawn for a new iOS build with SKAN ids); same runtime, OTAs unchanged.
   // 1.3.2 (owner, 2026-11-10): new store build for the relationship screenshots + ad-platform readiness; new runtime.
-  version: '1.3.2',
+  // 1.3.3 (owner, 2026-11-14: «بيلد جديد بكل التعديلات»): M239 — English/Arabic iOS permission texts (native), the binary's own
+  // version sent to the forced-update floor, three-line texts, language fixes; new runtime (OTAs now go to five).
+  version: APP_VERSION,
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -39,8 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
     fallbackToCacheTimeout: 0,
   },
-  // OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
-  runtimeVersion: process.env.OTA_RUNTIME_VERSION || { policy: 'appVersion' },
+  runtimeVersion: OTA_RUNTIME || { policy: 'appVersion' },
   ios: {
     bundleIdentifier: APP_ID,
     supportsTablet: false,
@@ -79,7 +97,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   // Mobile only: keeps expo export and eas update from bundling a web build.
   platforms: ['ios', 'android'],
-  // M157: per-language iOS permission texts (InfoPlist.strings): the tracking prompt in Arabic and English.
+  // M157: per-language iOS permission texts (InfoPlist.strings): the tracking, microphone and Face ID prompts in Arabic and English.
   locales: { ar: './locales/ar.json', en: './locales/en.json' },
   plugins: [
     'expo-router',
@@ -108,10 +126,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-video',
     // M104: the advisor listens — microphone recording (native module: needs a new build; old
     // binaries hide the mic button via requireOptionalNativeModule).
-    ['expo-audio', { microphonePermission: 'يستخدم التطبيق الميكروفون لتسجيل سؤالك الصوتي للمستشار.' }],
+    ['expo-audio', { microphonePermission: MIC_EN }],
     // M118d: the biometric app lock (native module: works from the NEXT build; older binaries
     // hide the toggle via requireOptionalNativeModule).
-    ['expo-local-authentication', { faceIDPermission: 'يستخدم التطبيق بصمة الوجه لفتح التطبيق عند تفعيل قفل الأمان.' }],
+    ['expo-local-authentication', { faceIDPermission: FACE_ID_EN }],
     // M157: ads attribution (TikTok, Meta, X, LinkedIn, Google Ads) through AppsFlyer — native module, binary
     // 1.3.0; older binaries skip it via lib/adsAttribution.ts. The iOS tracking prompt text lives in `locales`
     // (Arabic + English); this default covers any other device language.

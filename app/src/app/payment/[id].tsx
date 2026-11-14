@@ -114,7 +114,7 @@ export default function PaymentScreen() {
         {payment.status === 'created' ? <AppButton label={t('payment.openCheckout')} icon="card-outline" onPress={() => void reopen()} /> : null}
         {payment.status === 'created' ? <AppButton label={t('payment.refreshStatus')} variant="outline" icon="refresh-outline" onPress={() => void refetch()} /> : null}
         {payment.status === 'failed' ? (
-          <AppButton label={t('payment.retry')} icon="refresh-outline" onPress={() => router.navigate({ pathname: '/service/[key]', params: { key: payment.serviceKey, answers: JSON.stringify(Object.fromEntries(payment.answers.map((answer) => [answer.key, answer.value]))) } })} />
+          <AppButton label={t('payment.retry')} icon="refresh-outline" onPress={() => router.navigate({ pathname: '/service/[key]', params: { key: payment.serviceKey, answers: JSON.stringify(Object.fromEntries(payment.answers.map((answer) => [answer.key, answer.original ?? answer.value]))) } })} />
         ) : null}
         <AppButton label={t('payment.all')} variant="outline" icon="receipt-outline" onPress={() => router.navigate('/payments')} />
       </FadeInView>

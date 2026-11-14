@@ -242,3 +242,25 @@ test('multi-day workshops: days are normalized, the agenda keeps them until the 
 
   await send('DELETE', `/api/admin/agenda/${event.id}`, undefined, adminToken);
 });
+
+test('M239: the English backfill write never overwrites the owner wording or a changed Arabic', async () => {
+  const { AgendaService, AGENDA_EVENTS_KEY } = await import('./agenda/service.js');
+  const kv = new MemoryKV();
+  const base = { date: '2030-01-01', time: '10:00', place: 'الرياض', createdAt: 'x', updatedAt: 'x' };
+  await kv.set(AGENDA_EVENTS_KEY, {
+    events: [
+      { ...base, id: 'a', title: 'ورشة', blurb: 'وصف' },
+      { ...base, id: 'b', title: 'ورشة', blurb: 'وصف', en: { title: 'Owner Wording', blurb: '', place: null }, enAuto: false },
+      { ...base, id: 'c', title: 'ورشة جديدة', blurb: 'وصف' },
+    ],
+  });
+  const service = new AgendaService({ kv } as unknown as ConstructorParameters<typeof AgendaService>[0]);
+  const en = { title: 'Auto', blurb: 'Blurb', place: 'Riyadh' };
+  const source = { title: 'ورشة', blurb: 'وصف', place: 'الرياض' };
+  assert.equal(await service.fillEnglish('a', source, en), true);
+  assert.equal(await service.fillEnglish('b', source, en), false);
+  assert.equal(await service.fillEnglish('c', source, en), false);
+  assert.equal((await service.event('a'))?.en?.title, 'Auto');
+  assert.equal((await service.event('b'))?.en?.title, 'Owner Wording');
+  assert.equal((await service.event('c'))?.en, undefined);
+});

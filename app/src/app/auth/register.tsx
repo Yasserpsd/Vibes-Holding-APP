@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, type ScrollView } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
@@ -74,6 +74,9 @@ export default function RegisterScreen() {
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
   const scrollRef = useRef<ScrollView | null>(null);
   const [form, setForm] = useState<Form>({ ...EMPTY, name: socialName?.trim() ?? '', email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' });
+  // M239 (owner, 2026-11-14: a right e-mail kept its red warning): the handlers read the newest values from here, never
+  // from the render they were created in — an autofill writes a field and leaves it inside one render.
+  const [newest] = useState(() => ({ form }));
   const [showInvite, setShowInvite] = useState(Boolean(invite?.trim()));
   const errors = useFormErrors<Field>(scrollRef);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -117,7 +120,8 @@ export default function RegisterScreen() {
   // Owner (2026-11-07: «خلي التحذير يطلع لما أسيب الخانة… مش وأنا بكتب»): typing never paints a NEW red warning; an
   // existing red goes the moment the value is right, and the verdict on a field comes when the member leaves it (or submits).
   const set = (key: keyof Form) => (value: string) => {
-    const draft = { ...form, [key]: value };
+    const draft = { ...newest.form, [key]: value };
+    newest.form = draft;
     setForm(draft);
     if (!issueOf(key, draft)) errors.clear(key);
     // The number's rule follows the country.
@@ -125,21 +129,31 @@ export default function RegisterScreen() {
     // M211: the proof belongs to one number in one country.
     if (key === 'country') setProof(null);
   };
-  const blur = (key: Field) => () => errors.check(key, issueOf(key, form));
+  const blur = (key: Field) => () => errors.check(key, issueOf(key, newest.form));
   const validate = (proven: PhoneProofState = proof) => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {
-      const message = issueOf(key, form);
+      const message = issueOf(key, newest.form);
       if (message) next[key] = message;
     }
     if ((config?.phoneProofRequired || social) && proven?.kind !== 'done' && !next.phone) next.phone = t('phoneProof.required');
     return next;
   };
   const phoneReady = issueOf('phone', form) === null;
+  // M239: a red warning never outlives its reason — whatever painted it, it goes once the value on screen is right.
+  const shown = errors.errors;
+  const clearError = errors.clear;
+  useEffect(() => {
+    for (const key of ['name', 'email', 'password', 'jobTitle'] as const) {
+      if (shown[key] && issueOf(key, form) === null) clearError(key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
+  }, [form, shown, clearError]);
 
   /** `proven` is the proof that has just arrived, before the state caught up with it. */
   const submit = async (proven: PhoneProofState = proof) => {
     if (busy) return;
+    const latest = newest.form;
     setSubmitError(null);
     // M227 (owner, 2026-11-11: a member pressed the button without confirming and did not understand a code was due):
     // a right number that is not proven yet gets its code at once, the page goes up to the code field, and the
@@ -151,17 +165,17 @@ export default function RegisterScreen() {
       setTimeout(() => errors.scrollTo('phone'), 50);
       return;
     }
-    if (errors.fail(validate(proven), ORDER) || !form.persona) return;
+    if (errors.fail(validate(proven), ORDER) || !latest.persona) return;
     setBusy(true);
     try {
       // M212: the account of a first Google/Apple sign-in is born here, with the form's fields and the proven number.
       if (social) {
         if (proven?.kind !== 'done') return;
         const result = await authApi.socialComplete(social.token, proven.token, {
-          name: form.name.trim(),
-          persona: form.persona,
-          jobTitle: form.jobTitle.trim(),
-          inviteCode: form.inviteCode.trim() || undefined,
+          name: latest.name.trim(),
+          persona: latest.persona,
+          jobTitle: latest.jobTitle.trim(),
+          inviteCode: latest.inviteCode.trim() || undefined,
         });
         if (result.created) markIntroDue();
         await signIn(result.token, result.me);
@@ -173,14 +187,14 @@ export default function RegisterScreen() {
         return;
       }
       const result = await authApi.register({
-        name: form.name.trim(),
-        country: form.country,
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        persona: form.persona,
-        jobTitle: form.jobTitle.trim(),
-        inviteCode: form.inviteCode.trim() || undefined,
+        name: latest.name.trim(),
+        country: latest.country,
+        phone: latest.phone.trim(),
+        email: latest.email.trim(),
+        password: latest.password,
+        persona: latest.persona,
+        jobTitle: latest.jobTitle.trim(),
+        inviteCode: latest.inviteCode.trim() || undefined,
         phoneProof: proven?.kind === 'done' ? proven.token : undefined,
       });
       if (result.pending) {

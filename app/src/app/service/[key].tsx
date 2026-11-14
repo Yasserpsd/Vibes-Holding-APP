@@ -8,6 +8,7 @@ import { errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
 import { amountLabel, paymentsApi, useMonthlyDeal } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
@@ -165,7 +166,7 @@ export default function ServiceScreen() {
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(1)}>
-        <Text style={styles.summary}>{service.summary}</Text>
+        <ClampText style={styles.summary} text={service.summary} />
       </FadeInView>
       {/* M176 (owner: «بعض الأماكن الكلام Bulk»): the description as tidy blocks — sub-headings, fact rows, bullets. */}
       {service.detail ? (

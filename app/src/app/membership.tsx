@@ -6,9 +6,10 @@ import { useMembershipContent, type MembershipGroup, type MembershipItem, type N
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { GlassCard } from '@/components/lux';
+import { ClampText } from '@/components/ClampText';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { PaperCard } from '@/components/paper';
 import { Screen } from '@/components/Screen';
 import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
@@ -18,7 +19,7 @@ import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor } from '@/lib/icons';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 /** Membership benefits as the owner wrote them (server content), grouped; lines can open a screen or WhatsApp. */
 export default function MembershipScreen() {
@@ -50,7 +51,9 @@ export default function MembershipScreen() {
       {/* M81 extension: the owner's membership banner — shows only when he fills the slot. */}
       <SlotBanner slot="membership.banner" />
       <FadeInView delay={entranceDelay(0)}>
-        <Text style={styles.intro}>{data.intro}</Text>
+        <PaperCard>
+          <ClampText text={data.intro} />
+        </PaperCard>
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <MembershipStatusCard
@@ -77,10 +80,10 @@ export default function MembershipScreen() {
       {status === 'signedIn' && me?.persona === 'neutral' && data.neutralReasons ? (
         <>
           <FadeInView delay={entranceDelay(3)}>
-            <View style={styles.reasonsHead}>
+            <PaperCard style={styles.reasonsHead}>
               <Text style={styles.reasonsTitle}>{data.neutralReasons.title}</Text>
-              <Text style={styles.reasonsIntro}>{data.neutralReasons.intro}</Text>
-            </View>
+              <ClampText text={data.neutralReasons.intro} />
+            </PaperCard>
           </FadeInView>
           {data.neutralReasons.items.map((reason, index) => (
             <FadeInView key={reason.title} delay={entranceDelay(index + 4)}>
@@ -103,7 +106,7 @@ export default function MembershipScreen() {
 /** M99d: one of the neutral's ten reasons — a numbered golden badge, the title, its gold pills, the text. */
 function ReasonCard({ index, reason }: { index: number; reason: NeutralReason }) {
   return (
-    <GlassCard style={styles.reason}>
+    <PaperCard style={styles.reason}>
       <View style={styles.reasonHeader}>
         <View style={styles.reasonNumber}>
           <Text style={styles.reasonNumberText}>{index}</Text>
@@ -121,17 +124,17 @@ function ReasonCard({ index, reason }: { index: number; reason: NeutralReason })
           ))}
         </View>
       ) : null}
-      <Text style={styles.reasonText}>{reason.text}</Text>
-    </GlassCard>
+      <ClampText text={reason.text} style={styles.reasonText} />
+    </PaperCard>
   );
 }
 
 function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: MembershipItem) => void }) {
   return (
-    <GlassCard style={styles.group}>
+    <PaperCard style={styles.group}>
       <View style={styles.groupHeader}>
         <View style={styles.iconBox}>
-          <Ionicons name={iconFor(group.icon, 'checkmark-circle-outline')} size={22} color={colors.gold} />
+          <Ionicons name={iconFor(group.icon, 'checkmark-circle-outline')} size={22} color={colors.paperGold} />
         </View>
         <Text style={styles.groupTitle}>{group.title}</Text>
         {group.comingSoon ? (
@@ -148,21 +151,21 @@ function GroupCard({ group, onOpen }: { group: MembershipGroup; onOpen: (item: M
           accessibilityRole={item.link ? 'button' : 'none'}
           style={[styles.item, index > 0 && styles.itemBorder]}
         >
-          <Ionicons name={group.comingSoon ? 'time-outline' : 'checkmark-circle'} size={18} color={group.comingSoon ? colors.textMuted : colors.gold} />
+          <Ionicons name={group.comingSoon ? 'time-outline' : 'checkmark-circle'} size={18} color={group.comingSoon ? colors.paperMuted : colors.paperGold} />
           <Text style={[styles.itemText, group.comingSoon && styles.itemSoon]}>{item.text}</Text>
-          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : chevronForward()} size={16} color={colors.goldLight} /> : null}
+          {item.link ? <Ionicons name={item.link.type === 'whatsapp' ? 'logo-whatsapp' : chevronForward()} size={16} color={colors.paperGold} /> : null}
         </PressScale>
       ))}
-    </GlassCard>
+    </PaperCard>
   );
 }
 
 const styles = themedStyles(() => ({
   guestActions: { gap: spacing.sm },
-  intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   group: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    gap: 0,
   },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   iconBox: {
@@ -171,16 +174,16 @@ const styles = themedStyles(() => ({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.goldSoft,
-    boxShadow: shadows.glowGoldFaint,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.paperBorder,
   },
-  groupTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart, flex: 1 },
-  soon: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark, backgroundColor: colors.goldFaint },
-  soonText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  groupTitle: { ...typography.subtitle, color: colors.paperGold, textAlign: textStart, flex: 1 },
+  soon: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.paperBorder, backgroundColor: colors.paper },
+  soonText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.paperGold },
   // M99d: the neutral's 10-reason page.
   reasonsHead: { gap: spacing.xs },
-  reasonsTitle: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
-  reasonsIntro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
+  reasonsTitle: { ...typography.subtitle, color: colors.paperGold, textAlign: textStart },
   reason: { gap: spacing.sm, padding: spacing.md },
   reasonHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   reasonNumber: {
@@ -190,23 +193,22 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.gold,
-    boxShadow: shadows.glowGoldFaint,
   },
   reasonNumberText: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 22, color: colors.goldInk },
-  reasonTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart, flex: 1 },
+  reasonTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.paperInk, textAlign: textStart, flex: 1 },
   reasonBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   reasonBadge: {
     paddingVertical: 2,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.borderGold,
-    backgroundColor: colors.goldFaint,
+    borderColor: colors.paperBorder,
+    backgroundColor: colors.paper,
   },
-  reasonBadgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
-  reasonText: { ...typography.body, fontSize: 14, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
+  reasonBadgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.paperGold },
+  reasonText: { fontSize: 14, lineHeight: 24 },
   item: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm + 2 },
-  itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  itemText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
-  itemSoon: { color: colors.textSecondary },
+  itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.paperBorder },
+  itemText: { ...typography.body, color: colors.paperInk, textAlign: textStart, flex: 1 },
+  itemSoon: { color: colors.paperInkSoft },
 }));

@@ -11,5 +11,5 @@ export type AppStatus = {
 };
 
 export const appApi = {
-  status: () => apiGet<AppStatus>('/api/app/status', { version: env.appVersion }),
+  status: () => apiGet<AppStatus>('/api/app/status', env.binaryVersion ? { version: env.appVersion, binary: env.binaryVersion } : { version: env.appVersion }),
 };

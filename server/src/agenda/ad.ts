@@ -45,12 +45,26 @@ const copySchema = z.object({
 
 const SYSTEM: Record<AppLang, string> = {
   ar: 'أنت كاتب إعلانات لنادي أعمال سعودي فاخر. اكتب إعلانًا قصيرًا جذابًا ليوم واحد عن ورشة عمل، مرتبطًا بعنوان الورشة وموضوعها، بأسلوب راقٍ ومحفّز يدفع القارئ لحجز مقعده الآن. غيّر الزاوية كل يوم (الفائدة العملية، الندرة، قصة قصيرة، سؤال يلمس القارئ). القواعد: لا تعد بأرباح أو نتائج مالية، لا تخترع معلومات غير موجودة في البيانات، لا تستخدم كلمة «مجاني» ومشتقاتها (استخدم «بدون رسوم»)، لا تضع شرطة بين رقمين، لا إيموجي أكثر من واحد. أعد JSON فقط: {"headline": "عنوان حتى 60 حرفًا", "body": "سطران حتى 220 حرفًا", "cta": "نص زر حتى 24 حرفًا"}.',
-  en: 'You write ads for a premium Saudi business club. Write a short, compelling one-day ad for a workshop, tied to its title and topic, refined and motivating so the reader books a seat now. Change the angle every day (practical benefit, scarcity, a micro-story, a question that touches the reader). Rules: never promise profits or financial results, never invent facts that are not in the data, at most one emoji. Return JSON only: {"headline": "up to 60 characters", "body": "two lines, up to 220 characters", "cta": "button label up to 24 characters"}.',
+  en: 'You write ads for a premium Saudi business club. Write in English only, even when the workshop data is in Arabic (render names and titles in English). Write a short, compelling one-day ad for a workshop, tied to its title and topic, refined and motivating so the reader books a seat now. Change the angle every day (practical benefit, scarcity, a micro-story, a question that touches the reader). Rules: never promise profits or financial results, never invent facts that are not in the data, at most one emoji. Return JSON only: {"headline": "up to 60 characters", "body": "two lines, up to 220 characters", "cta": "button label up to 24 characters"}.',
 };
 
+const ARABIC = /[؀-ۿ]/u;
+
+/**
+ * M239 (owner, 2026-11-14: the English app opened on an Arabic popup): the English ad is English throughout — the
+ * event's stored English, and a plain English line where there is none.
+ */
+function englishTitle(event: AgendaEvent): string {
+  const title = event.en?.title?.trim() ?? '';
+  return title && !ARABIC.test(title) ? title : '';
+}
+
+const isEnglish = (copy: WorkshopAdCopy): boolean => !ARABIC.test(copy.headline + copy.body + copy.cta);
+
 function fallback(event: AgendaEvent, lang: AppLang): WorkshopAdCopy {
+  const title = englishTitle(event);
   return lang === 'en'
-    ? { headline: `This week at the club: ${event.title}`.slice(0, 70), body: 'A practical workshop with tools you can use right away. Seats are limited — book yours in one tap.', cta: 'Book your seat' }
+    ? { headline: (title ? `This week at the club: ${title}` : 'A hands-on workshop at the club this week').slice(0, 70), body: 'A practical workshop with tools you can use right away. Seats are limited — book yours in one tap.', cta: 'Book your seat' }
     : { headline: `«${event.title}»`.slice(0, 70), body: 'ورشة عملية تخرج منها بأدوات تطبّقها مباشرة في عملك. المقاعد محدودة — احجز مقعدك الآن بضغطة واحدة.', cta: 'احجز مقعدك الآن' };
 }
 
@@ -88,18 +102,21 @@ export class WorkshopAdService {
     const stored = await this.deps.kv.get<Stored>(KEY);
     const fresh: Stored = stored && stored.day === day && stored.eventId === event.id ? stored : { day, eventId: event.id, copies: {} };
     let copy = fresh.copies[lang];
+    // A stored English copy with Arabic in it (written before M239) is written again.
+    if (copy && lang === 'en' && !isEnglish(copy)) copy = undefined;
     if (!copy) {
       copy = await this.write(event, lang).catch((error: unknown) => {
         this.deps.log.warn({ err: error }, 'workshop ad: the model did not write, the template did');
         return fallback(event, lang);
       });
+      if (lang === 'en' && !isEnglish(copy)) copy = fallback(event, lang);
       fresh.copies[lang] = copy;
       await this.deps.kv.set(KEY, fresh);
     }
     return {
       ...copy,
       eventId: event.id,
-      title: event.title,
+      title: lang === 'en' ? englishTitle(event) || 'Workshop at the club' : event.title,
       date: event.date,
       dates: event.dates?.length ? event.dates : [event.date],
       time: event.time,
@@ -113,15 +130,16 @@ export class WorkshopAdService {
 
   private async write(event: AgendaEvent, lang: AppLang): Promise<WorkshopAdCopy> {
     if (!this.deps.apiKey) return fallback(event, lang);
+    const english = lang === 'en' ? event.en : null;
     const facts = {
-      title: event.title,
+      title: english?.title || event.title,
       dates: event.dates?.length ? event.dates : [event.date],
       time: event.time,
       mode: event.mode,
       feeSar: event.feeSar,
       originalFeeSar: event.originalFeeSar ?? 0,
       memberFeeSar: event.memberFeeSar ?? 0,
-      about: event.blurb.slice(0, 700),
+      about: (english?.blurb || event.blurb).slice(0, 700),
     };
     const fetchImpl = this.deps.fetchImpl ?? fetch;
     const response = await fetchImpl(ENDPOINT, {

@@ -13,6 +13,7 @@ import { useLatestPosts } from '@/api/posts';
 import { useProjectsList } from '@/api/queries';
 import { useVideos } from '@/api/videos';
 import { useAuth } from '@/auth/AuthProvider';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AffiliateHomeCard } from '@/components/AffiliateHomeCard';
 import { AgendaBlock } from '@/components/AgendaBlock';
@@ -350,7 +351,7 @@ export default function HomeScreen() {
           <Text style={styles.heroTitle}>{content.hero.title}</Text>
         </FadeInView>
         <FadeInView delay={250} offset={8}>
-          <Text style={styles.heroSubtitle}>{greeting ? `${greeting} ${heroSubtitle}` : heroSubtitle}</Text>
+          <ClampText style={styles.heroSubtitle} text={greeting ? `${greeting} ${heroSubtitle}` : heroSubtitle} />
         </FadeInView>
         <FadeInView delay={330} offset={0}>
           <GoldHairline style={styles.heroDivider} />
@@ -451,7 +452,7 @@ function AdvisorCompanionCard({ block, onChip, onOpen }: { block: NonNullable<Ho
         </Floating>
         <View style={styles.advisorTexts}>
           <Text style={styles.advisorTitle}>{block.title}</Text>
-          <Text style={styles.advisorSubtitle}>{block.subtitle}</Text>
+          <ClampText style={styles.advisorSubtitle} text={block.subtitle} />
         </View>
       </View>
       <View style={styles.advisorChips}>
@@ -483,7 +484,7 @@ function PodcastStageCard({ block, onPress }: { block: NonNullable<HomeContent['
         </Floating>
         <View style={styles.podcastTexts}>
           <Text style={styles.podcastTitle}>{block.title}</Text>
-          <Text style={styles.podcastSubtitle}>{block.subtitle}</Text>
+          <Text style={styles.podcastSubtitle} numberOfLines={3}>{block.subtitle}</Text>
           <View style={styles.podcastCtaRow}>
             <Text style={styles.podcastCta}>{block.cta}</Text>
             <Ionicons name={chevronForward()} size={14} color={colors.gold} />
@@ -499,7 +500,7 @@ function SavingsCard({ block, onPress }: { block: NonNullable<HomeContent['savin
   return (
     <GlassCard radius={radii.xl} style={styles.savingsCard}>
       <Text style={styles.savingsTitle}>{block.title}</Text>
-      <Text style={styles.savingsSubtitle}>{block.subtitle}</Text>
+      <ClampText style={styles.savingsSubtitle} text={block.subtitle} />
       <View style={styles.savingsList}>
         {block.items.map((item) => (
           <View key={item} style={styles.savingsRow}>
@@ -530,7 +531,7 @@ function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membersh
         </Floating>
         <View style={styles.membershipTexts}>
           <Text style={styles.membershipTitle}>{block.title}</Text>
-          <Text style={styles.membershipSubtitle}>{block.subtitle}</Text>
+          <Text style={styles.membershipSubtitle} numberOfLines={3}>{block.subtitle}</Text>
           <View style={styles.membershipCtaRow}>
             <Text style={styles.membershipCta}>{block.cta}</Text>
             <Ionicons name={chevronForward()} size={14} color={colors.gold} />

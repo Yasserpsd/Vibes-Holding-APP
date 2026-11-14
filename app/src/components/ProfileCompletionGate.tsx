@@ -121,6 +121,17 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     }
   };
   const current: Record<Field, string> = { name, contactEmail, phone, persona, jobTitle };
+  // M239 (owner, 2026-11-14: a right e-mail kept its red warning on the sign-up form): a warning never outlives its
+  // reason — an autofill can write a field and leave it inside one render, and the leave then judges the old value.
+  const shown = form.errors;
+  const clearError = form.clear;
+  useEffect(() => {
+    const values = { name, contactEmail, jobTitle };
+    for (const key of ['name', 'contactEmail', 'jobTitle'] as const) {
+      if (shown[key] && issueOf(key, values[key]) === null) clearError(key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
+  }, [name, contactEmail, jobTitle, shown, clearError]);
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {

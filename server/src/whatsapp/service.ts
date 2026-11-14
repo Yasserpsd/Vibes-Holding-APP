@@ -6,7 +6,7 @@ import type { Mailer } from '../mail/mailer.js';
 import type { KV } from '../store.js';
 import type { NewTemplate, WaTemplate, WhatsappClient } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
-import { amountText, firstName, NOTICE_KINDS, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type NoticeKind, type TemplateVars, type WaKind, type WaLang } from './templates.js';
+import { amountText, firstName, nameFor, NOTICE_KINDS, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type NoticeKind, type TemplateVars, type WaKind, type WaLang } from './templates.js';
 
 /** What every send answers. `error` explains a fallback too (channel `email`/`none` + why WhatsApp was not used). */
 export type WaResult = { channel: 'whatsapp' | 'email' | 'none'; messageId?: string; error?: string };
@@ -103,7 +103,8 @@ export class WhatsappService {
    * template's first variable, `values` the rest in order. No e-mail of its own: the caller's mail goes out as before.
    */
   sendNotice(kind: NoticeKind, input: Omit<SendInput, 'email'> & { name?: string | null }, values: (string | number | null | undefined)[] = []): Promise<WaResult> {
-    const greeting = input.name === undefined ? [] : [firstName(input.name) || (toLang(input.lang) === 'en' ? 'Member' : 'عضونا')];
+    // M239: an Arabic-script name never opens an English notice, whoever the caller is.
+    const greeting = input.name === undefined ? [] : [firstName(nameFor(input.name, toLang(input.lang))) || (toLang(input.lang) === 'en' ? 'Member' : 'عضونا')];
     return this.deliver(kind, input, { list: [...greeting, ...values] });
   }
 
@@ -254,9 +255,11 @@ export class WhatsappService {
     return rows;
   }
 
-  private async deliver(kind: WaKind, input: SendInput, vars: TemplateVars): Promise<WaResult> {
+  private async deliver(kind: WaKind, input: SendInput, given: TemplateVars): Promise<WaResult> {
     try {
       const lang = toLang(input.lang);
+      // M239: the same rule for every template and its e-mail fallback — English texts carry no Arabic-script name.
+      const vars: TemplateVars = given.name == null ? given : { ...given, name: nameFor(given.name, lang) };
       const phone = normalizePhone(input.phone);
       const ref = input.ref?.trim() || null;
       if (ref) {

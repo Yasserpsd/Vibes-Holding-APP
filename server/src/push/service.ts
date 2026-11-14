@@ -389,6 +389,13 @@ export class PushService {
     return mine[0]?.lang ?? null;
   }
 
+  /** M239: the English form of the member's name as his own app last reported it (his newest device), or null. */
+  async nameEnOf(contactId: number): Promise<string | null> {
+    const mine = (await this.load()).filter((entry) => entry.contactId === contactId && entry.nameEn?.trim());
+    mine.sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
+    return mine[0]?.nameEn?.trim() || null;
+  }
+
   private async sendLocalized(contactId: number, messageOf: (lang: AppLang) => PushMessage): Promise<PushOutcome> {
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId);
     const english = mine.filter((entry) => entry.lang === 'en').map((entry) => entry.token);

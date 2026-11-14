@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useGolden } from '@/api/queries';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GoldenCompanyCard } from '@/components/GoldenCompanyCard';
@@ -66,7 +67,7 @@ export default function GoldenScreen() {
               />
             </View>
             <Text style={styles.heroTitle}>{content.umbrella.name}</Text>
-            <Text style={styles.intro}>{content.intro}</Text>
+            <ClampText style={styles.intro} text={content.intro} />
             <View style={styles.valueRow}>
               <View style={styles.valueBadge}>
                 <Text style={styles.valueLabel}>{t('golden.portfolioValue')}</Text>

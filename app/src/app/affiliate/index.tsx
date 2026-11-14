@@ -14,7 +14,7 @@ import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate, formatNumber } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
@@ -188,7 +188,7 @@ export default function AffiliateScreen() {
           {data.status === 'rejected' ? (
             <Notice
               tone="warning"
-              text={data.application?.adminNote ? `${t('affiliate.rejected')}\n${t('affiliate.adminNote')}: ${data.application.adminNote}` : t('affiliate.rejected')}
+              text={data.application?.adminNote && !(getLang() === 'en' && /[؀-ۿ]/.test(data.application.adminNote)) ?`${t('affiliate.rejected')}\n${t('affiliate.adminNote')}: ${data.application.adminNote}` : t('affiliate.rejected')}
             />
           ) : null}
           <FadeInView delay={entranceDelay(0)}>
@@ -275,7 +275,7 @@ function PayoutRow({ payout }: { payout: AffiliatePayout }) {
       <View style={styles.rowText}>
         <SarText style={styles.rowName}>{`${formatNumber(payout.amount)} ريال`}</SarText>
         <Text style={styles.rowState}>{`${t(stateKey)} · ${formatArabicDate(payout.requestedAt)}`}</Text>
-        {payout.adminNote ? <Text style={styles.rowState}>{payout.adminNote}</Text> : null}
+        {payout.adminNote && !(getLang() === 'en' && /[؀-ۿ]/.test(payout.adminNote)) ? <Text style={styles.rowState}>{payout.adminNote}</Text> : null}
       </View>
     </GlassCard>
   );

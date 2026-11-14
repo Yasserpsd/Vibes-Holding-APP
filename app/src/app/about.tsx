@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Linking, StyleSheet, Text, View } from 'react-native';
 
 import { useAboutContent, type AboutSection } from '@/api/content';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
@@ -48,7 +49,7 @@ export default function AboutScreen() {
           </View>
         </Floating>
         <Text style={styles.title}>{data.title}</Text>
-        <Text style={styles.intro}>{data.intro}</Text>
+        <ClampText style={styles.intro} text={data.intro} />
       </FadeInView>
 
       {/* M81 extension: the owner's about banner — shows only when he fills the slot. */}
@@ -110,9 +111,7 @@ function Section({ section }: { section: AboutSection }) {
         <Text style={styles.sectionTitle}>{section.title}</Text>
       </View>
       {section.paragraphs.map((paragraph, index) => (
-        <Text key={index} style={styles.paragraph}>
-          {paragraph}
-        </Text>
+        <ClampText key={index} style={styles.paragraph} text={paragraph} />
       ))}
       {section.bullets.map((bullet) => (
         <View key={bullet} style={styles.bullet}>

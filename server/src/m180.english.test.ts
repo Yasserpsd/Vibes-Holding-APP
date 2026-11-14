@@ -156,3 +156,67 @@ test('Projects Bank: AI fills what the founder left without English; contacts ne
     useProjectsEnglish(built.projectsEnglish);
   }
 });
+
+test('M239: a title or company name that stays Arabic is repaired, only the missing fields are asked', async () => {
+  const seen: string[][] = [];
+  let stubborn = true;
+  const translator: Translator = {
+    mode: 'openai',
+    // Like the model that hands a short Arabic name back unchanged.
+    translate: async (texts) => {
+      seen.push(texts);
+      return texts.map((text) => (text ? (stubborn && ARABIC.test(text) && text.length < 8 ? text : `EN-${text.length}`) : ''));
+    },
+  };
+  const current = project({ title: 'آمن', companyName: 'شركة الأمان', founderName: 'محمد العتيبي', detailsEn: 'Founder English details' });
+  const english = new ProjectsEnglish({ kv: new MemoryKV(), translator, log: Fastify({ logger: false }).log, all: () => [current] });
+  useProjectsEnglish(english);
+  try {
+    await english.run();
+    const shown = localizeProject(current, 'en');
+    assert.ok(!ARABIC.test(shown.title), 'the short title gets a Latin spelling');
+    assert.equal(shown.title, 'Amn');
+    assert.ok(!ARABIC.test(shown.companyName ?? ''));
+    assert.ok(!ARABIC.test(shown.founderName ?? ''));
+    const calls = seen.length;
+    await english.run();
+    assert.equal(seen.length, calls, 'a repaired project is not asked again');
+  } finally {
+    stubborn = false;
+    useProjectsEnglish(built.projectsEnglish);
+  }
+});
+
+test('M239: a founder «English» field holding Arabic letters is not English (live rows 7018 / 6584)', async () => {
+  const seen: string[][] = [];
+  const translator: Translator = { mode: 'openai', translate: async (texts) => { seen.push(texts); return texts.map((text) => (text ? 'Aman Co' : '')); } };
+  const live = project({ title: 'آمن', titleEn: 'آمن', companyName: 'Cenemato', companyNameEn: 'سينما سيارات', founderName: 'Saad Alharbi', founderNameEn: 'Saad Alharbi', excerpt: 'Short text', excerptEn: 'Short text', detailsEn: 'Founder English details' });
+  const real = project({ id: 8, title: 'آمن', titleEn: 'Aman', companyName: 'شركة الأمان', companyNameEn: 'Aman Company', founderNameEn: 'Saad Alharbi', excerptEn: 'Short text' });
+  const english = new ProjectsEnglish({ kv: new MemoryKV(), translator, log: Fastify({ logger: false }).log, all: () => [live, real] });
+  useProjectsEnglish(english);
+  try {
+    await english.run();
+    const shown = localizeProject(live, 'en');
+    assert.ok(!ARABIC.test(shown.title) && !ARABIC.test(shown.companyName ?? ''));
+    assert.equal(shown.companyName, 'Cenemato', 'the Latin site name wins without a model call');
+    assert.ok(seen.every((texts) => !texts.includes('Cenemato')), 'a Latin value is never sent to the translator');
+    const kept = localizeProject(real, 'en');
+    assert.equal(kept.title, 'Aman', 'a real English founder value still wins');
+    assert.equal(kept.companyName, 'Aman Company');
+    assert.ok(seen.every((texts) => !texts.includes('Aman Company')), 'a real English value is never sent to the translator');
+  } finally {
+    useProjectsEnglish(built.projectsEnglish);
+  }
+});
+
+test('M239: a clean cache from an earlier pass costs no model call', async () => {
+  const seen: string[][] = [];
+  const translator: Translator = { mode: 'openai', translate: async (texts) => { seen.push(texts); return texts.map((text) => (text ? 'Safe Co' : '')); } };
+  const kv = new MemoryKV();
+  const current = project({ title: 'آمن' });
+  const first = new ProjectsEnglish({ kv, translator: { mode: 'openai', translate: async (texts) => texts.map((text) => (text ? 'ok' : '')) }, log: Fastify({ logger: false }).log, all: () => [current] });
+  await first.run();
+  const second = new ProjectsEnglish({ kv, translator, log: Fastify({ logger: false }).log, all: () => [current] });
+  await second.run();
+  assert.equal(seen.length, 0, 'a clean cache costs no model call');
+});

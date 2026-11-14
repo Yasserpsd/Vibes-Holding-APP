@@ -1,7 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 
 import type { StoreConfig } from '@/api/membership';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { trackMembershipCheckout, trackMembershipPurchase } from '@/lib/adsAttribution';
 
 type PurchasesModule = typeof import('react-native-purchases');
@@ -51,7 +51,18 @@ export function riyalPrice(priceString: string): string {
   const lead = priceString.match(new RegExp(`^\\s*${CURRENCY.source}\\s*(${AMOUNT.source})$`, 'u'));
   const trail = priceString.match(new RegExp(`^\\s*(${AMOUNT.source})\\s*${CURRENCY.source}\\s*$`, 'u'));
   const amount = (lead?.[1] ?? trail?.[1])?.trim().replace(/[.,٫][0٠]{2}$/u, '');
-  return amount ? `${amount} ريال` : priceString;
+  // M239 (owner, 2026-11-14): an English app on an Arabic-language phone must not show Arabic-Indic digits.
+  const shown = (text: string) => (getLang() === 'en' ? latinDigits(text) : text);
+  return amount ? `${shown(amount)} ريال` : shown(priceString);
+}
+
+/** Arabic-Indic / Persian digits and separators folded to Latin. */
+function latinDigits(text: string): string {
+  return text
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[٬،]/g, ',')
+    .replace(/٫/g, '.');
 }
 
 let configuredKey: string | null = null;

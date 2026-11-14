@@ -4,6 +4,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { meetupsFor, useMeetupsContent, type Meetup, type PortalKey } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
@@ -35,7 +36,7 @@ export default function MeetupsScreen() {
     <Screen title={data.title} subtitle={data.subtitle}>
       {intro ? (
         <FadeInView>
-          <Text style={styles.intro}>{intro}</Text>
+          <ClampText style={styles.intro} text={intro} />
         </FadeInView>
       ) : null}
       {meetups.map((meetup, index) => (

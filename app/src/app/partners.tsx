@@ -4,6 +4,7 @@ import { Image, Share, Text, View } from 'react-native';
 
 import { usePartners, type Partner } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
+import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard, GoldGradient, NeonPulse } from '@/components/lux';
@@ -126,7 +127,7 @@ function PartnerCard({ partner }: { partner: Partner }) {
           ) : null}
         </View>
       </View>
-      {partner.description ? <Text style={styles.partnerDetail}>{partner.description}</Text> : null}
+      {partner.description ? <ClampText style={styles.partnerDetail} text={partner.description} /> : null}
       {/* Owner (2026-10-25): «الشراء من الشريك» leaves — whoever wants to order goes straight to WhatsApp. */}
       {partner.whatsapp ? (
         <AppButton label={t('partners.contact')} icon="logo-whatsapp" onPress={() => void openWhatsApp(partner.whatsapp, t('partners.contactMessage', { name: partner.name }))} />

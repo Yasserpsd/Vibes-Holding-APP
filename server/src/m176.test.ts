@@ -76,7 +76,20 @@ test('M177: the daily workshop ad names the next open workshop, keeps the copy r
   const none = new WorkshopAdService({ kv: new MemoryKV(), log: { warn: () => undefined } as never, agenda: { upcomingOpen: async () => [] } as never, model: 'x' });
   assert.equal(await none.today('ar', NOV), null);
   const noKey = new WorkshopAdService({ kv: new MemoryKV(), log: { warn: () => undefined } as never, agenda, model: 'x' });
-  assert.ok((await noKey.today('en', NOV))?.headline.includes('ورشة'), 'the template names the workshop without a key');
+  assert.ok((await noKey.today('ar', NOV))?.headline.includes('ورشة'), 'the template names the workshop without a key');
+
+  // M239: the English ad carries no Arabic — not from the model, not from the title, not from an older stored copy.
+  const arabic = /[؀-ۿ]/u;
+  const plain = await noKey.today('en', NOV);
+  assert.ok(plain && !arabic.test(plain.headline + plain.body + plain.cta + plain.title), 'no English title: a plain English line');
+  const translated = { ...event, en: { title: 'AI workshop', blurb: 'A hands-on workshop.', place: null } };
+  const stale = new MemoryKV();
+  await stale.set('agenda:workshopAd', { day: '2026-11-14', eventId: 'w1', copies: { en: { headline: 'عنوان قديم', body: 'نص قديم بالعربية.', cta: 'احجز' } } });
+  const english = new WorkshopAdService({ kv: stale, log: { warn: () => undefined } as never, agenda: { upcomingOpen: async () => [translated] } as never, apiKey: 'sk-test-key-123456789012', model: 'gpt-test', fetchImpl });
+  const en = await english.today('en', Date.parse('2026-11-14T12:00:00+03:00'));
+  assert.ok(en && !arabic.test(en.headline + en.body + en.cta + en.title), 'an Arabic answer from the model falls back to English');
+  assert.equal(en.title, 'AI workshop');
+  assert.ok(en.headline.includes('AI workshop'));
 });
 
 test('M214: every tip carries the picture of what it offers, from the uploaded photos and banners', async () => {

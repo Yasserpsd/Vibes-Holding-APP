@@ -6,7 +6,8 @@ import { MemoryKV } from '../store.js';
 import { WhatsappClient, type WaTemplate } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
 import { fallbackMail, WhatsappService } from './service.js';
-import { buildBodyParams, fitParams, pickTemplate, planDelivery } from './templates.js';
+import { tellMember, type TellDeps } from './tell.js';
+import { buildBodyParams, fitParams, nameFor, pickTemplate, planDelivery } from './templates.js';
 
 // M174: member messages on WhatsApp. The pure decisions (phone, template, fallback) and the service with a fake Graph API.
 
@@ -44,6 +45,28 @@ test('body parameters follow the template order and are sanitized', () => {
   assert.deepEqual(buildBodyParams('receipt', { amount: 250, service: 'استشارة\n  أعمال', invoiceNo: 10001 }, 'ar'), ['250', 'استشارة أعمال', '10001']);
   assert.deepEqual(buildBodyParams('receipt', { amount: 99.5, service: '', invoiceNo: null }, 'en'), ['99.50', 'Service', '-']);
   assert.deepEqual(buildBodyParams('welcome', {}, 'en'), ['Member']);
+});
+
+test('M239: an Arabic name never reaches an English template parameter', () => {
+  assert.deepEqual(buildBodyParams('welcome', { name: 'فارس العتيبي' }, 'en'), ['Member']);
+  assert.deepEqual(buildBodyParams('membership', { name: 'فارس', date: '2027-01-01' }, 'en'), ['Member', '2027-01-01']);
+  assert.deepEqual(buildBodyParams('welcome', { name: 'Fares Alotaibi' }, 'en'), ['Fares Alotaibi']);
+  assert.deepEqual(buildBodyParams('welcome', { name: 'فارس العتيبي' }, 'ar'), ['فارس العتيبي']);
+  assert.equal(nameFor('فارس العتيبي', 'en', 'Fares Alotaibi'), 'Fares Alotaibi');
+  assert.equal(nameFor('فارس العتيبي', 'en', 'فارس'), '');
+  assert.equal(nameFor('فارس العتيبي', 'ar', 'Fares Alotaibi'), 'فارس العتيبي');
+});
+
+test('M239: tellMember hands an English notice the English name, or none', async () => {
+  const seen: (string | null | undefined)[] = [];
+  const base = {
+    hub: { call: async () => ({ contact: { id: 7, phone: '0503844438', name: 'فارس العتيبي', lang: 'en' } }) } as unknown as TellDeps['hub'],
+    push: { langOf: async () => 'en' } as unknown as TellDeps['push'],
+    whatsapp: { enabled: true, sendNotice: async (_kind: string, input: { name?: string | null }) => (seen.push(input.name), { channel: 'whatsapp' }) } as unknown as TellDeps['whatsapp'],
+  };
+  await tellMember(base, 7, 'admin_message');
+  await tellMember({ ...base, englishName: async () => 'Fares Alotaibi' }, 7, 'admin_message');
+  assert.deepEqual(seen, [null, 'Fares Alotaibi']);
 });
 
 test('fitParams drops extra variables but refuses a template that needs more or unsupported parts', () => {
