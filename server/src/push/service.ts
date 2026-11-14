@@ -382,6 +382,13 @@ export class PushService {
     return this.sendLocalized(contactId, messageOf);
   }
 
+  /** The language the member's app last ran in (his most recently seen device); null when he has no device here. */
+  async langOf(contactId: number): Promise<AppLang | null> {
+    const mine = (await this.load()).filter((entry) => entry.contactId === contactId && entry.lang);
+    mine.sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
+    return mine[0]?.lang ?? null;
+  }
+
   private async sendLocalized(contactId: number, messageOf: (lang: AppLang) => PushMessage): Promise<PushOutcome> {
     const mine = (await this.load()).filter((entry) => entry.contactId === contactId);
     const english = mine.filter((entry) => entry.lang === 'en').map((entry) => entry.token);

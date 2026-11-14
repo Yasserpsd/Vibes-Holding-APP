@@ -441,8 +441,20 @@ export class DashboardService {
       // The member's next request in the app reads the new state from the hub.
       this.deps.auth.forget(contactId);
       this.bust('hub', 'pb');
+      // M234 (owner: «كل العمليات توصل واتس اب»): a membership given or extended from the dashboard is told on WhatsApp
+      // like a paid one («سارية حتى»). A revoke and an honorary member (no end date) are not.
+      const { contact, event } = result;
+      if (input.action !== 'revoke' && !isHonorary(contact) && contact.member_end) {
+        const lang = await this.memberLang(contactId, contact.lang);
+        this.deps.whatsapp?.announceMembership({ phone: contact.phone, lang, name: contact.name, expiresAt: `${contact.member_end}T00:00:00+03:00`, ref: `membership:${contactId}:grant:${event.id}` }, () => undefined);
+      }
       return { ok: true as const, contact: result.contact, event: result.event };
     });
+  }
+
+  /** M234: the language the member's app runs in now (his last seen device), else the one he registered with. */
+  private async memberLang(contactId: number, registered: string | null | undefined): Promise<string | null> {
+    return (await this.deps.push.langOf(contactId).catch(() => null)) ?? registered ?? null;
   }
 
   /**
@@ -470,7 +482,7 @@ export class DashboardService {
       // the honorary membership belongs only to official partners in the founding contract of a Vibes Ventures company.
       const { contact, event } = result;
       const email = String(contact.contact_email ?? '').trim() || contact.email;
-      void this.deps.whatsapp?.sendHonorary({ phone: contact.phone, lang: contact.lang, name: contact.name, email, ref: `honorary:${contactId}:${event.id}` }, !input.on);
+      void this.deps.whatsapp?.sendHonorary({ phone: contact.phone, lang: await this.memberLang(contactId, contact.lang), name: contact.name, email, ref: `honorary:${contactId}:${event.id}` }, !input.on);
       // M232: his devices leave (or rejoin) every broadcast at once; the one push about the membership itself still goes.
       await this.deps.push.setHonorary(contactId, input.on).catch(() => undefined);
       this.deps.push.honoraryChanged(contactId, input.on);
