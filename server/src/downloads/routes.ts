@@ -15,7 +15,7 @@ function rangeOf(query: unknown): number {
 }
 
 /** M233: the Play Console's daily acquisitions as read on its statistics page, one whole number per day. */
-const consoleDays = z.object({ days: z.record(z.string().regex(/^d{4}-d{2}-d{2}$/), z.number().int().min(0).max(1_000_000)) });
+const consoleDays = z.object({ days: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.number().int().min(0).max(1_000_000)) });
 
 export const downloadsRoutes: FastifyPluginAsync<DownloadsRoutesOptions> = async (app, { service, auth }) => {
   const requireAdmin = dashboardGuard(auth);
