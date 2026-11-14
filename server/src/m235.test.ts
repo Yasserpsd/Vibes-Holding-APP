@@ -84,11 +84,15 @@ test('a reply and a message from the management to one member are announced on W
   assert.equal(sent.at(-1)?.template, 'club_admin_message');
   assert.equal(JSON.stringify(sent).includes('نص الرسالة'), false, 'the words of a message never leave the app');
 
-  // A message for everyone stays in the app.
+  // M236: a message for everyone reaches every verified account once, the member above included.
   const all = await post('/api/admin/app/messages', { title: 'للجميع', body: 'رسالة عامة.', audience: { type: 'all' } }, adminToken);
   assert.equal(all.statusCode, 201, all.body);
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  assert.equal(sent.length, before + 1);
+  for (let i = 0; i < 200 && !sent.slice(before + 1).some((entry) => entry.to === '966558323502'); i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+  const wave = sent.slice(before + 1);
+  assert.ok(wave.length >= 2, 'the admin and the member at least');
+  assert.ok(wave.every((entry) => entry.template === 'club_admin_message'));
+  assert.equal(new Set(wave.map((entry) => entry.to)).size, wave.length, 'one message per number');
+  assert.equal(wave.filter((entry) => entry.to === '966558323502').length, 1);
 });
 
 test('an account deleted by the administration is told on the number it held, only when asked', async () => {

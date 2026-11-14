@@ -27,7 +27,8 @@ export type WaRecord = {
 };
 
 export const WHATSAPP_LOG_KEY = 'whatsapp:messages';
-const KEEP_RECORDS = 500;
+/** M236: a broadcast to every account writes hundreds of records at once; the newest ones must not push the day's codes and receipts out. */
+const KEEP_RECORDS = 2000;
 const TEMPLATE_TTL_MS = 10 * 60_000;
 /** Delivery states only move forward; `failed` can land at any time. */
 const STATUS_ORDER: Record<string, number> = { accepted: 0, sent: 1, delivered: 2, read: 3 };
