@@ -123,7 +123,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.md,
     right: spacing.md,
-    zIndex: 950,
     elevation: 950,
     flexDirection: 'row',
     alignItems: 'center',

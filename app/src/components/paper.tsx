@@ -25,6 +25,8 @@ export function PaperCard({ children, style, pinned = false }: PaperCardProps) {
   return (
     <PaperContext.Provider value={true}>
       <View style={[styles.card, pinned && styles.pinnedCard, style]}>
+        {children}
+        {/* Drawn last so it sits on top without zIndex: a zIndex child switches Android to custom draw order, which crashed 1.3.2 (getChildDrawingOrder). */}
         {pinned ? (
           <View style={styles.pin} pointerEvents="none">
             <View style={styles.pinHead}>
@@ -32,7 +34,6 @@ export function PaperCard({ children, style, pinned = false }: PaperCardProps) {
             </View>
           </View>
         ) : null}
-        {children}
       </View>
     </PaperContext.Provider>
   );
@@ -50,7 +51,7 @@ const styles = themedStyles(() => ({
   },
   // The faint tilt sells the «sheet dropped on the desk» read without hurting legibility.
   pinnedCard: { transform: [{ rotate: '-0.4deg' }], paddingTop: spacing.md + 6 },
-  pin: { position: 'absolute', top: -9, left: 0, right: 0, alignItems: 'center', zIndex: 1 },
+  pin: { position: 'absolute', top: -9, left: 0, right: 0, alignItems: 'center' },
   pinHead: {
     width: 18,
     height: 18,

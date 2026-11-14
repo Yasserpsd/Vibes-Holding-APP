@@ -31,5 +31,5 @@ export function SplashFlash() {
 }
 
 const styles = StyleSheet.create({
-  cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000', zIndex: 1000, elevation: 1000, alignItems: 'center', justifyContent: 'center' },
+  cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000', elevation: 1000, alignItems: 'center', justifyContent: 'center' },
 });

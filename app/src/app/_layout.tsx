@@ -133,8 +133,6 @@ export default function RootLayout() {
           <AdsAttribution />
           <SyncPoller />
           <ScreenTracker />
-          {/* M195: the forced-update cover and the «restart to apply the OTA» banner. */}
-          <UpdateGate />
           <StatusBar style={getThemeName() === 'light' ? 'dark' : 'light'} />
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}
@@ -218,8 +216,6 @@ export default function RootLayout() {
           <MembershipCelebration />
           {/* M141: «قيّمنا على المتجر» — a small sheet for signed-in members, at most once a week. */}
           <RateUsPrompt />
-          {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
-          <SplashFlash />
           {/* M204 (owner): missing details and the unconfirmed number are weekly popups with «لاحقًا», never a wall. */}
           <GentlePopups />
           {/* M232 (owner): a popup published from the dashboard («أدوات التواصل») — once per device, never over another popup. */}
@@ -230,8 +226,14 @@ export default function RootLayout() {
           <WhatsappVerifyHost />
           {/* M204 (owner): a new dealing of an account with an unproven number asks for the WhatsApp code first. */}
           <WhatsappGateHost />
+          {/* M240: the root covers carry NO zIndex (a zIndex child switches Android to custom draw order, which
+              crashed 1.3.2 in getChildDrawingOrder when a cover left). They stack by this order, lowest first. */}
+          {/* M195: the forced-update cover and the «restart to apply the OTA» banner. */}
+          <UpdateGate />
           {/* M118d: the biometric app lock — covers everything while it waits for the face. */}
           <AppLockGate />
+          {/* M118 (owner): his golden-sparkles artwork flashes for a split second as the app opens. */}
+          <SplashFlash />
           {/* M137: the preview build is retired — a TEST binary shows only the «download the store app» cover. */}
           <RetiredBuildGate />
         </GuestGateProvider>

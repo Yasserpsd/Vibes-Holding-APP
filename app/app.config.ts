@@ -138,6 +138,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/withKotlinStdlibPin',
     // M157: the locales' NSUserTrackingUsageDescription needs a default-locale twin or Android release lint fails (ExtraTranslation).
     './plugins/withAndroidTrackingString',
+    // M240: R8 code obfuscation in Android release builds (Play «DEX code optimization» notice, due Feb 2027).
+    './plugins/withAndroidR8',
     [
       'expo-tracking-transparency',
       { userTrackingPermission: 'This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.' },

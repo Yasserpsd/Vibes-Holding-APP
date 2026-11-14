@@ -76,7 +76,6 @@ const styles = themedStyles(() => ({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 999,
     elevation: 999,
     backgroundColor: colors.black,
     alignItems: 'center',

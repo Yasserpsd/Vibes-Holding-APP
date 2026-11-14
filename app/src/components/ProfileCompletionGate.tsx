@@ -363,7 +363,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
 }
 
 const styles = StyleSheet.create({
-  cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 900, elevation: 900, backgroundColor: formPalettes.light.bg },
+  cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, elevation: 900, backgroundColor: formPalettes.light.bg },
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.md, gap: spacing.md },
   emblem: { width: 110, height: 110, alignSelf: 'center' },
