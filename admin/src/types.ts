@@ -182,7 +182,7 @@ export type BridgeSide = { version: string | null; ok: boolean };
 
 /** Never fails as a whole: a part that could not load is null with its entry in `errors`. */
 /** One store on the downloads card: null numbers = the store has not answered (never a device count). */
-export type StoreDownloads = { configured: boolean; installs: number | null; allTime: number | null; since: string | null; latest: string | null; error?: string };
+export type StoreDownloads = { configured: boolean; installs: number | null; allTime: number | null; since: string | null; latest: string | null; error?: string; source?: 'console' };
 
 /** M158 + M228: store downloads per store (range and all-time) and, as a separate unit, the signed-in devices. */
 export type Downloads = {

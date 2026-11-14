@@ -217,3 +217,24 @@ test('the Google assertion is RS256 for the storage read-only scope and the inst
     { day: '2026-10-28', installs: 11, total: 129 },
   ]);
 });
+
+test('Play Console days stand in until Google writes its installs file, which then replaces them (M233)', async () => {
+  const local = new MemoryKV();
+  const now = Date.now();
+  const day = (offset: number) => riyadhDay(now - offset * 86_400_000);
+  const push = new PushService({ kv: local, log: app.log });
+  const empty = { month: async () => null, list: async () => [] } as unknown as PlayStoreClient;
+  const service = new DownloadsService({ kv: local, push, log: app.log, google: empty });
+  assert.equal(await service.importPlayConsole({ [day(6)]: 4, [day(5)]: 6 }), 2);
+  await service.snapshot(now);
+  const stood = (await service.read(now, 30)).stores.google;
+  assert.deepEqual([stood.installs, stood.allTime, stood.since, stood.latest, stood.source], [10, 10, day(6), day(5), 'console']);
+  // The file arrives: its numbers win, the mark leaves, and a later Console import no longer touches those days.
+  const rows = [{ day: day(6), installs: 5, total: 5 }, { day: day(5), installs: 7, total: 12 }];
+  const filed = { month: async () => rows, list: async () => [] } as unknown as PlayStoreClient;
+  const second = new DownloadsService({ kv: local, push, log: app.log, google: filed });
+  await second.snapshot(now);
+  assert.equal(await second.importPlayConsole({ [day(6)]: 1 }), 0);
+  const real = (await second.read(now, 30)).stores.google;
+  assert.deepEqual([real.allTime, real.source, real.error], [12, undefined, undefined]);
+});

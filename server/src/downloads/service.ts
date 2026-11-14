@@ -27,6 +27,8 @@ export type DailyRow = {
   storeIos?: number;
   /** Google's lifetime «Total User Installs» as of that day. */
   playTotal?: number;
+  /** M233: `storeAndroid` of this day was read from the Play Console statistics page (Google has issued no installs file yet); the file's own number replaces it. */
+  androidSource?: 'console';
 };
 export type DailyDoc = Record<string, DailyRow>;
 
@@ -43,6 +45,8 @@ export type StoreAnswer = {
   latest: string | null;
   /** Why the store did not answer on the last attempt (the store answer itself, no secrets). */
   error?: string;
+  /** M233: 'console' while any counted day comes from the Play Console statistics page instead of Google's installs file. */
+  source?: 'console';
 };
 
 /**
@@ -83,6 +87,24 @@ export class DownloadsService {
 
   private async load(): Promise<DailyDoc> {
     return (await this.deps.kv.get<DailyDoc>(DAILY_KEY)) ?? {};
+  }
+
+  /**
+   * M233 (owner, 2026-11-14): three weeks after the launch Google has still issued no installs file, while the Play
+   * Console statistics page shows the real daily acquisitions. Those days are stored as read there (dated, marked
+   * 'console'); a day Google's file already answered is never overwritten, and the file replaces them when it arrives.
+   */
+  async importPlayConsole(days: Record<string, number>): Promise<number> {
+    const doc = await this.load();
+    let stored = 0;
+    for (const [day, installs] of Object.entries(days)) {
+      const row = doc[day];
+      if (row?.storeAndroid !== undefined && row.androidSource !== 'console') continue;
+      doc[day] = { ...(row ?? { android: 0, ios: 0 }), storeAndroid: installs, androidSource: 'console' };
+      stored += 1;
+    }
+    await this.deps.kv.set(DAILY_KEY, doc);
+    return stored;
   }
 
   /** Today's row (device counts always, store installs when configured), kept beside the earlier days. */
@@ -135,7 +157,7 @@ export class DownloadsService {
         // M230: Google can write its first file weeks after the first install (the Play Console had numbers long before
         // any report existed). Until one Google day is stored, the months are asked from further back, and every day of
         // a month that was read is kept (never today's), so the days of the launch are not lost to the 30-day window.
-        const started = Object.values(doc).some((row) => row.storeAndroid !== undefined);
+        const started = Object.values(doc).some((row) => row.storeAndroid !== undefined && row.androidSource !== 'console');
         const span = started ? days : lastRiyadhDays(FIRST_FILL_DAYS + 1, now).slice(0, FIRST_FILL_DAYS);
         const months = Array.from(new Set(span.map((day) => day.slice(0, 7).replace('-', ''))));
         const yesterday = days[days.length - 1]!;
@@ -146,7 +168,8 @@ export class DownloadsService {
           found += 1;
           for (const entry of rows) {
             if (entry.day > yesterday) continue;
-            const base = doc[entry.day] ?? { android: 0, ios: 0 };
+            const base = { ...(doc[entry.day] ?? { android: 0, ios: 0 }) };
+            delete base.androidSource;
             doc[entry.day] = { ...base, storeAndroid: entry.installs, ...(entry.total !== null ? { playTotal: entry.total } : {}) };
           }
         }
@@ -202,6 +225,7 @@ export class DownloadsService {
       google.allTime = playTotal;
       google.since = null;
     }
+    if (known.some((day) => doc[day]!.storeAndroid !== undefined && doc[day]!.androidSource === 'console')) google.source = 'console';
     const answered = [apple, google].filter((entry) => entry.installs !== null);
     const add = (pick: (entry: StoreAnswer) => number | null): number | null => (answered.length ? answered.reduce((sum, entry) => sum + (pick(entry) ?? 0), 0) : null);
     return {

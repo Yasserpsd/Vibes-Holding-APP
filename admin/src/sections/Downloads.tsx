@@ -69,7 +69,9 @@ function pending(name: string, store: StoreDownloads): { row: string; auto: bool
 /** What a store's number covers: from its first download (or the launch) to the last day the store has published. */
 function covers(store: StoreDownloads): string {
   const from = store.since ? `من ${formatDay(store.since, 'short')}` : 'منذ الإطلاق';
-  return store.latest ? `تحميل ${from} حتى ${formatDay(store.latest, 'short')}` : `تحميل ${from}`;
+  // M233: days read from the Play Console statistics page (Google has issued no installs file yet) say where they come from.
+  const origin = store.source === 'console' ? ' · من إحصاءات Play Console' : '';
+  return (store.latest ? `تحميل ${from} حتى ${formatDay(store.latest, 'short')}` : `تحميل ${from}`) + origin;
 }
 
 function Step({ label, value, extra, notes, tone, onOpen }: { label: string; value: string; extra?: ReactNode; notes: string[]; tone?: 'gold' | 'outline'; onOpen?: () => void }) {
