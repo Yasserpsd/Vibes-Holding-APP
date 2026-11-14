@@ -2,8 +2,8 @@ import type { WaTemplate } from './client.js';
 
 export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended' | NoticeKind;
 /** M235: short notices of what the administration did; every one is filled from `TemplateVars.list`, in order. */
-export type NoticeKind = 'admin_message' | 'pb_credit' | 'account_deleted' | 'affiliate_update' | 'payout_update' | 'affiliate_bonus' | 'affiliate_cycle';
-export const NOTICE_KINDS: ReadonlySet<string> = new Set<NoticeKind>(['admin_message', 'pb_credit', 'account_deleted', 'affiliate_update', 'payout_update', 'affiliate_bonus', 'affiliate_cycle']);
+export type NoticeKind = 'admin_message' | 'admin_reply' | 'pb_credit' | 'account_deleted' | 'affiliate_update' | 'payout_update' | 'affiliate_bonus' | 'affiliate_cycle';
+export const NOTICE_KINDS: ReadonlySet<string> = new Set<NoticeKind>(['admin_message', 'admin_reply', 'pb_credit', 'account_deleted', 'affiliate_update', 'payout_update', 'affiliate_bonus', 'affiliate_cycle']);
 export type WaLang = 'ar' | 'en';
 
 /** The templates registered on the WABA (each exists in ar and en); `code` is the Authentication one. */
@@ -23,7 +23,10 @@ export const TEMPLATE_NAMES: Record<WaKind, string> = {
   // M205: the honorary membership was taken back (it belongs to partners in the Vibes Ventures companies only).
   honorary_ended: 'club_honorary_ended',
   // M235 (filed at Meta 2026-11-14, Utility, ar + en; wording in scripts/m235-wa-templates.json).
+  // Meta re-classed club_admin_message as MARKETING the day it was filed (a message the management starts). M237: the
+  // answer to the member's OWN message has its own template, filed as Utility.
   admin_message: 'club_admin_message',
+  admin_reply: 'club_admin_reply',
   pb_credit: 'club_pb_credit',
   account_deleted: 'club_account_deleted',
   affiliate_update: 'club_affiliate_update',

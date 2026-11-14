@@ -559,7 +559,7 @@ export class DashboardService {
       const result = await this.hub(admin, 'admin_reply', { contact_id: contactId, text }, false);
       this.bust('threads');
       // M235 (owner: «لما يجيله رسالة من الإدارة توصل واتس اب برده»): the words stay in the app; WhatsApp says one arrived.
-      void tellMember(this.deps, contactId, 'admin_message', [], `reply:${contactId}:${result.message_id}`);
+      void tellMember(this.deps, contactId, 'admin_reply', [], `reply:${contactId}:${result.message_id}`);
       return { ok: true as const, message_id: result.message_id };
     });
   }

@@ -9,7 +9,7 @@ import { buildBodyParams, TEMPLATE_NAMES } from './whatsapp/templates.js';
 
 /** Meta's Graph API as the server sees it: every club template approved in ar + en, every send accepted and kept. */
 /** How many variables each new template holds. */
-const VARIABLES: Record<string, number> = { club_admin_message: 1, club_pb_credit: 3, club_account_deleted: 1, club_affiliate_update: 2, club_payout_update: 2, club_affiliate_bonus: 3, club_affiliate_cycle: 3 };
+const VARIABLES: Record<string, number> = { club_admin_message: 1, club_admin_reply: 1, club_pb_credit: 3, club_account_deleted: 1, club_affiliate_update: 2, club_payout_update: 2, club_affiliate_bonus: 3, club_affiliate_cycle: 3 };
 const sent: { to: string; template: string; language: string; params: string[] }[] = [];
 const graph: typeof fetch = async (input, init) => {
   const url = String(input);
@@ -73,7 +73,7 @@ test('a reply and a message from the management to one member are announced on W
   const member = await signUp('m235.member@gmail.com', '0558323502');
   const reply = await post(`/api/admin/threads/${member.id}/reply`, { text: 'أهلًا بك، وصلتنا رسالتك.', confirm: true }, adminToken);
   assert.equal(reply.statusCode, 200, reply.body);
-  const first = await waitFor('club_admin_message', '966558323502');
+  const first = await waitFor('club_admin_reply', '966558323502');
   assert.deepEqual([first.language, first.params], ['ar', ['سلطان']]);
 
   const before = sent.length;

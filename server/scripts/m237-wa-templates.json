@@ -1,0 +1,16 @@
+[
+  {
+    "name": "club_admin_reply",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، تم الرد على رسالتك التي أرسلتها إلى إدارة Investors Club. يمكنك قراءة الرد من بريد الوارد في التطبيق.",
+    "bodyExamples": ["أحمد"]
+  },
+  {
+    "name": "club_admin_reply",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, the Investors Club management has replied to the message you sent. You can read the reply in the Inbox in the app.",
+    "bodyExamples": ["Ahmed"]
+  }
+]
