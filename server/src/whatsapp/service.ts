@@ -6,7 +6,7 @@ import type { Mailer } from '../mail/mailer.js';
 import type { KV } from '../store.js';
 import type { NewTemplate, WaTemplate, WhatsappClient } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
-import { amountText, firstName, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type TemplateVars, type WaKind, type WaLang } from './templates.js';
+import { amountText, firstName, NOTICE_KINDS, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type NoticeKind, type TemplateVars, type WaKind, type WaLang } from './templates.js';
 
 /** What every send answers. `error` explains a fallback too (channel `email`/`none` + why WhatsApp was not used). */
 export type WaResult = { channel: 'whatsapp' | 'email' | 'none'; messageId?: string; error?: string };
@@ -95,6 +95,15 @@ export class WhatsappService {
   /** M205: «منحكم العضوية الشرفية», or its end when `ended`; `ref` keeps one message per grant or revoke. */
   sendHonorary(input: HonoraryInput, ended = false): Promise<WaResult> {
     return this.deliver(ended ? 'honorary_ended' : 'honorary', input, { name: firstName(input.name) });
+  }
+
+  /**
+   * M235 (owner: «كل العمليات توصل واتس اب»): a short notice of what the administration did. `name` (when given) is the
+   * template's first variable, `values` the rest in order. No e-mail of its own: the caller's mail goes out as before.
+   */
+  sendNotice(kind: NoticeKind, input: Omit<SendInput, 'email'> & { name?: string | null }, values: (string | number | null | undefined)[] = []): Promise<WaResult> {
+    const greeting = input.name === undefined ? [] : [firstName(input.name) || (toLang(input.lang) === 'en' ? 'Member' : 'عضونا')];
+    return this.deliver(kind, input, { list: [...greeting, ...values] });
   }
 
   /** M204: «تم تفعيل عضويتك… سارية حتى {{2}}». */
@@ -414,6 +423,7 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 /** The plain e-mail used when WhatsApp cannot carry the message (same facts as the templates). */
 export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { subject: string; text: string } | null {
   // M204: the five newer kinds have richer mails of their own, sent by their callers (`orMail`).
+  if (NOTICE_KINDS.has(kind)) return null;
   if (kind === 'membership' || kind === 'event_ticket' || kind === 'visit_update' || kind === 'request_update' || kind === 'invoice' || kind === 'code') return null;
   if (kind === 'welcome') {
     return lang === 'en'

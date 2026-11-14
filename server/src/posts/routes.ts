@@ -14,7 +14,7 @@ import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
 import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish };
+export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -79,7 +79,7 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -109,6 +109,12 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     if (audience.type === 'all') return push.reachable();
     if (audience.type === 'persona') return (await push.tokensForPersona(audience.persona)).length;
     return (await push.tokensFor(audience.contactId)).length;
+  };
+
+  /** M235: WhatsApp says a message arrived, to the one member it is addressed to; a message for everyone or a category stays in the app. */
+  const announce = (post: Post) => {
+    const audience = audienceOf(post);
+    if (audience.type === 'member') tellMember?.(audience.contactId, `post:${post.id}`);
   };
 
   /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
@@ -273,6 +279,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         // M42 (owner: «بمجرد ما انشر اي رسالة كل الناس يجيلها اشعار فورا»): the FIRST publish notifies
         // its audience by itself; edits never re-notify, and the manual button stays for reminders.
         // M232: a popup opens inside the app by itself and sends no notification.
+        if (post.kind !== 'popup' && post.status === 'published' && previous?.status !== 'published') announce(post);
         if (autoPush && post.kind !== 'popup' && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
           void pushPost((await service.get(post.id)) ?? post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
         }
@@ -370,6 +377,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       // M180: the in-app composer gets its English before the push, like a dashboard post.
       await english?.ensure(post.id);
       await sync.bump('posts');
+      announce(post);
       const devices = await audienceDevices(post);
       const outcome = devices > 0 ? await pushPost((await service.get(post.id)) ?? post) : null;
       return reply.code(201).send({ post: (await service.get(post.id)) ?? post, devices, push: outcome });

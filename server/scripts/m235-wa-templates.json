@@ -1,0 +1,100 @@
+[
+  {
+    "name": "club_admin_message",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، وصلتك رسالة جديدة من إدارة Investors Club. يمكنك الاطلاع عليها من بريد الوارد في التطبيق.",
+    "bodyExamples": ["أحمد"]
+  },
+  {
+    "name": "club_admin_message",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, you have a new message from the Investors Club management. You can read it in the Inbox in the app.",
+    "bodyExamples": ["Ahmed"]
+  },
+  {
+    "name": "club_pb_credit",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، أضافت إدارة Investors Club {{2}} إلى رصيدك في بنك المشاريع، وأصبح رصيدك المتاح {{3}}. يمكنك استخدامه من التطبيق.",
+    "bodyExamples": ["أحمد", "3", "8"]
+  },
+  {
+    "name": "club_pb_credit",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, the Investors Club management added {{2}} to your Projects Bank credit. Your available credit is now {{3}}. You can use it in the app.",
+    "bodyExamples": ["Ahmed", "3", "8"]
+  },
+  {
+    "name": "club_account_deleted",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، نفيدك بأن إدارة Investors Club حذفت حسابك، ولم يعد الدخول إليه متاحًا. إذا كان لديك اشتراك عبر Apple أو Google فيمكنك إلغاؤه من إعدادات المتجر، إذ لا يتوقف تلقائيًا بحذف الحساب.",
+    "bodyExamples": ["أحمد"]
+  },
+  {
+    "name": "club_account_deleted",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, please note that the Investors Club management has deleted your account, and it can no longer be accessed. If you hold a subscription through Apple or Google, you can cancel it from the store settings, as deleting the account does not stop it.",
+    "bodyExamples": ["Ahmed"]
+  },
+  {
+    "name": "club_affiliate_update",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، راجعت إدارة Investors Club طلبك في برنامج الممثلين. الحالة الآن: {{2}}. تجد التفاصيل في حسابك في التطبيق.",
+    "bodyExamples": ["أحمد", "لم يُعتمد"]
+  },
+  {
+    "name": "club_affiliate_update",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, the Investors Club management reviewed your Affiliates Program application. Current status: {{2}}. The details are in your account in the app.",
+    "bodyExamples": ["Ahmed", "Not approved"]
+  },
+  {
+    "name": "club_payout_update",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "تحديث على طلب سحب أرباحك بمبلغ {{1}} ريال في برنامج ممثلي Investors Club. الحالة الآن: {{2}}. تجد التفاصيل في حسابك في التطبيق.",
+    "bodyExamples": ["750", "تم التحويل"]
+  },
+  {
+    "name": "club_payout_update",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Update on your request to withdraw {{1}} SAR of earnings in the Investors Club Affiliates Program. Current status: {{2}}. The details are in your account in the app.",
+    "bodyExamples": ["750", "Transferred"]
+  },
+  {
+    "name": "club_affiliate_bonus",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، بلغت هدف دورة الأداء باستقطاب {{2}} أعضاء دافعين، وأضافت إدارة Investors Club بدل المواصلات والمصروفات النثرية بمبلغ {{3}} ريال إلى رصيدك في برنامج الممثلين. تجد التفاصيل في التطبيق.",
+    "bodyExamples": ["أحمد", "10", "1,000"]
+  },
+  {
+    "name": "club_affiliate_bonus",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, you reached your performance cycle target of {{2}} paying members, and the Investors Club management added a transport and incidentals allowance of {{3}} SAR to your Affiliates Program balance. The details are in the app.",
+    "bodyExamples": ["Ahmed", "10", "1,000"]
+  },
+  {
+    "name": "club_affiliate_cycle",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، جدّدت إدارة Investors Club دورة الأداء الخاصة بك في برنامج الممثلين. تنتهي الدورة في {{2}}، والهدف {{3}} أعضاء دافعين. العدّاد يعمل الآن في التطبيق.",
+    "bodyExamples": ["أحمد", "2027-02-12", "10"]
+  },
+  {
+    "name": "club_affiliate_cycle",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, the Investors Club management renewed your performance cycle in the Affiliates Program. The cycle ends on {{2}} and the target is {{3}} paying members. The counter is now running in the app.",
+    "bodyExamples": ["Ahmed", "2027-02-12", "10"]
+  }
+]

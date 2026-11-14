@@ -371,7 +371,7 @@ type Deps = {
   log: FastifyBaseLogger;
   publicUrl: string;
   /** M202: optional so a server without WhatsApp, and the tests, simply skip the message. */
-  whatsapp?: Pick<WhatsappService, 'sendAffiliateLink'>;
+  whatsapp?: Pick<WhatsappService, 'sendAffiliateLink'> & Partial<Pick<WhatsappService, 'sendNotice'>>;
   push?: AffiliatePush;
   /** Accounts that muted the advisor's daily push (M87b) hear no reminder either. */
   muted?: () => Promise<Set<number>>;
@@ -619,7 +619,11 @@ export class AffiliateService {
       out.record = { ...record };
       return out;
     });
-    if (events.record && events.bonus) this.deps.notifier.affiliateBonus(events.record, events.bonus);
+    if (events.record && events.bonus) {
+      this.deps.notifier.affiliateBonus(events.record, events.bonus);
+      // M235: the same news on WhatsApp.
+      void this.deps.whatsapp?.sendNotice?.('affiliate_bonus', { phone: events.record.phone, lang: events.record.lang, name: events.record.name, ref: `aff-bonus:${contactId}:${events.bonus.n}` }, [events.bonus.target, events.bonus.bonus.toLocaleString('en-US')]);
+    }
     if (events.record && events.ended) this.deps.notifier.affiliateCycleEnded(events.record, events.ended);
   }
 
@@ -687,7 +691,10 @@ export class AffiliateService {
       record.renewalRequestedAt = null;
       return { record: { ...record }, cycle: next };
     });
-    if (result) this.deps.notifier.affiliateCycleRenewed(result.record, result.cycle);
+    if (result) {
+      this.deps.notifier.affiliateCycleRenewed(result.record, result.cycle);
+      void this.deps.whatsapp?.sendNotice?.('affiliate_cycle', { phone: result.record.phone, lang: result.record.lang, name: result.record.name, ref: `aff-cycle:${result.record.contactId}:${result.cycle.n}` }, [result.cycle.endAt.slice(0, 10), result.cycle.target]);
+    }
     return result?.record ?? null;
   }
 
@@ -905,6 +912,8 @@ export class AffiliateService {
     if (record) this.deps.notifier.affiliateDecided(record, this.referralLink(AffiliateService.codeOf(record)));
     // M202: a new affiliate gets his code and link on WhatsApp too. It never holds up the decision.
     if (record?.status === 'approved') void this.sendLink(record);
+    // M235: a refusal is told on WhatsApp too (the note stays in the e-mail and the app).
+    if (record?.status === 'rejected') void this.deps.whatsapp?.sendNotice?.('affiliate_update', { phone: record.phone, lang: record.lang, name: record.name }, [record.lang === 'en' ? 'Not approved' : 'لم يُعتمد']);
     return record;
   }
 
@@ -1004,9 +1013,14 @@ export class AffiliateService {
       payout.decidedAt = now.toISOString();
       payout.decidedBy = adminName;
       payout.adminNote = note.trim() || null;
-      return { payout: { ...payout }, email: affiliates.find((entry) => entry.contactId === payout.contactId)?.email ?? '' };
+      const owner = affiliates.find((entry) => entry.contactId === payout.contactId);
+      return { payout: { ...payout }, email: owner?.email ?? '', phone: owner?.phone ?? '', lang: owner?.lang ?? 'ar' };
     });
-    if (result) this.deps.notifier.affiliatePayoutDecided(result.payout, result.email);
+    if (result) {
+      this.deps.notifier.affiliatePayoutDecided(result.payout, result.email);
+      const label = result.lang === 'en' ? (status === 'paid' ? 'Transferred' : 'Not approved') : status === 'paid' ? 'تم التحويل' : 'لم يُعتمد';
+      void this.deps.whatsapp?.sendNotice?.('payout_update', { phone: result.phone, lang: result.lang, ref: `payout:${id}:${status}` }, [result.payout.amount.toLocaleString('en-US'), label]);
+    }
     return result?.payout ?? null;
   }
 

@@ -17,6 +17,7 @@ import type { PushService } from '../push/service.js';
 import { parseHubTime, riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import type { WhatsappService } from '../whatsapp/service.js';
+import { tellMember } from '../whatsapp/tell.js';
 
 /**
  * The dashboard's view of the club (docs/BRIDGE_V2.md 4): the hub stays the one source of accounts and memberships
@@ -517,6 +518,8 @@ export class DashboardService {
       if (!result.already) {
         const email = result.email || account.email;
         if (input.tellMember) this.deps.notifier?.tellAccountDeleted(email, result.lang === 'en' ? 'en' : 'ar', account.name);
+        // M235: the same notice on the number the account held (the hub's row is emptied by now).
+        if (input.tellMember) void this.deps.whatsapp?.sendNotice('account_deleted', { phone: account.phone, lang: result.lang, name: account.name, ref: `deleted:${contactId}` });
         this.deps.notifier?.accountDeletedByAdmin({ name: account.name, phone: account.phone, email, contactId, by: admin.me.name || admin.me.email, note: input.note, told: input.tellMember });
       }
       return { ok: true as const };
@@ -545,6 +548,8 @@ export class DashboardService {
       if (account.state !== 'member') throw new RequestError('not_member', 'رصيد بنك المشاريع يُضاف للأعضاء المشتركين فقط', 409);
       const result = await this.deps.pb.grant({ contactId, amount: input.amount, note: input.note, actor: admin.me.name || admin.me.email, member: toPbMember(account) });
       this.bust('pb');
+      // M235: the member hears of the added «رصيد» on WhatsApp.
+      if (result.granted > 0) void tellMember(this.deps, contactId, 'pb_credit', [result.granted, result.left]);
       return { ok: true as const, granted: result.granted, left: result.left };
     });
   }
@@ -553,6 +558,8 @@ export class DashboardService {
     return this.write(admin, 'reply', contactId, { params: { length: text.length, excerpt: text.slice(0, 80) }, note: '', requestId }, async () => {
       const result = await this.hub(admin, 'admin_reply', { contact_id: contactId, text }, false);
       this.bust('threads');
+      // M235 (owner: «لما يجيله رسالة من الإدارة توصل واتس اب برده»): the words stay in the app; WhatsApp says one arrived.
+      void tellMember(this.deps, contactId, 'admin_message', [], `reply:${contactId}:${result.message_id}`);
       return { ok: true as const, message_id: result.message_id };
     });
   }

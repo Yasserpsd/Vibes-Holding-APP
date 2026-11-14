@@ -129,6 +129,7 @@ import { videosRoutes } from './videos/routes.js';
 import { VideosService } from './videos/service.js';
 import { webhookRoutes } from './webhooks/routes.js';
 import { WhatsappClient } from './whatsapp/client.js';
+import { tellMember } from './whatsapp/tell.js';
 import { whatsappAdminRoutes, whatsappWebhookRoutes } from './whatsapp/routes.js';
 import { WhatsappService } from './whatsapp/service.js';
 import { workshopsRoutes } from './workshops/routes.js';
@@ -700,7 +701,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     const found = await hubClient.call('member_status', { contact_id: contactId });
     return found.contact?.id === contactId && isHonorary(found.contact);
   });
-  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish });
+  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref) });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests, legacy });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
   const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER

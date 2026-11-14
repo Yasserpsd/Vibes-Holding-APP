@@ -1,6 +1,9 @@
 import type { WaTemplate } from './client.js';
 
-export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended';
+export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended' | NoticeKind;
+/** M235: short notices of what the administration did; every one is filled from `TemplateVars.list`, in order. */
+export type NoticeKind = 'admin_message' | 'pb_credit' | 'account_deleted' | 'affiliate_update' | 'payout_update' | 'affiliate_bonus' | 'affiliate_cycle';
+export const NOTICE_KINDS: ReadonlySet<string> = new Set<NoticeKind>(['admin_message', 'pb_credit', 'account_deleted', 'affiliate_update', 'payout_update', 'affiliate_bonus', 'affiliate_cycle']);
 export type WaLang = 'ar' | 'en';
 
 /** The templates registered on the WABA (each exists in ar and en); `code` is the Authentication one. */
@@ -19,6 +22,14 @@ export const TEMPLATE_NAMES: Record<WaKind, string> = {
   honorary: 'club_honorary_membership',
   // M205: the honorary membership was taken back (it belongs to partners in the Vibes Ventures companies only).
   honorary_ended: 'club_honorary_ended',
+  // M235 (filed at Meta 2026-11-14, Utility, ar + en; wording in scripts/m235-wa-templates.json).
+  admin_message: 'club_admin_message',
+  pb_credit: 'club_pb_credit',
+  account_deleted: 'club_account_deleted',
+  affiliate_update: 'club_affiliate_update',
+  payout_update: 'club_payout_update',
+  affiliate_bonus: 'club_affiliate_bonus',
+  affiliate_cycle: 'club_affiliate_cycle',
 };
 export const WA_KINDS = Object.keys(TEMPLATE_NAMES) as WaKind[];
 
@@ -38,6 +49,8 @@ export type TemplateVars = {
   status?: string | null;
   /** The full address behind a template's URL button; the button's variable is what follows the template's fixed part. */
   buttonLink?: string | null;
+  /** M235: the values of a notice kind, in the order its template numbers them. */
+  list?: (string | number | null | undefined)[];
 };
 
 export type DeliveryPlan =
@@ -62,6 +75,7 @@ export function formatAmount(amount: number | null | undefined): string {
 /** The values for {{1}}, {{2}}… in the order the templates define them (receipt: amount SAR, service, invoice number). */
 export function buildBodyParams(kind: WaKind, vars: TemplateVars, lang: WaLang): string[] {
   if (kind === 'code') return [cleanParam(vars.code, '-')];
+  if (NOTICE_KINDS.has(kind)) return (vars.list ?? []).map((value) => cleanParam(value, '-'));
   if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا')];
   if (kind === 'affiliate_link') return [cleanParam(vars.name, lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
   const service = cleanParam(vars.service, lang === 'en' ? 'Service' : 'خدمة');
