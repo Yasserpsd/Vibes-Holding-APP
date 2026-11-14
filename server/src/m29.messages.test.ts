@@ -211,3 +211,35 @@ test('the app composer is for admins alone, finds the member and sends message p
   assert.equal(broad.statusCode, 201, broad.body);
   assert.ok(hub.published.some((body) => body.key === broad.json().post.id && !body.remove));
 });
+
+// M238: «أعضاء محددون» — one message for a chosen list of members.
+test('a chosen list of members: only they read it, only their devices ring, and the list is 1 to 50 without repeats', async () => {
+  const members = [
+    { contactId: users.investor.id, name: 'ناصر السالم' },
+    { contactId: users.neutral.id, name: 'ناصر القحطاني' },
+  ];
+  const listId = await publish({ title: 'لأعضاء محددين', body: 'رسالة لقائمة مختارة.', audience: { type: 'members', members } });
+  assert.ok((await feedIds(users.investor.token)).includes(listId));
+  assert.ok((await feedIds(users.neutral.token)).includes(listId));
+  assert.ok(!(await feedIds(users.entrepreneur.token)).includes(listId));
+  assert.ok(!(await feedIds()).includes(listId));
+  assert.ok(!hub.published.some((body) => body.key === listId));
+
+  // The app labels it like a message for one member.
+  const feed = await get('/api/posts?limit=50', users.neutral.token);
+  assert.equal((feed.json().posts as { id: string; audience: string }[]).find((post) => post.id === listId)?.audience, 'member');
+
+  pushBatches.length = 0;
+  const pushed = await send('POST', `/api/admin/posts/${listId}/notify`, undefined, adminToken);
+  assert.equal(pushed.statusCode, 200, pushed.body);
+  assert.deepEqual(pushBatches.flat().map((message) => message.to).sort(), ['ExponentPushToken[inv00001]', 'ExponentPushToken[neu00001]']);
+
+  const draft = (audience: Record<string, unknown>) => send('POST', '/api/admin/posts', { status: 'draft', title: 'قائمة', body: 'نص.', audience }, adminToken);
+  assert.equal((await draft({ type: 'members', members: [] })).statusCode, 400);
+  assert.equal((await draft({ type: 'members', members: [members[0], members[0]] })).statusCode, 400);
+  const many = (count: number) => Array.from({ length: count }, (_, index) => ({ contactId: 900000 + index, name: '' }));
+  assert.equal((await draft({ type: 'members', members: many(51) })).statusCode, 400);
+  assert.equal((await draft({ type: 'members', members: many(50) })).statusCode, 201);
+  // A moderator never sends to a list.
+  assert.equal((await send('POST', '/api/admin/posts', { status: 'draft', title: 'قائمة', body: 'نص.', audience: { type: 'members', members } }, modToken)).statusCode, 403);
+});

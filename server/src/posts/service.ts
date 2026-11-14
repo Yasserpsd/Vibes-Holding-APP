@@ -39,11 +39,23 @@ const pollInputSchema = z.object({
   resultsVisible: z.boolean().default(true),
 });
 
+/** M238: the most members one message may be addressed to by name; beyond it the owner sends to a category or to everyone. */
+export const MAX_AUDIENCE_MEMBERS = 50;
+
 /** M29: who a message is for. `name` on a member audience is only a display label for the dashboard. */
 export const audienceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('all') }),
   z.object({ type: z.literal('persona'), persona: z.enum(['neutral', 'entrepreneur', 'investor']) }),
   z.object({ type: z.literal('member'), contactId: z.coerce.number().int().positive(), name: z.string().trim().max(120).default('') }),
+  // M238: a chosen list of members (1 to 50), each once.
+  z.object({
+    type: z.literal('members'),
+    members: z
+      .array(z.object({ contactId: z.coerce.number().int().positive(), name: z.string().trim().max(120).default('') }))
+      .min(1)
+      .max(MAX_AUDIENCE_MEMBERS)
+      .refine((list) => new Set(list.map((member) => member.contactId)).size === list.length, 'العضو مكرر في القائمة'),
+  }),
 ]);
 
 export const postInputSchema = z
@@ -122,7 +134,17 @@ export type PostPoll = { options: PostPollOption[]; closesAt: string | null; res
 export function pollClosed(poll: PostPoll, now = Date.now()): boolean {
   return poll.closesAt !== null && Date.parse(poll.closesAt) <= now;
 }
-export type PostAudience = { type: 'all' } | { type: 'persona'; persona: Persona } | { type: 'member'; contactId: number; name: string };
+export type PostAudience =
+  | { type: 'all' }
+  | { type: 'persona'; persona: Persona }
+  | { type: 'member'; contactId: number; name: string }
+  | { type: 'members'; members: { contactId: number; name: string }[] };
+
+/** M238: the accounts a message is addressed to by name (one member or a chosen list); empty for everyone / a category. */
+export function audienceMemberIds(audience: PostAudience): number[] {
+  if (audience.type === 'member') return [audience.contactId];
+  return audience.type === 'members' ? audience.members.map((member) => member.contactId) : [];
+}
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 
 /**
@@ -142,7 +164,7 @@ export function canSee(post: Pick<Post, 'audience'>, viewer: PostViewer): boolea
   if (viewer?.honorary) return false;
   if (audience.type === 'all') return true;
   if (!viewer) return false;
-  return audience.type === 'persona' ? viewer.persona === audience.persona : viewer.contactId === audience.contactId;
+  return audience.type === 'persona' ? viewer.persona === audience.persona : audienceMemberIds(audience).includes(viewer.contactId);
 }
 
 /** Every media URL a post points at (images, uploaded video, poster), ours or not. */

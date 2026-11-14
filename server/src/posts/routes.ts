@@ -12,7 +12,7 @@ import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
 import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
-import { audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostInput, type PostsService, type PostViewer } from './service.js';
+import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
 
 export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void };
 
@@ -58,7 +58,8 @@ function publicPost(post: Post, lang: AppLang = 'ar') {
     publishedAt,
     kind: post.kind ?? 'post',
     event,
-    audience: audienceOf(post).type,
+    // M238: a chosen list reads in the app exactly like a message for one member («لك خصيصًا»).
+    audience: audienceOf(post).type === 'members' ? 'member' : audienceOf(post).type,
   };
 }
 
@@ -103,18 +104,31 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     return hello ? { ...shown, body: shown.body ? `${hello}\n\n${shown.body}` : hello } : shown;
   };
 
+  /** M232 + M238: the refusal when a named member (the one, or any of a chosen list) is honorary; null when none is. */
+  const honoraryIn = async (audience: PostAudience) => {
+    if (audience.type === 'member') return (await auth.honoraryOf(audience.contactId)) ? HONORARY_MEMBER : null;
+    if (audience.type !== 'members') return null;
+    const held: string[] = [];
+    for (const member of audience.members) if (await auth.honoraryOf(member.contactId)) held.push(member.name || `#${member.contactId}`);
+    return held.length ? { error: { code: 'honorary', message: `أزل من القائمة أصحاب العضوية الشرفية، فلا تصلهم رسائل الإدارة ولا إشعاراتها: ${held.join('، ')}` } } : null;
+  };
+
   /** How many registered devices the post's audience holds right now (M232: honorary members' devices never count). */
   const audienceDevices = async (post: Post): Promise<number> => {
     const audience = audienceOf(post);
     if (audience.type === 'all') return push.reachable();
     if (audience.type === 'persona') return (await push.tokensForPersona(audience.persona)).length;
-    return (await push.tokensFor(audience.contactId)).length;
+    let devices = 0;
+    for (const contactId of audienceMemberIds(audience)) devices += (await push.tokensFor(contactId)).length;
+    return devices;
   };
 
   /** M235 + M236: WhatsApp says a message arrived (its words stay in the app): to the one member it is addressed to, or to every account of its audience. */
   const announce = (post: Post, uuid: string) => {
     const audience = audienceOf(post);
-    if (audience.type === 'member') tellMember?.(audience.contactId, `post:${post.id}`);
+    // M238: every member of a chosen list hears it like the one member of a personal message.
+    const named = audienceMemberIds(audience);
+    if (named.length) for (const contactId of named) tellMember?.(contactId, `post:${post.id}`);
     else tellAudience?.(uuid, audience.type === 'persona' ? audience.persona : null, `post:${post.id}`);
   };
 
@@ -135,10 +149,11 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       };
     };
     const audience = audienceOf(post);
+    const named = audienceMemberIds(audience);
     // M232: every device hears its own wording; honorary members' devices are left out by the push service itself.
     const outcome = await push.broadcastPersonal((device) => {
       if (audience.type === 'persona' && device.persona !== audience.persona) return null;
-      if (audience.type === 'member' && device.contactId !== audience.contactId) return null;
+      if (named.length && !named.includes(device.contactId)) return null;
       return messageIn(device.lang === 'en' ? 'en' : 'ar', device.name, device.nameEn);
     });
     if (outcome.sent > 0) await service.markNotified(post.id);
@@ -258,7 +273,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         }
         if (admin.level !== 'admin' && (isPoll(input) || isPoll(before))) return await reply.code(403).send(MODERATOR_POLL);
         // M232: an honorary member is kept apart from the management's messages — say so instead of sending into nothing.
-        if (input.audience.type === 'member' && (await auth.honoraryOf(input.audience.contactId))) return await reply.code(409).send(HONORARY_MEMBER);
+        const honorary = await honoraryIn(input.audience);
+        if (honorary) return await reply.code(409).send(honorary);
         await checkMedia(input);
         // A copy: the stored post object is changed in place by the update.
         const previous = before ? { ...before, images: [...before.images] } : null;
@@ -333,7 +349,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       // audience means nobody would receive it: say so instead of reporting a sent notification.
       if ((await audienceDevices(post)) === 0) {
         const audience = audienceOf(post);
-        const who = audience.type === 'all' ? 'للإشعارات بعد' : audience.type === 'persona' ? 'لهذه الفئة بعد' : 'لهذا العضو بعد';
+        const who = audience.type === 'all' ? 'للإشعارات بعد' : audience.type === 'persona' ? 'لهذه الفئة بعد' : audience.type === 'members' ? 'لهؤلاء الأعضاء بعد' : 'لهذا العضو بعد';
         return reply.code(409).send({ error: { code: 'no_devices', message: `لا توجد أجهزة مسجلة ${who}، فلن يصل الإشعار إلى أحد` } });
       }
       const outcome = await pushPost(post);
@@ -368,7 +384,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (!admin) return;
       const input = parse(composeSchema, request.body, reply);
       if (!input) return;
-      if (input.audience.type === 'member' && (await auth.honoraryOf(input.audience.contactId))) return reply.code(409).send(HONORARY_MEMBER);
+      const honorary = await honoraryIn(input.audience);
+      if (honorary) return reply.code(409).send(honorary);
       const post = await service.create(
         { title: input.title, body: input.body, links: [], images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, audience: input.audience },
         admin.me.name ?? admin.me.email ?? null,

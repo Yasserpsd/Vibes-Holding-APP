@@ -62,7 +62,10 @@ export type PostPollInput = { options: { id?: string; label: string }[]; closesA
 export type PollResults = { options: { id: string; label: string; votes: number | null }[]; closesAt: string | null; closed: boolean; resultsVisible: boolean; totalVotes: number | null; myVote: string | null };
 /** M29: everyone, one persona, or one member («رسالة Admin»). `name` is only the shown label. */
 export type PostPersona = 'neutral' | 'entrepreneur' | 'investor';
-export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona } | { type: 'member'; contactId: number; name: string };
+export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona } | { type: 'member'; contactId: number; name: string } | { type: 'members'; members: PostMember[] };
+/** M238: one chosen member of a message's list. */
+export type PostMember = { contactId: number; name: string };
+export const MAX_AUDIENCE_MEMBERS = 50;
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 /** `video` is the YouTube link or id, `videoFile` the uploaded video; a post may carry both. */
 export type PostInput = { title: string; body: string; english?: { title: string; body: string } | null; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; popup?: { until: string | null } | null; audience: PostAudience };

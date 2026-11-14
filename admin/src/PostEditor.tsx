@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, type PostLink, type PostPersona, type PostPollInput, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, MAX_AUDIENCE_MEMBERS, type PostLink, type PostMember, type PostPersona, type PostPollInput, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
 import { capturePoster, DEFAULT_UPLOAD_CONFIG, fileProblem, megabytes, typedFile, typeNames } from './media';
 
 type Props = { post: Post | null; isAdmin: boolean; onClose: (saved: Post | null) => void };
@@ -62,12 +62,16 @@ function sendPoster(frame: Blob, signal: AbortSignal): Promise<string | null> {
 
 type MemberHit = { id: number; name: string; email: string; persona: string };
 
-/** M29: the «عضو واحد» picker — a small search over the hub accounts, ending in one chosen member. */
-function MemberPicker({ chosen, onPick }: { chosen: { contactId: number; name: string } | null; onPick: (member: MemberHit | null) => void }) {
+/**
+ * M29 + M238: the «أعضاء محددون» picker — a small search over the hub accounts; every pick joins the list
+ * (one member or up to MAX_AUDIENCE_MEMBERS), and each chosen name leaves it with its ✕.
+ */
+function MemberPicker({ chosen, onChange }: { chosen: PostMember[]; onChange: (members: PostMember[]) => void }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<MemberHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const full = chosen.length >= MAX_AUDIENCE_MEMBERS;
 
   async function search() {
     const term = q.trim();
@@ -87,41 +91,61 @@ function MemberPicker({ chosen, onPick }: { chosen: { contactId: number; name: s
     }
   }
 
-  if (chosen) {
-    return (
-      <p className="member-chosen">
-        <strong>{chosen.name || `عضو #${chosen.contactId}`}</strong>
-        <button className="link" type="button" onClick={() => onPick(null)}>تغيير العضو</button>
-      </p>
-    );
-  }
+  const add = (hit: MemberHit) => {
+    if (full || chosen.some((member) => member.contactId === hit.id)) return;
+    onChange([...chosen, { contactId: hit.id, name: hit.name || hit.email }]);
+  };
+
   return (
     <>
-      <div className="link-add">
-        <input
-          placeholder="ابحث بالاسم أو البريد أو الجوال"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            void search();
-          }}
-        />
-        <button type="button" disabled={busy} onClick={() => void search()}>{busy ? '…' : 'بحث'}</button>
-      </div>
-      {note ? <p className="error" role="alert">{note}</p> : null}
-      {hits ? (
-        hits.length ? (
-          <ul className="member-hits">
-            {hits.map((hit) => (
-              <li key={hit.id}>
-                <button type="button" onClick={() => onPick(hit)}>
-                  <strong>{hit.name || hit.email}</strong>
-                  <span className="muted"> · {personaLabel(hit.persona) || 'بدون فئة'} · {hit.email}</span>
-                </button>
+      {chosen.length ? (
+        <div className="member-chosen">
+          <ul className="member-chips">
+            {chosen.map((member) => (
+              <li key={member.contactId}>
+                <strong>{member.name || `عضو #${member.contactId}`}</strong>
+                <button type="button" aria-label={`إزالة ${member.name || `عضو #${member.contactId}`}`} onClick={() => onChange(chosen.filter((other) => other.contactId !== member.contactId))}>✕</button>
               </li>
             ))}
+          </ul>
+          <p className="muted member-count">
+            {chosen.length === 1 ? 'تم اختيار عضو واحد' : chosen.length === 2 ? 'تم اختيار عضوين' : `تم اختيار ${chosen.length} ${chosen.length <= 10 ? 'أعضاء' : 'عضوًا'}`} من {MAX_AUDIENCE_MEMBERS} كحد أقصى
+            {chosen.length > 1 ? <button className="link" type="button" onClick={() => onChange([])}>إزالة الكل</button> : null}
+          </p>
+        </div>
+      ) : null}
+      {full ? (
+        <p className="muted hint">اكتمل الحد الأقصى ({MAX_AUDIENCE_MEMBERS} عضوًا). لعدد أكبر استخدم «فئة واحدة» أو «للجميع».</p>
+      ) : (
+        <div className="link-add">
+          <input
+            placeholder={chosen.length ? 'أضف عضوًا آخر: ابحث بالاسم أو البريد أو الجوال' : 'ابحث بالاسم أو البريد أو الجوال'}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              void search();
+            }}
+          />
+          <button type="button" disabled={busy} onClick={() => void search()}>{busy ? '…' : 'بحث'}</button>
+        </div>
+      )}
+      {note ? <p className="error" role="alert">{note}</p> : null}
+      {hits && !full ? (
+        hits.length ? (
+          <ul className="member-hits">
+            {hits.map((hit) => {
+              const added = chosen.some((member) => member.contactId === hit.id);
+              return (
+                <li key={hit.id}>
+                  <button type="button" disabled={added} onClick={() => add(hit)}>
+                    <strong>{hit.name || hit.email}</strong>
+                    <span className="muted"> · {personaLabel(hit.persona) || 'بدون فئة'} · {hit.email}{added ? ' · تمت إضافته' : ''}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="muted">لا نتائج لهذا البحث.</p>
@@ -146,7 +170,11 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [video, setVideo] = useState(post?.youtubeId ?? '');
   const [pinned, setPinned] = useState(post?.pinned ?? false);
   // M29: who reads the message — everyone, one category, or one member. Only admins retarget.
-  const [audience, setAudience] = useState<PostAudience>(post?.audience ?? { type: 'all' });
+  const [audience, setAudience] = useState<PostAudience>(() => {
+    const saved = post?.audience ?? { type: 'all' };
+    // M238: a message saved for one member opens as a list of one, so more members can be added.
+    return saved.type === 'member' ? { type: 'members', members: [{ contactId: saved.contactId, name: saved.name }] } : saved;
+  });
   // An event is a post with a date and a place: the websites' feed and the assistant hear it like any other post.
   const [kind, setKind] = useState<PostKind>(post?.kind ?? 'post');
   const [eventDay, setEventDay] = useState(() => eventFields(post?.event).day);
@@ -333,8 +361,8 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
       setError('استفتاء يحتاج خيارين مكتوبين على الأقل.');
       return;
     }
-    if (audience.type === 'member' && !audience.contactId) {
-      setError('اختر العضو الذي تصله الرسالة أولًا.');
+    if (audience.type === 'members' && audience.members.length === 0) {
+      setError('اختر عضوًا واحدًا على الأقل تصله الرسالة.');
       return;
     }
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
@@ -474,7 +502,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
               <div className="chips" role="group" aria-label="جمهور الرسالة">
                 <button type="button" className={audience.type === 'all' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'all'} onClick={() => setAudience({ type: 'all' })}>للجميع</button>
                 <button type="button" className={audience.type === 'persona' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'persona'} onClick={() => setAudience({ type: 'persona', persona: audience.type === 'persona' ? audience.persona : 'neutral' })}>فئة واحدة</button>
-                <button type="button" className={audience.type === 'member' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'member'} onClick={() => setAudience({ type: 'member', contactId: 0, name: '' })}>عضو واحد</button>
+                <button type="button" className={audience.type === 'members' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'members'} onClick={() => setAudience({ type: 'members', members: audience.type === 'members' ? audience.members : [] })}>أعضاء محددون</button>
               </div>
               {audience.type === 'persona' ? (
                 <div className="chips" role="group" aria-label="الفئة">
@@ -483,14 +511,14 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                   ))}
                 </div>
               ) : null}
-              {audience.type === 'member' ? (
+              {audience.type === 'members' ? (
                 <MemberPicker
-                  chosen={audience.contactId ? { contactId: audience.contactId, name: audience.name } : null}
-                  onPick={(member) => setAudience({ type: 'member', contactId: member?.id ?? 0, name: member?.name ?? '' })}
+                  chosen={audience.members}
+                  onChange={(members) => setAudience({ type: 'members', members })}
                 />
               ) : null}
               <p className="muted hint">أصحاب العضوية الشرفية معزولون تمامًا: لا تصلهم رسائل الإدارة ولا البوب أب ولا إشعاراتها، أيًّا كانت فئتهم.</p>
-              {audience.type !== 'all' ? <p className="muted hint">الرسالة الموجّهة تصل داخل التطبيق فقط إلى صاحبها، ولا تظهر في المواقع ولا يعرفها المستشار.</p> : null}
+              {audience.type !== 'all' ? <p className="muted hint">الرسالة الموجّهة تصل داخل التطبيق فقط إلى من وُجّهت إليهم، ولا تظهر في المواقع ولا يعرفها المستشار.</p> : null}
             </fieldset>
           ) : null}
 

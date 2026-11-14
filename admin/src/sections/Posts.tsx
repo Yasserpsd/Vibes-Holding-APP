@@ -12,7 +12,10 @@ function AudiencePill({ post }: { post: Post }) {
   const audience = audienceOf(post);
   if (audience.type === 'all') return null;
   if (audience.type === 'persona') return <Pill tone="gold">لفئة {personaLabel(audience.persona)}</Pill>;
-  return <Pill tone="gold">لعضو: {audience.name || `#${audience.contactId}`}</Pill>;
+  if (audience.type === 'member') return <Pill tone="gold">لعضو: {audience.name || `#${audience.contactId}`}</Pill>;
+  const [first] = audience.members;
+  if (audience.members.length === 1 && first) return <Pill tone="gold">لعضو: {first.name || `#${first.contactId}`}</Pill>;
+  return <span title={audience.members.map((member) => member.name || `#${member.contactId}`).join('، ')}><Pill tone="gold">لأعضاء محددين: {audience.members.length}</Pill></span>;
 }
 
 /** How the hand-over to the hub went: the websites' feed and the assistant hear a published post through it. */
@@ -115,7 +118,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
   async function push(post: Post) {
     const again = post.notifiedAt ? ' سبق إرسال إشعار لهذا المنشور.' : '';
     const audience = audienceOf(post);
-    const target = audience.type === 'all' ? `إلى ${devices} جهاز` : audience.type === 'persona' ? `إلى أجهزة فئة ${personaLabel(audience.persona)}` : `إلى أجهزة العضو ${audience.name || `#${audience.contactId}`}`;
+    const target = audience.type === 'all' ? `إلى ${devices} جهاز` : audience.type === 'persona' ? `إلى أجهزة فئة ${personaLabel(audience.persona)}` : audience.type === 'member' ? `إلى أجهزة العضو ${audience.name || `#${audience.contactId}`}` : `إلى أجهزة الأعضاء المحددين (${audience.members.length})`;
     if (!window.confirm(`إرسال إشعار بهذا المنشور ${target}؟${again}`)) return;
     setBusyId(post.id);
     try {
