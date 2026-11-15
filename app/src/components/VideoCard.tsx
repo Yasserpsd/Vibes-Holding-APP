@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { useInlinePlayback, YouTubePlayer } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
-import { textDir, textStart } from '@/i18n/direction';
+import { markParagraphs, textDir, textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { loadWebView, youtubeIdOf } from '@/lib/player';
@@ -16,7 +16,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 
 type Props = {
   video: Video;
-  /** Opens the watch screen: only for a video that is not on YouTube, or on a binary without the WebView module. */
+  /** Opens the watch screen: for a narrow strip card, a video that is not on YouTube, or a binary without the WebView module. */
   onPress: () => void;
   /** Fixed width for horizontal strips; the card then stretches to the strip's tallest card. */
   width?: number;
@@ -29,12 +29,14 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
   // The thumbnail fades in once it arrives instead of popping over the dark surface.
   const [thumbOpacity] = useState(() => new Animated.Value(0));
   const strip = width !== undefined;
-  // Owner (2026-11-15: «يفضل في نفس الصفحة ويفتحلي الفيديو، ميودنيش لصفحة تانية»): a YouTube video plays inside its own card.
+  // Owner (2026-11-15: «يفضل في نفس الصفحة ويفتحلي الفيديو، ميودنيش لصفحة تانية»): a YouTube video plays inside its own card —
+  // but only in a full-width card. Inside a narrow strip card YouTube's own title, logo and controls pile on top of
+  // each other (emulator, 2026-11-15), so a strip card opens the watch screen as before.
   const webview = useMemo(() => loadWebView(), []);
   const youtubeId = youtubeIdOf(video.url);
   const inline = useInlinePlayback();
-  const playsHere = Boolean(youtubeId && webview);
-  const player = youtubeId && webview && inline.playing ? <YouTubePlayer youtubeId={youtubeId} webview={webview} /> : null;
+  const playsHere = Boolean(youtubeId && webview) && !strip;
+  const player = playsHere && youtubeId && webview && inline.playing ? <YouTubePlayer youtubeId={youtubeId} webview={webview} /> : null;
   return (
     // While the video plays the card stops taking presses, so every touch on the picture reaches the player's own controls.
     <PressScale onPress={playsHere ? inline.start : onPress} disabled={player !== null} wrapStyle={strip ? [styles.fill, { width }] : null} style={strip ? styles.fill : null}>
@@ -59,11 +61,11 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
         </View>
         <View style={[styles.texts, strip && styles.fill]}>
           <Text style={[styles.title, strip && styles.titleStrip, textDir(video.title)]} numberOfLines={2}>
-            {video.title}
+            {markParagraphs(video.title)}
           </Text>
           {video.blurb ? (
             <Text style={[styles.blurb, textDir(video.blurb)]} numberOfLines={2}>
-              {video.blurb}
+              {markParagraphs(video.blurb)}
             </Text>
           ) : null}
           {video.publishedAt ? <Text style={styles.date}>{formatArabicDate(video.publishedAt)}</Text> : null}
@@ -75,7 +77,7 @@ export function VideoCard({ video, onPress, width, onAsk }: Props) {
               wrapStyle={[styles.askWrap, strip && styles.askWrapStrip]}
               style={styles.ask}
             >
-              <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
+              <Ionicons name="sparkles-outline" size={14} color={colors.goldText} />
               <Text style={styles.askText}>{t('advisor.ask')}</Text>
             </PressScale>
           ) : null}
@@ -117,5 +119,5 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.goldDark,
   },
-  askText: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
+  askText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldText },
 }));

@@ -1,0 +1,255 @@
+{
+ "key": "text-pushed-left",
+ "words": "Some people say the text is pushed to the left in a strange way that makes no sense.",
+ "diagnosis": {
+  "summary": "There is no single switch behind this complaint. The forced direction itself is sound: after I18nManager.forceRTL a JavaScript reload is enough on both platforms (Android re-reads the flag at every root measure, iOS when the reloaded surface builds its view), with one real hole: English chosen on an Arabic-language iPhone stays right-to-left for ever. What members see as \"text thrown to the left\" comes from text rules: both platforms take a paragraph's direction from its first strong letter (Arabic that opens with a Latin word reads backwards; on Android every Arabic paragraph of a multi-line message whose first line opens Latin is drawn on the left; on iPhone any unaligned Text that opens Latin is drawn from the left), three text boxes carry the Text helper textStart (physical left for a TextInput), and the \"own letters\" rule sends Latin-only strings to the left edge. Today's pass cured part of it (contact box, projects search, project cards on iPhone) but spread that last rule to projects, videos and advisor replies, where it now also pushes Latin names left on Android.",
+  "causes": [
+   {
+    "cause": "Text boxes styled with the Text helper `textStart` ('left'). A Text reads 'left' as the start edge (right in Arabic); a TextInput reads it as the physical left. So the placeholder and the typed Arabic sit on the left while everything around them is on the right.",
+    "evidence": "Helper: C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:29 (`textStart = 'left'`), :47-49 (`inputStart()` is the physical one). Native: Android C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactAndroid\\src\\main\\java\\com\\facebook\\react\\views\\textinput\\ReactTextInputManager.kt:545-568 (`\"left\" -> Gravity.LEFT`, no RTL swap). iOS: an input's attributes carry no layoutDirection (C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactCommon\\react\\renderer\\components\\textinput\\BaseTextInputProps.cpp:230-244), so the left/right swap in ...\\textlayoutmanager\\platform\\ios\\react\\renderer\\textlayoutmanager\\RCTAttributedTextUtils.mm:198-207 never runs for it. Members' bundle (git show 97705af): app/src/components/CountryPicker.tsx:157-165 (search, `textAlign: textStart`), app/src/components/OptionPicker.tsx:126, app/src/app/contact.tsx:220; app/src/app/(tabs)/projects.tsx:91-101 with style :265 had no alignment at all. Sequence: Arabic app -> sign-in or sign-up -> tap the country -> the sheet opens with autoFocus -> «ابحث بالاسم أو رمز الاتصال…» and the typed letters are at the left edge; same in the «راسل الإدارة» composer and the city picker of the affiliate form. Working tree: C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx:234 and C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx:102 are fixed; C:\\Projects\\vibes-club-app\\app\\src\\components\\CountryPicker.tsx:165-173 and C:\\Projects\\vibes-club-app\\app\\src\\components\\OptionPicker.tsx:130 are unchanged. The reviewers saw the same thing on the emulator for contact.tsx (C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\rev-home.md:51).",
+    "platforms": "iOS and Android, Arabic mode, every version (1.2.0 to 1.3.3)",
+    "confidence": "proven-in-code",
+    "fixedToday": "partly: contact composer and projects search fixed; the country search (sign-in, sign-up, profile, WhatsApp check) and the option search are not"
+   },
+   {
+    "cause": "Android: a Text holding several lines gets ONE alignment, computed from the first strong letter of the whole string, but applied to each paragraph relative to that paragraph's own direction. If the first line opens with a Latin word, every Arabic paragraph under it is drawn on the LEFT; inside an Arabic message, any line that opens Latin or holds only digits or a link is drawn on the left.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactAndroid\\src\\main\\java\\com\\facebook\\react\\views\\text\\TextLayoutManager.kt:184-214 (`isScriptRTL` = first strong letter of the whole spanned; one Layout.Alignment; NORMAL and OPPOSITE swapped when it differs from the layout direction) and :661-694 (StaticLayout built with setAlignment only, no setTextDirection, so each paragraph resolves its own direction by first strong letter). An explicit `textAlign: textStart` does not change this (it is the same branch as no alignment). Sites that print server or member text with line breaks in one Text: C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx:176 (the management thread, including the message opened to every account in M241), C:\\Projects\\vibes-club-app\\app\\src\\components\\AdminPopup.tsx:85, C:\\Projects\\vibes-club-app\\app\\src\\components\\WorkshopAd.tsx:108, C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\news.tsx:157, C:\\Projects\\vibes-club-app\\app\\src\\app\\meetup\\[key].tsx:49, C:\\Projects\\vibes-club-app\\app\\src\\app\\people\\[id].tsx:68 (bio). Sequence: the management writes «Investors Club» on the first line (the brand rule keeps the name Latin) and Arabic lines below -> on Android the Arabic lines hug the left edge; on iPhone they stay right because the explicit alignment is applied to the whole string (RCTAttributedTextUtils.mm:198-207). Same files and lines in 97705af.",
+    "platforms": "Android only, both languages (mirror image in English), every version",
+    "confidence": "proven-in-code",
+    "fixedToday": "no"
+   },
+   {
+    "cause": "iPhone: a Text with no textAlign is aligned by iOS from its first strong letter. Content that opens with a Latin word (a brand, an English name) or holds only digits, and fills the row width, is drawn from the left edge in left-to-right order, between right-aligned Arabic neighbours.",
+    "evidence": "React Native sets no paragraph alignment when the style has none (C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactCommon\\react\\renderer\\textlayoutmanager\\platform\\ios\\react\\renderer\\textlayoutmanager\\RCTAttributedTextUtils.mm:198-216), which leaves it to TextKit's natural alignment; Android instead aligns such text to the layout start (TextLayoutManager.kt:197-203), so Android members do not see this one. The project's own notes describe it: C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:36-38 (M177) and C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\rev-projects.md:42. Members' bundle (97705af), full-width text with no alignment and live content: app/src/components/ProjectCard.tsx:84, :90, :95 (title, company, excerpt), app/src/app/project/[id].tsx:116 (title), :126 (English title), :350 (description paragraphs, style `body` :429), app/src/components/PostsBlock.tsx:77 and :112 (styles :163-164), app/src/components/GoldenCompanyCard.tsx:34-36. Working tree: ProjectCard.tsx:87-98 and project/[id].tsx:120, :130 now take `textDir`; still unaligned: C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx:367 (style `body` :446), C:\\Projects\\vibes-club-app\\app\\src\\components\\PostsBlock.tsx:77, :112, C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenCompanyCard.tsx:35-37. Scan: 249 of 730 text styles carry no textAlign; most sit in rows or pills where it cannot show, 59 usages are stretched (62 in the members' tree).",
+    "platforms": "iOS, Arabic mode, every version",
+    "confidence": "likely",
+    "fixedToday": "partly: Projects Bank cards and the project title; not the project description, the posts block, the golden company cards"
+   },
+   {
+    "cause": "Both platforms: an Arabic sentence that opens with a Latin word gets a left-to-right base direction, so the Latin word is drawn at the left end and the full stop at the right end even when the block is right-aligned. The app's cure (`writingDirection` from `textDir`) works on iOS only.",
+    "evidence": "Android ignores the style: C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactAndroid\\src\\main\\java\\com\\facebook\\react\\views\\text\\TextAttributeProps.kt:417 (`TA_KEY_BEST_WRITING_DIRECTION -> {}`), and the layout uses the default first-strong rule (TextLayoutManager.kt:661-694). iOS applies it only where it is passed (RCTAttributedTextUtils.mm:212-216); `textDir` is C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:40-44. The bundled Arabic copy is clean (2 of 1,614 strings open with a Latin letter: auth.login.placeholder, form.file.hint; the brand sits mid-sentence everywhere), so this is live content: project excerpts and descriptions, posts, advisor replies, dashboard texts, hub sentences, member bios.",
+    "platforms": "Android everywhere; iOS wherever `textDir` is not applied; every version",
+    "confidence": "proven-in-code",
+    "fixedToday": "partly: iOS at the `textDir` sites added today; nothing on Android"
+   },
+   {
+    "cause": "The «own letters» rule itself: `textDir` sends any string without an Arabic letter to the far edge, which is the left in Arabic. Members have it in the news only; today's pass spread it to projects, videos, the player, advisor replies and file names, where Latin names used to sit on the right.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:40-44 (`isRTL()` and no Arabic letter -> `textEnd`). In 97705af only: app/src/app/news/[id].tsx:64, :71, app/src/components/NewsCarousel.tsx:208, :234, :235, app/src/components/news/NewsCard.tsx:60, :64. Added in 0fcf3e5: C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectCard.tsx:87, :93, :98; ProjectsBankCarousel.tsx:86; GoldenOpportunity.tsx:91; C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx:120, :130; VideoCard.tsx:61, :65; C:\\Projects\\vibes-club-app\\app\\src\\app\\watch.tsx:93; C:\\Projects\\vibes-club-app\\app\\src\\components\\advisor\\RichText.tsx:18-21, Composer.tsx:54, MessageBubble.tsx:146. Four of these had `textAlign: textStart` in the members' bundle (VideoCard.tsx:87, :90; watch.tsx:339; ProjectsBankCarousel.tsx:120; GoldenOpportunity.tsx:150), so a Latin title sat on the right on both platforms; after the pass it moves to the left on both. Visible in today's emulator shot C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\android-shots\\project-ar-dark.png: «Fionta Seven» at the left edge under the right-aligned Arabic title.",
+    "platforms": "iOS and Android, Arabic mode (mirror image in English)",
+    "confidence": "proven-in-code",
+    "fixedToday": "no: widened by today's pass (owner's decision needed before the OTA)"
+   },
+   {
+    "cause": "iPhone only: English chosen on an iPhone whose language is Arabic stays right-to-left at every launch. The member sees English text hugging the right, mirrored rows, while chevrons and inputs follow the left-to-right helpers.",
+    "evidence": "iOS direction = forceRTL OR (allowRTL AND the app's language is right-to-left): C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\React\\Modules\\RCTI18nUtil.m:32-41, :99-103. The binary ships ar.lproj (C:\\Projects\\vibes-club-app\\app\\app.config.ts:117), so the last term is true on an Arabic iPhone. The patched expo-localization still calls `allowRTL(true)` in OnCreate (C:\\Projects\\vibes-club-app\\app\\node_modules\\expo-localization\\ios\\LocalizationModule.swift:23-31, :72), and every Expo module is created at every start and every reload (C:\\Projects\\vibes-club-app\\app\\node_modules\\expo-modules-core\\ios\\Core\\ModuleHolder.swift:56). Sequence: «حسابي» -> English -> C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:97-104 writes allowRTL(false), forceRTL(false) and reloads -> the reload re-allows RTL -> the layout is RTL again -> syncDirection (:82-94) restarts once, the same happens, the guard at :91 returns -> English in a right-to-left layout, and the same at every later launch (the guard key is never cleared). Android is not affected: its direction needs the force flag (I18nUtil.kt:22-24; the device-language term at :63-69 reads Locale.getAvailableLocales()[0], not the phone's language). The patch dates from 2026-10-23, so every binary from 1.2.0 behaves this way.",
+    "platforms": "iOS, English mode on an Arabic-language iPhone, 1.2.0 to 1.3.3",
+    "confidence": "likely",
+    "fixedToday": "no"
+   },
+   {
+    "cause": "Android: the direction flag is live, the language is not. The flag is flipped before the reload is requested; if the reload waits, the old-language screen can be re-laid out in the new direction (Arabic to English: Arabic text in a left-to-right layout). Related edge: the 12-second launch watchdog opens the app in the default Arabic before the saved language is read.",
+    "evidence": "The root re-reads the flag at every measure: C:\\Projects\\vibes-club-app\\app\\node_modules\\react-native\\ReactAndroid\\src\\main\\java\\com\\facebook\\react\\runtime\\ReactSurfaceView.kt:83-117 -> ReactSurfaceImpl.kt:178-194, :217. direction.ts:97-104 flips the flag, then asks for the reload; expo-updates runs its procedures one at a time (C:\\Projects\\vibes-club-app\\app\\node_modules\\expo-updates\\android\\src\\main\\java\\expo\\modules\\updates\\statemachine\\UpdatesStateMachine.kt:46-48), and C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx:137-155 downloads an update in the first 30 seconds of a launch (always the case on a fresh install), so a language change from the welcome screen in that window waits for the download. A root re-measure in between (keyboard) flips the layout. Watchdog: _layout.tsx:57, :176-182 with the default `lang = 'ar'` at C:\\Projects\\vibes-club-app\\app\\src\\i18n\\index.ts:40. Both windows are narrow.",
+    "platforms": "Android (the watchdog edge on both), every version",
+    "confidence": "possible",
+    "fixedToday": "no"
+   },
+   {
+    "cause": "Design, not a defect: Latin form fields (mobile number, e-mail, password, codes, invite code) are left-aligned in Arabic forms, so on sign-in and sign-up the digits and the example number sit on the left under right-aligned labels.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\FormField.tsx:70, :113 (`latin: { textAlign: 'left', writingDirection: 'ltr' }`); used at C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\register.tsx:276-345, C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\login.tsx:97-108 and C:\\Projects\\vibes-club-app\\app\\src\\components\\LoginIdentifier.tsx. Shot: C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\android-shots\\signup-ar-dark.png («5XXXXXXXX» at the left edge). Kept on purpose by the review (C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\rev-design.md:69).",
+    "platforms": "iOS and Android, Arabic mode, every version",
+    "confidence": "possible",
+    "fixedToday": "no (kept on purpose)"
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Text boxes: in the `search` style of both pickers replace `textAlign: textStart` with `textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr'` (the same lines as contact.tsx:234; both sheets use the lazy `themedStyles`, so the call is made at render time). Add one line to the lint script: `textStart` / `textEnd` never in a style passed to a TextInput.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\CountryPicker.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\OptionPicker.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Two style lines; check the sheet in Arabic and in English on the emulator."
+   },
+   {
+    "change": "One primitive for every server- or member-written string. In direction.ts add `dirMark(paragraph)`: U+200F in front of a paragraph that holds an Arabic letter, U+200E otherwise (the mark is what Android obeys; `writingDirection` stays for iOS). Add a `ContentText` component that splits the string on line breaks, renders one Text per paragraph (with `numberOfLines` it joins the lines with a space instead), and applies the mark, the writing direction and the alignment. Use it at: contact.tsx:176, AdminPopup.tsx:85, WorkshopAd.tsx:108, (tabs)/news.tsx:157, meetup/[key].tsx:49, people/[id].tsx:68, hq/index.tsx:194, requests/index.tsx:154, PostsBlock.tsx:77 and :112, GoldenCompanyCard.tsx:35-37, project/[id].tsx:345-367 (through Highlight), golden/[code].tsx:99-111, StructuredText and advisor RichText paragraphs, and the 20 current `textDir` sites. This cures the Android paragraph rule, the reversed word order on Android and the unaligned text on iPhone in one place.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\Highlight.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\StructuredText.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\advisor\\RichText.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AdminPopup.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\WorkshopAd.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PostsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenCompanyCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\people\\[id].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\meetup\\[key].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\news.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\golden\\[code].tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Medium. About 25 call sites. The invisible mark must stay at index 0 when Highlight and SarText split the string, must not reach anything sent to the server or compared as text, and travels with copied text. ClampText measuring and `numberOfLines` previews need a look. Needs one emulator pass in both languages and one look on an iPhone."
+   },
+   {
+    "change": "Decide the alignment rule for Latin-only content in Arabic mode. Recommended: every string stays on the start edge (right in Arabic, left in English) and only the reading order follows its letters, i.e. `textDir()` returns `textAlign: textStart` with the content's writing direction; own-side alignment only for full English paragraphs if the owner wants it (news body, a long advisor reply). This undoes the left jump of Latin titles at the 13 sites added today (project cards, project page, videos, player, golden opportunity, carousel, advisor, file names) and still cures the M177 case, because an Arabic headline that opens with a Latin word becomes right-to-left and right-aligned. Decide before today's bundle is published.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts"
+    ],
+    "delivery": "owner-decision",
+    "risk": "Reverses a rule the owner approved for the news in M177 (2026-11-01); an English-only headline in the Arabic feed would then sit on the right, read left-to-right. One function, every `textDir` site follows."
+   },
+   {
+    "change": "Default alignment for the remaining unaligned text: add `textAlign: textStart` to the six typography tokens (tokens.ts:250-255) so every style that spreads a token starts from the start edge unless it sets its own, and give the styles that do not use a token an explicit one (PostsBlock.tsx:163-164, GoldenCompanyCard code/name/tagline, project/[id].tsx:446). Keep the scan used in this step as a lint check (text style with a font and no textAlign, used in a column container).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\theme\\tokens.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PostsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenCompanyCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Medium for the token default: a style where the token is spread after `textAlign: 'center'`, or passed later in a style array, would lose its centering; grep those before. Low for the explicit styles."
+   },
+   {
+    "change": "Make the layout follow the loaded language even when the native flag disagrees: give the root container at _layout.tsx:204 `direction: isRTL() ? 'rtl' : 'ltr'`. Text alignment follows the Yoga direction of its own node on both platforms (ParagraphShadowNode.cpp:78-84), so this covers English on an Arabic iPhone, the Android window between the flag and the reload, and the watchdog launch, on every runtime already installed.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Medium until tried: the `direction` style is already relied on at watch.tsx:347 and :353 but was not visible in today's shots; left/right style swapping stays tied to the native flag (start/end are safe); check a Modal, a horizontal list and the native header in both languages on the emulator. Cannot be tried on an iPhone here."
+   },
+   {
+    "change": "Close the iPhone hole in the binary: stop expo-localization from re-allowing RTL at every start. Either drop `supportsRTL` from the plugin options and from `extra` (app.config.ts:134 and :177), which makes the module's OnCreate a no-op on both platforms, or extend the existing patch to remove LocalizationModule.swift:72. The app's own allowRTL / forceRTL then persist. Android keeps `android:supportsRtl=\"true\"` from the Expo template (checked in expo/template.tgz and in the local prebuild manifest).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts",
+     "C:\\Projects\\vibes-club-app\\app\\patches\\expo-localization+57.0.2.patch"
+    ],
+    "delivery": "new-binary",
+    "risk": "Native, rides with 1.3.4. Three launches to check on an iPhone: Arabic app on an Arabic iPhone (RTL from the first frame), Arabic chosen on an English iPhone (RTL after one restart and at the next cold start), English chosen on an Arabic iPhone (LTR at the next cold start). Old binaries keep the hole; the root `direction` wrapper covers them by OTA."
+   },
+   {
+    "change": "Latin form fields in Arabic forms: keep them as they are, or keep left-to-right typing but align to the start edge (`textAlign: inputStart()` with `writingDirection: 'ltr'` in the `latin` style, FormField.tsx:113).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\FormField.tsx"
+    ],
+    "delivery": "owner-decision",
+    "risk": "Taste only. One style line; a phone number or e-mail would sit on the right in Arabic and still read left-to-right."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone. That iOS draws an unaligned Text from its first strong letter is TextKit behaviour: React Native's source only shows that no alignment is set; the project's own M177 note and rev-projects.md:42 describe the same symptom.",
+   "The iPhone reload path (RCTHost.mm:621-644 -> RCTFabricSurface.mm:80-85, :142-156, :177-190) and the English-on-Arabic-iPhone lock were read from source only. One device check settles it: Arabic-language iPhone, choose English, close and reopen twice.",
+   "The Android paragraph rule (a multi-line Text whose first line opens Latin) was read from TextLayoutManager.kt and not reproduced on the emulator in this read-only step. A management message with «Investors Club» on the first line and Arabic below shows it.",
+   "Which of these the complaining members actually saw: there are no member screenshots, and how many live projects, posts and messages open with a Latin word was not measured (no network calls in this step).",
+   "Whether a `direction` style on the root container flips the whole tree on Android in React Native 0.86 (the fix plan's OTA safeguard). The app already relies on it in watch.tsx, but today's shots do not show that bar.",
+   "The Android device-language term reads Locale.getAvailableLocales()[0] (I18nUtil.kt:63-69). It was treated as never right-to-left; not checked per device.",
+   "How a natural-aligned UITextField (a TextInput with no textAlign) resolves on an English-language iPhone running the Arabic app. Only the projects search had none in the members' bundle, and it has an explicit alignment now.",
+   "How often the reload after a language change is delayed behind an update download, and whether a root re-measure really happens in that window on a member's phone.",
+   "That the EAS builds applied the expo-localization patch (postinstall patch-package, committed 2026-10-23, before the 1.2.0 build of 2026-10-29) was inferred from the repository, not from a build log."
+  ],
+  "data": "WHEN THE NATIVE DIRECTION CHANGES\niOS: isRTL = forceRTL OR (allowRTL AND the app's language is right-to-left) - RCTI18nUtil.m:32-41. Read from NSUserDefaults when the surface builds its view (RCTFabricSurface.mm:142-156, :177-190). expo-updates reloadAsync -> RCTTriggerReloadCommandListeners (RelaunchProcedure.swift:76) -> RCTHost resets and restarts every surface (RCTHost.mm:621-644), the new view re-reads the flag, the new runtime re-reads the I18nManager constants (RCTI18nManager.mm:49-55). A JavaScript reload is enough; without it nothing changes until the next launch.\nAndroid: isRTL = manifest supportsRtl AND (forceRTL OR (allowRTL AND Locale.getAvailableLocales()[0] is RTL)) - I18nUtil.kt:22-24, :55-69. In practice only the force flag counts. Re-read at every root measure (ReactSurfaceView.kt:83-117 -> ReactSurfaceImpl.kt:178-194), so the layout changes even before the reload; the reload refreshes the JS constant. No process restart needed.\nexpo-localization OnCreate runs at every start and every reload on both platforms (ModuleHolder.swift:56; AppContext.kt:139-141): iOS allowRTL(true) only (patched, LocalizationModule.swift:72); Android allowRTL(true) only (LocalizationModule.kt:55-72; the forcesRTL string stays \"unset\").\n\nWHAT A MEMBER SEES\nFresh install, Arabic phone: iPhone is right-to-left from the first frame, no restart. Android draws left-to-right behind the splash, sets the flag, reloads once (the splash shows twice), then right-to-left.\nFresh install, English phone: the app opens in English, left-to-right (i18n/index.ts:68-77, :131-137). Choosing Arabic sets the flags and reloads: right-to-left at once and at every later launch.\nArabic phone, English chosen: Android left-to-right after the reload. iPhone right-to-left for ever (the hole above).\nBetween the choice and the reload: iPhone nothing changes; Android the layout can flip at the next root measure while the old language is still on screen.\n\nMEASUREMENTS (working tree, app/src)\nText styles with a font: 730; without textAlign: 249; stretched usages without alignment (heuristic): 59 now, 62 in the members' tree (97705af).\n`textDir(` call sites: 7 in the members' bundle (news only), 20 now.\n`textAlign: 'left' | 'right'` literals: 1 (FormField.tsx:113, Latin inputs). Module-scope I18nManager.isRTL reads: 2 in the members' bundle (NewsCarousel.tsx:25, ProfileCompleteness.tsx:24), 0 now. `row-reverse`: 0. `direction: 'ltr'`: watch.tsx:347, :353 only.\nTextInputs (8 components): members' bundle - CountryPicker search, OptionPicker search, contact composer on the physical left; projects search unaligned; FormField, advisor composer, code fields correct. Now - CountryPicker.tsx:173 and OptionPicker.tsx:130 still on the physical left.\nar.json, 1,614 strings: 2 open with a Latin letter (auth.login.placeholder, form.file.hint), 16 open with a placeholder, 10 are Latin only, 0 contain a line break. en.json: 3 strings contain Arabic (the language names).\nOne Text holding multi-line server or member text: contact.tsx:176, AdminPopup.tsx:85, WorkshopAd.tsx:108, (tabs)/news.tsx:157, meetup/[key].tsx:49, people/[id].tsx:68.\n\nScan script used (outside the repository): C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\ctx.js"
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "Most of the native mechanics hold up in the code. Android TextLayoutManager.kt:183-213 takes one alignment from the first strong letter of the whole string (FIRSTSTRONG_LTR). buildLayout (:661-694) sets no text direction, so every paragraph resolves its own direction. TextAttributeProps.kt:417 drops writingDirection. ReactTextInputManager.kt:562-563 maps 'left' to Gravity.LEFT. On iOS, RCTAttributedTextUtils.mm:197-216 swaps left and right only when an alignment is set, and the input's defaultTextAttributes come from props with no layoutDirection (RCTTextInputComponentView.mm:146-147, :295-300). ParagraphShadowNode.cpp:81-84 takes the text direction from Yoga.",
+   "The colleague's list of multi-line Text sites leaves out the most-used one: the AI advisor's replies. In the members' bundle (97705af:app/src/components/advisor/RichText.tsx:48-50, :80), every non-heading, non-table line is joined into ONE paragraph with '\\n', and bullets are rewritten to '• '. That paragraph is drawn as one Text (MessageBubble style text: textAlign textStart, :204). On Android, any bullet line whose first strong letter is Latin ('• ROI: …', '• **SaaS**: …', '1. MVP …') is laid out LTR with ALIGN_NORMAL, so it sits at the LEFT edge between right-aligned Arabic bullets. On iPhone the line stays right-aligned, but the bullet and the Latin term sit at the left end of the line. The working tree still joins lines this way (RichText.tsx:129 plus flush). Its new contentDir (:18-21) sets only textAlign for Arabic text, so nothing changes on either platform.",
+   "Cause 2 says the M241 commit opened a message to every account. It did not: 7f4bca3 opens the management contact thread (/api/contact) to every signed-in account; it is not a broadcast text. contact.tsx:176 is still a valid multi-line site, but there is no M241 'Investors Club'-first message to point at.",
+   "Cause 4 / fix-plan step 3 says that switching textDir to textStart plus writingDirection 'still cures the M177 case'. On Android it does not. writingDirection is ignored there (TextAttributeProps.kt:417). An Arabic headline that opens with a Latin word becomes right-aligned (the ALIGN_OPPOSITE swap) but keeps LTR word order, with the Latin word at the left end of the line. Android needs a bidi mark in the string; the style alone cannot do it.",
+   "Cause 6 (English chosen on an Arabic iPhone stays RTL) is real in the code: LocalizationModule.swift:23-31 and :72 run allowRTL(true) at every start, and RCTI18nUtil.m:32-41 counts the app's language. But it produces the opposite of the complaint: English text pushed to the RIGHT. It only touches English-mode members on Arabic iPhones. It is not a lead for 'text pushed to the left'.",
+   "Cause 7 is speculative (a narrow race window) and does not explain a steady complaint.",
+   "Fix-plan step 2 (a ContentText component that splits strings into one Text per paragraph at about 25 sites) is more invasive than it needs to be. Inserting U+200F / U+200E at the start of each paragraph INSIDE the same string gives the same result on Android. The whole-string first-strong test then sees the mark, so the alignment is ALIGN_NORMAL, and each paragraph's own direction becomes the mark's direction. This keeps numberOfLines, ClampText measurement, Highlight and SarText spans and the selectable text intact.",
+   "Fix-plan step 4 (put textAlign: textStart into the shared typography tokens) has a hazard the colleague did not list. Any TextInput style that spreads a typography token and has no textAlign of its own would get 'left', which is the PHYSICAL left for an input. That would push Arabic input to the left, the very symptom being fixed. Composer and FormField do not spread tokens today, but the default is a trap. Use explicit per-style alignment instead.",
+   "Fix-plan step 5 (direction on the root container) does nothing for the complaint in the normal state, where the native flag already matches the language. Physical left/right styles and native components that follow the I18nManager flag (horizontal lists, gestures) would not follow a Yoga-only direction, so it adds risk for a rare edge. It is optional and goes last.",
+   "Confirmed: the country and option picker searches (CountryPicker.tsx:173, OptionPicker.tsx:130, same in 97705af) still use textAlign: textStart on a TextInput, so the placeholder and typed text sit on the physical left in Arabic. Confirmed too: the members' bundle uses textDir only in the news, and today's pass moved Latin-only titles from the right to the left at VideoCard, watch, ProjectsBankCarousel and GoldenOpportunity (members' styles had textStart at VideoCard.tsx:87, :90; watch.tsx:339; ProjectsBankCarousel.tsx:120; GoldenOpportunity.tsx:150).",
+   "The binary-fix check list is right: RCTI18nUtil.m:48-55 defaults allowRTL to YES when nothing is stored, so dropping supportsRTL still gives an Arabic iPhone RTL from the first frame."
+  ],
+  "missedCauses": [
+   "Advisor replies (all versions, both platforms; worst on Android). Multi-line markdown paragraphs and bullet lists are drawn as one Text (97705af RichText.tsx:48-50 and :80, MessageBubble.tsx:204; unchanged in the working tree at RichText.tsx:129, :158 and :186). Lines that start with a Latin term, a link or digits only are thrown to the left edge on Android. On iPhone the bullet and the Latin word sit at the left end of a right-aligned line. GPT replies to investors are full of Latin terms (ROI, SaaS, MVP, KPI, B2B, the brand), so this is probably the most frequent 'text on the left for no reason' a member meets.",
+   "The same per-paragraph rule hits the other multi-line content sites the colleague listed (contact thread, AdminPopup, WorkshopAd, news body, meetup, member bio), and also StructuredText users (posts/[id].tsx, agenda/[id].tsx, service/[key].tsx, PostsBlock). StructuredText joins lines with '\\n' at StructuredText.tsx:39-41 and draws them in one Text at :104.",
+   "iPhone: a price or number-only Text (digits plus currency, no strong letter) with no textAlign takes natural alignment and is drawn on the left. Android aligns the same text to the start, i.e. the right. This is minor and only shows where such a Text fills the row."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Picker search boxes. In app/src/components/CountryPicker.tsx (style `search`, line 173) and app/src/components/OptionPicker.tsx (style `search`, line 130), replace `textAlign: textStart` with `textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr'`, as contact.tsx:233-235 already does. Import inputStart and isRTL from '@/i18n/direction'. Both style sheets are themedStyles, so the call runs at render time; confirm that before relying on it, and if the sheet is built at module scope, pass the style inline on the TextInput as projects.tsx:102 does. Add a lint/grep check: no `textStart` or `textEnd` in any style object passed to a <TextInput>.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\CountryPicker.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\OptionPicker.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator, Arabic: open sign-up, tap the country field. The placeholder «ابحث بالاسم أو رمز الاتصال…» and the typed Arabic sit on the right. Switch to English: both sit on the left. Do the same for the city picker in the affiliate form (OptionPicker). iOS follows the same physical mapping (RCTTextInputComponentView.mm:146), but only an iPhone can confirm it."
+   },
+   {
+    "priority": 2,
+    "change": "Paragraph bidi marks for server- or member-written text. Add to app/src/i18n/direction.ts a pure function `markParagraphs(text: string): string`. It splits on /\\r?\\n/, prefixes each non-empty paragraph with U+200F (RLM) when the paragraph holds an Arabic letter [؀-ۿ], otherwise with U+200E (LRM), and joins again with '\\n'. For a Latin-only paragraph in Arabic mode, use the result of priority 3 if the owner wants it on the right. It skips a paragraph that already starts with a mark and returns '' for empty input. Apply it ONLY to the string passed as Text children, never to data sent to the server or compared. Sites: advisor RichText (wrap block.text in the paragraph and heading Inline calls at RichText.tsx:158 and :186, before tokenizing, so the mark sits at index 0 of each line and stays outside **bold** and link tokens); StructuredText paragraph text (StructuredText.tsx:39-41 and :104); contact.tsx:176 bubble text; AdminPopup.tsx:85; WorkshopAd.tsx:108; (tabs)/news.tsx:157; meetup/[key].tsx:49; people/[id].tsx:68; PostsBlock.tsx:77 and :112; GoldenCompanyCard.tsx:35-37; project/[id].tsx:367 (description, before Highlight); and the 20 textDir sites. Keep each one as a single Text, so numberOfLines, ClampText, Highlight and SarText keep working. Keep the existing explicit textAlign: textStart on these styles: iOS then right-aligns every paragraph, and the mark fixes the word order on both platforms. Android takes alignment from the first strong letter of the whole string (the mark) and direction per paragraph (each line's mark). Pure JS, no new native API: safe for runtimes 1.2.0 to 1.3.3.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\advisor\\RichText.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\StructuredText.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AdminPopup.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\WorkshopAd.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\news.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\meetup\\[key].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\people\\[id].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PostsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenCompanyCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Unit test (node) for markParagraphs: Arabic, Latin, mixed, empty lines, CRLF, already marked. Android emulator, Arabic: ask the advisor for 'a list of KPIs for a SaaS startup'. Every bullet, including the ones that open with a Latin term, hugs the right, and the bullet sits on the right. Write a management message in the local mock server whose first line is «Investors Club» with Arabic lines below: all lines sit on the right. Check that copy/paste from a selectable advisor reply still pastes cleanly. iPhone: same two checks; only possible on a real device."
+   },
+   {
+    "priority": 3,
+    "change": "Owner decision before today's bundle is published by OTA: where a Latin-only string sits in Arabic mode. Today's pass (0fcf3e5) moved Latin-only titles to the LEFT at ProjectCard, ProjectsBankCarousel, GoldenOpportunity, project/[id], VideoCard, watch, advisor RichText, Composer and MessageBubble. Before, members saw them on the right at VideoCard, watch, ProjectsBankCarousel and GoldenOpportunity. Recommended: change textDir() (direction.ts:40-44) to always return textAlign: textStart (the start edge of the screen language) and to keep writingDirection from the content, plus the priority-2 mark for Android. Then Latin names sit on the right in Arabic, read left-to-right, and Arabic headlines that open with a Latin word read right-to-left on both platforms. If the owner wants to keep M177's 'English headline on the left' for the news only, keep a separate newsDir() with the old behaviour and use it only in news/[id].tsx, NewsCarousel.tsx and news/NewsCard.tsx.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Android emulator, Arabic: on the project page of a project with a Latin name (the «Fionta Seven» case in docs/reviews/2026-11-15/android-shots/project-ar-dark.png), the name sits under the Arabic title on the right. A video card with an English title sits on the right. The news follows whichever rule was chosen."
+   },
+   {
+    "priority": 4,
+    "change": "Give an explicit alignment to the content text that still has none, so iPhone does not fall back to natural (first-strong) alignment. Set textAlign: textStart on PostsBlock.tsx styles :163-164, the GoldenCompanyCard code/name/tagline styles, and the project/[id].tsx `body` style (:446). Do NOT add textAlign to the shared typography tokens (tokens.ts:250-255): a TextInput style that spreads a token would get a physical 'left'. Optionally add a scan script (text style with a fontFamily, no textAlign, in a column) as a warning-only lint.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PostsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenCompanyCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\project\\[id].tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and lint pass. Android shows no change, since Android already aligns unaligned text to the start. The real effect is on iPhone only: a post or golden company whose text opens with a Latin word sits on the right. That needs a real iPhone."
+   },
+   {
+    "priority": 5,
+    "change": "Owner decision on Latin form fields (FormField.tsx:113 `latin: { textAlign: 'left', writingDirection: 'ltr' }`, used for phone, e-mail, password, codes and the login identifier). Either keep them (a common convention), or keep LTR typing aligned to the start edge: `latin: { textAlign: inputStart(), writingDirection: 'ltr' }`, resolved at render time like line 70. Every new member sees this on sign-up and sign-in, so if members mean 'the number box is on the left', this is it.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\FormField.tsx"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Android emulator, Arabic: on sign-up, «5XXXXXXXX» and the typed digits sit on the right and read left-to-right. Check the e-mail and password fields and the WhatsApp code step."
+   },
+   {
+    "priority": 6,
+    "change": "Binary 1.3.4: stop expo-localization from re-allowing RTL at every start on iOS. Extend patches/expo-localization+57.0.2.patch so that LocalizationModule.swift setRTLPreferences calls allowRTL(supportsRTL) only when NSUserDefaults has no 'RCTI18nUtil_allowRTL' value yet, i.e. only on first install. Alternatively, remove supportsRTL from app.config.ts:134 and :177. That is also safe, because RCTI18nUtil.m:48-55 defaults allowRTL to YES. Android keeps android:supportsRtl from the template.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\patches\\expo-localization+57.0.2.patch",
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "howToVerify": "Real iPhone only, three cases. (1) Arabic iPhone, fresh install: RTL from the first frame. (2) Arabic iPhone, choose English in «حسابي», then close and reopen twice: LTR every time. (3) English iPhone, choose Arabic: RTL after one restart and at every cold start."
+   },
+   {
+    "priority": 7,
+    "change": "Optional safety net, last: put style `direction: isRTL() ? 'rtl' : 'ltr'` on the root container in _layout.tsx (around :201-204). This only matters when the native flag disagrees with the language (English on an Arabic iPhone on old binaries, the Android window between the flag flip and the reload). Ship it only after the emulator checks below.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator in both languages: home, a Modal sheet (CountryPicker), a horizontal carousel, the native header back arrow, any style using physical left/right margins. No mirrored element. The iPhone case it targets can only be checked on a real Arabic-language iPhone."
+   }
+  ],
+  "ownerMessage": "Text that starts with an English word (advisor replies with terms like ROI or SaaS, Latin project and video names, management messages) makes the phone flip that line, so it jumps to the left edge, most often on Android. The country search box is also set to the wrong side. A small OTA update fixes this: it marks each line's direction inside the text, fixes the search boxes, and you decide whether English-only names stay on the right in Arabic mode. Only the English-on-an-Arabic-iPhone case needs the next store build, 1.3.4."
+ }
+}

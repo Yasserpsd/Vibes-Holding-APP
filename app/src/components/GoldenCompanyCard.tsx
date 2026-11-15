@@ -7,6 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { Sheen } from '@/components/motion';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -32,9 +33,10 @@ export function GoldenCompanyCard({ company }: Props) {
           <Sheen width={LOGO_SIZE} height={LOGO_SIZE} />
         </View>
         <View style={styles.titles}>
-          <Text style={styles.code}>{company.code}</Text>
-          <Text style={styles.name}>{company.name}</Text>
-          {company.tagline ? <Text style={styles.tagline}>{company.tagline}</Text> : null}
+          {/* Written in the dashboard, Latin or Arabic: each starts at the screen's start edge and reads its own way. */}
+          <Text style={styles.code}>{markParagraphs(company.code)}</Text>
+          <Text style={styles.name}>{markParagraphs(company.name)}</Text>
+          {company.tagline ? <Text style={styles.tagline}>{markParagraphs(company.tagline)}</Text> : null}
         </View>
       </View>
       {/* §5.1: the offer opens as a native page in the app, never in the browser. */}
@@ -75,14 +77,18 @@ const styles = themedStyles(() => ({
     fontFamily: fonts.bold,
     fontSize: 12,
     lineHeight: 16,
-    color: colors.gold,
+    // Small gold text: the readable gold in the light theme (same as gold in the dark).
+    color: colors.goldText,
+    textAlign: textStart,
   },
   name: {
     ...typography.subtitle,
     color: colors.textPrimary,
+    textAlign: textStart,
   },
   tagline: {
     ...typography.caption,
     color: colors.textSecondary,
+    textAlign: textStart,
   },
 }));

@@ -1,23 +1,31 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
-import { BreakingPill, isBreaking } from '@/components/news/NewsCard';
+import { BreakingPill, fitWords, isBreaking } from '@/components/news/NewsCard';
 import { MarketsStrip } from '@/components/MarketsStrip';
 import { FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
-import { isRTL, textDir, textStart } from '@/i18n/direction';
+import { isRTL, markParagraphs, textDir, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-const ROTATE_MS = 4500;
+// Members (2026-11-16, «الكلام بيختفي لوحده»): 4.5 s was less than a headline and its snippet take to read.
+const ROTATE_MS = 8000;
+// Once the member has touched the strip it stops turning by itself for the rest of this app run, even if the
+// home screen is built again. The member's own swipes and the dots keep working.
+let stoppedByMember = false;
 const SLIDES = 8;
+// The reserved two lines of the title and of the snippet (line heights in the styles below).
+const TITLE_LINE = 27;
+const SNIPPET_LINE = 22;
+const SNIPPET_SIZE = 14;
 // The next card peeks in at the reading end so the strip reads as something to flip through.
 const PEEK = 32;
 const GAP = 10;
@@ -27,7 +35,8 @@ const GAP = 10;
  * moving carousel of the latest real items (rule 7: original title, source, time, snippet — tap opens
  * the item with its «اقرأ من المصدر»); the live price strip sits right above it.
  * Owner, 2026-11-01 («اقدر اقلب بينها… لو خبر عاجبني ارجعه»): the card follows the finger both ways,
- * the next one peeks in, the first touch stops the auto-advance for good, and the dots jump to an item.
+ * the next one peeks in, the first touch (a swipe, a tap, a dot) stops the auto-advance for the rest of the
+ * app run, and the dots jump to an item. Untouched, it turns every 8 seconds.
  * Every card keeps one height (image or fallback, two title lines, two snippet lines).
  */
 // M182 (owner, 2026-11-02): the carousel's items come from the server's home scope — money and
@@ -40,11 +49,14 @@ export function NewsCarousel() {
   const feed = useHomeNews();
   const items = useMemo(() => (feed.data?.items ?? []).slice(0, SLIDES), [feed.data]);
   const [width, setWidth] = useState(0);
-  const [touched, setTouched] = useState(false);
+  const [touched, setTouched] = useState(() => stoppedByMember);
   // Off the screen (another tab, a pushed page) the strip stops turning: no timer and no animation frames nobody sees.
   const focused = useIsFocused();
   const [position] = useState(() => new Animated.Value(0));
-  const touch = useCallback(() => setTouched(true), []);
+  const touch = useCallback(() => {
+    stoppedByMember = true;
+    setTouched(true);
+  }, []);
   const cardWidth = width ? width - PEEK : 0;
   const step = cardWidth + GAP;
   // Transforms are physical: the next card sits toward the reading end (left in Arabic, right in English).
@@ -99,6 +111,9 @@ export function NewsCarousel() {
       jump: (slot: number) => go(Math.round(live.at) + offsetOf(slot)),
       // A tap on the center card opens it (true); a tap on a peeking card slides it in.
       tap: (slot: number) => {
+        // A tap on a story counts as the member's touch too (like a swipe or a dot): the strip stops turning by
+        // itself. A finger that only scrolls the page past the strip does not.
+        live.onTouch();
         const offset = offsetOf(slot);
         if (offset === 0) return true;
         go(Math.round(live.at) + offset);
@@ -156,7 +171,7 @@ const CarouselCard = memo(function CarouselCard({ item, slot, cardWidth, transla
   return (
     // Every card shares one height: the first stays in flow and gives the strip its size.
     <Animated.View style={[slot !== 0 && styles.side, cardWidth ? { width: cardWidth } : null, translateX ? { transform: [{ translateX }] } : null]}>
-      <NewsSlide item={item} onPress={() => (pager.tap(slot) ? router.push(`/news/${item.id}` as Href) : undefined)} />
+      <NewsSlide item={item} cardWidth={cardWidth} onPress={() => (pager.tap(slot) ? router.push(`/news/${item.id}` as Href) : undefined)} />
     </Animated.View>
   );
 });
@@ -211,16 +226,24 @@ function NumberOfDayCard() {
           <Text style={styles.numberEyebrow}>{t('news.numberOfDay')}</Text>
         </View>
         <Text style={styles.numberValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{number.text}</Text>
-        <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{number.item.title}</Text>
+        <Text style={[styles.numberTitle, textDir(number.item.title)]} numberOfLines={2}>{markParagraphs(number.item.title)}</Text>
         <Text style={styles.numberSource} numberOfLines={1}>{number.item.source.name}</Text>
       </View>
     </PressScale>
   );
 }
 
-function NewsSlide({ item, onPress }: { item: NewsItem; onPress: () => void }) {
+function NewsSlide({ item, cardWidth, onPress }: { item: NewsItem; cardWidth: number; onPress: () => void }) {
   // A picture that fails to load gives way to the newspaper block, like an item without one.
   const [imageFailed, setImageFailed] = useState(false);
+  // Only the first card is in flow and sizes the strip, so every card must reserve the same two lines. Text and
+  // line heights grow with the system font size; a reserve in plain points did not, and a later card's last
+  // snippet line was cut on phones with a larger font.
+  const { fontScale } = useWindowDimensions();
+  const titleReserve = { minHeight: TITLE_LINE * 2 * fontScale };
+  const snippetReserve = { minHeight: SNIPPET_LINE * 2 * fontScale };
+  // Cut at the end of a word so Android never clips the ellipsis (see `fitWords`).
+  const snippet = item.snippet ? fitWords(item.snippet, Math.max(0, cardWidth - spacing.md * 2), SNIPPET_SIZE, fontScale, 2) : '';
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={item.title}>
       <GlassCard style={styles.card}>
@@ -239,8 +262,8 @@ function NewsSlide({ item, onPress }: { item: NewsItem; onPress: () => void }) {
             </View>
             <Text style={styles.time} numberOfLines={1}>{formatRelativeTime(item.publishedAt)}</Text>
           </View>
-          <Text style={[styles.title, textDir(item.title)]} numberOfLines={2}>{item.title}</Text>
-          <Text style={[styles.snippet, item.snippet ? textDir(item.snippet) : null]} numberOfLines={2}>{item.snippet ?? ''}</Text>
+          <Text style={[styles.title, titleReserve, textDir(item.title)]} numberOfLines={2}>{markParagraphs(item.title)}</Text>
+          <Text style={[styles.snippet, snippetReserve, item.snippet ? textDir(item.snippet) : null]} numberOfLines={2}>{markParagraphs(snippet)}</Text>
         </View>
       </GlassCard>
     </PressScale>
@@ -258,9 +281,10 @@ const styles = themedStyles(() => ({
   sourcePill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.goldSoft, borderWidth: 1, borderColor: colors.borderGoldSoft, maxWidth: '60%' },
   source: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLightText },
   time: { ...typography.caption, color: colors.textMuted, flex: 1, textAlign: textStart },
-  // Two reserved lines each: every card in the pager keeps one height.
-  title: { ...typography.subtitle, fontSize: 17, lineHeight: 27, minHeight: 54, color: colors.textPrimary, textAlign: textStart },
-  snippet: { ...typography.body, fontSize: 14, lineHeight: 22, minHeight: 44, color: colors.textSecondary, textAlign: textStart },
+  // Two reserved lines each, so every card in the pager keeps one height: the reserve is set in NewsSlide,
+  // multiplied by the system font scale.
+  title: { ...typography.subtitle, fontSize: 17, lineHeight: TITLE_LINE, color: colors.textPrimary, textAlign: textStart },
+  snippet: { ...typography.body, fontSize: SNIPPET_SIZE, lineHeight: SNIPPET_LINE, color: colors.textSecondary, textAlign: textStart },
   numberWrap: { marginTop: spacing.sm },
   numberCard: {
     minHeight: 176,

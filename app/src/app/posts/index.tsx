@@ -1,5 +1,5 @@
-import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Stack, useRouter, type Href } from 'expo-router';
+import { useState } from 'react';
 import { RefreshControl, Text } from 'react-native';
 
 import { usePosts } from '@/api/posts';
@@ -7,11 +7,11 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { entranceDelay, FadeInView } from '@/components/motion';
-import { PostCard } from '@/components/PostsBlock';
+import { MarkAllReadButton, PostCard } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { markSeen } from '@/lib/seen';
+import { isPostUnread, useReadPosts } from '@/lib/readPosts';
 import { themedStyles } from '@/theme/styles';
 import { colors, typography } from '@/theme/tokens';
 
@@ -22,13 +22,11 @@ export default function PostsScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   useAdvisorScreen({ type: 'screen', id: 'posts', title: t('nav.posts') });
-  // M75: reading the admin messages clears their unread count.
-  useFocusEffect(
-    useCallback(() => {
-      markSeen('posts');
-    }, []),
-  );
+  // M242: opening this list no longer marks anything read — each message stays unread (gold dot, semi-bold title)
+  // until the member opens it, or taps «تعليم الكل كمقروء».
+  const read = useReadPosts();
   const posts = query.data?.pages.flatMap((page) => page.posts) ?? [];
+  const unreadIds = posts.filter((post) => isPostUnread(post, read)).map((post) => post.id);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -58,6 +56,7 @@ export default function PostsScreen() {
           <Text style={styles.empty}>{t('posts.empty')}</Text>
         </FadeInView>
       ) : null}
+      <MarkAllReadButton ids={unreadIds} />
       {posts.map((post, index) => (
         <FadeInView key={post.id} delay={entranceDelay(index)}>
           <PostCard post={post} />

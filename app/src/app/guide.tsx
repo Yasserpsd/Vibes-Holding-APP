@@ -107,7 +107,7 @@ const styles = themedStyles(() => ({
     experimental_backgroundImage: gradients.gold,
     boxShadow: shadows.glowGoldFaint,
   },
-  stepNumber: { color: colors.gold, fontFamily: fonts.bold, fontSize: 16 },
+  stepNumber: { color: colors.goldText, fontFamily: fonts.bold, fontSize: 16 },
   stepNumberActive: { color: colors.goldInk },
   railLine: { flex: 1, width: 2, borderRadius: 1, backgroundColor: colors.borderGoldSoft, marginTop: spacing.xs },
   stepBody: { flex: 1, gap: spacing.sm },

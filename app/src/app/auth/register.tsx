@@ -22,7 +22,7 @@ import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
 import { markIntroDue } from '@/lib/introGate';
-import { isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
+import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -129,7 +129,15 @@ export default function RegisterScreen() {
     // M211: the proof belongs to one number in one country.
     if (key === 'country') setProof(null);
   };
-  const blur = (key: Field) => () => errors.check(key, issueOf(key, newest.form));
+  const blur = (key: Field) => () => {
+    // Leaving the e-mail field shows the address as it will be sent (invisible marks, a trailing dot, capitals gone);
+    // never while typing. The provider's own address of a Google/Apple sign-up is left as it came.
+    if (key === 'email' && !social) {
+      const cleaned = cleanEmail(newest.form.email);
+      if (cleaned !== newest.form.email) set('email')(cleaned);
+    }
+    errors.check(key, issueOf(key, newest.form));
+  };
   const validate = (proven: PhoneProofState = proof) => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {
@@ -190,7 +198,7 @@ export default function RegisterScreen() {
         name: latest.name.trim(),
         country: latest.country,
         phone: latest.phone.trim(),
-        email: latest.email.trim(),
+        email: cleanEmail(latest.email),
         password: latest.password,
         persona: latest.persona,
         jobTitle: latest.jobTitle.trim(),
@@ -392,5 +400,5 @@ export default function RegisterScreen() {
 const styles = themedStyles(() => ({
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs },
   invite: { alignSelf: 'center', paddingVertical: spacing.xs },
-  inviteText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
+  inviteText: { ...typography.caption, color: colors.goldText, textDecorationLine: 'underline' },
 }));

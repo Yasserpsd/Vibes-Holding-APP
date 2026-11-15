@@ -23,6 +23,7 @@ import { VoiceFill, type FillField } from '@/components/VoiceFill';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
+import { isEmail } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -98,8 +99,6 @@ export function FormEmbed({ formKey, scrollRef }: { formKey: string | undefined;
   );
 }
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
 /** What the signed-in account already answers; the member can still edit every field. */
 function prefillOf(field: FormFieldDef, me: Me | null): string {
   if (!me || !field.prefill) return '';
@@ -143,7 +142,7 @@ function Form({ form, me, signedIn, scrollRef }: { form: FormDef; me: Me | null;
       if (field.required && !value) {
         message = field.type === 'agree' ? t('form.agree', { field: field.label }) : field.type === 'select' ? t('form.error.choose') : t('form.error.required');
         sentence = field.type === 'agree' ? message : t('form.missing', { field: field.label });
-      } else if (value && field.prefill === 'email' && !EMAIL_SHAPE.test(value)) {
+      } else if (value && field.prefill === 'email' && !isEmail(value)) {
         message = t('form.error.email');
         sentence = message;
       }

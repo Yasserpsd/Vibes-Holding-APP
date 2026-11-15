@@ -96,7 +96,7 @@ const styles = themedStyles(() => ({
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart, flex: 1 },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },
   badgeText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
-  amount: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 22, color: colors.gold, textAlign: textStart },
+  amount: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 22, color: colors.goldText, textAlign: textStart },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   meta: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 }));

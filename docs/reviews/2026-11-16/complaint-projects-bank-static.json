@@ -1,0 +1,219 @@
+{
+ "key": "projects-bank-static",
+ "words": "Some people say the Projects Bank is \"fixed, the same all the time\" — it never seems to change.",
+ "diagnosis": {
+  "summary": "The Projects Bank looks frozen because it IS the same list: the live bank (259 projects) had 0 projects changed in the last 7 days, 1 in 14 days, 2 in 30 days, and no project added since the batch No. 244-260 of 2026-09-04; the screen's default order «الأعلى تقييمًا» is fully deterministic over that data (only 2 projects in the whole bank have a rating, the rest follow by last-edit date), so the first 20 cards are identical on every visit - unchanged since 2026-11-01, 18 of 20 unchanged since 2026-09-21. The sync itself is healthy (every 10 minutes, last run 5 minutes before my check, no error) and the on-disk cache is not the cause; the app simply has no rotating default, no freshness sign, and on members' bundles no refetch on return. Today's pass only wired the refetch side (app foreground + home pull-to-refresh); the main cause is untouched.",
+  "causes": [
+   {
+    "cause": "Static source data shown through a deterministic default order. The Projects tab opens on sort 'top'; the server sorts rated projects first, then everything else by modifiedAt descending. Only two projects are rated (No. 166 and No. 98, one 5-star rating each), so page 1 is always: 166, 98, 217, 220, 258, 260, 259, 257 ... 245. 'latest', 'views' and 'golden' are equally static. A perfect refetch returns the identical page.",
+    "evidence": "App: C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx:42 `useState<ProjectsSort>('top')` (identical in 97705af and HEAD). Server: C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts:226-233 ('top' = stars, count, then byLatest), :218-220 (byLatest = modifiedAt desc, id desc). Live read-only GETs 2026-11-15 11:18 UTC on api.vibesholdingsa.com: /health -> projectsBank {count 259, updatedAt 11:13:48Z, lastError null}; all 259 projects paged through /api/projects: modifiedAt within 7 days = 0, 14 days = 1 (No. 217, 2026-11-01), 30 days = 2 (No. 220, 2026-10-29), 60 days = 3 (No. 258, 2026-09-21); highest number 260, Nos. 244-260 all dated 2026-09-04; rated projects = 2. Sequence: member opens the tab today, tomorrow, next week -> same request sort=top page=1 -> same 20 ids in the same order.",
+    "platforms": "iOS and Android, every app version and bundle (server-side order + app default)",
+    "confidence": "proven-in-code",
+    "fixedToday": "no - today's pass did not touch the default sort or the server order"
+   },
+   {
+    "cause": "No sign of freshness anywhere on the screen. Cards show only a views counter; the header shows the static pills «259 مشروع» and «18 قطاع». The server sends `updatedAt` with every page and with the filters but the app never reads it. The app receives no creation date at all (modifiedAt is taken from the feed's `modified` first), so «الأحدث» means 'last edited' and a «جديد» mark cannot be drawn. The tab's +N badge counts modifiedAt newer than the member's last visit, which has been 0 for two weeks.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectCard.tsx:82 (views only; grep finds no modifiedAt / date / new mark in ProjectCard.tsx, project/[id].tsx, SectorStrip.tsx). projects.tsx stats row (97705af lines 150-167). Server sends updatedAt: service.ts:160 and :176; grep of app/src finds no reader of it for projects. C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\mapper.ts:169 `modifiedAt: asIsoDate(raw.modified ?? raw.modified_gmt ?? raw.date_gmt ?? raw.date)`. Badge: C:\\Projects\\vibes-club-app\\app\\src\\lib\\badges.ts:29-33 with C:\\Projects\\vibes-club-app\\app\\src\\lib\\seen.ts:66-68.",
+    "platforms": "iOS and Android, all versions",
+    "confidence": "proven-in-code",
+    "fixedToday": "no"
+   },
+   {
+    "cause": "The only rotating order («اكتشف») is the fourth chip and rotates once per UTC day (03:00 Riyadh). The home carousel and «الفرصة الذهبية» both draw from that order's first page, i.e. the same 20 of 259 projects for the whole day: the carousel reshuffles 8 of those 20 on every focus, the golden card picks 1 of the 20 per app open. Many opens in one day keep meeting the same 20 projects.",
+    "evidence": "service.ts:243-248 (daySeed = floor(Date.now()/86_400_000)). C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectsBankCarousel.tsx:39 (sort 'discover'), :17 MAX_SLIDES 8, :44-64 (seed on focus over page 1 only). C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx:37 and the `pick(page.items, OPEN_SEED)` above it. I reproduced the server formula locally: it matches the live discover page exactly, and consecutive days share only 0-3 of 20 cards - the rotation works, it is just daily and not the default.",
+    "platforms": "iOS and Android, all versions",
+    "confidence": "proven-in-code",
+    "fixedToday": "no"
+   },
+   {
+    "cause": "On members' bundles a phone that keeps the app in memory never asks for the lists again. TanStack's refetch-on-focus listens to a browser window (absent on a phone), tabs stay mounted so returning to the tab refetches nothing, and the home pull-to-refresh skipped the bank query. The only automatic trigger is SyncPoller, which fires only when the bank's content hash changes - the daily «اكتشف» rotation is not such a change. Result: with the app left alive for days, the home pool of 20 and the «اكتشف» list stay on the day they were first loaded until a cold start. Small weight: because of cause 1 a refetch of the default list brings the same data anyway.",
+    "evidence": "git show 97705af:app/src/app/_layout.tsx:66-70 (QueryClient with staleTime 60 s, no focusManager). 97705af projects.tsx:52-56 (the only focus effect is markSeen). 97705af (tabs)/index.tsx:94 (`Promise.all([home, services, videos, partners, latestPosts])` - no bank). C:\\Projects\\vibes-club-app\\app\\src\\components\\SyncPoller.tsx:20 and :54-55; server onChange only on hash change: service.ts:103 and :182-184, C:\\Projects\\vibes-club-app\\server\\src\\app.ts:280-281. Pull-to-refresh on the Projects tab itself did work (97705af projects.tsx:207-215).",
+    "platforms": "iOS and Android on the bundles published up to 2026-11-14 (97705af); mostly felt on iPhone, which keeps apps suspended for days",
+    "confidence": "proven-in-code",
+    "fixedToday": "partly - HEAD C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx wires focusManager to AppState (stale mounted queries refetch when the app returns to the foreground) and (tabs)/index.tsx:93-107 adds bank.refetch() to the home pull-to-refresh. Not added: refetch on return to the tab. Committed in 0fcf3e5, not in members' hands yet."
+   },
+   {
+    "cause": "The server answers from the last snapshot with no visible sign when the feed is unreachable: a failed refresh keeps the in-memory list (and the kv snapshot is reloaded at boot), the API still answers 200 with the old updatedAt, and the app ignores updatedAt. Not the cause today - the feed is healthy - but an outage would freeze the bank silently.",
+    "evidence": "service.ts:108-111 (catch keeps items, sets lastError only), :57-62 (snapshot loaded at start), :125-127 (lastError visible only on /health). Live /health at 11:18 UTC: lastError null, updatedAt 11:13:48Z; refresh interval C:\\Projects\\vibes-club-app\\server\\src\\config.ts:15 (PB_REFRESH_MINUTES default 10).",
+    "platforms": "server; would affect both platforms",
+    "confidence": "possible",
+    "fixedToday": "no (nothing to fix today; no outage observed)"
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Cheapest and widest reach (no OTA, reaches every installed version at once): in sortProjects 'top' keep the rated projects first (stars, then count) but order the unrated tail by the day's discover rank instead of byLatest. Extract the rank from the 'discover' case into a shared helper and use it as the tie-breaker. With today's data page 1 becomes No. 166, No. 98 + 18 different projects every day (simulated: 0-3 of 20 repeat between consecutive days). Optionally seed by the Riyadh day (riyadh.ts riyadhDay) so the order turns at midnight Riyadh, not 03:00.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts"
+    ],
+    "delivery": "server",
+    "risk": "The label «الأعلى تقييمًا» then sits over a tail in rotating order (honest: unrated projects have no rating order), but 'top' as the default face was the owner's M116 decision, so he should confirm. A member scrolling across the day boundary can meet a repeated or skipped card (already true for «اكتشف»). server/src/m116.ratings.test.ts:157-168 still passes (it asserts only that the rated project leads and the second is unrated). Production deploy needs the owner's OK."
+   },
+   {
+    "change": "Alternative to the first item if the owner prefers a clear label: make «اكتشف» the default and the first chip (app default sort + DEFAULT_SORTS order; server SORT_LABELS order, which drives filters.sorts).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m116.ratings.test.ts"
+    ],
+    "delivery": "owner-decision",
+    "risk": "Reverses the M116 rule; needs OTA on every runtime plus a server deploy; the test asserting sorts[0] === 'top' (m116.ratings.test.ts:159) must change. Phones that do not take OTAs keep the old default."
+   },
+   {
+    "change": "Refetch on return to the tab: extend the existing useFocusEffect in the Projects tab (and the carousel's focus effect) to refetch when the list's data is older than a few minutes (compare list.dataUpdatedAt, do not refetch on every focus). Ship it together with today's already-committed focusManager wiring and bank.refetch() on the home.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectsBankCarousel.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Refetching an infinite list re-requests every loaded page (up to 13 requests for the whole bank), hence the age check. Visible benefit only together with a rotating order (first item)."
+   },
+   {
+    "change": "Show when the bank was last read, using the `updatedAt` the server already sends with every page: one small line beside the count pills. It also exposes a stale snapshot if the feed ever breaks.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\ar.json",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\en.json"
+    ],
+    "delivery": "ota",
+    "risk": "It is the time of the last sync, not of a new project: worded as 'updated today' it would be untrue in the present state (nothing new since 2026-09-04). Word it as a sync time («آخر مزامنة»), formal Arabic, owner approves the wording."
+   },
+   {
+    "change": "A truthful «جديد» mark: add a creation date `publishedAt` (feed `date_gmt` / `date`) to PublicProject next to modifiedAt, show «جديد» on the card for about 14 days after publishing, and let the tab's +N badge count publishedAt instead of modifiedAt.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\mapper.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\types.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\types.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\badges.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\ar.json",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\en.json"
+    ],
+    "delivery": "server",
+    "risk": "Server first, then an OTA for the card. With today's data it shows nothing (honest), so it pays only once projects are added. The feed's `date` field is seen only in the test fixture (mapper.test.ts:11), not confirmed on the live feed."
+   },
+   {
+    "change": "«مشروع اليوم» at the top of the bank: the server already picks two projects a day for the notifications (12:00 a golden one, 20:00 one of the rest) but only an admin route reads the pick. Add a public GET that returns today's pick as a PublicProject and draw it as one card above the list (it changes twice a day and matches the notification the member received).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\daily.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\routes.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\queries.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx"
+    ],
+    "delivery": "server",
+    "risk": "Server + OTA. Must return public fields only (hard rule 4) and nothing when the owner's daily switch is off (routes.ts:178-196)."
+   },
+   {
+    "change": "The real cure is content: no project was added to the bank since 2026-09-04 and the whole bank holds two ratings. New projects on the Projects Bank site reach the server within 10 minutes and open apps within about 10 seconds (/api/sync). Encouraging ratings (only 2 exist) would also make «الأعلى تقييمًا» a living order.",
+    "files": [],
+    "delivery": "owner-decision",
+    "risk": "None technical; no code can make the bank look new without inventing data."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone or an Android phone; every app-side finding is from reading the code at 97705af and at HEAD.",
+   "Whether commit 0fcf3e5 (today's pass) has been published by OTA; I assumed members still run 97705af-era bundles as the task states.",
+   "Whether the source site holds newer projects that the mapper drops: the feed needs its key, which I did not read. Only No. 236 is missing from 1-260, so a dropped tail is unlikely.",
+   "Whether the live feed carries a creation date (`date` / `date_gmt`); seen only in the test fixture.",
+   "The feed's failure history: only the current /health state (healthy) is visible.",
+   "When the two ratings were given, so I cannot say how long the first two cards have been exactly these.",
+   "What bumped the /api/sync `projects` version at 2026-11-14T20:13:48Z (a deploy or a translation run is likely); not investigated.",
+   "That a list restored from the disk cache refetches on mount when older than 60 s is taken from TanStack Query's documented behaviour, not from a run.",
+   "The simulation of the proposed 'rated first, then daily rotation' order used the server's own hash formula on live data in a local read-only Node script; it was not run inside the server."
+  ],
+  "data": "Live measurements, production API, 2026-11-15 11:18 UTC (read-only GETs: /health, /api/sync, /api/projects, /api/projects/filters; header x-app-lang: ar)\n\nSync\n- /health projectsBank: count 259, updatedAt 2026-11-15T11:13:48Z, lastError null. Refresh every 10 minutes (config.ts:15).\n- /api/projects answers Cache-Control: no-store; page carries updatedAt (unused by the app).\n- /api/sync projects version = 2026-11-14T20:13:48Z (last content-hash change).\n\nBank content (all 259 projects)\n- Numbers 1-260, one missing (No. 236). 11 golden, featuredOrder set on 0. 18 sectors. Every project has an image.\n- modifiedAt by month: 2026-11: 1 | 2026-10: 1 | 2026-09: 19 | 2026-08: 16 | 2026-07: 20 | 2026-06: 48 | 2026-05: 16 | 2026-04: 1 | 2026-03: 5 | 2026-02: 131 | 2026-01: 1\n- Changed in the last 7 days: 0 | 14 days: 1 | 30 days: 2 | 60 days: 3\n- Newest three by modifiedAt: No. 217 (2026-11-01), No. 220 (2026-10-29), No. 258 (2026-09-21); then Nos. 260-244 all on 2026-09-04.\n- Rated projects: 2 (No. 166 five stars x1, No. 98 five stars x1). Views: max 29,456, median 2,728, min 1,472.\n\nFirst page (20) per sort, by project number\n- top (app default): 166, 98, 217, 220, 258, 260, 259, 257, 256, 255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245\n- latest (server default; used by the tab badge and the news tab): 217, 220, 258, 260, 259, 257, 256 ... 244, 243\n- views: 75, 64, 210, 209, 208, 207, 206, 126, 70, 160, 94, 46, 50, 138, 239, 204, 10, 127, 3, 110\n- golden: 243, 242, 241, 206, 207, 208, 64, 209, 239, 210, 240, then the latest order\n- discover (home carousel + golden opportunity; changes once per UTC day): 33, 209, 215, 72, 149, 255, 197, 144, 100, 111, 91, 102, 188, 252, 132, 43, 231, 12, 192, 248\n- Daily rotation check (server formula reproduced locally, matches live): overlap of the first page with the previous day over the next 6 days = 2, 3, 1, 1, 0, 0 of 20.\n\nApp cache facts\n- useProjectsList has no staleTime of its own (queries.ts:20-28) -> default 60 s; filters and count 5 min.\n- Disk cache keeps the `projects` root up to 24 h (queryCache.ts:18, :22) and is restored at cold start; a restored list older than 60 s refetches behind the first paint, so the disk copy is not what freezes the screen.\n- Rating a project invalidates ['projects'] on that phone only (RateProjectModal.tsx:60); a rating is not a sync change for other phones (app.ts:280-281).\n- Working tree = HEAD for every Projects Bank app file (the only modified app file during this run was app/src/api/auth.ts, another session's)."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "Root cause confirmed, from the code and from local evidence. I made no production requests in this run (my step did not grant them), so the two live ratings, the month histogram and /health are the colleague's figures, not re-measured by me. Default sort is hard-coded 'top' (git show 97705af:app/src/app/(tabs)/projects.tsx:42; HEAD 57a2b96 line 43); the server puts rated projects first, then last-edit date (C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts:226-233 and :218-220 at HEAD). That is fully deterministic, identical on iOS and Android and on every bundle. Independent evidence that the data is static: C:\\Projects\\vibes-club-app\\docs\\PROJECT_BRIEF.md:131 (260 projects in the feed on 2026-09-11) against C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\rev-android-run.md:14 (259 on 2026-11-15); and the emulator shot C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\android-shots\\projects-ar-dark.png, taken against a local server reading the real feed with no ratings: the first card of the default list is «فيونتا سفن», whose page shows «آخر تحديث 1 نوفمبر 2026» (rev-android-run.md:70), i.e. the most recently edited project of the whole bank was last edited on 1 November.",
+   "Overstated: 'no project added since the batch No. 244-260 of 2026-09-04'. modifiedAt is the feed's last-edit field (C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\mapper.ts:169), so 2026-09-04 is when those 17 were last edited, not proof of when they were created. What the repository does prove is that the bank did not grow between 2026-09-11 (260) and 2026-11-15 (259).",
+   "The colleague's first fix ('cheapest and widest reach') does not change what the member sees on opening the tab. The same screenshot shows the header filling the top half and exactly ONE card on the first screen. With 'rated first, then daily rotation' cards 1 and 2 stay the two rated projects for ever (my simulation of the proposed comparator on 259 synthetic ids, 7 days: only places 3-20 change, the two rated ones merely swap with each other). It cures from the third card down, not the first impression. The default order itself must rotate from card 1.",
+   "Cause 2 is partly wrong: 'no date anywhere, grep finds none in project/[id].tsx'. The project page does show a date, built by the server so an app grep misses it: the row «آخر تحديث» in «ملخص المستشار» (C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\brief.ts:235, labels :74 and :102), seen on the emulator (rev-android-run.md:70). For 258 of 259 projects that date is older than two weeks, so every project page tells the member in words that nothing has moved.",
+   "Cause 4 is right in the code (97705af app/src/app/_layout.tsx:49-53 has no focusManager; projects.tsx:52-56 only marks the badge) but the conclusion drawn from it is not. SyncPoller keeps its baseline for the whole JS session (97705af app/src/components/SyncPoller.tsx:39), runs a tick at once on every return to the foreground (:69-73, :81-82) and invalidates ['projects'] on any version change (:54-55). So a server-side bump of the `projects` sync version when the rotation turns makes every installed bundle re-read its lists on return, with no OTA. The proposed OTA 'refetch on return to the tab' is therefore unnecessary. Also 'fires only when the content hash changes' is incomplete: the version also moves after the English fill (C:\\Projects\\vibes-club-app\\server\\src\\app.ts:291) and on the Projects Bank webhook (server/src/webhooks/routes.ts:161). 'Mostly felt on iPhone' is a guess; nothing supports it.",
+   "Drop the 'last sync' line. `updatedAt` is the time of the last successful feed read, renewed every 10 minutes (service.ts:100-101, sent at :160 and :176). Under any wording a member reads as 'updated' it is untrue, and it would print 'minutes ago' over a list that has not changed in weeks.",
+   "The «جديد» mark as written cannot work today. The feed's verified field list (PROJECT_BRIEF.md:131) has `modified` and no creation date; the real-shaped fixture has only `modified` (C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\mapper.test.ts:86-93); `date` exists only in the synthetic fixture (:11). publishedAt would be null for every project. It needs either a server-side 'first seen' record or a plugin change (plugin work happens in other chats and must pass the rig).",
+   "'Make «اكتشف» the default' needs no server or test change for the chip order (the app can put its chip first), and it has an unmentioned side effect: the tab's list then shares one cache entry with the home carousel and the golden card (key ['projects', params] in app/src/api/queries.ts; undefined params drop out of the key hash; the home uses {q:'', sort:'discover'} at (tabs)/index.tsx:79, ProjectsBankCarousel.tsx:39, GoldenOpportunity.tsx:37). A home pull-to-refresh or a return to the foreground then re-requests every page the member scrolled in the tab.",
+   "The working tree changed under me. Between 00:25 and 00:33 (2026-11-16) another session was editing 28 files, among them service.ts, routes.ts, types.ts, app.ts, companion/service.ts, ratings/service.ts and (tabs)/projects.tsx (uncommitted, marked M242). That snapshot already holds the Riyadh-day rotation with a salted tail for «الأعلى تقييمًا», the sync bump at the turn, a rating bump, the default «اكتشف» and id de-duplication. I did not verify it as finished. Three things in it contradict this plan: (a) a new header line prints `filters.updatedAt` (the sync time) under the string «آخر تحديث للبنك {time}», which will read 'قبل 4 دقائق' for ever; (b) SORT_LABELS is reordered on the server while server/src/m116.ratings.test.ts:159 still expects 'top' first, so the test fails; (c) focus refetches were added in the tab, the carousel and the golden card on the shared paged list. Its code comment says the owner approved the default change («أيوه غيّره»); I cannot confirm that. All line numbers I give are HEAD 57a2b96 or 97705af, not the moving tree.",
+   "Not verified: nothing was run on an iPhone or the emulator; the SyncPoller path on members' bundles, the focus refetch in HEAD and the refetch of a disk-restored list (@tanstack/query-core 5.102.8) are read from the code. I did not check whether commit 0fcf3e5 has been published by OTA, nor whether the feed is served through a page cache on the site. A saved earlier challenge (C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-16\\complaint-projects-bank-static.json) reports re-measuring the live figures with public GETs and reaches the same verdict; I reached mine independently before reading it."
+  ],
+  "missedCauses": [
+   "The first screen holds one card, and two single ratings own it. Any rated project is pinned above all unrated ones (service.ts:231), the bank has two ratings, and the header leaves room for exactly one card (projects-ar-dark.png). So every member, on both platforms, meets the same card on every visit, and one more tap by any signed-in account would pin another project the same way.",
+   "The only rotating order is out of sight. In the same screenshot the sort row shows «حسب اهتماماتي», «الأعلى تقييمًا», «الأحدث» and a cut «الأكثر مشاهدة»; «اكتشف» is off-screen until the row is dragged sideways (the same finding as rev-android-run.md:81 for «فلترة»). Members effectively never reach it.",
+   "Every project page states its own age: the «آخر تحديث» row (brief.ts:235) shows a date that is months old for most of the bank. It is true, and it reinforces the complaint each time a project is opened.",
+   "A new rating reaches no other phone. RatingsService is built without any change hook (app.ts:274 at HEAD) and its save path moves no sync version, so the stars and the «الأعلى تقييمًا» order stay as they were on every other phone until a cold start.",
+   "The inbox tab repeats the stillness: app/src/app/(tabs)/news.tsx (around line 90) lists the 'latest' bank projects dated by last edit, so the same rows have sat there for weeks.",
+   "Paging has no guard against the order turning while a member scrolls: pages fetched before and after the turn can repeat a project and the list keys rows by id (HEAD (tabs)/projects.tsx:63 and :179). It exists today for «اكتشف» at 03:00 Riyadh and becomes relevant as soon as a rotating order is the default.",
+   "The daily order turns on the UTC day (service.ts:245), i.e. at 03:00 Riyadh, while the adviser's daily tip counts Riyadh days (server/src/companion/service.ts:44, :220, :281), so the project the tip names changes in the middle of the Riyadh night."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Server: a daily order that reaches every installed version. In service.ts add `export function rotationDay(now = Date.now()) { return Math.floor((now + 3 * 3_600_000) / 86_400_000); }` (Riyadh day, the same expression as companion/service.ts:44) and `export function dayOrder(projects, day, salt = 0)` returning the comparator `rank(a) - rank(b) || b.id - a.id` with rank = hash32(id * 2654435761 + day + salt). Give sortProjects (HEAD line 222) a `day` argument, passed from list() (line 151) as `query.day ?? rotationDay()`. Case 'discover' (243-248) becomes `copy.sort(dayOrder(copy, day))`. Case 'top' (226-233) keeps stars then count and replaces both uses of byLatest with `dayOrder(copy, day, 7919)` so its tail differs from the home's pool. Keep the period at one day. In app.ts after the ProjectsService is built (line 285) add a 60-second unref'd interval, cleared in onClose: read `sync.versions()` and call `moved('projects')` when `rotationDay(v.projects) < rotationDay()`. That makes open and suspended apps on every bundle re-read their lists after midnight Riyadh and heals a turn missed during a restart. Make companion/service.ts use rotationDay and pass `day`. Optional and useful for members without the OTA: put `discover` first in SORT_LABELS so the chip is on screen; then m116.ratings.test.ts:159 must expect 'discover'. Known limit: the two rated projects still lead «الأعلى تقييمًا». If this is already in the working tree from the other session, review and test it instead of rewriting it.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\app.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\companion\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\types.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m116.ratings.test.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\rotation.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "New test: rotationDay differs between 20:59:59Z and 21:00:00Z of one date; dayOrder gives the same order for the same day and a different one for the next day and for another salt. Run the server tests and tsc (Railway type-checks test files, a type error there leaves the old deploy live silently); m116.ratings.test.ts:157-168 must still show the rated project first. After the TEST deploy: GET /api/projects?sort=top&limit=20 before and after 21:00 UTC, places 1-2 equal, the rest different, and /api/sync shows a larger `projects` version within about a minute of 21:00 UTC. Android emulator, preview build on the test API: leave the Projects tab open across that minute, the cards reorder untouched within about 70 seconds; repeat with the app in the background before and reopened after. iPhone: only on a real device after the production deploy the owner approves: leave the app suspended overnight, reopen without killing it, the list from the third card and the home golden card differ from the day before."
+   },
+   {
+    "priority": 2,
+    "change": "Owner decision: the bank opens on «اكتشف» instead of «الأعلى تقييمًا». It reverses his M116 rule and is the only way the first card changes daily. A comment in the uncommitted tree says he already agreed on 2026-11-16; confirm that with him before anything is published. If he refuses, step 1 stays the whole cure and the first two cards remain fixed until more ratings exist.",
+    "files": [],
+    "delivery": "owner-decision",
+    "howToVerify": "Nothing to run: a yes or no from the owner in his own message."
+   },
+   {
+    "priority": 3,
+    "change": "OTA, after the yes in step 2. In (tabs)/projects.tsx (HEAD lines): line 43 `useState<ProjectsSort>('discover')` and rewrite the comment on line 42; move `{ key: 'discover', label: '' }` to the top of DEFAULT_SORTS (26-32); at line 65 put the discover chip first whatever order the server sends; at line 63 flatten the pages keeping the first occurrence of each id (a Set), so a turn during scrolling never gives two rows one key (line 179). Do NOT print `filters.updatedAt` under «آخر تحديث للبنك»: it is the sync time; remove that line from the in-progress edit. The tab and home focus refetches added in the tree are not needed once step 1 is live; if kept, keep the five-minute age check and accept that every loaded page is re-requested. Ship together with commit 0fcf3e5 (foreground refetch, bank in the home pull-to-refresh). Pure JS, no native module, safe on runtimes 1.2.0 to 1.3.3.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and eslint inside app/ (no web target). Android emulator, Arabic and English: on a fresh open «اكتشف» is the first chip and the selected one; the first card equals the first id of GET /api/projects?sort=discover; «الأعلى تقييمًا» still shows the rated projects first; scroll to the end, the number of cards equals the count pill and the debug log has no duplicate-key warning; the next Riyadh day opens on a different first card. Before publishing: git status must be clean (the tree holds other sessions' uncommitted files, and an OTA ships the working tree), use the environment flag with --non-interactive, and check the manifest on all five runtimes. iPhone: only on the owner's device after the production OTA."
+   },
+   {
+    "priority": 4,
+    "change": "Server: let a rating reach the other phones. Add `onChange?: () => void` to the Deps of RatingsService and call it at the end of the save path, right after the summaries are recomputed; build it in app.ts:274 as `new RatingsService({ kv, onChange: () => moved('projects') })`. Every member rating, dashboard entry, hide, delete and pinned value then makes open apps re-read the stars and the «الأعلى تقييمًا» order within about 10 seconds.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\ratings\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\app.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m116.ratings.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Extend m116.ratings.test.ts: read /api/sync, post a review, read it again, `v.projects` is larger. Emulator on the test API: rate a project from the dashboard while the tab is open on «الأعلى تقييمًا»; stars and position change without a pull within about 20 seconds."
+   },
+   {
+    "priority": 5,
+    "change": "Content, the real cure: publish new projects on the Projects Bank site (also check whether submissions are waiting for approval there) and enter the meetups' ratings from the dashboard's ratings section. A new project reaches the server within 10 minutes and open apps about 10 seconds later. Two side decisions for the owner: whether the «آخر تحديث» row should stay on the project page (if not, drop it at serve time in the brief route of server/src/projectsBank/routes.ts, without raising the brief VERSION, which would rebuild every AI summary at a cost), and whether a single rating from any account should be able to put a project first for everyone.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\routes.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\brief.ts"
+    ],
+    "delivery": "dashboard-content",
+    "howToVerify": "After a project is published on the site: it is first under «الأحدث» within 10 minutes and the tab's +N badge appears on phones that have not opened the bank since. If the row is dropped: the project page on the emulator, Arabic and English, shows no «آخر تحديث» / 'Last update' row and no new AI call appears in the server log."
+   },
+   {
+    "priority": 6,
+    "change": "Later, pays only once projects are added: a truthful «جديد» mark that does not depend on the feed. The server records when it first saw each project id (one kv document; every id present at the first run is stored as 'known before', so nothing is marked new on day one) and sends `addedAt` on PublicProject. The card shows «جديد» for 14 days after addedAt and app/src/lib/badges.ts counts addedAt instead of modifiedAt. Server first, then the OTA with the two new strings in both tables; older bundles ignore the field.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\projectsBank\\types.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\types.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\badges.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\ar.json",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\en.json"
+    ],
+    "delivery": "server",
+    "howToVerify": "Service test: a second refresh that brings one extra id gives that project an addedAt and leaves the others null. Emulator on the test API: with today's data no card shows «جديد»; a project published on the test site shows the pill and raises the tab badge."
+   }
+  ],
+  "ownerMessage": "Members see the same Projects Bank because it really is the same: the bank has not grown since at least 11 September, and the screen opens on «الأعلى تقييمًا», where the only two rated projects always sit first and the rest follow in a fixed order, so the single card that fits on the first screen never changes. The cure is a server-side order that turns every midnight Riyadh and reaches every installed version, an update that opens the bank on «اكتشف» so the very first card changes daily, and above all new projects and real ratings, which no code can replace."
+ }
+}

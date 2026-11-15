@@ -75,12 +75,15 @@ export function isRiyalUnit(unit: string): boolean {
 }
 
 export function ChangeText({ quote }: { quote: MarketQuote }) {
-  const up = quote.changePct >= 0;
-  const color = up ? colors.success : colors.danger;
+  const size = Math.abs(quote.changePct);
+  // A zero change is neutral: no arrow, muted colour (gold showed «0%» with a green up arrow — emulator review item 41).
+  const flat = size === 0;
+  const up = quote.changePct > 0;
+  const color = flat ? colors.textMuted : up ? colors.success : colors.danger;
   return (
     <View style={styles.change}>
-      <Ionicons name={up ? 'caret-up' : 'caret-down'} size={11} color={color} />
-      <Text style={[styles.pct, { color }]} numberOfLines={1}>{`${LRM}${Math.abs(quote.changePct)}%`}</Text>
+      {flat ? null : <Ionicons name={up ? 'caret-up' : 'caret-down'} size={11} color={color} />}
+      <Text style={[styles.pct, { color }]} numberOfLines={1}>{`${LRM}${size}%`}</Text>
     </View>
   );
 }
@@ -107,7 +110,8 @@ export function MarketsStrip() {
             <View style={styles.labelRow}>
               {/* Owner (2026-11-02): no flag on TASI in the strip — «السوق السعودي» keeps its full name. */}
               {quote.key === 'tasi' ? null : <QuoteIcon quote={quote} />}
-              <Text style={styles.label} numberOfLines={1}>{english ? quote.labelEn : quote.label}</Text>
+              {/* One line that shrinks to fit: a larger system font cut «السوق السعودي» (emulator review item 30). */}
+              <Text style={styles.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{english ? quote.labelEn : quote.label}</Text>
             </View>
             <SarText style={styles.price} numberOfLines={1}>
               {isRiyalUnit(english ? quote.unitEn : quote.unit) ? `${LRM}${priceText(quote.price)} ريال` : `${LRM}${priceText(quote.price)}`}
@@ -128,7 +132,8 @@ export function MarketsStrip() {
 }
 
 const styles = themedStyles(() => ({
-  markets: { gap: 4, marginBottom: spacing.sm },
+  // The top margin keeps the tiles off the last line of the section's description (emulator review item 25).
+  markets: { gap: 4, marginTop: spacing.sm, marginBottom: spacing.sm },
   row: { gap: spacing.sm },
   tile: { width: QUOTE_WIDTH },
   quote: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 1 },
@@ -140,5 +145,5 @@ const styles = themedStyles(() => ({
   change: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   pct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   unit: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
-  extra: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
+  extra: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldText, textAlign: textStart },
 }));

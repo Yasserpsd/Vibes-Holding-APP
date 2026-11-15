@@ -141,6 +141,12 @@ function remainingTo(target: number, now: number): Remaining {
   return { days: Math.floor(minutes / 1440), hours: Math.floor((minutes % 1440) / 60), minutes: minutes % 60 };
 }
 
+/**
+ * How far the labels of the compact countdown follow the system text size. At 10 pt a label («دقيقة», "hours") is
+ * narrower than its 34 pt cell up to this scale, so the cells never widen.
+ */
+const COMPACT_LABEL_SCALE = 1.15;
+
 /** One flip cell: the value snaps closed and springs open again whenever it changes. */
 function FlipCell({ value, label, small = false }: { value: number; label: string; small?: boolean }) {
   const [scaleY] = useState(() => new Animated.Value(1));
@@ -161,9 +167,17 @@ function FlipCell({ value, label, small = false }: { value: number; label: strin
   return (
     <View style={styles.flipCell}>
       <Animated.View style={[styles.flipCard, small && styles.flipCardSm, { transform: [{ scaleY }] }]}>
-        <Text style={[styles.flipDigits, small && styles.flipDigitsSm]}>{String(display).padStart(2, '0')}</Text>
+        {/* 2026-11-16: the compact countdown lives inside a 200 pt home card. Its digits are a fixed-size dial (they do
+            not grow with the system text size) and its labels grow by 15% at most, so the three cells are the same
+            width on every phone — about 126 pt, inside the 164 pt the card leaves. At 1.2x and more the third cell
+            used to be cut at the card's edge. The full-size countdown on a page scales like any text. */}
+        <Text style={[styles.flipDigits, small && styles.flipDigitsSm]} allowFontScaling={!small}>
+          {String(display).padStart(2, '0')}
+        </Text>
       </Animated.View>
-      <Text style={styles.flipLabel}>{label}</Text>
+      <Text style={[styles.flipLabel, small && styles.flipLabelOnPhoto]} numberOfLines={1} maxFontSizeMultiplier={small ? COMPACT_LABEL_SCALE : undefined}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -181,12 +195,14 @@ export function FlipCountdown({ targetMs, title = '', compact = false }: { targe
   if (compact) {
     return (
       <View style={styles.countdownCompact}>
-        <Text style={styles.countdownCompactLabel}>{t('wow.startsIn')}</Text>
+        <Text style={styles.countdownCompactLabel} numberOfLines={1} maxFontSizeMultiplier={COMPACT_LABEL_SCALE}>
+          {t('wow.startsIn')}
+        </Text>
         <View style={styles.flipRow}>
           <FlipCell small value={left.days} label={t('wow.days')} />
-          <Text style={[styles.flipColon, styles.flipColonSm]}>:</Text>
+          <Text style={[styles.flipColon, styles.flipColonSm]} allowFontScaling={false}>:</Text>
           <FlipCell small value={left.hours} label={t('wow.hours')} />
-          <Text style={[styles.flipColon, styles.flipColonSm]}>:</Text>
+          <Text style={[styles.flipColon, styles.flipColonSm]} allowFontScaling={false}>:</Text>
           <FlipCell small value={left.minutes} label={t('wow.minutes')} />
         </View>
       </View>
@@ -367,7 +383,7 @@ const styles = themedStyles(() => ({
   tickerTape: { flexDirection: 'row' },
   tickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs + 2 },
   tickerItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm },
-  tickerDiamond: { fontSize: 8, lineHeight: 18, color: colors.gold },
+  tickerDiamond: { fontSize: 8, lineHeight: 18, color: colors.goldText },
   tickerText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText },
   // The countdown.
   countdown: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
@@ -378,7 +394,8 @@ const styles = themedStyles(() => ({
   countdownCompactLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.onPhotoGold },
   flipCardSm: { minWidth: 34, paddingVertical: 2, paddingHorizontal: spacing.xs + 2 },
   flipDigitsSm: { fontSize: 15, lineHeight: 22 },
-  flipColonSm: { fontSize: 14, lineHeight: 30 },
+  // The compact colons sit on the event card's dark plate with the on-photo label: the same gold in both themes.
+  flipColonSm: { fontSize: 14, lineHeight: 30, color: colors.onPhotoGold },
   flipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   flipCell: { alignItems: 'center', gap: 2 },
   flipCard: {
@@ -394,6 +411,9 @@ const styles = themedStyles(() => ({
   },
   flipDigits: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, color: colors.goldLightText },
   flipLabel: { ...typography.caption, fontSize: 10, lineHeight: 14, color: colors.textMuted },
+  // 2026-11-16: the compact countdown sits on the event photo's scrim, so its «يوم / ساعة / دقيقة» labels wear the
+  // on-photo ink (the page's muted ink was navy on a dark photo in the light theme).
+  flipLabelOnPhoto: { color: colors.onPhotoMuted },
   flipColon: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 40, color: colors.gold },
   // Confetti and dust.
   confetti: { position: 'absolute', top: 0, borderRadius: 2 },

@@ -83,7 +83,10 @@ const styles = themedStyles(() => ({
   // A long server title wraps inside the row instead of pushing the badge out of the card.
   title: { ...typography.subtitle, color: colors.textPrimary, flexShrink: 1, textAlign: textStart },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill },
-  badgeText: { ...typography.caption, color: colors.goldInk, fontSize: 12 },
+  // The badge is a solid status tone (success / warning / danger / muted). Those tones are made to stand out
+  // against the page colour of each theme, so the page colour is their ink: near-black in the dark theme,
+  // near-white in the light one (the fixed dark `goldInk` was unreadable on the light theme's deep tones).
+  badgeText: { ...typography.caption, color: colors.black, fontSize: 12 },
   status: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   meta: { gap: 2, paddingStart: spacing.xl + spacing.sm },
   metaText: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },

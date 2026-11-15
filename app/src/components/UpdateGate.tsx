@@ -11,6 +11,7 @@ import { FormCard } from '@/components/form/FormTheme';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { blockAutoPopups } from '@/lib/popupGate';
+import { reloadApp } from '@/lib/reloadApp';
 import { brand, fonts, formPalettes, spacing, typography } from '@/theme/tokens';
 
 /**
@@ -100,7 +101,10 @@ function PendingOta() {
         label={t('update.restart.button')}
         onPress={() => {
           setDismissed(true);
-          void updates.reloadAsync().catch(() => setDismissed(false));
+          // The shared restart: its reload page is the opening screen (brand black and the emblem), not a white spinner page.
+          void reloadApp().then((restarting) => {
+            if (!restarting) setDismissed(false);
+          });
         }}
         style={styles.bannerButton}
       />

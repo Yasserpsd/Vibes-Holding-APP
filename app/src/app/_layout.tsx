@@ -1,3 +1,6 @@
+// First on purpose: the global error handler is in place before any other module of the app runs (lib/crashGuard.ts).
+import { markFirstCommit } from '@/lib/crashGuard';
+
 import {
   IBMPlexSansArabic_400Regular,
   IBMPlexSansArabic_500Medium,
@@ -7,10 +10,10 @@ import {
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { requireOptionalNativeModule } from 'expo';
-import { LocaleProvider, Stack } from 'expo-router';
+import { LocaleProvider, Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { AppState, View } from 'react-native';
 
@@ -21,8 +24,10 @@ import { GlobalTabBar } from '@/components/GlobalTabBar';
 import { GuestNudge } from '@/components/GuestNudge';
 import { AppLockGate } from '@/components/AppLockGate';
 import { AdminPopup } from '@/components/AdminPopup';
+import { CrashScreen } from '@/components/CrashScreen';
 import { GentlePopups } from '@/components/GentlePopups';
 import { IntroVideoPopup } from '@/components/IntroVideo';
+import { LaunchCover } from '@/components/LaunchCover';
 import { WhatsappVerifyHost } from '@/components/WhatsappVerify';
 import { WhatsappGateHost } from '@/components/WhatsappGateHost';
 import { RateUsPrompt } from '@/components/RateUsPrompt';
@@ -41,6 +46,7 @@ import { isRTL, syncDirection } from '@/i18n/direction';
 import { syncStrings } from '@/i18n/remote';
 import { installNotificationHandler } from '@/lib/notifications';
 import { persistQueryCache, restoreQueryCache } from '@/lib/queryCache';
+import { memberMayBeTyping, reloadApp } from '@/lib/reloadApp';
 import { loadTheme } from '@/theme/theme';
 import { colors, fonts, getThemeName, typography } from '@/theme/tokens';
 
@@ -55,11 +61,6 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
  * whatever is ready.
  */
 const LAUNCH_WATCHDOG_MS = 12_000;
-/**
- * An update that finishes downloading later than this after the launch is NOT applied by force: by then the member
- * may be typing in a form. It stays «pending»: the restart banner (UpdateGate) offers it and the next launch applies it.
- */
-const AUTO_RELOAD_WINDOW_MS = 30_000;
 /** A phone that keeps the app alive for days: back in the foreground with a check older than this, look for an update again. */
 const UPDATE_RECHECK_MS = 3 * 60 * 60_000;
 
@@ -94,7 +95,30 @@ const detailHeader = () => ({
   animation: 'fade_from_bottom' as const,
 });
 
+/**
+ * 2026-11-16 (members: «شاشة سودا بدون سبب»): expo-router wraps the root layout in this boundary. A screen or a root
+ * cover that throws while drawing now shows the recovery screen (components/CrashScreen.tsx) instead of the dead
+ * black window on Android or the app closing on iPhone. In the first seconds of a cold start on a downloaded update
+ * the error is thrown on instead, so expo-updates can still roll a broken update back (lib/crashGuard.ts).
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <CrashScreen error={error} retry={retry} />;
+}
+
+/** One broken screen keeps the rest of the app alive: its own boundary offers «رجوع» beside the restart. */
+function ScreenCrash({ error, retry }: ErrorBoundaryProps) {
+  return <CrashScreen error={error} retry={retry} scope="screen" />;
+}
+
+export const unstable_settings = { screenErrorBoundary: ScreenCrash };
+
 export default function RootLayout() {
+  // The first commit (the launch cover is mounted): expo-updates can no longer roll a broken update back, so from
+  // here on the boundaries and the global handler catch every error instead of passing it on (lib/crashGuard.ts).
+  useEffect(() => {
+    markFirstCommit();
+  }, []);
+
   const [fontsLoaded, fontError] = useFonts({
     IBMPlexSansArabic_400Regular,
     IBMPlexSansArabic_500Medium,
@@ -134,9 +158,13 @@ export default function RootLayout() {
   // default. Early in the launch only (the effect runs once), gated on the native module (M92
   // pattern) so development builds and a binary without updates never crash. Every error is
   // swallowed: the default next-launch path still stands behind it.
+  // 2026-11-16 (members: «شاشة سودا بدون سبب»; decided by the coordinator): the reload happens ONLY while the launch
+  // cover / splash is still showing — the member then sees one longer opening screen. Once the first screen is
+  // visible the update stays pending: the «restart» banner (UpdateGate) offers it and the next cold start runs it.
+  // Second lock: never while the member may be typing (lib/reloadApp.ts). This replaces the 30-second rule.
+  const firstScreenShown = useRef(false);
   useEffect(() => {
     if (!requireOptionalNativeModule('ExpoUpdates')) return;
-    const startedAt = Date.now();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const updates = require('expo-updates') as typeof import('expo-updates');
     let lastCheckAt = 0;
@@ -147,8 +175,7 @@ export default function RootLayout() {
         lastCheckAt = Date.now();
         return check.isAvailable ? updates.fetchUpdateAsync() : null;
       })
-      // Late on a slow network = the member is already using the app: no forced reload (see AUTO_RELOAD_WINDOW_MS).
-      .then((fetched) => (fetched?.isNew && Date.now() - startedAt <= AUTO_RELOAD_WINDOW_MS ? updates.reloadAsync() : undefined))
+      .then((fetched) => (fetched?.isNew && !firstScreenShown.current && !memberMayBeTyping() ? reloadApp() : undefined))
       .catch(() => undefined)
       .finally(() => {
         busy = false;
@@ -181,11 +208,15 @@ export default function RootLayout() {
 
   const ready = watchdog || ((fontsLoaded || fontError !== null) && i18nReady && cacheReady);
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync().catch(() => undefined);
+    if (!ready) return;
+    firstScreenShown.current = true;
+    void SplashScreen.hideAsync().catch(() => undefined);
   }, [ready]);
 
   if (!ready) {
-    return null;
+    // 2026-11-16: never an empty root. At a cold start this sits under the native splash; after a reload (language,
+    // theme, an update) the native splash does not come back, and this is the opening screen the member sees.
+    return <LaunchCover />;
   }
 
   return (
@@ -200,8 +231,11 @@ export default function RootLayout() {
           <AskAdvisorProvider>
             {/* The native headers (back arrow side) read the direction from here, not from I18nManager's start-up constant (see direction.ts). */}
             <LocaleProvider direction={isRTL() ? 'rtl' : 'ltr'}>
-              {/* The Stack and the fixed bottom bar share the column: detail screens sit ABOVE the bar, never behind it. */}
-              <View style={{ flex: 1 }}>
+              {/* The Stack and the fixed bottom bar share the column: detail screens sit ABOVE the bar, never behind it.
+                  The page colour fills it: behind the bar's rounded top corners the window's black showed as two
+                  wedges on every pushed screen of the light theme. The direction is stated here too, read at render
+                  from the language, for the launches where the native flag has not caught up with it yet. */}
+              <View style={{ flex: 1, backgroundColor: colors.black, direction: isRTL() ? 'rtl' : 'ltr' }}>
                 <View style={{ flex: 1 }}>
                   <Stack
                 screenOptions={{
@@ -241,6 +275,8 @@ export default function RootLayout() {
                 <Stack.Screen name="meetups" options={{ ...detailHeader(), title: t('nav.meetups') }} />
                 <Stack.Screen name="meetup/[key]" options={{ ...detailHeader(), title: t('nav.meetup') }} />
                 <Stack.Screen name="about" options={{ ...detailHeader(), title: t('nav.about') }} />
+                {/* «راسل الإدارة» opened with no header, no title and no back arrow: the same detail header as the rest. */}
+                <Stack.Screen name="contact" options={{ ...detailHeader(), title: t('contact.title') }} />
                 <Stack.Screen name="hq/index" options={{ ...detailHeader(), title: t('nav.hq') }} />
                 <Stack.Screen name="hq/book" options={{ ...detailHeader(), title: t('nav.hqBook') }} />
                 <Stack.Screen name="hq/pass/[id]" options={{ ...detailHeader(), title: t('nav.hqPass') }} />

@@ -1,7 +1,47 @@
 // Light client-side checks; the hub enforces the real rules and answers in Arabic.
 
+/**
+ * Arabic-Indic (٠-٩) and Persian (۰-۹) digits as ASCII digits; everything else as typed. A member whose keypad
+ * types «١٢٣٤» must see a code field fill (2026-11-16: the fields dropped those digits and nothing appeared).
+ */
+export function toAsciiDigits(value: string): string {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0));
+}
+
+/** Marks nobody sees: direction marks and isolates, zero-width characters, the byte-order mark, the soft hyphen. */
+const INVISIBLE = /[​-‏‪-‮⁠-⁩؜﻿­]/g;
+/** What a sentence leaves behind an address pasted out of a chat. */
+const TRAILING_PUNCTUATION = /[.,;،]+$/;
+
+/**
+ * The address as the club stores it (2026-11-16: «دخلت إيميل صح وطلع خطأ»). What a member cannot see or does not
+ * count as wrong goes: invisible direction marks, Arabic-Indic digits, a leading `mailto:`, wrapping `<>`, outer
+ * spaces, a trailing dot or comma, capital letters. The server applies the same cleaning; keep the two in step.
+ */
+export function cleanEmail(value: string): string {
+  let email = toAsciiDigits(value.replace(INVISIBLE, '')).trim();
+  email = email.replace(/^mailto:/i, '').trim().replace(TRAILING_PUNCTUATION, '').trim();
+  if (email.startsWith('<') && email.endsWith('>')) email = email.slice(1, -1).trim().replace(TRAILING_PUNCTUATION, '').trim();
+  return email.toLowerCase();
+}
+
+// The shape WordPress `is_email` accepts (the hub's judge): one «@», a plain local part, dotted domain labels.
+const EMAIL_LOCAL = new RegExp("^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$");
+const EMAIL_LABEL = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+/** Judges the CLEANED address, so what the screen accepts is what the hub accepts. */
 export function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim().toLowerCase());
+  const email = cleanEmail(value);
+  if (email.length < 6 || email.includes('..')) return false;
+  const at = email.indexOf('@');
+  if (at < 1 || at !== email.lastIndexOf('@')) return false;
+  const labels = email.slice(at + 1).split('.');
+  if (!EMAIL_LOCAL.test(email.slice(0, at)) || labels.length < 2) return false;
+  // No real domain ends in a single letter; the screens refused it before, and still do.
+  if ((labels[labels.length - 1] ?? '').length < 2) return false;
+  return labels.every((label) => EMAIL_LABEL.test(label));
 }
 
 export type PhoneRules = { dial?: string; pattern?: string; min?: number; max?: number; starts?: string[] };
@@ -12,10 +52,7 @@ export type PhoneRules = { dial?: string; pattern?: string; min?: number; max?: 
  * Indian 91… stays whole). The server applies the same cleaning for older bundles.
  */
 export function localPhoneDigits(value: string, rules?: PhoneRules): string {
-  const raw = value
-    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
-    .replace(/\D+/g, '');
+  const raw = toAsciiDigits(value).replace(/\D+/g, '');
   const digits = raw.replace(/^0+/, '');
   const dial = rules?.dial;
   if (!dial || !digits.startsWith(dial) || digits.length <= (rules?.max ?? 12)) return digits;

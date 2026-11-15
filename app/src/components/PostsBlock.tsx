@@ -8,13 +8,28 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { PaperCard } from '@/components/paper';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
+import { isPostUnread, markAllPostsRead, useReadPosts } from '@/lib/readPosts';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 import { withoutMediaLines } from '@/components/StructuredText';
 
 export const HOME_POSTS_LIMIT = 3;
+
+/**
+ * The server opens a member's plain message with a greeting line of its own — «الأستاذ/ ناصر،», «Dear Nasser,»,
+ * «Dear member,» — followed by a blank line (server/src/posts/routes.ts: `greeting` + `personal`). A short preview
+ * spent itself on it: the home card showed the greeting and «…», none of the message's own words (final emulator
+ * pass, 2026-11-16). The preview starts at the message's own first words; the message screen keeps the greeting.
+ */
+const GREETING_LINE = /^\s*(?:الأستاذ\/ [^\n]{1,80}،|Dear [^\n]{1,80},)[ \t]*\r?\n\s*/u;
+
+/** The words a card or a row previews: no greeting line, no media lines. */
+export function postPreview(body: string): string {
+  return withoutMediaLines(body.replace(GREETING_LINE, ''));
+}
 
 /** First image of the post, else the YouTube thumbnail, else the uploaded video's poster, else nothing. */
 function thumbnailOf(post: Post): string | null {
@@ -46,6 +61,22 @@ export function PostsBlock() {
   );
 }
 
+/**
+ * M242: «تعليم الكل كمقروء» — a small text button that exists only while something is unread (the inbox tab, the
+ * messages list). `ids` are the unread messages it marks.
+ */
+export function MarkAllReadButton({ ids }: { ids: string[] }) {
+  if (ids.length === 0) return null;
+  return (
+    <PressScale onPress={() => markAllPostsRead(ids)} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('inbox.markAllRead')} wrapStyle={styles.markAllWrap} style={styles.markAll}>
+      <Ionicons name="checkmark-done" size={14} color={colors.goldText} />
+      <Text style={styles.markAllText} numberOfLines={1}>
+        {t('inbox.markAllRead')}
+      </Text>
+    </PressScale>
+  );
+}
+
 /** M29: a targeted message is marked for its reader; the feed already holds only what he may read. */
 export function audienceBadge(post: Pick<Post, 'audience'>): string | null {
   if (post.audience === 'member') return t('posts.forYou');
@@ -63,6 +94,11 @@ export function PostCard({ post }: { post: Post }) {
   const event = eventOf(post);
   const targeted = audienceBadge(post);
   const paper = post.pinned;
+  // M242: unread until the member opens it — a gold dot and a heavier title.
+  const read = useReadPosts();
+  const unread = isPostUnread(post, read);
+  // The message's own first words (the server's greeting line is skipped, see postPreview).
+  const preview = post.body ? postPreview(post.body) : '';
   const body = (
     <View style={[styles.texts, thumbnail && !paper ? styles.textsPadded : null]}>
           {targeted ? (
@@ -74,8 +110,9 @@ export function PostCard({ post }: { post: Post }) {
             </View>
           ) : null}
           <View style={styles.titleRow}>
-            <Text style={[styles.title, paper && styles.titlePaper]} numberOfLines={2}>
-              {post.title}
+            {unread ? <View style={[styles.unreadDot, paper && styles.unreadDotPaper]} /> : null}
+            <Text style={[styles.title, paper && styles.titlePaper, unread && styles.titleUnread]} numberOfLines={2}>
+              {markParagraphs(post.title)}
             </Text>
           </View>
           {event ? (
@@ -104,13 +141,13 @@ export function PostCard({ post }: { post: Post }) {
             <View style={styles.eventPlace}>
               <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={paper ? colors.paperGold : colors.goldLightText} />
               <Text style={[styles.eventPlaceText, paper && styles.inkSoftPaper]} numberOfLines={1}>
-                {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
+                {markParagraphs(event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online'))}
               </Text>
             </View>
           ) : null}
-          {post.body ? (
+          {preview ? (
             <Text style={[styles.body, paper && styles.inkSoftPaper]} numberOfLines={2}>
-              {withoutMediaLines(post.body)}
+              {markParagraphs(preview)}
             </Text>
           ) : null}
           <View style={styles.metaRow}>
@@ -120,7 +157,13 @@ export function PostCard({ post }: { post: Post }) {
         </View>
   );
   return (
-    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={paper ? radii.xl : radii.lg} accessibilityRole="button" accessibilityLabel={post.title}>
+    <PressScale
+      onPress={() => router.push(`/posts/${post.id}` as Href)}
+      glow
+      glowRadius={paper ? radii.xl : radii.lg}
+      accessibilityRole="button"
+      accessibilityLabel={unread ? `${t('inbox.unread')}: ${post.title}` : post.title}
+    >
       {paper ? (
         // The golden pin head and the hair of tilt come from PaperCard itself.
         <PaperCard pinned style={styles.paperCard}>
@@ -160,8 +203,15 @@ const styles = themedStyles(() => ({
   eventWhenPaper: { color: colors.paperGold },
   texts: { flex: 1, gap: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  title: { ...typography.body, flex: 1, color: colors.textPrimary },
-  body: { ...typography.caption, color: colors.textSecondary },
+  title: { ...typography.body, flex: 1, color: colors.textPrimary, textAlign: textStart },
+  // M242: the unread mark — a lit gold dot before a semi-bold title (ink-gold on the paper sheet).
+  titleUnread: { fontFamily: fonts.semiBold },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.goldNeon, boxShadow: shadows.glowGoldFaint },
+  unreadDotPaper: { backgroundColor: colors.paperGold, boxShadow: undefined },
+  markAllWrap: { alignSelf: 'flex-end' },
+  markAll: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
+  markAllText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 19, color: colors.goldText },
+  body: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   event: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   eventBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.gold },
   eventBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },

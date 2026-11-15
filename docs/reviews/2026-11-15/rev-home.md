@@ -4,6 +4,83 @@ Review date: 2026-11-15. All 22 files of the area were read once. Nothing was ru
 
 Round 2 (coordinator decisions, same day): items 1–9 are applied and listed under `Fixed` with «decision N». Not applied by decision: taller chips (P3), the intro film from the server, the 4-tab layout. `app/contact.tsx` belongs to the coordinator; my two earlier edits there are listed, nothing was touched after the freeze.
 
+Round 3 (2026-11-16, owner request «لما يوصل رسالة من الإدارة ينور تحت هنا»): built, see the next section. JavaScript only, no new package.
+
+## Round 5 — three points of the final emulator pass (2026-11-16)
+
+- **1 · the gold strip no longer cuts in English** — `app/(tabs)/index.tsx`, `UnreadMessagesStrip`: the label has the first line to itself and shrinks (to 75 %) before it is ever cut; the second line carries the title (one line, its own direction, starting where the label starts) and «اقرأ الرسالة» at the end. The action grows at most 10 % with the system font, so the title keeps the room. Several unread messages: the count line and the chevron only, as before.
+- **2 · the message preview starts at the message's own words** — `components/PostsBlock.tsx`: new `postPreview(body)` drops the server's greeting line («الأستاذ/ …،», «Dear …,» and the blank line after it — the exact shapes of `greeting` in `server/src/posts/routes.ts`) before the media lines are dropped; used by the card's two-line preview and by the inbox row (`app/(tabs)/news.tsx`, which had the same preview). The message screen is untouched and keeps the greeting. A body that is only the greeting still shows it. Checked with six sample bodies in Node (Arabic, English with a name, English «member», CRLF, greeting only, a message that opens with its own «Dear all, …» sentence — left alone).
+- **3 · «راسل الإدارة» bottom area** — `app/contact.tsx`: the composer no longer pads the bottom inset (the bar under the screen already covers it when the keyboard is closed; with the keyboard open it was the blank strip), and while the keyboard is closed the hint line keeps `ADVISOR_DOCK_RISE + 2` pt of air under it, so the raised advisor button no longer crosses it. With the bar's geometry (54 pt circle rising 18 pt) the crown's top is 17 pt above the bar's edge and the hint's text now ends 24 pt above it. The advisor composer uses 12 pt because a wide field sits there; a centred line of text sits exactly above the crown, so it needs the full rise.
+
+Needs a look on the emulator: the strip in English at the normal font and at the largest one (label whole, title whole or ended with «…» only when it is truly long); the home card of a signed-in member showing the message's first words in both languages; «راسل الإدارة» with the keyboard closed (hint clear of the button) and open (field flush above the keys, no blank strip), in Arabic and English.
+
+Checks: `npx tsc --noEmit` → exit 0. `npx eslint` on `(tabs)/index.tsx`, `(tabs)/news.tsx`, `PostsBlock.tsx`, `contact.tsx` → exit 0. Not run: Metro, emulator, device.
+
+## Round 4 — the affiliate complaint and the Android emulator findings (2026-11-16)
+
+JavaScript only; my files plus the two call sites `i18n/chooseLanguage.ts` and `theme/theme.ts`. No string-table edit, no key missing.
+
+One line per item
+- **A · applied** — `app/(tabs)/index.tsx` and `app/(tabs)/account.tsx`: both pull-to-refresh handlers now `invalidateQueries({ queryKey: ['affiliate'] })` (invalidate, so a guest's disabled query sends nothing). The push line of the plan (`PushRegistrar.tsx`) was not in my list and is not done.
+- **B1 (item 35) · applied** — `components/GlobalTabBar.tsx` now uses the navigator's own numbers (read in expo-router's bottom-tabs): bar 49 pt over the bottom inset, no side padding, item padding 5, icon 25 pt in a 31×28 box, active mark a 38 pt circle, badge at top −3 / end −3. Before it was 3 pt taller, its icons 3 pt inward (the «8 px»), its mark a pill. The advisor circle sits in the same icon box as in the tabs bar.
+- **B2 (item 17) · applied** — a tab the persona hides keeps an empty slot in both bars (`tabBarButton: () => null` instead of `href: null` in `(tabs)/_layout.tsx`; an empty slot in `GlobalTabBar.tsx`), so the advisor circle stays in the middle: two slots on each side. The hidden screen stays reachable by its path, as before.
+- **B3 (item 30) · applied** — `components/MarketsStrip.tsx`: the tile label is one line that shrinks to fit (down to 75 %). `app/(tabs)/account.tsx`: e-mail and phone are one line each, shrink to fit (down to 70 %), the e-mail with a middle ellipsis as the last resort. The tab labels were done in round 3.
+- **B4 (item 26) · applied** — `app/(tabs)/index.tsx` quick actions: two lines, and a label slightly too long shrinks to fit (down to 80 %) instead of ending in «…». The two pills «Start your consult..» / «Request your me…» of the same finding are in `components/ServiceTile.tsx` (not my file).
+- **B5 (item 28) · applied** — `app/(tabs)/index.tsx` gold door cards: the hint line is two lines, so «…Google Play و App Store» wraps between words.
+- **B6 (item 25) · applied** — the same `spacing.sm` under a section's description everywhere on the home: the partners and videos strips (`index.tsx`), «جولة في النادي» (`ClubTourStrip.tsx`) and the markets tiles under «الأخبار» (`MarketsStrip.tsx`). The agenda, people and meetups strips and the «قدّم من هنا» button already carry it in their own files (`AgendaBlock`, `PeopleBlock`, `MeetupsBlock`).
+- **B7 (item 41) · applied** — `components/MarketsStrip.tsx` `ChangeText`: a zero change has no arrow and the muted colour (also on the markets screen, which shares it).
+- **B8 (item 18) · applied** — new `components/AppDialog.tsx`: `showAppDialog({ title, message?, actions })` + `AppDialogHost`. The golden card and fade/pop of the other popups, token colours, centred text and full-width answers (nothing to mirror between the two languages), closed by the Android back key and a tap outside (both take the `cancel` answer), no `zIndex`; it holds the screen so no automatic popup opens over it; with no host on screen it falls back to the system dialog. Used by sign-out (`account.tsx`), language (`i18n/chooseLanguage.ts`) and theme (`theme/theme.ts`). The host is mounted inside `AdminPopup` (already in the root layout for the whole launch) — **no line to add in `_layout.tsx`**.
+
+Things to know
+- `account.menu.hq` in English («Club headquarters and my visits») is long for a quarter-width tile; it now shrinks to stay on two lines — to roughly 8–8.5 pt by my estimate from the tile width, not measured on a phone (the floor is 80 % of the 10 pt label). A shorter English value (for example «Club HQ & visits») would keep the full size — the key exists, only its English text would change.
+- The dialog answers are stacked and full-width (sign-out: «تسجيل الخروج» in the danger colour, then «إلغاء»).
+- While this round ran, `npx tsc` showed five errors in `components/MembershipGate.tsx` (another session's edit in progress); they were gone on the next run.
+
+Needs a look on a phone (Android emulator first)
+1. Open a page from a tab and go back: the bar must not move by a pixel — icons, labels, the active circle and the advisor circle (items 35).
+2. An entrepreneur account (Projects hidden): the advisor circle in the middle in both bars, with an empty slot where Projects was.
+3. System font at 1.3: «السوق السعودي» whole, the account e-mail on one line.
+4. English home: «Club headquarters…» tile on two lines without «…»; Arabic home as an entrepreneur: the «انشر تطبيقك» hint on two lines.
+5. The gaps under «الأخبار», «شركاؤنا», the videos strip and «جولة في النادي».
+6. Gold at 0 %: grey, no arrow.
+7. The three questions (language, theme, sign-out) in Arabic and English, dark and light: the app's card, back key closes, a tap outside closes; choosing a language or theme still restarts the app; the language question on the welcome screen too.
+8. Pull-to-refresh on the home and on حسابي as an approved affiliate: one `GET /api/affiliate` each; as a guest, none.
+
+Checks: `npx tsc --noEmit` → exit 0 (second run; see above). `npx eslint` on `(tabs)/_layout.tsx`, `(tabs)/index.tsx`, `(tabs)/account.tsx`, `GlobalTabBar.tsx`, `AppDialog.tsx`, `AdminPopup.tsx`, `MarketsStrip.tsx`, `ClubTourStrip.tsx`, `i18n/chooseLanguage.ts`, `theme/theme.ts` → exit 0. Not run: Metro, emulator, device.
+
+## Round 3 — unread management messages (2026-11-16)
+
+Code comments carry the tag `M242`; if the brief gives this work another number it is one find-and-replace.
+
+What was built, file by file
+- `lib/readPosts.ts` (new) — the device-local read state: the ids this device opened (newest 300, stored in parts because ids are 36 characters) and a baseline time saved at the first launch of the feature. Unread = published after the baseline and not in the set; nothing is unread until the stored state has loaded. Exports `useUnreadPosts()` (from `useLatestPosts(10)`, newest first), `markPostRead`, `markAllPostsRead`, plus `useReadPosts` / `isPostUnread` for a row that draws its own dot. Writes are queued one at a time; a mark made before the stored list is in waits for it (a message opened straight from a push).
+- `lib/badges.ts` — `inbox` is now `useUnreadPosts().length` (the other three counts unchanged). New `useAppIconBadge()`: writes the icon number when the count changes and when the app returns to the foreground; signed out = 0; writes nothing while the account, the read state or the feed is still loading.
+- `lib/notifications.ts` — new `setAppBadge(count)`: optional-module check for the badge module, `setBadgeCountAsync` only when the function exists and only when the number differs from the icon's current one, every failure swallowed.
+- `app/posts/[id].tsx` — `markPostRead(id)` once the post has loaded.
+- `app/(tabs)/_layout.tsx` and `components/GlobalTabBar.tsx` — while a message is unread the inbox tab shows the gold «unread» envelope (`mail-unread`), a soft gold glow breathing behind it (`NeonPulse`, still under «reduce motion»; drawn before the icon, the count after it, no `zIndex`), the count badge, and the accessibility label `inbox.tabUnread`. Same 40×30 glow in both bars. `GlobalTabBar` also mounts `useAppIconBadge()` (it lives for the whole launch).
+- Both bars, item 8 — the labels no longer follow the system font size (`tabBarAllowFontScaling: false`, `allowFontScaling={false}`) and shrink to fit (`adjustsFontSizeToFit`, down to 75 %) before they are ever cut. In the (tabs) bar the label is drawn by a small `TabLabel` with the navigator's own label style, so a phone where the words fit looks the same.
+- `app/(tabs)/index.tsx` — `UnreadMessagesStrip`, the first thing on the page: one unread → `inbox.newFromManagement` + the title (one line, `textDir`) + `inbox.openMessage`, a tap opens the message; several → `inbox.newFromManagementCount`, a tap opens the inbox tab. Gold, ink on gold, 48 pt minimum; gone when nothing is unread.
+- `app/(tabs)/news.tsx` — a message row is lit (gold dot, gold icon box, heavier title) while unread instead of «newer than the last visit»; the header count is the unread count; `inbox.markAllRead` under the header only while something is unread. Entering the tab still resets the dots of events, projects and profiles, never the messages.
+- `components/PostsBlock.tsx` — `PostCard` shows a gold dot and a semi-bold title while unread (ink-gold dot on the pinned paper sheet); new `MarkAllReadButton`.
+- `app/posts/index.tsx` — opening the list no longer marks anything read (the old `markSeen('posts')` is gone); `MarkAllReadButton` on top while something is unread.
+- `components/PushRegistrar.tsx` — checked, not changed: a push of type `post` already invalidates `['posts']` (`server/src/posts/routes.ts:152` sends that type).
+
+Things to know
+- The first launch with this bundle takes every existing message as read (the baseline), so nobody opens the app to a lit tab for old messages. The light starts with the next message.
+- In the inbox tab every title was already semi-bold, so an unread message there is bold (one step heavier) — otherwise the two states would look the same. On the message cards (home block, messages list) unread is semi-bold over the regular title, as asked.
+- The read state belongs to the device, not the account: two accounts on one phone share it.
+- `inbox.unread` is used as the screen-reader prefix of an unread row.
+
+Needs a look on a real phone
+1. Send a management message: the tab lights in both bars (a tab screen and a detail screen), the gold strip tops the home, the dot shows in the inbox, the messages list and the home block; open the message → all of them go out.
+2. Two unread messages: the strip shows the count and opens the inbox tab; «تعليم الكل كمقروء» clears everything.
+3. The glow behind the envelope in light mode and in dark mode, and with «reduce motion» on (it must hold still).
+4. App icon number — iPhone: it needs the notification permission, and going from N to 0 also empties the notification centre (iOS behaviour). Samsung: the launcher shows the number. Pixel-style launchers show no number at all (nothing to fix in JavaScript).
+5. The Samsung phone with the larger system font: the five labels whole in both bars, «بنك المشاريع» not cut; and an iPhone at the default size looks as before.
+6. An old binary (runtime 1.2.0): the app opens and the lights work; the icon number is simply absent if that binary has no badge module.
+
+Checks: `npx tsc --noEmit` → exit 0. `npx eslint` on `(tabs)/_layout.tsx`, `(tabs)/index.tsx`, `(tabs)/news.tsx`, `posts/[id].tsx`, `posts/index.tsx`, `GlobalTabBar.tsx`, `PostsBlock.tsx`, `PushRegistrar.tsx`, `lib/badges.ts`, `lib/readPosts.ts`, `lib/notifications.ts` → exit 0. `mail-unread` / `mail-unread-outline` are in the Ionicons type (tsc). Not run: Metro, emulator, device.
+
 ## Fixed
 
 Tab bar

@@ -6,7 +6,7 @@ import { Animated, Image, Platform, ScrollView, StyleSheet, Text, View, useWindo
 import { goldenCodeForUrl, useGolden, useProject, useProjectBrief } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
-import { Highlight } from '@/components/Highlight';
+import { Highlight, ownDirection } from '@/components/Highlight';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { EMPTY_VALUE, ProjectBrief } from '@/components/project/ProjectBrief';
 import { ProjectReviews } from '@/components/project/ProjectReviews';
@@ -15,7 +15,7 @@ import { RateProjectModal } from '@/components/project/RateProjectModal';
 import { StarsRow } from '@/components/Stars';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { isRTL, textDir, textStart } from '@/i18n/direction';
+import { isRTL, textStart } from '@/i18n/direction';
 import { trackProjectView } from '@/lib/adsAttribution';
 import { formatNumber } from '@/lib/format';
 import { topicIcon, type IoniconName } from '@/lib/icons';
@@ -117,7 +117,7 @@ export default function ProjectScreen() {
           ) : null}
 
           <FadeInView delay={30}>
-            <Text style={[styles.title, textDir(project.title)]}>{project.title}</Text>
+            <Text style={[styles.title, ownDirection(project.title)]}>{project.title}</Text>
             {/* M116d (owner): a tap on the stars under the name opens the rating sheet right away. */}
             {project.rating ? (
               <PressScale onPress={() => setRateOpen(true)} accessibilityRole="button" accessibilityLabel={t('ratings.add')} wrapStyle={styles.titleStars}>
@@ -127,7 +127,8 @@ export default function ProjectScreen() {
           </FadeInView>
           {project.titleEn ? (
             <FadeInView delay={50}>
-              <Text style={[styles.titleEn, textDir(project.titleEn)]}>{project.titleEn}</Text>
+              {/* The Latin company line starts at the page's start edge like its neighbours, written left to right. */}
+              <Text style={[styles.titleEn, ownDirection(project.titleEn)]}>{project.titleEn}</Text>
             </FadeInView>
           ) : null}
 
@@ -443,7 +444,7 @@ const styles = themedStyles(() => ({
   metaText: { ...typography.caption, color: colors.textSecondary },
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.gold },
-  body: { ...typography.body, color: colors.textSecondary },
+  body: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   readMoreHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   readMorePill: {
@@ -474,7 +475,7 @@ const styles = themedStyles(() => ({
   },
   richHeadingText: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.goldLightText, flex: 1, textAlign: textStart },
   richBullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingStart: spacing.xs },
-  richDiamond: { fontSize: 9, lineHeight: 24, color: colors.gold },
+  richDiamond: { fontSize: 9, lineHeight: 24, color: colors.goldText },
   richBulletText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
   // M95: a long paragraph's sentence rows, each led by its matched icon.
   richPiece: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },

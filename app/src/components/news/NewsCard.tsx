@@ -6,7 +6,7 @@ import type { NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { textDir } from '@/i18n/direction';
+import { markParagraphs, textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
@@ -18,6 +18,30 @@ type Props = {
   /** Compact cards sit in the horizontal decisions strip. */
   compact?: boolean;
 };
+
+const ARABIC_LETTERS = /[؀-ۿ]/u;
+
+/**
+ * Android draws the ellipsis of an Arabic line that was cut in the middle of a word partly outside the text box:
+ * the last letter kept takes its stand-alone shape, the line grows past its box and «…» loses a dot («..», seen
+ * on the emulator 2026-11-15; there is no padding on those Texts). So a long text is cut here instead, at the end
+ * of a word, with «…» as an ordinary character; `numberOfLines` stays on the Text as the safety net.
+ * The fit is an estimate from the box width and the font size (average letter advance, slightly generous), so a
+ * line normally ends with a little room to spare. `boxWidth` 0 (not measured yet) returns the text untouched.
+ */
+export function fitWords(text: string, boxWidth: number, fontSize: number, fontScale: number, lines = 1): string {
+  if (!boxWidth) return text;
+  const advance = fontSize * fontScale * (ARABIC_LETTERS.test(text) ? 0.42 : 0.52);
+  const perLine = Math.floor(boxWidth / advance);
+  // Wrapping leaves up to a word unused at the end of every line but the last.
+  const budget = perLine * lines - 6 * (lines - 1);
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= budget) return flat;
+  const cut = flat.slice(0, budget);
+  const space = cut.lastIndexOf(' ');
+  const kept = space > budget * 0.6 ? cut.slice(0, space) : cut;
+  return `${kept.replace(/[\s،,.;:؛–—-]+$/u, '')}…`;
+}
 
 /** M182b (owner): a story younger than this wears the red «عاجل» pill. */
 export const BREAKING_MS = 2 * 3_600_000;
@@ -61,11 +85,11 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
         <View style={styles.body}>
           <View style={styles.text}>
             <Text style={[styles.title, compact && styles.compactTitle, textDir(item.title)]} numberOfLines={3}>
-              {item.title}
+              {markParagraphs(item.title)}
             </Text>
             {!compact && item.snippet ? (
               <Text style={[styles.snippet, textDir(item.snippet)]} numberOfLines={2}>
-                {item.snippet}
+                {markParagraphs(item.snippet)}
               </Text>
             ) : null}
           </View>

@@ -1,0 +1,216 @@
+{
+ "key": "affiliate-appears-late",
+ "words": "The representatives (affiliate) programme does not appear until the member has closed and reopened the app three or four times.",
+ "diagnosis": {
+  "summary": "Nothing on the server or in the account hides the programme: the Account row, the /affiliate screen and the home «أرباحي» card are in every bundle since 2-4 Nov and are embedded in binaries 1.3.1, 1.3.2 and 1.3.3. What goes stale is the member's own affiliate state: GET /api/affiliate lives only in TanStack memory, and in the members' bundles nothing refreshes it after the dashboard approves (no foreground refetch, no push, no sync part, no pull-to-refresh), so a phone that keeps the app alive shows «pending» and no card until the process is really killed or the screen is re-entered. OTA delivery explains \"three or four times\" only for binaries 1.2.0/1.3.0, whose embedded bundle has no programme and applies an update on the second cold start; on 1.3.2/1.3.3 the newest bundle runs within the first launch, so it does not explain it there.",
+  "causes": [
+   {
+    "cause": "Stale affiliate state in a running app: after the dashboard approves (or a referral registers), nothing tells the app, and the members' bundles never re-ask while the app stays alive.",
+    "evidence": "What decides visibility: C:\\Projects\\vibes-club-app\\app\\src\\api\\affiliate.ts:118-126 (key ['affiliate','mine',id], staleTime 30 s, unchanged today); home card C:\\Projects\\vibes-club-app\\app\\src\\components\\AffiliateHomeCard.tsx:23-26 renders null unless status==='approved' with a balance (also null while loading or on error); screen app/src/app/affiliate/index.tsx (97705af:80 panel, :183 «pending» notice). No flag on the account, nothing in /api/home.\nServer is fresh on every call: server/src/affiliate/routes.ts:127-181 reads the record from Postgres KV (server/src/store.ts:76-79, no cache); /api/* is no-store (97705af server/src/app.ts:188-190). decide() (server/src/affiliate/service.ts:892-918) sends an e-mail and a WhatsApp message only: no push, and /api/sync has no affiliate part (app/src/components/SyncPoller.tsx:18-23).\nMembers' bundle (git show 97705af): _layout.tsx:49-53 creates the QueryClient with no focusManager wiring; TanStack's default listener needs window.addEventListener('visibilitychange') (node_modules/@tanstack/query-core/build/modern/focusManager.js), which a phone never fires. Home pull-to-refresh refetches five queries, not this one ((tabs)/index.tsx:92-96). The affiliate screen had no RefreshControl (affiliate/index.tsx:75). PushRegistrar.tsx:62-70 invalidates payments/hq/posts/contact only. The query is not persisted (lib/queryCache.ts:22 KEEP_ROOTS has no 'affiliate').\nSequence: member accepts the agreement, sees «سيُفعَّل طلب انضمامك فور استلامك رسالة التأكيد…», leaves the app. Admin approves; the e-mail says the panel is in My account. Member taps the icon: the process is still alive, the same screen (or the home) is still mounted with status 'pending' in memory, no refetch happens. Sending the app to the background and back any number of times changes nothing. Only (a) a real kill or an OS reclaim, then a cold start (empty memory cache, fresh GET), or (b) leaving the screen and opening it again (new observer, data older than 30 s) shows the approved panel and the home card. A member who counts every home-button press as a «close» needs as many tries as it takes for the process to die. Variant: one failed GET at launch (15 s timeout, client.ts:33) leaves the card silently absent for the whole session, since the home pull does not retry it.",
+    "platforms": "iOS and Android; every bundle from M184 (2 Nov) to 14 Nov, on binaries 1.2.0 to 1.3.3. Most visible on iPhone, where the process survives for days.",
+    "confidence": "proven-in-code",
+    "fixedToday": "Partly. In HEAD 0fcf3e5: foreground refetch (app/src/app/_layout.tsx:77-82) refreshes the query on every return after 30 s, and the affiliate screen got pull-to-refresh (app/src/app/affiliate/index.tsx:42-49, 101). Still missing: the home pull-to-refresh does not include it ((tabs)/index.tsx:93-110), no push or polling on approval, PushRegistrar does not invalidate it. A phone on the old bundle receives the fix only at its next cold start."
+   },
+   {
+    "cause": "OTA delivery of the feature itself on binaries whose embedded bundle predates the programme (1.2.0 and 1.3.0): the Account row does not exist until an update has been downloaded and applied on a later cold start.",
+    "evidence": "Commit 559b320 (version 1.3.0, 30 Oct): (tabs)/account.tsx has no affiliate row, app/src/app/affiliate/ does not exist, _layout.tsx has no checkForUpdateAsync. The programme shipped by OTA on 2 Nov (dd792fa) together with the self-applying update effect M182d. app/app.config.ts:68-71: updates.fallbackToCacheTimeout 0, default check on load, so native expo-updates starts the bundle it already has and downloads in the background; node_modules/expo-updates .../procedures/StartupProcedure.kt:88-98 completes at launch, not after the download.\nSequence on 1.3.0: launch 1 runs the embedded 30-Oct bundle (no row), download in the background; background/foreground cycles change nothing; cold start 2 runs the new bundle. If the app was left before the download finished, cold start 3. That is 2-4 «closes».\nOn 1.3.1 (db63425), 1.3.2 (a66fe95) and 1.3.3 (1c4b1e4) the embedded bundle already contains the row, the screens, the home card and the effect check → fetch → reloadAsync (97705af _layout.tsx:108-116), so a fresh install has the programme from the first second and moves to the newest bundle by restarting itself during the first launch (second cold start at worst). OTA alone cannot produce «three or four times» on 1.3.2 / 1.3.3.",
+    "platforms": "Both; binaries 1.2.0 and 1.3.0 only (the store served 1.3.0 from 30 Oct until 1.3.1/1.3.2 went live around 8-12 Nov; 1.3.2 was submitted on 10 Nov). Not 1.3.1+.",
+    "confidence": "likely",
+    "fixedToday": "Not by today's pass; already cured earlier by the 1.3.1+ binaries (feature embedded) and by M182d. Today only adds the 30 s reload window and the 3-hour foreground recheck (_layout.tsx:62-64, 137-174)."
+   },
+   {
+    "cause": "Signed-in member with no account object sees «سجّل الدخول للاطلاع على برنامج ممثلي نادي المستثمرين» instead of the programme, until a later launch reaches the server.",
+    "evidence": "97705af app/src/app/affiliate/index.tsx:40 `if (status !== 'signedIn' || !me)` shows the guest notice. AuthProvider (97705af): a stored token, no usable account.v1.json and a non-401 failure of authApi.me at launch (offline, hub slower than 10 s) sets status 'signedIn' with me = null, and nothing asks again in that session. Needs three conditions at once, so rare.",
+    "platforms": "Both; bundles up to 14 Nov.",
+    "confidence": "possible",
+    "fixedToday": "Yes: app/src/auth/AuthProvider.tsx:183-191 asks again on return to the foreground; affiliate/index.tsx:52-59 shows a loader while the account is restored."
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Ship today's commit as it is: the AppState-driven focusManager (stale queries refetch on return to the app) and the pull-to-refresh on the affiliate screen. No further edit; this is the main cure for the warm-app case.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\affiliate\\index.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Every return to the app now refetches all stale mounted queries, including GET /api/affiliate for every signed-in account (see the server item). Reaches a phone only at its next cold start."
+   },
+   {
+    "change": "Home pull-to-refresh also refreshes the affiliate state: in onRefresh add `queryClient.invalidateQueries({ queryKey: ['affiliate'] })` to the allSettled list (invalidate, not refetch(): refetch() on the disabled guest query would send a 401 request).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\index.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "One more GET per pull for signed-in accounts; none for guests."
+   },
+   {
+    "change": "While an application waits for the decision, ask again by itself: in useAffiliate add `refetchInterval: (query) => (query.state.data?.status === 'pending' ? 60_000 : false)`. Only pending applicants poll, and only in the foreground.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\affiliate.ts"
+    ],
+    "delivery": "ota",
+    "risk": "Low: a handful of accounts, one GET a minute. Do it together with the server item, because that GET currently writes."
+   },
+   {
+    "change": "On arrival of a push whose type starts with 'affiliate', invalidate ['affiliate'] in the received listener (next to the payment/hq/post/contact lines). A tap already opens data.screen.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PushRegistrar.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "None; one line."
+   },
+   {
+    "change": "Send a push when the dashboard decides: in decide(), after the mail, call the existing push dependency (the one remind() uses) with data { screen: '/affiliate', type: 'affiliate' } and a title/body in the account's language. Transactional, so it should not follow the advisor mute.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m184.affiliate.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "Signed-out phones and phones without notification permission get nothing (the app-side refetch covers them). Must never delay or fail the decision: fire and forget, as sendLink does."
+   },
+   {
+    "change": "Wording of the approval / refusal push in formal Arabic and English (it can mirror the e-mail title «تم اعتماد عضويتك في برنامج ممثلي نادي المستثمرين»).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts"
+    ],
+    "delivery": "owner-decision",
+    "risk": "New member-facing copy needs the owner's approval."
+   },
+   {
+    "change": "Make GET /api/affiliate read-only when there is nothing to bring up to date: in sync() return before mutate() when the caller has no record or it is not approved, and inside mutate() write the two documents only when something changed. Today every call rewrites affiliate:records and affiliate:payouts through one server-wide queue, and the home card makes every signed-in phone call it at each launch and, from today's bundle, at each return to the app.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m186.affiliate-cycles.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low; the approved path must still stamp membership, earnings and cycles (tests m184, m186, m198, m202 cover it). Also removes a narrow lost-update window while two server instances overlap during a deploy."
+   },
+   {
+    "change": "Build 1.3.4 from a tree that contains the items above, so a fresh install has them embedded and does not depend on the first-launch update. No native change is needed for this complaint.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "risk": "None specific; the build is already planned."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone or an Android phone; the warm-app sequence comes from reading the app code and the TanStack and expo-updates sources.",
+   "Which surface the members meant (the Account row, the approved panel, or the home «أرباحي» card), when they complained and which binary they had then. If the complaints date from 2 to about 11 Nov on store binary 1.3.0, the OTA explanation is the main one; on 1.3.2 / 1.3.3 it cannot be.",
+   "No network request was made: not checked what u.expo.dev serves today per runtime, whether today's commit is already published, or any production log of /api/affiliate failures.",
+   "The exact days 1.3.1 and 1.3.2 became live in each store, and the build date of the live iPhone 1.3.0 (a memory note says 1-2 Nov with M178-M180 embedded; only commit 559b320 was checked).",
+   "What a «close» does on each phone: home button, swipe-away, or Android Back (which may destroy the Activity and remount the tree with a warm cache, and that does refetch).",
+   "expo-updates when the JS fetch and the native launch download of the same update run together: only the Android procedures were read, not iOS.",
+   "Whether production runs one server instance at all times (railway.json sets no replicas); the lost-update risk in sync() is theoretical."
+  ],
+  "data": "SURFACES OF THE PROGRAMME\n- Account row «برنامج ممثلي نادي المستثمرين»: unconditional for a signed-in account ((tabs)/account.tsx:157; 97705af:146). Exists in bundles from M184 (2 Nov).\n- /affiliate screen: pitch + apply (none/rejected), agreement, «pending» notice, approved panel; all from GET /api/affiliate.\n- Home «أرباحي» card ((tabs)/index.tsx:380): approved only, same query; from M194 (4 Nov).\n\nCACHES BETWEEN SERVER AND SCREEN\n| Layer | Holds affiliate state? | Refresh |\n| Hub -> server meCache (auth/service.ts:827-836, 60 s fresh, 24 h stale-while-revalidate) | No, only the membership tier used for the commission | - |\n| Server KV (Postgres) | Source of truth, read on every call | immediate |\n| HTTP | no-store on /api/* | none cached |\n| TanStack memory | Yes, staleTime 30 s, always observed by the home card | mount when stale; own POSTs (apply, agreement, payout); today: return to foreground, pull on the affiliate screen. Not: home pull, SyncPoller, push |\n| Persisted query file (KEEP_ROOTS) | No | cold start always asks; card appears after the answer |\n| Saved account file (M165) | No affiliate flag | - |\n\nLAUNCHES A NEW PHONE NEEDS TO RUN THE NEWEST BUNDLE\n| Binary | Embedded bundle has the programme | Self-applying update code | Result |\n| 1.2.0 / 1.3.0 (29-30 Oct) | No | No | Second cold start; third if the first download was cut. Background/foreground does not count |\n| 1.3.1 (8 Nov) | Yes | Yes | First launch (restarts itself when the download ends) |\n| 1.3.2 (10 Nov) | Yes | Yes | First launch |\n| 1.3.3 (14 Nov) | Yes | Yes | First launch |\nA phone already installed gets a newly published update at its next COLD start only (members' bundle checks once at mount; the 3-hour foreground recheck is from today).\n\nSIDE NOTE FOR OTHER COMPLAINTS: in the members' bundle the self-restart has no time limit (97705af _layout.tsx:112-116), so on a fresh install it can fire while the newcomer is typing in the sign-up form; today's 30 s window (_layout.tsx:62, 151) ends that."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "Cause 1 is graded 'proven-in-code', but only the mechanism is proven, not that it is what the members hit. In the members' bundle a real kill and reopen cures it on the FIRST try: the affiliate answer is not persisted (git show 97705af:app/src/lib/queryCache.ts line 22, KEEP_ROOTS has no 'affiliate'), the saved account makes the app 'signedIn' at once (97705af:app/src/auth/AuthProvider.tsx lines 76-79), the query is then enabled and asks the server (97705af:app/src/api/affiliate.ts lines 118-126), and the server reads Postgres on every call (server/src/affiliate/routes.ts lines 127-181, server/src/store.ts PgKV.get). So 'three or four times' fits only if those closes were not kills (Home button; Back at the root on Android 12+ only backgrounds). That is an inference about behaviour nobody observed: 'likely', not proven.",
+   "'Only a kill or leaving the screen and opening it again shows the approved panel' is incomplete. Re-entering works only when the cached answer is older than 30 s (staleTime 30_000 with the default refetchOnMount), and every refetch restarts that clock. I ran the app's own @tanstack/query-core 5.102.8 in Node with React-Native-like globals (script: C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\bb956ec3f7ad69ae\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\sim\\rn-like.cjs, timings scaled): mounted observer with no focus wiring = 0 new calls, stays 'pending'; new observer when stale = 1 call, screen and home card both turn 'approved'; new observer inside the stale window = 0 calls, still 'pending'. Also any new useAffiliate observer refreshes it (apply, payout, a tap on the daily reminder push, which does router.push('/affiliate')).",
+   "Today's commit is called 'the main cure'; it is weaker than that. The same simulation shows a return to the app inside the 30 s window makes no call (still 'pending'), and it does nothing for a member who stays inside the app while the management approves unless he knows to pull down on the programme screen; the home has no way at all (C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\index.tsx lines 94-113 do not include it). It also reaches a phone only after a real restart (the members' bundle looks for an update once, at mount: 97705af:app/src/app/_layout.tsx lines 108-117), and nobody checked that it is published.",
+   "'Ship today's commit as it is' ignores the state of the tree: git status shows uncommitted work of another session (app/src/api/auth.ts, app/src/app/delete-account.tsx, app/src/components/PasswordPrompt.tsx, app/src/i18n/strings/ar.json and en.json, server/src/appStrings/catalog.ts). eas update bundles the working tree, so an OTA now would ship that half-done work to production.",
+   "Cause 2 (OTA delivery on 1.2.0 / 1.3.0) is graded 'likely' although it cannot apply to the complainants. I checked the three build commits: db63425 (1.3.1), a66fe95 (1.3.2) and 1c4b1e4 (1.3.3) each contain the Account row, the home card and the self-applying update effect (grep counts row=1 card=1 checkForUpdateAsync=1, focusManager=0). For members on 1.3.2 / 1.3.3 it is history, not a cause.",
+   "The decision push is ranked fifth and its only stated risk is 'signed-out phones get nothing'. Two points are wrong. (a) It is the only proposed item that helps a phone still running the old bundle in memory: the old tap handler opens data.screen (97705af:app/src/components/PushRegistrar.tsx lines 45-50 and 58-60), a new /affiliate screen mounts and refetches. (b) 'Call the existing push dependency (the one remind() uses)' would send nothing when AUTO_PUSH is off, because that dependency is then undefined (C:\\Projects\\vibes-club-app\\server\\src\\app.ts line 404: push: autoPush ? push : undefined). A decision push needs its own always-on dependency.",
+   "A side effect of the foreground refetch was not mentioned: every mounted infinite list (app/src/api/news.ts, posts.ts, queries.ts, videos.ts; none sets refetchOnWindowFocus) refetches ALL its loaded pages at each return to the app after 60 s. Not a break (SyncPoller invalidations already do the same on content changes) but more data and server calls; worth one look on the emulator after a long scroll.",
+   "Confirmed, not corrected: nothing on the server or in the account hides the programme (no flag, row unconditional for a signed-in account at 97705af:app/src/app/(tabs)/account.tsx line 146); decide() sends e-mail and WhatsApp only (server/src/affiliate/service.ts lines 892-918); every GET /api/affiliate rewrites two KV documents through one queue (service.ts lines 430-442 and 585-621); invalidateQueries does not call for a guest while observer.refetch() does (simulated: 0 calls against 1); cause 3 is real but rare.",
+   "Limits of this review, not verified: nothing was run on an iPhone or an Android phone or emulator; no network request was made (not known whether commit 0fcf3e5 is published, what u.expo.dev serves per runtime, or any production log); what the members mean by 'close' and which surface they meant (the approved panel, the home card, or the row); whether production runs a single server instance; expo-updates behaviour on iOS when the JS fetch and the native launch download overlap."
+  ],
+  "missedCauses": [
+   "The 30-second freshness window. Typical case: the member accepts the agreement (fetch, 'pending'), the management approves within the next seconds or minutes while he is still in the app or pops out to WhatsApp for a few seconds. Going back and opening the row again, or returning to the app, inside 30 s of the last fetch makes no request at all, in the members' bundle AND in today's commit. This produces 'I had to try several times' with no kill involved, on iOS and Android alike.",
+   "The app's own wording sends the member back at exactly the wrong moment. The pending notice promises activation 'as soon as you receive the confirmation email' (C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\ar.json line 1521, en.json line 1521) and the approval mail says the panel is under My account (C:\\Projects\\vibes-club-app\\server\\src\\mail\\notify.ts lines 349 and 375). He gets the mail, taps the app icon, and the app resumes on the still-mounted screen with the stale 'pending' sentence. The mail also names the row «ممثلو نادي المستثمرين» while the row is labelled «برنامج ممثلي نادي المستثمرين» (ar.json lines 1496-1497), a small mismatch.",
+   "The three affiliate screens have no header and no back arrow, in the members' bundle and today: affiliate/index, affiliate/apply and affiliate/payout are not registered in the root Stack (C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx lines 212-264 list no affiliate screen; root screenOptions set headerShown false; the screens only set a title). The same omission is visible for the contact screen in C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\android-shots\\contact-ar-dark.png. On iPhone a member who just accepted the agreement sits on 'pending' with no visible way back, so he leaves the app from there and returns to the very same mounted screen, the one case where nothing ever re-asks. Not verified on a device.",
+   "Phones that keep the old bundle alive cannot be reached by the OTA until a real restart, and those are exactly the affected phones (iPhones that stay in memory for days). The only remote lever for them is a notification whose tap opens /affiliate, or one sentence from the owner: swipe the app away once and open it (that single real restart gives the fresh state and, during the same launch, the new bundle).",
+   "A failed first request at launch (weak signal, or the moment of a server redeploy) leaves the home card absent for the whole session in the members' bundle, because the card renders nothing on error and nothing retries it; each further background/foreground changes nothing. The colleague listed it as a variant; it is a second, independent way to reach 'several closes' and is cured by the same refresh triggers."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "In useAffiliate add a second parameter and two options. Signature: useAffiliate(enabled: boolean, onOpen = false). Add to the useQuery options: refetchOnMount: onOpen ? 'always' : true, and refetchInterval: (query) => (query.state.data?.status === 'pending' ? 30_000 : false). Keep the key and staleTime 30_000. In affiliate/index.tsx line 36 call useAffiliate(status === 'signedIn', true). Leave apply.tsx line 34, payout.tsx line 29 and AffiliateHomeCard on the default. Result: the programme screen asks the server every time it opens, and while an application waits for the decision both the screen and the home card ask again every 30 s in the foreground. Pure JS, safe on runtimes 1.2.0 to 1.3.3 (refetchInterval as a function is already used in app/src/api/payments.ts line 65). Cost: only pending applicants poll; with the screen open two observers may each ask once per 30 s.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\affiliate.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\affiliate\\index.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and eslint in app/. Library behaviour already checked with the simulation script (re-entry inside the window: 0 calls without 'always', 1 call with it; polling: calls while pending, stops at 'approved', pauses when not focused). Android emulator with the local debug build and the local mock server: register a test member (real-looking two-word name), apply, accept, see 'pending'; approve with POST /api/admin/affiliates/<contactId>/decision {status:'approved'} on the local server; without touching the phone the panel must replace 'pending' within 30 s. Repeat with the member waiting on the home: the «أرباحي» card must appear within 30 s. Repeat and re-open the row right after approving: the panel shows at once. iPhone: only on a real device after the OTA."
+   },
+   {
+    "priority": 2,
+    "change": "Home pull-to-refresh also refreshes the affiliate state, and an affiliate notification arriving in the foreground does too. (a) (tabs)/index.tsx: import { useQueryClient } from '@tanstack/react-query' (the file has no react-query import today), const queryClient = useQueryClient() inside HomeScreen, and add queryClient.invalidateQueries({ queryKey: ['affiliate'] }) to the Promise.allSettled list at lines 98-109. Use invalidate, not refetch(): simulated, invalidate makes 0 calls for a guest's disabled query, refetch() makes 1 (a 401). (b) PushRegistrar.tsx, in the received listener after line 69: if (target.type.startsWith('affiliate')) void queryClient.invalidateQueries({ queryKey: ['affiliate'] });",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PushRegistrar.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and eslint. Emulator with the local server log open: signed in, pull down on the home, exactly one GET /api/affiliate appears; as a guest, none. The push line can only be seen with a real notification on a real device (the emulator shows no banner): after step 6, approve a test account while its app is open and watch the panel change without a touch."
+   },
+   {
+    "priority": 3,
+    "change": "Give the three affiliate screens the standard header with the back arrow, as every other detail screen has. In the root Stack, after the invite line (line 233), add: <Stack.Screen name=\"affiliate/index\" options={{ ...detailHeader(), title: t('nav.affiliate') }} />, and the same for name=\"affiliate/apply\" and name=\"affiliate/payout\". The screens already set that title themselves and use the same Screen component as invite, so the look matches the existing convention (header title plus the gold page title). JS only. Include it in the same bundle as steps 1-2 only if the emulator look is right; otherwise leave it for the next bundle, it does not block the cure.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator, Arabic and English, dark and light: open My account, the programme row, then the application form: a header with the back arrow on the correct side, no doubled top gap, the keyboard still leaves the last field visible. iPhone: edge swipe back and the arrow, on a real device only."
+   },
+   {
+    "priority": 4,
+    "change": "Make GET /api/affiliate read-only when there is nothing to bring up to date, and deploy this BEFORE the OTA (steps 1-2 and today's foreground refetch multiply calls to this route, and each call today rewrites two whole KV documents through one server-wide queue). In sync() (service.ts line 585): first const current = await this.find(contactId); if (!current || current.status !== 'approved') return; before any mutate(). For the approved path, write only on a real change: give mutate() an optional second argument changed: (result) => boolean, default () => true, and return before the two kv.set calls when it answers false; in sync() take a JSON snapshot of the record at the top of the callback and one at the end, both ignoring membership.seenAt (a write-only field, nothing reads it), and report changed = the two differ. The short-code backfill (loadRecords, mutate(() => undefined)) keeps the default and still writes.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m186.affiliate-cycles.test.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m184.affiliate.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "New test with a KV wrapper that counts set(): a GET /api/affiliate by an account with no record, and by a pending one, makes 0 writes; a second GET by an approved affiliate with nothing new makes 0 writes; a newly paid referral, a membership change, a target reached and an expired cycle each still write once. The existing suites m184, m186, m194, m198 and m202 must stay green, plus server tsc (Railway type-checks the test files too). No device needed."
+   },
+   {
+    "priority": 5,
+    "change": "Publish ONE production OTA that carries today's commit 0fcf3e5 (foreground refetch at _layout.tsx line 79, pull-to-refresh on the programme screen, the 30-second limit on the forced reload) together with steps 1-3. Before publishing: git status must be clean, the uncommitted work of the other session (delete-account.tsx, PasswordPrompt.tsx, api/auth.ts, ar.json, en.json) must be committed on purpose or stashed, because eas update ships the working tree; tsc and eslint clean. The owner runs the publish for each runtime (1.3.3, 1.3.2, 1.3.1, 1.3.0, 1.2.0) with --environment production --non-interactive. Each phone takes it at its next real restart; a phone that only goes to the background keeps the old bundle, so tell complaining representatives once: swipe the app away and open it.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\api\\affiliate.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\affiliate\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PushRegistrar.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "After the publish, read the u.expo.dev manifest of each of the five runtimes (multipart/mixed accept header) and confirm the new update id, appEnv production and the production API host. Then on a real Android phone and on the owner's iPhone with a test account: apply, accept, approve from the dashboard, and check the three cases: staying on the screen (within 30 s), waiting on the home (card within 30 s), Home button for 40 s then back (updated). Also start typing in a long form, leave for two minutes and return: the typed text must still be there. The iPhone part cannot be checked from here."
+   },
+   {
+    "priority": 6,
+    "change": "Send a notification when the dashboard decides. Add to the AffiliateService Deps a new optional decisionPush?: AffiliatePush and pass decisionPush: push (always, not the AUTO_PUSH-gated one) where the service is built in app.ts (next to line 404). In decide(), after the mail at line 912: if (record) void this.deps.decisionPush?.sendTo(record.contactId, (lang) => ({ title, body, data: { screen: '/affiliate', type: 'affiliate-decision' } })).catch((error) => this.deps.log.warn({ err: error, contactId }, 'affiliate decision push failed')); it must never delay or fail the decision. A tap opens the programme screen, which refetches on mount, so this also helps a phone still on the old bundle; with step 2 a notification arriving while the app is open refreshes the state by itself.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\app.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\m184.affiliate.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Test with a fake push dependency: approve sends one message with data.screen '/affiliate' in the account's language, reject sends the refusal text, a push that throws does not change the 200 answer of POST /api/admin/affiliates/:contactId/decision. Real delivery and the tap only on real phones with notifications allowed (the emulator shows no banner): approve a test account whose app is in the background, tap the notification, the panel opens approved."
+   },
+   {
+    "priority": 7,
+    "change": "Owner approves the member-facing wording. (a) The decision notification, formal Arabic and English. Proposed: title «برنامج ممثلي نادي المستثمرين» / 'Investors Club Affiliates Program'; approved body «تم اعتماد انضمامك للبرنامج. اضغط لفتح لوحة المتابعة ورابط الإحالة الخاص بك.» / 'Your membership in the program is approved. Tap to open your dashboard and referral link.'; refused body «صدر قرار الإدارة بشأن طلبك. اضغط للاطلاع عليه.» / 'The management has decided on your application. Tap to view it.' (b) The approval mail names the row «ممثلو نادي المستثمرين» while the row in My account reads «برنامج ممثلي نادي المستثمرين»: align the mail (notify.ts lines 349 and 375) with the row label in both languages.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\affiliate\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\mail\\notify.ts"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "The owner reads and approves the four sentences and the mail line; then the mail test of m184 asserts the new line and a test approval on the TEST server shows the mail and the notification text."
+   },
+   {
+    "priority": 8,
+    "change": "Build 1.3.4 from a tree that contains steps 1-4 and 6, so a fresh install has them embedded and does not depend on the first-launch update. No native change is needed for this complaint; bump the version first as usual.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "howToVerify": "Fresh install of the 1.3.4 build with the network off after sign-in is impossible to test meaningfully; instead install it on the Play-enabled emulator and on TestFlight and run the same approve scenario before any OTA exists for runtime 1.3.4. iPhone only on a real device."
+   }
+  ],
+  "ownerMessage": "Members saw this because the app asked the server about their representative status once and then kept that answer for as long as the app stayed alive in the phone's memory, so an approval given afterwards did not show until the app was truly shut down (pressing Home and coming back is not a restart) or the programme screen was opened again more than 30 seconds later. The fix makes the app ask again by itself every time the member returns to it, every time he opens the programme, every 30 seconds while his application is waiting and on pull-down, plus a notification at approval; it goes out as an over-the-air update that each phone picks up at its next real restart, and it could not be tried on an iPhone from here."
+ }
+}

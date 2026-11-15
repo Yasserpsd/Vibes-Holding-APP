@@ -17,13 +17,22 @@ export type ProjectsListParams = {
   mine?: '1';
 };
 
+/**
+ * Which page to ask for. M242: a later page carries the rotation `day` of the page before it, so a list opened
+ * before midnight Riyadh (when «اكتشف» and the tail of «الأعلى تقييمًا» are dealt again) keeps its order to the
+ * end and never repeats a project. A bare number is the first page, and what an older cache file holds.
+ */
+type ProjectsPageParam = number | { page: number; day?: number };
+
 export function useProjectsList(params: ProjectsListParams) {
   return useInfiniteQuery({
     queryKey: ['projects', params],
-    queryFn: ({ pageParam }) =>
-      apiGet<ProjectsPage>('/api/projects', { ...params, page: pageParam, limit: PAGE_SIZE }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    queryFn: ({ pageParam }) => {
+      const { page, day } = typeof pageParam === 'number' ? { page: pageParam, day: undefined } : pageParam;
+      return apiGet<ProjectsPage>('/api/projects', { ...params, page, limit: PAGE_SIZE, day });
+    },
+    initialPageParam: 1 as ProjectsPageParam,
+    getNextPageParam: (lastPage): ProjectsPageParam | undefined => (lastPage.hasMore ? { page: lastPage.page + 1, day: lastPage.day } : undefined),
   });
 }
 

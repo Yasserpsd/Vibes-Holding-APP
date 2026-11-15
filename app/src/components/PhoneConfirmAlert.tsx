@@ -8,8 +8,10 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
+import { codeKeyboardType } from '@/components/PhoneCodeStep';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -96,11 +98,11 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: 
                   style={styles.code}
                   value={code}
                   onChangeText={(value) => {
-                    const digits = value.replace(/\D/g, '').slice(0, 4);
+                    const digits = toAsciiDigits(value).replace(/\D/g, '').slice(0, 4);
                     setCode(digits);
                     if (digits.length === 4) void check(digits);
                   }}
-                  keyboardType="number-pad"
+                  keyboardType={codeKeyboardType}
                   textContentType="oneTimeCode"
                   autoComplete="sms-otp"
                   maxLength={4}
@@ -175,6 +177,6 @@ const styles = themedStyles(() => ({
   spinner: { position: 'absolute', end: spacing.sm },
   error: { ...typography.caption, color: colors.danger, textAlign: 'center' },
   links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: spacing.lg, rowGap: spacing.xs, paddingVertical: spacing.xs },
-  link: { ...typography.caption, color: colors.gold, textAlign: 'center' },
+  link: { ...typography.caption, color: colors.goldText, textAlign: 'center' },
   linkOff: { color: colors.textMuted },
 }));

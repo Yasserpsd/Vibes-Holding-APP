@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, Image, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
+import { LaunchCover } from '@/components/LaunchCover';
 import { t } from '@/i18n';
 import { authenticate, lockAvailable, lockEnabled } from '@/lib/appLock';
 import { themedStyles } from '@/theme/styles';
@@ -71,8 +72,8 @@ export function AppLockGate() {
   }, []);
 
   if (locked === false) return null;
-  // Still reading the setting: the bare cover, with no prompt and nothing to press.
-  if (locked === null) return <View style={styles.cover} />;
+  // Still reading the setting: the opening screen (brand black and the emblem), with no prompt and nothing to press.
+  if (locked === null) return <LaunchCover overlay elevation={999} />;
   return (
     <View style={styles.cover}>
       <Image source={require('../../assets/images/club-emblem.png')} style={styles.emblem} resizeMode="contain" />

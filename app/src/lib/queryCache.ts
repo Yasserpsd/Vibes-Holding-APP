@@ -1,7 +1,9 @@
 import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query';
+import { requireOptionalNativeModule } from 'expo';
 // The legacy entry gates its own native module (M92 pattern): safe on every binary.
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { env } from '@/config/env';
 import { getLang, type Lang } from '@/i18n';
 
 /**
@@ -23,11 +25,44 @@ const KEEP_ROOTS = new Set(['content', 'services', 'videos', 'partners', 'posts'
 
 // The server answers in the app's language (x-app-lang), so a snapshot belongs to the language it was
 // saved in: after a language switch the other language's copy is dropped, never painted (owner, 2026-11-01).
-type Snapshot = { savedAt: number; lang: Lang; state: ReturnType<typeof dehydrate> };
+// 2026-11-16: it also belongs to the BUNDLE that wrote it. After an update (or a reload into one) the new code never
+// draws an older bundle's data shapes: a screen that throws on one was a route to the black window on Android.
+type Snapshot = { savedAt: number; lang: Lang; bundle: string; state: ReturnType<typeof dehydrate> };
 
 function fileUri(): string | null {
   const dir = FileSystem.documentDirectory;
   return dir ? `${dir}${FILE}` : null;
+}
+
+/** The bundle that is running: the id of the downloaded update, else the binary's own bundle by its version. */
+function currentBundle(): string {
+  try {
+    const id = (requireOptionalNativeModule('ExpoUpdates') as { updateId?: unknown } | null)?.updateId;
+    if (typeof id === 'string' && id) return id;
+  } catch {
+    // No updates module (development): the version below names the bundle.
+  }
+  return `embedded-${env.appVersion}`;
+}
+
+// One writer for the whole module, so the recovery screen can wait for a write in flight before it deletes the file.
+let writing: Promise<void> = Promise.resolve();
+let writesStopped = false;
+
+/**
+ * Deletes the saved snapshot and stops writing it for the rest of this launch (the recovery screen's «restart»: a
+ * saved answer may be what broke a screen, so the next start draws from the server). Never throws.
+ */
+export async function dropQueryCacheFile(): Promise<void> {
+  writesStopped = true;
+  const uri = fileUri();
+  if (!uri) return;
+  try {
+    await writing;
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // Nothing to delete, or the file system refused: the bundle stamp and the 24-hour limit still stand.
+  }
 }
 
 function keepQuery(queryKey: readonly unknown[]): boolean {
@@ -47,6 +82,8 @@ export async function restoreQueryCache(client: QueryClient): Promise<boolean> {
     if (!parsed || typeof parsed.savedAt !== 'number' || !parsed.state || !Array.isArray(parsed.state.queries)) return false;
     if (Date.now() - parsed.savedAt > MAX_AGE_MS) return false;
     if (parsed.lang !== getLang()) return false;
+    // A file from another bundle (also every file written before the stamp existed) is not painted.
+    if (parsed.bundle !== currentBundle()) return false;
     const fresh = parsed.state.queries.filter((query) => keepQuery(query.queryKey) && Date.now() - query.state.dataUpdatedAt <= MAX_AGE_MS);
     hydrate(client, { mutations: [], queries: fresh });
     return fresh.length > 0;
@@ -60,14 +97,15 @@ export function persistQueryCache(client: QueryClient): () => void {
   const uri = fileUri();
   if (!uri) return () => undefined;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let writing: Promise<void> = Promise.resolve();
   const flush = () => {
     timer = null;
+    if (writesStopped) return;
     // Runs from a timer: a throw (an odd value that JSON cannot hold) would be an uncaught error, a crash in a release build.
     try {
       const snapshot: Snapshot = {
         savedAt: Date.now(),
         lang: getLang(),
+        bundle: currentBundle(),
         state: dehydrate(client, { shouldDehydrateQuery: (query) => query.state.status === 'success' && keepQuery(query.queryKey), shouldDehydrateMutation: () => false }),
       };
       const text = JSON.stringify(snapshot);

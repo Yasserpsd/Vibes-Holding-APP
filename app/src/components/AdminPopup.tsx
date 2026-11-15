@@ -5,9 +5,11 @@ import { Image, Modal, ScrollView, Text, View } from 'react-native';
 import { usePopups, type AdminPopupItem } from '@/api/posts';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { AppDialogHost } from '@/components/AppDialog';
 import { GlassCard } from '@/components/lux';
 import { PopIn } from '@/components/motion';
 import { t } from '@/i18n';
+import { markParagraphs } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
@@ -20,11 +22,24 @@ const SEEN_MAX = 60;
 const QUIET_PREFIXES = ['/auth', '/welcome', '/profile-edit', '/phone-confirm', '/checkout', '/payment', '/form', '/watch'];
 
 /**
+ * Mounted once in the root layout, for the whole launch: the dashboard popup, and beside it the host of the
+ * app's own question dialog (components/AppDialog — language, theme, sign-out).
+ */
+export function AdminPopup() {
+  return (
+    <>
+      <AdminPopupCard />
+      <AppDialogHost />
+    </>
+  );
+}
+
+/**
  * M232 (owner: «أقدر أضيف بوب اب من داشبورد»): a popup the management published from the dashboard («أدوات التواصل»).
  * The server sends only what this viewer may see (never to an honorary member); the device shows each popup ONCE, and
  * it shares the single automatic-popup slot of a launch (M128), so it never opens on top of another popup.
  */
-export function AdminPopup() {
+function AdminPopupCard() {
   const { status, me } = useAuth();
   const pathname = usePathname();
   // Never over the sign-up flow (a guest's gate included), a form, a checkout or payment, or the fullscreen player.
@@ -81,8 +96,8 @@ export function AdminPopup() {
           <GlassCard golden radius={radii.xxl} style={styles.card}>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
               {open.image ? <Image source={{ uri: sized(open.image, 340) }} style={styles.image} resizeMode="cover" /> : null}
-              <Text style={styles.title}>{open.title}</Text>
-              {open.body ? <Text style={styles.text}>{open.body}</Text> : null}
+              <Text style={styles.title}>{markParagraphs(open.title)}</Text>
+              {open.body ? <Text style={styles.text}>{markParagraphs(open.body)}</Text> : null}
             </ScrollView>
             {link ? (
               <AppButton

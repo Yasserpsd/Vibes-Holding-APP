@@ -3,6 +3,7 @@ import { NativeModules, Platform } from 'react-native';
 import type { StoreConfig } from '@/api/membership';
 import { getLang, t } from '@/i18n';
 import { trackMembershipCheckout, trackMembershipPurchase } from '@/lib/adsAttribution';
+import { loadSetting, saveSetting } from '@/lib/deviceStore';
 
 type PurchasesModule = typeof import('react-native-purchases');
 type PurchasesPackage = import('react-native-purchases').PurchasesPackage;
@@ -95,6 +96,8 @@ export async function identifyPurchases(config: StoreConfig, contactId: number):
 
 /** Sign-out: the next account on this device must not inherit the store identity. */
 export async function resetPurchases(): Promise<void> {
+  // The offer fetched for the account that is leaving goes with it (see loadMembershipOffer).
+  cachedOffer = null;
   const purchases = loadPurchases();
   if (!purchases || !configuredUser) return;
   configuredUser = null;
@@ -102,6 +105,73 @@ export async function resetPurchases(): Promise<void> {
     await purchases.default.logOut();
   } catch {
     // Already anonymous: nothing to forget.
+  }
+}
+
+// One store-offer fetch per launch and per account, shared by the members-only popup and the home card.
+// It is kept under the store identity it was fetched for (`vc-<hub id>`): a sign-out or another account never reads it.
+let cachedOffer: { user: string; offer: StoreOffer } | null = null;
+
+/** The offer already fetched for this account in this launch, if any. */
+export function cachedMembershipOffer(config: StoreConfig, contactId: number): StoreOffer | null {
+  return cachedOffer && cachedOffer.user === `${config.appUserIdPrefix}${contactId}` ? cachedOffer.offer : null;
+}
+
+/** Identifies the store account as this member, then fetches the offer (and keeps it for the launch). Null when the store cannot be reached. */
+export async function loadMembershipOffer(config: StoreConfig, contactId: number): Promise<StoreOffer | null> {
+  try {
+    if (!(await identifyPurchases(config, contactId))) return null;
+    const offer = await fetchMembershipOffer(config);
+    cachedOffer = offer ? { user: `${config.appUserIdPrefix}${contactId}`, offer } : null;
+    return offer;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The «a purchase is waiting for the server» flag (review 2026-11-16, «اشتريت العضوية ولازم أقفل التطبيق وأفتحه»).
+ * The store said yes (or holds the payment) but the server has not activated yet: the flag survives a restart so
+ * the app keeps asking the server (AuthProvider) until it answers «active». It never activates anything by itself.
+ * Stored through deviceStore, whose secure-store calls sit behind the optional-module guard (safe on every binary).
+ */
+export type PurchaseWatch = { contactId: number; at: number };
+
+const WATCH_KEY = 'membership.purchaseWatch';
+/** A purchase the server has not confirmed after three days needs the management, not more asking. */
+const WATCH_MAX_AGE_MS = 72 * 60 * 60_000;
+
+export async function savePurchaseWatch(contactId: number): Promise<PurchaseWatch> {
+  const watch: PurchaseWatch = { contactId, at: Date.now() };
+  try {
+    await saveSetting(WATCH_KEY, JSON.stringify(watch));
+  } catch {
+    // This launch still watches; only the «after a restart» part is lost.
+  }
+  return watch;
+}
+
+/** The saved flag when it belongs to this account and is younger than 72 hours; an old or foreign one is removed. */
+export async function loadPurchaseWatch(contactId: number): Promise<PurchaseWatch | null> {
+  try {
+    const raw = await loadSetting(WATCH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PurchaseWatch> | null;
+    const valid =
+      parsed !== null && typeof parsed === 'object' && parsed.contactId === contactId && typeof parsed.at === 'number' && Date.now() - parsed.at < WATCH_MAX_AGE_MS;
+    if (valid) return { contactId, at: parsed.at as number };
+    await saveSetting(WATCH_KEY, null);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPurchaseWatch(): Promise<void> {
+  try {
+    await saveSetting(WATCH_KEY, null);
+  } catch {
+    // Nothing to clear, or the store is unavailable: the flag expires by its age.
   }
 }
 

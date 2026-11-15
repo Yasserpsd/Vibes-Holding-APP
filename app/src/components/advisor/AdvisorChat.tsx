@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,6 +36,27 @@ import { useAdvisorChat } from './useAdvisorChat';
 
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
 const IOS_TAB_BAR_HEIGHT = 49;
+
+/**
+ * The raised advisor button in the middle of the tab bar rises above the bar's top edge and covered the bottom of
+ * the message field. While the keyboard is closed the composer keeps this much air under it; while it is open the
+ * bar is out of the way (hidden on Android, behind the keys on iOS) and the air goes.
+ */
+const DOCK_CROWN_ROOM = 12;
+
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const shown = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', () => setOpen(true));
+    const hidden = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setOpen(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  return open;
+}
 
 /** The app-action check runs before the message shows: past this wait the advisor answers as usual. */
 const INTENT_WAIT_MS = 8000;
@@ -95,6 +116,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   // content and the keyboard only in the first case.
   const stickToEnd = useRef(true);
   const dragging = useRef(false);
+  const keyboardOpen = useKeyboardOpen();
 
   useEffect(() => {
     latestContext.current = context;
@@ -248,9 +270,12 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
       </View>
       <GoldHairline />
 
+      {/* Review 2026-11-16: `padding` on Android too. Edge-to-edge means the window is not resized for the keyboard,
+          so `undefined` left the composer behind the keys. On Android the tab bar steps aside while typing and the
+          chat then runs to the bottom of the screen: no offset. iOS keeps its tab-bar offset. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_TAB_BAR_HEIGHT + insets.bottom : 0}
       >
         {chat.status === 'loading' ? (
@@ -328,7 +353,9 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
           </FadeInView>
         ) : null}
         {context ? (
-          <FadeInView offset={8} duration={220}>
+          // The side margins live on this row: on the pill itself they were added to its `maxWidth: 100%`, so a long
+          // title pushed the pill past the screen edge and its ✕ went half off-screen.
+          <FadeInView offset={8} duration={220} style={styles.contextRow}>
             <View style={styles.context}>
               <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
               <Text style={styles.contextText} numberOfLines={1}>{t('advisor.askingAbout', { title: context.title })}</Text>
@@ -338,7 +365,17 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
             </View>
           </FadeInView>
         ) : null}
-        <Composer value={draft} onChange={setDraft} onSend={() => void submit(draft)} busy={busy} attachment={attachment} onAttach={setAttachment} onDetach={() => setAttachment(null)} />
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSend={() => void submit(draft)}
+          busy={busy}
+          attachment={attachment}
+          onAttach={setAttachment}
+          onDetach={() => setAttachment(null)}
+          bottomRoom={keyboardOpen ? 0 : DOCK_CROWN_ROOM}
+          keyboardOpen={keyboardOpen}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -525,12 +562,11 @@ const styles = themedStyles(() => ({
   gate: { gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md },
   gateRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   gateText: { ...typography.body, color: colors.textPrimary, textAlign: textStart, flex: 1 },
+  contextRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   context: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,

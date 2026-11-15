@@ -158,7 +158,7 @@ function RequestRow({ request, onOpen }: { request: MemberRequest; onOpen: (() =
             <PressScale onPress={onOpen} accessibilityRole="button">
               <View style={styles.openLink}>
                 <Text style={styles.openText}>{t('requests.open')}</Text>
-                <Ionicons name={chevronForward()} size={16} color={colors.gold} />
+                <Ionicons name={chevronForward()} size={16} color={colors.goldText} />
               </View>
             </PressScale>
           ) : null}
@@ -176,7 +176,7 @@ const styles = themedStyles(() => ({
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },
   badgeText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart, marginTop: spacing.xs },
-  amount: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.gold, textAlign: textStart },
+  amount: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldText, textAlign: textStart },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
   meta: { ...typography.caption, color: colors.textMuted, textAlign: textStart, flex: 1 },
   details: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: spacing.xs },
@@ -187,6 +187,6 @@ const styles = themedStyles(() => ({
   noteLabel: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   noteText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   openLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xs, minHeight: 44 },
-  openText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.gold },
+  openText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldText },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
 }));

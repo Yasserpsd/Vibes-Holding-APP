@@ -1,5 +1,4 @@
-import { Alert } from 'react-native';
-
+import { showAppDialog } from '@/components/AppDialog';
 import { t } from '@/i18n';
 import { restart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
@@ -38,9 +37,14 @@ export async function switchTheme(next: ThemeName): Promise<void> {
 export function chooseTheme(): void {
   const current = getThemeName();
   const mark = (name: string, active: boolean) => (active ? `${name} (${t('theme.current')})` : name);
-  Alert.alert(t('theme.title'), t('theme.message'), [
-    { text: mark(t('theme.light'), current === 'light'), onPress: () => void switchTheme('light') },
-    { text: mark(t('theme.dark'), current === 'dark'), onPress: () => void switchTheme('dark') },
-    { text: t('theme.cancel'), style: 'cancel' },
-  ]);
+  // The app's own dialog (themed, closed by the Android back key), not the system's white one.
+  showAppDialog({
+    title: t('theme.title'),
+    message: t('theme.message'),
+    actions: [
+      { label: mark(t('theme.light'), current === 'light'), onPress: () => void switchTheme('light') },
+      { label: mark(t('theme.dark'), current === 'dark'), onPress: () => void switchTheme('dark') },
+      { label: t('theme.cancel'), style: 'cancel' },
+    ],
+  });
 }

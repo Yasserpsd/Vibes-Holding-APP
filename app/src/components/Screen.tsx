@@ -1,6 +1,17 @@
 import { HeaderHeightContext } from 'expo-router/react-navigation';
-import { useContext, type ReactElement, type ReactNode, type RefObject } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View, type RefreshControlProps } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactElement, type ReactNode, type RefObject } from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type RefreshControlProps,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
@@ -26,6 +37,110 @@ type Props = {
   scrollRef?: RefObject<ScrollView | null>;
 };
 
+/**
+ * Review 2026-11-16 (members: «الكيبورد يغطي المكان اللي بكتب فيه»): keeping the field that holds the cursor in view.
+ *
+ * The binary runs edge-to-edge, so Android no longer resizes the window for the keyboard: the keyboard wrapper pads
+ * the bottom instead (see `Screen` below), which shortens the scroll view. That alone does not move the content — a
+ * field in the lower half stays behind the keys until the member drags the form. So the scroll view around a form
+ * tracks where it is and how tall it is, and brings the focused field back into its visible part:
+ *   - when a field takes the cursor (FormField reports its whole row: label, input and the line under it);
+ *   - when the scroll view gets shorter, which is the keyboard opening.
+ * It scrolls only when the field is really outside, by the smallest distance that shows it.
+ */
+type FieldScroll = { focus: (row: View | null) => void; blur: (row: View | null) => void };
+
+const FieldScrollContext = createContext<FieldScroll | null>(null);
+
+/** For a scroll view that is not a `Screen` (the profile-completion cover): wrap its content in this. */
+export const FieldScrollProvider = FieldScrollContext.Provider;
+
+/** A field reports its focus to the scroll view around it; null where no such scroll view exists (a modal sheet). */
+export const useFieldScroll = (): FieldScroll | null => useContext(FieldScrollContext);
+
+/** Air kept above and below the focused row, so it never sits flush against the header or the keyboard. */
+const FIELD_AIR = 20;
+
+/**
+ * The scroll view's side of the above. Returns the value for `FieldScrollProvider` and the props to spread on the
+ * ScrollView (`scrollsChildToFocus` included: Android's own «scroll to the focused child» mis-measures a field
+ * inside a tilted sheet — PaperCard `pinned` — and threw the whole page back to its top on every tap).
+ */
+export function useFieldScroller(scrollRef: RefObject<ScrollView | null>) {
+  const offset = useRef(0);
+  const viewport = useRef(0);
+  const row = useRef<View | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const reveal = useCallback(() => {
+    const scroll = scrollRef.current;
+    // A field that is not a FormField (a bare TextInput) still counts: the input itself is measured.
+    const target = row.current ?? TextInput.State.currentlyFocusedInput();
+    const room = viewport.current;
+    if (!scroll || !target || room <= 0) return;
+    try {
+      // The content view is the frame of reference: y is the row's offset inside the scrolled content.
+      const content = (scroll as unknown as { getInnerViewRef?: () => View | null }).getInnerViewRef?.();
+      if (!content) return;
+      target.measureLayout(
+        content as never,
+        (_x, y, _width, height) => {
+          const top = offset.current;
+          let next: number | null = null;
+          if (y - FIELD_AIR < top) next = y - FIELD_AIR;
+          // A row taller than the visible room (a long note) shows its top; any other shows whole.
+          else if (y + height + FIELD_AIR > top + room) next = height + FIELD_AIR * 2 > room ? y - FIELD_AIR : y + height + FIELD_AIR - room;
+          if (next !== null) scroll.scrollTo({ y: Math.max(0, next), animated: true });
+        },
+        // Not inside this scroll view (a field in a sheet above it): nothing to do.
+        () => undefined,
+      );
+    } catch {
+      // Measuring can fail while the layout is still settling; the next focus or keyboard change tries again.
+    }
+  }, [scrollRef]);
+
+  const schedule = useCallback(
+    (delay: number) => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(reveal, delay);
+    },
+    [reveal],
+  );
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const field = useMemo<FieldScroll>(
+    () => ({
+      focus: (node) => {
+        row.current = node;
+        // Keyboard already up: the room is known, move now (after the hint line under the field has drawn).
+        // Keyboard on its way: wait for it — the shorter scroll view below reschedules this the moment it opens,
+        // so the form moves once, not twice. The long wait only fires when no keyboard comes (a hardware one).
+        schedule(Keyboard.isVisible() ? 80 : 450);
+      },
+      blur: (node) => {
+        if (row.current === node) row.current = null;
+      },
+    }),
+    [schedule],
+  );
+
+  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    offset.current = event.nativeEvent.contentOffset.y;
+  }, []);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      const shrank = height < viewport.current - 1;
+      viewport.current = height;
+      if (shrank) schedule(60);
+    },
+    [schedule],
+  );
+
+  return { field, scrollProps: { onScroll, onLayout, scrollEventThrottle: 32, scrollsChildToFocus: false } };
+}
+
 /** Scrollable screen with keyboard handling, used by forms and detail pages. */
 export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef }: Props) {
   // The bottom padding keeps the last element clear of the floating «اسأل المستشار» button. Without a tab bar or
@@ -37,16 +152,28 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
   // gives the header height, or 0 for a screen without a header. expo-router 57 ships react-navigation inside itself,
   // so the context comes from its own entry, not from @react-navigation/elements (not installed here).
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  // Review 2026-11-16: under the stack's header the top inset is already taken by the header itself. Adding it again
+  // left an empty band as tall as the status bar under the header, and scrolled content was cut along that band.
+  // A screen without a header (the tab screens) keeps its top edge.
+  const safeEdges = headerHeight > 0 ? edges.filter((edge) => edge !== 'top') : edges;
+  const ownScrollRef = useRef<ScrollView | null>(null);
+  const scroll = scrollRef ?? ownScrollRef;
+  const keeper = useFieldScroller(scroll);
   return (
-    <SafeAreaView style={styles.safeArea} edges={edges}>
+    <SafeAreaView style={styles.safeArea} edges={safeEdges}>
       {watermark ? <EmblemWatermark /> : null}
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}>
+      {/* Review 2026-11-16: `padding` on Android too. Edge-to-edge means the window is not resized for the keyboard,
+          so `undefined` (a plain View) left every form behind the keys. The offset is the header above this view on
+          both platforms; if a device ever did resize the window, the padding works out to zero by itself. */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={headerHeight}>
+        <FieldScrollProvider value={keeper.field}>
         <ScrollView
-          ref={scrollRef}
+          ref={scroll}
           contentContainerStyle={[styles.content, { paddingBottom: clearance }]}
           keyboardShouldPersistTaps="handled"
           refreshControl={refreshControl}
           showsVerticalScrollIndicator={false}
+          {...keeper.scrollProps}
         >
           {title ? (
             <FadeInView offset={10} duration={360}>
@@ -59,6 +186,7 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
           ) : null}
           {children}
         </ScrollView>
+        </FieldScrollProvider>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

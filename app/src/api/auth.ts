@@ -138,6 +138,8 @@ export type LoginResult = PendingResult | SignedInResult | TotpStepResult | Phon
 /** M211: a first Google/Apple sign-in: the account is created once the number is proven. M212: the provider's name and
  * e-mail fill the sign-up form. */
 export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number; name: string; email: string };
+/** M241: what proves the owner before a deletion starts; `social` is the object `POST /api/auth/social` takes. */
+export type DeleteProof = { password: string } | { social: { provider: 'google' | 'apple'; token: string } };
 /** M212: the sign-up form's own fields, sent with the proof of a first Google/Apple sign-in. */
 export type SocialSignupProfile = { name: string; persona: Persona; jobTitle: string; inviteCode?: string };
 
@@ -243,8 +245,10 @@ export const authApi = {
   deleteMe: (password: string, reason?: string) => apiRequest<{ ok: true }>('DELETE', '/api/me', { body: { password, ...(reason ? { reason } : {}) } }),
   // M117: the three-step deletion — password starts it, the mailed code + the shown word confirm it,
   // and the request only SCHEDULES the deletion 30 days ahead (cancellable the whole time).
-  deleteStart: (password: string, reason?: string) =>
-    apiRequest<{ ok: true; email: string; via?: 'whatsapp' | 'email'; phone?: string; seconds: number; word: string; days: number }>('POST', '/api/me/delete/start', { body: { password, ...(reason ? { reason } : {}) } }),
+  // M241: the owner is proven by exactly one of the two — the password, or a fresh Apple / Google identity token
+  // (an account born from those buttons never chose a password).
+  deleteStart: (proof: DeleteProof, reason?: string) =>
+    apiRequest<{ ok: true; email: string; via?: 'whatsapp' | 'email'; phone?: string; seconds: number; word: string; days: number }>('POST', '/api/me/delete/start', { body: { ...proof, ...(reason ? { reason } : {}) } }),
   deleteConfirm: (code: string, word: string) => apiRequest<{ ok: true; dueAt: string; daysLeft: number }>('POST', '/api/me/delete/confirm', { body: { code, word } }),
   deleteState: () => apiGet<{ scheduled: { dueAt: string; daysLeft: number } | null }>('/api/me/delete/state'),
   deleteCancel: () => apiRequest<{ ok: true; cancelled: boolean }>('POST', '/api/me/delete/cancel', { body: {} }),

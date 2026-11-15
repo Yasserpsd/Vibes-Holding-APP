@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { I18nManager, Modal, Text, View } from 'react-native';
+import { I18nManager, Modal, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import type { Me } from '@/api/auth';
 import { AppButton } from '@/components/AppButton';
@@ -91,6 +91,7 @@ export function CompletionMeter({ percent, size, children }: { percent: number; 
 export function CompleteProfilePopup({ me }: { me: Me }) {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
   const percent = profileCompletion(me);
 
   useEffect(() => {
@@ -122,12 +123,16 @@ export function CompleteProfilePopup({ me }: { me: Me }) {
     <Modal transparent animationType="fade" visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
-          <GlassCard golden radius={radii.xxl} style={styles.card}>
-            <View style={styles.iconRing}>
-              <Ionicons name="person-circle-outline" size={34} color={colors.gold} />
-            </View>
-            <Text style={styles.title}>{t('profileNudge.title')}</Text>
-            <Text style={styles.text}>{t('profileNudge.text', { percent })}</Text>
+          {/* 2026-11-16: the card stops at 88% of the window; on a short screen or with large system text the words
+              scroll inside it and the two buttons stay in view (the WorkshopAd treatment). */}
+          <GlassCard golden radius={radii.xxl} style={[styles.card, { maxHeight: Math.round(windowHeight * 0.88) }]}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} bounces={false}>
+              <View style={styles.iconRing}>
+                <Ionicons name="person-circle-outline" size={34} color={colors.gold} />
+              </View>
+              <Text style={styles.title}>{t('profileNudge.title')}</Text>
+              <Text style={styles.text}>{t('profileNudge.text', { percent })}</Text>
+            </ScrollView>
             <AppButton label={t('profileNudge.cta')} icon="create-outline" onPress={go} />
             <AppButton label={t('profileNudge.later')} variant="outline" onPress={dismiss} />
           </GlassCard>
@@ -161,6 +166,9 @@ const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
+  // The words give way first when the card reaches its cap; the buttons under them keep their height.
+  scroll: { flexGrow: 0 },
+  scrollContent: { gap: spacing.sm },
   iconRing: {
     width: 60,
     height: 60,

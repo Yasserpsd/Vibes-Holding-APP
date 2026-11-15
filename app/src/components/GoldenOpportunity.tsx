@@ -1,15 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { HomeContent } from '@/api/content';
 import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
+import { ownDirection } from '@/components/Highlight';
 import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StarsRow } from '@/components/Stars';
-import { chevronForward, textDir, textStart } from '@/i18n/direction';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -17,6 +18,9 @@ import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@
 // M99c (owner): ONE golden opportunity per APP OPEN — the seed lives for the JS session, so the pick
 // changes when the app is closed and reopened, not on every screen focus.
 const OPEN_SEED = Date.now();
+
+/** A list this old is asked for again when the home comes back into view (not on every focus). */
+const REFRESH_AFTER_MS = 5 * 60_000;
 
 /** Seeded pick: projects with an image first, so the reveal stays cinematic. */
 function pick(items: PublicProject[], seed: number): PublicProject | null {
@@ -48,8 +52,19 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
     setBrokenFor(imageUri);
     setImageBroken(false);
   }
+  // Which photo has actually arrived. Until then (slow network, offline, no photo) the card is the themed
+  // placeholder, so its words wear the theme's colours; the scrim and the on-photo white come with the photo.
+  const [loadedUri, setLoadedUri] = useState<string | null>(null);
+  // Coming back to the home asks for the bank's list again once it is older than five minutes.
+  const { dataUpdatedAt, refetch } = list;
+  useFocusEffect(
+    useCallback(() => {
+      if (dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > REFRESH_AFTER_MS) void refetch({ cancelRefetch: false });
+    }, [dataUpdatedAt, refetch]),
+  );
   if (!project) return null;
   const showImage = Boolean(project?.image) && !imageBroken;
+  const onPhoto = showImage && loadedUri === imageUri;
 
   return (
     <View>
@@ -77,24 +92,29 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
               // Android decodes at the card's size instead of the photo's — the home stops paying for full-resolution bitmaps.
               resizeMethod="resize"
               accessibilityLabel={project.title}
+              onLoad={() => setLoadedUri(imageUri)}
               onError={() => setImageBroken(true)}
             />
           ) : null}
           {/* M107b: the dark scrim belongs on a photo only — over the golden fallback it read as a dead black card. */}
           {/* No GoldSweep here: its rim mask repaints the card interior opaque and swallowed the photo. */}
-          {showImage ? <View style={styles.scrim} pointerEvents="none" /> : null}
-          <View style={styles.body}>
-            <View style={styles.pillRow}>
-              {project.sector ? <Pill text={project.sector.name} /> : null}
-              {project.stage ? <Pill text={project.stage.name} /> : null}
+          {onPhoto ? <View style={styles.scrim} pointerEvents="none" /> : null}
+          {/* The sector and stage ride the card's top edge, clear of the photo's subject. */}
+          {project.sector || project.stage ? (
+            <View style={styles.pillRow} pointerEvents="none">
+              {project.sector ? <Pill text={project.sector.name} onPhoto={onPhoto} /> : null}
+              {project.stage ? <Pill text={project.stage.name} onPhoto={onPhoto} /> : null}
             </View>
-            <Text style={[styles.title, textDir(project.title)]} numberOfLines={2}>
+          ) : null}
+          <View style={styles.body}>
+            <Text style={[styles.title, !onPhoto && styles.titlePlain, ownDirection(project.title)]} numberOfLines={2}>
               {project.title}
             </Text>
             {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
             <View style={styles.ctaRow}>
-              <Text style={styles.cta}>{block.cta}</Text>
-              <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+              {/* On the photo's scrim the call wears the on-photo gold; on the golden fallback (no photo yet) the page's readable gold. */}
+              <Text style={[styles.cta, onPhoto && styles.ctaOnPhoto]}>{block.cta}</Text>
+              <Ionicons name={chevronForward()} size={14} color={onPhoto ? colors.onPhotoGold : colors.goldText} />
             </View>
           </View>
         </View>
@@ -104,10 +124,10 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
   );
 }
 
-function Pill({ text }: { text: string }) {
+function Pill({ text, onPhoto }: { text: string; onPhoto: boolean }) {
   return (
-    <View style={styles.pill}>
-      <Text style={styles.pillText} numberOfLines={1}>
+    <View style={[styles.pill, !onPhoto && styles.pillPlain]}>
+      <Text style={[styles.pillText, !onPhoto && styles.pillTextPlain]} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -139,8 +159,9 @@ const styles = themedStyles(() => ({
   },
   fallbackEmblem: { width: 110, height: 110, opacity: 0.5 },
   body: { padding: spacing.md, gap: spacing.xs },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  pillRow: { position: 'absolute', top: spacing.md, start: spacing.md, end: spacing.md, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   pill: {
+    maxWidth: '100%',
     paddingVertical: 2,
     paddingHorizontal: spacing.sm,
     borderRadius: radii.pill,
@@ -148,8 +169,13 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
+  // No photo behind the card (missing, failed or still loading): the chips and the title follow the theme.
+  pillPlain: { backgroundColor: colors.goldFaint, borderColor: colors.borderGoldSoft },
   pillText: { ...typography.caption, color: colors.onPhotoGold },
+  pillTextPlain: { color: colors.goldLightText },
   title: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.onPhoto, textAlign: textStart },
+  titlePlain: { color: colors.textPrimary },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },
+  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldText },
+  ctaOnPhoto: { color: colors.onPhotoGold },
 }));

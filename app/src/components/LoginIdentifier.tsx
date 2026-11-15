@@ -5,7 +5,7 @@ import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { t } from '@/i18n';
-import { isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
+import { cleanEmail, isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -21,10 +21,11 @@ export type Identifier = { mode: IdentifierMode; country: string; value: string 
 
 export const EMPTY_IDENTIFIER: Identifier = { mode: 'phone', country: 'sa', value: '' };
 
-/** The request body fields for this identifier: the raw login plus the country for a phone. */
+/** The request body fields for this identifier: the number plus its country, or the cleaned e-mail address. */
 export function identifierPayload(identifier: Identifier): { login: string; country?: string } {
-  const login = identifier.value.trim();
-  return identifier.mode === 'phone' ? { login, country: identifier.country } : { login };
+  if (identifier.mode === 'phone') return { login: identifier.value.trim(), country: identifier.country };
+  // The address goes as the club stores it: no invisible marks, no trailing dot, lower case (lib/validation).
+  return { login: cleanEmail(identifier.value) };
 }
 
 export function identifierValid(identifier: Identifier): boolean {
@@ -99,10 +100,20 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               latin
               keyboardType="phone-pad"
               textContentType="telephoneNumber"
+              autoComplete="tel"
               autoCorrect={false}
               editable={editable}
               value={value.value}
-              onChangeText={(text) => onChange({ ...value, value: localPhoneDigits(text, country) })}
+              onChangeText={(text) => {
+                // A saved login or a pasted address can land in this field: an «@» or a letter means an e-mail, so the
+                // e-mail tab takes the text whole instead of this field stripping it down to its digits.
+                if (/[@A-Za-z]/.test(text)) {
+                  setDrafts((current) => ({ ...current, phone: value.value }));
+                  onChange({ ...value, mode: 'email', value: text });
+                  return;
+                }
+                onChange({ ...value, value: localPhoneDigits(text, country) });
+              }}
               placeholder={placeholder}
               hint={t('auth.login.phoneHint')}
               error={phoneBad ? t('auth.phone.check', { format: placeholder }) : undefined}
@@ -117,9 +128,15 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
           autoCorrect={false}
           keyboardType="email-address"
           textContentType="username"
+          autoComplete="email"
           editable={editable}
           value={value.value}
           onChangeText={(text) => onChange({ ...value, value: text })}
+          // Leaving the field shows the address as it will be sent; never while typing.
+          onBlur={() => {
+            const cleaned = cleanEmail(value.value);
+            if (cleaned !== value.value) onChange({ ...value, value: cleaned });
+          }}
           placeholder={t('auth.login.emailPlaceholder')}
         />
       )}

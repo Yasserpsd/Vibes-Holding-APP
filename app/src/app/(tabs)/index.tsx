@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ReactElement } from 'react';
 import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -36,10 +37,11 @@ import { WalletCard } from '@/components/WalletCard';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
-import { chevronForward, textStart } from '@/i18n/direction';
+import { chevronForward, markParagraphs, textDir, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
+import { useUnreadPosts } from '@/lib/readPosts';
 import { markSeen } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -78,6 +80,7 @@ export default function HomeScreen() {
   const meetups = useMeetupsContent();
   const bank = useProjectsList({ q: '', sort: 'discover' });
   const hq = useHq();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   // M102: the entrepreneur's collapsed services grid.
   const [gridOpen, setGridOpen] = useState(false);
@@ -105,6 +108,10 @@ export default function HomeScreen() {
         meetups.refetch(),
         bank.refetch(),
         hq.refetch(),
+        // Complaint 2026-11-16 («برنامج الممثلين مش بيظهر غير بعد 3-4 مرات»): the member's affiliate state is re-read
+        // too, so an approval shows «أرباحي» on the next pull. Invalidate, not refetch(): a guest's disabled query
+        // must not send a request.
+        queryClient.invalidateQueries({ queryKey: ['affiliate'] }),
       ]);
     } finally {
       setRefreshing(false);
@@ -350,6 +357,8 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
+      {/* M242 (owner): an unread management message is the first thing on the page, above everything else. */}
+      <UnreadMessagesStrip />
       {/* M177 (owner): the next workshop, once a day, in the day's AI-written words — the first thing every open shows. */}
       <WorkshopAdPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
@@ -404,6 +413,50 @@ export default function HomeScreen() {
   );
 }
 
+/**
+ * M242 (owner, 2026-11-16: «رسائل الإدارة حاجة مهمة جدا في الأبلكيشن»): the gold strip that crowns the home while a
+ * management message is unread. One message: its title, and a tap opens it. Several: their count, and a tap
+ * opens «بريد وارد». It leaves by itself once the messages are read (lib/readPosts).
+ */
+function UnreadMessagesStrip() {
+  const router = useRouter();
+  const unread = useUnreadPosts();
+  const first = unread[0];
+  if (!first) return null;
+  const single = unread.length === 1;
+  const head = single ? t('inbox.newFromManagement') : t('inbox.newFromManagementCount', { count: unread.length });
+  const open = () => (single ? router.push(`/posts/${first.id}` as Href) : router.navigate('/(tabs)/news' as Href));
+  return (
+    <FadeInView offset={8}>
+      <PressScale onPress={open} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={single ? `${head}: ${first.title}. ${t('inbox.openMessage')}` : head}>
+        <GoldGradient style={styles.unreadStrip}>
+          <Ionicons name="mail-unread" size={22} color={colors.goldInk} />
+          <View style={styles.unreadTexts}>
+            {/* The label has the whole first line to itself and shrinks before it is ever cut: beside the action it
+                read «New message from the m…» in English (final emulator pass, 2026-11-16). */}
+            <Text style={styles.unreadHead} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {head}
+            </Text>
+            {/* Second line: the title (it follows its own letters, one line) and the action at the end. The action
+                barely grows with the system font, so the title keeps the room. */}
+            {single ? (
+              <View style={styles.unreadSecond}>
+                <Text style={[styles.unreadTitle, textDir(first.title)]} numberOfLines={1}>
+                  {markParagraphs(first.title)}
+                </Text>
+                <Text style={styles.unreadCta} numberOfLines={1} maxFontSizeMultiplier={1.1}>
+                  {t('inbox.openMessage')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Ionicons name={chevronForward()} size={18} color={colors.goldInk} />
+        </GoldGradient>
+      </PressScale>
+    </FadeInView>
+  );
+}
+
 /** M102: the home's top image — the real HQ, opening the HQ screen; the banner slot is the fallback. */
 function HqBanner() {
   const router = useRouter();
@@ -450,7 +503,9 @@ function QuickAction({ icon, label, onPress }: { icon: IoniconName; label: strin
             <Ionicons name={icon} size={22} color={colors.gold} />
           </View>
         </Floating>
-        <Text style={styles.quickLabel} numberOfLines={2}>
+        {/* Two lines, and a label a little too long for them shrinks to fit instead of ending in «…»
+            (English «Club headquarters a…», emulator review item 26). */}
+        <Text style={styles.quickLabel} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
           {label}
         </Text>
       </GlassCard>
@@ -505,7 +560,7 @@ function PodcastStageCard({ block, onPress }: { block: NonNullable<HomeContent['
           <Text style={styles.podcastSubtitle} numberOfLines={3}>{block.subtitle}</Text>
           <View style={styles.podcastCtaRow}>
             <Text style={styles.podcastCta}>{block.cta}</Text>
-            <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+            <Ionicons name={chevronForward()} size={14} color={colors.goldText} />
           </View>
         </View>
       </GlassCard>
@@ -522,7 +577,7 @@ function SavingsCard({ block, onPress }: { block: NonNullable<HomeContent['savin
       <View style={styles.savingsList}>
         {block.items.map((item) => (
           <View key={item} style={styles.savingsRow}>
-            <Ionicons name="diamond" size={12} color={colors.gold} />
+            <Ionicons name="diamond" size={12} color={colors.goldText} />
             <Text style={styles.savingsItem}>{item}</Text>
           </View>
         ))}
@@ -530,7 +585,7 @@ function SavingsCard({ block, onPress }: { block: NonNullable<HomeContent['savin
       <PressScale onPress={onPress} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={block.cta}>
         <View style={styles.savingsCta}>
           <Text style={styles.savingsCtaText}>{block.cta}</Text>
-          <Ionicons name={chevronForward()} size={16} color={colors.gold} />
+          <Ionicons name={chevronForward()} size={16} color={colors.goldText} />
         </View>
       </PressScale>
     </GlassCard>
@@ -552,7 +607,7 @@ function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membersh
           <Text style={styles.membershipSubtitle} numberOfLines={3}>{block.subtitle}</Text>
           <View style={styles.membershipCtaRow}>
             <Text style={styles.membershipCta}>{block.cta}</Text>
-            <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+            <Ionicons name={chevronForward()} size={14} color={colors.goldText} />
           </View>
         </View>
       </GlassCard>
@@ -570,7 +625,8 @@ function GoldDoorCard({ icon, title, hint, onPress }: { icon: IoniconName; title
         </View>
         <View style={styles.plusTexts}>
           <Text style={styles.plusTitle}>{title}</Text>
-          <Text style={styles.plusHint} numberOfLines={1}>
+          {/* Two lines: one line cut the mixed text inside the English name («…App S», emulator review item 28). */}
+          <Text style={styles.plusHint} numberOfLines={2}>
             {hint}
           </Text>
         </View>
@@ -627,6 +683,24 @@ const styles = themedStyles(() => ({
   heroDivider: { width: 72, marginTop: spacing.xs, alignSelf: 'center' },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  // M242: the unread-message strip — full gold, ink on gold, at least 48 pt tall.
+  unreadStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 48,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
+    boxShadow: shadows.glowGold,
+  },
+  unreadTexts: { flex: 1, gap: 1 },
+  unreadHead: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldInk, textAlign: textStart },
+  unreadSecond: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // No flex: the title is as wide as its words (so it starts where the label starts, whatever its language)
+  // and only shrinks when the line is full.
+  unreadTitle: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldInk, flexShrink: 1 },
+  unreadCta: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 19, color: colors.goldInk, flexShrink: 0, marginStart: 'auto' },
   // M102: the HQ photo crowning the home.
   hqBanner: {
     width: '100%',
@@ -729,7 +803,7 @@ const styles = themedStyles(() => ({
   podcastTitle: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   podcastSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   podcastCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  podcastCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.gold },
+  podcastCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldText },
   // M74-5: the savings card.
   savingsCard: { gap: spacing.xs, padding: spacing.md, marginTop: spacing.sm },
   savingsTitle: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
@@ -748,7 +822,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     marginTop: spacing.xs,
   },
-  savingsCtaText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.gold },
+  savingsCtaText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.goldText },
   // M99a: the guest's membership card.
   membershipCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm },
   membershipIcon: {
@@ -763,7 +837,7 @@ const styles = themedStyles(() => ({
   membershipTitle: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   membershipSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   membershipCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  membershipCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.gold },
+  membershipCta: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldText },
   // M74: the entrepreneur's «+» to شركاء النجاح — deliberately unlike every other card.
   plusCard: {
     flexDirection: 'row',
@@ -785,7 +859,8 @@ const styles = themedStyles(() => ({
   plusTitle: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.goldInk, textAlign: textStart },
   plusHint: { ...typography.caption, color: colors.goldInk, opacity: 0.8, textAlign: textStart },
   list: { gap: spacing.sm, marginTop: spacing.sm },
-  strip: { gap: spacing.sm, paddingVertical: spacing.xs },
+  // The same distance under a section's description as the agenda, people and meetups strips (emulator review item 25).
+  strip: { gap: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   mini: {
     width: MINI_WIDTH,
     gap: spacing.xs,

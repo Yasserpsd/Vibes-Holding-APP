@@ -48,3 +48,6 @@ server/data/
 # Local secrets vault: key files live ONLY here and in Railway/EAS (rule 1); never committed
 .secrets.local/
 server/.ssh-backup-key*
+
+# Emulator screenshots of the review runs stay on this PC (about 60 MB); the reports name them.
+docs/reviews/**/android-shots/

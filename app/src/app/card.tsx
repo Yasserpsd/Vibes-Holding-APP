@@ -125,9 +125,10 @@ export default function CardScreen() {
             <View style={[styles.logoBadge, { borderColor: metal.frame }]}>
               <Image source={require('../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
             </View>
+            {/* The club's name once: since it became Latin «Investors Club» in both languages (2026-10-21), the
+                spaced-capitals line under it repeated the same two words. */}
             <View style={styles.headText}>
               <Text style={[styles.club, { color: metal.body }]} numberOfLines={1}>{t('common.clubName')}</Text>
-              <Text style={[styles.clubEn, { color: metal.bright }]} numberOfLines={1}>{t('card.clubEn')}</Text>
             </View>
             {/* M103: the member's standing, loud and unmistakable — VIP in gold, or the quiet silver tag. */}
             {active ? (
@@ -314,7 +315,7 @@ function PrintBlock({ active }: { active: boolean }) {
       <Text style={styles.printText}>{t('card.printText')}</Text>
       {/* M162 (owner): say it loud — pickup at the HQ costs nothing; home delivery carries shipping fees by region. */}
       <View style={styles.printFreeRow}>
-        <Ionicons name="business-outline" size={16} color={colors.gold} />
+        <Ionicons name="business-outline" size={16} color={colors.goldText} />
         <Text style={styles.printFree}>{t('card.printFree')}</Text>
       </View>
       {!active ? (
@@ -440,9 +441,8 @@ const styles = themedStyles(() => ({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
   logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: GOLD.body, backgroundColor: CARD_FRAME_BLACK, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 32, height: 32 },
-  headText: { flex: 1, gap: 1 },
+  headText: { flex: 1 },
   club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: GOLD.body, textAlign: textStart },
-  clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: GOLD.bright, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
   categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: GOLD.body },
   categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.goldInk },
   // M103: the silvered, faded shell of the unactivated card.
@@ -523,7 +523,7 @@ const styles = themedStyles(() => ({
   printTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   printText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   printFreeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  printFree: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart, flex: 1 },
+  printFree: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldText, textAlign: textStart, flex: 1 },
   form: { gap: spacing.sm },
   methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   methodNote: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

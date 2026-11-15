@@ -106,8 +106,10 @@ const styles = themedStyles(() => ({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.gold, flex: 1, textAlign: textStart },
   clear: { ...typography.caption, color: colors.textMuted, textDecorationLine: 'underline' },
-  body: { flexGrow: 0 },
-  bodyContent: { gap: spacing.sm, paddingVertical: spacing.xs },
+  // The list runs to the sheet's edges and pads its content instead: a ScrollView clips at its own bounds, and
+  // the selected chip's glow was cut square where the list ended at the sheet's padding.
+  body: { flexGrow: 0, marginHorizontal: -spacing.md },
+  bodyContent: { gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   sectionTitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, marginTop: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 }));

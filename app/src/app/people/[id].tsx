@@ -12,7 +12,7 @@ import { PersonAvatar } from '@/components/PeopleBlock';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -54,7 +54,7 @@ export default function PersonScreen() {
                 <Text style={styles.honoraryText} numberOfLines={1}>{t('membership.honorary')}</Text>
               </View>
             ) : null}
-            {data.title || data.company ? <Text style={styles.title}>{[data.title, data.company].filter(Boolean).join(' · ')}</Text> : null}
+            {data.title || data.company ? <Text style={styles.title}>{markParagraphs([data.title, data.company].filter(Boolean).join(' · '))}</Text> : null}
             {/* M73: the spotlight facts under the name — field/experience and the city. */}
             {data.specialty || data.city ? (
               <View style={styles.facts}>
@@ -65,7 +65,7 @@ export default function PersonScreen() {
           </FadeInView>
 
           <FadeInView delay={120}>
-            <Text style={styles.bio}>{data.bio}</Text>
+            <Text style={styles.bio}>{markParagraphs(data.bio)}</Text>
           </FadeInView>
 
           {data.milestones.length > 0 ? (
@@ -172,7 +172,7 @@ const styles = themedStyles(() => ({
     boxShadow: shadows.glowGold,
   },
   name: { ...typography.title, color: colors.textPrimary, textAlign: 'center' },
-  title: { ...typography.body, color: colors.gold, textAlign: 'center' },
+  title: { ...typography.body, color: colors.goldText, textAlign: 'center' },
   honorary: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.gold },
   honoraryText: { ...typography.caption, fontSize: 12, color: colors.goldInk },
   bio: { ...typography.body, color: colors.textSecondary, textAlign: textStart, lineHeight: 26 },

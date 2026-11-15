@@ -40,7 +40,7 @@ export default function PeopleScreen() {
         <FadeInView delay={100} offset={6}>
           <View style={styles.countRow}>
             <View style={styles.countPill}>
-              <Ionicons name="sparkles-outline" size={14} color={colors.gold} />
+              <Ionicons name="sparkles-outline" size={14} color={colors.goldText} />
               <Text style={styles.countPillText}>{formatPeopleCount(items.length)}</Text>
             </View>
           </View>

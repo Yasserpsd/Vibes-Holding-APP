@@ -57,6 +57,8 @@ export type ProjectsPage = {
   total: number;
   hasMore: boolean;
   updatedAt: string | null;
+  /** M242: the rotation day this page was dealt under (sent back with the next page); an older server sends none. */
+  day?: number;
 };
 
 export type FilterOption = Term & { count: number };

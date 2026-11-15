@@ -12,8 +12,9 @@ import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, shadows, spacing } from '@/theme/tokens';
+import { fonts } from '@/theme/tokens';
 
 type Params = { stepToken?: string };
 
@@ -27,7 +28,6 @@ export default function TotpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(!stepToken);
-  const [focused, setFocused] = useState(false);
 
   const submit = async () => {
     if (busy || !stepToken) return;
@@ -66,12 +66,10 @@ export default function TotpScreen() {
           textContentType="oneTimeCode"
           maxLength={9}
           value={code}
-          onChangeText={(value) => setCode(value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+          onChangeText={(value) => setCode(toAsciiDigits(value).toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
           onSubmitEditing={() => void submit()}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           error={error}
-          style={[styles.code, focused && styles.codeFocused]}
+          style={styles.code}
           editable={!expired}
         />
       </FadeInView>
@@ -89,7 +87,7 @@ export default function TotpScreen() {
 }
 
 const styles = themedStyles(() => ({
+  // The golden focus halo comes from FormField's own frame around the input (a plain View). A box shadow on the
+  // input itself makes Android swap its background and reset its padding (review 2026-11-16).
   code: { fontFamily: fonts.semiBold, fontSize: 26, letterSpacing: 6, textAlign: 'center' },
-  codeFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
-  spacer: { height: spacing.sm },
 }));

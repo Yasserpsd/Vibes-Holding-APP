@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
-import { membershipApi, useStoreConfig, type StoreConfig, type SyncResult } from '@/api/membership';
+import { useStoreConfig, type StoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
@@ -33,29 +33,22 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 // `storePending`: the store itself is still processing the payment (Android pending purchase) — a calm wait, not a failure.
 type Phase = 'loading' | 'ready' | 'unavailable' | 'busy' | 'activating' | 'done' | 'pending' | 'storePending';
 
+// The first, quick round of asking the server right after the store's answer. Each check is `syncMembership()` of
+// AuthProvider (about 8 s at most for the caller, a later answer still applied); when the round ends without
+// «active» the watcher there goes on asking — on a timer, on every return to the app, after a restart.
 const SETTLE_ATTEMPTS = 8;
 const SETTLE_DELAY_MS = 3000;
-const SETTLE_ATTEMPT_MS = 8000;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * One server sync, given up after about 8 seconds: a hanging request must not stretch the «جارٍ تفعيل عضويتك» wait
- * to minutes. null = no answer this time — the next attempt asks again; only the server's answer activates.
- */
-export async function syncMembershipOnce(): Promise<SyncResult | null> {
-  try {
-    return await Promise.race([membershipApi.sync(), wait(SETTLE_ATTEMPT_MS).then(() => null)]);
-  } catch {
-    return null;
-  }
-}
+// U+200E, U+200F and U+061C, built from their code points so no invisible character sits in this file.
+const BIDI_MARKS = new RegExp(`[${String.fromCharCode(0x200e, 0x200f, 0x061c)}]`, 'g');
 
 /**
  * The store's price string as the member reads it: Android sometimes wraps the symbol in invisible
  * right-to-left / left-to-right marks, which stopped riyalPrice() from recognising «SAR 1,900.00».
  */
 export function storePriceLabel(priceString: string): string {
-  return riyalPrice(priceString.replace(/[‎‏؜]/g, ''));
+  return riyalPrice(priceString.replace(BIDI_MARKS, ''));
 }
 
 /**
@@ -63,7 +56,7 @@ export function storePriceLabel(priceString: string): string {
  * the activation from the server: the store's own result never activates anything here.
  */
 export function StorePurchaseCard({ title }: { title: string }) {
-  const { me, setMe } = useAuth();
+  const { me, syncMembership, watchMembership, stopMembershipWatch, membershipPending, membershipPendingLong } = useAuth();
   const { data: config, isLoading, error: configError, refetch: refetchConfig } = useStoreConfig(Boolean(me));
   const [phase, setPhase] = useState<Phase>('loading');
   const phaseRef = useRef<Phase>('loading');
@@ -84,7 +77,12 @@ export function StorePurchaseCard({ title }: { title: string }) {
 
   useEffect(() => {
     if (!config || contactId === null || !apiKey || !supported) return;
-    if (phaseRef.current === 'activating' || phaseRef.current === 'done' || phaseRef.current === 'pending' || phaseRef.current === 'storePending') return;
+    // A purchase in hand (the store sheet, the server check) is never restarted by this effect. A waiting notice
+    // is left alone too — until the purchase has waited more than 30 minutes: then the offer is fetched below so
+    // the Subscribe button can come back beside the notice.
+    const held = phaseRef.current;
+    if (held === 'busy' || held === 'activating' || held === 'done') return;
+    if ((held === 'pending' || held === 'storePending') && !membershipPendingLong) return;
     let cancelled = false;
     go('loading');
     (async () => {
@@ -102,6 +100,13 @@ export function StorePurchaseCard({ title }: { title: string }) {
         }
         return;
       }
+      if (membershipPending && !membershipPendingLong) {
+        // A purchase of this account is still waiting for the server (this launch or an earlier one): the calm
+        // notice and «استعادة المشتريات», not a second Subscribe button. After 30 minutes of waiting the offer is
+        // fetched instead, and the button returns beside the notice (see the render below).
+        go('storePending');
+        return;
+      }
       try {
         const found = await fetchMembershipOffer(config);
         if (cancelled) return;
@@ -114,27 +119,27 @@ export function StorePurchaseCard({ title }: { title: string }) {
     return () => {
       cancelled = true;
     };
-  }, [config, contactId, apiKey, supported, active, go]);
+  }, [config, contactId, apiKey, supported, active, membershipPending, membershipPendingLong, go]);
 
   // The store said yes; only the server's answer counts (webhook, or its REST check in /api/membership/sync).
   const settle = useCallback(async () => {
+    const owner = contactId;
     go('activating');
     for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt += 1) {
       const started = Date.now();
       // null = server busy, offline or no answer within the cap: try again below.
-      const result = await syncMembershipOnce();
-      if (result) {
-        setMe(result.me);
-        if (result.me.membership.status === 'active') {
-          go('done');
-          return;
-        }
+      const account = await syncMembership();
+      // Another account signed in on this phone while this round was still asking: the purchase is not its own.
+      if (account && account.id !== owner) return;
+      if (account?.membership.status === 'active') {
+        go('done');
+        return;
       }
       // An attempt that already took its time is not followed by another pause.
       if (Date.now() - started < SETTLE_DELAY_MS) await wait(SETTLE_DELAY_MS);
     }
     go('pending');
-  }, [go, setMe]);
+  }, [contactId, go, syncMembership]);
 
   const buy = async () => {
     // A second tap while the store sheet is opening must not start a second purchase.
@@ -143,12 +148,19 @@ export function StorePurchaseCard({ title }: { title: string }) {
     go('busy');
     const result = await purchaseMembership(config, offer);
     if (result.status === 'cancelled') return go('ready');
-    // The store is still processing the payment: a calm wait — no error, and no second Subscribe while it shows.
-    if (result.status === 'pending') return go('storePending');
+    if (result.status === 'pending') {
+      // The store is still processing the payment: a calm wait — no error, no second Subscribe while it shows —
+      // and the app keeps asking the server until the payment completes and the membership is active.
+      watchMembership();
+      return go('storePending');
+    }
     if (result.status === 'failed') {
       setError(result.message);
       return go('ready');
     }
+    // The store took the payment. From here the app keeps asking the server until it says active, even if this
+    // screen is left or the app is closed in the middle (the watch is saved before the first check).
+    watchMembership();
     await settle();
   };
 
@@ -163,14 +175,33 @@ export function StorePurchaseCard({ title }: { title: string }) {
       return go(from);
     }
     if (!result.entitled) {
+      // The store itself has nothing for this account. A purchase that never completed (a deferred payment that
+      // expired or was cancelled) must not keep the waiting notice — and the Subscribe button — locked for days:
+      // the watch ends here and the card goes back to its offer.
+      stopMembershipWatch();
       setError(t('store.noPrevious', { store: storeName() }));
-      return go(from);
+      if (from !== 'storePending') return go(from);
+      if (offer) return go('ready');
+      // The waiting notice was showing without a price (the purchase was made in an earlier launch): fetch the
+      // offer now. The phase stays `busy` meanwhile, so the effect above does not start a second fetch.
+      try {
+        const found = await fetchMembershipOffer(config);
+        setOffer(found);
+        return go(found ? 'ready' : 'unavailable');
+      } catch {
+        return go('unavailable');
+      }
     }
+    watchMembership();
     await settle();
   };
 
+  // «Waiting» is never sticky: the moment the account is active — this card's own check, the watcher, a push, a
+  // return to the app — the waiting states give way to the success notice, on this same screen.
+  const shown: Phase = active && (phase === 'pending' || phase === 'storePending' || phase === 'activating') ? 'done' : phase;
+
   if (!me || isLoading) return null;
-  if (phase === 'done') {
+  if (shown === 'done') {
     // The paid moment: the success notice (checkmark) springs in under a golden halo.
     return (
       <PopIn style={styles.doneGlow}>
@@ -178,7 +209,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
       </PopIn>
     );
   }
-  if (phase === 'pending') {
+  if (shown === 'pending') {
     return (
       <FadeInView offset={8}>
         <Notice tone="warning" text={t('store.pending')} />
@@ -208,13 +239,14 @@ export function StorePurchaseCard({ title }: { title: string }) {
           <Ionicons name="storefront-outline" size={22} color={colors.gold} />
           <Text style={styles.title}>{title}</Text>
         </View>
-        <FadeInView key={phase} offset={6} duration={260} style={styles.phase}>
-          {phase === 'loading' ? <Progress text={t('store.loadingPrice')} /> : null}
-          {phase === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
-          {phase === 'activating' ? <Progress text={t('store.activating')} /> : null}
-          {phase === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
-          {phase === 'storePending' ? <Notice text={t('store.pending')} /> : null}
-          {phase === 'ready' && offer ? (
+        <FadeInView key={shown} offset={6} duration={260} style={styles.phase}>
+          {shown === 'loading' ? <Progress text={t('store.loadingPrice')} /> : null}
+          {shown === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
+          {shown === 'activating' ? <Progress text={t('store.activating')} /> : null}
+          {shown === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
+          {/* The waiting notice; after 30 minutes of waiting the price and Subscribe return under it (phase `ready`). */}
+          {shown === 'storePending' || (membershipPending && (shown === 'ready' || shown === 'unavailable')) ? <Notice text={t('store.pending')} /> : null}
+          {shown === 'ready' && offer ? (
             <>
               <PopIn style={styles.priceRow}>
                 <SarText style={styles.price}>{storePriceLabel(offer.product.priceString)}</SarText>
@@ -223,7 +255,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
               <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />
             </>
           ) : null}
-          {phase === 'ready' || phase === 'unavailable' || phase === 'storePending' ? (
+          {shown === 'ready' || shown === 'unavailable' || shown === 'storePending' ? (
             <PressScale onPress={() => void restore()} style={styles.restore} wrapStyle={styles.restoreWrap} hitSlop={8}>
               <Ionicons name="refresh-outline" size={16} color={colors.goldLightText} />
               <Text style={styles.restoreText}>{t('store.restore')}</Text>

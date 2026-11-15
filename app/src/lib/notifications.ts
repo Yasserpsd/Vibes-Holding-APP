@@ -50,6 +50,30 @@ export function installNotificationHandler(): void {
   }
 }
 
+/**
+ * M242: the number on the app icon = the member's unread management messages. Guarded like everything native
+ * in this file: a binary without the badge module (or without the function) does nothing, and no failure ever
+ * reaches the member — the icon number is a nicety, never an error.
+ */
+export function setAppBadge(count: number): void {
+  try {
+    if (!requireOptionalNativeModule('ExpoBadgeModule')) return;
+    const notifications = loadNotifications();
+    if (!notifications || typeof notifications.setBadgeCountAsync !== 'function') return;
+    const wanted = Math.max(0, Math.round(count));
+    const write = () => notifications.setBadgeCountAsync(wanted);
+    // Written only when it differs from what the icon shows: on iOS writing 0 also empties the notification
+    // centre, which must not happen on every launch of an app whose number is already 0.
+    const done =
+      typeof notifications.getBadgeCountAsync === 'function'
+        ? notifications.getBadgeCountAsync().then((current) => (current === wanted ? false : write()))
+        : write();
+    void done.catch(() => undefined);
+  } catch {
+    // Nothing to do: the lights inside the app still tell the member.
+  }
+}
+
 let currentToken: string | null = null;
 
 /** The token registered during this launch (unregistered on sign-out). */

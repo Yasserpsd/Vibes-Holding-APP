@@ -1,0 +1,286 @@
+{
+ "key": "membership-needs-restart",
+ "words": "A member buys the annual membership inside the app and then has to close the app and open it again before the membership shows as active.",
+ "diagnosis": {
+  "summary": "The purchase itself is not lost. Two app behaviours force the restart: (1) after the store says yes the app asks the server only 8 times (about 25–35 s, popup locked meanwhile), then shows \"will be activated within minutes\" and never asks again in that launch; (2) even when activation succeeds at once, several cards keep the old \"not a member\" answer (home wallet card, event page) because nothing refetches them. The server side most likely feeds (1): production appears to activate only when RevenueCat's webhook arrives, which I could not confirm from here. Today's pass cured part of (2) only; (1) is untouched.",
+  "causes": [
+   {
+    "cause": "The app stops asking after 8 tries and nothing else re-reads the account in a running app. While it asks, the popup cannot be closed.",
+    "evidence": "Members' bundle (git show 97705af:<path>): C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx:47-48 (8 attempts, 3 s pause), :102-117 settle() ends in setPhase('pending'), :92-93 + :150 dismiss() and Android back are ignored during 'busy'/'activating', :164 the 'pending' notice. Same loop in C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx:34-35, :97-112, :153. The account is read from the server only at launch (C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx:81) and in refresh() (:149-163); refresh() has two callers: pull-to-refresh on the Account tab (C:/Projects/vibes-club-app/app/src/app/(tabs)/account.tsx:85-89) and a push that ARRIVES while the app is open (C:/Projects/vibes-club-app/app/src/components/PushRegistrar.tsx:62-65). No AppState listener, no timer. Sequence: store sheet closes -> 'Activating…' (popup locked) -> 8 x (POST /api/membership/sync + 3 s), about 25-35 s when the server answers fast, up to 8 x 33 s = 264 s when each request hangs to the 30 s write timeout (C:/Projects/vibes-club-app/app/src/api/client.ts:33-34) -> 'Your subscription was received… activated within minutes' -> the server activates later -> the app still holds the old account until relaunch. A member who kills the app during the long spinner gets the same result.",
+    "platforms": "iOS and Android; store builds 1.3.2 / 1.3.3 and every earlier runtime (logic unchanged since M120/M122b, 2026-10-23)",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's pass only caps each attempt at 8 s (C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx:36-51 at HEAD), so it gives up sooner (worst case 64 s); it still never asks again and the popup is still locked (MembershipGate.tsx:95-97 at HEAD). New side effect: an answer slower than 8 s is thrown away even if it says 'active'."
+   },
+   {
+    "cause": "Production most likely activates only when RevenueCat's webhook arrives; the app's own sync call then only re-reads the hub. A webhook later than the 25-35 s loop produces cause 1.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/membership/service.ts:240-245: without REVENUECAT_SECRET_KEY sync() = forget cache + hub re-read; activation happens only in handleRevenueCat (:189-233) -> activate (:321-371). C:/Projects/vibes-club-app/docs/PROJECT_BRIEF.md:445 and :467 record only REVENUECAT_PUBLIC_KEY_ANDROID / _IOS and REVENUECAT_WEBHOOK_AUTH being added to production; :153 calls the secret key optional; :501 (the verified purchase chain) lists a webhook event only, no SYNC event. RevenueCat's own figure for webhook delivery is 5-60 s (from memory, not re-read today).",
+    "platforms": "both (server)",
+    "confidence": "likely",
+    "fixedToday": "No (Railway variable, not code)."
+   },
+   {
+    "cause": "After a successful activation the account flips to active, but server answers cached in the app under keys without the membership status are never asked again, so parts of the app keep saying 'not a member'.",
+    "evidence": "Members' bundle: setMe() only replaces the account (AuthProvider.tsx:165-168), no query invalidation; the QueryClient has no focus wiring (C:/Projects/vibes-club-app/app/src/app/_layout.tsx:49-53), so a mounted query never refetches by itself. Not keyed by membership: wallet C:/Projects/vibes-club-app/app/src/api/queries.ts:69 -> C:/Projects/vibes-club-app/app/src/components/WalletCard.tsx:32-41 shows 'فعّل عضويتك لتستخدم رصيدك' on the home (C:/Projects/vibes-club-app/app/src/app/(tabs)/index.tsx:228-232; the home pull-to-refresh :92-94 skips it), the Account tab and the services screen until relaunch or a first mount of another wallet card; events C:/Projects/vibes-club-app/app/src/api/agenda.ts:68,76 -> the event page under the popup keeps the fee and the 'activate membership' card (C:/Projects/vibes-club-app/app/src/app/agenda/[id].tsx:189-202; price decided in C:/Projects/vibes-club-app/server/src/agenda/service.ts:243-245); person page stays on its 403 lock (C:/Projects/vibes-club-app/app/src/api/people.ts:41, C:/Projects/vibes-club-app/server/src/profiles/routes.ts:86); also affiliate.ts:121 (the home 'representatives' card), card.ts:35, invites.ts:22. Keyed correctly and fine: services (content.ts:233-254), HQ (hq.ts:95-120), partners (partners.ts:37-39), project unlock (ProjectUnlock.tsx:41).",
+    "platforms": "iOS and Android, every buyer on the bundles up to 2026-11-14",
+    "confidence": "proven-in-code",
+    "fixedToday": "Partly, in git only (0fcf3e5): wallet key carries the status (queries.ts:86 at HEAD), event keys carry the account (agenda.ts:72,81,114,128), stale queries refetch when the app returns to the foreground (_layout.tsx:79-82). Not fixed: person page, affiliate, card print, invites; setMe()/refresh() still invalidate nothing (AuthProvider.tsx:162-181 at HEAD)."
+   },
+   {
+    "cause": "Tapping the 'membership activated' notification from outside the app only navigates to the membership screen; the account is not re-read, so the screen still shows 'not activated' with the Subscribe card.",
+    "evidence": "C:/Projects/vibes-club-app/app/src/components/PushRegistrar.tsx:45-60: open() does router.push(target.screen) only; refresh() runs solely in the foreground-arrival listener (:62-65). Push payload: C:/Projects/vibes-club-app/server/src/push/service.ts:603-622 (screen '/membership'). Members without notification permission get no push at all (C:/Projects/vibes-club-app/app/src/lib/notifications.ts:72-74).",
+    "platforms": "iOS and Android",
+    "confidence": "proven-in-code",
+    "fixedToday": "No (file unchanged today)."
+   },
+   {
+    "cause": "If the RevenueCat REST key IS set but RevenueCat refuses or times out, sync answers 502 on every try, so the app never receives the account even when the webhook already activated it.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/membership/service.ts:246 + :287-301 (fetchSubscriber throws store_unavailable 502, no timeout on the fetch); the test pins this behaviour: C:/Projects/vibes-club-app/server/src/m7b.test.ts:212-213. The app treats it as 'try again' and ends in 'pending' (cause 1).",
+    "platforms": "both (server)",
+    "confidence": "possible",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "Server account cache can be refilled with a pre-activation copy: forget() does not cancel a hub read already in flight, and that read stores its answer with a fresh timestamp.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/auth/service.ts:792-797 forget, :827-836 me, :838-846 fetchMe -> :1288-1293 remember, :849-858 revalidate. A read started before the hub activation and finishing after sync's final read leaves 'not a member' final for 60 s (ME_CACHE_MS :274) and served once more after that; 45 server call sites read this cache (services lock, event price, people). Needs a hub answer slower than the whole activation, so rare. Not covered by C:/Projects/vibes-club-app/server/src/m165.meCache.test.ts.",
+    "platforms": "both (server)",
+    "confidence": "possible",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "A failed account read at launch keeps the saved (old) account for the whole launch, which explains needing more than one restart.",
+    "evidence": "Members' bundle AuthProvider.tsx:81-95: on a non-401 error (timeout, hub slow) the app stays on the saved copy and never retries. Also a relaunch within 60 s of the last sync, before the webhook, gets the cached non-member copy and never asks again.",
+    "platforms": "iOS and Android",
+    "confidence": "possible",
+    "fixedToday": "No. Today's retry on return to the foreground only runs when there is no account at all (AuthProvider.tsx:183-191 at HEAD)."
+   },
+   {
+    "cause": "A purchase from the popup can run under an anonymous store identity after sign-out + sign-in (or an expired session) in the same launch; the server then cannot map it to the member. This gives 'paid, never activated' rather than 'active after restart'.",
+    "evidence": "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx (members' bundle :52, :81, :129-133, :223; same at HEAD :53, :84, :133-137, :263): the offer is cached for the whole launch and buy() skips loadOffer -> identifyPurchases when an offer exists. clearLocal() calls resetPurchases() -> logOut() (AuthProvider.tsx:47, C:/Projects/vibes-club-app/app/src/lib/purchases.ts:97-106). Webhook app_user_id is then anonymous -> parseAppUserId null -> 'pending: unknown app user id' (C:/Projects/vibes-club-app/server/src/membership/service.ts:222-224). The /membership screen card always identifies first (StorePurchaseCard.tsx:91), so only the popup path is exposed.",
+    "platforms": "iOS and Android",
+    "confidence": "possible",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "A payment the store holds as pending (Android slow card or cash, Apple Ask to Buy) completes later and the app never checks again.",
+    "evidence": "Members' bundle: PAYMENT_PENDING_ERROR is shown as a red failure (purchases.ts storeErrorMessage); no later sync. Activation then comes by webhook only and reaches the app through causes 1 and 4.",
+    "platforms": "mostly Android",
+    "confidence": "possible",
+    "fixedToday": "Partly: today's pass shows a calm 'pending' state with Restore (StorePurchaseCard.tsx:147, MembershipGate.tsx:146 at HEAD) but still never re-checks by itself."
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "One reaction to a membership change, in one place: in AuthProvider keep the last 'status|kind|endDate' of the account; whenever setMe(), refresh() or the launch read brings a different value for the same account id, call queryClient.invalidateQueries(). Covers purchase, push, pull-to-refresh and expiry, and makes the per-key fixes unnecessary.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. One burst of refetches per real change; must not fire on the first assignment of a launch or on sign-out (clearLocal already empties the cache)."
+   },
+   {
+    "change": "Keep asking after the 8 tries. When settle() ends in 'pending' or the store reports a pending payment, save a small flag (contact id + time) in the device store. While the flag is set and the account is not active: call POST /api/membership/sync at launch, on every return to the foreground, and on a timer while the app is open (every 15 s for 5 min, then every 60 s up to 30 min); on 'active' -> setMe, clear the flag, show the success notice. Clear after 72 h or on sign-out. In addition, for any signed-in non-member, re-read the account (fresh) on return to the foreground, at most once a minute. Use getCustomerInfo (already used on every runtime) as the hint that a store entitlement exists; only the server's answer activates.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx",
+     "C:/Projects/vibes-club-app/app/src/lib/deviceStore.ts",
+     "C:/Projects/vibes-club-app/app/src/lib/purchases.ts"
+    ],
+    "delivery": "ota",
+    "risk": "Low to medium. Extra sync calls each cost one hub read (plus one RevenueCat read if the REST key is set); bounded by the schedule above. Must stop on sign-out and never activate locally."
+   },
+   {
+    "change": "The popup must not trap the member and must not drop a late answer. After about 10 s of 'Activating…' offer Close (the watcher above continues). In syncMembershipOnce keep the original request: if it answers after the 8 s cap, still apply its account (setMe) instead of discarding it.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/ar.json",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/en.json"
+    ],
+    "delivery": "ota",
+    "risk": "Low. One new string pair in formal Arabic and English."
+   },
+   {
+    "change": "A tap on a membership notification re-reads the account before (or while) opening the screen: in open(), when target.type === 'membership', call refresh(); same for the response that launched the app.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/PushRegistrar.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low."
+   },
+   {
+    "change": "Always identify before a purchase: in the popup's buy() await identifyPurchases(config, me.id) right before purchaseMembership (fall back to /membership when it fails), and drop the cached offer and the popup's offer state when the account id changes or the member signs out.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/lib/purchases.ts"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Adds a short wait before the store sheet after a re-login only."
+   },
+   {
+    "change": "Make sync() robust: a RevenueCat REST failure or timeout (add an 8 s abort) is logged and falls through to the hub re-read (200, checked:false) instead of 502; when activate() succeeded, build the answer from the contact the hub returned in activate_member rather than a second hub read.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/membership/service.ts",
+     "C:/Projects/vibes-club-app/server/src/m7b.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low. The test that expects 502 changes. The owner pushes; Railway deploys."
+   },
+   {
+    "change": "Guard the account cache against in-flight overwrites: forget() bumps a generation counter; fetchMe() records the counter when it starts and stores its result only if the counter is unchanged (otherwise returns it uncached). Add a test: forget during a slow hub read must not re-cache the old copy.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/auth/service.ts",
+     "C:/Projects/vibes-club-app/server/src/m165.meCache.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low. Slightly more hub reads right after a membership change."
+   },
+   {
+    "change": "Confirm, and if missing set, REVENUECAT_SECRET_KEY on the production Railway service so the first sync activates without waiting for the webhook; then GET /api/membership/store must show restCheck: true. Do it after the sync() robustness change, and run one sandbox purchase on the test server to confirm the webhook + sync pair still yields a single activation (the server's same-expiry / same-transaction guard and the hub's reference check are what prevent a double year).",
+    "files": [],
+    "delivery": "owner-decision",
+    "risk": "The key is a secret: the owner pastes it in Railway, never in chat or git. Without the robustness change a RevenueCat outage would turn every sync into 502."
+   },
+   {
+    "change": "Retry the launch account read: when the first /api/me fails with anything but 401, try again on the next return to the foreground and once after about 20 s, not only when no account is loaded.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low."
+   }
+  ],
+  "notVerified": [
+   "Whether production has REVENUECAT_SECRET_KEY: not checked (this step allowed no live GET). One public read settles it: GET https://api.vibesholdingsa.com/api/membership/store -> restCheck. The brief records only the two public keys and the webhook value being added to production.",
+   "Real activation delay: not measured. GET /api/admin/membership/purchases (receivedAt minus purchasedAt per real purchase, and whether any SYNC event exists) and the Railway log lines 'store membership sync' / 'revenuecat subscriber request refused' would turn causes 2 and 5 from likely/possible into facts.",
+   "RevenueCat's webhook delivery time (5-60 s) is quoted from memory of their documentation, not re-read today.",
+   "Nothing was run: no purchase, no iPhone, no Android device or emulator. The AppState behaviour around the App Store and Google Play sheets and the RevenueCat SDK behaviour after logOut() are from knowledge of the libraries, not observed.",
+   "How many members have notifications allowed (decides how often the foreground push rescues cause 1) is unknown.",
+   "Number of running instances of the production API: the account cache is per process; with more than one instance, forget() on one would leave the other stale. Not visible from the repository.",
+   "The hub side (activate_member writes and account reads go straight to the database, member.changed is sent to the server) was read in the test rig's working copy at C:/Projects/vibes-test-rig/work/hub/vibes-ai-assistant/includes/class-vai-hub.php (:3941, :6240, :1505-1643); the live plugin version may differ.",
+   "Today's fixes are in git (0fcf3e5, 2dea37a); I did not check whether an OTA carrying them has been published.",
+   "The owner's second complaint (the representatives programme appears only after several restarts) shares the mechanism of cause 3 (C:/Projects/vibes-club-app/app/src/api/affiliate.ts:121, permanently mounted home card) but was not traced here."
+  ],
+  "data": "Where 'not a member' can survive after the store said yes (members' bundle = commit 97705af), and for how long:\n\n| # | Place | What the member sees | Survives until | Today's tree |\n|---|---|---|---|---|\n| 1 | Account object in the app (AuthProvider state + saved copy) | whole app non-member; 'will be activated within minutes' | relaunch, or pull-to-refresh on the Account tab, or a push arriving while the app is open | not fixed |\n| 2 | Popup during 'Activating…' | spinner, cannot close | 25-35 s normally; up to 264 s when requests hang | shorter (max 64 s), still locked |\n| 3 | Wallet card (home, account, services) key ['projects-wallet', id], staleTime 60 s | 'Activate your membership to use your balance' | relaunch, or first mount of another wallet card after 60 s | fixed in git |\n| 4 | Event list and event page keys ['agenda'], ['agenda','event',id] | seat fee + 'activate membership' card | leaving and re-entering the page after 15-30 s | fixed in git |\n| 5 | Person page ['person', id] in 403 state | lock notice under the popup | leaving and re-entering | not fixed |\n| 6 | ['affiliate','mine',id], ['card','print'], ['invites','mine'] | old answer; the home affiliate card is always mounted | relaunch (30-60 s staleTime + a new mount) | not fixed (foreground refetch added) |\n| 7 | Server account cache (per session uuid) | services locked / member price wrong although the account says active | 60 s final + one more stale answer; narrow race | not fixed |\n| 8 | Server sync with REST key set and RevenueCat failing | 502 x 8 -> 'pending' | relaunch after the webhook | not fixed |\n| 9 | Launch /api/me failed (non-401) | saved old account for the whole launch | next relaunch | not fixed |\n| 10 | Notification tapped from outside the app | membership screen says 'not activated' + Subscribe | relaunch or Account pull-to-refresh | not fixed |\n| 11 | Popup purchase under anonymous store identity (re-login in the same launch) | paid, 'pending', never activates | manual activation by the management, or Restore purchases with the REST key set | not fixed |\n| 12 | Store-held pending payment | 'pending' | webhook + relaunch | calmer notice only |\n\nTiming constants: app SETTLE_ATTEMPTS 8, SETTLE_DELAY_MS 3000, write timeout 30 s (members' bundle), attempt cap 8 s (today); server ME_CACHE_MS 60 s, ME_STALE_MAX_MS 24 h, ME_HUB_TIMEOUT_MS 10 s.\nThings that DO work: services list and service page, HQ, partners and project unlock are keyed by '<id>:<membership status>' and refetch by themselves once the account flips; the server drops its cached account on sync, on the RevenueCat webhook activation and on the hub's member.changed webhook."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "Cause 1 holds in the code, but the colleague's explanation of why it never recovers leaves a gap. On the members' bundle, StorePurchaseCard renders the 'pending' notice BEFORE it checks `active` (git show 97705af:app/src/components/StorePurchaseCard.tsx:153-158 runs before :162; same order at HEAD :181 before :199), and its effect returns early while phaseRef is 'pending' (:64). So on /membership the card keeps saying «سيتم التفعيل خلال دقائق» even after `me` turns active (push refresh, pull-to-refresh elsewhere), until the screen unmounts. The popup also stays on 'pending' if it is left open. Any fix that only updates `me` (fix plan items 1, 2 and 4) will not clear this notice unless both components also leave 'pending' when `me.membership.status === 'active'`.",
+   "Cause 2 is the most likely root, but the colleague calls it unconfirmed while the repository supports it fairly well. docs/STORES.md:134 still lists `optional REVENUECAT_SECRET_KEY` as an unchecked production item. PROJECT_BRIEF.md:445/:467 record only the public keys and the webhook value. The production sandbox test at :501 shows only an INITIAL_PURCHASE webhook event and no SYNC event. Without the key, server/src/membership/service.ts:243-244 makes every one of the 8 app syncs a plain hub re-read, so activation depends entirely on when the webhook arrives. One fact the colleague did not use: RevenueCat retries a failed webhook only after minutes, so a webhook that hits a Railway deploy or restart delays activation by minutes, not seconds. Still not proven: no live GET was allowed in this step.",
+   "Cause 4 is correct, but the more common version of it was missed. activate() sends the WhatsApp «membership active» message first and then the push (service.ts:356-361), and WhatsApp is the main channel since M204. A member who opens WhatsApp moves the app to the background. The push then arrives while the app is backgrounded, so addNotificationReceivedListener (PushRegistrar.tsx:62-65 in the members' bundle) does not fire on iOS, and on Android it only fires if the JS context is running in the foreground. When the member comes back nothing re-reads the account, because no AppState listener exists in 97705af. The HEAD listener (AuthProvider.tsx at HEAD, effect after setMe) runs only when `me` is null. So the app's own announcement takes the member out of the app, and coming back shows the stale account.",
+   "Cause 3's claim that a relaunch clears everything is slightly too strong. On the members' bundle, 'agenda', 'people' and 'projects' are persisted across launches (app/src/lib/queryCache.ts at 97705af, KEEP_ROOTS line 22), with no membership in their keys. A relaunch shortly after the purchase therefore paints the pre-membership event price from disk until staleTime runs out and the query refetches. This is minor, but the fix should invalidate these queries and not only re-key them.",
+   "Cause 8 (anonymous store identity) is worse than the colleague says: the purchase never activates on its own. The webhook arrives with an anonymous app_user_id, giving 'pending: unknown app user id' (service.ts:222-224). A later identifyPurchases()/logIn aliases the purchase to vc-<id>, but the resulting RevenueCat event (TRANSFER or none) is not in ACTIVATING (service.ts:26). Only sync with the REST key, or a manual activation, recovers it. This does not match the complaint ('active after restart'), so it is a side finding, not a cause of this complaint.",
+   "The colleague's figures check out: 8 attempts, 3 s pause, 30 s write timeout (client.ts:33-34 at 97705af), and at HEAD an 8 s cap per attempt with no pause after a slow attempt, so 8 x 8 = 64 s worst case. The late-answer loss in HEAD's syncMembershipOnce (Promise.race drops a slower 'active' answer) is real. Server cache constants ME_CACHE_MS 60 s and a 24 h stale-while-revalidate window are confirmed in server/src/auth/service.ts:820-847."
+  ],
+  "missedCauses": [
+   "The post-activation WhatsApp message (and the push behind it) takes the member out of the app. On return there is no AppState-based re-read for a signed-in non-member, neither in 97705af nor at HEAD (HEAD's listener is gated on `!me`). Files: server/src/membership/service.ts:356-361; app/src/components/PushRegistrar.tsx:62-65 (97705af); app/src/auth/AuthProvider.tsx (HEAD, AppState effect). This is probably the most frequent path once activation takes longer than the popup loop, and it affects both platforms.",
+   "The 'pending' phase is sticky in StorePurchaseCard (97705af :153 before the active check at :162; HEAD :181 before :199) and in the popup. Even when `me` becomes active in the same launch, the /membership screen keeps the «will be activated» notice until the member leaves and re-enters it. A member who sees that notice concludes a restart is needed. Both platforms.",
+   "Persisted query roots ('agenda', 'people', 'projects' in app/src/lib/queryCache.ts at 97705af) carry pre-membership answers across a relaunch for up to their staleTime, so the event page fee can survive even the restart for a short window.",
+   "The /membership screen itself has no pull-to-refresh and no refresh on focus (app/src/app/membership.tsx at 97705af:25-70). The only manual rescue is pull-to-refresh on the Account tab, which members are unlikely to know about.",
+   "purchaseMembership already returns `entitled` from RevenueCat's customerInfo (app/src/lib/purchases.ts:157 at 97705af), and the app throws it away. It is a free, local signal that a sync loop should keep going for longer. Rule 5 still applies: it must never activate anything locally."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "AuthProvider: (a) Add an AppState listener active for any signed-in account (not only when `me` is null). On 'active', if me.membership.status !== 'active' and the last fresh read was more than 30 s ago, call refresh() (authApi.me(token, true)). (b) Keep a ref with the last `${me.id}|${status}|${kind}|${endDate}`. In setMe(), refresh() and the launch read, when the id is the same and the signature differs (skip the first assignment of the launch and sign-out), call queryClient.invalidateQueries() once. This covers wallet, agenda (including the persisted copy), people, affiliate, card and invites with no per-key changes, and also covers expiry. Uses only AppState and TanStack APIs that exist on every runtime from 1.2.0 to 1.3.3.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator with the local server-mock (:3009): sign in as a non-member, open the home and an event page, flip the account to active on the mock server, background the app and return. The account, wallet card and event fee must update with no relaunch. Typecheck and lint. The iPhone behaviour (backgrounding when WhatsApp opens) can only be confirmed on the owner's iPhone after the OTA."
+   },
+   {
+    "priority": 2,
+    "change": "Make 'pending' non-sticky. StorePurchaseCard: move the `active` check above the 'pending' and 'storePending' branches. When `active` becomes true while phaseRef is 'pending' or 'storePending', call go('done'). MembershipGateHost: same, with a useEffect on me.membership.status that calls setPhase('done') when it is active and the phase is 'pending', 'storePending' or 'activating'.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Emulator plus mock server: force the settle loop to end in 'pending' (mock answers non-member), then flip the account to active and trigger refresh() (pull-to-refresh on Account, or return from background with step 1). The /membership card and the open popup must switch to the success notice."
+   },
+   {
+    "priority": 3,
+    "change": "Background watcher after a purchase. When settle() ends in 'pending', when purchaseMembership returns 'pending'/storePending, or when it returns entitled:true, save {contactId, at} with deviceStore (secure-store guarded by requireOptionalNativeModule, so it is safe on old binaries). While the flag exists and me is not active, call syncMembershipOnce(): at launch, on every return to the foreground, and every 15 s for 5 min then every 60 s up to 30 min while the app is open. On an active answer: setMe (which triggers the step 1 invalidation), clear the flag, and show the success notice if a popup or card is mounted. Clear the flag after 72 h or on sign-out (clearLocal). Never activate locally.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/lib/deviceStore.ts"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Emulator plus mock server with a delayed activation (mock flips to active 90 s after the first sync): the app must turn active in place with no restart. Kill the app during 'Activating…', relaunch before the flip, and it must still turn active within a minute. A real-store run is possible on the Play-enabled emulator against the test server (sandbox activates there). iPhone only on a real device."
+   },
+   {
+    "priority": 4,
+    "change": "Popup and late answers. Show a Close button after 10 s of 'activating' (the step 3 watcher keeps working; the closed popup must not reset phase to 'idle' while activation is still pending). In syncMembershipOnce keep the original promise: if it resolves after the 8 s cap with an account, still call setMe(result.me) (pass setMe in, or route it through AuthProvider) instead of dropping it. Add one ar/en string pair if a new label is needed (formal Arabic).",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/StorePurchaseCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/ar.json",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/en.json"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Mock server delays /api/membership/sync by 12 s and answers active: the app must end active. Android back press and Close must work after 10 s. Unit-level check of syncMembershipOnce with a fake slow promise."
+   },
+   {
+    "priority": 5,
+    "change": "PushRegistrar open(): when targetOf(data).type === 'membership', call refresh() before router.push (also for the response that launched the app via getLastNotificationResponseAsync).",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/PushRegistrar.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Code review plus an emulator test: send a test push with data {type:'membership', screen:'/membership'} from the admin push tool to a non-member who was then flipped to active, and tap it from the background. The emulator shows no banner (known quirk), so the tap path is fully checked only on a real device."
+   },
+   {
+    "priority": 6,
+    "change": "Server sync robustness: in fetchSubscriber add an 8 s AbortController. In sync(), catch store_unavailable, log it, and fall through to `{ me: await auth.me(session, true), checked: false, ... }` with status 200 instead of 502. After activate() succeeded, forget() is already called. Keep the second hub read but do not let it fail the request. Update m7b.test.ts:212-213 to the new behaviour.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/membership/service.ts",
+     "C:/Projects/vibes-club-app/server/src/m7b.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "npm test in server (m7b with a fetch that throws or hangs must answer 200 checked:false), tsc including test files (Railway tsc-checks them). The owner pushes and Railway deploys."
+   },
+   {
+    "priority": 7,
+    "change": "Owner decision: add REVENUECAT_SECRET_KEY (RevenueCat REST v1 secret) to the production Railway service, after step 6 is live, so the first sync activates without waiting for the webhook. The owner pastes it in Railway himself, never in chat or git.",
+    "files": [],
+    "delivery": "owner-decision",
+    "howToVerify": "GET https://api.vibesholdingsa.com/api/membership/store must show restCheck: true. Then GET /api/admin/membership/purchases after the next real purchase should show a SYNC event, or a webhook marked 'duplicate', with one activation only. A sandbox purchase on the test server first confirms webhook plus sync give a single activation."
+   },
+   {
+    "priority": 8,
+    "change": "Identify before every popup purchase: in MembershipGateHost.buy() await identifyPurchases(config, me.id) right before purchaseMembership (go to /membership if it returns false), and set cachedOffer = null in clearLocal/sign-out and when me.id changes.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/MembershipGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/lib/purchases.ts",
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Play-enabled emulator against the test server: sign out and back in within one launch, buy from the popup. The webhook record must show appUserId vc-<id> and contactId mapped."
+   },
+   {
+    "priority": 9,
+    "change": "Server account cache generation guard: forget() increments a per-contact generation. fetchMe() reads the generation before the hub call and stores the result only if it has not changed (otherwise it returns the result uncached). Add a test to m165.meCache.test.ts: forget during a slow hub read must not re-cache the old copy.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/auth/service.ts",
+     "C:/Projects/vibes-club-app/server/src/m165.meCache.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "New unit test passes; tsc clean."
+   },
+   {
+    "priority": 10,
+    "change": "Retry a failed launch account read: if the first /api/me fails with a non-401 error, retry once after about 20 s and again on the next return to the foreground (step 1's listener already covers the foreground; add the timed retry).",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/auth/AuthProvider.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Emulator: start the app with the mock server down, bring it up within 20 s, and the account must load with no relaunch."
+   }
+  ],
+  "ownerMessage": "After the store payment, the app checks with our server for only about half a minute. If the activation arrives later, the app never checks again in that session and keeps showing the old non-member state, and the activation WhatsApp message takes the member out of the app, so nothing refreshes when they come back. The fix is an app-only update (OTA, no new store build): re-check whenever the member comes back to the app and keep checking for a while after a purchase. Optionally, you add the RevenueCat secret key on Railway so activation happens on the first check."
+ }
+}

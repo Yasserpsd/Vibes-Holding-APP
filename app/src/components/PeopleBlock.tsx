@@ -42,7 +42,7 @@ export function PeopleBlock({ block }: { block?: { title: string; subtitle: stri
         </ScrollView>
       ) : null}
       {block ? (
-        <AppButton label={block.cta} icon="sparkles-outline" variant="outline" onPress={() => router.push('/people/apply' as Href)} />
+        <AppButton label={block.cta} icon="sparkles-outline" variant="outline" onPress={() => router.push('/people/apply' as Href)} style={styles.apply} />
       ) : null}
     </FadeInView>
   );
@@ -78,7 +78,9 @@ function PersonCard({ person, onPress }: { person: Person; onPress: () => void }
 }
 
 const styles = themedStyles(() => ({
-  strip: { gap: spacing.sm, paddingBottom: spacing.xs },
+  // The strip and the apply button keep their own distance from the section's description line above them.
+  strip: { gap: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  apply: { marginTop: spacing.sm },
   card: {
     width: 150,
     alignItems: 'center',

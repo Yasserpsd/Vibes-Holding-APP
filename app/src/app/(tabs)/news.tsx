@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Image, RefreshControl, Text, View } from 'react-native';
+import { Image, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 
 import { cardImageOf, useAgenda } from '@/api/agenda';
 import { usePeople } from '@/api/people';
@@ -13,18 +13,20 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
+import { fitWords } from '@/components/news/NewsCard';
+import { MarkAllReadButton, postPreview } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
-import { countNew, markSeen, useSeenMarks } from '@/lib/seen';
+import { isPostUnread, useReadPosts, useUnreadPosts } from '@/lib/readPosts';
+import { markSeen, useSeenMarks } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
-import { withoutMediaLines } from '@/components/StructuredText';
 
 // M214 (owner, 2026-11-07: «لازم كل خبر معاه صورة جنبه»): no row without a picture — the club emblem stands in.
 const clubEmblem = require('../../../assets/images/club-emblem.png');
@@ -43,6 +45,8 @@ type InboxItem = {
   time: string | null;
   image: string | null;
   route: Href;
+  /** M242: a management message the member has not opened yet (always false for the other kinds). */
+  unread?: boolean;
 };
 
 const KIND_META: Record<InboxItem['kind'], { icon: IoniconName; label: StringKey }> = {
@@ -60,13 +64,17 @@ export default function InboxScreen() {
   const projects = useProjectsList({ q: '', sort: 'latest' });
   const people = usePeople();
   const seen = useSeenMarks();
+  // M242: which management messages were opened on this device, and the ones still unread (newest first).
+  const read = useReadPosts();
+  const unread = useUnreadPosts();
   // M176 (owner): the advisor's personal daily suggestion, by name — today's leads the tab, the earlier ones stay as rows.
   const { status, me } = useAuth();
   const tips = useQuery({ queryKey: ['companion', 'tips', me?.id ?? 0], queryFn: companionApi.tips, enabled: status === 'signedIn', staleTime: 30 * 60_000 });
   const todayTip = tips.data?.tips[0] ?? null;
   useAdvisorScreen({ type: 'screen', id: 'news', title: t('tabs.inbox') }, true);
 
-  // Entering the center is the acknowledgement: the tab badge resets here.
+  // Entering the center acknowledges the fresh events, projects and profiles (their dots reset here).
+  // M242: a management message is different — it stays unread, and the tab stays lit, until it is opened.
   useFocusEffect(
     useCallback(() => {
       markSeen('inbox');
@@ -76,7 +84,7 @@ export default function InboxScreen() {
   const items = useMemo<InboxItem[]>(() => {
     const out: InboxItem[] = [];
     for (const post of posts.data?.posts ?? []) {
-      out.push({ id: `post:${post.id}`, kind: 'post', title: post.title, subtitle: withoutMediaLines(post.body) || null, time: post.publishedAt, image: post.images[0] ?? null, route: `/posts/${post.id}` as Href });
+      out.push({ id: `post:${post.id}`, kind: 'post', title: post.title, subtitle: postPreview(post.body) || null, time: post.publishedAt, image: post.images[0] ?? null, route: `/posts/${post.id}` as Href, unread: isPostUnread(post, read) });
     }
     for (const event of (agenda.data?.events ?? []).filter((entry) => !entry.past).slice(0, 6)) {
       out.push({ id: `event:${event.id}`, kind: 'event', title: event.title, subtitle: event.blurb || null, time: `${event.date}T${event.time || '09:00'}:00+03:00`, image: cardImageOf(event), route: `/agenda/${event.id}` as Href });
@@ -99,12 +107,11 @@ export default function InboxScreen() {
     const events = out.filter((item) => item.kind === 'event');
     const rest = out.filter((item) => item.kind !== 'event').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
     return [...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
-  }, [posts.data, agenda.data, projects.data, people.data, tips.data]);
+  }, [posts.data, agenda.data, projects.data, people.data, tips.data, read]);
 
   const loading = posts.isLoading && agenda.isLoading;
   // Every source failed and nothing is cached: say so instead of «nothing new yet».
   const failed = items.length === 0 && posts.isError && agenda.isError && projects.isError && people.isError;
-  const unreadPosts = countNew((posts.data?.posts ?? []).map((post) => post.publishedAt), seen.posts);
 
   // The spinner stays until every list has answered (a controlled `refreshing={false}` snapped it shut at once).
   const [refreshing, setRefreshing] = useState(false);
@@ -127,7 +134,9 @@ export default function InboxScreen() {
     >
       {/* M75c (owner): the unread count sits right beside «رسائل الإدارة». */}
       <FadeInView>
-        <SectionHeader title={t('nav.posts')} badge={unreadPosts} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
+        <SectionHeader title={t('nav.posts')} badge={unread.length} cta={t('common.viewAll')} onPress={() => router.push('/posts' as Href)} />
+        {/* M242: the count is now the messages not opened yet; «تعليم الكل كمقروء» shows only while there is one. */}
+        <MarkAllReadButton ids={unread.map((post) => post.id)} />
       </FadeInView>
       {loading ? (
         <SkeletonCards count={5} />
@@ -138,7 +147,8 @@ export default function InboxScreen() {
       ) : (
         items.map((item, index) => (
           <FadeInView key={item.id} delay={entranceDelay(Math.min(index, 8), 60)}>
-            <InboxRow item={item} fresh={Boolean(item.time && Date.parse(item.time) > seen.inbox)} onPress={() => router.push(item.route)} />
+            {/* A management message is lit while it is unread; the other kinds while they are newer than the last visit. */}
+            <InboxRow item={item} fresh={item.kind === 'post' ? Boolean(item.unread) : Boolean(item.time && Date.parse(item.time) > seen.inbox)} onPress={() => router.push(item.route)} />
           </FadeInView>
         ))
       )}
@@ -166,7 +176,7 @@ export default function InboxScreen() {
 function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; onPress: () => void }) {
   const meta = KIND_META[item.kind];
   return (
-    <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={item.title}>
+    <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={item.unread ? `${t('inbox.unread')}: ${item.title}` : item.title}>
       <GlassCard radius={radii.lg} style={styles.row}>
         {/* M84e: the type icon pops into its box as the row enters. */}
         <PopIn delay={100}>
@@ -180,18 +190,25 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
             {fresh ? <View style={styles.freshDot} /> : null}
             {item.time ? <Text style={styles.time}>{formatRelativeTime(item.time)}</Text> : null}
           </View>
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
+          <Text style={[styles.title, item.unread && styles.titleUnread]} numberOfLines={2}>
+            {markParagraphs(item.title)}
           </Text>
-          {item.subtitle ? (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {item.subtitle}
-            </Text>
-          ) : null}
+          {item.subtitle ? <OneLine text={item.subtitle} /> : null}
         </View>
         <InboxThumb uri={item.image} />
       </GlassCard>
     </PressScale>
+  );
+}
+
+/** The row's second line, cut at the end of a word so Android never clips the ellipsis to «..» (see `fitWords`). */
+function OneLine({ text }: { text: string }) {
+  const [width, setWidth] = useState(0);
+  const { fontScale } = useWindowDimensions();
+  return (
+    <Text style={styles.subtitle} numberOfLines={1} onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}>
+      {markParagraphs(fitWords(text, width, typography.caption.fontSize, fontScale))}
+    </Text>
   );
 }
 
@@ -234,6 +251,8 @@ const styles = themedStyles(() => ({
   freshDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.goldNeon, boxShadow: shadows.glowGoldFaint },
   time: { ...typography.caption, fontSize: 11, color: colors.textMuted, marginStart: 'auto' },
   title: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
+  // M242: every title here is already semi-bold, so an unread management message goes one step heavier.
+  titleUnread: { fontFamily: fonts.bold },
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   thumb: { width: 54, height: 54, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
   thumbEmblem: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldSoft },

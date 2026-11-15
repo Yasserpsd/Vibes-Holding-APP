@@ -4,9 +4,10 @@ import { Animated, Image, Text, View } from 'react-native';
 
 import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
+import { ownDirection } from '@/components/Highlight';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
-import { textDir, textStart } from '@/i18n/direction';
+import { textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -15,6 +16,8 @@ const ROTATE_MS = 6000;
 const FADE_OUT_MS = 220;
 const FADE_IN_MS = 320;
 const MAX_SLIDES = 8;
+/** A list this old is asked for again when the home comes back into view (not on every focus). */
+const REFRESH_AFTER_MS = 5 * 60_000;
 
 /** Seeded Fisher–Yates: the same seed always deals the same hand, so renders stay stable. */
 function shuffled<T>(items: T[], seed: number): T[] {
@@ -52,6 +55,13 @@ export function ProjectsBankCarousel() {
       return () => setFocused(false);
     }, []),
   );
+  // Coming back to the home asks for the bank's list again once it is older than five minutes.
+  const { dataUpdatedAt, refetch } = list;
+  useFocusEffect(
+    useCallback(() => {
+      if (dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > REFRESH_AFTER_MS) void refetch({ cancelRefetch: false });
+    }, [dataUpdatedAt, refetch]),
+  );
 
   const page = list.data?.pages[0];
   const slides = useMemo(
@@ -83,7 +93,7 @@ export function ProjectsBankCarousel() {
         <Animated.View style={{ opacity }}>
           <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" resizeMethod="resize" accessibilityLabel={project.title} />
           <View style={styles.overlay}>
-            <Text style={[styles.title, textDir(project.title)]} numberOfLines={1}>
+            <Text style={[styles.title, ownDirection(project.title)]} numberOfLines={1}>
               {project.title}
             </Text>
             <View style={styles.metaRow}>

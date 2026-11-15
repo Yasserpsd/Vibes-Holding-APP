@@ -58,7 +58,7 @@ export function SectorStrip({ sectors, sector, onSector, total }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.titleRow}>
-        <Ionicons name="grid-outline" size={16} color={colors.gold} />
+        <Ionicons name="grid-outline" size={16} color={colors.goldText} />
         <Text style={styles.title}>{t('projects.sectorsTitle')}</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -127,7 +127,7 @@ function Tile({ icon, name, count, selected, dimmed, onPress }: TileProps) {
 const styles = themedStyles(() => ({
   wrap: { gap: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  title: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
+  title: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldText, textAlign: textStart },
   row: { gap: spacing.sm, paddingVertical: spacing.xs },
   tile: {
     width: 96,

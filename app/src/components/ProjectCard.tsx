@@ -7,8 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { PressScale, Sheen } from '@/components/motion';
 import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
-import { textDir } from '@/i18n/direction';
-import { rangeDashes } from '@/components/Highlight';
+import { ownDirection, rangeDashes } from '@/components/Highlight';
 import { formatNumber } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -24,6 +23,12 @@ type Props = {
 
 /** Fixed image strip height; the sheen only needs the measured width. */
 const IMAGE_HEIGHT = 168;
+
+/** The same name once spacing and letter case are set aside. */
+function sameName(a: string, b: string): boolean {
+  const plain = (value: string) => value.trim().replace(/\s+/gu, ' ').toLowerCase();
+  return plain(a) === plain(b);
+}
 
 export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props) {
   // The cover fades in once it arrives instead of popping over the dark surface.
@@ -41,11 +46,14 @@ export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props
   }
   const golden = project.isGolden;
   const showContact = !golden && Boolean(onContact);
+  const hasPhoto = Boolean(project.image) && !imageBroken;
+  // A company named exactly like the project says nothing new under the title.
+  const company = project.companyName && sameName(project.companyName, project.title) ? null : project.companyName;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl}>
       <GlassCard golden={golden} radius={radii.xl} style={golden ? styles.cardGolden : null}>
         <View style={styles.imageBox} onLayout={(event) => setImageWidth(event.nativeEvent.layout.width)}>
-          {project.image && !imageBroken ? (
+          {hasPhoto && project.image ? (
             <Animated.Image
               source={{ uri: project.image }}
               style={[styles.image, { opacity: imageOpacity }]}
@@ -60,8 +68,9 @@ export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props
               <Ionicons name="briefcase-outline" size={40} color={colors.goldDark} />
             </View>
           )}
-          {/* A soft scrim keeps the pills readable over any image. */}
-          <View style={styles.scrim} />
+          {/* The photo's bottom-up scrim (the same in both themes) arrives with the photo; the pills carry their
+              own dark backing, so they read on any picture and on the placeholder alike. */}
+          {hasPhoto ? <Animated.View style={[styles.scrim, { opacity: imageOpacity }]} pointerEvents="none" /> : null}
           {/* V2: golden projects catch the light — a slow metal sheen across the cover. */}
           {golden && imageWidth > 0 ? <Sheen width={imageWidth} height={IMAGE_HEIGHT} /> : null}
           {golden ? (
@@ -78,24 +87,25 @@ export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props
             </View>
           ) : null}
           <View style={styles.viewsPill}>
-            <Ionicons name="eye-outline" size={13} color={colors.goldLightText} />
+            <Ionicons name="eye-outline" size={13} color={colors.onPhotoGold} />
             <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
           </View>
         </View>
         <View style={styles.body}>
-          {/* M177: a title or blurb opening with a Latin brand or a number follows its own letters, not the first character. */}
-          <Text style={[styles.title, textDir(project.title)]} numberOfLines={2}>
+          {/* Every line starts at the card's start edge and reads in the order of its own letters (a Latin
+              brand on an Arabic card sits on the right, written left to right). */}
+          <Text style={[styles.title, ownDirection(project.title)]} numberOfLines={2}>
             {project.title}
           </Text>
-          {/* M116: the stars on EVERY project — empty outlines until the first rating (owner). */}
-          {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
-          {project.companyName ? (
-            <Text style={[styles.company, textDir(project.companyName)]} numberOfLines={1}>
-              {project.companyName}
+          {/* The stars show once the project has a rating; a row of five empty stars said nothing. */}
+          {project.rating && project.rating.stars !== null ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
+          {company ? (
+            <Text style={[styles.company, ownDirection(company)]} numberOfLines={1}>
+              {company}
             </Text>
           ) : null}
           {project.excerpt ? (
-            <Text style={[styles.excerpt, textDir(project.excerpt)]} numberOfLines={2}>
+            <Text style={[styles.excerpt, ownDirection(project.excerpt)]} numberOfLines={2}>
               {rangeDashes(project.excerpt)}
             </Text>
           ) : null}
@@ -135,7 +145,7 @@ export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props
                   style={styles.advisorCta}
                   accessibilityLabel={t('advisor.askAbout', { title: project.title })}
                 >
-                  <Ionicons name="sparkles" size={15} color={colors.gold} />
+                  <Ionicons name="sparkles" size={15} color={colors.goldText} />
                   <Text style={styles.advisorCtaText} numberOfLines={1}>
                     {t('advisor.ask')}
                   </Text>
@@ -172,8 +182,8 @@ const styles = themedStyles(() => ({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 56,
-    backgroundColor: colors.overlay,
+    height: 96,
+    experimental_backgroundImage: gradients.scrim,
   },
   goldenBadge: {
     position: 'absolute',
@@ -203,15 +213,17 @@ const styles = themedStyles(() => ({
     paddingVertical: 3,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.overlay,
+    // Over a photo: the same dark backing and on-photo gold in both themes (the light theme's navy overlay
+    // with dark-gold text was barely readable).
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     borderWidth: 1,
-    borderColor: colors.goldDark,
+    borderColor: colors.borderGold,
   },
   stagePillText: {
     ...typography.caption,
     fontSize: 11,
     lineHeight: 16,
-    color: colors.goldLightText,
+    color: colors.onPhotoGold,
   },
   viewsPill: {
     position: 'absolute',
@@ -223,7 +235,7 @@ const styles = themedStyles(() => ({
     paddingVertical: 3,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   body: {
     padding: spacing.md,
@@ -267,7 +279,7 @@ const styles = themedStyles(() => ({
     ...typography.caption,
     fontSize: 11,
     lineHeight: 16,
-    color: colors.goldLightText,
+    color: colors.onPhotoGold,
   },
   actions: {
     flexDirection: 'row',

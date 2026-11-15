@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Text, View } from 'react-native';
+import { Image, Modal, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { useHq } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
@@ -66,6 +66,7 @@ export function IntroVideoPopup() {
   const router = useRouter();
   const { status, me, confirmed } = useAuth();
   const film = useIntroFilm();
+  const { height: windowHeight } = useWindowDimensions();
   const [phase, setPhase] = useState<'idle' | 'open'>('idle');
   const [decided, setDecided] = useState<string | null>(null);
   const account = status === 'signedIn' && confirmed && me ? String(me.id) : null;
@@ -107,17 +108,21 @@ export function IntroVideoPopup() {
     <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
-          <GlassCard golden radius={radii.xxl} style={styles.popCard}>
-            <PressScale onPress={play} accessibilityRole="button" accessibilityLabel={t('home.intro.play')}>
-              <View style={styles.thumbBox}>
-                <Image source={{ uri: film.poster }} style={styles.thumb} resizeMode="cover" accessibilityLabel={t('home.intro.title')} />
-                <View style={styles.playRing}>
-                  <Ionicons name="play" size={26} color={colors.goldInk} />
+          {/* 2026-11-16: the card stops at 88% of the window; on a short screen or with large system text the poster
+              and the words scroll inside it and the two buttons stay in view (the WorkshopAd treatment). */}
+          <GlassCard golden radius={radii.xxl} style={[styles.popCard, { maxHeight: Math.round(windowHeight * 0.88) }]}>
+            <ScrollView style={styles.popScroll} contentContainerStyle={styles.popScrollContent} bounces={false}>
+              <PressScale onPress={play} accessibilityRole="button" accessibilityLabel={t('home.intro.play')}>
+                <View style={styles.thumbBox}>
+                  <Image source={{ uri: film.poster }} style={styles.thumb} resizeMode="cover" accessibilityLabel={t('home.intro.title')} />
+                  <View style={styles.playRing}>
+                    <Ionicons name="play" size={26} color={colors.goldInk} />
+                  </View>
                 </View>
-              </View>
-            </PressScale>
-            <Text style={styles.title}>{t('home.intro.title')}</Text>
-            <Text style={styles.subtitle}>{t('home.intro.subtitle')}</Text>
+              </PressScale>
+              <Text style={styles.title}>{t('home.intro.title')}</Text>
+              <Text style={styles.subtitle}>{t('home.intro.subtitle')}</Text>
+            </ScrollView>
             <AppButton label={t('home.intro.play')} icon="play" onPress={play} />
             <AppButton label={t('home.intro.later')} variant="outline" onPress={dismiss} />
           </GlassCard>
@@ -131,6 +136,9 @@ const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   popCard: { gap: spacing.sm, padding: spacing.md },
+  // The poster and the words give way first when the card reaches its cap; the buttons under them keep their height.
+  popScroll: { flexGrow: 0 },
+  popScrollContent: { gap: spacing.sm },
   card: { gap: spacing.sm, padding: spacing.md },
   thumbBox: { borderRadius: radii.lg, overflow: 'hidden' },
   thumb: { width: '100%', height: 180, backgroundColor: colors.surfaceElevated },

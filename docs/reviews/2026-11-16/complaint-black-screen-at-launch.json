@@ -1,0 +1,249 @@
+{
+ "key": "black-screen-at-launch",
+ "words": "Some people report problems loading the app itself: a black screen appears with no clear reason.",
+ "diagnosis": {
+  "summary": "Two causes are provable in the code. (1) Android only: a fatal JavaScript error does not close the app. Expo's host delegate hands it to expo-updates, which ignores it once 10 s have passed since the first frame, while React Native has already destroyed the React host. The member is left on the app's black window until the app is swiped away, and the app has no error boundary or global error handler. (2) Both platforms: the launch update check does check, fetch, then reloadAsync in the middle of the first screen. A reload shows expo-updates' default white spinner page, then a black gap, because the root layout returns null and the splash is never shown again after its first hide. Today's pass capped the reload at 30 s and added the 12 s watchdog, but added no boundary and nothing visible while not ready.",
+  "causes": [
+   {
+    "cause": "Android: a fatal JS error leaves a dead black window instead of a crash. This covers any uncaught render error in any screen or root cover, and any synchronous throw in a timer, listener or onPress. More than 10 s after the first frame it is swallowed; inside that window the screen is black for up to 5 s and then the app closes.",
+    "evidence": "All node_modules paths are under C:\\Projects\\vibes-club-app\\app\\node_modules.\n1. An uncaught render error is fatal: react-native/src/private/renderer/errorhandling/ErrorHandlers.js:59-67, then Libraries/Core/ExceptionsManager.js:151-173.\n2. Native side: ReactAndroid/.../modules/core/ExceptionsManagerModule.kt:46-54 throws JavascriptException. The queue handler at runtime/ReactHostImpl.kt:1057 passes it to handleHostException (:786-796), which calls reactHostDelegate.handleInstanceException(e) and then destroy().\n3. destroy (:1469-1560) stops the surfaces, clears attachedSurfaces and sets currentActivity = null. Nothing finishes the activity or rethrows.\n4. Expo's delegate, expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt:86-93, throws only when there are no host handlers. expo-updates always registers one (expo-updates/android/.../UpdatesPackage.kt:27-58).\n5. That handler ends in errorrecovery/ErrorRecovery.kt:49-53: the exception is handled only while shouldHandleReactInstanceException is true. It is switched off 10 s after CONTENT_APPEARED (:65-77, :97-99). After that the exception is dropped.\n6. Inside the window, after content appeared, ErrorRecoveryHandler.kt:76-82,130-150,177-184 waits up to 5 s for a remote update and then crashes.\n7. No recovery on return: ReactHostImpl.onHostResume (:251-259) does not restart the instance, and onBackPressed (:356-358) returns false with no instance. Reopening from the launcher shows the same black window while Android keeps the process.\n8. The app has no protection: a search of app/src for ErrorBoundary, componentDidCatch, getDerivedStateFromError and setGlobalHandler finds nothing. C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx renders providers, Stack and covers with no boundary (members' copy 128-242, same today).\n9. Triggers known in the members' bundle, from today's area reports: STATE[ticket.state] in app/agenda/ticket/[id].tsx:52 and app/hq/pass/[id].tsx:47, and the cache snapshot timer in lib/queryCache.ts. I found no throw on the launch path itself.\n10. Consistent with this: the M240 brief entry lists only two Play vitals crash clusters for 1.3.2, one user each. A swallowed fatal never reaches vitals.",
+    "platforms": "Android, every runtime from 1.2.0 to 1.3.3 (app/package.json has had expo-updates ~57.0.22 and RN 0.86.3 since the 1.2.0 commit 0205300). On iOS a fatal JS error closes the app instead (RCTExceptionsManager.mm reportFatal; expo-updates ErrorRecovery.swift:335-347 restores the default fatal handler after its window). That iOS path was read only.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's pass removed some single throw sites (ticket and pass state lookup, the queryCache flush try/catch at lib/queryCache.ts:66-78, the notification handler wrap), but added no error boundary and no global handler."
+   },
+   {
+    "cause": "Both platforms: the launch update check reloads the app in the middle of the first screen. The reload shows a white page with a blue spinner, then a black gap, then the black SplashFlash cover. Whatever the member typed or opened is lost. It happens on the first open after every published update and on the very first launch after install, because the store binary's embedded bundle is older than the latest update.",
+    "evidence": "1. The reload: members' copy `git show 97705af:app/src/app/_layout.tsx` lines 108-117 runs checkForUpdateAsync, fetchUpdateAsync, reloadAsync with no time limit. Today it is C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx:137-156, with the 30 s limit at :62 and :151.\n2. reloadAsync() with no options calls ExpoUpdates.reload(null) (expo-updates/src/Updates.ts:211-228).\n3. Android reload screen: UpdatesModule.kt:64-67 and procedures/RelaunchProcedure.kt:73-78 show the ReloadScreenManager before reactHost.restart. Its default is white #ffffff with a #007aff spinner (reloadscreen/ReloadScreenConfiguration.kt:44-58). It is removed at RUN_JS_BUNDLE_END (ReloadScreenManager.kt:19-27).\n4. iOS reload screen: UpdatesModule.swift:38-45, Procedures/RelaunchProcedure.swift:75-78, default white and systemBlue (ReloadScreen/ReloadScreenConfiguration.swift:5-6,45), hidden on RCTContentDidAppearNotification (ReloadScreenManager.swift:11).\n5. The native splash never returns. Android: expo-splash-screen/.../SplashScreenManager.kt:17,64-71,100-102, keepSplashScreenOnScreen is only ever set to false and the pre-draw listener removes itself. iOS: SplashScreenManager.swift:30-52 removes the loading view, and didReceiveReloadCommand (:82-84) is never registered (no RCTRegisterReloadCommandListener in the package).\n6. The gap: `if (!ready) return null` (members' copy 124-126, today :187-189) over backgroundColor BRAND_BLACK (app/app.config.ts:55 in the members' copy). It lasts for the language, the wording overrides (up to 81 secure-store reads, lib/deviceStore.ts:155-160), the theme and the cache file.\n7. Then two opaque covers: C:\\Projects\\vibes-club-app\\app\\src\\components\\SplashFlash.tsx:34 (#000000 for 700 ms plus a 350 ms fade, :10-11) and C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx:83-88.\n8. The same sequence follows every restart(): C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts:63-74, used by the direction sync (:82-94), the language switch (:97-104) and the theme switch (theme/theme.ts:31-35).",
+    "platforms": "iOS and Android, runtimes 1.2.0 to 1.3.3. The black gap is longer on Android (slower bundle load and Keystore reads); on iPhone it is a white flash and a short black one.",
+    "confidence": "proven-in-code",
+    "fixedToday": "Partly. A download that ends later than 30 s after launch is no longer applied by force (_layout.tsx:62,151). Inside 30 s the reload still interrupts the first screen, and the white reload page and the black gap are unchanged."
+   },
+   {
+    "cause": "Bare black covers right after the native splash, on every start and every reload. SplashFlash is opaque black until its 1080x1920 JPG is decoded. The GuestGate cover is bare black until the saved session and the guest flag are read. Since today AppLockGate also starts as a bare black cover until the lock setting is read.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\SplashFlash.tsx:26-34: the cover has backgroundColor #000000, and the image is assets/images/splash-flash.jpg (1080x1920, 177 KB, decoded after mount). C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx:83-84: covered = hasSession === null || !ready || (locked && !atGate) draws an empty View. C:\\Projects\\vibes-club-app\\app\\src\\components\\AppLockGate.tsx:14,39,75 (today): locked === null draws an empty cover for up to 4 s; the members' copy started open (line 20 of the 97705af file). The stack order is at _layout.tsx:273,295-301.",
+    "platforms": "iOS and Android; more visible on slow Android phones and for members on the light theme (black before a white app).",
+    "confidence": "likely",
+    "fixedToday": "No. Today's pass added one more bare cover (AppLockGate, bounded to 4 s)."
+   },
+   {
+    "cause": "A stalled secure-store or file read holds a cover with nothing on it. In the members' bundle the root `ready` had no limit, so it meant the emblem splash for ever at a cold start and pure black for ever after a reload. The GuestGate cover waits for loadToken() and loadSetting() with no limit at all.",
+    "evidence": "Members' copy of _layout.tsx:119-126: ready = fonts && i18nReady && cacheReady with no timeout. Today the watchdog is at :57,176-182. C:\\Projects\\vibes-club-app\\app\\src\\auth\\AuthProvider.tsx: hasSession stays null until Promise.all([loadToken(), loadSavedAccount()]) answers (members' copy :65-67). GuestGate.tsx:35-39,83 has no timer. Every read catches errors (lib/deviceStore.ts:96-109, lib/queryCache.ts:38-52), so only a read that never answers can do this. Nothing in the code shows that such a stall happens.",
+    "platforms": "iOS and Android",
+    "confidence": "possible",
+    "fixedToday": "Partly. The root layout opens after 12 s (_layout.tsx:57,176-182). The GuestGate cover is still unbounded."
+   },
+   {
+    "cause": "Android 12 and 12L only: a cold start from a notification, a link or the Play «Open» button gets the system splash without the icon. That is a plain black screen for the whole launch.",
+    "evidence": "expo-splash-screen's plugin sets android:windowSplashScreenBehavior=icon_preferred (seen in the local prebuild, app/android/app/src/main/res/values/styles.xml:13). That attribute exists only from API 33. On API 31-32 the system uses the solid-colour style for launches that do not come from the launcher. This rests on Android's documented behaviour, not on a device test. The club sends pushes daily, so affected phones would see it often.",
+    "platforms": "Android 12 / 12L (API 31-32) only",
+    "confidence": "possible",
+    "fixedToday": "No, and it cannot be fixed on those versions. A shorter launch only shortens it."
+   },
+   {
+    "cause": "Blank dark screens inside the app, and a short black remount when Android re-creates the activity. The blank screens were a non-PDF or half-downloaded deck, a stale meetup link, an empty meetups list, and a failed web page or checkout load. Android re-creates the activity when the system font size or display size changes; the root layout mounts again with no splash and the member is back on the home.",
+    "evidence": "Blank screens: listed in docs/reviews/2026-11-15/rev-projects.md:27,30, rev-community.md:22-23, rev-home.md:48 and rev-membership.md:26. `git diff 97705af --stat` shows deck.tsx, meetup/[key].tsx, meetups.tsx, webpage.tsx and checkout/[id].tsx changed today. Activity re-creation: the local prebuild's AndroidManifest.xml:38 has no fontScale or density in configChanges, and SplashScreenManager.keepSplashScreenOnScreen is already false in a live process.",
+    "platforms": "Both for the blank screens; Android for the activity re-creation",
+    "confidence": "likely",
+    "fixedToday": "The blank screens: yes, in the area passes (taken from the reports and the diff stat, not re-tested by me). The activity re-creation: no (rare)."
+   }
+  ],
+  "data": "ROUTES TO A BLACK OR EMPTY SCREEN (members' bundle = 97705af)\n\n| # | Route | Platform | What the member sees | How likely | Today's pass |\n|---|---|---|---|---|---|\n| 1 | Fatal JS error more than 10 s after the first frame | Android | Black window until the app is swiped away; reopening from the launcher shows black again | Every uncaught JS exception ends here; no telemetry to count them | Not fixed |\n| 2 | Fatal JS error within 10 s of the first frame | Android | Black for up to 5 s, then the app closes | Same class, at launch | Not fixed |\n| 3 | Fatal JS error | iOS | The app closes (a crash, not a black screen) | n/a | n/a |\n| 4 | Update auto-reload at launch | Both | White spinner page, black gap, gold artwork, home again; typed text lost | Every member, first open after every publish and first launch after install | Partly (30 s cap) |\n| 5 | Language switch, theme switch, direction restart | Both | Same white then black sequence | On the member's own action | Unchanged |\n| 6 | Normal cold start | Both | Emblem splash, black cover until the artwork decodes, artwork about 1 s, content | Every launch, under a second | Unchanged; AppLockGate bare cover added (up to 4 s) |\n| 7 | Cold start offline | Both | No black route found: fonts, language, theme and cache are local; the saved account opens the home; API calls time out at 15 s (api/client.ts:33,81-82) | n/a | n/a |\n| 8 | Stalled secure-store or file read | Both | Members' bundle: splash for ever, or pure black for ever after a reload | Unproven | Root bounded to 12 s; GuestGate cover not |\n| 9 | Cold start from a notification or link | Android 12 / 12L | Black system splash with no icon until ready | Small share of phones, daily pushes | Not fixable there |\n| 10 | Activity re-created (font or display size change, «Don't keep activities») | Android | Short black, back on the home | Rare | Unchanged |\n| 11 | Blank dark screens inside the app (deck, meetup, meetups, web page, checkout) | Both | Empty dark page | Depends on content | Fixed in the area passes |\n| 12 | Corrupt or shape-changed cache snapshot | Both | A corrupt file is safe (lib/queryCache.ts:41-51 catches). A valid file from an older bundle is hydrated with no bundle stamp (:17,38-48); a render that throws on it becomes route 1 or 2 on every launch for up to 24 h | No concrete shape break found | Unchanged |\n\nFor route 9, the notification target is pushed only once the navigator is ready (PushRegistrar.tsx:42-55).\n\nLAUNCH WALK, MEMBERS' BUNDLE (`git show 97705af:app/src/app/_layout.tsx`)\n- :46-47 installNotificationHandler(), SplashScreen.preventAutoHideAsync() (unhandled promise).\n- :69-74 useFonts.\n- :78-87 initI18n, then syncDirection, in parallel with loadTheme; then i18nReady.\n- :92-101 restoreQueryCache, then cacheReady.\n- :108-117 update check, fetch, reloadAsync with no limit.\n- :119-126 ready; hideAsync; `return null` while not ready.\n- :128-242 the tree with no boundary. Cover order: GuestGate (:210), UpdateGate (:232), AppLockGate (:234), SplashFlash (:236), RetiredBuildGate (:238).\n\nTODAY (working tree = HEAD for app/)\n- _layout.tsx:49 the preventAutoHideAsync rejection is caught.\n- :57 and :176-182 the 12 s watchdog.\n- :62 and :151 the 30 s reload limit.\n- :158-172 a foreground re-check after 3 hours that never reloads.\n- :184 the hideAsync rejection is caught.\n- :187-189 still `return null`.\n\nCONFIG (app/app.config.ts)\n- updates.fallbackToCacheTimeout 0: launches the cached bundle at once and downloads behind.\n- runtimeVersion: policy appVersion.\n- backgroundColor: BRAND_BLACK; userInterfaceStyle: dark.\n- Splash: emblem, 160 wide, on black.\n- No checkAutomatically override, so the native side also downloads on load.",
+  "fixPlan": [
+   {
+    "change": "Add error boundaries with a recovery screen. In app/src/app/_layout.tsx export `ErrorBoundary` (expo-router wraps the root layout in `<Try catch={ErrorBoundary}>`, expo-router/build/useScreens.js:156-165) and `export const unstable_settings = { screenErrorBoundary: ScreenError }` (useScreens.js:146,237,277). ScreenError: one broken screen shows a short message with «رجوع» and «الرئيسية» while the rest of the app keeps running. Root ErrorBoundary: emblem, one sentence, and a button «إعادة تشغيل التطبيق» that deletes query-cache.v1.json and then reloads (fallback: the boundary's `retry`). The root screen must be self-contained: no provider hooks, fixed brand colours, an image and plain Text only. A caught error is non-fatal, so on Android the React host is no longer destroyed.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\CrashScreen.tsx (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\queryCache.ts (export a dropQueryCacheFile helper)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\ar.json",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\en.json"
+    ],
+    "delivery": "ota",
+    "risk": "`unstable_settings.screenErrorBoundary` is an unstable expo-router API. It is in the vendored 57.0.21 JS, which ships inside the bundle, so it works on every runtime. It was read, not run: it needs one emulator pass with a deliberate throw in a screen and in a root cover. A boundary also hides errors from the stores, so log them (console now, a server beacon later)."
+   },
+   {
+    "change": "Add a global handler for errors outside render (timers, listeners, onPress). At module scope of the root layout, in release builds only, call `ErrorUtils.setGlobalHandler`. It must never forward a fatal error to native on Android. It raises the same recovery cover through a small module-level emitter that the root layout listens to. Keep the default handler in development (red box).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\crashGuard.ts (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "The app keeps running after an error in a handler, so state can be inconsistent; the recovery cover asks for a restart. On iOS this replaces a crash with the cover, so App Store crash logs will no longer show these errors."
+   },
+   {
+    "change": "Stop the reload from interrupting the first screen, and make it look like the splash. (a) One helper `reloadApp()` used by restart() (i18n/direction.ts:63-74), the launch check (_layout.tsx:151) and the banner button (UpdateGate.tsx:103). It calls `Updates.reloadAsync({ reloadScreenOptions: { backgroundColor: <the BRAND_BLACK value>, image: require('club-emblem.png'), imageResizeMode: 'contain', fade: true, spinner: { enabled: false } } })` and falls back to a plain reloadAsync() if that rejects. (b) Replace the 30 s window with «under the splash only»: when checkForUpdateAsync says an update exists, hold `ready` for at most about 2.5 s for the fetch and reload while the native splash is still up. Once the first screen has been shown, never reload by force: the update stays pending, the existing «restart» banner offers it and the next cold start applies it.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\UpdateGate.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "The first open after a publish can be up to about 2.5 s longer, only when an update exists. On a slow network the update arrives one launch later (the banner remains). This softens the owner's M182d wish that an update applies on the first open, so he should know. Update flows cannot be tried in a debug build; they need one pass on a store or preview build."
+   },
+   {
+    "change": "Never show a bare black screen. Replace `return null` (_layout.tsx:187-189) with a static launch cover: brand black with the emblem at the native splash size (160), needing no fonts or strings. Draw the same emblem on the GuestGate cover (GuestGate.tsx:84) and on AppLockGate's `null` state (AppLockGate.tsx:75). SplashFlash: show the cover only once the artwork has loaded (onLoad, or preload it behind the splash); otherwise skip the flash.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AppLockGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\SplashFlash.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Members on the light theme still see a black cover before a white app (it matches the native splash). A device pass should confirm the emblem does not jump against the native splash."
+   },
+   {
+    "change": "Bound the GuestGate cover. If `hasSession === null` or the guest flag is still unread after about 4 s, uncover. The pending reads keep running and correct the state when they answer.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "On a stalled read, a visitor can see the home for a moment before being sent to the welcome screen."
+   },
+   {
+    "change": "Stamp the persisted cache with the bundle that wrote it. Add `bundle` (Updates.updateId, or the app version for the embedded bundle) to the Snapshot type and drop the file when it differs at restore, next to the language check (lib/queryCache.ts:44-46 in the members' numbering). A new bundle then never renders an older bundle's data shapes.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\queryCache.ts"
+    ],
+    "delivery": "ota",
+    "risk": "The first launch after each update shows skeletons once instead of the instant paint."
+   },
+   {
+    "change": "Shorten the not-ready time. (a) syncDirection deletes the attempt key only when it exists; today every launch does a secure-store delete and a full mirror-file rewrite behind the splash (i18n/direction.ts:85-88, lib/deviceStore.ts:83-91,111-124). (b) Keep the wording overrides in one plain JSON file instead of up to 81 secure-store reads (i18n/index.ts:138, lib/deviceStore.ts:155-160). They are not secret.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\index.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\deviceStore.ts"
+    ],
+    "delivery": "ota",
+    "risk": "Saved overrides must migrate: the first launch falls back to the bundled text until syncStrings downloads them again. The gain was not measured."
+   },
+   {
+    "change": "Android safety net in the 1.3.4 binary. A small local Expo module (or config plugin) registers a ReactNativeHostHandler whose onReactInstanceException, in release, ends the process a few seconds later if no new React instance has been created in between. A fatal error that slips past the JS guards then becomes a real crash (clean restart, visible in Play vitals) instead of a dead black window.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\modules\\crash-guard (new local module)",
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "risk": "New native code in a build that also carries R8 for the first time. It must wait longer than expo-updates' 5 s recovery wait and must not fire when expo-updates has relaunched an older update. It needs internal testing. With the two JS guards live it is a safety net only, so including it in 1.3.4 is the owner's call."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on a device. The Android dead-black-window was read in the vendored native code and not reproduced. To reproduce: a release or preview build on the emulator, throw inside an onPress 15 s after launch, and expect a black window with no crash dialog.",
+   "Nothing was verified on an iPhone. That a fatal JS error closes the app there was read only (RCTExceptionsManager.mm, expo-updates ErrorRecovery.swift). Whether a native Modal that is open during a reload leaves anything on screen on iOS is unknown.",
+   "Which JS errors members actually hit is unknown. There is no JS error telemetry, and Play vitals cannot see swallowed fatals. I found no throw on the launch path of the 97705af bundle; the ticket and pass state lookup and the cache-shape risk are candidates only.",
+   "The length of the white reload page and of the black gap was not measured. The number of secure-store reads for the wording overrides is server-driven, and I made no request to production.",
+   "The Android 12 / 12L solid-colour splash for launches from a notification rests on documented Android behaviour, not a device test. The icon_preferred line was seen in the local, git-ignored prebuild and is assumed to be the same in the store builds.",
+   "Whether a stalled secure-store or file read ever happens on members' phones: no evidence either way.",
+   "The timing of the reloadAsync promise on the direction restart (whether the splash is hidden just before the reload) was not observed.",
+   "The store binaries are assumed to carry the native code now in node_modules: app/package.json has not changed since 2026-10-30 and the 1.2.0 commit already had expo-updates ~57.0.22. The lockfile was not compared.",
+   "expo-router's `ErrorBoundary` export on the root layout and `unstable_settings.screenErrorBoundary` were read in build/useScreens.js only, not run.",
+   "Today's fixes for the blank screens (deck, meetup, meetups, web page, checkout) are taken from the area reports and the diff stat; I did not re-read them line by line."
+  ]
+ },
+ "challenge": {
+  "verdict": "confirmed",
+  "corrections": [
+   "The causes are ranked in the wrong order. Cause 2 (the update reload at launch) is the common one, and it is the one that matches 'problems loading the app itself'. It hits every member on the first open after each production OTA, and every new install on its first launch: the store binaries carry an older embedded bundle, and the native ON_LOAD download plus the JS check in git show 97705af:app/src/app/_layout.tsx:108-117 both fetch, so `fetched.isNew` is true. M240 alone published to five runtimes on 2026-11-14. Cause 1 (the dead window after a fatal error) needs a JS throw, and none was found on the launch path. It should be the second priority.",
+   "Cause 3 is overstated. In the members' copy (97705af _layout.tsx:210,234,236) and today, SplashFlash is mounted after GuestGate and AppLockGate. It is opaque (#000 plus the artwork) for 700 ms and then fades for 350 ms (SplashFlash.tsx:10-11,34). The bare GuestGate cover (GuestGate.tsx:83-88) and today's AppLockGate null cover (AppLockGate.tsx:24,74) are hidden under it. They show only when the secure-store read takes longer than about 1 s. The only bare black that SplashFlash itself shows is the frame or two before the bundled JPG decodes, which is negligible. These covers matter only after a reload or on a stalled read, not at a normal cold start.",
+   "The 'up to 5 s black, then the app closes' window is narrower than stated. It applies only to the first 10 s after the first CONTENT_APPEARED of the process. ErrorRecovery.startMonitoring runs once per process: ExpoReactHostFactory.kt:138-141 calls onDidCreateDevSupportManager only when the ReactHost is created, then StartupProcedure.kt:222-228. The content-appeared listener is removed after the first time (ErrorRecovery.kt:65-77). After any JS reload (the launch update, the language switch, the theme switch) the window is not re-armed. A fatal error in the reloaded bundle, even on its first render, is therefore dropped and leaves the dead black window at once.",
+   "Fix plan item 2 needs a caveat. `ErrorUtils.setGlobalHandler` does not catch uncaught render errors. React's onUncaughtError (react-native/src/private/renderer/errorhandling/ErrorHandlers.js:59-67) calls ExceptionsManager.handleException(error, true), which goes to global.RN$handleException (defined natively at ReactCommon/react/runtime/ReactInstance.cpp:504) and becomes fatal without passing through ErrorUtils. The global handler only covers errors that native code reports through ErrorUtils (timers, listeners, onPress), via JsErrorHandler.cpp:237-241 (flag useAlwaysAvailableJSErrorHandling = false by default, ReactNativeFeatureFlagsDefaults.kt:182). So the root ErrorBoundary is mandatory. The global handler is a complement, not a substitute.",
+   "Fix plan item 1 hides a trade-off. An error caught by a boundary is reported as soft: ErrorHandlers.onCaughtError, then ExceptionsManagerModule.kt reportSoftException, which only logs. expo-updates then never sees it. Today a broken OTA that throws on its first render at a cold start is marked failed and rolled back to the previous update (ErrorRecoveryHandler.kt maybeStartPipeline, markFailedLaunchForLaunchedUpdate, LAUNCH_CACHED_UPDATE). With a root boundary, every member gets the recovery screen until a fixed OTA is published. This is acceptable only with an error beacon and a smoke test of every production OTA. The owner must be told.",
+   "The colleague left one point unverified, and it is now verified: the lockfile pins expo-updates 57.0.22 and expo-router 57.0.21 both in 0205300 (the 1.2.0 commit) and in 97705af. reloadScreenOptions, the expo-router root `ErrorBoundary` export and `unstable_settings.screenErrorBoundary` (build/useScreens.js:141-175,237,277) therefore exist in every runtime that receives OTAs (1.2.0 to 1.3.3).",
+   "Fix plan item 3(b) ('reload only under the splash, at most about 2.5 s') is presented as the fix. It is really an owner decision that reverses M182d. It is also not needed to remove the black. The reload screen styled as the splash, together with a static launch cover in place of `return null`, already makes a mid-session reload look like a short splash. The policy change should come after that, as an option for the owner.",
+   "The verification steps assume a preview build can exercise these flows. It cannot. Every preview-id binary shows only RetiredBuildGate (RetiredBuildGate.tsx:21, M240 note in the brief). Update and reload checks need a local release build made with APP_ENV=production against the local mock server, or the internal Play track."
+  ],
+  "missedCauses": [
+   "Reload, then a dead window. Because expo-updates arms its error window once per process (ExpoReactHostFactory.kt:138-141, ErrorRecovery.kt:65-77,97-99), a fatal error after the launch-update reload is swallowed as soon as more than 10 s have passed since the process's first frame. The plausible trigger is the cache: the reloaded bundle hydrates the previous bundle's query cache, which carries no bundle stamp (git show 97705af:app/src/lib/queryCache.ts:26,38-48). A render that throws on an old data shape on Android gives a permanent black window right after 'the update', instead of a rollback or a crash. iOS was not verified.",
+   "Today's 12 s watchdog (C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx:176-182) opens the app before i18n is settled when the reads are slow. syncDirection (i18n/direction.ts:82-94) can then still call restart() after the first screen is visible, which is a reload in the middle of the screen with the white then black sequence. This is rare, needs reads longer than 12 s, and only follows a language change.",
+   "No telemetry exists. Swallowed fatals never reach Play vitals, and boundary-caught errors would not either. Without a small beacon (POST to the server with message, route, bundle id and platform), nobody can tell which of these routes members actually hit, or notice a broken OTA once rollback no longer protects against it."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Make every reload and every not-ready frame look like the splash. (a) New helper `reloadApp()` in app/src/lib/reloadApp.ts: if requireOptionalNativeModule('ExpoUpdates') is present, call `Updates.reloadAsync({ reloadScreenOptions: { backgroundColor: '#0B0B0B', image: require('../../assets/images/club-emblem.png'), imageResizeMode: 'contain', fade: true, spinner: { enabled: false } } })`. If that rejects, call `Updates.reloadAsync()`. If that also rejects, use DevSettings.reload() in __DEV__ only. Use it in i18n/direction.ts restart() (:63-74), in _layout.tsx in the launch check (:151), and in UpdateGate PendingOta (:103). (b) In _layout.tsx replace `if (!ready) return null` (:187-189) with a self-contained `<LaunchCover/>`: a View with flex:1 and backgroundColor '#0B0B0B', and the emblem centred at the native splash size (160 wide). It uses no fonts, no t(), no theme tokens. (c) Render the same LaunchCover for the GuestGate cover (GuestGate.tsx:84) and for AppLockGate's `locked === null` (AppLockGate.tsx:74), in place of the bare View.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\reloadApp.ts (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\LaunchCover.tsx (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\UpdateGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AppLockGate.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and eslint. Android emulator: a local release build made with APP_ENV=production against the local mock server (a preview id shows only RetiredBuildGate). Switch language in «حسابي», which takes the same reloadAsync path. Expected: black with the emblem, no white page, no spinner, no bare black gap, and the emblem does not jump between the reload screen and LaunchCover. iPhone: only by TestFlight or a production OTA; it cannot be verified here."
+   },
+   {
+    "priority": 2,
+    "change": "Root error boundary. In app/src/app/_layout.tsx add `export function ErrorBoundary({ error, retry }: ErrorBoundaryProps)` (expo-router wraps the root layout in Try). It renders `<CrashScreen/>`: brand black, the emblem, one fixed bilingual sentence chosen from a module-level lang read in try/catch (Arabic default), and one button «إعادة تشغيل التطبيق» / «Restart the app». The button deletes query-cache.v1.json (export `dropQueryCacheFile()` from lib/queryCache.ts), then calls reloadApp(); if that rejects, it calls retry(). No provider hooks, no themed styles, no AppButton. Plain Pressable, Text and Image only, so the fallback itself cannot throw. Add a fire-and-forget beacon: a raw fetch with no apiRequest dependency, try/catch, to POST /api/app/client-error with message, first stack lines, pathname, Updates.updateId and platform. The server route is new, rate-limited, stores the last N rows and needs no auth. Optional later step: `unstable_settings = { screenErrorBoundary }` in the same layout, so that one broken screen shows «رجوع» instead of the whole-app screen.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\CrashScreen.tsx (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\queryCache.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src (new client-error route)"
+    ],
+    "delivery": "ota",
+    "howToVerify": "In the production-env local release build, add a temporary throw inside a screen's render behind a debug-only flag and open the screen more than 15 s after launch. Expected: CrashScreen, not a black window, and the button restarts into a working app. Remove the flag before the OTA. Server: a unit test for the route. Tell the owner that broken-OTA auto-rollback is lost, so every production OTA gets a smoke test on the internal track first."
+   },
+   {
+    "priority": 3,
+    "change": "Global handler for errors outside render, in new lib/crashGuard.ts, imported first in _layout.tsx. When !__DEV__: `const previous = ErrorUtils.getGlobalHandler(); ErrorUtils.setGlobalHandler((error, isFatal) => { if (!isFatal) return previous(error, false); sendBeacon(error); })`. A fatal error is never forwarded to native, so on Android the React host is not destroyed and the app keeps running. In __DEV__ keep the default handler. Do not raise a cover for these errors: a throw in a timer or onPress usually breaks one action, not the app. This does not cover render errors; step 2 does.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\crashGuard.ts (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Local production-env release build on the emulator: a debug-only button that throws inside setTimeout more than 15 s after launch. Expected: the app stays usable, `adb logcat -s ReactNativeJS` shows the beacon, and there is no black window. Today the same throw leaves a dead black window, which is the reproduction of cause 1. iPhone not verifiable here."
+   },
+   {
+    "priority": 4,
+    "change": "Stamp the persisted query cache with the bundle. Add `bundle: string` to Snapshot in lib/queryCache.ts. Its value is `Updates.updateId ?? 'embedded-' + appVersion`, read behind requireOptionalNativeModule('ExpoUpdates') in a try. Write it in flush. In restoreQueryCache, return false when `parsed.bundle !== currentBundle()`, next to the language check. An OTA or a reload then never renders an older bundle's data shapes.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\queryCache.ts"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Unit-test the restore decision in Node with a fake file of a different bundle; it must be dropped. On the emulator, the first launch after a reload shows skeletons once, then the instant paint again on the next launch."
+   },
+   {
+    "priority": 5,
+    "change": "Bound the GuestGate cover. In GuestGate.tsx add a 4 s timer at mount that sets a `timedOut` flag. `covered = !timedOut && (hasSession === null || !ready) || (locked && !atGate)`. The pending reads keep running and correct the state when they answer.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\auth\\GuestGate.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "tsc and eslint. Emulator: temporarily delay loadToken by 10 s in a debug build. The cover lifts at 4 s, and a visitor is then sent to /welcome once the read answers."
+   },
+   {
+    "priority": 6,
+    "change": "Owner decision: when an OTA found at launch is applied. Option A (keeps M182d) reloads as today; after step 1 it looks like the splash, but the member's place and any typed text are still lost. Option B: reload only if the download finished before `ready` (still under the native splash); otherwise leave the update pending. The restart banner offers it, and the next cold start runs it anyway, because the native ON_LOAD download plus fallbackToCacheTimeout 0 launch the newest downloaded update. Implement B by recording `const shownAt` when ready turns true and replacing the 30 s window at _layout.tsx:151 with `!shownAt`.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\_layout.tsx"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Only with a production-env build and a real published update, on the internal track or one member's phone: publish, open, and observe a splash-only reload (B) or the styled mid-screen reload (A)."
+   },
+   {
+    "priority": 7,
+    "change": "Shorten the not-ready time. (a) syncDirection: delete ATTEMPT_KEY only if loadSetting(ATTEMPT_KEY) is not null; today every launch does a secure-store delete and a mirror rewrite (direction.ts:85-88). (b) Move the wording overrides from up to 81 secure-store parts into one plain JSON file through expo-file-system/legacy (they are not secret). Keep reading the old keys once as a fallback, then delete them.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\direction.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\index.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\deviceStore.ts"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Measure the splash time with timestamps logged to logcat, before and after, on the emulator, in a cold start with saved overrides."
+   },
+   {
+    "priority": 8,
+    "change": "Optional Android safety net in binary 1.3.4: a local Expo module that registers a ReactNativeHostHandler. Its onReactInstanceException, in release only, schedules Process.killProcess after 8 s unless onDidCreateReactInstance fired in between. A fatal error that slips past steps 2 and 3 then becomes a clean crash and restart, visible in Play vitals, instead of a dead black window.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\modules\\crash-guard (new)",
+     "C:\\Projects\\vibes-club-app\\app\\app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "howToVerify": "Internal Play track build: force a fatal 15 s after launch. Expected: the process dies and the next tap starts clean. Also confirm it does not fire when expo-updates relaunches within its own window."
+   }
+  ],
+  "ownerMessage": "Members see a black screen mainly because the app reloads itself the first time it is opened after each update we publish: it flashes a white page, then black, then the gold image. On Android, a rare error in the app can also leave a black screen that stays until the app is closed from the recent-apps list. The fix is one OTA update: every reload will show the club emblem on black like the opening screen, any error will show a «إعادة تشغيل التطبيق» (restart the app) screen instead of black, and each error will be reported to us so we can see it."
+ }
+}

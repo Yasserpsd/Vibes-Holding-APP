@@ -1,14 +1,18 @@
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
+import { LaunchCover } from '@/components/LaunchCover';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
-import { themedStyles } from '@/theme/styles';
-import { colors } from '@/theme/tokens';
 
 /** The «المتابعة كضيف» tap is recorded on the device: a returning visitor walks straight in. */
 const GUEST_START_KEY = 'investorsclub.guestStart';
+/**
+ * How long the opening cover waits for the saved session and the guest choice. A read that never answers (a stalled
+ * secure store) must not hold a cover with nothing behind it for ever: after this the app shows, and the reads still
+ * correct the state when they answer (a visitor is then sent to the gate).
+ */
+const COVER_TIMEOUT_MS = 4_000;
 
 type GuestGateValue = {
   /** The app is closed to this visitor: only the gate and the account screens open. */
@@ -80,10 +84,13 @@ export function GuestGate() {
     router.replace('/welcome');
   }, [navigationReady, locked, atGate, router]);
 
-  const covered = hasSession === null || !ready || (locked && !atGate);
-  return covered ? <View style={styles.cover} /> : null;
-}
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setTimedOut(true), COVER_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
-const styles = themedStyles(() => ({
-  cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.black },
-}));
+  const covered = (!timedOut && (hasSession === null || !ready)) || (locked && !atGate);
+  // 2026-11-16: the cover is the opening screen (brand black and the emblem), never a bare black view.
+  return covered ? <LaunchCover overlay /> : null;
+}

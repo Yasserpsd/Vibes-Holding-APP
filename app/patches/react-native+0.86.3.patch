@@ -1,0 +1,37 @@
+diff --git a/node_modules/react-native/Libraries/Components/TextInput/TextInput.js b/node_modules/react-native/Libraries/Components/TextInput/TextInput.js
+index adca4e3..f581cf4 100644
+--- a/node_modules/react-native/Libraries/Components/TextInput/TextInput.js
++++ b/node_modules/react-native/Libraries/Components/TextInput/TextInput.js
+@@ -904,6 +904,8 @@ const TextInput: component(
+ ) = function TextInput({
+   ref: forwardedRef,
+   allowFontScaling = true,
++  // Investors Club patch (M241): the same app-wide cap on the system font size as Text.
++  maxFontSizeMultiplier = 1.3,
+   rejectResponderTermination = true,
+   underlineColorAndroid = 'transparent',
+   autoComplete,
+@@ -923,6 +925,7 @@ const TextInput: component(
+   return (
+     <InternalTextInput
+       allowFontScaling={allowFontScaling}
++      maxFontSizeMultiplier={maxFontSizeMultiplier}
+       rejectResponderTermination={rejectResponderTermination}
+       underlineColorAndroid={underlineColorAndroid}
+       editable={readOnly !== undefined ? !readOnly : editable}
+diff --git a/node_modules/react-native/Libraries/Text/Text.js b/node_modules/react-native/Libraries/Text/Text.js
+index 8e7b29c..a99f8ad 100644
+--- a/node_modules/react-native/Libraries/Text/Text.js
++++ b/node_modules/react-native/Libraries/Text/Text.js
+@@ -248,6 +248,11 @@ const TextImpl: component(
+   if (_role !== undefined) {
+     processedProps.role = _role;
+   }
++  // Investors Club patch (M241): one app-wide cap on the system font size, so cards and
++  // bars with fixed room never clip their text. A Text that sets its own value keeps it.
++  if (processedProps.maxFontSizeMultiplier == null) {
++    processedProps.maxFontSizeMultiplier = 1.3;
++  }
+ 
+   let textPressabilityProps: ?TextPressabilityProps;
+   if (isPressable) {

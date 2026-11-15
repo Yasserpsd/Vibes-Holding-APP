@@ -45,7 +45,8 @@ export function ClubTourStrip() {
 }
 
 const styles = themedStyles(() => ({
-  strip: { gap: spacing.sm, paddingVertical: spacing.xs },
+  // The same distance under the section's description as every other home strip (emulator review item 25).
+  strip: { gap: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   photo: {
     width: PHOTO_WIDTH,
     height: PHOTO_HEIGHT,

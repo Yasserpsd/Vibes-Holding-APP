@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useProjectFilters, useProjectsList } from '@/api/queries';
+import { useProjectFilters, useProjectsCount, useProjectsList } from '@/api/queries';
 import type { ProjectsSort, PublicProject } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
@@ -17,19 +17,41 @@ import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
 import { inputStart, isRTL } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
-import { formatProjectCount, formatSectorCount } from '@/lib/format';
+import { formatProjectCount, formatRelativeTime, formatSectorCount } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // The labels come from the app's strings (projects.sort.*); a server label serves a sort the app does not know yet.
 const DEFAULT_SORTS: { key: ProjectsSort; label: string }[] = [
+  { key: 'discover', label: '' },
   { key: 'top', label: '' },
   { key: 'latest', label: '' },
   { key: 'views', label: '' },
-  { key: 'discover', label: '' },
   { key: 'golden', label: '' },
 ];
+
+/** A list this old is asked for again when the tab comes back into view (not on every focus). */
+const REFRESH_AFTER_MS = 5 * 60_000;
+
+/** «اكتشف» leads the sorts row whatever order the server sends. */
+function discoverFirst<T extends { key: ProjectsSort }>(sorts: T[]): T[] {
+  return [...sorts.filter((option) => option.key === 'discover'), ...sorts.filter((option) => option.key !== 'discover')];
+}
+
+/** Every page flattened, each project once: when the daily rotation turns between two pages, a project can come back on the next page. */
+function uniqueProjects(pages: { items: PublicProject[] }[] | undefined): PublicProject[] {
+  const seen = new Set<number>();
+  const out: PublicProject[] = [];
+  for (const page of pages ?? []) {
+    for (const project of page.items) {
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+      out.push(project);
+    }
+  }
+  return out;
+}
 
 export default function ProjectsScreen() {
   const router = useRouter();
@@ -39,8 +61,9 @@ export default function ProjectsScreen() {
   const signedIn = status === 'signedIn';
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  // M116 (owner): the bank's default face is «الأعلى تقييمًا».
-  const [sort, setSort] = useState<ProjectsSort>('top');
+  // Owner, 2026-11-16 («بنك المشاريع ثابت طول الوقت» → «أيوه غيّره»): the bank opens on «اكتشف», the order
+  // the server turns every Riyadh day, so the first cards change daily. It replaces M116's «الأعلى تقييمًا».
+  const [sort, setSort] = useState<ProjectsSort>('discover');
   const [sector, setSector] = useState<string | undefined>();
   const [stage, setStage] = useState<string | undefined>();
   // M107 «حسب اهتماماتي»: keeps only the projects matching my saved interests.
@@ -60,15 +83,27 @@ export default function ProjectsScreen() {
 
   const filters = useProjectFilters();
   const list = useProjectsList({ q, sort, sector, stage, mine: mineOn ? '1' : undefined });
-  const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
-  const sorts = filters.data?.sorts ?? DEFAULT_SORTS;
+  const sorts = discoverFirst(filters.data?.sorts ?? DEFAULT_SORTS);
   const sectorOptions = filters.data?.sectors ?? [];
   const chosenSector = sector ? sectorOptions.find((option) => option.slug === sector) : undefined;
-  const allSectorsCount = sectorOptions.length > 0 ? sectorOptions.reduce((sum, option) => sum + option.count, 0) : undefined;
+  // The «كل القطاعات» tile carries the bank's own total (the same number as the count pill), never the sum
+  // of the sector counts: a project without a sector made the two disagree (258 beside 259).
+  const bankCount = useProjectsCount();
+  const unfiltered = !q && !sector && !stage && !mineOn;
+  const bankTotal = bankCount.data ?? (unfiltered ? total : undefined);
+  // Coming back to the tab asks for the list again once it is older than five minutes.
+  const { dataUpdatedAt, refetch } = list;
+  useFocusEffect(
+    useCallback(() => {
+      if (dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > REFRESH_AFTER_MS) void refetch({ cancelRefetch: false });
+    }, [dataUpdatedAt, refetch]),
+  );
   // M128 (owner, 2026-10-26: «محفظة Vibes Ventures تختفي تمامًا»): the pinned M121b showcase card
   // left the list. Vibes companies will appear as REGULAR bank entries, lightly marked (next milestone).
-  const rows: PublicProject[] = items;
+  const pages = list.data?.pages;
+  const rows = useMemo(() => uniqueProjects(pages), [pages]);
+  const bankUpdated = filters.data?.updatedAt ? formatRelativeTime(filters.data.updatedAt) : '';
   // M130b (owner: «في تقل في تقليب بنك المشاريع»): the newest page's covers start downloading as
   // soon as the page lands, so scrolling meets cached images instead of one load per card.
   const lastPage = list.data?.pages[list.data.pages.length - 1];
@@ -112,12 +147,15 @@ export default function ProjectsScreen() {
       </FadeInView>
 
       <FadeInView delay={entranceDelay(2)}>
-        {/* One row: the sorts, then «فلترة» opening the sheet (the sector/stage chip rows used to crowd the header). */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {signedIn ? <Chip label={t('projects.mine')} selected={mineOn} onPress={() => setMine((value) => !value)} /> : null}
-          {sorts.map((option) => (
-            <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
-          ))}
+        {/* The sorts scroll; «فلترة» is pinned at the row's end, outside the scrolling part, so it is always in view
+            (it used to be the row's last item, off-screen until the row was dragged). */}
+        <View style={styles.sortRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortScroll} contentContainerStyle={styles.chips}>
+            {signedIn ? <Chip label={t('projects.mine')} selected={mineOn} onPress={() => setMine((value) => !value)} /> : null}
+            {sorts.map((option) => (
+              <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
+            ))}
+          </ScrollView>
           {filters.data && (filters.data.sectors.length > 0 || filters.data.stages.length > 0) ? (
             <PressScale
               onPress={() => setFiltersOpen(true)}
@@ -130,12 +168,12 @@ export default function ProjectsScreen() {
               <Text style={[styles.filterButtonText, (sector || stage) && styles.filterButtonTextActive]}>{t('projects.filter')}</Text>
             </PressScale>
           ) : null}
-        </ScrollView>
+        </View>
       </FadeInView>
 
       {/* Owner, 2026-11-10: the sectors on the screen itself, titled, with icons and counts. */}
       <FadeInView delay={entranceDelay(3)}>
-        <SectorStrip sectors={sectorOptions} sector={sector} onSector={setSector} total={allSectorsCount} />
+        <SectorStrip sectors={sectorOptions} sector={sector} onSector={setSector} total={bankTotal} />
       </FadeInView>
 
       {chosenSector ? <ActiveSectorBanner option={chosenSector} total={total} onClear={() => setSector(undefined)} /> : null}
@@ -157,13 +195,22 @@ export default function ProjectsScreen() {
         <FadeInView key={total} offset={6} duration={320}>
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.gold} />
+              <Ionicons name="briefcase-outline" size={14} color={colors.goldText} />
               <BankTotal total={total} />
             </View>
             {!sector && (filters.data?.sectors.length ?? 0) > 0 ? (
               <View style={styles.statPill}>
-                <Ionicons name="pie-chart-outline" size={14} color={colors.gold} />
+                <Ionicons name="pie-chart-outline" size={14} color={colors.goldText} />
                 <Text style={styles.statPillText}>{formatSectorCount(filters.data?.sectors.length ?? 0)}</Text>
+              </View>
+            ) : null}
+            {/* When the bank's data last changed on the server (the filters answer carries it). */}
+            {bankUpdated ? (
+              <View style={styles.freshness}>
+                <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+                <Text style={styles.freshnessText} numberOfLines={1}>
+                  {t('projects.updatedAt', { time: bankUpdated })}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -284,8 +331,10 @@ const styles = themedStyles(() => ({
     boxShadow: shadows.glowGoldFaint,
   },
   searchInput: { ...typography.body, flex: 1, color: colors.textPrimary, paddingVertical: spacing.sm + 2 },
+  sortRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sortScroll: { flex: 1 },
   chips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
-  // «فلترة» rides the sorts row; it lights up gold while a filter is on.
+  // «فلترة» is pinned beside the sorts; it lights up gold while a filter is on.
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -315,6 +364,9 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldFaint,
   },
   statPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLightText },
+  // The freshness line sits beside the pills as plain quiet text, not a third pill.
+  freshness: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: 4, flexShrink: 1 },
+  freshnessText: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
   footerRetry: {

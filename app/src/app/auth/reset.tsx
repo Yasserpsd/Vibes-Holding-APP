@@ -10,10 +10,12 @@ import { FormField } from '@/components/FormField';
 import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { codeKeyboardType } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -128,7 +130,7 @@ export default function ResetPasswordScreen() {
         <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} editable={step === 'request'} />
         {step === 'confirm' ? (
           <>
-            <FormField label={t('auth.verify.code')} latin keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} />
+            <FormField label={t('auth.verify.code')} latin keyboardType={codeKeyboardType} textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(toAsciiDigits(value).replace(/\D/g, ''))} />
             <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint={t('auth.register.passwordHint')} />
           </>
         ) : null}
@@ -171,6 +173,6 @@ const styles = themedStyles(() => ({
   doneIcon: { alignSelf: 'center', marginTop: spacing.md },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   resend: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.xs },
-  resendText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
+  resendText: { ...typography.caption, color: colors.goldText, textDecorationLine: 'underline' },
   resendWaiting: { color: colors.textMuted, textDecorationLine: 'none' },
 }));

@@ -122,5 +122,8 @@ export function useAffiliate(enabled: boolean) {
     queryFn: affiliateApi.overview,
     enabled,
     staleTime: 30_000,
+    // M242: an application waiting for the management's decision asks again every minute, so the approved page
+    // (and the home earnings card) appears on a phone left open. Nobody else polls; it pauses in the background.
+    refetchInterval: (query) => (query.state.data?.status === 'pending' ? 60_000 : false),
   });
 }

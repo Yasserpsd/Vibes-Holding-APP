@@ -95,7 +95,7 @@ function WorkshopCard({
           <Ionicons
             name={workshop.mode === 'online' ? 'globe-outline' : workshop.mode === 'hq' ? 'business-outline' : 'sync-outline'}
             size={14}
-            color={closed ? colors.textMuted : colors.gold}
+            color={closed ? colors.textMuted : colors.goldText}
           />
           <Text style={styles.modeText} numberOfLines={1}>
             {t(MODE_KEY[workshop.mode])}

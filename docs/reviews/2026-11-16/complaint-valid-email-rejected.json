@@ -1,0 +1,202 @@
+{
+ "key": "valid-email-rejected",
+ "words": "Some people entered a correct e-mail address and still saw an error.",
+ "diagnosis": {
+  "summary": "The e-mail pattern itself refuses no ordinary valid address: 37 inputs tested, and trailing/leading space, capitals, +tag, dots, long TLDs, .sa/.com.sa, digits and hyphens in the domain all pass app, server and hub. Two real causes remain. (1) iPhone, bundles before the M239 change of 14 Nov: the sign-up form judged the PREVIOUS value when the field was left, so an address that iOS wrote as the field lost focus kept a red «Enter a valid email address» under a correct address; M239 cures it in code, today's pass did not touch it. (2) Not fixed anywhere: the address is never cleaned, so an invisible direction mark from a paste, Arabic-Indic digits or a trailing dot/comma pass the app and the server, the hub refuses them and the member reads «البريد الإلكتروني مطلوب» (Arabic) or «Some of the details entered are not valid» (English); at sign-in the same input answers «no account» and carries the member to the sign-up screen.",
+  "causes": [
+   {
+    "cause": "Stale validation when the e-mail field is left (sign-up form, and the completion gate's contact e-mail). The old blur handler read the form of the render it was created in, not the value just written.",
+    "evidence": "Before M239 (git show 1c4b1e4^:app/src/app/auth/register.tsx lines 119-128): set() built `{ ...form, [key]: value }` and `blur = (key) => () => errors.check(key, issueOf(key, form))`. React Native 0.86.3 iOS, app/node_modules/react-native/Libraries/Text/TextInput/RCTBackedTextInputDelegateAdapter.mm:72-82: textFieldDidEndEditing fires a catch-up textInputDidChange and then textInputDidEndEditing in the same native call when iOS changed the text without an EditingChanged event (its own comment: a change triggered by losing focus). ReactCommon/react/renderer/core/EventQueueProcessor.cpp flushEvents delivers all queued events in one loop, so React does not re-render between them. Sequence: member picks the address from the iOS suggestion/autofill or iOS completes it as he taps the next field -> onChangeText stores the full address -> onBlur runs in the same JS task with the old closure, judges the empty/partial previous value -> errors.check paints form.error.email; nothing clears it (set() only clears on a later edit of that field), the red summary counts 1 error. On submit the old validate() read the current form, so the sign-up itself could pass, but with an unproven number submit returns early at the M227 branch (register.tsx:161-167) and the red line stays through the whole WhatsApp code step. Fixed in the tree the members' bundle is built from: register.tsx:77-79 (newest box), :122-132 (set and blur read newest.form), :143-151 (effect drops an error once the value is valid), :193 sends latest.email.trim(); ProfileCompletionGate.tsx:124-134 has the effect only (its blur at :177 still reads the closure, the effect clears it one render later).",
+    "platforms": "iPhone only (the catch-up change-at-blur is iOS code; Android reports every text change at once). Bundles older than commit 1c4b1e4 (14 Nov 21:13 +03): the embedded bundle of store 1.3.2 and every OTA before the 14 Nov 20:07 UTC one. 1.3.3 embeds the fix.",
+    "confidence": "likely",
+    "fixedToday": "Not by today's pass. Fixed by M239 the day before (register.tsx and ProfileCompletionGate.tsx, unchanged today except a comment's encoding). Whether phones already run it depends on the 14 Nov OTA having been applied."
+   },
+   {
+    "cause": "The address is never cleaned, and the hub is stricter than the app and the server. Characters the member cannot see or does not consider wrong pass both of our checks and are refused by the hub's WordPress is_email().",
+    "evidence": "App: app/src/lib/validation.ts:3-5 `/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/` on trim().toLowerCase(), any non-space character allowed. Server: server/src/auth/routes.ts:62 register e-mail is only `.trim().min(5).max(190)`, sent as typed at server/src/auth/service.ts:375; routes.ts:142 contactEmail uses the same loose pattern; server/src/hub/phone.ts:107-110 normEmail the same. Hub (outside the repo, read from the rig copy C:/Projects/vibes-test-rig/work/hub/vibes-ai-assistant, 2.30.0): includes/helpers.php:178-181 vai_norm_email = strtolower(trim) then is_email() or ''; includes/class-vai-hub.php:3136 and 3181-3186 op_register. Throwaway test (C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\emailtest\\t.cjs): pass app + server, refused by the hub: Arabic-Indic and Persian digits (the phone field folds them at validation.ts:16-17, the e-mail field does not), U+200E / U+200F / U+061C / U+202A..U+202C / U+2068..U+2069 / U+200B pasted with the address, a trailing dot, a trailing comma or Arabic comma, a double dot in the domain, a typographic apostrophe, mailto:, angle brackets, an Arabic-script domain. Sequence: member pastes the address from a chat (or types digits from the Arabic layout) -> field shows a correct-looking address, no red -> Sign up -> hub 400.",
+    "platforms": "Both platforms, every bundle and both store versions (the check lives in server + hub). Pasted marks on both; Arabic-Indic digits more likely on Android keyboards, since iOS forces an ASCII keyboard on an e-mail field.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's pass added one more copy of the same loose pattern (app/src/components/FormEmbed.tsx:101,146, trimmed, no cleaning) and autoCorrect={false} on the profile contact e-mail; no normalisation anywhere in app or server."
+   },
+   {
+    "cause": "The refusal of cause 2 is shown with the wrong words. Because vai_norm_email() turns a malformed address into an empty string, the hub answers code `invalid` with «البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل» (e-mail is REQUIRED) to a member who did type one; the hub's own `email_domain` sentence is unreachable for a malformed address.",
+    "evidence": "class-vai-hub.php:3181-3186 (rig copy): `if ($email === '') return vai_error('invalid', 'البريد الإلكتروني مطلوب…')` runs before the is_email / email_domain line. server/src/hub/client.ts:57-77 passes code and text through; server/src/auth/guard.ts:32-34. App: app/src/api/client.ts:127-132 localMessage — Arabic app prints the hub sentence, English app prints errors.code.invalid «Some of the details entered are not valid» (app/src/i18n/strings/en.json:153) with no field named, in the Notice above the button (register.tsx:381), no red field. Same shape for the contact e-mail: class-vai-hub.php:4013-4018 `invalid` «اكتب بريدًا إلكترونيًا صحيحًا للتواصل». Checked the other suspects: `exists` (409) shows its own sentence (en.json:166), `rate` (429, routes.ts:207-210, 6 sign-ups / 15 min / IP, trustProxy on at server/src/app.ts:197) shows its own sentence; neither is displayed as an invalid e-mail. `errors.code.invalid_email` exists only since today's commit 0fcf3e5 and no member route returns that code.",
+    "platforms": "Both, all bundles.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "Sign-in and password reset with a correct address answer «no account» and push the member to the sign-up screen: (a) the same uncleaned address as cause 2; (b) an Apple «Hide My Email» member who types the real address he gave as contact e-mail with a wrong or never-set password.",
+    "evidence": "(a) app/src/components/LoginIdentifier.tsx:25-33 sends value.trim() after isEmail; server/src/auth/service.ts:428-437 login -> hub find_account (class-vai-hub.php:2803: vai_norm_email fails -> not found) -> 401 bad_login -> accountExists (service.ts:454-463) -> hub member_status (class-vai-hub.php:4382: again '' -> found:false) -> AuthError no_account 404 -> app/src/app/auth/login.tsx:69 router.push('/auth/register', fromLogin). Reset: service.ts:945 -> hub not_found 404 -> English app prints errors.code.not_found «We couldn't find what you asked for». (b) hub find_account matches contact_email (class-vai-hub.php:2806-2808) but member_status matches email_norm only (4393-4395), so a wrong password for such an account becomes no_account instead of bad_login. An account born from Google/Apple has no known password at all and gets bad_login «The email or mobile number, or the password, is wrong» for its correct address (class-vai-hub.php:3713-3716).",
+    "platforms": "Both, all bundles. (b) only Apple-relay accounts.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "Sign-in screen opens on the phone tab; a saved login (password manager) that writes the e-mail into that field is stripped to its digits, and the member gets «Enter your mobile number and your password» or the phone-format error.",
+    "evidence": "app/src/components/LoginIdentifier.tsx:22 (EMPTY_IDENTIFIER mode 'phone'), :105 `onChange({ ...value, value: localPhoneDigits(text, country) })` — «ahmed2020@gmail.com» becomes «2020»; app/src/app/auth/login.tsx:34-35. Whether iOS/Android autofill really targets that field was not seen on a device.",
+    "platforms": "Both, all bundles; only members who use saved logins.",
+    "confidence": "possible",
+    "fixedToday": "No."
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Server first, because it reaches every bundle and both platforms without an OTA. Add `cleanEmail(input)` beside normEmail in server/src/hub/phone.ts: remove format characters (U+200B-U+200F, U+202A-U+202E, U+2060-U+2069, U+061C, U+FEFF, U+00AD), fold Arabic-Indic (U+0660-0669) and Persian (U+06F0-06F9) digits to 0-9, drop a leading `mailto:` and wrapping `<>`, trim, strip trailing `.`, `,`, `،`, `;`, lower-case. Use it in: registerSchema.email (routes.ts:62) as a transform, normEmail/normLogin (phone.ts:97-110, so login, reset and accountExists get it), profileSchema.contactEmail (routes.ts:142). After cleaning, check the shape the hub accepts (ASCII local part `[a-z0-9!#$%&'*+/=?^_`{|}~.-]+`, domain labels `[a-z0-9-]+` with no edge hyphen, no `..`, at least two labels, 6+ characters) and refuse with code `invalid` and the Arabic sentence «اكتب بريدًا إلكترونيًا صحيحًا (مثل name@example.com)». Keep the code `invalid`: bundles before today have no `errors.code.invalid_email` and would fall to the general «Something went wrong» line. Add tests for the 37 inputs.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\hub\\phone.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\routes.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\service.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low. Cleaning only removes characters that can never be part of an address the hub accepts. Login must clean exactly as register does, or an account created from a cleaned address could not be found; both go through the same function. Railway type-checks test files, so the new test must compile."
+   },
+   {
+    "change": "App: the same `cleanEmail` in validation.ts; `isEmail` judges the cleaned value against the hub-compatible shape, so a wrong address gets the red line under the field instead of a hub refusal. Send the cleaned value at register.tsx:193, ProfileCompletionGate.tsx:152, profile-edit.tsx:93 and :107, LoginIdentifier.tsx:25-33, and replace FormEmbed's private EMAIL_SHAPE (:101, :146) with the shared isEmail. On blur write the cleaned value back into the field (register.tsx blur('email'), gate blur('contactEmail')) so the member sees what is sent; never rewrite while typing (cursor jumps).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\validation.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\register.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompletionGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\profile-edit.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\LoginIdentifier.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\FormEmbed.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. A stricter isEmail could refuse an exotic address the hub also refuses today, so nothing accepted now is lost; keep the app and server patterns in one tested table so they cannot drift."
+   },
+   {
+    "change": "Finish the M239 cure and confirm it is on phones. (a) In ProfileCompletionGate.tsx make blur and submit read the newest values as register.tsx does (a state-held box written in field()), instead of relying only on the effect at :124-134. (b) Before the next OTA, read the served manifests of the five production runtimes and confirm the bundle contains the M239 sign-up change; if a runtime serves an older tree, republish. (c) Store iPhones that do not apply OTAs get it only with 1.3.3.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompletionGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\register.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low for (a). (b) is a read-only check; the OTA ships the working tree, so git status must be clean of other sessions' half work first."
+   },
+   {
+    "change": "Sign-in field: when the text arriving in the phone tab contains `@` or letters (autofill or paste), switch the identifier to the e-mail tab with that text instead of stripping it to digits (LoginIdentifier.tsx:105). Add autoComplete hints (`tel` / `email` / `current-password`) so Android autofill targets the right field.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\LoginIdentifier.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\login.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. The switch must not fire on ordinary phone typing (digits, +, spaces only)."
+   },
+   {
+    "change": "Hub plugin (outside this repo, the owner's plugin chat + the test rig): (1) op_register: a non-empty address that fails is_email answers «البريد الإلكتروني غير صحيح…» (the email_domain sentence), not «البريد الإلكتروني مطلوب»; (2) op_member_status also matches contact_email, so an Apple-relay member with a wrong password gets bad_login, not no_account; (3) optional: op_login tells an account born from Google/Apple to use that button or reset the password, as reset_request already names the provider. After fix 1 of this plan the app can no longer reach (1), so it is a safety net.",
+    "files": [
+     "C:\\Projects\\vibes-test-rig\\work\\hub\\vibes-ai-assistant\\includes\\class-vai-hub.php",
+     "C:\\Projects\\vibes-test-rig\\work\\hub\\vibes-ai-assistant\\includes\\helpers.php"
+    ],
+    "delivery": "owner-decision",
+    "risk": "Plugin change on the live identity system: rig phases first, New Era folder delivery. (3) reveals that an address has an account, which the reset flow already does."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone or an Android phone. The iOS gesture that makes the text change as the field loses focus (which suggestion or autofill path) was not reproduced; the mechanism is read from React Native's iOS source and the pre-M239 handlers.",
+   "Whether members' phones already run the M239 change: no manifest or served bundle was fetched in this read-only step. The brief says the 14 Nov 20:07 UTC OTA went to five runtimes and an OTA ships the working tree, which held M239 by then; a memory note says store iPhones may not apply OTAs (open investigation). When each complaint was made relative to that OTA is unknown.",
+   "The hub was read from the rig copy (C:/Projects/vibes-test-rig/work/hub, version 2.30.0), not from the live site; the live allowed_email_domains setting was not read (the code migrates it to '*').",
+   "WordPress is_email() was emulated in the Node script from its core source, not executed in PHP.",
+   "No server or hub logs were read, so how often the hub answers `invalid` on register, and which of the tested input classes real members actually send, is unknown. Cause 2 is proven as a mismatch, not measured as a frequency.",
+   "Hermes was assumed to evaluate this simple pattern as Node does.",
+   "Whether iOS autofill can fill a field that is not focused without any change event reaching JS (state empty under a visibly filled field; M239 would not cure that) could not be checked here.",
+   "Whether a password manager really writes the saved e-mail into the phone tab on the sign-in screen (cause 5) was not seen on a device."
+  ],
+  "data": "Pattern test, 37 inputs (app isEmail = validation.ts:3; server register = routes.ts:62; hub = vai_norm_email + is_email emulated). Sent value is trimmed by the app and again by the server.\n\nACCEPTED everywhere (app, server, hub):\nuser@gmail.com | trailing space | leading space | User.Name@Gmail.COM | Name+tag@gmail.com | first.m.last@gmail.com | ceo@company.technology | user@domain.sa | user@domain.com.sa | user@mail2web4u.com | user@my-company.co | user_name99@outlook.sa | o'brien@gmail.com | a@b.co | NBSP after | U+FEFF before | newline after (the last three are removed by JS trim).\n\nPASS app + server, REFUSED by the hub -> member sees hub code `invalid` («البريد الإلكتروني مطلوب…» / English «Some of the details entered are not valid»):\nArabic-Indic digits in the name (U+0660-0669) | Persian digits (U+06F0-06F9) | U+200E before | U+200F after | U+061C before | U+202A…U+202C around | U+2068…U+2069 around | U+200B after | trailing dot «user@gmail.com.» | trailing comma | trailing Arabic comma | user@gmail..com | typographic apostrophe (U+2019) | Arabic-script domain | mailto:user@gmail.com | <user@gmail.com>.\n\nREFUSED by the app (red form.error.email, never sent), all genuinely malformed:\nuser @gmail.com | user@gmail. com | fullwidth @ (U+FF20) | a@b.c.\n\nEvery e-mail check a member passes through:\n- Sign-up: register.tsx:108-109 isEmail (skipped for Google/Apple sign-ups, :97) -> POST /api/auth/register, routes.ts:62 (trim, 5-190 chars, no pattern) -> hub `register` receives {email as typed, name, country, phone, password, persona, job_title, lang, source, …} (service.ts:367-389) -> hub answers: `invalid` (malformed or empty), `email_domain` (only if a domain list is configured), `exists` 409, `rate` 429, `phone`, `referral`, `app_only`.\n- Completion gate contact e-mail: ProfileCompletionGate.tsx:109 isEmail -> routes.ts:142 (trim, lower-case, same loose pattern) -> hub profile update `contact_email` -> `invalid`.\n- Profile edit contact e-mail: profile-edit.tsx:93 inline copy of the pattern (trimmed) -> same server path.\n- Sign-in / reset: LoginIdentifier.tsx:30-33 isEmail; failure texts are «Enter your email and your password» (login.tsx:34-35) and «Enter your registered email or mobile number» (reset.tsx:46-47), neither says the address is invalid -> routes.ts:51 loginFieldSchema (trim, 3-190) -> normLogin (phone.ts:97) -> hub `login` / `reset_request` -> bad_login, no_account (server-made), not_found, rate.\n- Service forms: FormEmbed.tsx:101,140-148 (new today, trimmed, same loose pattern); the forms server trims and applies no e-mail pattern.\n- Not reachable from the app: zod .email() in server/src/legal/routes.ts:12 and server/src/whatsapp/routes.ts:21; `invalid_email` only in server/src/mail/recipients.ts:62 (dashboard).\n\nTrimming: the field is trimmed before validation (isEmail) and before sending on every screen; autofill updates the value the validator reads since M239 on the sign-up form (handlers read newest.form), and on the gate through the clearing effect."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "Cause 1 does not apply to the bundle the task says members run. 97705af (14 Nov 23:10) already contains M239 (1c4b1e4, 14 Nov 21:13). `git show 97705af:app/src/app/auth/register.tsx` has `newest` at :77-79, set/blur reading `newest.form` at :122-132 and the clearing effect at :143-151. The brief (M240) says the five production runtimes served that tree from 14 Nov 20:07 UTC. So cause 1 explains only phones that had not taken the 14 Nov OTA: complaints from before that evening, iPhones in the open 'store iPhone never applies OTAs' problem, and a fresh 1.3.2 install before the M182d first-open check-fetch-reload (97705af _layout.tsx:108-117) finished. It cannot explain a complaint from a phone on the current bundle.",
+   "Cause 1's confidence is overstated. 'Likely' should be 'plausible, not reproduced'. The catch-up path at RCTBackedTextInputDelegateAdapter.mm:72-82 runs only when shouldChangeCharactersInRange set `_textDidChangeIsComing` and no UIControlEventEditingChanged followed. RN's own comment says that is autocorrection on focus loss, and the sign-up e-mail field has autoCorrect={false} (97705af register.tsx:318). Which iOS autofill or QuickType path takes this route is unknown. The real evidence that the symptom existed is the owner's own M239 report («ده إيميل مظبوط… ليه جايب Enter a valid email address»), not the mechanism.",
+   "Fix-plan step 3(a) (state-held box in ProfileCompletionGate) is cosmetic. The effect at ProfileCompletionGate.tsx:124-134 already clears a stale red one render later. It is not a cure for anything members see.",
+   "Cause 2 is proven as a mismatch but is probably rare. iOS gives an ASCII keyboard on keyboardType email-address, and nothing shows chat apps adding direction marks when an address is copied. Arabic-Indic digits from an Android Arabic layout are the realistic sub-case. The colleague presents this as the main unfixed cause, but other unfixed paths are more likely to hit real members (see missedCauses).",
+   "The colleague says the hub's email_domain sentence is unreachable. That holds for op_register but not for the profile e-mail update (rig class-vai-hub.php:4001-4004 returns email_domain when vai_norm_email fails). There the English app shows a stale string, en.json:163: «This email is not accepted. We accept Gmail, iCloud or Outlook, or a work email on a Saudi domain (.sa)». The hub has accepted any domain since 2.6 (migrate_v26, class-vai-hub.php:543-551). A member with a correct yahoo or company address would read that as a domain refusal.",
+   "In cause 4(b) the colleague treats only Apple-relay accounts as the bad_login/no_account confusion. The broader hole is in accountExists. member_status (class-vai-hub.php:4378-4400) matches contact rows WITHOUT the pass_hash filter and also the separate members list (member_lookup :2636). Every person the club already knows without an app password therefore gets the wrong-password sentence, not 'create your account'. This is missed cause 1 below."
+  ],
+  "missedCauses": [
+   "MOST LIKELY MISSED: people the club already knows who never set an app password. These are members who paid on vcmem.com before the app (members table), website or widget leads, and Paymob or event contacts (contacts rows with pass_hash=''). Sequence on both platforms and every bundle: they type their correct, known e-mail and any password -> server/src/auth/service.ts:428-437 sends `login` to the hub -> hub op_login (rig class-vai-hub.php:3714-3716) calls find_account, which requires pass_hash<>'' (:2804-2806), finds nothing and answers bad_login 401 -> service.ts:434 calls accountExists (:454-463) -> hub member_status finds the row anyway (no pass filter, :4396) or the members list (:4398-4399) and answers found:true -> the server re-throws bad_login. The member reads «البريد/الجوال أو كلمة المرور غير صحيحة» (English: «The email or mobile number, or the password, is wrong», en.json:166). If they then tap «نسيت كلمة المرور», find_reset_account (:4228-4243) requires pass_hash<>'' OR verified=1, so a members-list-only person gets not_found «لا يوجد حساب بهذا البريد» (English «We couldn't find what you asked for»). One screen says the password is wrong, the next says there is no account. These are exactly the people who would insist 'my e-mail is correct'. Not fixed today. Frequency unknown: no hub data was read.",
+   "Sign-up `exists` caused by the PHONE, not the e-mail. Hub op_register looks up `(email_norm=%s OR phone_norm=%s) AND pass_hash<>''` and answers exists 409 for a verified row (rig class-vai-hub.php ~3211-3213). A member who types a new, correct e-mail with a number already on another account (an old account with a mistyped e-mail, a shared office number, a relative) gets «عندك حساب بهذا البريد أو الجوال» / «You already have an account with this email or mobile number». He reads it as an e-mail refusal. The same thing happens when the original account was created with a mistyped address: sign-in with the correct address gives no_account -> the app opens sign-up (login.tsx:69) -> sign-up gives exists. Both platforms, all bundles, not fixed.",
+   "Accounts born from Google/Apple get a random password hash (op_social_login: wp_hash_password(vai_key(32)), rig class-vai-hub.php ~3849/3866). Their correct e-mail with any password always gets bad_login, and nothing tells them to use the Google/Apple button (only reset_request names the provider). The colleague mentions this in passing. It belongs among the main sign-in causes because it needs no unusual input.",
+   "Sign-in screen, phone tab first. EMPTY_IDENTIFIER mode is 'phone' (97705af LoginIdentifier.tsx:22). If iOS Keychain or Android autofill puts the saved username (an e-mail) into the field before the password field, onChangeText strips it with localPhoneDigits (:105). The live check phoneBad (:62) then paints «auth.phone.check» red at once, and submit says «Enter your mobile number and your password». The colleague has this as 'possible'. I agree it was not seen on a device. Note that the red line appears immediately, not only on submit.",
+   "Not verifiable here: password autofill on the sign-in screen that never reaches JS state. Single-line Fabric inputs have no selection-based catch-up (RCTTextInputComponentView.mm:506-524 only for multiline). In that case `!password` at login.tsx:32-34 gives «Enter your email and your password» under a visibly filled form. The same blind spot, iOS autofill writing a field with no change event, would also defeat M239 on the sign-up form, because state stays empty."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Server login: tell 'known to the club but no app password' apart from 'wrong password'. In server/src/auth/service.ts replace accountExists(login): Promise<boolean> with accountState(login): Promise<'none' | 'passwordless' | 'account' | 'unknown'>. Call hub member_status as today. found:false -> 'none'. found:true with result.contact?.has_account === 0, or with no contact and source 'members_list' -> 'passwordless'. found:true with has_account 1 -> 'account'. Any throw, odd input or old hub -> 'unknown'. In login()'s catch (service.ts:432-437), on HubError 401/404: 'none' -> keep the current no_account. 'passwordless' -> throw new AuthError('no_account', 'بريدك معروف لدى النادي، لكن لم يُنشأ له حساب في التطبيق بعد — أنشئ حسابك بالبريد نفسه ورقم جوالك', 404). Keep the code no_account: every existing bundle already routes no_account to /auth/register (login.tsx:66-70), the Arabic app prints the server sentence, and the English app prints en.json:167 «No account is registered with these details — create your account first». Otherwise re-throw. Do the same in the password-reset path: when the hub answers not_found and accountState is 'passwordless', answer no_account with the same sentence, so reset and sign-in say the same thing. Add tests with a hub mock for each of the four states. Railway type-checks test files, so the tests must compile.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\service.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\routes.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Unit tests with a mocked hub (member_status returning has_account 0, has_account 1, a members_list hit, and found:false). On the test rig: create a contact with pass_hash='' plus a members-list row, sign in from the Android emulator with a preview build against api-test, and confirm the app opens the sign-up screen with the notice. Then register with the same e-mail and phone and confirm the hub adopts the contact and the membership follows (rig phase run before any live use)."
+   },
+   {
+    "priority": 2,
+    "change": "Server sign-up: say which detail is taken. In service.ts register(), catch HubError code 'exists' and call hub member_status twice, once with { email } only and once with { phone: hubNumber(...) } only. Only a hit with contact.has_account === 1 counts. If only the phone matches, throw new AuthError('exists', 'رقم الجوال هذا مسجّل لحساب آخر — سجّل الدخول برقم الجوال، أو استخدم «نسيت كلمة المرور»', 409). If only the e-mail matches, use 'هذا البريد مسجّل لحساب آخر — سجّل الدخول، أو استخدم «نسيت كلمة المرور»'. If both match or the lookup fails, re-throw the hub's sentence. Keep the code exists so old bundles behave as today: Arabic shows the new sentence, English shows en.json:164.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\service.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Unit tests with the hub mock answering exists, and member_status matching phone only, e-mail only, both, or throwing. On the rig: register a second account with a new e-mail and a phone already on a verified account, and read the sentence in the Arabic app on the emulator."
+   },
+   {
+    "priority": 3,
+    "change": "Server e-mail cleaning, as the colleague proposed. Add cleanEmail(input) in server/src/hub/phone.ts. It removes U+200B-U+200F, U+202A-U+202E, U+2060-U+2069, U+061C, U+FEFF and U+00AD; folds U+0660-0669 and U+06F0-06F9 to ASCII digits; drops a leading 'mailto:' and wrapping '<>'; trims; strips trailing '.', ',', '،', ';'; lower-cases. Use it in registerSchema.email (routes.ts:61) as a transform, in normEmail/normLogin (phone.ts:97-110, which covers login, reset and accountExists), and in the profile contactEmail schema. After cleaning, check the shape WordPress is_email accepts: local part [a-z0-9!#$%&'*+/=?^_`{|}~.-]+, domain labels [a-z0-9-]+ with no hyphen at either edge, no '..', at least two labels. Refuse with code 'invalid' and «اكتب بريدًا إلكترونيًا صحيحًا (مثل name@example.com)». Keep 'invalid': bundles before 0fcf3e5 have no errors.code.invalid_email. Login and register must use the same function.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\hub\\phone.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\routes.ts",
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\service.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "A table test of the colleague's 37 inputs, with expected cleaned value or refusal. Then register on api-test from the Android emulator with an address typed using Arabic-Indic digits and with a trailing dot, and confirm an account is created with the cleaned address."
+   },
+   {
+    "priority": 4,
+    "change": "Measure before doing more. In the register, login and reset handlers, log one line per hub refusal with code (invalid, email_domain, exists, bad_login, no_account, not_found, rate), the route, the platform from the existing app headers, and boolean flags computed on the raw input: hadFormatChar, hadNonAsciiDigit, hadTrailingPunct, hadUpper, accountState from step 1. Never log the address, the phone or any part of either. Read the counts after a week to see which cause dominates.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\server\\src\\auth\\service.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "A unit test asserts the log line holds no '@' and no digits from the input. After deploy, read the Railway logs for a day."
+   },
+   {
+    "priority": 5,
+    "change": "App OTA, JS only, safe on runtimes 1.2.0-1.3.3: no new native module, and autoComplete has been a TextInput prop on both platforms for many RN versions. (a) Add cleanEmail to app/src/lib/validation.ts, same rules as the server, and make isEmail judge the cleaned value against the same is_email-compatible shape. Send the cleaned value at register.tsx (latest.email), ProfileCompletionGate.tsx (contact e-mail), profile-edit.tsx (contact e-mail) and LoginIdentifier.tsx identifierPayload. Replace FormEmbed's private EMAIL_SHAPE with isEmail. On blur only, write the cleaned value back into the field; never while typing. (b) LoginIdentifier.tsx:105: if the text arriving in phone mode contains '@' or a Latin letter, call onChange({ ...value, mode: 'email', value: text }) instead of stripping it, and keep the phone draft. Add autoComplete='tel' on the phone field, autoComplete='email' plus textContentType 'username' on the e-mail field, and autoComplete='current-password' on login.tsx's password field. (c) Correct en.json errors.code.email_domain (and its ar twin if it says the same) to «Check the email address — your activation code is sent to it. Any personal or company address is accepted.»",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\lib\\validation.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\register.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompletionGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\profile-edit.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\LoginIdentifier.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\login.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\FormEmbed.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\i18n\\strings\\en.json"
+    ],
+    "delivery": "ota",
+    "howToVerify": "App tsc and eslint. A small unit table for isEmail and cleanEmail, shared with the server table so the two cannot drift. On the Android emulator (local debug build): paste an address with U+200F around it and see the cleaned value after leaving the field; paste 'name@gmail.com' into the phone tab and see the switch to the e-mail tab. iOS Keychain autofill into the phone field can be checked only on a real iPhone. Before publishing, check git status is clean of other sessions' work, then run the OTA command with --environment production --non-interactive for each runtime."
+   },
+   {
+    "priority": 6,
+    "change": "Confirm M239 is on the phones; no code change. Read the served manifest for each of the five production runtimes and confirm the bundle contains the M239 register.tsx (search the bundle for the `newest` handler or the M239 comment text). Watch the open store-iPhone OTA problem: until App Store 1.3.3 is live, an iPhone that does not apply OTAs keeps the pre-M239 sign-up form.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\auth\\register.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Read-only manifest and bundle fetch from u.expo.dev (multipart/mixed). Whether the red line is really gone on an iPhone 1.3.2 can be seen only on the owner's iPhone, by picking the address from the QuickType suggestion and tapping the next field."
+   },
+   {
+    "priority": 7,
+    "change": "Hub plugin, the owner's plugin chat plus the rig, then the New Era folder. (1) op_register: a non-empty address that fails is_email answers the email_domain sentence ('البريد الإلكتروني غير صحيح…') instead of 'البريد الإلكتروني مطلوب'. (2) op_register exists: return which field matched (field: 'email' | 'phone'), so step 2's extra lookups can go later. (3) op_login: an account whose source ends in :apple or :google answers bad_login with 'حسابك مسجّل بزر Apple/Google — ادخل به، أو استخدم «نسيت كلمة المرور»', as reset_request already does. (4) op_member_status: also match contact_email and report has_account, so the Apple-relay case returns bad_login correctly.",
+    "files": [
+     "C:\\Projects\\vibes-test-rig\\work\\hub\\vibes-ai-assistant\\includes\\class-vai-hub.php",
+     "C:\\Projects\\vibes-test-rig\\work\\hub\\vibes-ai-assistant\\includes\\helpers.php"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Rig phases A-D plus the static checker. Then e2e from the emulator against api-test: a Google-born account with a typed password, a phone-taken sign-up, and a malformed address."
+   }
+  ],
+  "ownerMessage": "Most members who type a correct e-mail and still see an error are people the club already knows without an app password (paid on the website, earlier contacts, or Google/Apple accounts): the app tells them the password is wrong, or tells them there is no account. Others hit a mobile number already used by another account, which the message blames on the e-mail, and on older iPhone versions a red warning stayed under a correct address. A server change that sends the first group to create their account and names the field actually in use reaches every phone without a new build. A small app update and the 1.3.3 iPhone release take care of the rest."
+ }
+}

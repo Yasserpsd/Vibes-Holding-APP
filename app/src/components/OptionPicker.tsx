@@ -5,7 +5,7 @@ import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextI
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FieldError } from '@/components/form/FormParts';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
@@ -127,7 +127,8 @@ const styles = themedStyles(() => ({
   hint: { ...typography.caption, textAlign: textStart },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.lg },
   sheet: { maxHeight: '75%', gap: spacing.sm, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1 },
-  search: { ...typography.body, padding: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, textAlign: textStart },
+  // A TextInput reads left/right as the physical sides (a Text does not): the box starts on the language's own side.
+  search: { ...typography.body, padding: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
   list: { flexGrow: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm, borderRadius: radii.md },
   rowText: { ...typography.body, flex: 1, textAlign: textStart },

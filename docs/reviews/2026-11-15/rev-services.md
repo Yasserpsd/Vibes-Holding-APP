@@ -29,6 +29,15 @@ Area: `services`, `service/[key]`, `form/[key]`, `requests`, `affiliate/*`, `Ser
 - **Decision 5** — `form.file.hint` and `form.file.badType` exist in both tables now; the `tOptional` calls stay and show them.
 - **Decision 6, amounts** — `app/requests/index.tsx`: the private `sarAmount` is gone, `formatSar` from `@/lib/format` instead. `app/affiliate/index.tsx`: balance, withdrawn, commission (three sentences), bonuses, the cycle allowance (two sentences) and each payout amount use `formatSar`; the counts (members, days, target, cycle number) stay `formatNumber`. `app/affiliate/payout.tsx`: the amount to withdraw uses `formatSar`.
 
+### Third round — two findings of the Android emulator run (both are in `components/ServiceTile.tsx`; the run named `ServiceCard.tsx`, but both screenshots show the grid tile)
+
+- **Item 39** (`services-ar-dark.png`) — a tile without a price and without a saving no longer draws the gold filament and the two empty reserved lines under its summary; a price without a saving no longer keeps an empty second line. The inner pressable now fills its wrapper (`press: { flex: 1 }` — it was missing, which is why the two tiles of a row were already 6 pt apart in the screenshot), so every card reaches the height of the tallest tile in its row and the grid stays even.
+- **Item 26** (`home1-en-dark.png`) — in English the call-to-action pill takes a second line («Start your / consultation», «Request your / meetup») instead of ending in «…»; it sits beside the 42 pt icon ring, so the tile is no taller. Arabic keeps its one-line pill, untouched (the wrap styles apply in English only).
+
+### Fourth round — final emulator pass, item 1 (`final-font200-service-en-dark.png`)
+
+- `app/service/[key].tsx` — the savings pill under the price («Save 15,000 … with your membership») ran past the right edge with a 200% system font. It is now never wider than its column (`maxWidth: '100%'`), its sentence wraps inside it in both languages (`flexShrink: 1`, no `numberOfLines`), and the radius is 16 pt — the same full pill on one line, a rounded box when wrapped. `tsc` exit 0 (the earlier `RichText.tsx` errors are gone), `eslint` exit 0. Not re-shot on the emulator.
+
 ## Problems not fixed
 
 - **medium — `meetup/[key].tsx` renders `FormEmbed` without `scrollRef`** (rev-community applies it): the red fields and summary work there, only the auto-scroll to the first error waits for `<Screen scrollRef={scrollRef}>` + `<FormEmbed … scrollRef={scrollRef} />`.
@@ -50,5 +59,6 @@ Done by the coordinator or by me in the second round: the two `form.file.*` stri
 
 - `cd app; npx tsc --noEmit` → exit 0, no errors (last run after the second round's final edit; other sessions' edits were in the tree).
 - `npx eslint` on all 14 files I changed (`api/forms.ts`, `services/index`, `service/[key]`, `form/[key]`, `requests/index`, `affiliate/index|apply|payout`, `ServiceCard`, `ServiceTile`, `FormEmbed`, `FormField`, `FormFileField`, `form/FormParts`) → exit 0, no warnings.
+- Third round (2026-11-16): `npx eslint src/components/ServiceTile.tsx` → exit 0. `npx tsc --noEmit` → exit 2 with three errors, none in my files: `src/components/advisor/RichText.tsx(19,15)` `Cannot find name 'textDir'` and `(158,48)`, `(188,26)` `Cannot find name 'START_EDGE'` — another session's edit in progress (the file is modified in the tree); left untouched.
 - Not run: any device or emulator (not allowed for this session; the app has no web target). Behaviour above is from reading the code and the `expo-file-system` 57.0.7 source. To eyeball once on a device before the 1.3.4 build: a real upload on both platforms (percentage moves, «إلغاء» stops it, a second pick works after a cancel), the FormEmbed scroll-to-first-error, the Android keyboard on a long form, and the long-press copy on the affiliate link.
 - Copy scan of my files: no «مجاني / مجانًا / مجانية», no hyphen-minus between numbers, no colloquial Arabic added.

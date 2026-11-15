@@ -1,0 +1,333 @@
+{
+ "key": "arabic-in-english-mode",
+ "words": "Almost everyone who uses the app in English (foreigners) complains that a great deal of Arabic text shows in many places and they cannot understand it.",
+ "diagnosis": {
+  "summary": "The app's own wording is complete in English (1,534 keys, none missing, no Arabic sentence in the screens' code); every Arabic sentence an English member meets is server content or a picture. Whole areas were served in Arabic until the three server passes of 1, 4 and 14 November (M180, M199, M239 - the last committed 2026-11-14 21:13 and pushed that evening), which fits \"Arabic everywhere\"; a live read-only check today (128 GETs with x-app-lang: en) finds the public API clean except the eleven Golden offer pages (600 of 615 text blocks Arabic). What still reaches an English member: those offer pages, pictures / video thumbnails / posters with Arabic lettering and Arabic-speech videos, notes and replies typed in Arabic by the management or other members, Arabic iOS microphone and Face ID prompts on binaries up to 1.3.2, and server errors that the English app replaces with one general sentence. Today's review pass cured none of the Arabic sources; it only added English error sentences, in the tree and not yet published.",
+  "causes": [
+   {
+    "cause": "Golden company offer pages have no English at all: the server copies each company's Arabic web /offer/ page and serves the same blocks to both languages.",
+    "evidence": "Live, production, x-app-lang: en: 11 pages (V + 01..10), 615 text blocks, 600 contain Arabic (V 118/121, 01 30/31, 02 87/90, 03 50/53, 04 19/19, 05 41/43, 06 85/88, 07 81/81, 08 52/52, 09 2/2, 10 35/35). Code: C:/Projects/vibes-club-app/server/src/golden/service.ts:116-127 fetches the page with 'accept-language: ar,en;q=0.6' and stores one `blocks` list; C:/Projects/vibes-club-app/server/src/content/routes.ts:86 answers `blocks: offer?.blocks ?? []` with no langOf (the company name, tagline and disclaimer on lines 85-88 are localized, the body is not); C:/Projects/vibes-club-app/app/src/app/golden/[code].tsx:96-111 draws block.text as received. Sequence: English member opens Golden Projects -> taps a company -> English header, then the whole page body in Arabic.",
+    "platforms": "iOS and Android, every app version (server answer)",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's diff of golden/[code].tsx only touches image sizing, the 404 state and the keyboard wrapper; nothing in server/src/golden."
+   },
+   {
+    "cause": "History: until 1, 4 and 14 November large parts of the server content were served in Arabic to the English app; the complaints most likely describe that state.",
+    "evidence": "git: 53ac169 (2026-11-01 21:44, M180) first gave English to the Projects Bank (259 projects) and management messages; 386e66a (2026-11-04 22:58, M199) added englishCache.ts for referrals, agenda files, invites, payments, profiles, requests and the member's own name; 1c4b1e4 (2026-11-14 21:13, M239) fixed the workshop popup, agenda pushes, events without English, companion tip, legal pages, Arabic hashtags on videos, founders' 'English' fields that held Arabic, Arabic names in WhatsApp notices. docs/PROJECT_BRIEF.md line 790 records M239 as pushed with four OTAs the same evening and says 'app code was clean; the leaks were server-side'. Today's live scan: /api/home, membership, about, guide, meetups, services (+15 pages), golden, news, videos (116), agenda, posts, people, partners, hq, 8 forms, legal and all 259 projects return zero Arabic strings in English. The persisted cache cannot replay the other language (C:/Projects/vibes-club-app/app/src/lib/queryCache.ts, `parsed.lang !== getLang()`).",
+    "platforms": "iOS and Android, every version (server-side, so each fix reached every bundle at once)",
+    "confidence": "likely",
+    "fixedToday": "Yes, but by the earlier server passes (last one 2026-11-14 evening), not by today's pass. I could not date the complaints."
+   },
+   {
+    "cause": "Pictures and videos carry Arabic that no translation touches: every picture slot holds one image for both languages, and all 116 videos are Arabic speech.",
+    "evidence": "No per-language picture field exists anywhere in server/src (grep for imageEn / posterEn / coverEn: nothing). C:/Projects/vibes-club-app/server/src/agenda/ad.ts:122 sends the same event poster to both languages (the brief notes the workshop poster is an Arabic image). C:/Projects/vibes-club-app/app/src/components/MeetupsBlock.tsx:58 and the videos list use YouTube's designed thumbnail (i.ytimg.com, 50+8 on page 1) - today's emulator screenshots C:/Projects/vibes-club-app/docs/reviews/2026-11-15/android-shots/home2-en-dark.png and home3-en-dark.png show English titles over thumbnails lettered in Arabic, and Arabic partner logos. Live picture counts in English: 3 screen banners, 15+67 service pictures, 2 event posters + 3 recording covers, 3 HQ photos, 7 people photos, 11 company logos.",
+    "platforms": "iOS and Android, every version",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Content only the owner can supply (English posters, thumbnails, subtitles); code can only add the slot and a text-free fallback."
+   },
+   {
+    "cause": "Text typed in Arabic by the management or by other members is served exactly as typed, with no English twin and no cached translation.",
+    "evidence": "(a) HQ: C:/Projects/vibes-club-app/server/src/hq/service.ts:210-229 returns `purpose` and `adminNote` as stored; an office or meeting-room booking stores the Arabic label (hq/service.ts:361 `HQ_SPACE_LABELS[space]`); shown at C:/Projects/vibes-club-app/app/src/app/hq/index.tsx:193-195 and hq/pass/[id].tsx:65,68. (b) Requests: C:/Projects/vibes-club-app/server/src/requests/routes.ts:30-32 translates titleEn and rows but not `note`; shown at app/src/app/requests/index.tsx:151-154. (c) 'A Life & Legacy' rejection note: app/src/app/people/apply.tsx:144-146. (d) Message-the-management thread: C:/Projects/vibes-club-app/server/src/contact/routes.ts and service.ts have no language handling; replies shown at app/src/app/contact.tsx:176. (e) Project reviews: C:/Projects/vibes-club-app/server/src/ratings/routes.ts:38-46, name and comment as typed; app/src/components/project/ProjectReviews.tsx:69,74. (f) Event ticket: C:/Projects/vibes-club-app/server/src/agenda/routes.ts:214-220 has no langOf; agenda/service.ts:520 uses event.title / place (not event.en) and :156 an Arabic attendance label; app/src/app/agenda/ticket/[id].tsx:59,65,68. (g) Representative share text: C:/Projects/vibes-club-app/server/src/affiliate/routes.ts:167 (intro and agreement have English twins, shareText has none). The affiliate notes are simply hidden in English (app/src/app/affiliate/index.tsx:191,278), so that information is lost rather than translated.",
+    "platforms": "iOS and Android, every version",
+    "confidence": "proven-in-code",
+    "fixedToday": "No (M239 only hid the two affiliate notes). Today's tree even shows the Arabic request title when the English one is empty (app/src/app/requests/index.tsx:109)."
+   },
+   {
+    "cause": "Server errors are always written in Arabic; the English app never prints them, but for most codes it has no sentence of its own and shows one general line, so the member cannot tell what is wrong.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/auth/guard.ts:41-50 and every RequestError send Arabic only (live: 401, 403, 404 answers are Arabic with x-app-lang: en). C:/Projects/vibes-club-app/app/src/api/client.ts:127-132: English takes `errors.code.<code>` from the table, otherwise a server message without Arabic letters, otherwise the general sentence. Script over server/src: 144 error codes, 89 had no English sentence in the members' bundle (97705af), 34 still have none in today's tree (bad_date, bad_time, bad_span, bad_purpose, bad_option, duplicate, gateway, no_fee, no_event, address, city, heard_from, member_review ...). The code `invalid` is used 53 times with a specific Arabic sentence each (which field, why); in English all 53 read 'Some of the details entered are not valid'.",
+    "platforms": "iOS and Android; all bundles published up to 2026-11-14",
+    "confidence": "proven-in-code",
+    "fixedToday": "Partly: the English table grew from 71 to 127 error sentences in the tree (not published yet); 34 codes and the one-size `invalid` sentence remain."
+   },
+   {
+    "cause": "English-only failure next to the complaint: a plain visit to the headquarters cannot be booked from the English app.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/hq/service.ts:186 `content(lang = 'ar')`; :347 book() reads `this.content()` (Arabic) and :362 refuses any purpose not in the ARABIC list (`bad_purpose`). The English app shows the English list (live /api/hq in English: 'Meeting room booking', 'Business meeting', ...; Arabic list differs) and posts the label it shows: C:/Projects/vibes-club-app/app/src/app/hq/book.tsx:86,104,207-208. `errors.code.bad_purpose` exists in neither table, so the member sees the general error. Forms accept both languages (C:/Projects/vibes-club-app/server/src/forms/service.ts:117-119); HQ does not. Office and meeting-room bookings pass because the server names them itself.",
+    "platforms": "iOS and Android, English mode, every version",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Not reproduced live (no POST allowed in this step)."
+   },
+   {
+    "cause": "iPhone permission prompts for the microphone and Face ID are Arabic on the store binaries up to 1.3.2, whatever the phone language.",
+    "evidence": "`git show 1c4b1e4^:app/app.config.ts` lines 111 and 114: the expo-audio and expo-local-authentication prompts are Arabic literals, and app/locales/en.json then held only the tracking prompt. M239 moved them to English defaults plus C:/Projects/vibes-club-app/app/locales/en.json and ar.json (C:/Projects/vibes-club-app/app/app.config.ts:32-33, 100-101, 129, 132) - native, binary 1.3.3 only.",
+    "platforms": "iOS, binaries 1.2.0 to 1.3.2 (Android draws these dialogs itself)",
+    "confidence": "proven-in-code",
+    "fixedToday": "Fixed in binary 1.3.3 (submitted 2026-11-14, still in review per the brief); an OTA cannot change it."
+   },
+   {
+    "cause": "By design the English app falls back to the Arabic text whenever the automatic English is missing or the AI call failed.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/content/i18n.ts:80 ('A missing translation leaves the Arabic text'); translate.ts:59; englishCache.ts:41-43 sends all missing texts in ONE call with a 20 s limit (the app's read deadline is 15 s) and returns the Arabic on failure; content sweep every 360 min, 5 s after a dashboard edit (content/englishSweep.ts:22-24); Projects Bank pass hourly (projectsBank/english.ts:20), so a new or edited project keeps its Arabic excerpt and details for up to an hour; posts hourly retry (posts/english.ts:15-16); the member's own name stays Arabic when MeLocalizer fails (auth/routes.ts:184). On the local mock server (no translator) today's screenshots show exactly this: inbox-en-dark.png has two Arabic event rows, home1-en-dark.png greets 'Welcome, ناصر'. Live production today shows no such hole.",
+    "platforms": "iOS and Android, every version",
+    "confidence": "possible",
+    "fixedToday": "No. Nothing tells the owner when a translation failed."
+   },
+   {
+    "cause": "Arabic outside the app's own screens for an English member.",
+    "evidence": "(a) WhatsApp broadcast of a management message: C:/Projects/vibes-club-app/server/src/whatsapp/tell.ts:62 uses only the language of the member's registered device; a member without a push token (notifications declined or signed out) gets Arabic, while the one-to-one path (:31) also falls back to the hub's stored language. (b) Payment: the gateway description is the Arabic service title (C:/Projects/vibes-club-app/server/src/payments/service.ts:380, :397 'حضور فعالية: ...' -> moyasar.ts:84); the return page is Arabic only (payments/pages.ts:28 `lang=\"ar\" dir=\"rtl\"`), though the embedded checkout intercepts it (app/src/app/checkout/[id].tsx) so only old binaries show it. (c) Links that open Arabic web pages: form agreement links (C:/Projects/vibes-club-app/server/src/forms/content.ts:165 vcmem.com/workshop/), partner and company sites. (d) /legal pages in English are a summary, not the full text.",
+    "platforms": "iOS and Android",
+    "confidence": "proven-in-code",
+    "fixedToday": "No."
+   },
+   {
+    "cause": "The advisor: the hub's quick-reply buttons arrive in Arabic, and the reply language rests on a soft instruction to the hub's model.",
+    "evidence": "C:/Projects/vibes-club-app/server/src/advisor/context.ts:71-72 only adds '(English: reply in English)' to the page title and a note; quick_replies options come from the hub untouched (C:/Projects/vibes-club-app/app/src/api/advisor.ts:6; docs/reviews/2026-11-15/rev-advisor.md:66). The opening, bot name and gate text are correctly replaced through hubText() (AdvisorChat.tsx:277,307,392).",
+    "platforms": "iOS and Android",
+    "confidence": "possible",
+    "fixedToday": "No. Not tested against the live hub."
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Golden offer pages in English, automatically: after each refresh translate every text block once through the existing translator and cache (new EnglishCache prefix `golden`, batches of 40 like the content sweep), store `blocksEn` beside `blocks` in the kv snapshot, and answer `lang === 'en' ? offer.blocksEn ?? offer.blocks`. Give EnglishCache.texts() batching so a 121-block page is not one 20-second call. Optional later: an `offerUrlEn` field per company for an owner-written English page, which then wins over the AI text.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/golden/service.ts",
+     "C:/Projects/vibes-club-app/server/src/content/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/englishCache.ts",
+     "C:/Projects/vibes-club-app/server/src/app.ts",
+     "C:/Projects/vibes-club-app/server/src/golden/golden.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "AI wording of investment copy (valuations, no promised returns): numbers must stay untouched and the owner should read the 11 pages once. About 600 blocks of one-time OpenAI cost. Until the first pass ends the page stays Arabic."
+   },
+   {
+    "change": "English for text typed in Arabic, with the existing EnglishCache at serve time: HQ visit `adminNote` and `purpose` (purpose mapped by its position in the Arabic/English lists, space labels from a table), request `note`, the people-profile rejection note, management replies in the contact thread (not the member's own lines), review comments plus reviewer names through NameTransliterator, the event ticket (title and place from event.en, attendance label from a table, holder name from me.en), and a `shareTextEn` twin for the representative's share text. Then stop hiding the affiliate notes in English and translate them the same way.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/hq/service.ts",
+     "C:/Projects/vibes-club-app/server/src/hq/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/requests/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/profiles/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/contact/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/ratings/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/agenda/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/agenda/service.ts",
+     "C:/Projects/vibes-club-app/server/src/affiliate/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/affiliate/service.ts",
+     "C:/Projects/vibes-club-app/app/src/app/affiliate/index.tsx"
+    ],
+    "delivery": "server",
+    "risk": "Machine translation of a management note can be imprecise. The first English request waits for the AI: give it a short limit and serve the Arabic for that one answer. Only the affiliate un-hiding needs an OTA."
+   },
+   {
+    "change": "HQ booking in English: in book() accept the purpose in either language (find it in the English list, store the Arabic one at the same position), and pass langOf(request) to myVisits / pass / cancel so `purpose` is shown in the member's language.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/hq/service.ts",
+     "C:/Projects/vibes-club-app/server/src/hq/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/m6.test.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low. If the owner edits the two purpose lists to different lengths the position match must fail safe (keep the text as sent)."
+   },
+   {
+    "change": "Errors in English from the server: one reply hook that, for x-app-lang: en, swaps an Arabic `error.message` for its cached English (EnglishCache prefix `error`; on a miss translate in the background and send the Arabic, which the app already replaces). Existing bundles show a Latin server message for every code they do not know (client.ts:131), so the 89 codes are covered without an OTA. In the app, let `invalid` and `bad_request` prefer a non-Arabic server message over the table sentence, and add the 34 codes still missing to en.json / ar.json.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/app.ts",
+     "C:/Projects/vibes-club-app/server/src/auth/guard.ts",
+     "C:/Projects/vibes-club-app/app/src/api/client.ts",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/en.json",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/ar.json"
+    ],
+    "delivery": "server",
+    "risk": "Messages that embed a name or a number create many cache entries: cap the cache and skip long texts. The app half (the `invalid` preference and the table) needs an OTA to the five runtimes."
+   },
+   {
+    "change": "Pictures: add an optional English picture to the event poster, the three screen banners and the service pictures in the dashboard; in English, when none is given, send no poster so the popup uses its text-free fallback (WorkshopAd.tsx:89 already falls back to the HQ photo). For videos and meetup cards the owner either uploads bilingual thumbnails on YouTube or agrees that the English app uses YouTube's plain video frame instead of the designed thumbnail.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/agenda/ad.ts",
+     "C:/Projects/vibes-club-app/server/src/agenda/service.ts",
+     "C:/Projects/vibes-club-app/server/src/content/images.ts",
+     "C:/Projects/vibes-club-app/server/src/videos/service.ts",
+     "C:/Projects/vibes-club-app/app/src/components/MeetupsBlock.tsx"
+    ],
+    "delivery": "dashboard-content",
+    "risk": "The English pictures themselves are the owner's work. Plain video frames can look dull or still show burnt-in Arabic captions. The MeetupsBlock change needs an OTA."
+   },
+   {
+    "change": "Videos are Arabic speech: decide between English subtitles on YouTube, or a small 'Arabic audio' tag on video cards in the English app so a foreigner knows before opening.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/VideoCard.tsx",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/en.json"
+    ],
+    "delivery": "owner-decision",
+    "risk": "None in code; subtitles are content work."
+   },
+   {
+    "change": "Notices and pages outside the app: in tellAudience fall back to the hub's stored language when the member has no device (as tellMember does); build the gateway description from the English service title or event.en when the payment's language is English; render /pay/return in the payment's stored language.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/whatsapp/tell.ts",
+     "C:/Projects/vibes-club-app/server/src/payments/service.ts",
+     "C:/Projects/vibes-club-app/server/src/payments/pages.ts"
+    ],
+    "delivery": "server",
+    "risk": "The hub's account list may not carry `lang` (then one member_status call per account, or a hub change). Payment titles are also used in mails and invoices: change only the gateway description."
+   },
+   {
+    "change": "Make missing English visible and shorter-lived: count failed translations per source and show them on the dashboard / health line; translate a new or changed project right after the feed refresh instead of waiting for the hourly pass.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/projectsBank/english.ts",
+     "C:/Projects/vibes-club-app/server/src/content/englishSweep.ts",
+     "C:/Projects/vibes-club-app/server/src/posts/english.ts",
+     "C:/Projects/vibes-club-app/server/src/app.ts"
+    ],
+    "delivery": "server",
+    "risk": "Low; more OpenAI calls right after a large feed change."
+   },
+   {
+    "change": "iPhone microphone and Face ID prompts: nothing to write, release binary 1.3.3 (already submitted). Members on 1.3.2 keep the Arabic prompt until they update.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/app.config.ts",
+     "C:/Projects/vibes-club-app/app/locales/en.json"
+    ],
+    "delivery": "new-binary",
+    "risk": "None beyond the store review."
+   },
+   {
+    "change": "Owner content with no automatic answer: English versions of the web pages the app links to (workshop terms on vcmem.com, company and partner sites), the full legal text in English (today a summary), and English quick-reply buttons from the hub's advisor (hub plugin, edited in the owner's other chats; the server could translate the buttons through EnglishCache meanwhile).",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/forms/content.ts",
+     "C:/Projects/vibes-club-app/server/src/legal/pages.ts",
+     "C:/Projects/vibes-club-app/server/src/advisor/service.ts"
+    ],
+    "delivery": "owner-decision",
+    "risk": "Legal wording needs the owner's or a lawyer's approval; the Arabic text stays the authoritative one."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone or on any phone. App behaviour is read from the code and from today's Android emulator screenshots in C:/Projects/vibes-club-app/docs/reviews/2026-11-15/android-shots (taken against a local server, not production).",
+   "Signed-in answers were not fetched live (no session): /api/me, HQ visits and pass, requests, contact thread, affiliate, payments, event ticket, advisor history. Everything said about them comes from the server code.",
+   "When each complaint was made is unknown, so 'most of it predates the 14 November evening deploy' is an inference from the commit dates and the brief, not a measurement. I did not read which commit production runs, only how it answers.",
+   "Pictures were not opened: whether the 3 screen banners, 82 service pictures, event posters, HQ and people photos carry Arabic lettering is unchecked. Arabic lettering was seen only on YouTube thumbnails and partner logos in the emulator screenshots.",
+   "The HQ visit refusal in English (bad_purpose) was not reproduced: POST requests were not allowed in this step.",
+   "The advisor's reply language and quick replies on the live hub, the language of hub e-mails (verification, password reset) and of the WhatsApp sign-in code were not tested.",
+   "Not called on purpose: /api/app/status and /api/news/:id (each call changes a counter) and /api/projects/:id/brief (spends an AI request).",
+   "The language of the Moyasar hosted payment page itself was not checked.",
+   "How often the Arabic fallback happens in production (failed or late AI translations) could not be measured; the live scan today found no such hole on the public routes."
+  ],
+  "data": "LIVE SCAN, production https://api.vibesholdingsa.com, 2026-11-15, header x-app-lang: en, GET only, no session, about 2.6 requests a second, 96 + 32 requests. Scripts and raw result (outside the repo): C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\scan-en.mjs, C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\scan2.mjs, C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\scan-en.json\n\nFIELDS THAT STILL CARRY ARABIC IN ENGLISH (field path | Arabic / total | sample | does the app show it?)\n- /api/golden/offer/:code blocks[].text | 600 / 615 over 11 pages | «قبل أن تصل إلى أرقام العرض، شاهد كيف تجمع وديني النقل والشحن» | YES, the whole page body\n- error.message on every refused request | always | «سجّل الدخول أولًا», «المشروع غير موجود», the members-only sentence | no: replaced by the app's table or the general sentence\n- /api/auth/config countries[].name | 198 / 198 | «السعودية» | no: the app reads nameEn or its own table (CountryPicker.tsx:15)\n- /api/auth/config phonePolicy, emailPolicy | 1 / 1 each | «التسجيل متاح من أي دولة في العالم...» | no: the app uses its own key (register.tsx:261)\n- /api/markets quotes[].label 14 / 16, unit 16 / 16 | «السوق السعودي», «تاسي · نقطة» | no: the app reads labelEn / unitEn\n- items[].sector.slug 258 / 258, /api/projects/filters sectors[].slug 18 / 18 | «الطاقة-والاستدامة» | no: a filter key, never drawn\n- /api/feed items[].title 19 / 26, excerpt 16 / 26 | «الأسئلة الشائعة» | no: the app never calls this route\n\nCLEAN IN ENGLISH (0 Arabic strings): /api/strings, /api/home (159 strings), /api/membership (191), /api/membership/store, /api/about (79), /api/guide (49), /api/meetups (102), /api/services (317) and 15 service pages, /api/images, /api/golden (54), /api/news/topics, /api/news/feed (139), feed scope=home (113), /api/news/number, /api/news/decisions (46), /api/videos (419; 116 videos) and 2 video pages, /api/agenda (35) and 2 events, /api/posts (10) and 1 post, /api/popups, /api/people (36), /api/partners (21), /api/sync, /api/discounts/active, /api/workshop-ad (10), /api/interests (20), /api/badges, /api/hq (62), 8 forms (252), /legal/privacy, /legal/terms, /legal/account-deletion, 3 project pages and their reviews.\nProjects Bank, all 259 projects in English: Arabic in title 0, company name 0, excerpt 0, details 0, sector name 0, stage name 0. First page compared with Arabic: no empty English field (details 69,564 characters in English against 51,473 in Arabic).\n\nAPP TABLES (git show 97705af, the members' bundle): ar.json 1,534 keys, en.json 1,534 keys, 0 missing; 3 English values hold Arabic on purpose (lang.arabic, welcome.language, account.menu.language: the way back to Arabic). Arabic literals in app/src outside comments: 97 lines, all patterns, icon keywords, month names with an English twin, and the riyal marker that SarText swaps for the symbol; no sentence.\nhubText(): 7 call sites, all correct (auth/verify.tsx:32,90; advisor/AdvisorChat.tsx:277,307,392; project/ProjectUnlock.tsx:114,120).\nDates and numbers: lib/format.ts has English months, relative time and counts; digits are Latin in both languages.\n\nERROR CODES: 144 codes in server/src; without an English sentence: 89 in the members' bundle, 34 in today's tree (address, bad_date, bad_option, bad_purpose, bad_span, bad_time, below_used, city, decided, duplicate, empty, empty_list, gateway, golden, heard_from, honorary, invalid_hmac, member_review, member_session_gone, no_event, no_fee, no_project, not_poll, off, otp_mail_failed, otp_mail_off, otp_off, pb_config, pb_not_configured, pb_not_supported, popup, supported_price, too_many, unavailable).\n\nPICTURES SERVED TO THE ENGLISH APP (one image for both languages): screen banners 3, service pictures 15 + 67, event posters 2 + recording covers 3, workshop popup poster 1, HQ photos 3, people photos 7, company logos 11, partner logos 2, video thumbnails from YouTube (58 on the first page of 116 videos).\n\nRAW SERVER TEXT THE APP DRAWS UNTRANSLATED (code): golden blocks; hq visit purpose and adminNote; request note; people-profile note; contact replies; review name and comment; ticket event title, place, holder; affiliate shareText; advisor hub replies and quick replies."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "The code claims I re-checked hold. Golden: server/src/content/routes.ts:86 returns `blocks: offer?.blocks ?? []` with no language, while the name, tagline and disclaimer (lines 80-88) are localized. HQ: server/src/hq/service.ts:186 `content(lang = 'ar')`, :347 book() calls `this.content()`, :361-362 refuse any purpose that is not in the Arabic list. The English app sends the English label it shows (git show 97705af:app/src/app/hq/book.tsx:86,104). Errors: 97705af:app/src/api/client.ts:123-126 uses the table sentence, then a server message with no Arabic letters, then null (the general sentence). Requests: server/src/requests/routes.ts:30-32 translates titleEn and rows but not `note`.",
+   "The HQ `bad_purpose` refusal is a real English-only bug, but it is not the Arabic-text complaint. The member sees the app's general English error, not Arabic. Rank it as a broken feature, separate from the complaint.",
+   "Line numbers for the iPhone prompts are off. In the tree, app/app.config.ts has expo-audio at :145 and expo-local-authentication at :148, and `locales` at :117, not 100-101/129/132. The finding itself is right: `git show 1c4b1e4^:app/app.config.ts` lines 111 and 114 are Arabic literals.",
+   "Error-message fix: an AI translation at reply time through EnglishCache is the wrong tool. These messages are fixed sentences in our own code, so translating them per request spends OpenAI calls and adds delay and a cache-size problem for no gain. The member's first failure would still be Arabic, which the app then hides behind the general sentence. Better: give RequestError an optional English twin written in code, and send it when langOf(request) === 'en'. Existing bundles already show a Latin server message for codes missing from their table (client.ts:126), so the server change alone covers them without an OTA.",
+   "`invalid` is the one exception. Every bundle up to 97705af has `errors.code.invalid` in its table, so the table sentence wins even when the server sends English. Only an OTA that prefers a Latin server message for `invalid` / `bad_request` cures it. The colleague mentions this but files the whole item as 'server'; it is server plus OTA.",
+   "Request title: the tree's fallback to the Arabic title (app/src/app/requests/index.tsx:109) replaces the old bundle's empty title (97705af line 85). That is an improvement, not a new leak. Since the server fills titleEn through english.rows, it rarely triggers.",
+   "The 'History' cause is the most likely main explanation for 'Arabic in many places'. It is still inference: neither of us could date the complaints. Only the owner can confirm by asking the members when they saw it (before or after the evening of 2026-11-14)."
+  ],
+  "missedCauses": [
+   "The advisor tab (a main tab for every member) answers through the live n8n brain. Per docs/M150_N8N_AUDIT.md:197, the brain picks the reply language from the letters of the current message (Arabic letters give an Arabic reply, Latin gives English) and is told to ignore the stored 'لغته: en'. That rule overrides the app's English note (server/src/advisor/context.ts:71-72). Results: an English-mode member who taps a quick reply or a suggestion that is Arabic text, or whose voice note is transcribed with any Arabic, gets an Arabic answer. The same audit shows the brain's tool buttons carry Arabic labels («المشاريع الذهبية», «بنك المشاريع»). Not tested live: n8n MCP and live hub calls were not allowed in this step.",
+   "Several Arabic web pages open inside the app: the payment invoice (Moyasar or hub invoice) opens in the in-app browser from app/src/app/payment/[id].tsx:157 with no language parameter; pitch decks open after an unlock (app/src/app/deck.tsx) as the founders' Arabic PDFs; news 'read from source' pages are whatever the source publishes. Only the legal pages get `?lang=` (StorePurchaseCard.tsx:256 legalUrl).",
+   "Member-typed community posts are translated only by an hourly pass (server/src/posts/english.ts). A fresh post stays Arabic for up to an hour in English. The colleague's 'possible' cause covers this; my point is that it is routine, not a failure case.",
+   "Rule ruled out: the app's own language handling is not a cause. initI18n (97705af:app/src/i18n/index.ts:132-137) follows the device language on every runtime except 1.0.0. syncStrings checks `answer.lang` (i18n/remote.ts). Overrides are stored per language, and the persisted query cache drops a snapshot from the other language. A device in English therefore starts in English with no Arabic from the app itself."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Golden offer pages in English. In server/src/golden/service.ts, after each offer refresh, translate every block's text through EnglishCache (new prefix 'golden'), in batches of at most 40 texts per OpenAI call, and store `blocksEn` next to `blocks` in the kv snapshot. Keep numbers, percentages and currency exactly as written: run a check that the Arabic block and its English text contain the same digit sequences, and keep the Arabic block when they differ. Add batching to EnglishCache.texts() (server/src/englishCache.ts:41-43 currently sends everything in one 20 s call). In server/src/content/routes.ts:86 answer `blocks: langOf(request) === 'en' ? (offer?.blocksEn ?? offer?.blocks ?? []) : (offer?.blocks ?? [])`. The localized disclaimer (line 88) stays on every page. Server-only: every bundle draws block.text as received (app/src/app/golden/[code].tsx).",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/golden/service.ts",
+     "C:/Projects/vibes-club-app/server/src/content/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/englishCache.ts",
+     "C:/Projects/vibes-club-app/server/src/golden/golden.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Unit test with a stub translator: blocksEn is filled, a block whose digits change keeps the Arabic text, Arabic requests are unchanged. After deploy: GET /api/golden/offer/01..10 and /V with x-app-lang: en; count blocks with Arabic letters (target near 0). The owner reads the 11 pages once for the valuation wording before announcing it."
+   },
+   {
+    "priority": 2,
+    "change": "English for text typed in Arabic, at serve time, through EnglishCache (short timeout; on a miss, send the Arabic and translate in the background): HQ `adminNote`; request `note` (requests/routes.ts:30-32: add 'note' to the english.rows fields); the people-profile rejection note; management replies in the contact thread (server/src/contact/routes.ts, staff lines only, never the member's own lines); review comments in server/src/ratings/routes.ts:38-46, with reviewer names through the existing NameTransliterator. Event ticket (server/src/agenda/routes.ts:214-220 and agenda/service.ts:520, :156): use event.en title/place when lang is en, take the attendance label from an English table, and the holder name from the member's English name. Add a `shareTextEn` twin to the affiliate share text (affiliate/routes.ts:167). Pass langOf(request) to myVisits / pass / cancel in hq/routes.ts. Show `purpose` through a position map between content('ar').purposes and content('en').purposes, and space labels through an English HQ_SPACE_LABELS table.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/hq/service.ts",
+     "C:/Projects/vibes-club-app/server/src/hq/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/requests/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/profiles/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/contact/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/ratings/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/agenda/routes.ts",
+     "C:/Projects/vibes-club-app/server/src/agenda/service.ts",
+     "C:/Projects/vibes-club-app/server/src/affiliate/routes.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Server tests in the m6/m36/m116/m41 style with a stub translator: each field comes back in English when x-app-lang is en and unchanged in Arabic. Then on the Android emulator against the local mock server in English: HQ visits, requests, contact, reviews and ticket show no Arabic. iPhone not needed: no native change."
+   },
+   {
+    "priority": 3,
+    "change": "HQ booking from the English app. In HqService.book (server/src/hq/service.ts:347-362), when no space is given, look up input.purpose first in the Arabic list. If it is missing there, find it in content('en').purposes and store the Arabic purpose at the same index, but only when both lists have the same length. Otherwise refuse with bad_purpose as today. Add an English sentence for `bad_purpose`, `bad_date`, `bad_time` and `bad_span` (step 4).",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/hq/service.ts",
+     "C:/Projects/vibes-club-app/server/src/m6.test.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "m6 test: book with an English purpose label: 200, stored purpose is Arabic; lists of different lengths: bad_purpose. Emulator in English: book a plain visit successfully."
+   },
+   {
+    "priority": 4,
+    "change": "Errors in English without AI. Give RequestError (and guard.ts:41-50 replies) an optional English message, written in code next to the Arabic. A global error handler in server/src/app.ts sends it when langOf(request) === 'en'. Write the English for the 34 codes still missing and for each of the 53 `invalid` uses. Existing bundles already show a Latin server message for codes not in their table (97705af client.ts:126), so those are fixed with no OTA. In the app (next OTA): in client.ts, for `invalid` and `bad_request` prefer a non-Arabic server message over the table sentence, and add the 34 codes to en.json/ar.json. This is plain JS with no native module, safe on runtimes 1.2.0-1.3.3.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/app.ts",
+     "C:/Projects/vibes-club-app/server/src/auth/guard.ts",
+     "C:/Projects/vibes-club-app/app/src/api/client.ts",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/en.json",
+     "C:/Projects/vibes-club-app/app/src/i18n/strings/ar.json"
+    ],
+    "delivery": "server",
+    "howToVerify": "Server test: a refused request with x-app-lang: en returns an English message, Arabic is unchanged. App: typecheck + lint, then on the emulator in English trigger a validation error and see the specific English sentence. Ship the OTA with --environment and check the u.expo.dev manifest for all runtimes."
+   },
+   {
+    "priority": 5,
+    "change": "Advisor in English. In the advisor send response (server/src/advisor/service.ts), when lang is en, pass quick_replies / button labels through EnglishCache (they are a small fixed set and cache well). In the n8n brain prompt (owner publishes, Claude prepares a draft), change the mandatory language rule so that the app's English note wins over the letters of the message, and so that tool-button labels follow the reply language.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/advisor/service.ts",
+     "C:/Projects/vibes-club-app/server/src/advisor/context.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Server test with a stub hub reply that carries Arabic quick replies: English labels come back. Live: one English message from the emulator signed in on the test server, then on the owner's iPhone in English. Only a live check proves the brain's reply language."
+   },
+   {
+    "priority": 6,
+    "change": "Messages and pages outside the screens. In server/src/whatsapp/tell.ts:62 (tellAudience), fall back to the hub's stored language when the member has no device token, as tellMember does at :31. Build the payment gateway description from the English service title or event.en when the payment's language is en (payments/service.ts:380,397); leave invoices and mails unchanged. Render /pay/return in the payment's stored language (payments/pages.ts:28). Add `lang` to the invoice URL opened at app/src/app/payment/[id].tsx:157 only if the invoice host supports it.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/whatsapp/tell.ts",
+     "C:/Projects/vibes-club-app/server/src/payments/service.ts",
+     "C:/Projects/vibes-club-app/server/src/payments/pages.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Server tests for the tell fallback and the description. Moyasar hosted page and invoice language: real test payment on the test server only."
+   },
+   {
+    "priority": 7,
+    "change": "Make missing English visible: count translation failures per source (content sweep, Projects Bank pass, posts, golden, EnglishCache misses) and show them at /api/admin/health and on the dashboard. Translate a new or changed project right after the feed refresh instead of waiting for the hourly pass.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/projectsBank/english.ts",
+     "C:/Projects/vibes-club-app/server/src/content/englishSweep.ts",
+     "C:/Projects/vibes-club-app/server/src/posts/english.ts",
+     "C:/Projects/vibes-club-app/server/src/englishCache.ts"
+    ],
+    "delivery": "server",
+    "howToVerify": "Server test with a failing translator: the counter rises and appears in the admin health answer."
+   },
+   {
+    "priority": 8,
+    "change": "Pictures and videos (owner content): an optional English picture for the event poster, screen banners and service pictures in the dashboard. In English, when none is given, send no poster so WorkshopAd falls back to the text-free HQ photo. For videos: English subtitles on YouTube, or a small 'Arabic audio' tag on video cards (app OTA, VideoCard.tsx + en.json). Both need the owner's decision.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/agenda/ad.ts",
+     "C:/Projects/vibes-club-app/server/src/content/images.ts",
+     "C:/Projects/vibes-club-app/app/src/components/VideoCard.tsx"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Emulator in English after the owner uploads one English poster: the English one shows, the Arabic one shows in Arabic."
+   },
+   {
+    "priority": 9,
+    "change": "iPhone microphone and Face ID prompts: no code. Release binary 1.3.3 (already carries the English defaults and InfoPlist locales). Members on 1.3.2 see Arabic prompts until they update; an OTA cannot change it.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/app.config.ts",
+     "C:/Projects/vibes-club-app/app/locales/en.json"
+    ],
+    "delivery": "new-binary",
+    "howToVerify": "Only on a real iPhone with the phone set to English, on 1.3.3 from the store: the advisor microphone and the security lock show English prompts."
+   }
+  ],
+  "ownerMessage": "Until the server updates of 1, 4 and 14 November, large parts of the app reached English users in Arabic. What still shows Arabic today is the eleven Golden company pages, notes and replies the management types in Arabic, the advisor's buttons, Arabic pictures and videos, and some error messages. The fix is mostly on the server: automatic English for the Golden pages and the typed notes first, then the advisor buttons and English error messages, with no new store build needed except for the iPhone microphone and Face ID prompts, which arrive with version 1.3.3."
+ }
+}

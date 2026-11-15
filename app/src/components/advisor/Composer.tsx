@@ -7,7 +7,7 @@ import { stopSpeech } from '@/components/advisor/speech';
 import { VoiceButton, voiceInputAvailable } from '@/components/advisor/VoiceButton';
 import { GlowButton, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { inputStart, isRTL, textDir, textStart } from '@/i18n/direction';
+import { inputStart, isRTL, markParagraphs, textDir, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -21,9 +21,13 @@ type Props = {
   attachment?: PendingFile | null;
   onAttach?: (file: PendingFile) => void;
   onDetach?: () => void;
+  /** Air under the field: the chat passes the height of the raised advisor button while the keyboard is closed. */
+  bottomRoom?: number;
+  /** The keyboard is up: the PDF hint line gives its height back, so on a short screen the field stays above the keys. */
+  keyboardOpen?: boolean;
 };
 
-export function Composer({ value, onChange, onSend, busy, attachment = null, onAttach, onDetach }: Props) {
+export function Composer({ value, onChange, onSend, busy, attachment = null, onAttach, onDetach, bottomRoom = 0, keyboardOpen = false }: Props) {
   // M104: voice input (binaries without expo-audio hide the mic; see VoiceButton).
   const [listening, setListening] = useState(false);
   const hasContent = value.trim().length > 0 || attachment !== null;
@@ -46,13 +50,13 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
     Animated.timing(cross, { toValue: showSpinner ? 1 : 0, duration: 160, useNativeDriver: true }).start();
   }, [cross, showSpinner]);
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, bottomRoom > 0 ? { paddingBottom: bottomRoom } : null]}>
       {attachment ? (
         <PopIn>
           <View style={styles.attachment}>
             <Ionicons name="document-text" size={18} color={colors.gold} />
             <Text style={[styles.attachmentName, textDir(attachment.name)]} numberOfLines={1}>
-              {attachment.name}
+              {markParagraphs(attachment.name)}
             </Text>
             {attachment.size > 0 ? <Text style={styles.attachmentSize}>{formatFileSize(attachment.size)}</Text> : null}
             {!busy && onDetach ? (
@@ -62,13 +66,18 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
             ) : null}
           </View>
         </PopIn>
-      ) : fileInputAvailable() && onAttach ? (
-        // The limit is said before a file is picked; the picked file takes this line's place.
+      ) : fileInputAvailable() && onAttach && !keyboardOpen ? (
+        // The limit is said before a file is picked; the picked file takes this line's place. Hidden while the
+        // keyboard is open: the member is writing, and a short screen has no room for the line above the keys.
         <Text style={styles.fileHint} numberOfLines={1}>
           {t('advisor.file.hint')}
         </Text>
       ) : null}
       <View style={styles.bar}>
+        {/* Review 2026-11-16: the focus glow sits on this frame, not on the input. A box shadow set on the input swaps
+            its Android background, and Android then resets the input's padding to the stock 4 dp inset: the words
+            hugged the border while typing. Never collapsed, so the glow does not re-parent the focused input. */}
+        <View style={[styles.inputFrame, focused && styles.inputFrameFocused]} collapsable={false}>
         <TextInput
           style={[styles.input, focused && styles.inputFocused]}
           value={value}
@@ -84,6 +93,7 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
           onBlur={() => setFocused(false)}
           accessibilityLabel={t('advisor.messageLabel')}
         />
+        </View>
         {fileInputAvailable() && onAttach && !attachment ? <FileButton disabled={busy || listening} onFile={onAttach} /> : null}
         {voiceInputAvailable() ? (
           <VoiceButton
@@ -150,8 +160,10 @@ const styles = themedStyles(() => ({
   attachmentName: { flex: 1, color: colors.textPrimary, fontFamily: fonts.medium, fontSize: 14, writingDirection: 'ltr' },
   attachmentSize: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 12, writingDirection: 'ltr' },
   fileHint: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, textAlign: textStart, marginHorizontal: spacing.md, marginTop: spacing.xs },
+  // The frame takes the row's free width and carries the focus glow; same corners as the input.
+  inputFrame: { flex: 1, borderRadius: radii.lg },
+  inputFrameFocused: { boxShadow: shadows.glowGoldFaint },
   input: {
-    flex: 1,
     minHeight: 44,
     maxHeight: 132,
     paddingHorizontal: spacing.md,
@@ -166,7 +178,7 @@ const styles = themedStyles(() => ({
     lineHeight: 24,
   },
   // The field lights up golden while the member writes.
-  inputFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
+  inputFocused: { borderColor: colors.gold },
   send: {
     width: 44,
     height: 44,

@@ -156,6 +156,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/withAndroidTrackingString',
     // M240: R8 code obfuscation in Android release builds (Play «DEX code optimization» notice, due Feb 2027).
     './plugins/withAndroidR8',
+    // M241: lets `android.allowBackup: false` win over the AppsFlyer SDK's own manifest (the merger refuses the build otherwise).
+    './plugins/withAndroidNoBackup',
     [
       'expo-tracking-transparency',
       { userTrackingPermission: 'This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.' },

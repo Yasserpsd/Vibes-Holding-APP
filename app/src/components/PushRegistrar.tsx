@@ -46,7 +46,15 @@ export function PushRegistrar() {
       if (handled.current.has(identifier)) return;
       handled.current.add(identifier);
       const target = targetOf(data);
-      if (target) router.push(target.screen as Href);
+      if (!target) return;
+      if (target.type === 'membership') {
+        // «تم تفعيل عضويتك» tapped from outside the app (or the tap that launched it): the account is re-read BEFORE
+        // the screen opens, so it shows the active membership and not the copy the app held. The screen opens after
+        // four seconds at the latest; a slower answer still updates it in place.
+        void Promise.race([refresh(), new Promise((resolve) => setTimeout(resolve, 4000))]).finally(() => router.push(target.screen as Href));
+        return;
+      }
+      router.push(target.screen as Href);
     };
     // A tap that launched the app: the response waits until the navigator is ready.
     notifications
@@ -67,6 +75,8 @@ export function PushRegistrar() {
       if (target.type === 'hq_visit') void queryClient.invalidateQueries({ queryKey: ['hq'] });
       if (target.type === 'post') void queryClient.invalidateQueries({ queryKey: ['posts'] });
       if (target.type === 'contact') void queryClient.invalidateQueries({ queryKey: ['contact'] });
+      // Every affiliate message (approved, a new commission, a payout…) changes what the affiliate screens show.
+      if (target.type.startsWith('affiliate')) void queryClient.invalidateQueries({ queryKey: ['affiliate'] });
     });
     return () => {
       tapped.remove();

@@ -1,0 +1,345 @@
+{
+ "key": "text-unreadable-or-overlapping",
+ "words": "Some people say text becomes unreadable: it disappears by itself, or lines sit on top of each other.",
+ "diagnosis": {
+  "summary": "There is no single engine bug. ClampText's invisible twin and the animation primitives (FadeInView, PopIn, Sheen, tickers) were checked against the React Native 0.86 sources and cannot leave text hidden or doubled. What members see comes from layout defects under three conditions: text drawn over an icon or picture (event cards without a photo, seen in today's Android screenshots); fixed-height or non-scrolling boxes that overflow on a small phone or with a larger system font, which is capped nowhere; and the light theme, where gold text sat at 2.2:1 on white and the membership card showed navy text on black. Today's pass already cured the light-theme gold, the membership card, the guest account screen and three popups in the tree (not shipped yet); the event cards, the font-size cap and the news strip heights are still open.",
+  "causes": [
+   {
+    "cause": "Event cards draw their text on top of the placeholder icon when the event has no photo (\"lines sit on top of each other\"). The calendar icon is centred in the whole card while the title, date line, fee and countdown stack up from the bottom and cross the middle.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx:77-79 and :129 (fallback is absolute, centred, 46 px icon), :92-100 (bottom block), :118-127 (card 200x216, overflow hidden). C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx:89-91, :152 (same fallback, 52 px icon), :109-134 (bottom block). Arithmetic for the home card at default font: bottom block = 38 + 92 = 130 dp, so the title starts at y=84-94 while the icon occupies y=85-131. Seen directly in C:\\Projects\\vibes-club-app\\docs\\reviews\\2026-11-15\\android-shots\\home3-ar-dark.png and agenda-ar-dark.png (title and date line written across the calendar icon). Sequence: open home or the agenda, an upcoming event has no photo, the title is unreadable over the icon. Same pattern, milder, in C:\\Projects\\vibes-club-app\\app\\src\\components\\MeetupsBlock.tsx:60-62, :97 (two-line title reaches the icon). Related: pills and titles laid over photos that carry their own words (GoldenOpportunity.tsx:86-99 over a project image, meetup YouTube thumbnails) as in home1-ar-dark.png and home2-en-dark.png.",
+    "platforms": "iOS and Android, every app version and every published bundle (AgendaBlock and MeetupsBlock are unchanged since before 97705af)",
+    "confidence": "proven-in-code",
+    "fixedToday": "no (agenda/index.tsx only got a date-badge change today; the overlap is still in the tree)"
+   },
+   {
+    "cause": "Non-scrolling, vertically centred containers taller than the screen: the content overflows above and below, the top goes under the status bar and the bottom runs over the next element or off the screen. Hits the guest account tab, the daily workshop popup and the members-only popup.",
+    "evidence": "Members' bundle (git show 97705af): app/src/components/PlaceholderScreen.tsx — a plain View with flex:1 + justifyContent:'center' holding a 140 px emblem, title, description and up to six buttons plus the support card (app/src/app/(tabs)/account.tsx:64-81), about 690 dp of content. Available height is about 678 dp on a 6.1 inch iPhone, 562 dp on an iPhone SE, 476 dp on a 640 dp Android: the overflow is split top and bottom, so the last buttons are drawn over the version footer line and under the tab bar. app/src/components/WorkshopAd.tsx (old :90-135): Modal > centred backdrop > card with a 190 px photo, headline, an unbounded AI-written body, facts and two buttons, no maxHeight and no ScrollView; about 600-700 dp at default size, so on a short phone or at 1.3x the «لاحقًا» button (the only exit on iOS) is off-screen; it opens once a day on every home open. app/src/components/MembershipGate.tsx (old :150-196, styles :264-266): same pattern. Still unscrollable in the working tree: GuestNudge.tsx, RateUsPrompt.tsx, IntroVideo.tsx popup, ProfileCompleteness.tsx popup, PhoneConfirmAlert.tsx, PasswordPrompt.tsx (smaller cards, they overflow only at large font sizes).",
+    "platforms": "iOS and Android, bundles up to 2026-11-14 on all runtimes; worst on short phones (iPhone SE/8, 640 dp Androids) and with larger text",
+    "confidence": "proven-in-code",
+    "fixedToday": "yes in the tree, not shipped: PlaceholderScreen.tsx:23 now scrolls, WorkshopAd.tsx:96 caps the card at 88% of the window with an inner scroll, MembershipGate.tsx:305 and GentlePopups.tsx scroll. The six smaller popups listed are not done."
+   },
+   {
+    "cause": "The system font size is never capped (no allowFontScaling or maxFontSizeMultiplier anywhere in app/src), while a few boxes have fixed heights or dp-based reserved heights. Text and lineHeight scale, the boxes do not, so text is clipped or cards become unequal.",
+    "evidence": "grep over app/src: zero matches for allowFontScaling / maxFontSizeMultiplier. (1) Home next-event card, C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx:18-19, :118-127 (height 216, overflow hidden, space-between): content height = 66 + (114 + 20 x title lines) x scale. At 1.0 one-line title 200 dp (fits in 214), at 1.3 it is 240 dp (the day/hour/minute labels of the countdown are cut), at 1.3 with a two-line title 266 dp (digits half cut), at 1.6 it is 280-312 dp (countdown gone). (2) News strip, C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx:158, :251-252, :262-263: only card 0 is in flow and gives the pager its height, the others are absolute under overflow hidden, and equal heights rely on minHeight 54 / 44 in dp. At scale above 1 a two-line title is 54 x scale but a one-line title stays 54, so when card 0 is shorter than a later card the later card's last snippet line is clipped (29 dp at 1.3x, 59 dp at 1.6x). (3) The (tabs) bar on Android: app/src/app/(tabs)/_layout.tsx:87 with a fixed 49 dp bar (node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabBar.js:47); labels scale on Android only (BottomTabItem.js:17 turns scaling off on iOS), so they are truncated and cut from about 1.5x. (4) GoldenOpportunity.tsx:118-128 (height 220, content pinned to the bottom): the pill row is cut from about 1.6x. Other screens are flex-based and grow correctly. iOS Dynamic Type steps are 1.12, 1.24, 1.35 then 1.79-3.57; Android 1.15, 1.3 and up to 2.0.",
+    "platforms": "iOS and Android, all versions; only members who raised the phone's text size (common among older users)",
+    "confidence": "proven-in-code",
+    "fixedToday": "no (today's pass only made the screens of the previous cause scrollable)"
+   },
+   {
+    "cause": "Light theme (available since 2026-11-04): gold text and several dark-only surfaces are unreadable. Pale gold (#D9A83C) on white reads at 2.2:1 in 127 places (source names, «اقرأ من المصدر», prices, section «عرض الكل» pills, links); the always-black membership card used theme text colours, so the role, labels and contact line were navy on black.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\theme\\tokens.ts:84-133 (light palette: goldLight #D9A83C, gold #B8842A, black #F4F6FA). Members' bundle: 127 uses of colors.goldLight as a text or icon colour (grep on the 97705af tree), e.g. SectionHeader ctaText, ProjectCard company/tag/views, NewsCard source, StructuredText headings. app/src/app/card.tsx at 97705af :387-513: CARD_BLACK slab with holderRole / contact in colors.textSecondary (#3E5068 in light) and numberLabel / cellLabel in colors.textMuted. Left in the working tree: 95 style lines with color: colors.gold (3.3:1 on white, weak at 12-15 px); C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx:85 and :152 (no scrim when the image is missing, title stays white on the light surface); C:\\Projects\\vibes-club-app\\app\\src\\components\\wow.tsx:396 (flipLabel uses textMuted on the event photo); C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx:123-124 (success / warning colours on the photo scrim).",
+    "platforms": "iOS and Android, bundles from 2026-11-04 to 2026-11-14; only members who chose the light theme in «حسابي»",
+    "confidence": "proven-in-code",
+    "fixedToday": "mostly, in the tree, not shipped: 117 sites now use colors.goldLightText (#7F6218 in light, 5.7:1), card.tsx uses fixed gold and onPhoto tokens, textMuted / paperMuted / success / warning were darkened. The four leftovers above are open."
+   },
+   {
+    "cause": "Android: pill labels where the padding, border and background sat on the Text itself are measured too narrow, so the last letters are cut or replaced by an ellipsis.",
+    "evidence": "Members' bundle: app/src/components/ProjectCard.tsx (old :101-103, style :246-256) — the sector tag on every Projects Bank card, numberOfLines={1} with paddingHorizontal and a pill background on the Text; app/src/components/news/NewsCard.tsx (old :47, :76, styles :125, :161) — source and topic pills on every news card; app/src/app/project/[id].tsx (old :132, :414). Still in the tree: C:\\Projects\\vibes-club-app\\app\\src\\app\\news\\[id].tsx:80 and :142, and C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx:251 (hint). The project memory already records this Android behaviour; I did not reproduce it on a device.",
+    "platforms": "Android only, 1.3.2 / 1.3.3 with bundles up to 2026-11-14",
+    "confidence": "likely",
+    "fixedToday": "yes for ProjectCard, NewsCard and project/[id] (padding moved to a wrapping View); no for news/[id].tsx and contact.tsx"
+   },
+   {
+    "cause": "Content that leaves by itself, by design: the home news strip advances every 4.5 s until the first drag, the Projects Bank carousel fades to the next project every 6 s, service banners every 5 s. A member reading a two-line headline and two-line snippet loses it mid-sentence (\"it disappears by itself\").",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx:19 and :119 (ROTATE_MS 4500; only a pan or a dot tap stops it, a tap opens the item); C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectsBankCarousel.tsx:14 and :69; C:\\Projects\\vibes-club-app\\app\\src\\components\\RotatingBanner.tsx:8 and :38. These were owner requests (M176, M84, M105); the timing is the open question.",
+    "platforms": "iOS and Android, all versions",
+    "confidence": "possible",
+    "fixedToday": "no (today's pass only stops the news timer while the home is off screen)"
+   },
+   {
+    "cause": "ClampText keeps a stale line count when the text width or the font size changes while the screen stays mounted: the paragraph stays cut at three lines with no «اقرأ المزيد» pill, so the rest cannot be read.",
+    "evidence": "C:\\Projects\\vibes-club-app\\app\\src\\components\\ClampText.tsx:29-38 and :46-50: the measurement is keyed by the text only and the twin is unmounted after the first count. Sequence: iPhone, a screen with a three-line-or-shorter paragraph is open, the member raises the text size in Settings and returns, the paragraph now needs five lines but total is still 3, so overflow is false while numberOfLines={3} still applies (:42). Android restarts the activity on a font-size change (fontScale is not in configChanges, AndroidManifest.xml:38), so there it needs split-screen or a fold.",
+    "platforms": "iOS (text-size change while the app is open); Android only in split-screen; bundles from 2026-11-14",
+    "confidence": "possible",
+    "fixedToday": "no"
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Event cards without a photo: stop centring the placeholder icon under the text. In both files make the fallback a faint watermark anchored to the top (fallback: justifyContent 'flex-start', paddingTop spacing.md; icon size about 40, opacity about 0.2) or drop the icon and keep the gold wash; the date badge already marks the card as an event. Same change in MeetupsBlock.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\MeetupsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\meetups.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Pure style change; check one event with a photo and one without, in both themes."
+   },
+   {
+    "change": "Home event and meetup strip cards: replace the fixed height (CARD_HEIGHT 216 / 196) with minHeight and let the card grow, with flex: 1 passed through FadeInView > PressScale (wrapStyle and style) so the cards of a strip keep one height. Give the texts on these cards and the compact FlipCountdown maxFontSizeMultiplier={1.2} so the countdown always fits.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\MeetupsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\wow.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low to medium. The horizontal strip's row height changes with content; check a two-line title with the countdown at default and at the largest text size."
+   },
+   {
+    "change": "One app-wide cap on text scaling. React 19 ignores Text.defaultProps on function components, so add a small wrapper module (for example app/src/components/text.tsx exporting Text and TextInput with maxFontSizeMultiplier defaulting to the agreed cap) and switch the imports across app/src with a codemod, plus an eslint no-restricted-imports rule to keep it. Set tabBarAllowFontScaling: false on the (tabs) bar so Android matches iOS, and give GlobalTabBar's label the same treatment.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\text.tsx (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GlobalTabBar.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\eslint.config.js",
+     "every file under C:\\Projects\\vibes-club-app\\app\\src that imports Text or TextInput from react-native"
+    ],
+    "delivery": "ota",
+    "risk": "Medium. Mechanical but touches about 150 files; tsc and lint catch misses; Animated.Text and nested Text must keep working. Needs one pass on a phone at the largest text size."
+   },
+   {
+    "change": "Decide the cap value: 1.3 keeps every current layout whole; 1.5 is kinder to members who need large text but then the cards of the previous item must grow. Also decide the pace of the moving strips: news 4.5 s is shorter than the time needed to read a headline and snippet (proposal: 8 s, or no auto-advance once the strip has been on screen for one full cycle).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectsBankCarousel.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\RotatingBanner.tsx"
+    ],
+    "delivery": "owner-decision",
+    "risk": "None technically; the moving strips were the owner's own requests."
+   },
+   {
+    "change": "Ship today's pass, which is already in the tree: gold text tokens (117 sites), the membership card's fixed colours, the scrolling guest account screen, the scrolling workshop / membership / details popups, the Android pill fixes. It cures the light-theme and overflow causes for members once published to runtimes 1.2.0-1.3.3 and built into 1.3.4.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\theme\\tokens.ts",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\card.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PlaceholderScreen.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\WorkshopAd.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\MembershipGate.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GentlePopups.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectCard.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\news\\NewsCard.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Medium only because the pass is large (153 app files) and nothing in it has been seen on an iPhone or in the light theme; one device pass in light and dark before publishing."
+   },
+   {
+    "change": "Light-theme leftovers: small gold text still using colors.gold (95 style lines) moves to colors.goldText, titles of 20 px and more keep gold; GoldenOpportunity draws the scrim (or uses themed text colours) when the image is missing; the compact countdown label uses onPhotoMuted; the «تم التأكيد / بانتظار الدفع» line on event photos uses on-photo colours.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\wow.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx",
+     "about 50 files with color: colors.gold on small text"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Dark theme is unchanged by construction (goldText equals gold there); the 95 lines need a per-line look."
+   },
+   {
+    "change": "News strip: stop relying on dp minHeight for equal cards. Multiply the reserved heights by the font scale (useWindowDimensions().fontScale, limited by the cap) in title and snippet, or size the pager from the tallest card instead of card 0.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Only the reserved heights change; default-size phones render exactly as today."
+   },
+   {
+    "change": "Give the remaining centred popups the same treatment as the workshop popup (card capped at about 88% of the window height, text scrolls inside, buttons stay visible): GuestNudge, RateUsPrompt, the intro film popup, the complete-profile popup, PhoneConfirmAlert, PasswordPrompt.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GuestNudge.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\RateUsPrompt.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\IntroVideo.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompleteness.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PhoneConfirmAlert.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PasswordPrompt.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. No visual change where the card already fits."
+   },
+   {
+    "change": "Last padded pill Texts on Android: move padding, border and background from the Text to a wrapping View, as done today in NewsCard.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\news\\[id].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low."
+   },
+   {
+    "change": "ClampText hardening: key the measurement by text, laid-out width (onLayout of the wrapper) and font scale, so a width or text-size change re-mounts the twin and recounts. No other change to the component is needed.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ClampText.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. One extra measurement when the width or font scale changes."
+   },
+   {
+    "change": "Event and meetup pictures that carry their own words (YouTube thumbnails with baked titles, project covers with logos) under the app's pills and titles: use clean photos for events and meetups, or accept the app's title below the picture for those two strips.",
+    "files": [
+     "dashboard: event photos, meetup video thumbnails"
+    ],
+    "delivery": "dashboard-content",
+    "risk": "None in code; needs the owner's choice of pictures."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run by me on an iPhone or an Android phone. The only visual evidence is the Android emulator screenshots another session made today of the working tree (dark theme, default text size, Arabic and English); there are no light-theme, large-text or iOS screenshots.",
+   "Whether the live events and meetups lack photos, as they do in the emulator screenshots. If every live event has a photo, the title-over-icon overlap does not show in production and only the fixed-height clipping remains for those cards.",
+   "How many complaining members use the light theme or a raised text size. Both causes are proven in code but their share of the complaints is an inference.",
+   "The Android clipping of padded pill Texts was not reproduced; it rests on the code pattern, the other reviewers' note and the project's own recorded experience.",
+   "That entrance animations can never stay at opacity 0 on a real phone. By code reading they cannot: React Native 0.86 syncs the value back and re-commits when a native animation ends, Android overrides stale commits by default, iOS ignores stale opacity and transform commits while the animation owns them, and recycled views are realigned. The project did once see native-driver transforms go stale on real phones (the news carousel, 2026-11-02), so one look at a slow phone is still worth it.",
+   "The exact pixel heights at 1.3x and 1.6x are arithmetic from the style values (paddings, lineHeights, borders), not measurements.",
+   "The (tabs) bar label clipping on Android at large text sizes is derived from the navigator's fixed 49 dp bar and its font-scaling default, not seen.",
+   "Today's fixes in the tree (scrolling guest account, popups, gold text tokens, membership card colours) are unshipped and unseen on any device."
+  ],
+  "data": "CLEARED SUSPECTS\n- ClampText twin (app/src/components/ClampText.tsx:46-50, :73): absolute, opacity 0, pointerEvents none, removed after the first onTextLayout. It cannot become visible, cannot push the real text to zero height, and all 16 call sites are column contexts (home hero / advisor / savings, about, golden, meetups, membership x3, partners, service, workshops). onTextLayout is emitted from the shared C++ paragraph layout on both platforms (ReactCommon/react/renderer/components/text/ParagraphShadowNode.cpp:351-357). iOS view recycling does not leak its opacity (RCTViewComponentView diffs against the view's own last props).\n- FadeInView / PopIn (motion.tsx:31-43, :110-125), 375 and 51 uses: one-shot, start in an effect, stop on cleanup, restart to 1 on any dependency change; React Native ignores reduce-motion and the Android animator scale for Animated, so entrances always run. No path leaves opacity at 0.\n- Loops (usePulse, NeonPulse, Sheen, GoldSweep, GoldDust, Wiggle): decorative only; today's pass made them rest under reduce motion. GoldTicker is not used by any screen.\n\nFONT METRICS (read from the bundled TTFs)\nIBM Plex Sans Arabic, all weights: ascent 1.085 em, descent 0.415 em, natural line = 1.50 x font size; glyph box up to 1.64 em (Regular) and 1.73 em (Bold).\n\nSTYLES BELOW 1.4 x (19 in the whole app, all single-line digits, codes or badges)\n1.18 agenda badgeDay 22/26 | 1.22 badgeDaySm 18/22 | 1.27 tab label 11/14 (tokens.ts:255, GlobalTabBar.tsx:174) | 1.27 advisor time 11/14 | 1.30 number of the day 46/60 | 1.33 badgeText 12/16 (news/[id], posts/[id], WorkshopAd), goldenText, GoldenCompanyCard code, SectorStrip count, partners promoCode 36/48, StorePurchaseCard price 24/32 | 1.36 card number 22/30 | 1.38 vipText, meetups number and cta 13/18, MembershipGate price 26/36.\nBody styles: display 1.47, title 1.50, subtitle 1.56, body 1.63, caption 1.54. Tight lineHeight is not a cause.\n\nFIXED BOXES THAT HOLD TEXT (height in dp against content at scale s)\n- AgendaBlock card 216: 66 + (114 + 20n)s, n = title lines. s=1.0 n=1: 200 | s=1.0 n=2: 220 (6 dp into the bottom padding) | s=1.3 n=1: 240 | s=1.3 n=2: 266 | s=1.6 n=1: 280 | s=1.6 n=2: 312.\n- MeetupsBlock card 196: 44 + 76s, fits up to about 2.0x.\n- meetups screen card 210: about 62 + 102s, fits up to about 1.45x, 17 dp over at 1.6x.\n- GoldenOpportunity card 220: about 190 at 1.3x, about 222 at 1.6x.\n- NewsCarousel reserved heights 54 / 44 dp: a (2-line title, 2-line snippet) card is taller than a (1,1) card by 15 dp at 1.15x, 29 dp at 1.3x, 59 dp at 1.6x.\n- agenda screen card: minHeight 196, grows correctly.\n\nPOPUPS AND SCROLLING (ScrollView present: members' bundle -> working tree)\nWorkshopAd no -> yes | MembershipGate no -> yes | GentlePopups no -> yes | AdminPopup yes -> yes | WhatsappVerify yes -> yes | GuestNudge no -> no | RateUsPrompt no -> no | IntroVideo popup no -> no | ProfileCompleteness popup no -> no | PhoneConfirmAlert no -> no | PasswordPrompt no -> no. PlaceholderScreen (guest account, guest advisor tab): fixed View -> ScrollView.\n\nLIGHT THEME COUNTS\ncolors.goldLight as text or icon colour: 127 sites at 97705af, 9 non-text uses left today; colors.goldLightText: 117 sites today; color: colors.gold on text: 95 style lines today, 1 on goldText.\n\nPADDED TEXT PILLS (padding / border / background on the Text itself)\nMembers' bundle: ProjectCard tag, NewsCard source and tag, project/[id] tag, news/[id] tag, contact hint. Working tree: news/[id] tag and contact hint remain.\n\nScan scripts used (read-only, outside the repo): C:\\Users\\LENOVO\\AppData\\Local\\Temp\\claude\\04084e31ec0f8363\\91318d11-814e-4edd-a955-fd6b17ec10a1\\scratchpad\\scan-lineheight.cjs, scan-fixed-height2.cjs, scan-padded-text.cjs, scan-text-color.cjs, font-metrics.cjs; the members' tree was exported to the same folder under old\\app\\src."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "The colleague's own numbers contradict the cap decision. It says a 1.3 cap 'keeps every current layout whole', but its own AgendaBlock formula, 66 + (114 + 20n)·s, gives 240 dp at s=1.3 with a one-line title, against a fixed 216 dp card (app/src/components/AgendaBlock.tsx:19, :118-127). The countdown labels are still cut at 1.3. The news strip is already 15 dp off at 1.15 (NewsCarousel.tsx:262-263, minHeight 54/44). So a cap alone does not cure the clipping: the fixed-height cards and the reserved heights must change too, whatever cap is chosen.",
+   "The proposed fix for the event card ('anchor the placeholder icon to the top') would move the overlap, not remove it. The top of the card is already taken by the date badge and the pills (AgendaBlock.tsx:83-90 topRow; agenda/index.tsx has the same layout). On a 216 dp card there is no free band for a 40 dp icon. The fallback should have no icon at all (keep the gold wash), or show it only where no text is drawn. The overlap itself is confirmed: home3-ar-dark.png shows the calendar icon through «ملتقى المستثمرين الشهري», and rev-android-run.md item 9 found it independently.",
+   "The colleague planned a codemod over about 150 files plus a lint rule just to cap text scaling. That is heavier than needed. app/package.json already runs patch-package on postinstall (app/patches/ holds two patches). A one-line JS patch to node_modules/react-native/Libraries/Text/Text.js (processedProps around :289, defaulting maxFontSizeMultiplier) and the same in TextInput gives one app-wide default. It is pure JS, so it ships in the OTA bundle to every runtime: the native prop has existed in all binaries for years. It also caps text the app does not own (navigation header titles), which the import codemod would miss.",
+   "The light-theme cause is right but narrower than its wording suggests. theme/theme.ts:25 defaults to 'dark' and never follows the system appearance, so only members who picked «فاتح» in «حسابي» are affected. That is very likely a minority of the complaints.",
+   "The colleague's 'cleared' auto-rotating strips are not a fault in their mechanics. ProjectsBankCarousel.tsx:66-75 and RotatingBanner.tsx:35-43 ignore the `finished` flag and always fade back in, so the opacity cannot stay at 0. The 'disappears by itself' reading is about pace (4.5, 5 and 6 s), not a bug. The ranking 'possible' is fair. One gap: RotatingBanner has no focus guard, so it keeps rotating on screens that are not visible. That is harmless but inconsistent.",
+   "The ClampText stale-count case was checked: ClampText.tsx:29-30 keys the measurement by text only, and the probe (:73) is absolute with left and right set to 0, so it measures at the right width. The scenario holds, but it needs a live text-size change on iOS. It belongs at the bottom of the list, not among the main causes."
+  ],
+  "missedCauses": [
+   "Android, the riyal symbol drawn ON TOP of the last digit. This is literally 'characters sit on top of each other'. Seen in docs/reviews/2026-11-15/android-shots/service-ar-dark.png («30,00» with the symbol over the last zero), and also service-form-ar-dark.png («15,000» above «ادفع الآن») and event-ar-dark.png (struck «1,500»). Cause: app/src/components/SarText.tsx:21-41 splits «30,000 ريال» and puts an inline <Image> inside the <Text>. When the symbol is the last thing in an Arabic (RTL) paragraph that ends in Latin digits, Android positions the inline image at the wrong edge of the bidi run. Labels where words follow the symbol («15,000 ﷼ للأعضاء», «وفّر 15,000 ﷼ بعضويتك») render correctly. Example call sites: app/src/app/service/[key].tsx:175-177 and :314. SarText is unchanged since M199 (before 97705af), so every member on Android has it, and today's pass did not touch it. iOS (NSTextAttachment) was not verified.",
+   "Android, typed text disappears under the keyboard on every form and in the advisor chat. The binary is edge-to-edge (app/android/gradle.properties:47 edgeToEdgeEnabled=true; always on with SDK 57 / RN 0.86), so android:windowSoftInputMode=adjustResize (AndroidManifest.xml:38) no longer shrinks the window. Every KeyboardAvoidingView passes behavior=undefined on Android: app/src/components/Screen.tsx:43 (all forms: sign-up, sign-in, service request, profile), app/src/components/advisor/AdvisorChat.tsx:253, app/src/app/contact.tsx:122, ProfileCompletionGate.tsx:186. Seen on the emulator: advisor-keyboard-ar-dark.png and advisor-keyboard-en-dark.png (the whole composer is behind the keyboard and the typed text is invisible), signup-keyboard-ar-dark.png and form-keyboard-ar-dark.png (rev-android-run.md items 1-3). Today's pass only fixed the iOS offset (Screen.tsx keyboardVerticalOffset), so the cause is still open in the tree. A member who types and watches the text vanish will describe it as 'text disappears'.",
+   "Android, ellipsis and single-line truncation clipped to «..» in inbox rows and carousel snippets (rev-android-run.md item 29, inbox-ar-dark.png), the «مصدر رسمي» chip cut to «مصدر رس…» (newsitem-ar-dark.png), and the one-line mixed banner text cut inside «App S» (home-nonmember-4tabs-ar-light.png, RotatingBanner/ServiceTile). These add to the colleague's padded-pill list, which only names news/[id] and contact for the tree.",
+   "Possible, not proven: on Android, FlatList defaults removeClippedSubviews to true (node_modules/react-native/Libraries/Lists/FlatList.js:162-167), and every row of the projects list, the news list, decisions and the advisor chat is wrapped in a native-driver FadeInView (app/src/app/(tabs)/projects.tsx:191, app/src/app/news/index.tsx:145, app/src/app/news/decisions.tsx:27). Detached and reattached rows with native transforms are a known source of rows going blank after a fast scroll on Android. The emulator pass did not report it, so it is a lead to check, not a cause.",
+   "Minor overlaps on Android: in SectionHeader the last line of the description touches the cards below (rev-android-run.md item 25, home3-ar-dark.png), and content is cut about 63 px below the native header while scrolling because of a doubled top inset (item 24, Screen.tsx edges). Neither is 'unreadable', but members may report both as text 'sitting on' other things."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Event cards without a photo: remove the centred calendar icon from the fallback. Keep only the gold-wash background. In AgendaBlock.tsx MiniEvent, replace the <Ionicons name=\"calendar-outline\" size={46}> inside styles.fallback with nothing; the date badge already says 'event'. Do the same in the agenda list card (app/src/app/agenda/index.tsx fallback around :89-91, icon size 52) and in MeetupsBlock.tsx:60-62 and app/src/app/meetups.tsx if the same fallback is there. Do not move the icon to the top: the date badge and the pills are there.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\MeetupsBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\meetups.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator with the local mock server and one event seeded without a cover (the rev-android-run setup): home strip and /agenda, dark and light. Compare with home3-ar-dark.png and agenda-ar-dark.png. The title and date line must be on a clean background. On an iPhone, only by the owner after the OTA."
+   },
+   {
+    "priority": 2,
+    "change": "Android keyboard: in every KeyboardAvoidingView that passes behavior={Platform.OS === 'ios' ? 'padding' : undefined}, use 'padding' on Android too: Screen.tsx:43, advisor/AdvisorChat.tsx:253, contact.tsx:122, ProfileCompletionGate.tsx:186. Leave keyboardVerticalOffset at 0 on Android. KeyboardAvoidingView measures its own frame against the keyboard's screenY, so on a binary whose window does get resized it computes 0 and adds nothing. That makes it safe on every runtime from 1.2.0 to 1.3.3. In Screen.tsx, also call scrollRef.scrollTo or rely on the ScrollView's automatic scroll to the focused field, and check that the form no longer jumps to the top (rev-android-run.md item 2).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\Screen.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\advisor\\AdvisorChat.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompletionGate.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator (API 36, gesture navigation and three-button navigation): open the advisor tab and type, open sign-up and focus the job-title field, open a service request form and focus a lower field. The typed text and the send or submit button must stay above the keyboard. Repeat the advisor case in English (the placeholder takes two lines). There must be no blank gap after the keyboard closes. On iOS this change does nothing (the iOS branch is unchanged)."
+   },
+   {
+    "priority": 3,
+    "change": "Riyal symbol over the last digit (Android). In SarText.tsx, when the string ENDS with the currency word, do not let the inline image be the last thing in the paragraph. First attempt: append '‏' (RLM) after the Image node in the split output, so the attachment sits inside the RTL run and not at the bidi boundary. If the emulator still shows the overlap, use the structural fix instead: add an opt-in prop `block` to SarText that renders <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}> with <Text style={style}>{number}</Text><Image …/>, so the symbol is outside the Text. Pass `block` at the standalone price call sites: service/[key].tsx:175-177 and :314, the event page price and struck price, and the checkout amount. Keep the inline path for prices inside sentences.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\SarText.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\service\\[key].tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator, Arabic: the «اصنع ملتقاك» service page (30,000 list price), its request form (15,000 above «ادفع الآن»), and the paid event page (struck 1,500). Compare with service-ar-dark.png and event-ar-dark.png. Also check English (the symbol must follow the number) and a struck price. iOS layout of these prices is only verifiable on the owner's iPhone."
+   },
+   {
+    "priority": 4,
+    "change": "One app-wide cap on system text scaling, done with patch-package rather than a codemod. Edit app/node_modules/react-native/Libraries/Text/Text.js where processedProps is built (around :289): if props.maxFontSizeMultiplier is undefined, set processedProps.maxFontSizeMultiplier = 1.3. Make the same default in Libraries/Components/TextInput/TextInput.js. Then run `npx patch-package react-native` to write app/patches/react-native+0.86.3.patch (postinstall already applies patches). Set tabBarAllowFontScaling: false in app/src/app/(tabs)/_layout.tsx screenOptions and allowFontScaling={false} on the GlobalTabBar label, so the Android tab labels match iOS. The patch is JS only: the prop is native in every binary from 1.2.0, so it is OTA-safe.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\patches\\react-native+0.86.3.patch (new)",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\_layout.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GlobalTabBar.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "First check that the patch is in the bundle: `npx expo export` and grep the output bundle for maxFontSizeMultiplier with 1.3. Then on the Android emulator set the font size to the largest step (`adb shell settings put system font_scale 2.0`) and compare Home, Projects and Account with largefont-*.png: the text must stop growing past 1.3x. iOS Dynamic Type can only be checked on a real iPhone."
+   },
+   {
+    "priority": 5,
+    "change": "Fixed-height cards that hold text must fit at 1.3x. In AgendaBlock.tsx change card `height: CARD_HEIGHT` to `minHeight: CARD_HEIGHT`. So that every card in the strip keeps one height, give the strip's contentContainerStyle `alignItems: 'stretch'` and pass `flex: 1` through FadeInView (style) and PressScale (wrapStyle and style) to the card. Do the same for the meetups screen card (210) and GoldenOpportunity (220, content pinned to the bottom). MeetupsBlock (196) fits up to 2.0x and can stay. In NewsCarousel.tsx:262-263, multiply the reserved minHeights by Math.min(useWindowDimensions().fontScale, 1.3), i.e. 54·f and 44·f, so every card stays as tall as card 0.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\AgendaBlock.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\meetups.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator at font_scale 1.0 and 1.3: the home event card with a two-line title must show the countdown digits AND the day/hour/minute labels. Swipe the news strip to a card with a two-line title and a two-line snippet: the last snippet line must not be cut. At 1.0 the cards must look the same as today."
+   },
+   {
+    "priority": 6,
+    "change": "Remaining centred popups: give them the WorkshopAd treatment. Cap the card at Math.round(useWindowDimensions().height * 0.88), wrap the text in a ScrollView (bounces={false}), and keep the buttons outside the ScrollView so they are always visible. Applies to GuestNudge, RateUsPrompt, the IntroVideo popup, the ProfileCompleteness popup, PhoneConfirmAlert and PasswordPrompt. PasswordPrompt.tsx has uncommitted changes in the tree from another session: merge, do not overwrite.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GuestNudge.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\RateUsPrompt.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\IntroVideo.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProfileCompleteness.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PhoneConfirmAlert.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\PasswordPrompt.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator with a short screen (an AVD at 640 dp height, or `adb shell wm size 1080x1680`) and font_scale 1.3: open each popup. Every button must be reachable and the text must scroll. Reset with `adb shell wm size reset`."
+   },
+   {
+    "priority": 7,
+    "change": "Android text clipping: move padding, border and background from the Text to a wrapping View, in app/src/app/news/[id].tsx:80 and :142 (the «مصدر رسمي» chip), contact.tsx:251 (the hint), and the inbox row and snippet Texts in app/src/app/(tabs)/news.tsx that carry padding together with numberOfLines (the «..» ellipsis). Give the one-line banner text in RotatingBanner/ServiceTile numberOfLines={2}, or a View wrapper.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\news\\[id].tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\contact.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\news.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\RotatingBanner.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator, Arabic: a news item from an official source, the inbox tab, the contact screen and the guest home banner. Compare with newsitem-ar-dark.png, inbox-ar-dark.png and home-nonmember-4tabs-ar-light.png."
+   },
+   {
+    "priority": 8,
+    "change": "Light-theme leftovers, in addition to today's goldLightText pass. Small text (12-15 px) that uses `color: colors.gold` moves to colors.goldText; titles of 20 px and more keep gold. GoldenOpportunity.tsx:85 and :152: draw the scrim, or use themed text colours, when the image is missing or still loading (offline-home-ar-light.png). wow.tsx:396 flipLabel uses colors.onPhotoMuted. agenda/index.tsx:123-124 uses on-photo colours for «تم التأكيد / بانتظار الدفع». The MembershipStatusCard badges get readable ink on their green and gold backgrounds (rev-android-run.md item 11).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\GoldenOpportunity.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\wow.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\agenda\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\MembershipStatusCard.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator in the light theme: Home (also in airplane mode, for the golden card without its picture), Account, Membership, the agenda list. Dark theme must be pixel-identical, because goldText equals gold in dark."
+   },
+   {
+    "priority": 9,
+    "change": "ClampText hardening: store the measurement keyed by text + Math.round(width) + fontScale. Take the width from an onLayout on the wrapper View and fontScale from useWindowDimensions(). total stays 0, and the probe re-mounts, whenever any of the three changes.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ClampText.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator: open a project page with a three-line «نبذة», change font_scale with adb while the app stays open (split-screen or a fold AVD also works). The «اقرأ المزيد» pill must appear when the text now runs past three lines. The live text-size change itself can only be seen on an iPhone."
+   },
+   {
+    "priority": 10,
+    "change": "Check before changing anything: on the Android emulator, fast-fling the projects list, the news list and a long advisor conversation, then scroll back. Look for rows that stay blank. Only if blanks appear, set removeClippedSubviews={false} on those FlatLists (projects.tsx:177, news/index.tsx:141, news/decisions.tsx:23, AdvisorChat.tsx:268).",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\(tabs)\\projects.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\news\\index.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\app\\news\\decisions.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\advisor\\AdvisorChat.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Android emulator: Projects Bank with all 259 projects, fling to the end and back three times. Note any blank card. On iOS nothing changes (the prop is already false there)."
+   },
+   {
+    "priority": 11,
+    "change": "Owner decisions. (a) The cap value: 1.3 is recommended; it needs priority 5 to be done first. (b) The pace of the moving strips: news 4.5 s (NewsCarousel.tsx:19), Projects Bank 6 s (ProjectsBankCarousel.tsx:14), banners 5 s (RotatingBanner.tsx:8). The proposal is news at 8 s, or no auto-advance after one full cycle. (c) Events and meetups: use cover photos without baked-in words, or accept that the app's title sits on a plain background.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\NewsCarousel.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\ProjectsBankCarousel.tsx",
+     "C:\\Projects\\vibes-club-app\\app\\src\\components\\RotatingBanner.tsx"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "No technical check. After the decision, time the strips on the emulator."
+   },
+   {
+    "priority": 12,
+    "change": "Ship today's committed pass together with the steps above in ONE OTA to every runtime (1.3.3, 1.3.2, 1.3.1, 1.3.0, 1.2.0). Before running `eas update`, run `git status` and keep only intended files: the tree holds other sessions' uncommitted edits (auth.ts, delete-account.tsx, PasswordPrompt.tsx). Run `npx tsc --noEmit` and `npm run lint` in app/. Hand the owner the command with `--environment production --non-interactive`. Then check the u.expo.dev manifest per runtime. The 1.3.4 binary picks it all up by itself.",
+    "files": [
+     "C:\\Projects\\vibes-club-app\\app\\src (all changed files)",
+     "C:\\Projects\\vibes-club-app\\app\\patches\\react-native+0.86.3.patch"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Full emulator pass in Arabic and English, dark and light, at font_scale 1.0 and 1.3, on the screens above, before publishing. After publishing, the owner checks on his iPhone (production channel, two cold starts) the home event strip, a service price, a form with the keyboard, and one popup. Nothing on iOS can be verified from this PC."
+   }
+  ],
+  "ownerMessage": "Members saw unreadable text for several reasons together, none of them a crash. On event cards without a photo the title is printed over the calendar icon. On Android the riyal symbol sits on the last digit of some prices, and the keyboard covers what the member types. Large phone text sizes overflow some fixed-size cards and popups, and in the light theme the pale gold text is too faint (today's pass already fixed most of the light theme but has not been published). One update over the air, with no new app build, fixes all of this: remove the icon from photo-less event cards, fix the price symbol and the keyboard on Android, cap the text size and let the cards grow, then publish it together with today's fixes after one check on the emulator and on your iPhone."
+ }
+}

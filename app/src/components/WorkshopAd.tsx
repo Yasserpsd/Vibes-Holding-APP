@@ -11,7 +11,7 @@ import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { formatEventDays, formatNumber } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
@@ -104,10 +104,10 @@ export function WorkshopAdPopup() {
                 </View>
               </View>
             </PressScale>
-            <Text style={styles.headline}>{ad.headline}</Text>
-            <Text style={styles.body}>{ad.body}</Text>
+            <Text style={styles.headline}>{markParagraphs(ad.headline)}</Text>
+            <Text style={styles.body}>{markParagraphs(ad.body)}</Text>
             <View style={styles.facts}>
-              <Text style={styles.title} numberOfLines={2}>{ad.title}</Text>
+              <Text style={styles.title} numberOfLines={2}>{markParagraphs(ad.title)}</Text>
               <Text style={styles.when}>{when}</Text>
               {/* M182e (owner): the list price struck beside the club-support discount, then the real fee line. */}
               {ad.feeSar > 0 && (ad.originalFeeSar ?? 0) > 0 ? (

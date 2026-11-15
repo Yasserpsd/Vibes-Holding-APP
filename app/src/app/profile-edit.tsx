@@ -18,7 +18,7 @@ import { VoiceFill } from '@/components/VoiceFill';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { localPhoneDigits, phoneIssue } from '@/lib/validation';
+import { cleanEmail, isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -62,7 +62,7 @@ export default function ProfileEditScreen() {
   const phoneChanged = phone !== stored.local;
   // M161 (owner): the contact e-mail (invoices, club mails) is the member's to change; the sign-in e-mail is not.
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
-  const contactEmailChanged = contactEmail.trim().toLowerCase() !== (me?.contactEmail ?? '').trim().toLowerCase();
+  const contactEmailChanged = cleanEmail(contactEmail) !== cleanEmail(me?.contactEmail ?? '');
   const [form, setForm] = useState({
     name: me?.name ?? '',
     jobTitle: me?.jobTitle ?? '',
@@ -90,7 +90,7 @@ export default function ProfileEditScreen() {
       setError(t('profile.phoneInvalid'));
       return;
     }
-    if (contactEmailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactEmail.trim())) {
+    if (contactEmailChanged && !isEmail(contactEmail)) {
       setError(t('profile.contactEmailInvalid'));
       return;
     }
@@ -104,7 +104,8 @@ export default function ProfileEditScreen() {
       social: form.social.trim(),
     };
     if (memberType && memberType !== (me?.memberType ?? '')) patch.memberType = memberType;
-    if (contactEmailChanged) patch.contactEmail = contactEmail.trim().toLowerCase();
+    // The address goes as the club stores it: no invisible marks, no trailing dot, lower case (lib/validation).
+    if (contactEmailChanged) patch.contactEmail = cleanEmail(contactEmail);
     setBusy(true);
     setError(null);
     try {
@@ -188,8 +189,11 @@ export default function ProfileEditScreen() {
             autoCorrect={false}
             keyboardType="email-address"
             textContentType="emailAddress"
+            autoComplete="email"
             value={contactEmail}
             onChangeText={setContactEmail}
+            // Leaving the field shows the address as it will be sent; never while typing.
+            onBlur={() => setContactEmail((current) => cleanEmail(current))}
             hint={t('profile.contactEmailHint')}
           />
         ) : null}

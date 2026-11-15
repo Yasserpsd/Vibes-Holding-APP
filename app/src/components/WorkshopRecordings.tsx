@@ -196,6 +196,6 @@ const styles = themedStyles(() => ({
   fileIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderGold, marginBottom: spacing.xs },
   fileLead: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
   fileDay: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: colors.textPrimary, textAlign: 'center' },
-  fileTag: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14, color: colors.gold, letterSpacing: 1 },
+  fileTag: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14, color: colors.goldText, letterSpacing: 1 },
   note: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
 }));

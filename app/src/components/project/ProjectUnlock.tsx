@@ -207,7 +207,7 @@ function BalanceRow({ balance }: { balance: ProjectsBalance }) {
   const left = useCountUp(balance.left);
   return (
     <View style={styles.balance}>
-      <Ionicons name="wallet-outline" size={18} color={colors.gold} />
+      <Ionicons name="wallet-outline" size={18} color={colors.goldText} />
       <Text style={styles.balanceLabel}>{t('unlock.balance')}</Text>
       <Text style={styles.balanceValue}>{t('unlock.balanceLeft', { left: formatNumber(left), total: formatNumber(total) })}</Text>
     </View>
@@ -295,7 +295,7 @@ const styles = themedStyles(() => ({
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   balance: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.surfaceElevated },
   balanceLabel: { ...typography.caption, flex: 1, color: colors.textSecondary, textAlign: textStart },
-  balanceValue: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.gold },
+  balanceValue: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.goldText },
   contacts: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   contact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surfaceElevated, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   contactTexts: { flex: 1 },

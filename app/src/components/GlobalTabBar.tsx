@@ -5,11 +5,12 @@ import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
+import { NeonPulse } from '@/components/lux';
 import { t, type StringKey } from '@/i18n';
-import { useTabBadges } from '@/lib/badges';
+import { useAppIconBadge, useTabBadges } from '@/lib/badges';
 import { useHiddenTabs } from '@/lib/personaTabs';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, typography } from '@/theme/tokens';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -24,6 +25,12 @@ const TABS: TabDefinition[] = [
   { key: 'news', path: '/(tabs)/news', title: 'tabs.inbox', icon: 'mail', iconOutline: 'mail-outline' },
   { key: 'account', path: '/account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
+
+// The navigator's measurements (expo-router's bottom-tabs): the bar is 49 pt over the bottom inset, the icon
+// is 25 pt in a 31×28 box, the badge is 0.75 × the icon.
+const TAB_BAR_HEIGHT = 49;
+const TAB_ICON_SIZE = 25;
+const TAB_BADGE_SIZE = TAB_ICON_SIZE * 0.75;
 
 // On these routes the bar stays away: the gate and auth flow (no tabs yet) and the fullscreen player.
 const HIDDEN = ['/welcome', '/auth', '/watch'];
@@ -73,6 +80,9 @@ export function GlobalTabBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const badges = useTabBadges();
+  // M242: this component lives for the whole launch (it only draws nothing on some routes), so it also keeps
+  // the number on the app icon equal to the unread management messages.
+  useAppIconBadge();
   // The advisor dock opens the conversation knowing which detail page the member is on.
   const ask = useAskAdvisor();
   const advisorContext = useCurrentAdvisorContext();
@@ -88,10 +98,15 @@ export function GlobalTabBar() {
   const badgeOf = (key: string): number =>
     key === 'news' ? badges.inbox : key === 'projects' ? badges.projects : key === 'home' ? badges.home : key === 'account' ? badges.account : 0;
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
-      {TABS.filter((tab) => !hiddenTabs.has(tab.key)).map((tab) => {
+    // The navigator's own box, number for number (see the styles): 49 pt of bar over the bottom inset.
+    <View style={[styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom, paddingHorizontal: Math.max(insets.left, insets.right) }]}>
+      {TABS.map((tab) => {
+        // A tab the persona hides keeps its (empty) slot, as in the (tabs) bar: the advisor circle stays
+        // in the middle with two slots on each side.
+        if (hiddenTabs.has(tab.key)) return <View key={tab.key} style={styles.slot} />;
         if (tab.key === 'advisor') {
-          // Owner (2026-10-18): the raised golden circle in the middle — same dock as the (tabs) bar.
+          // Owner (2026-10-18): the raised golden circle in the middle — same dock as the (tabs) bar,
+          // inside the same icon box so it sits at the same height.
           return (
             <Pressable
               key={tab.key}
@@ -100,31 +115,45 @@ export function GlobalTabBar() {
               accessibilityLabel={t(tab.title)}
               style={styles.item}
             >
-              <AdvisorDockButton />
+              <View style={styles.iconBox}>
+                <View style={styles.iconFill}>
+                  <AdvisorDockButton />
+                </View>
+              </View>
             </Pressable>
           );
         }
         const current = tab.key === active;
         const count = badgeOf(tab.key);
+        // M242: an unread management message lights «بريد وارد» here exactly as in the (tabs) bar.
+        const unread = tab.key === 'news' && count > 0;
+        const iconName = unread ? (current ? 'mail-unread' : 'mail-unread-outline') : current ? tab.icon : tab.iconOutline;
         return (
           <Pressable
             key={tab.key}
             onPress={() => router.navigate(tab.path)}
             accessibilityRole="button"
-            accessibilityLabel={t(tab.title)}
+            accessibilityLabel={unread ? t('inbox.tabUnread', { count }) : t(tab.title)}
             accessibilityState={{ selected: current }}
             style={styles.item}
           >
             <View style={styles.iconBox}>
-              {current ? <View style={styles.halo} /> : null}
-              <Ionicons name={current ? tab.icon : tab.iconOutline} size={22} color={current ? colors.gold : colors.textMuted} />
-              {count > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{count > 9 ? '+9' : `+${count}`}</Text>
+              {/* The glow first, the icon over it, the count last: the drawing order does the layering (no zIndex, M240). */}
+              {unread ? (
+                <View style={styles.unreadGlow} pointerEvents="none">
+                  <NeonPulse radius={radii.pill} intensity="strong" duration={1300} />
                 </View>
               ) : null}
+              {current ? <View style={styles.halo} /> : null}
+              <Ionicons name={iconName} size={TAB_ICON_SIZE} color={current || unread ? colors.gold : colors.textMuted} />
+              {count > 0 ? (
+                <Text style={styles.badge} numberOfLines={1} allowFontScaling={false}>
+                  {count > 9 ? '+9' : `+${count}`}
+                </Text>
+              ) : null}
             </View>
-            <Text style={[styles.label, current && styles.labelActive]} numberOfLines={1}>
+            {/* Same rule as the (tabs) bar's TabLabel: no system font scaling, shrink to fit before any cut. */}
+            <Text style={[styles.label, current && styles.labelActive]} numberOfLines={1} allowFontScaling={false} adjustsFontSizeToFit minimumFontScale={0.75}>
               {t(tab.title)}
             </Text>
           </Pressable>
@@ -145,32 +174,45 @@ const styles = themedStyles(() => ({
     borderTopStartRadius: radii.xxl,
     borderTopEndRadius: radii.xxl,
     boxShadow: shadows.lift,
-    paddingTop: 4,
-    paddingHorizontal: spacing.xs,
   },
-  item: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 2 },
-  iconBox: { width: 38, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // Emulator review 2026-11-15 (item 35): this twin was 3 pt taller, its icons sat 3 pt inward and its active
+  // mark was a pill, so the bar moved when a page opened. Every number below is the navigator's own
+  // (expo-router's bottom-tabs: BottomTabItem `tabVerticalUiKit`, TabBarIcon `wrapperUikit`, Badge).
+  item: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', padding: 5 },
+  slot: { flex: 1 },
+  iconBox: { width: 31, height: 28, alignItems: 'center', justifyContent: 'center' },
+  iconFill: { position: 'absolute', alignSelf: 'center', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' },
+  // The active mark: the same 38 pt circle as the (tabs) bar's `haloFill`.
   halo: {
     position: 'absolute',
     width: 38,
-    height: 28,
+    height: 38,
     borderRadius: radii.pill,
     backgroundColor: colors.goldSoft,
     borderWidth: 1,
     borderColor: colors.borderGoldSoft,
     boxShadow: shadows.glowGoldFaint,
   },
+  // The navigator's Badge (size = 0.75 × the icon) wearing the (tabs) bar's `tabBarBadgeStyle`.
   badge: {
     position: 'absolute',
-    top: -4,
-    end: -8,
+    top: -3,
+    end: -3,
+    height: TAB_BADGE_SIZE,
     minWidth: 20,
     paddingHorizontal: 4,
-    borderRadius: radii.pill,
+    borderRadius: TAB_BADGE_SIZE / 2,
+    overflow: 'hidden',
+    textAlign: 'center',
     backgroundColor: colors.gold,
+    color: colors.goldInk,
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    lineHeight: 14,
     boxShadow: shadows.glowGoldFaint,
   },
-  badgeText: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 14, color: colors.goldInk, textAlign: 'center' },
-  label: { ...typography.tabLabel, color: colors.textMuted },
-  labelActive: { color: colors.gold },
+  // M242: the unread glow behind the envelope — the same pill as the (tabs) bar.
+  unreadGlow: { position: 'absolute', width: 40, height: 30, borderRadius: radii.pill, backgroundColor: colors.goldSoft },
+  label: { ...typography.tabLabel, color: colors.textMuted, textAlign: 'center' },
+  labelActive: { color: colors.goldText },
 }));

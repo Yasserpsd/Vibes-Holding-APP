@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Image, RefreshControl, Switch, Text, View } from 'react-native';
+import { Image, RefreshControl, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
@@ -11,6 +11,7 @@ import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
 import { hasSecureStorage } from '@/auth/storage';
 import { AppButton } from '@/components/AppButton';
+import { showAppDialog } from '@/components/AppDialog';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { legalUrl } from '@/components/StorePurchaseCard';
 import { MembershipStatusCard } from '@/components/MembershipStatusCard';
@@ -44,6 +45,7 @@ export default function AccountScreen() {
   const { data: content } = useMembershipContent();
   // M109c: the legal rows of «المزيد» open the server's own pages (or the owner's override URLs).
   const { data: store } = useStoreConfig();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   // M75: opening حسابي clears its +N badge.
   useFocusEffect(
@@ -86,18 +88,24 @@ export default function AccountScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refresh();
+      // Complaint 2026-11-16: the affiliate state is re-read with the account, so an approval shows on the next
+      // pull. Invalidate, not refetch(): only a query that is in use asks the server.
+      await Promise.allSettled([refresh(), queryClient.invalidateQueries({ queryKey: ['affiliate'] })]);
     } finally {
       setRefreshing(false);
     }
   };
 
   // One tap on a settings row must not end the session: a new sign-in costs a WhatsApp code (M203).
+  // The app's own dialog (AppDialog): themed, right-to-left in Arabic, closed by the Android back key.
   const confirmSignOut = () =>
-    Alert.alert(t('account.menu.signOut'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('account.menu.signOut'), style: 'destructive', onPress: () => void signOut() },
-    ]);
+    showAppDialog({
+      title: t('account.menu.signOut'),
+      actions: [
+        { label: t('account.menu.signOut'), style: 'destructive', onPress: () => void signOut() },
+        { label: t('common.cancel'), style: 'cancel' },
+      ],
+    });
 
   return (
     <Screen aboveTabBar watermark refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
@@ -246,8 +254,13 @@ function ProfileHeader({ me }: { me: Me }) {
         </View>
         {me.personaLabel ? <Text style={styles.meta}>{tOptional(`persona.${me.persona}`) ?? me.personaLabel}</Text> : null}
         {shown.jobTitle ? <Text style={styles.meta}>{shown.jobTitle}</Text> : null}
-        <Text style={styles.contact}>{me.email}</Text>
-        <Text style={styles.contact}>{me.phone}</Text>
+        {/* One line each, whatever the system font size: the address shrinks to fit, and only a very long one is cut — in the middle, never as «…@gmail» / «.com». */}
+        <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} ellipsizeMode="middle">
+          {me.email}
+        </Text>
+        <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          {me.phone}
+        </Text>
       </View>
     </View>
   );
@@ -286,7 +299,7 @@ function MenuGroup({ title, icon, children }: { title: string; icon?: IoniconNam
   return (
     <View style={styles.group}>
       <View style={styles.groupHead}>
-        {icon ? <Ionicons name={icon} size={14} color={colors.gold} /> : null}
+        {icon ? <Ionicons name={icon} size={14} color={colors.goldText} /> : null}
         <Text style={styles.groupTitle}>{title}</Text>
       </View>
       <GlassCard radius={radii.lg}>{children}</GlassCard>
@@ -355,7 +368,7 @@ const styles = themedStyles(() => ({
   // M79: the titled groups.
   group: { gap: spacing.xs },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs },
-  groupTitle: { ...typography.caption, color: colors.gold, textAlign: textStart, flex: 1 },
+  groupTitle: { ...typography.caption, color: colors.goldText, textAlign: textStart, flex: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

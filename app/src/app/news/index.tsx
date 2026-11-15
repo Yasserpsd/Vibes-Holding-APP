@@ -13,7 +13,7 @@ import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { NewsCard, PageFooter } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { chevronForward, textStart } from '@/i18n/direction';
+import { chevronForward, isRTL, textStart } from '@/i18n/direction';
 import { formatNewsCount } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -53,15 +53,23 @@ export default function NewsListScreen() {
   const askForInterests = signedIn && prefs.data !== undefined && !prefs.data.saved;
 
   const openItem = (item: NewsItem) => router.push({ pathname: '/news/[id]', params: { id: item.id } });
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   const header = (
     <View style={styles.header}>
       <FadeInView delay={entranceDelay(0)}>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>{t('news.title')}</Text>
+          {/* This page has no native header (it draws its own title), so the way back sits beside the title:
+              the arrow points to the start side, like the native header's on the other pages. */}
+          <View style={styles.titleLead}>
+            <PressScale onPress={goBack} accessibilityLabel={t('persona.back')} wrapStyle={styles.backWrap} style={styles.back}>
+              <Ionicons name={isRTL() ? 'arrow-forward' : 'arrow-back'} size={24} color={colors.goldText} />
+            </PressScale>
+            <Text style={styles.title}>{t('news.title')}</Text>
+          </View>
           {signedIn ? (
             <PressScale onPress={() => router.push('/news/interests')} style={styles.headerLink} hitSlop={8}>
-              <Ionicons name="options-outline" size={16} color={colors.gold} />
+              <Ionicons name="options-outline" size={16} color={colors.goldText} />
               <Text style={styles.headerLinkText}>{t('news.interestsLink')}</Text>
             </PressScale>
           ) : null}
@@ -126,7 +134,7 @@ export default function NewsListScreen() {
           <Text style={styles.count}>{personalized ? t('news.rankedForYou') : t('news.latest')}</Text>
           {(feed.data?.pages[0]?.total ?? 0) > 0 ? (
             <View style={styles.countPill}>
-              <Ionicons name="newspaper-outline" size={13} color={colors.gold} />
+              <Ionicons name="newspaper-outline" size={13} color={colors.goldText} />
               <Text style={styles.countPillText}>{formatNewsCount(feed.data?.pages[0]?.total ?? 0)}</Text>
             </View>
           ) : null}
@@ -136,7 +144,8 @@ export default function NewsListScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    // The top inset is the page's own: with no native header above it, the title sat under the status bar.
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Screen options={{ title: t('news.title') }} />
       <FlatList
         data={items}
@@ -187,6 +196,10 @@ const styles = themedStyles(() => ({
   header: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
   block: { gap: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  titleLead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
+  // A 44 pt target; pulled 10 pt toward the edge so the arrow itself lines up with the cards below.
+  backWrap: { marginStart: -10 },
+  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: { ...typography.title, color: colors.gold },
   // 44 pt tall: the link text alone is about 20.
   headerLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 },

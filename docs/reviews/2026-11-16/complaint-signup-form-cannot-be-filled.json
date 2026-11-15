@@ -1,0 +1,201 @@
+{
+ "key": "signup-form-cannot-be-filled",
+ "words": "Some people cannot fill the form at all, especially the sign-up form at the very start. Others: the keyboard completely covers the place where they type and they cannot reach or press the submit button.",
+ "diagnosis": {
+  "summary": "On Android the keyboard never makes room in any full-screen form: the app runs edge-to-edge (forced by Expo 57 / targetSdk 36), so the window no longer resizes for the keyboard, and the shared Screen, the profile-completion cover, the advisor chat and the contact thread all use KeyboardAvoidingView with behavior undefined on Android, which React Native renders as a plain View. Today's emulator screenshots show it directly (the advisor composer disappears behind the keyboard), and today's pass did not fix it. Three further contributors: on iPhone the padding was short by the header height (fixed today in Screen, unseen on a device) and a focused field is still never scrolled into view; every code field (WhatsApp sign-up code, sign-in code, e-mail code, reset, 2FA) silently drops Arabic-Indic digits so nothing appears when typed from an Arabic keypad; and the launch OTA check force-reloads the app whenever the download finishes, wiping a sign-up form a newcomer is already typing in.",
+  "causes": [
+   {
+    "cause": "Android: the keyboard overlays the bottom ~37% of the screen and nothing moves. Edge-to-edge is on, the window is not resized for the keyboard, and the four full-screen keyboard wrappers pass behavior undefined on Android, which is a no-op.",
+    "evidence": "Native facts: C:/Projects/vibes-club-app/app/android/gradle.properties has edgeToEdgeEnabled=true and Expo 57 refuses to turn it off (app/node_modules/@expo/prebuild-config/build/plugins/unversioned/edge-to-edge/withEdgeToEdge.js:26-27); AndroidManifest MainActivity has windowSoftInputMode=adjustResize; targetSdk 36 (node_modules/react-native/gradle/libs.versions.toml:4). React Native 0.86.3 calls WindowCompat.setDecorFitsSystemWindows(window,false) at start (ReactActivityDelegate.java:141 -> views/view/WindowUtil.kt:45-69 and 164-165). I grepped ReactAndroid, expo, expo-modules-core, safe-area-context and react-native-screens: nothing applies the IME inset to the activity content (only bottom-sheet code in screens). So adjustResize has no effect. JS side: node_modules/react-native/Libraries/Components/Keyboard/KeyboardAvoidingView.js:236-296 - behavior undefined falls to the default branch, a plain View. Sites with undefined on Android: C:/Projects/vibes-club-app/app/src/components/Screen.tsx:43 (97705af: line 36), app/src/components/ProfileCompletionGate.tsx:186, app/src/components/advisor/AdvisorChat.tsx:253 (97705af:207), app/src/app/contact.tsx:122. Screen is used by auth/register, login, reset, verify, phone, profile-edit, form/[key], service/[key], people/apply, posts/compose. Screenshot proof (emulator API 36, 1080x2400): docs/reviews/2026-11-15/android-shots/advisor-ar-dark.png shows the composer at y~2070-2190; advisor-keyboard-ar-dark.png shows the keyboard top at y=1517, the list unchanged and the composer gone behind the keys. form-keyboard-ar-dark.png: keyboard open, no focused field on screen. Sequence on register: member taps E-mail / Password / Job title (below y~1517 at rest) -> keyboard opens over the field -> ScrollView keeps its full height (ends behind the keyboard) -> member can drag the form up, but the content tail is only 32dp + bottom inset of padding (advisor/AskAdvisor.tsx:19,25-28), so the last ~280dp of real content (Job title, invite link, the submit button) can never rise above the keyboard; they type blind and reach submit only after closing the keyboard with the system back gesture. On short phones (640-720dp) the WhatsApp code field that auto-focuses under the phone field (PhoneCodeStep.tsx:95) also lands behind the number pad.",
+    "platforms": "Android only, every Android version (edge-to-edge is applied by RN on all API levels when the flag is on), store builds 1.3.2 and 1.3.3 and every older runtime. Seen on the API 36 emulator; older Android by code reading.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's Screen.tsx change (lines 34-43) only adds the iOS header offset; Android still gets behavior undefined. Today's tab-bar hiding on Android (app/src/app/(tabs)/_layout.tsx:90, GlobalTabBar.tsx:51-86) was justified by 'the window resizes', which is not what happens; it is harmless but does not uncover the field."
+   },
+   {
+    "cause": "iPhone: under the opaque native header the keyboard padding came out short by the header height, and a field focused in the lower part of the screen is never scrolled into view.",
+    "evidence": "Members' bundle: git show 97705af:app/src/components/Screen.tsx line 36 - KeyboardAvoidingView behavior 'padding' with no keyboardVerticalOffset. The auth and form screens sit under detailHeader (app/src/app/_layout.tsx:85-95, 263-268; opaque headerStyle). KeyboardAvoidingView.js:98-110 computes frame.y + frame.height - keyboardY from the onLayout frame, which is relative to the parent that starts below the header, so the padding is short by status bar + 44pt (about 91-106pt on current iPhones, 64 on SE). The bottom strip of the scroll view stayed behind the keyboard; on register the tail padding (32 + 34) leaves the submit button only just reachable at full scroll. Separately, in both the old and the new code nothing scrolls the focused input into view (no automaticallyAdjustKeyboardInsets, no scroll-to-focused; grep for Keyboard listeners finds only GlobalTabBar.tsx:55-56): a field tapped in the lower ~45% of the screen is covered when the keyboard rises and stays covered until the member drags the form. ProfileCompletionGate (no header, cover starts at y=0) had correct padding on iPhone.",
+    "platforms": "iOS, store 1.3.2 with bundles up to 2026-11-14 (all runtimes 1.2.0-1.3.3).",
+    "confidence": "proven-in-code",
+    "fixedToday": "Partly. Screen.tsx:39-43 and contact.tsx:81,123 now pass the header height (HeaderHeightContext) as keyboardVerticalOffset - correct by the arithmetic, not seen on an iPhone. The missing scroll-to-focused-field is not fixed."
+   },
+   {
+    "cause": "Every code field silently discards Arabic-Indic (and Persian) digits, so a member whose number pad types them sees nothing appear and cannot finish sign-up, sign-in on a new device, e-mail verification, password reset or 2FA.",
+    "evidence": "C:/Projects/vibes-club-app/app/src/components/PhoneCodeStep.tsx:98 - value.replace(/\\D/g,'').slice(0,4); JS \\D matches everything except ASCII 0-9, so '١٢٣٤' becomes '' and the controlled field stays empty (same line 96 in 97705af). Same filter in app/src/components/PhoneConfirmAlert.tsx:99, app/src/app/auth/verify.tsx:121, app/src/app/auth/reset.tsx:131; app/src/app/auth/totp.tsx:69 and app/src/app/security-2fa.tsx:180 strip with [^A-Z0-9-]. PhoneCodeStep is the WhatsApp code of the sign-up form (PhoneProofField.tsx:79-89, required when config.phoneProofRequired, register.tsx:139,161-167), of the completion form (ProfileCompletionGate.tsx:201) and of the sign-in code. The phone field does not have the problem: lib/validation.ts:14-23 (M215) folds these digits, which shows members really do type them. Sequence: Arabic keyboard active -> name typed in Arabic -> number pad shows ٠-٩ -> phone accepted (folded) -> code arrives on WhatsApp -> every key pressed in the code field is erased -> the form cannot be completed unless the member pastes the code.",
+    "platforms": "Both in code. In practice mainly iOS (the plain number pad follows the active keyboard language; Apple ships a separate ASCII-only pad for this reason) and Android keyboards set to Arabic numerals. All app versions.",
+    "confidence": "proven-in-code",
+    "fixedToday": "No. Today's PhoneCodeStep change only clears the code after a failed submit (line 57-58)."
+   },
+   {
+    "cause": "The launch OTA check reloads the whole app the moment the download finishes, with no regard for what the member is doing. A newcomer already typing in the sign-up form is thrown back to the welcome screen with an empty form.",
+    "evidence": "git show 97705af:app/src/app/_layout.tsx lines 108-116: checkForUpdateAsync -> fetchUpdateAsync -> fetched?.isNew ? updates.reloadAsync() - no time limit and no check of the route or focus. A fresh install always runs the binary's embedded bundle first and always finds a newer OTA (bundles were published daily up to 2026-11-14), so the first launch of every new member downloads and force-reloads; on a slow connection that lands 20-90 s in, exactly while the sign-up form is being filled. The same happens to existing members on the first launch after each publish.",
+    "platforms": "iOS and Android, 1.3.2 / 1.3.3 and older runtimes.",
+    "confidence": "likely",
+    "fixedToday": "Partly. Working tree app/src/app/_layout.tsx:62,126-141 reloads only within 30 s of launch - a newcomer can be on the form well inside 30 s, and neither route nor focus is checked. It also cannot reach the first launch of an already-published binary: that launch runs the embedded bundle with the unconditional reload, so only 1.3.4 cures it for new installs."
+   }
+  ],
+  "fixPlan": [
+   {
+    "change": "Give the keyboard real room on Android with the same mechanism iOS uses: behavior=\"padding\" on both platforms in the four full-screen wrappers. React Native already emits keyboardDidShow with the keyboard top in edge-to-edge (ReactRootView.java:950-999) and KeyboardAvoidingView listens to it on Android (KeyboardAvoidingView.js:209-213). Screen.tsx:43 -> behavior=\"padding\" keyboardVerticalOffset={headerHeight} on both platforms (headerHeight is already read at line 39; on the emulator the header ends at 80dp = status bar + toolbar, check the context returns that). ProfileCompletionGate.tsx:186 -> behavior=\"padding\", offset 0. AdvisorChat.tsx:253-254 -> behavior=\"padding\", Android offset 0 (keep the iOS tab-bar offset). contact.tsx:122-123 -> behavior=\"padding\", offset headerHeight on both. Use 'padding', not 'height': 'height' freezes the first frame height and today's tab-bar hiding changes the frame when the keyboard opens. If a device ever did resize the window, the padding self-corrects to 0 on the next onLayout.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/Screen.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/ProfileCompletionGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/advisor/AdvisorChat.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/contact.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Medium until seen once on the emulator: the Android header-height value and the interplay with the tab bar leaving on keyboard open must be checked (advisor composer, register Job title, completion cover, a service form). On Android the change is instant, not animated (keyboardDidShow carries no duration). If the offset proves unreliable, fall back to measuring the wrapper with measureInWindow against endCoordinates.screenY."
+   },
+   {
+    "change": "Scroll the focused field into view on both platforms. In Screen (and the completion cover): track the scroll offset (onScroll, scrollEventThrottle 16) and the viewport height (ScrollView onLayout); expose ensureVisible(node) through a small context. Call it (a) from FormField's onFocus (FormField.tsx:59-62) with the field row, and (b) when the ScrollView's layout height shrinks (the keyboard just opened) for TextInput.State.currentlyFocusedInput(). ensureVisible measures the node against the scroll content (node.measureLayout(scroll.getInnerViewRef()), the same call useFormErrors.ts:44-52 already uses) and scrolls only when the field's bottom + ~72dp (room for its hint or error line) is below the viewport, or its top is above it. Optional polish in the same change: returnKeyType=\"next\" chaining on the sign-up fields.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/Screen.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/FormField.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/ProfileCompletionGate.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low to medium: a scroll that fires while the hint-on-focus line or a blur error is still changing the layout can land a few points off; run it after a short delay (as useFormErrors does with 50 ms). Must not fight the existing scroll-to-first-error on a failed submit."
+   },
+   {
+    "change": "Accept Arabic-Indic and Persian digits in every code field. Add one helper beside localPhoneDigits in lib/validation.ts (fold U+0660-0669 and U+06F0-06F9 to ASCII, then strip non-digits) and use it at PhoneCodeStep.tsx:98, PhoneConfirmAlert.tsx:99, auth/verify.tsx:121, auth/reset.tsx:131, auth/totp.tsx:69, security-2fa.tsx:180 (fold before the A-Z0-9 filter) and the dial-code search in CountryPicker.tsx:51. Optionally, on iOS only, keyboardType 'ascii-capable-number-pad' for these fields (keep 'number-pad' on Android, where the unknown value would fall back to the text keyboard).",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/lib/validation.ts",
+     "C:/Projects/vibes-club-app/app/src/components/PhoneCodeStep.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/PhoneConfirmAlert.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/verify.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/reset.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/totp.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/security-2fa.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/CountryPicker.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Pure string handling; the four-digit auto-submit keeps working because the folded value is what is counted."
+   },
+   {
+    "change": "Never force-reload under a member who may be typing. In app/src/app/_layout.tsx:139 reload only if all hold: still early in the launch (a few seconds, not 30), no TextInput focused (TextInput.State.currentlyFocusedInput() == null) and the keyboard closed, and the current route is not a form route (/auth, /form, /profile-edit, /checkout, /payment, /contact, /service, /posts/compose - keep the pathname in a ref). Otherwise leave the update pending: the UpdateGate restart banner and the next launch already apply it.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/app/_layout.tsx"
+    ],
+    "delivery": "ota",
+    "risk": "Low. Slightly more members stay one launch behind on a new bundle; the banner covers that. By OTA it only protects launches after the fix is on the phone."
+   },
+   {
+    "change": "1.3.4 binary: (1) ship it with the reload guard and the keyboard fixes in the EMBEDDED bundle - the first launch of a new install always runs the embedded bundle, and the 1.3.2 / 1.3.3 binaries will keep their unconditional first-launch reload whatever is published by OTA. (2) Do not try to switch edge-to-edge off natively: Expo 57 rejects the setting and Android 16 enforces it; the JS padding above is the supported route. (3) A native keyboard library (react-native-keyboard-controller) would give frame-synced animation, but the same bundles serve runtimes 1.2.0-1.3.3 that would not have the module, so it would need a guarded fallback; not recommended now.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "risk": "Low. No native code change is required for the keyboard; the point is which JS is embedded."
+   },
+   {
+    "change": "One device pass before publishing the OTA. Emulator (API 36, plus one short AVD such as 360x640dp): advisor composer rides above the keys and returns; register - focus E-mail, Password, Job title, each visible, submit reachable with the keyboard open; press sign-up with an unproven number and confirm the code field is visible; completion cover; a service form; the modal sheets that use behavior 'height' (WhatsappVerify.tsx:79, PhoneConfirmAlert.tsx:85, CountryPicker.tsx:86, OptionPicker.tsx:65, RateProjectModal.tsx:74, golden/[code].tsx:162). iPhone (owner's device): register lower fields and a long form under a header, last field just above the keyboard with no gap; type a code with the Arabic keyboard active.",
+    "files": [
+     "C:/Projects/vibes-club-app/docs/reviews/2026-11-15/android-shots"
+    ],
+    "delivery": "owner-decision",
+    "risk": "None in itself; skipping it means shipping the Android offset and the iOS header fix unseen."
+   }
+  ],
+  "notVerified": [
+   "Nothing was run on an iPhone: the header-offset fix in Screen.tsx and the claim that a focused lower field stays covered until dragged are from code reading and the KeyboardAvoidingView arithmetic only.",
+   "Android below API 36 was not run. That the window does not resize there either follows from RN calling setDecorFitsSystemWindows(false) on every API level and from Android framework behaviour, not from a device.",
+   "The store binaries' native config was not inspected; app/android is a git-ignored local prebuild. It is inferred to match because package.json has been on Expo 57 / RN 0.86 since the first commit and Expo 57 forces edge-to-edge.",
+   "That keyboardDidShow fires with a correct screenY on the members' devices in edge-to-edge is read from ReactRootView.java, not observed; the proposed Android padding depends on it.",
+   "The value HeaderHeightContext returns on Android (expected status bar + toolbar = 80dp on the emulator) was not measured.",
+   "How many members' keypads actually emit Arabic-Indic digits is unknown; the code defect is certain, its share of the complaint is not.",
+   "The timing of the forced OTA reload (how often it lands while a newcomer is on the sign-up form) was not measured; no download sizes or logs were checked.",
+   "Modal sheets on Android (behavior 'height' inside a Modal, which is also edge-to-edge - ReactModalHostView.kt:395): whether keyboard events and the height shrink work there was not checked. rev-auth's note that the Modal window resizes by itself is doubtful for the same reason as the main window.",
+   "form-keyboard-ar-dark.png shows the service page scrolled to the top with the keyboard open; why the scroll position is there (how the android-run session opened the keyboard) is unexplained.",
+   "Not examined on a device: the iOS strong-password overlay on the sign-up password field (textContentType newPassword, register.tsx:334), which on some iOS versions hides typed characters."
+  ],
+  "data": "KeyboardAvoidingView sites (working tree; all paths under C:/Projects/vibes-club-app/app/src):\n- components/Screen.tsx:43 - iOS padding + header offset (today); Android undefined -> no-op. 97705af line 36: iOS padding, no offset.\n- components/ProfileCompletionGate.tsx:186 - iOS padding; Android undefined -> no-op. Unchanged today.\n- components/advisor/AdvisorChat.tsx:253 - iOS padding + tab-bar offset; Android undefined -> no-op (97705af:207).\n- app/contact.tsx:122 - iOS padding + header offset; Android undefined -> no-op.\n- Inside Modals, Android 'height': WhatsappVerify.tsx:79, PhoneConfirmAlert.tsx:85, PasswordPrompt.tsx:54, CountryPicker.tsx:86 (added today), OptionPicker.tsx:65 (added today), project/RateProjectModal.tsx:74, app/golden/[code].tsx:162.\n\nCode fields that drop non-ASCII digits:\n- components/PhoneCodeStep.tsx:98 (WhatsApp code: sign-up proof, completion form, sign-in step)\n- components/PhoneConfirmAlert.tsx:99\n- app/auth/verify.tsx:121 (e-mail code)\n- app/auth/reset.tsx:131 (reset code)\n- app/auth/totp.tsx:69 and app/security-2fa.tsx:180 (authenticator code)\n- components/CountryPicker.tsx:51 (dial-code search, minor)\nAlready folding: lib/validation.ts:14-23 (phone fields), lib/adsUserPii.ts:30.\n\nEmulator screenshots (1080x2400 px, about 914dp tall, docs/reviews/2026-11-15/android-shots):\n- Keyboard top at y=1517 px (578dp) in all keyboard shots; header bottom at y~210 px (80dp).\n- Usable scroll viewport with the keyboard open: about 498dp of 834dp; 336dp hidden.\n- advisor-ar-dark.png: composer at y~2070-2190, tab bar below. advisor-keyboard-ar-dark.png: composer not visible, message list identical.\n- signup-en-dark.png at rest: E-mail field at y~1810, Password at y~2050, both below the future keyboard top; category chips, Job title and the submit button further down.\n- Register content tail: paddingBottom = 32dp + bottom inset (advisor/AskAdvisor.tsx:19,25-28), so roughly the last 280dp of real content cannot rise above the keyboard on Android.\n\niOS arithmetic (pre-fix): padding = keyboard height - header height; shortfall = status bar + 44pt (about 91-106pt, 64 on SE).\n\nOTA reload: 97705af app/src/app/_layout.tsx:108-116 unconditional; working tree lines 62 and 126-141 limit it to 30 s after launch."
+ },
+ "challenge": {
+  "verdict": "partly-right",
+  "corrections": [
+   "The main Android cause holds up. I checked it in code and in a screenshot. The colleague's account of why the field stays hidden is incomplete, though. ReactScrollView.java:516-537 scrolls a focused child into view natively (requestChildFocus -> scrollToChild, requestChildRectangleOnScreen), and its onSizeChanged (line 458) calls super, which is Android ScrollView's 'keep the focused view visible when I shrink' logic. The field stays hidden because the ScrollView never shrinks, so Android thinks a field sitting behind the keyboard is on screen. Once Android padding is in place, Android brings the focused field and the caret into view by itself. The proposed JS ensureVisible / FormField onFocus machinery (colleague's fix step 2) is not needed on Android. It would also fight the native scroll and the existing scroll-to-first-error.",
+   "The Android padding math is right, and I checked it against the 0.86.3 source. ReactRootView.java:950-985 sends keyboardDidShow with screenY = getWindowVisibleDisplayFrame().bottom, which is window coordinates even edge-to-edge. KeyboardAvoidingView.js:98-110 compares that with the onLayout frame, which is relative to the parent. So under the native header the offset must be the full header height (status bar + toolbar), which is what the colleague wrote. Screen.tsx's KAV parent is a SafeAreaView whose top padding is counted in frame.y, so frame.y + frame.height still lines up with the window. Not measured: whether HeaderHeightContext really returns status bar + toolbar on Android.",
+   "iPhone: for the members' bundle the header shortfall is real. git show 97705af:app/src/components/Screen.tsx:36 has 'padding' with no offset, so padding = overlap minus header height, about 91-106 pt short. On register the submit button is still reachable, because the footnote, the gap and the 32 + 34 clearance after it add up to more than the shortfall. That part is right. The claim that a focused lower field is 'never scrolled into view' on iOS was not proven. UIKit may scroll a first-responder text field on its own, and I could not run an iPhone. More importantly, the colleague missed that RN 0.86 already ships the right iOS tool. ScrollView automaticallyAdjustKeyboardInsets (RCTScrollViewComponentView.mm:187-260) sets the bottom inset from window coordinates, so no header arithmetic is needed. It also scrolls the focused TextInput above the keyboard using firstResponderFocus (RCTTextInputComponentView.mm:173), animated with the keyboard. That replaces both the hand-written ensureVisible and today's header-offset KAV in Screen and in the completion cover.",
+   "Today's Screen.tsx fix (keyboardVerticalOffset = headerHeight on iOS) is correct by the arithmetic. It should not be combined with automaticallyAdjustKeyboardInsets: the inset is computed from the frame before KAV padding shrinks the view, which leaves an empty band. Pick one per screen.",
+   "The Arabic-Indic digit cause is real: /\\D/ and \\d without the u flag are ASCII-only. The colleague's list of affected fields is incomplete. app/src/app/delete-account.tsx:173-180 and app/src/app/persona.tsx:211 are number-pad code fields with no filter at all, so they send Arabic-Indic digits straight to the server, where a string compare fails.",
+   "The forced OTA reload is overrated as a cause of this complaint. fallbackToCacheTimeout is 0 (app.config.ts:70), and the download usually finishes while a newcomer is still on the welcome screen. A reload mid-form would also be described as 'the app restarted', not as being unable to type. The cause is real but minor and belongs at the bottom. Today's 30-second window already narrows it for bundles that have the fix."
+  ],
+  "missedCauses": [
+   "A sign-up with a number that has no WhatsApp can never be finished, on both platforms and in every version. server/src/auth/phoneCode.ts:95 allows the e-mail fallback only for purpose 'signin' (mayMail). For purpose 'signup', deliver() (lines 241-248) and deliveryFailed() (lines 213-224) mark the step unreachable and send nothing. Meta accepts the WhatsApp send, so the app shows 'sent to your WhatsApp' (PhoneCodeStep.tsx:83) and the code never arrives. The resend button then returns send_failed. Whenever config.phoneProofRequired is on, register.tsx:139/161-167 (members' bundle) blocks the form behind this code. Sequence: the member fills everything, presses «إنشاء حساب», the code goes out by itself (autoProof) and the form waits forever. This is a deliberate M211 rule, but nothing tells the member why. It matches 'cannot fill the sign-up form at all' for newcomers on a landline-like or non-WhatsApp SIM. I did not check whether phoneProofRequired is on in production.",
+   "On Android, closing the keyboard is the only way to reach the submit button. ScrollView keyboardShouldPersistTaps='handled' is set, so this is not a two-tap problem; the content simply cannot rise. I confirmed it in docs/reviews/2026-11-15/android-shots/signup-keyboard-ar-dark.png: the keyboard top is at y=1517 px and the persona chips are cut there. The job title, the invite link and «إنشاء حساب» are below the keyboard and the member cannot scroll them up.",
+   "Two more code fields with no digit folding: delete-account.tsx:176 (onChangeText={setCode}) and persona.tsx:211."
+  ],
+  "finalFixPlan": [
+   {
+    "priority": 1,
+    "change": "Android keyboard room. Change the four full-screen wrappers so Android gets real padding. (a) app/src/components/Screen.tsx (currently around line 43): behavior={Platform.OS === 'android' ? 'padding' : <see step 2>}. On Android use keyboardVerticalOffset={headerHeight}, which is already read from HeaderHeightContext at line 39. (b) app/src/components/ProfileCompletionGate.tsx:186: Android behavior 'padding', offset 0, because the cover is absolute at y=0 of the root. (c) app/src/components/advisor/AdvisorChat.tsx:253: behavior 'padding' on both platforms. Keep today's iOS offset; Android offset 0. (d) app/src/app/contact.tsx:122-123: behavior 'padding' on both, offset headerHeight on both. Use 'padding', never 'height': 'height' caches the first frame height, and the Android tab bar now hides on keyboard open. Add no JS scroll-to-field code for Android: once the ScrollView really shrinks, ReactScrollView's native onSizeChanged/requestChildFocus brings the focused field and the caret into view by itself. This is pure JS with no native module, so it is safe on runtimes 1.2.0-1.3.3 (all RN 0.86).",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/Screen.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/ProfileCompletionGate.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/advisor/AdvisorChat.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/contact.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Use the API 36 emulator plus one short AVD (360x640 dp). On register, focus E-mail, Password and Job title in turn: each must sit above the keyboard. Scroll to the end with the keyboard open: «إنشاء حساب» must be fully visible and tappable. Press sign-up with an unproven number: the WhatsApp code field must be visible above the number pad. Also check: the completion cover's last field, a service form (service/[key]), the advisor composer riding above the keys and returning when the keyboard closes, and the contact thread. If the header offset is wrong, there is a visible gap or overlap equal to the header height; then log HeaderHeightContext once."
+   },
+   {
+    "priority": 2,
+    "change": "iPhone: let the ScrollView do it natively in Screen and the completion cover. In Screen.tsx set automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'} on the ScrollView, and disable the KeyboardAvoidingView on iOS (enabled={Platform.OS === 'android'}, or behavior undefined on iOS). That drops today's iOS header offset there; do not run both, or the inset doubles. Do the same in ProfileCompletionGate.tsx (ScrollView at line ~187, KAV at 186). RN 0.86 computes the inset in window coordinates, so it is correct under any header, and it scrolls the focused TextInput above the keyboard, animated with it. Keep KAV 'padding' on iOS for AdvisorChat and contact: their composer sits outside the scroll view. The prop has existed since RN 0.69/0.70, so it is safe on every OTA runtime.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/components/Screen.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/ProfileCompletionGate.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "This can only be checked on a real iPhone (the owner's iPhone 17 Pro Max, preview channel first). On register, tap Job title while the keyboard is closed: it must slide above the keyboard. Move from E-mail (email keyboard) to Job title (default keyboard): it stays visible. Scroll to the end: the last element sits just above the keyboard with no large empty band. Run the same checks on a long service form under the header and on the completion cover. If anything misbehaves, fall back to today's committed KAV padding + header offset, which is correct by the arithmetic."
+   },
+   {
+    "priority": 3,
+    "change": "Accept Arabic-Indic and Persian digits in every code field. Add an export toAsciiDigits(value) in app/src/lib/validation.ts. It does the same two replaces as localPhoneDigits lines 15-17 (U+0660-0669 and U+06F0-06F9 to ASCII) and returns the string. Apply it before the existing filter at: PhoneCodeStep.tsx onChangeText (working tree around line 98, members' line 96), PhoneConfirmAlert.tsx:99, auth/verify.tsx:121, auth/reset.tsx:131, auth/totp.tsx:69 and security-2fa.tsx:180 (fold before toUpperCase/[^A-Z0-9-]), delete-account.tsx:176 (onChangeText={(v) => setCode(toAsciiDigits(v).replace(/\\D/g, ''))}), persona.tsx:211 (same), and CountryPicker.tsx:51. On these number fields, set keyboardType={Platform.OS === 'ios' ? 'ascii-capable-number-pad' : 'number-pad'}. Server side, for bundles that send the raw value (delete-account, persona), fold digits in the code-check routes before comparing.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/lib/validation.ts",
+     "C:/Projects/vibes-club-app/app/src/components/PhoneCodeStep.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/PhoneConfirmAlert.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/verify.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/reset.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/totp.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/security-2fa.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/delete-account.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/persona.tsx",
+     "C:/Projects/vibes-club-app/app/src/components/CountryPicker.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Add a unit test: toAsciiDigits('١٢٣٤') === '1234' and toAsciiDigits('۱۲۳۴') === '1234'. On the emulator, paste '١٢٣٤' into the WhatsApp code field and the e-mail code field: four digits must appear and auto-submit must fire. On the iPhone, with the Arabic keyboard or Arabic numerals active, type a code: digits must appear. Only a real iPhone can confirm that the ascii-capable pad shows."
+   },
+   {
+    "priority": 4,
+    "change": "Owner decision on the sign-up dead end for numbers that are not on WhatsApp. Today server/src/auth/phoneCode.ts:95 (mayMail = purpose === 'signin') means a 'signup' step never falls back to e-mail, and deliveryFailed (lines 213-224) only marks it unreachable. Option A: let phoneProofStart carry the e-mail typed on the form and allow the e-mail fallback for 'signup'. This needs a server change plus app register.tsx/PhoneProofField.tsx passing form.email, and hub rules unchanged. Option B, at minimum: when resend returns send_failed for an unreachable signup step, the server returns a specific code (e.g. phone_unreachable) and the app shows one formal Arabic line: the number must be on WhatsApp, use another number, plus the support WhatsApp line. First read the live config (phoneProofRequired) and the logs to see how many signup steps ended 'unreachable'.",
+    "files": [
+     "C:/Projects/vibes-club-app/server/src/auth/phoneCode.ts",
+     "C:/Projects/vibes-club-app/server/src/auth/routes.ts",
+     "C:/Projects/vibes-club-app/app/src/components/PhoneProofField.tsx",
+     "C:/Projects/vibes-club-app/app/src/app/auth/register.tsx"
+    ],
+    "delivery": "owner-decision",
+    "howToVerify": "Server test in m211.phoneproof.test.ts: a signup step whose WhatsApp delivery fails gets either a mailed code (option A) or a phone_unreachable answer on resend (option B). On the local mock server, register with a number the mock marks undeliverable and check the message shown."
+   },
+   {
+    "priority": 5,
+    "change": "Never force-reload under someone who may be typing. In app/src/app/_layout.tsx, in the reload branch (working tree around lines 126-141), additionally require: TextInput.State.currentlyFocusedInput() == null, Keyboard.isVisible() === false, and that the current pathname (kept in a ref from usePathname) does not start with /auth, /form, /service, /profile-edit, /contact, /posts/compose, /people/apply or /checkout. Otherwise leave the update pending for the UpdateGate banner or the next launch.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/src/app/_layout.tsx"
+    ],
+    "delivery": "ota",
+    "howToVerify": "Local debug build: publish a dummy update to a test channel, open register, focus Name before the download finishes. The app must not reload, and the restart banner appears instead. This only protects launches after the fix has reached the phone."
+   },
+   {
+    "priority": 6,
+    "change": "For binary 1.3.4: build it only after steps 1-5 are merged, so the embedded bundle (what a fresh install runs on its first launch) already carries the keyboard fixes, the digit folding and the reload guard. Make no native keyboard change: Expo 57 forces edge-to-edge, and no react-native-keyboard-controller, because runtimes 1.2.0-1.3.3 would lack the module.",
+    "files": [
+     "C:/Projects/vibes-club-app/app/app.config.ts"
+    ],
+    "delivery": "new-binary",
+    "howToVerify": "Install the store build on the emulator in airplane mode (embedded bundle only) and repeat the register keyboard checks from step 1."
+   }
+  ],
+  "ownerMessage": "On Android the keyboard never makes room for the form, so the lower fields and the sign-up button stay behind it. On iPhone the form also does not move far enough. Some members' Arabic number keypads type digits the code field throws away. A newcomer whose number is not on WhatsApp never receives the sign-up code. The first three are fixed with an OTA update that changes how forms make room for the keyboard on both platforms and accepts Arabic digits; it needs one emulator check and one check on your iPhone. The WhatsApp-only rule at sign-up needs your decision: either allow an e-mail code, or at least tell the member clearly to use a WhatsApp number."
+ }
+}

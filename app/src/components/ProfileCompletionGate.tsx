@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, displayProfile, useAuthConfig, type Me, type Persona, type PhoneStepResult } from '@/api/auth';
@@ -16,9 +16,10 @@ import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { PhoneCodeStep } from '@/components/PhoneCodeStep';
+import { FieldScrollProvider, useFieldScroller } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, tOptional } from '@/i18n';
-import { isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
+import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { brand, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
 const PERSONAS: Persona[] = ['neutral', 'entrepreneur', 'investor'];
@@ -66,6 +67,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   const config = configQuery.data;
   const scrollRef = useRef<ScrollView | null>(null);
   const form = useFormErrors<Field>(scrollRef);
+  // Review 2026-11-16: the field that holds the cursor stays above the keyboard (same mechanism as Screen).
+  const keeper = useFieldScroller(scrollRef);
   const need = (key: string) => (missing ?? []).includes(key as never);
   // M165 (owner, 2026-10-31): the country, phone and persona fields are drawn from the server's answer. Until it
   // is here the member sees a spinner, never an empty card; a failure shows a retry button and retries by itself.
@@ -149,7 +152,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     try {
       const rest = {
         ...(need('name') ? { name: name.trim() } : {}),
-        ...(need('contactEmail') ? { contactEmail: contactEmail.trim().toLowerCase() } : {}),
+        ...(need('contactEmail') ? { contactEmail: cleanEmail(contactEmail) } : {}),
         ...(need('persona') && persona ? { persona } : {}),
         ...(need('jobTitle') ? { jobTitle: jobTitle.trim() } : {}),
         ...(me?.inviteOpen && inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
@@ -182,12 +185,19 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   };
 
   return (
-    <View style={styles.cover}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+    // The status-bar inset sits on the cover itself, not inside the scrolled content: now that the form scrolls
+    // above the keyboard, its lines would otherwise slide under the clock and the battery.
+    <View style={[styles.cover, { paddingTop: insets.top }]}>
+      {/* Review 2026-11-16: `padding` on Android too — edge-to-edge no longer resizes the window for the keyboard, and
+          `undefined` left the lower fields and the save button behind the keys. The cover starts at the top of the
+          screen, so no offset on either platform. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        <FieldScrollProvider value={keeper.field}>
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl }]}
+          contentContainerStyle={[styles.content, { paddingTop: spacing.lg, paddingBottom: insets.bottom + spacing.xl }]}
           keyboardShouldPersistTaps="handled"
+          {...keeper.scrollProps}
         >
           <Image source={require('../../assets/images/club-logo.png')} style={styles.emblem} resizeMode="contain" />
           <View style={styles.row}>
@@ -264,12 +274,18 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   onChangeText={field('contactEmail', setContactEmail)}
                   error={form.errors.contactEmail}
                   anchorRef={form.anchor('contactEmail')}
-                  onBlur={blur('contactEmail')}
+                  // Leaving the field shows the address as it will be sent; never while typing.
+                  onBlur={() => {
+                    const cleaned = cleanEmail(contactEmail);
+                    if (cleaned !== contactEmail) setContactEmail(cleaned);
+                    form.check('contactEmail', issueOf('contactEmail', cleaned));
+                  }}
                   latin
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                   textContentType="emailAddress"
+                  autoComplete="email"
                 />
               </View>
             ) : null}
@@ -357,6 +373,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
           )}
           <Text style={styles.foot}>{t('completeProfile.foot')}</Text>
         </ScrollView>
+        </FieldScrollProvider>
       </KeyboardAvoidingView>
     </View>
   );
@@ -370,7 +387,9 @@ const styles = StyleSheet.create({
   invite: { alignSelf: 'center', paddingVertical: spacing.xs },
   inviteText: { ...typography.caption, color: brand.navy, textDecorationLine: 'underline' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: brand.navy, textAlign: 'center' },
+  // The title may shrink inside its row, so a long line («Welcome <name>, complete your details») wraps to a second
+  // line within the screen's side padding instead of running to both edges.
+  title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: brand.navy, textAlign: 'center', flexShrink: 1 },
   body: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 25, color: formPalettes.light.inkSoft, textAlign: 'center' },
   group: { gap: spacing.sm },
   loading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },

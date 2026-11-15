@@ -181,7 +181,7 @@ export default function ServiceScreen() {
             {service.savingsSar ? (
               <View style={styles.savingsPill}>
                 <Ionicons name="sparkles" size={13} color={colors.goldInk} />
-                <SarText style={styles.savingsText} numberOfLines={1}>
+                <SarText style={styles.savingsText}>
                   {t('service.save', { amount: formatNumber(service.savingsSar) })}
                 </SarText>
               </View>
@@ -395,18 +395,22 @@ const styles = themedStyles(() => ({
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   // M109b: the gold savings pill under the price labels.
+  // M241 (emulator, 200% font): never wider than the column it sits in — a long sentence or a large system
+  // font wraps inside it instead of running off the screen. The 16 pt radius is the same full pill on one
+  // line (24 pt tall) and keeps the wrapped lines inside the gold.
   savingsPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     gap: 4,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    borderRadius: radii.pill,
+    borderRadius: radii.lg,
     backgroundColor: colors.gold,
     boxShadow: shadows.glowGoldFaint,
   },
-  savingsText: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.goldInk },
+  savingsText: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 18, color: colors.goldInk, flexShrink: 1, textAlign: textStart },
   price: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textPrimary },
   // M182e: the pre-support list price, struck.
   wasPrice: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textMuted, textDecorationLine: 'line-through' },

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
@@ -17,11 +17,12 @@ import { audienceBadge } from '@/components/PostsBlock';
 import { StateView } from '@/components/StateView';
 import { StructuredText } from '@/components/StructuredText';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { playVideo } from '@/lib/player';
+import { markPostRead } from '@/lib/readPosts';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -35,6 +36,11 @@ export default function PostScreen() {
   useAdvisorScreen(post ? { type: 'post', id: post.id, title: post.title, event: Boolean(event) } : null);
   // Keeps the last link button clear of that floating button.
   const clearance = useAskAdvisorClearance();
+  // M242: a management message is read the moment it is on screen — the inbox light, the home strip and its dot go out.
+  const openedId = post?.id;
+  useEffect(() => {
+    if (openedId) markPostRead(openedId);
+  }, [openedId]);
 
   const isPoll = post?.kind === 'poll';
   return (
@@ -61,7 +67,7 @@ export default function PostScreen() {
               sheet — the title in ink, a golden rule, then the body as tidy blocks (sub-headings, bullets, figures in gold). */}
           <FadeInView delay={entranceDelay(1)}>
             <PaperCard style={styles.letter}>
-              <Text style={styles.letterTitle}>{post.title}</Text>
+              <Text style={styles.letterTitle}>{markParagraphs(post.title)}</Text>
               <GoldHairline style={styles.letterRule} />
               {post.body ? <StructuredText text={post.body} variant="paper" /> : null}
               {!event && !isPoll ? <Text style={styles.letterSign}>{t('posts.signature')}</Text> : null}
@@ -166,7 +172,7 @@ function PollCard({ postId, initial }: { postId: string; initial: Poll }) {
               ) : (
                 <Ionicons name={picked ? 'radio-button-on' : poll.closed ? 'remove-circle-outline' : 'ellipse-outline'} size={20} color={picked ? colors.gold : colors.textMuted} />
               )}
-              <Text style={[styles.optionLabel, (mine || picked) && styles.optionLabelMine]}>{option.label}</Text>
+              <Text style={[styles.optionLabel, (mine || picked) && styles.optionLabelMine]}>{markParagraphs(option.label)}</Text>
               {showCounts ? <Text style={styles.optionVotes}>{`${Math.round(share * 100)}%`}</Text> : null}
             </View>
             {showCounts ? (
@@ -223,7 +229,7 @@ function EventCard({ event }: { event: PostEvent }) {
           <Ionicons name="location-outline" size={20} color={colors.gold} />
           <View style={styles.eventTexts}>
             <Text style={styles.eventLabel}>{t('posts.where')}</Text>
-            <Text style={styles.eventValue}>{event.place}</Text>
+            <Text style={styles.eventValue}>{markParagraphs(event.place)}</Text>
           </View>
         </View>
       ) : null}

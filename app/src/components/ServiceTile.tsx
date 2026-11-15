@@ -27,10 +27,15 @@ export function ServiceTile({ service, onPress }: Props) {
   const { locked } = service;
   // «Save 1,000 SAR with your membership» is far longer than the Arabic sentence and would end in «…» on a
   // half-width tile, so English reserves two lines for it (read at render time, never at module scope).
-  const savingsLines = getLang() === 'en' ? 2 : 1;
+  const english = getLang() === 'en';
+  const savingsLines = english ? 2 : 1;
+  // M241 (Android run, item 39): a service without a price or a saving has nothing under the summary —
+  // no filament and no empty reserved lines. The row stays even because every tile fills its row's height.
+  const price = service.memberLabel ?? service.priceLabel ?? '';
+  const footer = Boolean(price) || Boolean(service.savingsSar);
   return (
     // M120 (owner): tapping a members-only service answers with the subscribe popup, not the page.
-    <PressScale onPress={locked ? showMembershipGate : onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
+    <PressScale onPress={locked ? showMembershipGate : onPress} wrapStyle={styles.wrap} style={styles.press} accessibilityRole="button" accessibilityLabel={service.title}>
       <GlassCard golden={!locked} style={[styles.card, locked && styles.lockedCard]}>
         <View style={styles.topRow}>
           {/* M84e: the icon ring pops into place — the tile's icon leads, alive. */}
@@ -41,14 +46,17 @@ export function ServiceTile({ service, onPress }: Props) {
           </PopIn>
           {locked ? (
             <View style={[styles.pill, styles.lockPill]}>
-              <Ionicons name="lock-closed" size={10} color={colors.gold} />
-              <Text style={[styles.pillText, { color: colors.gold }]} numberOfLines={1}>
+              <Ionicons name="lock-closed" size={10} color={colors.goldText} />
+              <Text style={[styles.pillText, { color: colors.goldText }]} numberOfLines={1}>
                 {t('services.membersOnly')}
               </Text>
             </View>
           ) : service.cta ? (
-            <View style={styles.pill}>
-              <Text style={[styles.pillText, { color: colors.gold }]} numberOfLines={1}>
+            // M241 (Android run, item 26): the English calls («Start your consultation») are longer than the
+            // Arabic ones and ended in «…»; in English the pill takes a second line, beside the 42 pt icon ring
+            // so the tile is no taller. Arabic keeps its one-line pill.
+            <View style={[styles.pill, english && styles.pillWrap]}>
+              <Text style={[styles.pillText, english && styles.pillTextWrap, { color: colors.goldText }]} numberOfLines={english ? 2 : 1}>
                 {service.cta}
               </Text>
             </View>
@@ -60,15 +68,22 @@ export function ServiceTile({ service, onPress }: Props) {
         <Text style={[styles.summary, locked && styles.lockedText]} numberOfLines={3}>
           {service.summary}
         </Text>
-        <GoldHairline style={styles.hairline} />
-        {/* Always rendered: the reserved lines keep every tile in the grid the same height. */}
-        <SarText style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
-          {service.memberLabel ?? service.priceLabel ?? ''}
-        </SarText>
-        {/* M109b: the membership saving, loud on every priced tile (reserved so rows stay even). */}
-        <SarText style={[styles.savings, locked && styles.lockedText, { minHeight: 16 * savingsLines }]} numberOfLines={savingsLines}>
-          {service.savingsSar ? t('service.save', { amount: formatNumber(service.savingsSar) }) : ''}
-        </SarText>
+        {footer ? (
+          <>
+            <GoldHairline style={styles.hairline} />
+            {price ? (
+              <SarText style={[styles.meta, locked && styles.lockedText]} numberOfLines={1}>
+                {price}
+              </SarText>
+            ) : null}
+            {/* M109b: the membership saving, loud on every priced tile. */}
+            {service.savingsSar ? (
+              <SarText style={[styles.savings, locked && styles.lockedText]} numberOfLines={savingsLines}>
+                {t('service.save', { amount: formatNumber(service.savingsSar) })}
+              </SarText>
+            ) : null}
+          </>
+        ) : null}
       </GlassCard>
     </PressScale>
   );
@@ -85,6 +100,8 @@ export const serviceTileWrapStyle = { flexBasis: '47%' as const, flexGrow: 1, ma
 
 const styles = themedStyles(() => ({
   wrap: { flex: 1 },
+  // M241: the pressable fills the wrapper, so the card inside reaches the height of the tallest tile in its row.
+  press: { flex: 1 },
   card: {
     flex: 1,
     padding: spacing.sm + 4,
@@ -116,13 +133,17 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldFaint,
     maxWidth: 110,
   },
+  // English only: the pill is never wider than the room beside the icon ring, so its label wraps inside it.
+  pillWrap: { flexShrink: 1 },
   lockPill: { borderColor: colors.borderGold, backgroundColor: colors.goldSoft },
   pillText: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 15 },
+  // English only: the label may wrap inside the pill instead of being cut.
+  pillTextWrap: { flexShrink: 1, textAlign: 'center' },
   // Reserved heights: a short title or summary keeps the tile as tall as its neighbors.
   title: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, minHeight: 42, color: colors.textPrimary, textAlign: textStart },
   summary: { ...typography.caption, fontSize: 11, lineHeight: 17, minHeight: 51, color: colors.textSecondary, textAlign: textStart },
   hairline: { marginVertical: spacing.xs },
-  meta: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, minHeight: 17, color: colors.gold, textAlign: textStart },
+  meta: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, minHeight: 17, color: colors.goldText, textAlign: textStart },
   savings: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 16, minHeight: 16, color: colors.goldNeon, textAlign: textStart },
   lockedText: { opacity: 0.75 },
 }));

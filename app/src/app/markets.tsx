@@ -43,7 +43,7 @@ export default function MarketsScreen() {
   return (
     <Screen>
       <Pressable style={styles.ask} hitSlop={6} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
-        <Ionicons name="sparkles" size={16} color={colors.gold} />
+        <Ionicons name="sparkles" size={16} color={colors.goldText} />
         <Text style={styles.askText}>{t('markets.askAdvisor')}</Text>
       </Pressable>
       <Text style={styles.live}>{t('markets.live', { time: data?.updatedAt ? formatRelativeTime(data.updatedAt) : '' })}</Text>
@@ -79,7 +79,7 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
         <Text style={styles.meta} numberOfLines={1}>{formatRelativeTime(quote.at)}</Text>
       </View>
       <Pressable style={styles.rowAsk} hitSlop={8} onPress={() => onAsk(label)} accessibilityRole="button" accessibilityLabel={t('markets.askAbout', { label })}>
-        <Ionicons name="sparkles-outline" size={16} color={colors.gold} />
+        <Ionicons name="sparkles-outline" size={16} color={colors.goldText} />
       </Pressable>
       <View style={styles.end}>
         <SarText style={styles.price} numberOfLines={1}>{riyal ? `${LRM}${priceText(quote.price)} ريال` : `${LRM}${priceText(quote.price)}`}</SarText>
@@ -91,7 +91,7 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
 
 const styles = themedStyles(() => ({
   ask: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: spacing.xs, paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGold, marginBottom: spacing.sm },
-  askText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
+  askText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldText },
   rowAsk: { padding: spacing.xs },
   live: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginBottom: spacing.sm },
   groupTitle: { ...typography.subtitle, fontSize: 16, color: colors.goldLightText, textAlign: textStart, marginTop: spacing.md, marginBottom: spacing.xs },
@@ -102,7 +102,7 @@ const styles = themedStyles(() => ({
   end: { alignItems: 'flex-end', gap: 2 },
   label: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
   meta: { fontSize: 11, lineHeight: 16, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
-  gram: { fontSize: 12, lineHeight: 18, fontFamily: fonts.medium, color: colors.gold, textAlign: textStart },
+  gram: { fontSize: 12, lineHeight: 18, fontFamily: fonts.medium, color: colors.goldText, textAlign: textStart },
   price: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 26, color: colors.textPrimary },
   note: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginTop: spacing.lg },
 }));

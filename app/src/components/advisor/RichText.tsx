@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 
-import { textDir, textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -8,19 +8,29 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 // The advisor's replies use markdown: **bold**, links (plain or [label](url)), headings, bullet lists and tables.
 // A plain link ends at the Arabic comma, semicolon and question mark too (U+060C, U+061B, U+061F), like at the Latin ones.
 const TOKEN = /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<>()[\]«»"'\u060C\u061B\u061F]+)/g;
-const ARABIC_LETTER = /[\u0600-\u06FF]/;
 
 /**
- * M177 for the chat: a reply with no Arabic at all (an English answer in the Arabic app) reads left-to-right from
- * the left edge. Text that holds Arabic sits on the Arabic side, and each of its lines keeps its own direction,
- * so an English line inside an Arabic reply still ends with its full stop on the right.
+ * The chat follows the app-wide rule (i18n/direction.ts, 2026-11-16): every line starts at the screen's start edge
+ * and reads in the order of its own letters. A reply is ONE Text with many lines, and Android gives one Text one
+ * alignment and each line its own direction — a bullet that opened with «ROI» or a link sat on the left among
+ * Arabic bullets. markParagraphs() carries each line's direction inside the string (the only thing Android obeys),
+ * so the style has nothing left to do but pin the edge.
  */
-function contentDir(text: string): TextStyle {
-  const dir = textDir(text);
-  return ARABIC_LETTER.test(text) ? { textAlign: dir.textAlign } : dir;
+const START_EDGE: TextStyle = { textAlign: textStart };
+
+/** The invisible direction marks markParagraphs() puts around a line (U+200E, U+200F, U+2066 to U+2069). */
+const isDirectionMark = (code: number): boolean => code === 0x200e || code === 0x200f || (code >= 0x2066 && code <= 0x2069);
+
+/**
+ * Where a plain link really ends: the punctuation after it and the mark that closes its line are not part of the
+ * address (a link at the end of a line would otherwise open with an invisible character glued to it).
+ */
+function linkEnd(part: string): number {
+  let end = part.length;
+  while (end > 0 && (isDirectionMark(part.charCodeAt(end - 1)) || '.,،;:!?'.includes(part.charAt(end - 1)))) end -= 1;
+  return end;
 }
 const MARKDOWN_LINK = /^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/;
-const TRAILING_PUNCTUATION = /[.,،;:!?]+$/;
 const HEADING = /^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/;
 const TABLE_SEPARATOR = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
@@ -155,8 +165,8 @@ export function RichText({ text, style, linkColor = colors.goldLightText, plain 
             return <Table key={index} header={block.header} rows={block.rows} linkColor={linkColor} />;
           case 'code':
             return (
-              <Text key={index} style={[style, contentDir(block.text)]} selectable>
-                {block.text}
+              <Text key={index} style={[style, START_EDGE]} selectable>
+                {markParagraphs(block.text)}
               </Text>
             );
           case 'rule':
@@ -180,10 +190,12 @@ type InlineProps = {
 };
 
 function Inline({ text, style, linkColor, selectable = false, marks = true }: InlineProps) {
-  // `split` with one capture group: even entries are the text between tokens, odd entries the tokens.
-  const parts = text.split(marks ? REPLY_TOKEN : TOKEN);
+  // The direction mark goes in front of every line BEFORE the split, so it stays the first character of its line,
+  // outside the **bold** and link tokens. `split` with one capture group: even entries are the text between tokens,
+  // odd entries the tokens.
+  const parts = markParagraphs(text).split(marks ? REPLY_TOKEN : TOKEN);
   return (
-    <Text style={[style, contentDir(text)]} selectable={selectable}>
+    <Text style={[style, START_EDGE]} selectable={selectable}>
       {parts.map((part, index) => {
         if (!part) return null;
         if (index % 2 === 0) return marks ? part.replace(ITALIC, '$1$2') : part;
@@ -212,8 +224,9 @@ function Inline({ text, style, linkColor, selectable = false, marks = true }: In
           );
         }
         if (/^https?:\/\//i.test(part)) {
-          const tail = TRAILING_PUNCTUATION.exec(part)?.[0] ?? '';
-          const url = tail ? part.slice(0, -tail.length) : part;
+          const end = linkEnd(part);
+          const url = part.slice(0, end);
+          const tail = part.slice(end);
           return (
             <Text key={index}>
               <Text style={[styles.link, { color: linkColor }]} onPress={() => void openLink(url)}>

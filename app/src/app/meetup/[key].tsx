@@ -12,7 +12,7 @@ import { StateView } from '@/components/StateView';
 import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { FormEmbed } from '@/components/FormEmbed';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, spacing, typography } from '@/theme/tokens';
 
@@ -46,7 +46,7 @@ export default function MeetupScreen() {
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(1)}>
-        <Text style={styles.description}>{meetup.description}</Text>
+        <Text style={styles.description}>{markParagraphs(meetup.description)}</Text>
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
         <View style={styles.features}>
@@ -54,8 +54,8 @@ export default function MeetupScreen() {
             <View key={feature.title} style={styles.feature}>
               <Ionicons name="sparkles-outline" size={18} color={colors.gold} />
               <View style={styles.featureBody}>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureText}>{feature.text}</Text>
+                <Text style={styles.featureTitle}>{markParagraphs(feature.title)}</Text>
+                <Text style={styles.featureText}>{markParagraphs(feature.text)}</Text>
               </View>
             </View>
           ))}

@@ -154,7 +154,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
       <View style={styles.stageHeader}>
         {/* M84e: the stage flag waves once as the card settles. */}
         <Wiggle delay={500}>
-          <Ionicons name="flag-outline" size={16} color={colors.gold} />
+          <Ionicons name="flag-outline" size={16} color={colors.goldText} />
         </Wiggle>
         <Text style={styles.blockTitle}>{t('brief.stage')}</Text>
         <View style={styles.stagePill}>

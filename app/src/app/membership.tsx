@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { useMembershipContent, type MembershipGroup, type MembershipItem, type NeutralReason } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
@@ -24,9 +25,21 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 /** Membership benefits as the owner wrote them (server content), grouped; lines can open a screen or WhatsApp. */
 export default function MembershipScreen() {
   const router = useRouter();
-  const { status, me } = useAuth();
+  const { status, me, refresh, syncMembership, membershipPending } = useAuth();
   const { data, isLoading, error, refetch } = useMembershipContent();
   useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? t('nav.membership') });
+  // Review 2026-11-16: this is where a member looks after buying, and it had no way to ask again. Pulling down
+  // re-reads the account from the server — through the membership check while a purchase is still waiting (the
+  // check that can find the activation), a plain fresh read otherwise — and the page's own content.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([status === 'signedIn' ? (membershipPending ? syncMembership() : refresh()) : null, refetch()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // `status === 'loading'`: the account is still being read from the device; the status card would
   // otherwise show «زائر» for a moment to a signed-in member.
@@ -49,7 +62,12 @@ export default function MembershipScreen() {
   };
 
   return (
-    <Screen title={data.title} subtitle={data.subtitle} watermark>
+    <Screen
+      title={data.title}
+      subtitle={data.subtitle}
+      watermark
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
+    >
       {/* M81 extension: the owner's membership banner — shows only when he fills the slot. */}
       <SlotBanner slot="membership.banner" />
       <FadeInView delay={entranceDelay(0)}>
@@ -58,12 +76,9 @@ export default function MembershipScreen() {
         </PaperCard>
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
-        <MembershipStatusCard
-          membership={status === 'signedIn' ? (me?.membership ?? null) : null}
-          texts={data.statusTexts}
-          activationNote={data.activationNote}
-          title={data.title}
-        />
+        {/* No `activationNote` here: the store card right below says where the subscription stands on THIS device
+            (the price and the button, «يتوفر قريبًا», «حدّث التطبيق», an error) — the note said the same thing twice. */}
+        <MembershipStatusCard membership={status === 'signedIn' ? (me?.membership ?? null) : null} texts={data.statusTexts} title={data.title} />
       </FadeInView>
       {status === 'signedIn' ? (
         <FadeInView delay={entranceDelay(2)}>

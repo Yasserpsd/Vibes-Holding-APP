@@ -6,7 +6,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
-import { textStart } from '@/i18n/direction';
+import { markParagraphs, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo, youtubeIdOf } from '@/lib/player';
@@ -99,7 +99,9 @@ export function parseBlocks(text: string): Block[] {
 
 /** Figures glow gold inside the owner's sentence; «ريال»/SAR inside them becomes the riyal symbol. */
 function Lit({ text, style, paper = false }: { text: string; style: object; paper?: boolean }) {
-  const parts = text.split(NUMBER);
+  // The owner's line carries its direction mark (i18n/direction.ts): added here, after the line was parsed into its
+  // block, so the mark never hides a bullet, a label or a link from the parser.
+  const parts = markParagraphs(text).split(NUMBER);
   return (
     <Text style={style}>
       {parts.map((part, index) => (index % 2 === 1 ? <SarText key={index} style={[style, paper ? styles.litPaper : styles.lit]}>{part}</SarText> : part))}
@@ -116,17 +118,17 @@ export function StructuredText({ text, variant = 'dark' }: { text: string; varia
     <GlassCard style={styles.card}>
       {blocks.map((block, index) => {
         if (block.kind === 'heading') {
-          return <Text key={index} style={styles.heading}>{block.text}</Text>;
+          return <Text key={index} style={styles.heading}>{markParagraphs(block.text)}</Text>;
         }
         if (block.kind === 'image' || block.kind === 'video') return <MediaBlock key={index} block={block} />;
         if (block.kind === 'fact') {
           return (
             <View key={index} style={styles.fact}>
               <View style={styles.factIcon}>
-                <Ionicons name={block.icon} size={15} color={colors.gold} />
+                <Ionicons name={block.icon} size={15} color={colors.goldText} />
               </View>
               <View style={styles.factTexts}>
-                <Text style={styles.factLabel}>{block.label}</Text>
+                <Text style={styles.factLabel}>{markParagraphs(block.label)}</Text>
                 <Lit text={block.text} style={styles.factText} />
               </View>
             </View>
@@ -187,7 +189,7 @@ function PaperBlocks({ blocks }: { blocks: Block[] }) {
           return (
             <View key={index} style={[styles.paperHeadingRow, index > 0 && styles.paperHeadingGap]}>
               <View style={styles.paperHeadingBar} />
-              <Text style={styles.paperHeading}>{block.text}</Text>
+              <Text style={styles.paperHeading}>{markParagraphs(block.text)}</Text>
             </View>
           );
         }
@@ -196,7 +198,7 @@ function PaperBlocks({ blocks }: { blocks: Block[] }) {
             <View key={index} style={styles.paperFact}>
               <Ionicons name={block.icon} size={16} color={colors.paperGold} style={styles.paperFactIcon} />
               <View style={styles.factTexts}>
-                <Text style={styles.paperFactLabel}>{block.label}</Text>
+                <Text style={styles.paperFactLabel}>{markParagraphs(block.label)}</Text>
                 <Lit text={block.text} style={styles.paperText} paper />
               </View>
             </View>
@@ -255,7 +257,7 @@ const styles = themedStyles(() => ({
   factLabel: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLightText, textAlign: textStart },
   factText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   bullet: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  diamond: { color: colors.gold, fontSize: 9, lineHeight: 26 },
+  diamond: { color: colors.goldText, fontSize: 9, lineHeight: 26 },
   bulletText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   lit: { fontFamily: fonts.semiBold, color: colors.goldLightText },
 }));

@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { textDir } from '@/i18n/direction';
+import { markParagraphs, textDir } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
@@ -43,11 +43,7 @@ export default function NewsItemScreen() {
           <FadeInView delay={entranceDelay(1)}>
             <View style={styles.meta}>
               <Text style={styles.source}>{item.source.name}</Text>
-              <View style={styles.tierPill}>
-                <Text style={styles.tier} numberOfLines={1}>
-                  {item.source.tierLabel}
-                </Text>
-              </View>
+              <TierChip label={item.source.tierLabel} />
               <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
             </View>
           </FadeInView>
@@ -62,14 +58,14 @@ export default function NewsItemScreen() {
           <FadeInView delay={entranceDelay(3)}>
             {/* M177 (owner): the headline on its own golden panel, the source's words on a second one — each in its own direction. */}
             <View style={styles.titlePanel}>
-              <Text style={[styles.title, textDir(item.title)]}>{item.title}</Text>
+              <Text style={[styles.title, textDir(item.title)]}>{markParagraphs(item.title)}</Text>
             </View>
           </FadeInView>
           {item.snippet ? (
             <FadeInView delay={entranceDelay(4)}>
               <View style={styles.bodyPanel}>
                 <View style={styles.bodyRail} />
-                <Text style={[styles.body, textDir(item.snippet)]}>{item.snippet}</Text>
+                <Text style={[styles.body, textDir(item.snippet)]}>{markParagraphs(item.snippet)}</Text>
               </View>
             </FadeInView>
           ) : null}
@@ -77,9 +73,9 @@ export default function NewsItemScreen() {
             <FadeInView delay={entranceDelay(5)}>
               <View style={styles.tags}>
                 {item.topics.map((topic) => (
-                  <Text key={topic.key} style={styles.tag}>
-                    {topic.label}
-                  </Text>
+                  <View key={topic.key} style={styles.tagPill}>
+                    <Text style={styles.tag}>{topic.label}</Text>
+                  </View>
                 ))}
               </View>
             </FadeInView>
@@ -102,6 +98,26 @@ export default function NewsItemScreen() {
   );
 }
 
+/**
+ * The source-tier chip («مصدر رسمي»). On Android a one-line label inside a shrink-to-fit chip was laid out a little
+ * narrower than its own text and lost its last letters to an ellipsis («مصدر رس…», emulator 2026-11-15), although
+ * the padding already sat on a wrapping View. The chip is therefore sized by a hidden copy of the label that is two
+ * letters longer (they stand in for the side padding), and the visible label is drawn centred across the whole chip:
+ * the same chip to the eye, with about 16 pt to spare for the label.
+ */
+function TierChip({ label }: { label: string }) {
+  return (
+    <View style={styles.tierPill}>
+      <Text style={[styles.tier, styles.tierSizer]} numberOfLines={1} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        {`${label}nn`}
+      </Text>
+      <Text style={[styles.tier, styles.tierLabel]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 /** The source's picture; if it fails to load the empty grey block is dropped instead of sitting above the headline. */
 function HeroImage({ uri }: { uri: string }) {
   const [failed, setFailed] = useState(false);
@@ -115,9 +131,11 @@ const styles = themedStyles(() => ({
   image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, boxShadow: shadows.lift },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   source: { ...typography.body, color: colors.goldLightText },
-  // Padding sits on a View: Android measures a padded Text too narrow and truncates it.
-  tierPill: { paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
+  // See TierChip: the hidden sizer gives the chip its width, the label fills it.
+  tierPill: { flexShrink: 0, paddingHorizontal: 1, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
   tier: { ...typography.caption, color: colors.textSecondary },
+  tierSizer: { opacity: 0 },
+  tierLabel: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, textAlign: 'center' },
   time: { ...typography.caption, color: colors.textMuted },
   // The pop wrapper hugs the badge so the spring scales it around its own center.
   badgeWrap: { alignSelf: 'flex-start' },
@@ -139,15 +157,9 @@ const styles = themedStyles(() => ({
   bodyRail: { width: 3, borderRadius: 2, backgroundColor: colors.gold },
   body: { ...typography.body, lineHeight: 28, color: colors.textPrimary, flex: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tag: {
-    ...typography.caption,
-    color: colors.goldLightText,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.goldDark,
-  },
+  // Padding and border sit on a View: Android measures a padded Text too narrow and cuts its last letters.
+  tagPill: { paddingVertical: 4, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.goldDark },
+  tag: { ...typography.caption, color: colors.goldLightText },
   // The card chrome (border, machined surface, lift) comes from the GlassCard.
   noteCard: {
     flexDirection: 'row',

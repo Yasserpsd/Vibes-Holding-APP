@@ -1,6 +1,6 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { useGuestGate } from '@/auth/GuestGate';
@@ -27,6 +27,7 @@ export function GuestNudge() {
   const { locked, ready } = useGuestGate();
   const [visible, setVisible] = useState(false);
   const shown = useRef(false);
+  const { height: windowHeight } = useWindowDimensions();
   // M128 (owner): one self-opening popup per launch. The nudge waits while another popup is up (or the forced-update
   // cover), takes the launch's slot, and holds the screen while open so nothing (the workshop ad) opens on top of it.
   const free = useAutoPopupFree();
@@ -58,9 +59,13 @@ export function GuestNudge() {
     <Modal transparent animationType="fade" statusBarTranslucent visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
-          <GlassCard golden radius={radii.xxl} style={styles.card}>
-            <Text style={styles.title}>{t('guestNudge.title')}</Text>
-            <Text style={styles.text}>{t('guestNudge.text')}</Text>
+          {/* 2026-11-16 (members: «كلام بيختفي»): on a short screen or with large system text the card stops at 88% of
+              the window — the words scroll inside it and the buttons stay in view (the WorkshopAd treatment). */}
+          <GlassCard golden radius={radii.xxl} style={[styles.card, { maxHeight: Math.round(windowHeight * 0.88) }]}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} bounces={false}>
+              <Text style={styles.title}>{t('guestNudge.title')}</Text>
+              <Text style={styles.text}>{t('guestNudge.text')}</Text>
+            </ScrollView>
             <AppButton label={t('guestNudge.register')} icon="person-add-outline" onPress={() => go('/auth/register')} />
             <AppButton label={t('guestNudge.signIn')} variant="outline" icon="log-in-outline" onPress={() => go('/auth/login')} />
             <PressScale onPress={dismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('guestNudge.later')}>
@@ -77,6 +82,9 @@ const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
   card: { gap: spacing.sm, padding: spacing.md },
+  // The text part gives way first when the card reaches its cap; the buttons under it keep their height.
+  scroll: { flexGrow: 0 },
+  scrollContent: { gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },
   text: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   later: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },

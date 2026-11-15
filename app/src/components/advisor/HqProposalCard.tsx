@@ -38,7 +38,7 @@ export function HqProposalCard({ action, busy, onPick, onConfirm }: Props) {
   return (
     <GlassCard radius={radii.md} style={styles.card}>
       <View style={styles.titleRow}>
-        <Ionicons name="calendar-outline" size={18} color={colors.gold} />
+        <Ionicons name="calendar-outline" size={18} color={colors.goldText} />
         <Text style={styles.title}>{t('advisor.act.title')}</Text>
       </View>
       {action.summary.map((line) => (
@@ -117,7 +117,7 @@ export function HqProposalCard({ action, busy, onPick, onConfirm }: Props) {
 const styles = themedStyles(() => ({
   card: { padding: spacing.md, gap: spacing.xs, alignSelf: 'stretch' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
+  title: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldText, textAlign: textStart },
   line: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, marginTop: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },

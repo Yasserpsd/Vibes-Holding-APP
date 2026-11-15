@@ -14,6 +14,7 @@ import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -177,7 +178,7 @@ export default function SecurityTotpScreen() {
                 textContentType="oneTimeCode"
                 maxLength={9}
                 value={code}
-                onChangeText={(value) => setCode(value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                onChangeText={(value) => setCode(toAsciiDigits(value).toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
                 onSubmitEditing={() => void submit()}
                 style={styles.code}
               />
@@ -225,8 +226,8 @@ const styles = themedStyles(() => ({
   pill: { borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   pillOn: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   pillText: { ...typography.caption, color: colors.textMuted },
-  pillTextOn: { color: colors.gold },
-  secret: { fontFamily: fonts.semiBold, fontSize: 16, letterSpacing: 2, color: colors.gold, textAlign: 'center', writingDirection: 'ltr' },
+  pillTextOn: { color: colors.goldText },
+  secret: { fontFamily: fonts.semiBold, fontSize: 16, letterSpacing: 2, color: colors.goldText, textAlign: 'center', writingDirection: 'ltr' },
   code: { fontFamily: fonts.semiBold, fontSize: 24, letterSpacing: 6, textAlign: 'center' },
   codes: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
   backupCode: { fontFamily: fonts.semiBold, fontSize: 16, letterSpacing: 1, color: colors.textPrimary, writingDirection: 'ltr', minWidth: '40%', textAlign: 'center' },

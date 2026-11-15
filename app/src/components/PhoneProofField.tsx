@@ -104,5 +104,5 @@ export function PhoneProofField({ phone, country, state, onChange, check, ready,
 const styles = themedStyles(() => ({
   wrap: { gap: spacing.xs },
   change: { alignSelf: 'center', paddingVertical: spacing.xs },
-  changeText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
+  changeText: { ...typography.caption, color: colors.goldText, textDecorationLine: 'underline' },
 }));

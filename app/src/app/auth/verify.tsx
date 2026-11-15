@@ -11,12 +11,14 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView, GrowBar } from '@/components/motion';
 import { Notice } from '@/components/Notice';
+import { codeKeyboardType } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { hubText, t } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
 import { markIntroDue } from '@/lib/introGate';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, shadows, spacing } from '@/theme/tokens';
+import { fonts, spacing } from '@/theme/tokens';
 
 /** M157: `flow: 'register'` marks the signup path (login also lands here for a new device). */
 type Params = { flow?: string; pendingToken?: string; email?: string; text?: string; interests?: string; interestsOther?: string };
@@ -33,7 +35,6 @@ export default function VerifyScreen() {
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(!pendingToken);
   const [cooldown, setCooldown] = useState(0);
-  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -111,22 +112,20 @@ export default function VerifyScreen() {
         <FormField
           label={t('auth.verify.code')}
           latin
-          keyboardType="number-pad"
+          keyboardType={codeKeyboardType}
           textContentType="oneTimeCode"
           maxLength={6}
           value={code}
           autoFocus
           onChangeText={(value) => {
             // M203 (owner: seconds, not minutes): the hub's code has four digits; the mock's test code does not.
-            const digits = value.replace(/\D/g, '');
+            const digits = toAsciiDigits(value).replace(/\D/g, '');
             setCode(digits);
             if (digits.length === 4 && !config?.testCode) void submit(digits);
           }}
           onSubmitEditing={() => void submit()}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           error={error}
-          style={[styles.code, focused && styles.codeFocused]}
+          style={styles.code}
           editable={!expired}
         />
       </FadeInView>
@@ -156,8 +155,8 @@ export default function VerifyScreen() {
 
 const styles = themedStyles(() => ({
   // The one-time code reads like a minted number: large, centered, spaced.
+  // The golden focus halo comes from FormField's own frame around the input (a plain View). A box shadow on the
+  // input itself makes Android swap its background and reset its padding (review 2026-11-16).
   code: { fontFamily: fonts.semiBold, fontSize: 28, letterSpacing: 10, textAlign: 'center' },
-  // While typing, the box lights up with the golden focus halo.
-  codeFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   resendBlock: { gap: spacing.sm },
 }));

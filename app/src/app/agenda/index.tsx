@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
@@ -17,6 +18,8 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
+/** The dark ground that on-photo colours need: the same in both themes, used only over a photo or as a plate of its own. */
+const DARK_GLASS = 'rgba(7, 7, 8, 0.72)';
 const MODE_KEY: Record<AgendaEvent['mode'], StringKey> = { hq: 'agenda.modeHq', online: 'agenda.modeOnline', both: 'agenda.modeBoth' };
 
 /** M41 «أجندة النادي»: the year's upcoming events, one tap away from a confirmed attendance. */
@@ -53,7 +56,7 @@ export default function AgendaScreen() {
 
 /**
  * The date chip. On a card it sits ON the photo (dark in both themes), so it keeps its dark glass;
- * `onPage` is for the event page, where it sits on the page itself and follows the theme.
+ * `onPage` is for a themed ground — the event page, or a card that has no photo — where it follows the theme.
  */
 export function EventDateBadge({ date, size = 'md', highlight = false, onPage = false }: { date: string; size?: 'sm' | 'md'; highlight?: boolean; onPage?: boolean }) {
   const day = date.slice(8, 10);
@@ -69,9 +72,30 @@ export function EventDateBadge({ date, size = 'md', highlight = false, onPage = 
 }
 
 /**
+ * The compact countdown on its own dark plate. Its label and digits are on-photo colours, so they always get a
+ * dark ground — over a busy photo and on a card with no photo alike. Renders nothing once the moment has passed
+ * (the countdown itself does the same), so no empty plate is left behind.
+ */
+export function CountdownPlate({ targetMs }: { targetMs: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(tick);
+  }, []);
+  if (targetMs <= now) return null;
+  return (
+    <View style={styles.countdownPlate}>
+      <FlipCountdown targetMs={targetMs} compact />
+    </View>
+  );
+}
+
+/**
  * M96 (owner): «الصورة هي الملك» — the photo fills the card and everything sits on it over a scrim.
  * A finished event renders unlit (dimmed photo + «انتهت»), a far upcoming one carries «قادمة»,
  * and the nearest one wears the glow and its own countdown.
+ * A card with NO photo is a themed surface with the gold wash: no placeholder icon under the text, no dark
+ * scrim, and themed text colours (the on-photo colours are for a photo's dark ground only).
  */
 function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEvent; highlight?: boolean; countdownMs?: number; onPress: () => void }) {
   const mine = event.mine;
@@ -80,42 +104,54 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
   const watchable = isWatchable(event);
   const past = event.past === true && !watchable;
   const ended = event.past === true;
+  const photo = cardImageOf(event);
+  const plain = !photo;
+  const memberFee = event.memberFeeSar ?? 0;
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, highlight && styles.cardGlow]}>
-        {cardImageOf(event) ? (
-          <Image source={{ uri: sized(cardImageOf(event), 360) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+        {photo ? (
+          <>
+            <Image source={{ uri: sized(photo, 360) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+            {past ? <View style={styles.pastShade} pointerEvents="none" /> : null}
+            <View style={styles.scrim} pointerEvents="none" />
+          </>
         ) : (
-          <View style={[styles.fallback, past && styles.photoPast]}>
-            <Ionicons name="calendar-outline" size={52} color={colors.goldDark} />
-          </View>
+          <View style={[styles.fallback, past && styles.photoPast]} pointerEvents="none" />
         )}
-        {past ? <View style={styles.pastShade} pointerEvents="none" /> : null}
-        <View style={styles.scrim} pointerEvents="none" />
         <View style={styles.topRow}>
-          <EventDateBadge date={event.date} highlight={highlight} />
+          <EventDateBadge date={event.date} highlight={highlight} onPage={plain} />
           {watchable ? (
             <WatchRibbon />
           ) : past ? (
-            <View style={[styles.pill, styles.pillDim]}>
-              <Text style={[styles.pillText, styles.pillTextDim]}>{t('agenda.ended')}</Text>
+            <View style={[styles.pill, styles.pillDim, plain && styles.pillDimPlain]}>
+              <Text style={[styles.pillText, styles.pillTextDim, plain && styles.textPastPlain]} numberOfLines={1}>
+                {t('agenda.ended')}
+              </Text>
             </View>
           ) : highlight ? null : (
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>{t('agenda.upcoming')}</Text>
+            <View style={[styles.pill, plain && styles.pillPlain]}>
+              <Text style={[styles.pillText, plain && styles.goldPlain]} numberOfLines={1}>
+                {t('agenda.upcoming')}
+              </Text>
             </View>
           )}
         </View>
         <View style={styles.bottom}>
-          <Text style={[styles.title, past && styles.titlePast]} numberOfLines={2}>
+          <Text style={[styles.title, past && styles.titlePast, plain && styles.titlePlain, plain && past && styles.textPastPlain]} numberOfLines={2}>
             {event.title}
           </Text>
-          <Text style={styles.meta} numberOfLines={2}>
+          <Text style={[styles.meta, plain && styles.metaPlain, plain && past && styles.textPastPlain]} numberOfLines={2}>
             {`${formatEventDays(event.dates, event.date)}${event.time ? ` · ${LRM}${event.time}` : ''} · ${t(MODE_KEY[event.mode])}`}
           </Text>
           {ended ? null : (
-            <SarText style={styles.fee} numberOfLines={1}>
-              {event.feeSar > 0 ? t('agenda.fee', { fee: String(event.feeSar) }) : t('agenda.free')}
+            // The truth for both readers: what members pay and what everyone else pays (a member fee of 0 = within the membership).
+            <SarText style={[styles.fee, plain && styles.goldPlain]} numberOfLines={2}>
+              {event.feeSar <= 0
+                ? t('agenda.free')
+                : memberFee > 0
+                  ? t('agenda.feeBoth', { member: String(memberFee), fee: String(event.feeSar) })
+                  : t('agenda.fee', { fee: String(event.feeSar) })}
             </SarText>
           )}
           {mine ? (
@@ -126,11 +162,7 @@ function EventCard({ event, highlight, countdownMs, onPress }: { event: AgendaEv
               </Text>
             </View>
           ) : null}
-          {countdownMs === undefined || ended ? null : (
-            <View style={styles.countdownWrap}>
-              <FlipCountdown targetMs={countdownMs} compact />
-            </View>
-          )}
+          {countdownMs === undefined || ended ? null : <CountdownPlate targetMs={countdownMs} />}
         </View>
       </View>
     </PressScale>
@@ -149,7 +181,8 @@ const styles = themedStyles(() => ({
     justifyContent: 'space-between',
   },
   cardGlow: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
-  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  // No photo: the themed gold wash alone (the date chip already says «event»; an icon here sat under the text).
+  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
   // M96: the switched-off lamp — the photo loses its light and a shade settles over it.
   photoPast: { opacity: 0.35 },
   pastShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.35)' },
@@ -160,9 +193,16 @@ const styles = themedStyles(() => ({
   titlePast: { color: colors.onPhotoSoft },
   meta: { ...typography.caption, color: colors.onPhotoSoft, textAlign: textStart },
   fee: { ...typography.caption, color: colors.onPhotoGold, textAlign: textStart },
+  // The themed colours of a card with no photo (same roles as the on-photo ones above).
+  titlePlain: { color: colors.textPrimary },
+  metaPlain: { color: colors.textSecondary },
+  goldPlain: { color: colors.goldText },
+  textPastPlain: { color: colors.textMuted },
+  pillPlain: { backgroundColor: colors.goldSoft },
+  pillDimPlain: { backgroundColor: colors.surface },
   minePill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   mineText: { ...typography.caption, flex: 1, textAlign: textStart },
-  countdownWrap: { alignSelf: 'flex-start', marginTop: spacing.xs },
+  countdownPlate: { alignSelf: 'flex-start', marginTop: spacing.xs, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.md, backgroundColor: DARK_GLASS },
   pill: {
     paddingVertical: 2,
     paddingHorizontal: spacing.sm + 2,
@@ -179,7 +219,7 @@ const styles = themedStyles(() => ({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderGold,
-    backgroundColor: 'rgba(7, 7, 8, 0.72)',
+    backgroundColor: DARK_GLASS,
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: 2,

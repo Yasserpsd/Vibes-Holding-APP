@@ -44,7 +44,8 @@ const STATE: Record<PaymentStatus, { title: StringKey; text: StringKey; color: s
 
 // How long a payment may stay «created» before the waiting text gains the support line.
 const LATE_AFTER_MS = 2 * 60_000;
-const ARABIC_LETTERS = /[؀-ۿ]/;
+// The Arabic block U+0600 to U+06FF, built from its code points (plain ASCII in this file).
+const ARABIC_LETTERS = new RegExp(`[${String.fromCharCode(0x0600)}-${String.fromCharCode(0x06ff)}]`);
 
 /** One payment: the status as the server knows it (from the gateway callback), the details, and the way back. */
 export default function PaymentScreen() {

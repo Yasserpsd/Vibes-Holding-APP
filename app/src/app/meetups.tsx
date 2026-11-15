@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
@@ -49,34 +48,41 @@ export default function MeetupsScreen() {
   );
 }
 
-/** The photo is the king (M96 pattern): the film's thumbnail fills the card, the pitch sits on a scrim. */
+/**
+ * The photo is the king (M96 pattern): the film's thumbnail fills the card, the pitch sits on a scrim.
+ * With NO thumbnail the card is a themed surface with the gold wash: no placeholder icon under the text (the
+ * number and the badge already head the card), no dark scrim, and themed text colours.
+ */
 function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () => void }) {
   const youtubeId = youtubeIdOf(meetup.videoUrl);
+  const plain = !youtubeId;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={meetup.title}>
       <View style={styles.card}>
         {youtubeId ? (
-          <Image source={{ uri: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <>
+            <Image source={{ uri: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <View style={styles.scrim} pointerEvents="none" />
+          </>
         ) : (
-          <View style={styles.fallback}>
-            <Ionicons name="people-outline" size={52} color={colors.goldDark} />
-          </View>
+          <View style={styles.fallback} pointerEvents="none" />
         )}
-        <View style={styles.scrim} pointerEvents="none" />
         <View style={styles.topRow}>
-          <Text style={styles.number}>{meetup.number}</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{meetup.badge}</Text>
+          <Text style={[styles.number, plain && styles.goldPlain]}>{meetup.number}</Text>
+          <View style={[styles.badge, plain && styles.badgePlain]}>
+            <Text style={[styles.badgeText, plain && styles.goldPlain]} numberOfLines={1}>
+              {meetup.badge}
+            </Text>
           </View>
         </View>
         <View style={styles.bottom}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, plain && styles.titlePlain]} numberOfLines={1}>
             {meetup.title}
           </Text>
-          <Text style={styles.teaser} numberOfLines={2}>
+          <Text style={[styles.teaser, plain && styles.teaserPlain]} numberOfLines={2}>
             {meetup.description}
           </Text>
-          <Text style={styles.cta}>{meetup.cta}</Text>
+          <Text style={[styles.cta, plain && styles.goldPlain]}>{meetup.cta}</Text>
         </View>
       </View>
     </PressScale>
@@ -86,7 +92,8 @@ function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () => void }
 const styles = themedStyles(() => ({
   intro: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   card: {
-    height: 210,
+    // A floor, not a fixed height: a larger system font grows the card instead of clipping the pitch.
+    minHeight: 210,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -94,7 +101,13 @@ const styles = themedStyles(() => ({
     overflow: 'hidden',
     justifyContent: 'space-between',
   },
-  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  // No thumbnail: the themed gold wash alone.
+  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  // The themed colours of a card with no thumbnail (same roles as the on-photo ones).
+  titlePlain: { color: colors.textPrimary },
+  teaserPlain: { color: colors.textSecondary },
+  goldPlain: { color: colors.goldText },
+  badgePlain: { backgroundColor: colors.goldSoft },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.sm },
   number: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, color: colors.onPhotoGold, opacity: 0.9 },

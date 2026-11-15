@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -84,6 +84,7 @@ export function RateUsPrompt() {
   const segments = useSegments();
   const { me, confirmed } = useAuth();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [visible, setVisible] = useState(false);
   // One attempt per JS launch: a member who taps «لاحقًا» is not asked again until the next week.
   const attempted = useRef(false);
@@ -138,16 +139,20 @@ export function RateUsPrompt() {
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={later} accessibilityLabel={t('rateUs.later')} />
         <FadeInView offset={32} style={[styles.sheetWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <GlassCard golden radius={radii.xxl} style={styles.card}>
+          {/* 2026-11-16: the sheet stops at 88% of the window; on a short screen or with large system text the emblem
+              and the words scroll inside it and the three buttons stay in view (the WorkshopAd treatment). */}
+          <GlassCard golden radius={radii.xxl} style={[styles.card, { maxHeight: Math.round(windowHeight * 0.88) }]}>
             <View style={styles.grip} />
-            <Image source={emblem} style={styles.emblem} resizeMode="contain" />
-            <View style={styles.stars} accessible accessibilityLabel={t('rateUs.title')}>
-              {[0, 1, 2, 3, 4].map((index) => (
-                <Ionicons key={index} name="star" size={18} color={colors.gold} />
-              ))}
-            </View>
-            <Text style={styles.title}>{t('rateUs.title')}</Text>
-            <Text style={styles.text}>{t('rateUs.text')}</Text>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} bounces={false}>
+              <Image source={emblem} style={styles.emblem} resizeMode="contain" />
+              <View style={styles.stars} accessible accessibilityLabel={t('rateUs.title')}>
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <Ionicons key={index} name="star" size={18} color={colors.gold} />
+                ))}
+              </View>
+              <Text style={styles.title}>{t('rateUs.title')}</Text>
+              <Text style={styles.text}>{t('rateUs.text')}</Text>
+            </ScrollView>
             <GoldHairline style={styles.hairline} />
             <AppButton label={t('rateUs.now')} icon="star-outline" onPress={rateNow} />
             <AppButton label={t('rateUs.later')} variant="ghost" onPress={later} />
@@ -166,6 +171,10 @@ const styles = themedStyles(() => ({
   sheetWrap: { paddingHorizontal: spacing.md },
   card: { alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   grip: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderGold, marginBottom: spacing.xs },
+  // The card centres its children, so the scrolling part takes the full width itself and centres what it holds.
+  // It gives way first when the sheet reaches its cap; the buttons under it keep their height.
+  scroll: { flexGrow: 0, alignSelf: 'stretch' },
+  scrollContent: { alignItems: 'center', gap: spacing.sm },
   emblem: { width: 64, height: 64 },
   stars: { flexDirection: 'row', gap: 4 },
   title: { ...typography.subtitle, color: colors.gold, textAlign: 'center' },

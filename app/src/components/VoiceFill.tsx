@@ -133,7 +133,7 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
         accessibilityState={{ busy: working, disabled: disabled || working }}
       >
         <Animated.View style={{ transform: [{ scale: pulse }] }}>
-          <Ionicons name={recording ? 'stop-circle' : working ? 'hourglass-outline' : 'mic'} size={20} color={recording ? colors.white : form ? form.accent : colors.gold} />
+          <Ionicons name={recording ? 'stop-circle' : working ? 'hourglass-outline' : 'mic'} size={20} color={recording ? colors.white : form ? form.accent : colors.goldText} />
         </Animated.View>
         <Text style={[styles.pillText, paper && styles.pillTextPaper, formText, recording && styles.pillTextRecording]} numberOfLines={1}>
           {label}
@@ -168,7 +168,7 @@ const styles = themedStyles(() => ({
   pillPaper: { backgroundColor: colors.white, borderColor: colors.paperGold },
   pillRecording: { backgroundColor: colors.danger, borderColor: colors.danger, boxShadow: shadows.glowGoldStrong },
   pillMuted: { opacity: 0.65 },
-  pillText: { ...typography.body, fontFamily: fonts.semiBold, color: colors.gold },
+  pillText: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldText },
   pillTextPaper: { color: colors.paperGold },
   pillTextRecording: { color: colors.white },
   hint: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },

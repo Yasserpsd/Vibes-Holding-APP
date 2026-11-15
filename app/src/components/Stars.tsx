@@ -54,7 +54,7 @@ export function StarsPicker({ value, onChange, size = 34 }: { value: number; onC
 const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   stars: { flexDirection: 'row', alignItems: 'center', gap: 1 },
-  value: { fontFamily: fonts.semiBold, color: colors.gold },
+  value: { fontFamily: fonts.semiBold, color: colors.goldText },
   count: { fontFamily: fonts.regular, color: colors.textSecondary },
   picker: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 }));

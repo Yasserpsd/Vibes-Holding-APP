@@ -79,3 +79,141 @@ Other sessions' files (exact edits):
 - Contrast: WCAG formula over the text / surface pairs of both palettes; the figures above are from that script.
 - `rev-design-gold-text.cjs`: dry run only — 111 sites, 8 of them in the four CHECK files.
 - Not run: no device, emulator, Metro, OTA or build. Nothing here was seen on a phone; the light-theme colours are computed, not looked at, and the iOS keyboard offset is untested.
+
+---
+
+# Round 4 (2026-11-16) — the shared text layer, for two member complaints
+
+Source: `docs/reviews/2026-11-16/complaint-text-pushed-left.json` and `complaint-text-unreadable-or-overlapping.json` (`challenge.finalFixPlan`), with the coordinator's decisions. JavaScript only, Edit tool only, no string key added or removed.
+
+## Fixed
+
+- `i18n/direction.ts:78` **`markParagraphs()`** (text plan priority 2) — puts an invisible direction mark in front of every line of server- or member-written text. Pure function; empty lines and lines that already open with a mark are left alone; `''` for no input. `restart()` / `syncDirection()` untouched (rev-platform's edits to them are in the same file and intact).
+  - One thing goes beyond the plan's wording, and it is needed for decision 2: a line that reads the OTHER way from the screen (no Arabic letter on the Arabic screen, or Arabic on the English one) gets the screen's mark **plus an isolate** of its own direction (U+2066 / U+2067 … U+2069). With a bare left-to-right mark, Android would still put that line on the left among Arabic lines, because one Text has one alignment; inside an isolate it sits on the start edge and still reads in its own order, full stop included.
+  - The marks are written as code points (`String.fromCharCode`), never as invisible characters in the source.
+- `i18n/direction.ts:47` **`textDir()`** (priority 3, decided) — always the start edge, with the content's own writing direction. Latin-only titles go back to the right in Arabic on project cards, the Projects Bank carousel, the golden opportunity, videos, the watch page and advisor file names. No caller needed a change to compile; `Highlight.ownDirection` already did the same.
+- `components/advisor/RichText.tsx` — the advisor's replies and the member's own bubbles: `:196` every paragraph and table cell, `:169` code blocks, both pinned to the start edge (`:19`). `:21-33`, `:227` a plain link that closes a line no longer swallows the closing mark (the address is cut before punctuation and marks).
+- `app/contact.tsx:175` — the management thread bubbles (another session edited the file after me; the call is still there).
+- `app/posts/[id].tsx:70,175,232` — the letter's title, the poll options, the event's place. The BODY is drawn by `StructuredText` (left for its owner, one-line change below).
+- `app/news/[id].tsx:61,68` — the headline and the source's snippet (the text itself is unchanged: the marks are invisible).
+- `components/ClampText.tsx` (unreadable plan priority 9) — the line count is kept for text + rounded width + system text size; a change of any of them mounts a new invisible twin and counts again.
+- Centred popups (priority 6), card capped at 88% of the window height, text in a `ScrollView` that gives way first, buttons outside it: `GuestNudge.tsx:64`, `RateUsPrompt.tsx:144` (the grip, the hairline and the three buttons stay; emblem, stars and words scroll), `IntroVideo.tsx:113` (the popup only; poster and words scroll), `ProfileCompleteness.tsx:128`. `PhoneConfirmAlert.tsx` and `PasswordPrompt.tsx` not touched.
+- `components/wow.tsx:166,399` (priority 8, my file) — the labels of the compact countdown (the one on the event photo) use `onPhotoMuted`. The full-size countdown on the page keeps `textMuted`: on-photo ink would be 2.7:1 on a white page.
+
+Not done on purpose: no `textAlign` in the typography tokens (decision 4); Latin form fields unchanged (decision 3).
+
+## One-line changes for the files left to their owners
+
+Each one: add `markParagraphs` to the import from `@/i18n/direction`, then:
+
+1. `components/Highlight.tsx:58` — `const parts = rangeDashes(text).split(IMPORTANT);` → `const parts = markParagraphs(rangeDashes(text)).split(IMPORTANT);` (covers every `Highlight` caller, `project/[id].tsx:354,364,368` included).
+2. `components/StructuredText.tsx:102` (`Lit`) — `const parts = text.split(NUMBER);` → `const parts = markParagraphs(text).split(NUMBER);`; and the two headings drawn without `Lit`: `:119` `{block.text}` → `{markParagraphs(block.text)}`, `:190` the same. This is what fixes the body of `posts/[id].tsx`, `agenda/[id].tsx` and `service/[key].tsx`.
+3. `components/GoldenCompanyCard.tsx:35-37` — `{company.code}`, `{company.name}`, `{company.tagline}` → each inside `markParagraphs(…)`; and `textAlign: textStart` on the `code`, `name` and `tagline` styles (plan priority 4, iPhone).
+4. `app/project/[id].tsx` — nothing once item 1 is in (its content goes through `Highlight`); only plan priority 4: `textAlign: textStart` on the `body` style.
+5. `components/PostsBlock.tsx:99` — `{post.title}` → `{markParagraphs(post.title)}`; `:134` `{withoutMediaLines(post.body)}` → `{markParagraphs(withoutMediaLines(post.body))}`; and `textAlign: textStart` on the `title` and `body` styles (priority 4).
+
+The same one-liner at the remaining sites of the plan, none of them mine: `WorkshopAd.tsx:107-108` (`ad.headline`, `ad.body`), `AdminPopup.tsx` (the popup's text), `meetup/[key].tsx:49` (`meetup.description`), `people/[id].tsx:68` (`data.bio`), `(tabs)/news.tsx:194` (the inbox row title), and the children of the `textDir` sites: `(tabs)/index.tsx:434`, `watch.tsx:93`, `advisor/Composer.tsx:54`, `advisor/MessageBubble.tsx:146`, `news/NewsCard.tsx:63,67`, `NewsCarousel.tsx:214,242,243`, `VideoCard.tsx:61,65`. Until they have it, an Arabic line that OPENS with a Latin word still reads in the wrong order on Android at those sites (unchanged from before; the edge is already right).
+
+## What must be looked at on a phone
+
+Nothing in this round was seen on a device. The two platforms differ here, so both are needed.
+
+Android (it reads direction from the string, and gives one Text one alignment):
+1. Advisor, Arabic: ask for «قائمة مؤشرات KPI لشركة SaaS». Every bullet starts on the right, also a bullet with no Arabic at all, which must read left to right with its full stop at its right end. A line that ends with a link: the link opens.
+2. No box or stray glyph anywhere a mark was added (advisor bubble, contact bubble, news page, post title) — the isolates U+2066 / U+2069 are new in this app; an old phone (Android 7 or 8) is the one to try. Copy a reply and paste it into a note: it must paste clean.
+3. Contact thread: a message whose first line is «Investors Club» with Arabic lines under it — all on the right.
+4. News page: an Arabic headline that opens with a Latin name reads right to left with the name on the right; an English headline sits on the right.
+5. Project cards, the Projects Bank carousel, videos, the watch page: a Latin-only name is on the right again.
+6. English mode: an Arabic line inside an English reply stays on the left and reads right to left.
+7. Popups on a short screen with large text (`adb shell wm size 1080x1680`, `font_scale 1.3`): the guest nudge, the rating sheet, the intro film, the profile nudge — every button visible, the words scroll.
+8. Project page with a three-line «نبذة»: change `font_scale` while the app is open — the «اقرأ المزيد» pill appears when the text now runs past three lines.
+9. Light theme, home event card with a photo: the «يوم / ساعة / دقيقة» labels are readable.
+
+iPhone (it takes the edge from the style and each line's base direction from the mark; before this round it guessed from the first letter):
+1. The same advisor check: bullets on the right, the bullet sign on the right, a Latin-only line readable left to right.
+2. English mode on the iPhone: Arabic lines inside an English reply.
+3. The four popups: the card is not clipped, the buttons are not squeezed, and the rating sheet still sits on the bottom edge.
+4. Text size changed in Settings while the app is open: the «اقرأ المزيد» pill follows (this case exists on iPhone only in practice).
+5. Still open from round 3: a long form under a header with the last field focused (keyboard offset in `Screen`).
+
+## Checks run (round 4)
+
+- Unit check of `markParagraphs()` / `textDir()` and the advisor link handling against the real source files (scratchpad script, 19 cases: Arabic, Latin, digits only, mixed lines, empty lines, CRLF, already marked, twice in a row, both screen languages, a link at the end of a marked line, bold at the start of one): all pass.
+- `npx eslint` on the 11 files changed in this round — exit 0.
+- `npx tsc --noEmit` — exit 2, six errors, none in my files: `keyboardType` `"ascii-capable-number-pad"` in `auth/reset.tsx`, `auth/verify.tsx`, `delete-account.tsx`, `persona.tsx`, `PhoneCodeStep.tsx`, `PhoneConfirmAlert.tsx` (another session's keyboard work in progress).
+- Source scan: no raw invisible character in `direction.ts` or `RichText.tsx`.
+
+---
+
+# Round 5 (2026-11-16) — the text layer everywhere, small gold text, the compact countdown
+
+Edit tool only; no string key added or removed; none of `Screen.tsx`, `FormField.tsx`, `FormEmbed.tsx`, `ProfileCompletionGate.tsx`, `AdvisorChat.tsx`, `contact.tsx` touched.
+
+## Fixed
+
+**1. Direction marks at every content site — 36 call sites in 16 files** (with round 4: 44 sites in 20 files), each found by its text:
+
+| File | Sites |
+| --- | --- |
+| `components/Highlight.tsx` | 1 — before the split, so every caller is covered (`project/[id].tsx` description lines included) |
+| `components/StructuredText.tsx` | 5 — `Lit` (paragraphs, bullets, fact values, both variants), the two headings, the two fact labels. Added AFTER the line is parsed, so a mark never hides a bullet or a label from the parser. This is the body of `posts/[id].tsx`, `agenda/[id].tsx`, `service/[key].tsx` |
+| `components/GoldenCompanyCard.tsx` | 3 — code, name, tagline |
+| `components/PostsBlock.tsx` | 3 — title, place line, body preview |
+| `components/WorkshopAd.tsx` | 3 — headline, body, title |
+| `components/AdminPopup.tsx` | 2 — title, body |
+| `app/meetup/[key].tsx` | 3 — description, feature title, feature text |
+| `app/people/[id].tsx` | 2 — bio, the title · company line |
+| `app/(tabs)/news.tsx` | 2 — the inbox row title and its one-line subtitle (after `fitWords`) |
+| `app/(tabs)/index.tsx` | 1 — the unread-message title |
+| `app/watch.tsx` | 2 — title, description |
+| `components/advisor/MessageBubble.tsx` | 1 — file name |
+| `components/news/NewsCard.tsx` | 2 — title, snippet |
+| `components/NewsCarousel.tsx` | 3 — number-of-the-day title, slide title, slide snippet (after `fitWords`) |
+| `components/VideoCard.tsx` | 2 — title, blurb |
+| `components/advisor/Composer.tsx` | 1 — the attachment name (done last, after re-reading the file; nothing else changed in it) |
+
+Start-edge alignment for iPhone (text plan priority 4), 6 styles: `GoldenCompanyCard` `code` / `name` / `tagline`, `PostsBlock` `title` / `body`, `project/[id].tsx` `body`.
+
+**2. Small gold text and icons in the light theme — 73 sites in 42 files, read line by line** (the list of `colors.gold` as a text or icon colour went from 230 to 157):
+
+- 44 text styles → `colors.goldText`: every one at 15 px and below (links, pills, prices in lists, captions, the «◆» bullets), plus the seven at 16 px, which are links, prices, a pill and the 2FA secret (`affiliate/index` `link`, `people/[id]` `title`, `security-2fa` `secret`, `guide` `stepNumber`, `HqProposalCard` `title`, `MessageBubble` `cardPrice`, `VoiceFill` `pillText`).
+- 28 icons of 10–18 px that sit beside such text → `colors.goldText` (chevrons after a call to action, pill icons, the sparkles beside «اسأل المستشار»).
+- On a surface that is not the page:
+  - `GoldenOpportunity.tsx` — the call and its chevron wear `onPhotoGold` while the photo and its scrim are showing, `goldText` on the golden fallback.
+  - `wow.tsx` — the compact countdown's colons → `onPhotoGold` (they sit on the event card's dark plate).
+  - `checkout/[id].tsx` — the lock beside «دفع آمن» → `paperGold`: the payment sheet is white in both themes, so theme gold was 2.2:1 there in the DARK theme.
+- Dark theme: unchanged by construction (`goldText` equals `gold` in the dark palette).
+
+**3. The compact countdown fits its card** (`components/wow.tsx`): its digits and colons are a fixed-size dial (`allowFontScaling={false}`), its three labels and «تبدأ خلال» grow by 15% at most (`maxFontSizeMultiplier`) on one line. The three cells are 34 pt wide by their style, so the row is about 126 pt on every phone, inside the 164 pt left by a 200 pt home card and the plate's padding. The full-size countdown on a page still scales like any text (up to the app-wide 1.3).
+
+## Left as it is, for the coordinator
+
+- **Files I was told not to touch**, same small-gold change still open: `contact.tsx` `bubbleBy` (13 px); `advisor/AdvisorChat.tsx` `creditText` and `openingTitle` (13 px) and two icons (`:360` 16 px, `:401` 14 px). In `Composer.tsx` only the mark was added; the 18 px `document-text` icon beside the attachment name is still `colors.gold`. Each is one word: `colors.gold` → `colors.goldText`.
+- **25 texts at 18 px keep `colors.gold`**: 23 `typography.subtitle` titles (section titles, sheet and popup titles, `SectionHeader`), the payout amount, and the colons of the full-size countdown. The instruction names 15 px and below and 20 px and above; 18 px is neither. They read 3.05–3.3:1 in the light theme — enough for a heading by the large-text rule only if it counts as large, which at 18 px semi-bold it just misses. Moving them to `goldText` is one word each; say the word and I do it.
+- **Kept on purpose:** rating stars (a deep-brown star reads as an empty one), the two title icons in `security.tsx` / `security-2fa.tsx` (beside an 18 px title), the avatar initial in `PeopleBlock`, `ProjectUnlock` `figureValueHighlight` (22 px), the active tab ICON (25 px; its 11 px label moved).
+- **Not `colors.gold` but the same problem:** `ServiceTile.tsx` `savings` is `colors.goldNeon` at 11 px — `#C9922E` in the light theme, about 2.7:1 on white. `goldNeon` is brighter than `goldText` in the dark theme, so swapping it would dim the dark tiles; it needs a decision (a `goldNeonText` alias, or accept the dimmer dark).
+- **`lib/validation.ts:14` (not mine):** the `INVISIBLE` regex now holds raw invisible characters (U+200B, U+200F, U+202A, U+202E, U+2069…) instead of `\u` escapes. It works, but nobody can read or review it, and a formatter or a copy can drop them silently. Cause, seen in my own edit of `direction.ts`: the Edit tool decodes `\uXXXX` in the text it is given. Fix: build the class from code points (`String.fromCharCode`) or re-type it with a tool that keeps escapes.
+- Nothing else from the list is left.
+
+## What must be looked at on a phone (added to round 4's list)
+
+Android:
+1. Home, an event card with a countdown, system text at its largest: the three cells and «تبدأ خلال» are inside the card, nothing cut on either side. Same in English («days / hours / min»).
+2. A management message with bullets and a «label: text» line, first line Latin: every block starts on the right. An event page and a service page drawn by the same component.
+3. Home golden opportunity with its photo, then in airplane mode without it: the call to action is readable in both, light and dark.
+4. Light theme, one pass over Home, Projects, Markets, Requests, Payments, Account: the small gold texts (links, prices, pills) are darker and readable; dark theme looks exactly as before.
+5. The payment sheet in the dark theme: the small lock beside «دفع آمن» is visible.
+
+iPhone:
+1. The golden company cards and the home message cards: a Latin name or a text that opens with a Latin word sits on the right (before, iPhone put it on the left; Android never did).
+2. The same countdown check with Larger Text on.
+3. A management message as in Android item 2.
+
+## Checks run (round 5)
+
+- `npx tsc --noEmit` — exit 0 (twice: after my last edit, and again after two other sessions edited `Composer.tsx` and `MembershipGate.tsx`; my lines are still in both).
+- `npx eslint src` (the whole app) — exit 0, no warnings.
+- Unit check of `markParagraphs()` / `textDir()` (19 cases) — all pass.
+- Scan for raw direction characters in `app/src`: none in any file I edited; one file of another session (`lib/validation.ts`, above).
+- Recount script: `colors.gold` as text at 16 px or below — 3 left, all in the two files I may not touch; icons at 16 px or below — 5 left (a star, two title icons, two in `AdvisorChat.tsx`).
+- Not run: no device, emulator, Metro, OTA or build. The countdown's 126 pt is computed from its styles, not measured on a screen.

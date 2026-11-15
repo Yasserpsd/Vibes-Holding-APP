@@ -136,7 +136,8 @@ export default function CheckoutScreen() {
           <SarText style={styles.amount}>{amountLabel(payment)}</SarText>
         </View>
         <View style={styles.secureRow}>
-          <Ionicons name="lock-closed" size={13} color={colors.gold} />
+          {/* The payment sheet is white in both themes, so the lock wears the gold that reads on paper. */}
+          <Ionicons name="lock-closed" size={13} color={colors.paperGold} />
           <Text style={styles.secureText}>{t('checkout.secure')}</Text>
         </View>
       </View>

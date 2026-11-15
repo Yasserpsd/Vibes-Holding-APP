@@ -59,7 +59,7 @@ export function WalletCard({ block }: { block?: NonNullable<HomeContent['wallet'
           ) : null}
           <View style={styles.ctaRow}>
             <Text style={styles.cta}>{cta}</Text>
-            <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+            <Ionicons name={chevronForward()} size={14} color={colors.goldText} />
           </View>
         </View>
       </GlassCard>
@@ -107,5 +107,5 @@ const styles = themedStyles(() => ({
   statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldLightText },
   statLabel: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textSecondary },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },
+  cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldText },
 }));

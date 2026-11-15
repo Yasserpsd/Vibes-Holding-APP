@@ -1,5 +1,5 @@
 import { useEffect, useState, type Ref } from 'react';
-import { View, type TextInput } from 'react-native';
+import { Platform, View, type KeyboardTypeOptions, type TextInput } from 'react-native';
 
 import { authApi, type PhoneStepResult } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -7,8 +7,16 @@ import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { t } from '@/i18n';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { spacing } from '@/theme/tokens';
+
+/**
+ * The keypad of every code field: on the iPhone the Western-digit pad, whatever numerals the keyboard is set to;
+ * Android has no such pad, so there the fields fold Arabic-Indic and Persian digits themselves (`toAsciiDigits`).
+ */
+// The iOS value is in React Native's own types (TextInput.flow.js) and its native code, but missing from its .d.ts.
+export const codeKeyboardType = (Platform.OS === 'ios' ? 'ascii-capable-number-pad' : 'number-pad') as KeyboardTypeOptions;
 
 type Props = {
   step: PhoneStepResult;
@@ -87,7 +95,7 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText, i
       <FormField
         label={t('auth.verify.code')}
         latin
-        keyboardType="number-pad"
+        keyboardType={codeKeyboardType}
         textContentType="oneTimeCode"
         maxLength={4}
         value={code}
@@ -95,7 +103,8 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText, i
         inputRef={inputRef}
         onChangeText={(value) => {
           // M203 (owner: seconds, not minutes): four digits typed or pasted from WhatsApp finish the step by themselves.
-          const digits = value.replace(/\D/g, '').slice(0, 4);
+          // A keypad that types «١٢٣٤» fills the field like any other (2026-11-16).
+          const digits = toAsciiDigits(value).replace(/\D/g, '').slice(0, 4);
           setCode(digits);
           if (digits.length === 4) void submit(digits);
         }}

@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { useVideo } from '@/api/videos';
 import { FadeInView, usePulse } from '@/components/motion';
 import { EmbedError, STAGE_BLACK, useEmbedLive } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
-import { textDir, textStart } from '@/i18n/direction';
+import { markParagraphs, textDir, textStart } from '@/i18n/direction';
+import { formatArabicDate } from '@/lib/format';
 import { linkParam, loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -27,7 +29,11 @@ export default function WatchScreen() {
   const params = useLocalSearchParams<{ url?: string; yt?: string; title?: string; poster?: string }>();
   const url = linkParam(params.url);
   const youtubeId = typeof params.yt === 'string' && YOUTUBE_ID.test(params.yt) ? params.yt : url ? youtubeIdOf(url) : null;
-  const title = typeof params.title === 'string' ? params.title : '';
+  // The club library's own record of a YouTube video (title, date, description). A video that is not one of the
+  // channel's (an admin-message link, the intro film) has none, and the page shows the title alone.
+  const details = useVideo(youtubeId ?? undefined).data?.video;
+  const title = (typeof params.title === 'string' && params.title) || details?.title || '';
+  const description = details?.description || details?.blurb || '';
 
   const webview = useMemo(() => loadWebView(), []);
   const video = useMemo(() => loadVideo(), []);
@@ -90,7 +96,14 @@ export default function WatchScreen() {
       <ScrollView contentContainerStyle={styles.below}>
         {title ? (
           <FadeInView delay={40}>
-            <Text style={[styles.title, textDir(title)]}>{title}</Text>
+            <Text style={[styles.title, textDir(title)]}>{markParagraphs(title)}</Text>
+          </FadeInView>
+        ) : null}
+        {/* Emulator 2026-11-15: the page under the player was empty. The date and the description fill it when the server has them. */}
+        {details?.publishedAt ? <Text style={styles.date}>{formatArabicDate(details.publishedAt)}</Text> : null}
+        {description ? (
+          <FadeInView delay={100}>
+            <Text style={[styles.description, textDir(description)]}>{markParagraphs(description)}</Text>
           </FadeInView>
         ) : null}
       </ScrollView>
@@ -374,4 +387,6 @@ const styles = themedStyles(() => ({
   fallbackText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   below: { padding: spacing.md, gap: spacing.md },
   title: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
+  date: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  description: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
 }));

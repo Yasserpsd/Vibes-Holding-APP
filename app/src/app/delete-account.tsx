@@ -1,21 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Keyboard, Text, View } from 'react-native';
 
-import { authApi } from '@/api/auth';
+import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
+import { availableSocialProvider, socialSignIn } from '@/auth/social';
 import { AppButton } from '@/components/AppButton';
 import { FormField } from '@/components/FormField';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { PasswordPrompt } from '@/components/PasswordPrompt';
+import { codeKeyboardType } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -25,6 +28,8 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
  * mailed to the account's e-mail, then a random confirm word the screen shows and the member
  * types. Even then nothing is deleted on the spot: the account stays fully usable for 30 days
  * with a countdown in حسابي and a «تراجع» door the whole time.
+ * M241 (2026-11-15): the first step takes one of two proofs — the password, or the member's own Apple / Google
+ * account for an account that was born from that button and never had a password.
  */
 const REASON_KEYS = ['notUsing', 'notFound', 'otherAccount', 'support', 'other'] as const;
 type ReasonKey = (typeof REASON_KEYS)[number];
@@ -49,6 +54,14 @@ export default function DeleteAccountScreen() {
   const [code, setCode] = useState('');
   const [typedWord, setTypedWord] = useState('');
   const [daysLeft, setDaysLeft] = useState(30);
+  // M241: an account born from the Apple / Google button never chose a password, so the same button proves the owner.
+  // It shows only where the sign-in screen would show it: the provider is on at the server and this binary has its module.
+  const { data: config } = useAuthConfig();
+  const provider = availableSocialProvider(config?.social);
+  const [socialBusy, setSocialBusy] = useState(false);
+  const [socialError, setSocialError] = useState<string | null>(null);
+  /** A closed prompt drops the answer of a request that is still on its way. */
+  const attempt = useRef(0);
 
   if (!me) {
     return (
@@ -66,24 +79,58 @@ export default function DeleteAccountScreen() {
     return [picked, written].filter(Boolean).join(' — ');
   };
 
+  /** Either proof ends the same way: the code is on its way and the confirm word is known. */
+  const begun = (answer: Awaited<ReturnType<typeof authApi.deleteStart>>) => {
+    setSentTo(answer.email);
+    setCodePhone(answer.via === 'whatsapp' ? (answer.phone ?? '') : '');
+    setWord(answer.word);
+    setConfirming(false);
+    setStep('code');
+  };
+
   const start = async (password: string) => {
+    // One request at a time, whichever proof it carries.
+    if (busy || socialBusy) return;
     if (!password) {
       setError(t('account.delete.passwordRequired'));
       return;
     }
+    const run = ++attempt.current;
     setBusy(true);
     setError(null);
+    setSocialError(null);
     try {
-      const answer = await authApi.deleteStart(password, reasonText());
-      setSentTo(answer.email);
-      setCodePhone(answer.via === 'whatsapp' ? (answer.phone ?? '') : '');
-      setWord(answer.word);
-      setConfirming(false);
-      setStep('code');
+      const answer = await authApi.deleteStart({ password }, reasonText());
+      if (run === attempt.current) begun(answer);
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (run === attempt.current) setError(errorMessage(cause));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // M241: the provider's own sheet hands a fresh identity token, and the server checks it is this account's.
+  const startSocial = async () => {
+    if (busy || socialBusy || !provider) return;
+    const run = ++attempt.current;
+    setSocialBusy(true);
+    setError(null);
+    setSocialError(null);
+    Keyboard.dismiss();
+    try {
+      const signed = await socialSignIn(provider);
+      if (run !== attempt.current) return;
+      if (!signed.ok) {
+        // A closed provider sheet is the member changing his mind: nothing to say.
+        if (!signed.cancelled) setSocialError(t('errors.code.social_token'));
+        return;
+      }
+      const answer = await authApi.deleteStart({ social: { provider: signed.provider, token: signed.token } }, reasonText());
+      if (run === attempt.current) begun(answer);
+    } catch (cause) {
+      if (run === attempt.current) setSocialError(errorMessage(cause));
+    } finally {
+      setSocialBusy(false);
     }
   };
 
@@ -128,9 +175,9 @@ export default function DeleteAccountScreen() {
             <FormField
               label={t('deleteAccount.codeLabel')}
               value={code}
-              onChangeText={setCode}
+              onChangeText={(value) => setCode(toAsciiDigits(value).replace(/\D/g, ''))}
               latin
-              keyboardType="number-pad"
+              keyboardType={codeKeyboardType}
               maxLength={6}
               placeholder="000000"
             />
@@ -151,10 +198,8 @@ export default function DeleteAccountScreen() {
 
   return (
     <Screen title={t('deleteAccount.title')} subtitle={t('deleteAccount.subtitle')}>
-      <FadeInView delay={entranceDelay(0)} style={styles.stack}>
+      <FadeInView delay={entranceDelay(0)}>
         <Notice tone="warning" text={t('deleteAccount.warning')} />
-        {/* An Apple/Google account has no password of its own yet: the line says where to set one before the prompt asks for it. */}
-        <Notice text={t('deleteAccount.socialHint')} />
       </FadeInView>
 
       <FadeInView delay={entranceDelay(1)}>
@@ -185,17 +230,31 @@ export default function DeleteAccountScreen() {
         </View>
       </FadeInView>
 
+      {/* The proof step: the password as before and, where this phone can run it, the member's Apple / Google account under it. */}
       <PasswordPrompt
         visible={confirming}
-        title={t('account.delete.title')}
-        message={t('account.delete.message')}
+        title={provider ? t('deleteAccount.proofTitle') : t('account.delete.title')}
+        message={provider ? t('deleteAccount.proofText') : t('account.delete.message')}
         confirmLabel={t('account.delete.confirm')}
         busy={busy}
         error={error}
         onConfirm={(password) => void start(password)}
+        alternative={
+          provider
+            ? {
+                label: t(provider === 'apple' ? 'deleteAccount.withApple' : 'deleteAccount.withGoogle'),
+                icon: provider === 'apple' ? 'logo-apple' : 'logo-google',
+                onPress: () => void startSocial(),
+                loading: socialBusy,
+                error: socialError,
+              }
+            : null
+        }
         onCancel={() => {
+          attempt.current += 1;
           setConfirming(false);
           setError(null);
+          setSocialError(null);
         }}
       />
     </Screen>
@@ -204,7 +263,6 @@ export default function DeleteAccountScreen() {
 
 const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
-  stack: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   reasonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs + 2 },
   reasonLabel: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },

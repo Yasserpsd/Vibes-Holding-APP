@@ -202,8 +202,9 @@ function Body({ onClose }: { onClose: () => void }) {
             </View>
           ) : null}
           {error ? <Notice tone="warning" text={error} support /> : null}
+          {/* One «لاحقًا» only: the popup's own button under this block (a second one here went back to the saved number
+              under the same word, and the two stood one above the other). */}
           <AppButton label={t('wa.popup.send')} icon="logo-whatsapp" loading={busy} disabled={!config} onPress={() => void sendToTyped()} />
-          {hasNumber ? <AppButton label={t('phoneAlert.later')} variant="outline" onPress={() => setEditing(false)} /> : null}
         </>
       ) : (
         <>

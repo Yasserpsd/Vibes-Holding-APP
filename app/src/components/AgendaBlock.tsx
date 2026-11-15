@@ -1,13 +1,11 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, type Href } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
-import { EventDateBadge } from '@/app/agenda/index';
+import { CountdownPlate, EventDateBadge } from '@/app/agenda/index';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { isWatchable, WatchRibbon } from '@/components/WatchRibbon';
-import { FlipCountdown } from '@/components/wow';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatDayCount } from '@/lib/format';
@@ -16,7 +14,8 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 200;
-const CARD_HEIGHT = 216;
+/** The least a card is tall. It is a floor, not a fixed height: a larger system font or a second line grows the card, and the strip's cards all take the tallest one's height. */
+const CARD_MIN_HEIGHT = 216;
 
 /**
  * M41 (renamed «أحدث الفعاليات», M77): the events as a strip on the home — the upcoming ones first,
@@ -61,52 +60,60 @@ export function AgendaBlock({ ctaLabel }: { ctaLabel?: string } = {}) {
   );
 }
 
-/** M96 (owner): «الصورة هي الملك» — the photo fills the card; date, title and the counter sit ON it over a scrim. */
+/**
+ * M96 (owner): «الصورة هي الملك» — the photo fills the card; date, title and the counter sit ON it over a scrim.
+ * A card with NO photo is a themed surface with the gold wash: no placeholder icon under the text, no dark
+ * scrim, and themed text colours (the on-photo colours are for a photo's dark ground only).
+ */
 function MiniEvent({ event, nearest, countdownMs, onPress }: { event: AgendaEvent; nearest: boolean; countdownMs?: number; onPress: () => void }) {
   const days = event.dates?.length ?? 1;
   // M192: a finished workshop with recordings stays lit, with the «متاحة للمشاهدة» ribbon.
   const watchable = isWatchable(event);
   const past = event.past === true && !watchable;
   const photo = cardImageOf(event);
+  const plain = !photo;
+  // The tag tells the truth for both readers: «برسوم — سعر خاص للأعضاء» when members pay too, «رسوم لغير الأعضاء» when they do not.
+  const feeTag = event.feeSar <= 0 ? t('agenda.free') : (event.memberFeeSar ?? 0) > 0 ? t('agenda.feeTagAll') : t('agenda.feeTag');
   return (
-    <PressScale onPress={onPress} glow={!past} glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={event.title}>
+    // flexGrow down the chain: the strip stretches every card to the tallest one's height.
+    <PressScale onPress={onPress} glow={!past} glowRadius={radii.lg} wrapStyle={styles.grow} style={styles.grow} accessibilityRole="button" accessibilityLabel={event.title}>
       <View style={[styles.card, nearest && styles.cardNearest]}>
         {photo ? (
-          <Image source={{ uri: sized(photo, 260) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+          <>
+            <Image source={{ uri: sized(photo, 260) }} style={[StyleSheet.absoluteFill, past && styles.photoPast]} resizeMode="cover" accessibilityLabel={event.title} />
+            {/* M167: a finished event is the switched-off lamp of the agenda page — dimmed photo under a shade. */}
+            {past ? <View style={styles.pastShade} pointerEvents="none" /> : null}
+            <View style={styles.scrim} pointerEvents="none" />
+          </>
         ) : (
-          <View style={[styles.fallback, past && styles.photoPast]}>
-            <Ionicons name="calendar-outline" size={46} color={colors.goldDark} />
-          </View>
+          <View style={[styles.fallback, past && styles.photoPast]} pointerEvents="none" />
         )}
-        {/* M167: a finished event is the switched-off lamp of the agenda page — dimmed photo under a shade. */}
-        {past ? <View style={styles.pastShade} pointerEvents="none" /> : null}
-        <View style={styles.scrim} pointerEvents="none" />
         <View style={styles.topRow}>
-          <EventDateBadge date={event.date} size="sm" highlight={nearest} />
+          <EventDateBadge date={event.date} size="sm" highlight={nearest} onPage={plain} />
           <View style={styles.topPills}>
-            {days > 1 ? <GoldPill text={formatDayCount(days)} /> : null}
+            {days > 1 ? <GoldPill text={formatDayCount(days)} plain={plain} /> : null}
             {/* With many events the member must see which ones are still ahead — and which ones ran already. */}
-            {watchable ? <WatchRibbon small /> : past ? <GoldPill text={t('agenda.ended')} dim /> : nearest ? null : <GoldPill text={t('agenda.upcoming')} />}
+            {watchable ? <WatchRibbon small /> : past ? <GoldPill text={t('agenda.ended')} dim plain={plain} /> : nearest ? null : <GoldPill text={t('agenda.upcoming')} plain={plain} />}
           </View>
         </View>
         <View style={styles.bottom}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, plain && styles.titlePlain, plain && past && styles.mutedPlain]} numberOfLines={2}>
             {event.title}
           </Text>
-          <Text style={[styles.meta, past && styles.metaPast]} numberOfLines={1}>
-            {watchable ? t('agenda.watchMeta') : past ? t('agenda.ended') : event.mine?.paid ? t('agenda.confirmed') : event.feeSar > 0 ? t('agenda.feeTag') : t('agenda.free')}
+          <Text style={[styles.meta, past && styles.metaPast, plain && styles.goldPlain, plain && past && styles.mutedPlain]} numberOfLines={2}>
+            {watchable ? t('agenda.watchMeta') : past ? t('agenda.ended') : event.mine?.paid ? t('agenda.confirmed') : feeTag}
           </Text>
-          {countdownMs === undefined || watchable ? null : <FlipCountdown targetMs={countdownMs} compact />}
+          {countdownMs === undefined || watchable ? null : <CountdownPlate targetMs={countdownMs} />}
         </View>
       </View>
     </PressScale>
   );
 }
 
-function GoldPill({ text, dim = false }: { text: string; dim?: boolean }) {
+function GoldPill({ text, dim = false, plain = false }: { text: string; dim?: boolean; plain?: boolean }) {
   return (
-    <View style={[styles.pill, dim && styles.pillDim]}>
-      <Text style={[styles.pillText, dim && styles.pillTextDim]} numberOfLines={1}>
+    <View style={[styles.pill, dim && styles.pillDim, plain && (dim ? styles.pillDimPlain : styles.pillPlain)]}>
+      <Text style={[styles.pillText, dim && styles.pillTextDim, plain && (dim ? styles.mutedPlain : styles.goldPlain)]} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -114,10 +121,13 @@ function GoldPill({ text, dim = false }: { text: string; dim?: boolean }) {
 }
 
 const styles = themedStyles(() => ({
-  strip: { gap: spacing.sm, paddingBottom: spacing.xs },
+  // The strip keeps its own distance from the section's description line above it.
+  strip: { gap: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  grow: { flexGrow: 1 },
   card: {
+    flexGrow: 1,
     width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    minHeight: CARD_MIN_HEIGHT,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -126,7 +136,14 @@ const styles = themedStyles(() => ({
     justifyContent: 'space-between',
   },
   cardNearest: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
-  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  // No photo: the themed gold wash alone (the date chip already says «event»; an icon here sat under the text).
+  fallback: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceElevated, experimental_backgroundImage: gradients.goldWash },
+  // The themed colours of a card with no photo (same roles as the on-photo ones).
+  titlePlain: { color: colors.textPrimary },
+  goldPlain: { color: colors.goldText },
+  mutedPlain: { color: colors.textMuted },
+  pillPlain: { backgroundColor: colors.goldSoft },
+  pillDimPlain: { backgroundColor: colors.surface },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.xs, padding: spacing.sm },
   topPills: { alignItems: 'flex-end', gap: spacing.xs },

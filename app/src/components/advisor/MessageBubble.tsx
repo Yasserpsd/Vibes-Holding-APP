@@ -10,7 +10,7 @@ import { Chip } from '@/components/Chip';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { textDir, textEnd, textStart } from '@/i18n/direction';
+import { markParagraphs, textDir, textEnd, textStart } from '@/i18n/direction';
 import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
@@ -139,12 +139,12 @@ function ActionView({ action, messageId, onAct, busy }: { action: AdvisorAction;
 
 /** M151: the PDF the member sent — name and size; a stored copy (url) opens in the in-app browser. */
 function FileChip({ file, mine }: { file: AdvisorFile; mine: boolean }) {
-  const color = mine ? colors.goldInk : colors.gold;
+  const color = mine ? colors.goldInk : colors.goldText;
   const body = (
     <>
       <Ionicons name="document-text" size={18} color={color} />
       <Text style={[styles.fileName, { color }, textDir(file.name)]} numberOfLines={1}>
-        {file.name}
+        {markParagraphs(file.name)}
       </Text>
       {file.size > 0 ? <Text style={[styles.fileSize, { color }]}>{formatFileSize(file.size)}</Text> : null}
     </>
@@ -178,7 +178,7 @@ function SpeakButton({ id, text }: { id: number; text: string }) {
 function ActionButton({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.pill} hitSlop={6} wrapStyle={styles.actionWrap} style={styles.action}>
-      <Ionicons name={icon} size={16} color={colors.gold} />
+      <Ionicons name={icon} size={16} color={colors.goldText} />
       <Text style={styles.actionLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -197,7 +197,7 @@ const styles = themedStyles(() => ({
   bubbleTheirs: { backgroundColor: colors.surfaceElevated, borderBottomStartRadius: radii.sm, borderWidth: 1, borderColor: colors.border },
   bubbleStaff: { borderColor: colors.borderGold },
   bubbleWide: { alignSelf: 'stretch', maxWidth: '100%' },
-  by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.gold, textAlign: textStart },
+  by: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldText, textAlign: textStart },
   image: { width: 220, height: 160, borderRadius: radii.md, backgroundColor: colors.surface },
   file: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.md, borderWidth: 1, maxWidth: 260 },
   fileMine: { borderColor: 'rgba(0,0,0,0.18)', backgroundColor: 'rgba(255,255,255,0.22)' },
@@ -227,10 +227,10 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: colors.goldFaint,
   },
-  actionLabel: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold, flexShrink: 1 },
+  actionLabel: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldText, flexShrink: 1 },
   card: { gap: spacing.xs, padding: spacing.md },
   cardTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
-  cardPrice: { ...typography.body, color: colors.gold, textAlign: textStart },
+  cardPrice: { ...typography.body, color: colors.goldText, textAlign: textStart },
   cardBullet: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   cardNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   system: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginVertical: spacing.sm },

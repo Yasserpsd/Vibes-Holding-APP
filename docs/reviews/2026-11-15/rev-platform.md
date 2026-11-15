@@ -34,11 +34,77 @@ Round 2 — the coordinator's decisions (2026-11-15), all applied:
    already empty.
 7. `app/src/lib/purchases.ts` — (a) `:12-13,164` `PurchaseResult` gains `{ status: 'pending' }`, returned for
    `PAYMENT_PENDING_ERROR`; (b) `:52-55` the anchors of `riyalPrice` accept LRM / RLM / Arabic letter mark where they
-   accepted spaces (one `GAP` constant = `[\s‎‏؜]*`). Checked in Node against 9 price strings.
+   accepted spaces (one `GAP` constant: whitespace, U+200E, U+200F, U+061C). Checked in Node against 9 price strings.
 8. `app/src/components/UpdateGate.tsx:12,139-140` — `textAlign: 'left'` → `textAlign: textStart`.
 9. `app/src/app/_layout.tsx:64,142-173` — back in the foreground with the last successful check older than 3 hours:
    check and fetch in the background, never a reload. Same guards as the launch check (optional native module, every
    failure swallowed); a failed look does not count, so the next return to the foreground tries again.
+
+Round 3 — the members' complaint «شاشة سودا بدون سبب» (coordinator task, 2026-11-16; plan in
+`docs/reviews/2026-11-16/complaint-black-screen-at-launch.json`). JavaScript only, every native call behind the
+optional-module check. New files: `lib/reloadApp.ts`, `lib/crashGuard.ts`, `components/LaunchCover.tsx`,
+`components/CrashScreen.tsx`.
+
+1. **Every reload and every not-ready frame is the opening screen** (plan priority 1).
+   - `app/src/lib/reloadApp.ts` — `reloadApp()`: the expo-updates reload page is brand black `#0B0B0B` with the emblem
+     at 160 points, no spinner, fading out; if the native side refuses the options, the plain reload; in development
+     the dev reload. Never throws; answers `false` when this binary cannot restart itself. Used by `restart()` in
+     `i18n/direction.ts:110-113` (language, theme, direction), the launch check (`_layout.tsx:172`), the banner button
+     (`UpdateGate.tsx:105`) and the recovery screen.
+   - `app/src/components/LaunchCover.tsx` + `_layout.tsx:210-214` — a static cover (brand black, the emblem, no
+     fonts / t() / tokens / hooks) instead of `return null`.
+   - The same cover replaces the bare views of `auth/GuestGate.tsx:95` and of the `null` state of
+     `components/AppLockGate.tsx:76`.
+   - `components/SplashFlash.tsx` — until the artwork has decoded the cover shows the emblem on brand black instead
+     of a bare black view; the 700 ms hold starts when the artwork is on screen; an artwork that fails or has not
+     loaded after 1.5 s is skipped.
+   - One limit found in the native code: the reload page reads `file:`, `http(s):` and `data:` pictures only. On
+     Android a bundle that still runs from the binary's own resources (the first session after an install) names
+     the emblem by resource id, so that reload shows the brand black alone (no spinner) and the launch cover draws
+     the emblem as soon as JavaScript is back. Downloaded bundles and iPhone are not affected.
+2. **Error boundaries and the global handler** (priorities 2 and 3).
+   - `_layout.tsx:104-113` — the root `ErrorBoundary` export and `unstable_settings.screenErrorBoundary` (one broken
+     screen keeps the app alive). Both draw `components/CrashScreen.tsx`: brand black, the emblem, one fixed sentence
+     in the app's language (Arabic when it cannot be read) and «إعادة تشغيل التطبيق» / «Restart the app», which
+     deletes `query-cache.v1.json` (`dropQueryCacheFile()`, `lib/queryCache.ts:56`) and reloads; a binary that cannot
+     reload redraws the tree. The per-screen variant adds «رجوع» / «Back». No provider hooks, no themed styles, no
+     shared button; it also hides the native splash (a throw in the first frame left it up).
+   - `lib/crashGuard.ts`, imported first (`_layout.tsx:2`) — release builds only: a fatal error outside render (a
+     timer, a listener, an onPress) is no longer handed to the native side, on both platforms; it is written to the
+     device log (`crash guard […]`).
+   - **Rollback kept, only where it can still happen** (corrected after the independent review, 2026-11-16):
+     expo-updates rolls a broken update back only for an error raised BEFORE the first view is mounted; once any
+     content has appeared it marks the launch successful and its plan is «wait for a remote update, then crash»
+     (`ErrorRecoveryHandler.kt` `handleContentAppeared`, checked). The root layout mounts `<LaunchCover/>` at its
+     first commit, so my first version (a pass-through for 8 s) re-threw screen errors when no rollback was possible
+     and would have torn the host down — the very black window this work cures. Now the pass-through needs all of:
+     first JavaScript start of the process, a downloaded update, **before the root layout's first commit**
+     (`markFirstCommit()`, `_layout.tsx:116-120`, `lib/crashGuard.ts:53-68`), and inside the first 8 s. In practice:
+     a throw at module scope or in the very first render of the root layout still reaches expo-updates (update
+     marked failed, previous one starts); every later error is caught. The boundary and the global handler use the
+     same function (`nativeRollbackStands()`). State that cannot be read counts as «nobody is watching».
+   - **Consequence to know:** a downloaded update whose home screen (or any screen) throws AFTER the launch cover is
+     no longer rolled back automatically; members see the recovery screen until a fixed update is published. That
+     is the trade-off the challenge named; it makes a smoke test of every production OTA, and the crash beacon,
+     more important.
+3. **Cache stamp and the gate's limit** (priorities 4 and 5).
+   - `lib/queryCache.ts:27-45,86,108` — the snapshot carries the bundle that wrote it (the update id, else
+     `embedded-<version>`); a file from another bundle, and every file written before the stamp, is not painted.
+   - `auth/GuestGate.tsx:15,87-94` — the opening cover gives way after 4 s; the reads still correct the state when
+     they answer.
+4. **Option B** (priority 6) — `_layout.tsx:155-172,204-208`: an update found at launch reloads the app only while
+   the launch cover / splash is still showing (`firstScreenShown` is false). Second lock, `memberMayBeTyping()` in
+   `lib/reloadApp.ts`: no focused text input, keyboard closed, not on `/auth`, `/form`, `/service`, `/profile-edit`,
+   `/contact`, `/posts/compose`, `/people/apply`, `/checkout` (the path is noted by `ScreenTracker.tsx:22-25`).
+   Otherwise the update stays pending for the banner and the next cold start. The 30-second rule of round 2 is gone.
+5. **Priority 7 (a)** — `i18n/direction.ts:124-128`: `syncDirection` deletes its attempt key only when it exists
+   (one read instead of a delete and a mirror rewrite on every launch). 7 (b) and priority 8 left, as instructed.
+6. **Emulator report.**
+   - Item 10 — `_layout.tsx:232`: the wrapper of the stack and the bottom bar takes the page colour (`colors.black`,
+     read at render): no black wedges behind the bar's corners in the light theme.
+   - Item 8 — `_layout.tsx:273`: `contact` is registered with the detail header and `contact.title`.
+   - Item 33 — **not applied, cannot be fixed in JavaScript**: see «Problems not fixed».
+7. **Text plan priority 7** — `_layout.tsx:232`: `direction: isRTL() ? 'rtl' : 'ltr'` on that same root container.
 
 ## Problems not fixed
 
@@ -55,7 +121,10 @@ Round 2 — the coordinator's decisions (2026-11-15), all applied:
 | **low** | **System UI stays dark in light mode**: `userInterfaceStyle: 'dark'` (+ `expo-system-ui`) forces dark keyboards, alerts (the tracking primer, the theme chooser), share sheets. | Native config; `automatic` needs a full visual pass. |
 | **low** | **«قيّمنا» never uses the store app link**: `RateUsPrompt.tsx:69` asks `Linking.canOpenURL('itms-apps://…')` / `('market://…')`; without `LSApplicationQueriesSchemes` (iOS) and a `<queries>` entry (Android 11+) both answer false, so the https page is always used (it still opens the store). | Not my file. Edit below. |
 | **low** | **Cold-start notification tap on older binaries**: the bundled `expo-notifications` JS (57.0.18) reads the tap through the native *sync* `getLastNotificationResponse`; a binary whose native side lacks it throws (caught) and the app opens on the home instead of the target screen. | Cannot check the 1.2.0 / 1.3.0 native side from here. |
-| **low** | **The lock and «retired» covers are plain views**: a native `Modal` opened by another component draws above them, Android's back button pops the hidden screens under them, and `AppLockGate` shows the app for a moment at a cold start (the lock setting is read asynchronously, `locked` starts `false`). | `AppLockGate.tsx` is not in my list; needs a small redesign (start covered until the setting is read). |
+| **low** | **The lock and «retired» covers are plain views**: a native `Modal` opened by another component draws above them, and Android's back button pops the hidden screens under them. (The cold-start gap of `AppLockGate` is closed: it starts covered, since round 3 with the emblem.) | Needs a small redesign (a Modal, or a back handler), not asked for. |
+| **medium** | **Android, emulator item 33: the in-app browser's toolbar stays white inside the dark app.** `lib/openLink.ts` already passes `toolbarColor: colors.black` and `controlsColor: colors.gold`. The installed `expo-web-browser` 57.0.3 drops it on Android: `WebBrowserModule.kt:107-113` builds the colour parameters with `.setSecondaryToolbarColor(color)` for `toolbarColor`, so the top toolbar colour is never set and Chrome follows the phone's own light/dark setting. No JavaScript option reaches it. iPhone is not affected. | Native code of a library: a `patch-package` patch (`app/patches/**` is the coordinator's) and a new binary. Edit below. |
+| **medium** | **No crash beacon.** A caught error is written to the device log only (`noteCrash` in `lib/crashGuard.ts`); the server route `POST /api/app/client-error` of the plan does not exist. Until it does, nobody sees which screens fail on members' phones, and a broken OTA that fails AFTER the first 8 s shows the recovery screen to everybody with no signal to us. | Skipped as instructed (server work). `noteCrash()` is the one place to add the request. Every production OTA needs a smoke test on a real phone first. |
+| **low** | **Option B: an update found at launch now almost always waits for the next cold start**, because the first screen is usually ready before the download ends. Confirmed in the code: the banner in `UpdateGate` (`PendingOta`, `:86-114`) reads `isUpdatePending` from `useUpdates()`, which the native state machine sets on every finished download — the native launch download (`StartupProcedure.kt:189`) and both JavaScript fetches, the launch check and the three-hour foreground re-check (`FetchUpdateProcedure.kt:122`) — and JavaScript receives it at load (`initialContext`) and by event after. Its button calls `reloadApp()` (`UpdateGate.tsx:105`). **What the member sees:** a small navy-and-gold bar at the top of whatever screen is open — «يرجى إعادة تشغيل التطبيق» with one button; a tap shows the black opening screen with the emblem for a moment and the app reopens on the new version; if he ignores it, the next time the app is opened from closed runs the new version by itself. | The coordinator's decision; noted so the banner is expected on a phone (also in a newcomer's first session). |
 | **low** | Android release manifest carries permissions the app does not use: `SYSTEM_ALERT_WINDOW`, `READ/WRITE_EXTERNAL_STORAGE` (≤ API 32). `FOREGROUND_SERVICE_MEDIA_PLAYBACK` + `AudioControlsService` come from `expo-audio` (Play asks for a declaration). | Native config. Edit below. |
 
 Notes without a problem: every native package is required lazily behind a registry check (`requireOptionalNativeModule` /
@@ -73,6 +142,11 @@ banner covers a missed reload. The only way a phone sees nothing is a binary who
 ## Shared-file changes needed
 
 P1–P3 and the `checkout.ts` fallback are applied (see Fixed, round 2). Still open:
+
+Native patch for emulator item 33 (new file `app/patches/expo-web-browser+57.0.3.patch`, new binary) — in
+`node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/WebBrowserModule.kt`, inside
+`createCustomTabsIntent`, the FIRST block (`val color = options.toolbarColor`): old `.setSecondaryToolbarColor(color)`
+→ new `.setToolbarColor(color)`. The second block (`secondaryToolbarColor`) stays as it is.
 
 Native config — the coordinator applies these himself (new store build 1.3.4):
 
@@ -135,8 +209,56 @@ No change needed in `i18n/**`, `theme/**`, `api/**`, `auth/**`.
 - `predictiveBackGestureEnabled: false` and `enableOnBackInvokedCallback=false` are consistent.
 - Keyboard: `windowSoftInputMode=adjustResize`; screens mix `behavior='height'` and none — for the Android-run session.
 
+## To look at on a phone (round 3 — nothing below was run on a device)
+
+A preview-id build shows only the «retired» cover: use a local release build made with `APP_ENV=production` against
+the local mock server, or the internal Play track / TestFlight.
+
+1. **Language switch and theme switch** («حسابي»), Android and iPhone: black with the emblem all the way — no white
+   page, no blue spinner, no bare black gap, and the emblem does not jump between the reload page, the launch cover
+   and the gold artwork. On Android in the first session after an install the reload itself may be plain brand black.
+2. **Cold start**, dark and light theme, signed in and as a visitor: splash → gold artwork → first screen, with no
+   black frame between; a visitor lands on the welcome screen without seeing the home first.
+3. **Update at launch**: publish a test update, open the app. Either one longer opening screen and the new bundle,
+   or the «restart» banner on the first screen — never a reload once a screen is visible. Then focus a field on the
+   register form while a download is running: no reload, the banner appears.
+4. **Recovery screen**: with a temporary throw in one screen's render, opened more than 10 s after launch → the
+   per-screen message with «رجوع» and «إعادة تشغيل التطبيق»; «رجوع» returns to a working app, the restart starts
+   clean with skeletons once. The same throw inside a root popup → the whole-app message. On Android neither may
+   leave a black window. Remove the throw before any OTA.
+5. **Rollback, where it still exists**: a test update that throws at module scope (or in the first render of the
+   root layout), at a cold start → the app closes or restarts on the previous update, as before. A test update that
+   throws in the home screen's render → the recovery screen at once, on Android and iPhone, never a black window
+   and never a closed app (this is the case the review corrected).
+6. **Throw inside a timer or an onPress** 15 s after launch (Android): the app stays usable and
+   `adb logcat -s ReactNativeJS` shows `crash guard [fatal]`.
+7. **After an update or a reload**: the first launch shows skeletons once (the cache of the older bundle is dropped),
+   the next launch paints at once again.
+8. **«راسل الإدارة»**: gold header, the title, a back arrow; the keyboard still keeps the field visible.
+9. **Light theme, any pushed screen**: no black wedges behind the rounded top corners of the bottom bar.
+10. **Root direction** (text plan 7), both languages on Android: home, a sheet (CountryPicker), a horizontal
+    carousel, the native back arrow, the bottom bar — nothing mirrored. English on an Arabic-language iPhone is the
+    case it targets and needs a real phone.
+11. **Sign-out, then kill the app at once**: the next launch paints nothing of the signed-out member.
+
 ## Checks run
 
+- Round 3 (2026-11-16): `npx tsc --noEmit` (whole project) → exit 0. `npx eslint` on `src/app/_layout.tsx`,
+  `src/lib/reloadApp.ts`, `src/lib/crashGuard.ts`, `src/lib/queryCache.ts`, `src/components/LaunchCover.tsx`,
+  `CrashScreen.tsx`, `SplashFlash.tsx`, `UpdateGate.tsx`, `ScreenTracker.tsx`, `AppLockGate.tsx`,
+  `src/auth/GuestGate.tsx`, `src/i18n/direction.ts` → exit 0, no warnings. Read in `node_modules` for the design:
+  expo-updates `Updates.js` / `ReloadScreenView.kt` / `ReloadScreenView.swift` (picture schemes, size, failure path),
+  `IUpdatesController.kt` + `UpdatesStateContext.kt` (`initialContext.restartCount`), expo-router `useScreens.js`
+  (`ErrorBoundary`, `screenErrorBoundary`), expo-web-browser `WebBrowserModule.kt` (item 33). Not done: the Node unit
+  test of the restore decision (the module imports React Native), and anything on a device.
+- After the review fix (first-commit rule): `npx tsc --noEmit` → exit 0 (the two errors below are gone);
+  `npx eslint src/app/_layout.tsx src/lib/crashGuard.ts src/components/CrashScreen.tsx` → exit 0.
+- A second `tsc` run a few minutes later (no change of mine in between) shows two errors from other sessions' edits
+  in progress, left alone: `src/app/(tabs)/account.tsx(14,31)` cannot find `@/components/AppDialog`, and
+  `src/components/MembershipGate.tsx(13,44)` imports `syncMembershipOnce`, which `StorePurchaseCard` does not export
+  yet. `eslint` on my twelve files is still clean.
+- In `lib/` this round, mine: `reloadApp.ts`, `crashGuard.ts` (new) and `queryCache.ts`. `badges.ts`, `validation.ts`,
+  `notifications.ts`, `purchases.ts` and `readPosts.ts` were changed by other sessions.
 - `npx tsc --noEmit` (inside `app/`, whole project, after round 2) → exit 0, no errors (the two purchase screens of
   rev-membership compile with the new `pending` status).
 - `npx eslint src/app/_layout.tsx src/lib/notifications.ts src/lib/queryCache.ts src/lib/adsAttribution.ts src/lib/checkout.ts src/lib/purchases.ts src/components/UpdateGate.tsx` → exit 0, no warnings.

@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { Animated, Platform, StyleSheet, View, type ColorValue } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View, type ColorValue } from 'react-native';
 
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
+import { NeonPulse } from '@/components/lux';
 import { PopIn } from '@/components/motion';
 import { t, type StringKey } from '@/i18n';
 import { useTabBadges } from '@/lib/badges';
@@ -32,7 +33,7 @@ const TABS: TabDefinition[] = [
 ];
 
 /** M38/V2: the chosen tab's icon pops and settles over a golden halo — the bar answers the finger. */
-function TabIcon({ name, color, size, focused }: { name: IoniconName; color: ColorValue; size: number; focused: boolean }) {
+function TabIcon({ name, color, size, focused, unread = false }: { name: IoniconName; color: ColorValue; size: number; focused: boolean; unread?: boolean }) {
   const [scale] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (!focused) return;
@@ -43,13 +44,35 @@ function TabIcon({ name, color, size, focused }: { name: IoniconName; color: Col
   }, [focused, scale]);
   return (
     <Animated.View style={[styles.icon, { transform: [{ scale }] }]}>
+      {/* M242: an unread management message lights the envelope — a soft gold glow breathing BEHIND the icon
+          (drawn first, no zIndex: M240); NeonPulse holds still under «reduce motion». */}
+      {unread ? (
+        <View style={styles.halo} pointerEvents="none">
+          <View style={styles.unreadGlow}>
+            <NeonPulse radius={radii.pill} intensity="strong" duration={1300} />
+          </View>
+        </View>
+      ) : null}
       {focused ? (
         <PopIn style={styles.halo}>
           <View style={styles.haloFill} />
         </PopIn>
       ) : null}
-      <Ionicons name={name} color={color} size={size} />
+      <Ionicons name={name} color={unread ? colors.gold : color} size={size} />
     </Animated.View>
+  );
+}
+
+/**
+ * The bar's label. Never scaled by the system font size and shrunk to fit before it is ever cut: a fifth of the
+ * width holds one line, and a Samsung phone with a larger font drew «بنك المشا…». Same face, size and colour as
+ * the navigator's own label, so nothing changes on a phone where the words already fit.
+ */
+function TabLabel({ title, color }: { title: string; color: ColorValue }) {
+  return (
+    <Text style={[styles.label, { color }]} numberOfLines={1} allowFontScaling={false} adjustsFontSizeToFit minimumFontScale={0.75}>
+      {title}
+    </Text>
   );
 }
 
@@ -85,6 +108,8 @@ export default function TabsLayout() {
           boxShadow: shadows.lift,
         },
         tabBarLabelStyle: typography.tabLabel,
+        // The labels and the count badge keep their size whatever the system font size is (see TabLabel).
+        tabBarAllowFontScaling: false,
         // Android resizes the window for the keyboard, so the bar would ride above it and eat the
         // composer's room (advisor chat, searches); it steps aside while typing. iOS keeps its bar.
         tabBarHideOnKeyboard: Platform.OS === 'android',
@@ -118,10 +143,20 @@ export default function TabsLayout() {
             name={tab.name}
             options={{
               title: t(tab.title),
-              href: hiddenTabs.has(tab.name) ? null : undefined,
-              tabBarIcon: ({ color, focused, size }) => (
-                <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
-              ),
+              // A tab the persona hides (M99) draws nothing but KEEPS its slot, so the advisor circle stays in
+              // the middle of the bar — two slots on each side (emulator review, item 17). `href: null` removed
+              // the slot and pushed the circle off-centre. The screen itself stays reachable by its path.
+              tabBarButton: hiddenTabs.has(tab.name) ? () => null : undefined,
+              tabBarIcon: ({ color, focused, size }) =>
+                // M242: «بريد وارد» with an unread management message — the gold «unread» envelope over its glow.
+                tab.name === 'news' && badges.inbox > 0 ? (
+                  <TabIcon name={focused ? 'mail-unread' : 'mail-unread-outline'} color={color} size={size} focused={focused} unread />
+                ) : (
+                  <TabIcon name={focused ? tab.icon : tab.iconOutline} color={color} size={size} focused={focused} />
+                ),
+              tabBarLabel: ({ color }) => <TabLabel title={t(tab.title)} color={color} />,
+              // The label is drawn by TabLabel, so the screen reader's words are set here.
+              tabBarAccessibilityLabel: tab.name === 'news' && badges.inbox > 0 ? t('inbox.tabUnread', { count: badges.inbox }) : t(tab.title),
               tabBarBadge: badgeOf(tab.name) > 0 ? (badgeOf(tab.name) > 9 ? '+9' : `+${badgeOf(tab.name)}`) : undefined,
               tabBarBadgeStyle: styles.badge,
             }}
@@ -144,6 +179,10 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     boxShadow: shadows.glowGoldFaint,
   },
+  // M242: the unread glow behind the envelope — the same pill in both bars (GlobalTabBar).
+  unreadGlow: { width: 40, height: 30, borderRadius: radii.pill, backgroundColor: colors.goldSoft },
+  // The navigator's own label style (centred, transparent) on the app's tab face.
+  label: { ...typography.tabLabel, textAlign: 'center', backgroundColor: 'transparent' },
   // M75: the «+N» pill on a tab — small, golden, impossible to miss.
   badge: {
     backgroundColor: colors.gold,

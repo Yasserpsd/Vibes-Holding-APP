@@ -6,7 +6,8 @@ import type { Country } from '@/api/auth';
 import { FieldError } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { getLang, t, tOptional } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { inputStart, isRTL, textStart } from '@/i18n/direction';
+import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -43,7 +44,8 @@ export function CountryPicker({ countries, selected, onSelect, compact = false, 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return countries;
-    const digits = needle.replace(/^[+0]+/, '');
+    // A dial code typed in Arabic-Indic or Persian digits («٩٦٦») finds its country like «966».
+    const digits = toAsciiDigits(needle).replace(/^[+0]+/, '');
     return countries.filter(
       (item) =>
         item.name.includes(query.trim()) ||
@@ -170,7 +172,9 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    textAlign: textStart,
+    // A TextInput reads left/right as the physical sides (a Text does not): the box starts on the language's own side.
+    textAlign: inputStart(),
+    writingDirection: isRTL() ? 'rtl' : 'ltr',
   },
   list: { flexGrow: 0 },
   row: {

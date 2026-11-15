@@ -200,6 +200,6 @@ const styles = themedStyles(() => ({
   partnerText: { flex: 1, gap: 4 },
   partnerName: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   discountPill: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.goldSoft },
-  discountText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.gold },
+  discountText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldText },
   partnerDetail: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
 }));
