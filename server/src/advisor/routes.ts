@@ -4,10 +4,12 @@ import { z } from 'zod';
 import { guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import { RateLimiter } from '../auth/rateLimit.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
 import { riyadhNow } from '../hq/service.js';
-import { langOf } from '../lang.js';
+import { langOf, type AppLang } from '../lang.js';
 import { FILL_FIELD_TYPES, type FormFiller } from './fill.js';
-import type { HqProposal, IntentDetector } from './intents.js';
+import { SCREEN_LABELS, type HqProposal, type IntentDetector } from './intents.js';
+import type { AdvisorMessage } from './sanitize.js';
 import type { AdvisorService } from './service.js';
 import { speakable, type SpeechSynthesizer } from './speech.js';
 import type { VoiceTranscriber } from './voice.js';
@@ -19,7 +21,43 @@ export type AdvisorRoutesOptions = {
   filler?: FormFiller;
   intents?: IntentDetector;
   speech?: SpeechSynthesizer;
+  /** M242: the labels under the advisor's replies, in English for the English app. */
+  english?: EnglishCache;
 };
+
+const ARABIC_LETTER = /[؀-ۿ]/;
+
+/**
+ * M242 (complaint «عربي في وضع الإنجليزية»): the buttons under a reply — the quick replies, a link's label, a
+ * screen's name — and the opening suggestions come from the hub in Arabic. The English app gets them in English
+ * (a small set that repeats, so the cache answers at once after the first time; a label with no English yet is
+ * sent as stored). A quick reply is also what the member SENDS when he taps it, and the brain answers in the
+ * language of the message: an English label keeps the conversation in English. The reply text itself is the
+ * brain's own words and is never touched here.
+ */
+export async function englishLabels(messages: AdvisorMessage[], english: EnglishCache | undefined, lang: AppLang): Promise<AdvisorMessage[]> {
+  if (lang !== 'en' || !english) return messages;
+  const labels: string[] = [];
+  for (const message of messages) {
+    for (const action of message.actions) {
+      if (action.type === 'quick_replies') labels.push(...action.options);
+      else if (action.type === 'link') labels.push(action.label);
+    }
+  }
+  const shown = labels.some((label) => ARABIC_LETTER.test(label)) ? await english.textsSoon(labels, lang) : labels;
+  let at = 0;
+  const next = (fallback: string): string => shown[at++] ?? fallback;
+  return messages.map((message) => ({
+    ...message,
+    actions: message.actions.map((action) => {
+      if (action.type === 'quick_replies') return { ...action, options: action.options.map((option) => next(option)) };
+      if (action.type === 'link') return { ...action, label: next(action.label) };
+      // A screen has its English name in the server's own table: no translation needed.
+      if (action.type === 'screen' && ARABIC_LETTER.test(action.label)) return { ...action, label: SCREEN_LABELS[action.screen].en };
+      return action;
+    }),
+  }));
+}
 
 // The app names what the member looks at; the server builds the context text itself (advisor/context.ts).
 const selection = z.string().trim().max(1000).nullish();
@@ -87,7 +125,7 @@ const fillSchema = z.object({
   country: z.string().regex(/^[a-z]{2}$/i).optional(),
 });
 
-export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler, intents, speech }) => {
+export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (app, { service, auth, voice, filler, intents, speech, english }) => {
   const requireSession = sessionGuard(auth);
   const maybeSession = optionalSession(auth);
   const limiter = new RateLimiter();
@@ -121,7 +159,12 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
     guard(async (request, reply) => {
       const current = await requireSession(request, reply);
       if (!current) return;
-      return service.history(current.session);
+      const history = await service.history(current.session);
+      const lang = langOf(request);
+      if (lang !== 'en' || !english) return history;
+      // M242: the labels under the replies and the opening suggestions, in English.
+      const [messages, suggestions] = await Promise.all([englishLabels(history.messages, english, lang), english.textsSoon(history.profile.suggestions, lang)]);
+      return { ...history, messages, profile: { ...history.profile, suggestions } };
     }),
   );
 
@@ -252,7 +295,8 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       if (!current) return;
       const query = parse(pollSchema, request.query, reply);
       if (!query) return;
-      return service.poll(current.session, query.after);
+      const polled = await service.poll(current.session, query.after);
+      return { ...polled, messages: await englishLabels(polled.messages, english, langOf(request)) };
     }),
   );
 };

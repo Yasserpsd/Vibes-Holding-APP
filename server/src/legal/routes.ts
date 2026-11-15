@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { guard } from '../auth/guard.js';
+import { cleanEmail } from '../hub/phone.js';
 import { isAppLang, langOf, type AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import { accountDeletionPage, privacyPage, termsPage } from './pages.js';
@@ -9,7 +10,8 @@ import { accountDeletionPage, privacyPage, termsPage } from './pages.js';
 export type LegalRoutesOptions = { notifier: Notifier };
 
 const deletionSchema = z.object({
-  email: z.string().trim().email().max(200),
+  // M242: cleaned like every other address (a pasted direction mark or a trailing full stop is not a wrong e-mail).
+  email: z.string().max(400).transform(cleanEmail).pipe(z.string().email().max(200)),
   name: z.string().trim().max(120).optional().default(''),
   phone: z.string().trim().max(30).optional().default(''),
   note: z.string().trim().max(1000).optional().default(''),

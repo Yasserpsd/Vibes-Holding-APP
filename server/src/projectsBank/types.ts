@@ -47,6 +47,8 @@ export type ProjectsQuery = {
   sort: ProjectsSort;
   page: number;
   limit: number;
+  /** M242: the rotation day the rotating orders are dealt under (service.ts `rotationDay`); absent = today's. */
+  day?: number;
 };
 
 export type ProjectsPage = {
@@ -56,6 +58,8 @@ export type ProjectsPage = {
   total: number;
   hasMore: boolean;
   updatedAt: string | null;
+  /** M242: the rotation day this page was dealt under. A client sends it back with its next page, so a list that began before midnight never repeats a project. */
+  day: number;
 };
 
 export type FilterOption = Term & { count: number };

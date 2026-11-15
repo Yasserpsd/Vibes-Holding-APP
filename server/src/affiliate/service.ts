@@ -85,7 +85,10 @@ export type AffiliateRecord = {
   decidedAt: string | null;
   decidedBy: string | null;
   adminNote: string | null;
-  /** M186: the affiliate's own membership as last seen through the hub (decides the commission tier). */
+  /**
+   * M186: the affiliate's own membership as last seen through the hub (decides the commission tier).
+   * M242: `seenAt` is the moment this state was first seen; a visit that finds it unchanged writes nothing.
+   */
   membership?: { active: boolean; endDate: string | null; seenAt: string };
   /** M186: one stamp per paid referral — the amount is fixed the moment it is counted. */
   earnings?: AffiliateEarning[];
@@ -373,8 +376,25 @@ type Deps = {
   /** M202: optional so a server without WhatsApp, and the tests, simply skip the message. */
   whatsapp?: Pick<WhatsappService, 'sendAffiliateLink'> & Partial<Pick<WhatsappService, 'sendNotice'>>;
   push?: AffiliatePush;
+  /**
+   * M242: the push that tells the applicant the dashboard decided. Transactional: it never rides the
+   * automatic-push switch (`push` above is absent with AUTO_PUSH=0) and never follows the advisor mute.
+   */
+  notify?: AffiliatePush;
   /** Accounts that muted the advisor's daily push (M87b) hear no reminder either. */
   muted?: () => Promise<Set<number>>;
+};
+
+/** M242: the decision push, as the coordinator worded it (formal Arabic; no promised returns). */
+export const DECISION_PUSH: Record<'approved' | 'rejected', Record<AppLang, { title: string; body: string }>> = {
+  approved: {
+    ar: { title: 'تم اعتماد انضمامك', body: 'اعتُمد انضمامك إلى برنامج ممثلي نادي المستثمرين. افتح صفحتك في التطبيق للحصول على رمز الإحالة ورابطك الخاص.' },
+    en: { title: 'Your application is approved', body: 'You are now part of the Investors Club Affiliates Program. Open your page in the app for your referral code and link.' },
+  },
+  rejected: {
+    ar: { title: 'قرار بشأن طلب انضمامك', body: 'صدر قرار الإدارة بشأن طلب انضمامك إلى برنامج ممثلي نادي المستثمرين. التفاصيل داخل التطبيق.' },
+    en: { title: 'A decision on your application', body: 'The management has decided on your application to the Investors Club Affiliates Program. The details are in the app.' },
+  },
 };
 
 export class AffiliateService {
@@ -577,46 +597,82 @@ export class AffiliateService {
   }
 
   /**
+   * The work of `sync` on one approved record, in place. `changed` says whether anything was written into it,
+   * so a visit that brings nothing new costs no write (M242).
+   */
+  private static bringUpToDate(
+    record: AffiliateRecord,
+    config: AffiliateConfig,
+    paid: Array<{ id: string; name: string; paidAt: string }>,
+    now: Date,
+    membership?: { active: boolean; endDate: string | null },
+  ): { changed: boolean; bonus?: AffiliateCycle; ended?: AffiliateCycle } {
+    const out: { changed: boolean; bonus?: AffiliateCycle; ended?: AffiliateCycle } = { changed: false };
+    // The membership as last seen decides the commission tier: it is stamped when its state moves, not on every visit.
+    if (membership && (record.membership?.active !== membership.active || (record.membership?.endDate ?? null) !== membership.endDate)) {
+      record.membership = { ...membership, seenAt: now.toISOString() };
+      out.changed = true;
+    }
+    if (!record.earnings) {
+      // The first sync after M186: referrals paid before it keep the original 250 (the owner's plan).
+      record.earnings = paid.map((entry) => ({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: config.commission, member: false }));
+      out.changed = true;
+    } else if (record.membership) {
+      const stamped = new Set(record.earnings.map((entry) => entry.inviteId));
+      for (const entry of paid) {
+        if (stamped.has(entry.id)) continue;
+        const member = AffiliateService.memberAt(record, entry.paidAt);
+        record.earnings.push({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: member ? config.commissionMember : config.commission, member });
+        out.changed = true;
+      }
+    }
+    if (!record.cycles?.length) {
+      record.cycles = [AffiliateService.newCycle(1, config.cycleDays, config.cycleTarget, config.cycleBonus, now)];
+      out.changed = true;
+    }
+    const cycle = record.cycles[record.cycles.length - 1];
+    if (!cycle || cycle.closedAt) return out;
+    const inWindow = AffiliateService.countIn(paid, cycle);
+    if (!cycle.bonusAt && cycle.bonus > 0 && inWindow >= cycle.target) {
+      cycle.bonusAt = now.toISOString();
+      out.bonus = { ...cycle };
+      out.changed = true;
+    }
+    if (now.toISOString() > cycle.endAt) {
+      cycle.closedAt = now.toISOString();
+      cycle.paid = inWindow;
+      record.renewalRequestedAt = now.toISOString();
+      out.ended = { ...cycle };
+      out.changed = true;
+    }
+    return out;
+  }
+
+  /**
    * M186: brings one affiliate up to date — stamps new paid referrals at the tier of that moment,
    * adds the cycle allowance when the target is met inside the window, and files the renewal request
    * when the counter runs out. Called on every app visit (with the hub's fresh membership) and by the
    * scheduled sweep; idempotent. Until a membership was seen once, stamping waits for the visit.
+   * M242: read-only for an account that is not an approved affiliate, and for a visit that changes nothing.
    */
   async sync(contactId: number, now = new Date(), membership?: { active: boolean; endDate: string | null }): Promise<void> {
+    // M242: the home card makes every signed-in phone ask GET /api/affiliate at each launch and each return to
+    // the app, and a pending applicant asks every minute. An account that is not an approved affiliate has
+    // nothing to bring up to date: one read, no write.
+    const current = await this.find(contactId);
+    if (!current || current.status !== 'approved') return;
     const [config, paid] = await Promise.all([this.config(), this.paidInvites(contactId)]);
+    // A dry run on a copy: the two documents are rewritten only when this visit brings something new.
+    if (!AffiliateService.bringUpToDate(structuredClone(current), config, paid, now, membership).changed) return;
     const events = await this.mutate((affiliates) => {
       const record = affiliates.find((entry) => entry.contactId === contactId);
       const out: { bonus?: AffiliateCycle; ended?: AffiliateCycle; record?: AffiliateRecord } = {};
+      // Decided again under the one writer: a decision or another visit may have landed since the dry run.
       if (!record || record.status !== 'approved') return out;
-      if (membership) record.membership = { ...membership, seenAt: now.toISOString() };
-      if (!record.earnings) {
-        // The first sync after M186: referrals paid before it keep the original 250 (the owner's plan).
-        record.earnings = paid.map((entry) => ({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: config.commission, member: false }));
-      } else if (record.membership) {
-        const stamped = new Set(record.earnings.map((entry) => entry.inviteId));
-        for (const entry of paid) {
-          if (stamped.has(entry.id)) continue;
-          const member = AffiliateService.memberAt(record, entry.paidAt);
-          record.earnings.push({ inviteId: entry.id, name: entry.name, paidAt: entry.paidAt, amount: member ? config.commissionMember : config.commission, member });
-        }
-      }
-      if (!record.cycles?.length) {
-        record.cycles = [AffiliateService.newCycle(1, config.cycleDays, config.cycleTarget, config.cycleBonus, now)];
-      }
-      const cycle = record.cycles[record.cycles.length - 1];
-      if (!cycle || cycle.closedAt) return out;
-      const inWindow = AffiliateService.countIn(paid, cycle);
-      if (!cycle.bonusAt && cycle.bonus > 0 && inWindow >= cycle.target) {
-        cycle.bonusAt = now.toISOString();
-        out.bonus = { ...cycle };
-      }
-      if (now.toISOString() > cycle.endAt) {
-        cycle.closedAt = now.toISOString();
-        cycle.paid = inWindow;
-        record.renewalRequestedAt = now.toISOString();
-        out.ended = { ...cycle };
-      }
-      out.record = { ...record };
+      const { bonus, ended } = AffiliateService.bringUpToDate(record, config, paid, now, membership);
+      if (bonus) out.bonus = bonus;
+      if (ended) out.ended = ended;
+      if (bonus || ended) out.record = { ...record };
       return out;
     });
     if (events.record && events.bonus) {
@@ -891,12 +947,16 @@ export class AffiliateService {
   /** The dashboard's decision — the only way an affiliate becomes active (owner, 2026-11-02). */
   async decide(contactId: number, status: 'approved' | 'rejected', note: string, adminName: string, now = new Date()): Promise<AffiliateRecord | null> {
     const config = await this.config();
+    // M242: whether this call really moved the status. The same decision saved twice (a double click on the
+    // dashboard) is one decision, and the applicant's phone hears of it once.
+    let statusChanged = false;
     const record = await this.mutate((affiliates) => {
       const existing = affiliates.find((entry) => entry.contactId === contactId);
       if (!existing) return null;
       if (status === 'approved' && !existing.agreementAcceptedAt) {
         throw new RequestError('agreement_pending', 'لم يوافق مقدّم الطلب على الاتفاقية بعد', 400);
       }
+      statusChanged = existing.status !== status;
       existing.status = status;
       existing.decidedAt = now.toISOString();
       existing.decidedBy = adminName;
@@ -914,7 +974,19 @@ export class AffiliateService {
     if (record?.status === 'approved') void this.sendLink(record);
     // M235: a refusal is told on WhatsApp too (the note stays in the e-mail and the app).
     if (record?.status === 'rejected') void this.deps.whatsapp?.sendNotice?.('affiliate_update', { phone: record.phone, lang: record.lang, name: record.name }, [record.lang === 'en' ? 'Not approved' : 'لم يُعتمد']);
+    // M242: the applicant's phone hears the decision at once. A tap opens the programme page, which re-reads
+    // its state on every bundle since M184 — the one path that reaches an app left open on «pending».
+    if (record && statusChanged) this.pushDecision(record.contactId, status);
     return record;
+  }
+
+  /** Fire and forget: the decision is saved already, and a push that fails (or throws) never undoes or delays it. */
+  private pushDecision(contactId: number, decision: 'approved' | 'rejected'): void {
+    const notify = this.deps.notify;
+    if (!notify) return;
+    void Promise.resolve()
+      .then(() => notify.sendTo(contactId, (lang) => ({ ...DECISION_PUSH[decision][lang], data: { screen: '/affiliate', type: 'affiliate' } })))
+      .catch((error: unknown) => this.deps.log.warn({ err: error, contactId }, 'affiliate decision push failed'));
   }
 
   /** The affiliate's referrals: every hub-verified registration with his code, paid = membership activated. */

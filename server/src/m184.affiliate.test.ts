@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { AffiliateService, DEFAULT_AFFILIATE_CONFIG } from './affiliate/service.js';
+import { localizeReferrals } from './affiliate/routes.js';
+import { AffiliateService, DECISION_PUSH, DEFAULT_AFFILIATE_CONFIG } from './affiliate/service.js';
 import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import type { HubBody, HubClient, HubContact, HubOp, HubResponse } from './hub/types.js';
 import { InvitesService } from './invites/service.js';
+import type { AppLang } from './lang.js';
 import { LogMailer } from './mail/mailer.js';
 import { Notifier } from './mail/notify.js';
 import { MemoryKV } from './store.js';
@@ -352,4 +354,165 @@ test('a rejected application can be sent again; the config falls back whole', as
   // While approved or pending, a second application is refused.
   await service.acceptAgreement(80);
   await assert.rejects(service.apply(member, APPLY), /قيد مراجعة/);
+});
+
+// M242 (complaint «مش بيظهر غير بعد 3-4 مرات»): an app left open on «pending» learned of the approval only
+// when its process was killed. The decision is pushed now; a tap opens the programme page, which re-reads itself.
+type DecisionPush = { title: string; body: string; data?: Record<string, string> };
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+test('the dashboard decision is pushed to the applicant in his app language; a failing push never blocks it', async () => {
+  const kv = new MemoryKV();
+  const notifier = new Notifier({ mailer: new LogMailer(), recipients: [], log: built.app.log, appEnv: 'test' });
+  const invites = new InvitesService({ kv, hub, notifier, log: built.app.log });
+  const pushed: { contactId: number; ar: DecisionPush; en: DecisionPush }[] = [];
+  let gatewayDown = false;
+  const notify = {
+    sendTo: async (contactId: number, messageOf: (lang: AppLang) => DecisionPush) => {
+      if (gatewayDown) throw new Error('push gateway down');
+      pushed.push({ contactId, ar: messageOf('ar'), en: messageOf('en') });
+      return { sent: 1 };
+    },
+  };
+  const service = new AffiliateService({ kv, invites, notifier, log: built.app.log, publicUrl: '', notify });
+  const applicant = (contactId: number, name: string) => ({ contactId, name, email: `rep${contactId}@gmail.com`, phone: `05500061${contactId}`, code: `N-00000000${contactId}` });
+  const data = { screen: '/affiliate', type: 'affiliate' };
+
+  await service.apply(applicant(61, 'سلمان القحطاني'), APPLY);
+  await service.acceptAgreement(61);
+  await settle();
+  assert.equal(pushed.length, 0, 'nothing is pushed before the decision');
+
+  await service.decide(61, 'approved', '', 'الإدارة');
+  await settle();
+  assert.equal(pushed.length, 1);
+  assert.equal(pushed[0]?.contactId, 61);
+  assert.deepEqual(pushed[0]?.ar, {
+    title: 'تم اعتماد انضمامك',
+    body: 'اعتُمد انضمامك إلى برنامج ممثلي نادي المستثمرين. افتح صفحتك في التطبيق للحصول على رمز الإحالة ورابطك الخاص.',
+    data,
+  });
+  assert.deepEqual(pushed[0]?.en, {
+    title: 'Your application is approved',
+    body: 'You are now part of the Investors Club Affiliates Program. Open your page in the app for your referral code and link.',
+    data,
+  });
+
+  await service.apply(applicant(62, 'هند الدوسري'), APPLY);
+  await service.acceptAgreement(62);
+  await service.decide(62, 'rejected', 'بيانات الحساب البنكي غير مكتملة', 'الإدارة');
+  await settle();
+  assert.equal(pushed.length, 2);
+  assert.equal(pushed[1]?.contactId, 62);
+  assert.deepEqual(pushed[1]?.ar, {
+    title: 'قرار بشأن طلب انضمامك',
+    body: 'صدر قرار الإدارة بشأن طلب انضمامك إلى برنامج ممثلي نادي المستثمرين. التفاصيل داخل التطبيق.',
+    data,
+  });
+  assert.deepEqual(pushed[1]?.en, {
+    title: 'A decision on your application',
+    body: 'The management has decided on your application to the Investors Club Affiliates Program. The details are in the app.',
+    data,
+  });
+  // The management's note stays in the e-mail and the app: a lock screen never shows it.
+  assert.ok(!JSON.stringify(pushed[1]).includes('البنكي'));
+  for (const text of Object.values(DECISION_PUSH).flatMap((langs) => Object.values(langs)).flatMap((message) => [message.title, message.body])) {
+    assert.ok(!/مجان|كريديت|الصفقات/u.test(text), text);
+  }
+
+  // The same decision saved again (a double click on the dashboard) is not a new decision: no second push.
+  await service.decide(61, 'approved', '', 'الإدارة');
+  await service.decide(62, 'rejected', 'بيانات الحساب البنكي غير مكتملة', 'الإدارة');
+  await settle();
+  assert.equal(pushed.length, 2);
+  // A decision that really changes — an approval taken back — is told.
+  await service.decide(61, 'rejected', '', 'الإدارة');
+  await settle();
+  assert.equal(pushed.length, 3);
+  assert.deepEqual([pushed[2]?.contactId, pushed[2]?.ar.title], [61, 'قرار بشأن طلب انضمامك']);
+
+  // The push gateway fails: the decision is saved and answered all the same.
+  gatewayDown = true;
+  await service.apply(applicant(63, 'ماجد العنزي'), APPLY);
+  await service.acceptAgreement(63);
+  const decided = await service.decide(63, 'approved', '', 'الإدارة');
+  await settle();
+  assert.equal(decided?.status, 'approved');
+  assert.equal((await service.find(63))?.status, 'approved');
+  assert.equal(pushed.length, 3);
+
+  // A server with no push service at all decides as before.
+  const bare = new AffiliateService({ kv: new MemoryKV(), invites, notifier, log: built.app.log, publicUrl: '' });
+  await bare.apply(applicant(64, 'ريم الحربي'), APPLY);
+  await bare.acceptAgreement(64);
+  assert.equal((await bare.decide(64, 'approved', '', 'الإدارة'))?.status, 'approved');
+});
+
+test('the decision push does not ride the automatic-push switch (AUTO_PUSH=0)', async () => {
+  const quietHub = new LeveledHub();
+  const quiet = await buildApp({ config: loadConfig({ LOG_LEVEL: 'silent', HUB_MODE: 'mock', NEWS_REFRESH_MINUTES: '0', VIDEOS_REFRESH_MINUTES: '0', NOTIFY_EMAIL: 'admin@vcmem.com', AUTO_PUSH: '0' }), kv: new MemoryKV(), hub: quietHub, mailer: new LogMailer() });
+  try {
+    const call = (method: 'GET' | 'POST', url: string, payload?: Record<string, unknown>, token?: string) => quiet.app.inject({ method, url, ...(payload ? { payload } : {}), headers: bearer(token) });
+    const registered = await call('POST', '/api/auth/register', { name: 'تركي السبيعي', country: 'sa', phone: '0557714999', email: 'm242.quiet@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب اختبار لإشعار قرار برنامج الممثلين.' });
+    assert.equal(registered.statusCode, 200, registered.body);
+    const verified = await call('POST', '/api/auth/verify', { pendingToken: registered.json().pendingToken, code: MOCK_CODE });
+    assert.equal(verified.statusCode, 200, verified.body);
+    // The mock hub makes a verified account an admin: it applies, and the dashboard route decides.
+    const token = verified.json().token as string;
+    const id = verified.json().me.id as number;
+    const sentTo: { contactId: number; message: DecisionPush }[] = [];
+    quiet.push.sendTo = async (contactId, messageOf) => {
+      sentTo.push({ contactId, message: messageOf('ar') });
+      return { sent: 1, failed: 0, dropped: 0 };
+    };
+    assert.equal((await call('POST', '/api/affiliate/apply', APPLY, token)).statusCode, 200);
+    assert.equal((await call('POST', '/api/affiliate/agreement', {}, token)).statusCode, 200);
+    const decided = await call('POST', `/api/admin/affiliates/${id}/decision`, { status: 'approved' }, token);
+    assert.equal(decided.statusCode, 200, decided.body);
+    await settle();
+    assert.deepEqual(sentTo, [{ contactId: id, message: { ...DECISION_PUSH.approved.ar, data: { screen: '/affiliate', type: 'affiliate' } } }]);
+  } finally {
+    await quiet.app.close();
+  }
+});
+
+// M242: a new referral's name could hold the affiliate's whole page for up to 20 s (the app gives up after 15 s).
+test('the affiliate page never waits long for the English names', async () => {
+  const rows = [
+    { name: 'خالد الشمري', paid: true },
+    { name: 'منى الزهراني', paid: false },
+  ];
+  const latin = new Map([
+    ['خالد الشمري', 'Khalid Al-Shammari'],
+    ['منى الزهراني', 'Mona Al-Zahrani'],
+  ]);
+  // Like the real transliterator: slow the first time a name is seen, instant once it is cached.
+  const cached = new Set<string>();
+  const slowNames = {
+    names: async (list: string[]) => {
+      if (!list.every((name) => cached.has(name))) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        for (const name of list) cached.add(name);
+      }
+      return list.map((name) => latin.get(name) ?? name);
+    },
+  };
+  const started = Date.now();
+  const first = await localizeReferrals(rows, slowNames, 'en', 40);
+  assert.ok(Date.now() - started < 250, 'answered at the deadline, not when the transliteration ended');
+  assert.deepEqual(first, rows, 'the stored names for now, every other field untouched');
+
+  // The transliteration finished behind the answer: the next call shows the Latin names.
+  await new Promise((resolve) => setTimeout(resolve, 320));
+  const second = await localizeReferrals(rows, slowNames, 'en', 40);
+  assert.deepEqual(second.map((row) => row.name), ['Khalid Al-Shammari', 'Mona Al-Zahrani']);
+  assert.deepEqual(second.map((row) => row.paid), [true, false]);
+
+  // A transliterator that fails answers the stored names; an empty list asks nothing.
+  const failing = { names: async (): Promise<string[]> => Promise.reject(new Error('model down')) };
+  assert.deepEqual(await localizeReferrals(rows, failing, 'en', 40), rows);
+  let asked = 0;
+  const counting = { names: async (list: string[]) => ((asked += 1), list) };
+  assert.deepEqual(await localizeReferrals([], counting, 'en', 40), []);
+  assert.equal(asked, 0);
 });

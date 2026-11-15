@@ -59,7 +59,10 @@ export async function tellAudience(deps: TellDeps & { log?: { info: (data: objec
           continue;
         }
         seen.add(phone);
-        const lang = await deps.push.langOf(account.id).catch(() => null);
+        // M242: an account with no device here was always told in Arabic. It falls back to the language it
+        // registered with, when the hub's row carries it — the same rule tellMember follows for one account.
+        const stored = (account as { lang?: unknown }).lang;
+        const lang = (await deps.push.langOf(account.id).catch(() => null)) ?? (stored === 'en' || stored === 'ar' ? stored : null);
         const result = await deps.whatsapp.sendNotice('admin_message', { phone, lang, name: await nameIn(deps, account.id, account.name, lang), ref: `${input.ref}:${account.id}` });
         if (result.channel === 'whatsapp' && result.error !== 'already_sent') out.sent += 1;
         else out.skipped += 1;

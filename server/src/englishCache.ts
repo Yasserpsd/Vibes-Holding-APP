@@ -12,6 +12,10 @@ import type { Translator } from './translate.js';
  */
 
 const ARABIC = /[؀-ۿ]/;
+/** M242: how many texts one translator call carries. */
+const BATCH_SIZE = 40;
+/** M242: how long `textsSoon` lets a page wait for a text that is not cached yet. */
+const SOON_MS = 1_500;
 
 export class EnglishCache {
   constructor(
@@ -39,17 +43,22 @@ export class EnglishCache {
     );
     if (!missing.length) return out;
     const unique = [...new Set(missing.map((index) => list[index] ?? ''))];
-    const translated = await this.translator.translate(unique).catch(() => null);
-    if (!translated) return out;
     const done = new Map<string, string>();
-    await Promise.all(
-      unique.map(async (text, index) => {
-        const english = (translated[index] ?? '').trim();
-        if (!english || ARABIC.test(english)) return;
-        done.set(text, english);
-        await this.kv.set(this.key(text), english);
-      }),
-    );
+    // M242: a long list (a golden company's whole offer page) goes in batches — one call for everything ran into
+    // the translator's 20-second deadline. A batch that fails leaves its texts as stored; the others still land.
+    for (let start = 0; start < unique.length; start += BATCH_SIZE) {
+      const batch = unique.slice(start, start + BATCH_SIZE);
+      const translated = await this.translator.translate(batch).catch(() => null);
+      if (!translated) continue;
+      await Promise.all(
+        batch.map(async (text, index) => {
+          const english = (translated[index] ?? '').trim();
+          if (!english || ARABIC.test(english)) return;
+          done.set(text, english);
+          await this.kv.set(this.key(text), english);
+        }),
+      );
+    }
     for (const index of missing) out[index] = done.get(list[index] ?? '') ?? out[index] ?? '';
     return out;
   }
@@ -57,6 +66,20 @@ export class EnglishCache {
   /** One text. */
   async text(value: string, lang: AppLang): Promise<string> {
     return (await this.texts([value], lang))[0] ?? value;
+  }
+
+  /**
+   * M242: for a screen the member is waiting on (a note the management typed in Arabic). The English when it is
+   * cached or arrives within `waitMs`; otherwise the stored text now, while the translation finishes behind the
+   * answer — the next call has it. Never throws, never holds a page for the translator's own 20 seconds.
+   */
+  async textsSoon(list: string[], lang: AppLang, waitMs = SOON_MS): Promise<string[]> {
+    if (lang !== 'en' || !list.some((text) => ARABIC.test(text))) return list;
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<string[]>((resolve) => {
+      timer = setTimeout(() => resolve(list), waitMs);
+    });
+    return Promise.race([this.texts(list, lang).catch(() => list), late]).finally(() => clearTimeout(timer));
   }
 
   /** Rewrites the chosen string fields of each row (e.g. `title`), keeping everything else. */

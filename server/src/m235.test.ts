@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { MemoryKV } from './store.js';
+import { tellAudience } from './whatsapp/tell.js';
 import { buildBodyParams, TEMPLATE_NAMES } from './whatsapp/templates.js';
 
 /** Meta's Graph API as the server sees it: every club template approved in ar + en, every send accepted and kept. */
@@ -105,6 +106,31 @@ test('an account deleted by the administration is told on the number it held, on
   assert.equal(gone.statusCode, 200, gone.body);
   await waitFor('club_account_deleted', '966558323503');
   assert.equal(sent.some((entry) => entry.to === '966558323504'), false);
+});
+
+// M242: a member who registered in English and has no device on this server was announced to in Arabic.
+test('a broadcast speaks the language of the device, else the one the account registered with', async () => {
+  const account = (id: number, phone: string, lang?: string) => ({ id, name: 'Lana Carter', phone, state: 'member', persona: 'investor', honorary: 0, ...(lang ? { lang } : {}) });
+  const told: { phone: string; lang: string | null | undefined }[] = [];
+  const deps = {
+    hub: { mode: 'mock' as const, call: async () => ({ ok: true as const, items: [account(1, '966500000001', 'en'), account(2, '966500000002'), account(3, '966500000003', 'en')], total: 3, page: 1, per_page: 100, counts: {} }) },
+    // Account 3 has a device here, running in Arabic: the device wins over what the hub stored.
+    push: { langOf: async (id: number) => (id === 3 ? ('ar' as const) : null) },
+    whatsapp: {
+      enabled: true,
+      sendNotice: async (_kind: string, input: { phone: string; lang?: string | null }) => {
+        told.push({ phone: input.phone, lang: input.lang });
+        return { channel: 'whatsapp' as const };
+      },
+    },
+  } as unknown as Parameters<typeof tellAudience>[0];
+  const out = await tellAudience(deps, { uuid: 'admin-uuid', persona: null, ref: 'post-1' });
+  assert.equal(out.sent, 3);
+  assert.deepEqual(told, [
+    { phone: '966500000001', lang: 'en' },
+    { phone: '966500000002', lang: null },
+    { phone: '966500000003', lang: 'ar' },
+  ]);
 });
 
 test('every notice kind has its template and fills it in order', () => {

@@ -7,7 +7,8 @@ import type { Notifier } from '../mail/notify.js';
 import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { mobileRule } from '../hub/countries.js';
-import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
+import { cleanEmail, COUNTRIES, EMAIL_INVALID_TEXT, EMAIL_POLICY_TEXT, GENERIC_PATTERN, inputFlags, isEmailShape, PHONE_POLICY_TEXT } from '../hub/phone.js';
+import { HubError } from '../hub/types.js';
 import { dashboardGuard, guard, parse, RequestError, sessionGuard } from './guard.js';
 import type { Mailer } from '../mail/mailer.js';
 import type { PushService } from '../push/service.js';
@@ -19,7 +20,7 @@ import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { maskNumber } from './phoneCode.js';
-import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import { ACTION_CODE_CAPABILITY, accountStateOf, AuthError, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SessionRecord } from './sessions.js';
 import type { SocialIdentity, SocialVerifier } from './social.js';
 
@@ -50,6 +51,17 @@ const passwordSchema = z.string().min(6, 'كلمة المرور 6 أحرف عل�
 const codeSchema = z.string().trim().regex(/^\d{4,6}$/, 'الرمز 4 أرقام');
 const loginFieldSchema = z.string().trim().min(3).max(190);
 const pendingTokenSchema = z.string().min(32).max(128);
+/**
+ * M242: an address as the hub will accept it. What the member cannot see or does not count as wrong is removed
+ * (hub/phone.ts `cleanEmail`); what is left must have the hub's own shape, or it is refused here with one clear
+ * sentence (code `invalid`) instead of the hub's «البريد الإلكتروني مطلوب» for an address that WAS typed.
+ */
+const emailField = (missing: string) =>
+  z
+    .string()
+    .max(400)
+    .transform(cleanEmail)
+    .pipe(z.string().min(1, missing).max(190, EMAIL_INVALID_TEXT).refine(isEmailShape, EMAIL_INVALID_TEXT));
 
 const registerSchema = z
   .object({
@@ -59,7 +71,7 @@ const registerSchema = z
     companyName: z.string().trim().max(190).optional(),
     country: z.string().trim().toLowerCase().max(5).default('sa'),
     phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
-    email: z.string().trim().min(5, 'البريد الإلكتروني مطلوب').max(190),
+    email: emailField('البريد الإلكتروني مطلوب'),
     password: passwordSchema,
     persona: personaSchema,
     // M203: job, bio, interests, type and company are asked later in the profile; older bundles still send them.
@@ -139,7 +151,7 @@ const profileSchema = z
     // M206: a Google/Apple sign-up has no invite field, so the code comes with the profile form.
     inviteCode: z.string().trim().max(30),
     // M156: the real address of an Apple-relay account.
-    contactEmail: z.string().trim().toLowerCase().min(5, 'اكتب بريدك الإلكتروني').max(190).regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'اكتب بريدًا إلكترونيًا صحيحًا'),
+    contactEmail: emailField('اكتب بريدك الإلكتروني'),
   })
   .partial();
 // M79: the deliberate delete flow sends WHY (a picked reason or the member's own words) so the owner learns from it.
@@ -212,6 +224,29 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   const requireSession = sessionGuard(service);
 
   /**
+   * M242 (complaint «إيميل صحيح ويترفض»): one line per refused sign-up, sign-in or password reset, so a week of
+   * logs says which cause is the common one. It holds the route, the refusal code, the platform and what KIND of
+   * text was typed (booleans from `inputFlags`) — never the address, the number or any part of them.
+   */
+  const noteRefusal = (route: 'register' | 'login' | 'reset', request: FastifyRequest, code: string, typed: unknown, error?: unknown): void => {
+    const accountState = accountStateOf(error);
+    app.log.info(
+      { route, code: /^[a-z_0-9]{1,40}$/.test(code) ? code : 'other', platform: sourceOf(request), ...inputFlags(typeof typed === 'string' ? typed : ''), ...(accountState ? { accountState } : {}) },
+      'auth refusal',
+    );
+  };
+  const watched = async <T>(route: 'register' | 'login' | 'reset', request: FastifyRequest, typed: unknown, run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) noteRefusal(route, request, error.code, typed, error);
+      throw error;
+    }
+  };
+  /** The address or number as it arrived, before any cleaning: only its kind is logged. */
+  const typedIn = (request: FastifyRequest, field: 'email' | 'login'): unknown => (request.body as Record<string, unknown> | null | undefined)?.[field];
+
+  /**
    * M241: what opens the deletion steps. A typed password is checked the way it always was. Without one, the fresh
    * Google / Apple token is verified exactly as at sign-in (signature, issuer, audience, expiry) and must belong to the
    * signed-in account itself; an identity of another account, or of no account, is refused and nothing is ever created.
@@ -268,10 +303,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   app.post(
     '/api/auth/register',
     guard(async (request, reply) => {
-      if (limited('register', 6, request, reply)) return;
+      const typed = typedIn(request, 'email');
+      if (limited('register', 6, request, reply)) return noteRefusal('register', request, 'rate', typed);
       const body = parse(registerSchema, request.body, reply);
-      if (!body) return;
-      const result = await service.register(body, request.ip, langOf(request), sourceOf(request), bundleOf(request));
+      if (!body) return noteRefusal('register', request, 'invalid', typed);
+      const result = await watched('register', request, typed, () => service.register(body, request.ip, langOf(request), sourceOf(request), bundleOf(request)));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -321,10 +357,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   app.post(
     '/api/auth/login',
     guard(async (request, reply) => {
-      if (limited('login', 12, request, reply)) return;
+      const typed = typedIn(request, 'login');
+      if (limited('login', 12, request, reply)) return noteRefusal('login', request, 'rate', typed);
       const body = parse(loginSchema, request.body, reply);
-      if (!body) return;
-      const result = await service.login(body.login, body.password, request.ip, body.country, bundleOf(request));
+      if (!body) return noteRefusal('login', request, 'invalid', typed);
+      const result = await watched('login', request, typed, () => service.login(body.login, body.password, request.ip, body.country, bundleOf(request)));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -552,10 +589,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   app.post(
     '/api/auth/reset/request',
     guard(async (request, reply) => {
-      if (limited('reset', 6, request, reply)) return;
+      const typed = typedIn(request, 'login');
+      if (limited('reset', 6, request, reply)) return noteRefusal('reset', request, 'rate', typed);
       const body = parse(resetRequestSchema, request.body, reply);
-      if (!body) return;
-      const sent = await service.requestReset(body.login, request.ip, body.country, body.channel);
+      if (!body) return noteRefusal('reset', request, 'invalid', typed);
+      const sent = await watched('reset', request, typed, () => service.requestReset(body.login, request.ip, body.country, body.channel));
       return { ok: true, ...sent };
     }),
   );
@@ -563,10 +601,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   app.post(
     '/api/auth/reset/confirm',
     guard(async (request, reply) => {
-      if (limited('reset', 6, request, reply)) return;
+      const typed = typedIn(request, 'login');
+      if (limited('reset', 6, request, reply)) return noteRefusal('reset', request, 'rate', typed);
       const body = parse(resetConfirmSchema, request.body, reply);
-      if (!body) return;
-      await service.confirmReset(body.login, body.code, body.password, request.ip, body.country);
+      if (!body) return noteRefusal('reset', request, 'invalid', typed);
+      await watched('reset', request, typed, () => service.confirmReset(body.login, body.code, body.password, request.ip, body.country));
       return { ok: true };
     }),
   );

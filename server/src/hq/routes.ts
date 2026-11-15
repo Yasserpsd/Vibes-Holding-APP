@@ -3,10 +3,14 @@ import { z } from 'zod';
 
 import { adminGuard, guard, optionalSession, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
-import { langOf } from '../lang.js';
-import type { HqService } from './service.js';
+import type { EnglishCache } from '../englishCache.js';
+import { langOf, type AppLang } from '../lang.js';
+import type { HqService, HqSpace } from './service.js';
 
-export type HqRoutesOptions = { service: HqService; auth: AuthService };
+export type HqRoutesOptions = { service: HqService; auth: AuthService; /** M242: the management's note on a visit, in English for the English app. */ english?: EnglishCache };
+
+/** M242: the hours-wallet spaces as the English app names them (the booking itself keeps the Arabic label). */
+const SPACE_LABELS_EN: Record<HqSpace, string> = { office: 'Private office', meeting: 'Meeting room booking' };
 
 // M109a: the hours-wallet space and duration ride the same date/slots/book routes.
 const spaceSchema = z.enum(['office', 'meeting']);
@@ -30,10 +34,28 @@ const decisionSchema = z.object({ status: z.enum(['confirmed', 'rejected']), not
 const verifySchema = z.object({ code: z.string().trim().min(6).max(120) });
 
 /** HQ page for everyone; booking, passes and the admin decisions need a session (admins: hub admin accounts). */
-export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { service, auth }) => {
+export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { service, auth, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = adminGuard(auth);
   const whoIs = optionalSession(auth);
+
+  /**
+   * M242: a member's own visits as the English app reads them. The booking stores Arabic (the reception reads it):
+   * the purpose is shown by its place in the English list, a wallet space by its English name, and the note the
+   * management typed on the decision in English. The member's own note stays as he wrote it. Arabic is untouched.
+   */
+  const shownIn = async <T extends { purpose: string; adminNote: string | null; space?: HqSpace | null }>(visits: T[], lang: AppLang): Promise<T[]> => {
+    if (lang !== 'en' || !visits.length) return visits;
+    const [arabic, inEnglish] = await Promise.all([service.content('ar'), service.content('en')]);
+    const typed = visits.map((visit) => visit.adminNote ?? '');
+    const notes = english ? await english.textsSoon(typed, lang) : typed;
+    return visits.map((visit, index) => {
+      const at = arabic.purposes.indexOf(visit.purpose);
+      const purpose = visit.space ? SPACE_LABELS_EN[visit.space] : at >= 0 && arabic.purposes.length === inEnglish.purposes.length ? (inEnglish.purposes[at] ?? visit.purpose) : visit.purpose;
+      return { ...visit, purpose, adminNote: visit.adminNote ? (notes[index] ?? visit.adminNote) : visit.adminNote };
+    });
+  };
+  const oneIn = async <T extends { purpose: string; adminNote: string | null; space?: HqSpace | null }>(visit: T, lang: AppLang): Promise<T> => (await shownIn([visit], lang))[0] ?? visit;
 
   app.get(
     '/api/hq',
@@ -70,7 +92,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
     guard(async (request, reply) => {
       const current = await requireSession(request, reply);
       if (!current) return;
-      return { visits: await service.myVisits(current.session.contactId) };
+      return { visits: await shownIn(await service.myVisits(current.session.contactId), langOf(request)) };
     }),
   );
 
@@ -82,7 +104,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       const body = parse(bookSchema, request.body, reply);
       if (!body) return;
       const me = await auth.me(current.session);
-      return { visit: await service.book(me, body, Date.now(), langOf(request)) };
+      return { visit: await oneIn(await service.book(me, body, Date.now(), langOf(request)), langOf(request)) };
     }),
   );
 
@@ -93,7 +115,7 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       if (!current) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      return { visit: await service.cancel(current.session.contactId, params.id) };
+      return { visit: await oneIn(await service.cancel(current.session.contactId, params.id), langOf(request)) };
     }),
   );
 
@@ -104,7 +126,8 @@ export const hqRoutes: FastifyPluginAsync<HqRoutesOptions> = async (app, { servi
       if (!current) return;
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
-      return { pass: await service.pass(current.session.contactId, params.id) };
+      const pass = await service.pass(current.session.contactId, params.id);
+      return { pass: { ...pass, visit: await oneIn(pass.visit, langOf(request)) } };
     }),
   );
 

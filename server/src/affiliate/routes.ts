@@ -382,7 +382,21 @@ p.en{direction:ltr;font-size:13px;margin-bottom:14px}
 </div></body></html>`;
 }
 
-async function localizeReferrals<T extends { name: string }>(rows: T[], names: NameTransliterator, lang: ReturnType<typeof langOf>): Promise<T[]> {
-  const shown = await names.names(rows.map((row) => row.name), lang).catch(() => rows.map((row) => row.name));
+/** M242: how long the affiliate's page waits for the English names. The app gives up on the whole answer after 15 s. */
+export const NAMES_WAIT_MS = 3_000;
+
+/**
+ * The referred people's names in the app's language. M242: never a reason to wait — a transliteration slower
+ * than `waitMs` (a new name can take the model up to 20 s) answers the stored names now; it still finishes
+ * behind the answer and is cached, so the next call shows the Latin names.
+ */
+export async function localizeReferrals<T extends { name: string }>(rows: T[], names: Pick<NameTransliterator, 'names'>, lang: ReturnType<typeof langOf>, waitMs = NAMES_WAIT_MS): Promise<T[]> {
+  const stored = rows.map((row) => row.name);
+  if (!stored.length) return rows;
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<string[]>((resolve) => {
+    timer = setTimeout(() => resolve(stored), waitMs);
+  });
+  const shown = await Promise.race([names.names(stored, lang).catch(() => stored), late]).finally(() => clearTimeout(timer));
   return rows.map((row, index) => ({ ...row, name: shown[index] ?? row.name }));
 }

@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
 import { RequestError } from '../auth/guard.js';
-import { membershipNumber, type AuthService, type Me } from '../auth/service.js';
+import { AuthError, membershipNumber, type AuthService, type Me } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, type HubClient } from '../hub/types.js';
 import type { InvitesService } from '../invites/service.js';
@@ -27,6 +27,8 @@ const ACTIVATING = new Set(['INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHAS
 const DEFAULT_DAYS = 365;
 const MAX_DAYS = 400;
 const REVENUECAT_API = 'https://api.revenuecat.com/v1';
+/** M242: RevenueCat gets this long to answer the app's sync; then the sync goes on without it. */
+const STORE_TIMEOUT_MS = 8_000;
 
 /** App user id the app registers with RevenueCat: `vc-<hub contact id>` (a bare number is accepted too). */
 export function parseAppUserId(value: string): number | null {
@@ -239,11 +241,21 @@ export class MembershipService {
    */
   async sync(session: SessionRecord, now = Date.now()): Promise<SyncResult> {
     const contactId = session.contactId;
+    // M242: what the session knew before this call — the answer of last resort when the hub cannot be re-read.
+    const before = this.deps.auth.peek(session);
     this.deps.auth.forget(contactId);
-    if (!this.deps.store.secretKey) {
-      return { me: await this.deps.auth.me(session, true), checked: false, entitlementActive: null, activation: 'none', reason: null };
+    const unchecked = async (): Promise<SyncResult> => ({ me: await this.account(session, before), checked: false, entitlementActive: null, activation: 'none', reason: null });
+    if (!this.deps.store.secretKey) return unchecked();
+    let subscriber: Subscriber | null;
+    try {
+      subscriber = await this.fetchSubscriber(contactId);
+    } catch (error) {
+      // M242: RevenueCat refusing or not answering in time used to make every try of the app a 502, so the app
+      // never received the account even when the webhook had activated it already. The store check is skipped
+      // (fetchSubscriber logged why) and the hub is re-read like on a server without the REST key.
+      if (!(error instanceof RequestError) || error.code !== 'store_unavailable') throw error;
+      return unchecked();
     }
-    const subscriber = await this.fetchSubscriber(contactId);
     const entitlement = subscriber?.entitlements?.[this.deps.store.entitlement];
     const expiresMs = entitlement?.expires_date ? Date.parse(entitlement.expires_date) : null;
     const active = Boolean(entitlement) && (expiresMs === null || Number.isNaN(expiresMs) || expiresMs > now);
@@ -281,26 +293,53 @@ export class MembershipService {
       this.deps.auth.forget(contactId);
     }
     this.deps.log.info({ contactId, active, activation, reason }, 'store membership sync');
-    return { me: await this.deps.auth.me(session, true), checked: true, entitlementActive: active, activation, reason };
+    return { me: await this.account(session, before), checked: true, entitlementActive: active, activation, reason };
   }
+
+  /**
+   * The account as the hub has it now. M242: a hub that cannot be re-read does not fail the sync — whatever was
+   * activated above is saved already; the session's earlier copy is answered and the app's next try reads again.
+   * A session the hub no longer knows (AuthError) still signs out, and without an earlier copy the failure stands.
+   */
+  private async account(session: SessionRecord, before: Me | null): Promise<Me> {
+    try {
+      return await this.deps.auth.me(session, true);
+    } catch (error) {
+      if (error instanceof AuthError || !before) throw error;
+      this.deps.log.warn({ err: error, contactId: session.contactId }, 'membership sync: the hub could not be re-read; the earlier account is answered');
+      return before;
+    }
+  }
+
+  /** How long `sync` waits for RevenueCat before answering without it. The app gives each of its tries 8 s. A test shortens it. */
+  storeTimeoutMs = STORE_TIMEOUT_MS;
 
   private async fetchSubscriber(contactId: number): Promise<Subscriber | null> {
     const fetchImpl = this.deps.fetchImpl ?? fetch;
+    const unavailable = () => new RequestError('store_unavailable', 'تعذّر التحقق من الاشتراك الآن، حاول بعد قليل', 502);
     let response: Response;
     try {
       response = await fetchImpl(`${REVENUECAT_API}/subscribers/${encodeURIComponent(appUserIdOf(contactId))}`, {
         headers: { authorization: `Bearer ${this.deps.store.secretKey}`, accept: 'application/json' },
+        // M242: no deadline meant a silent RevenueCat held the app's request until the app itself gave up.
+        signal: AbortSignal.timeout(this.storeTimeoutMs),
       });
     } catch (error) {
       this.deps.log.error({ err: error, contactId }, 'revenuecat subscriber request failed');
-      throw new RequestError('store_unavailable', 'تعذّر التحقق من الاشتراك الآن، حاول بعد قليل', 502);
+      throw unavailable();
     }
     if (!response.ok) {
       this.deps.log.warn({ contactId, status: response.status }, 'revenuecat subscriber request refused');
-      throw new RequestError('store_unavailable', 'تعذّر التحقق من الاشتراك الآن، حاول بعد قليل', 502);
+      throw unavailable();
     }
-    const body = (await response.json()) as { subscriber?: Subscriber };
-    return body.subscriber ?? null;
+    try {
+      const body = (await response.json()) as { subscriber?: Subscriber };
+      return body.subscriber ?? null;
+    } catch (error) {
+      // A body cut short or not JSON is the same «not now» as a refusal.
+      this.deps.log.warn({ err: error, contactId }, 'revenuecat subscriber answer unreadable');
+      throw unavailable();
+    }
   }
 
   private mailOf(event: PurchaseEvent, contactId: number): ActivationLike {

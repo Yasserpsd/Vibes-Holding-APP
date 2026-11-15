@@ -177,6 +177,17 @@ const walletKey = (contactId: number): string => `hq:hours:${contactId}`;
 
 type WalletDoc = { year: string; used: number };
 
+/**
+ * M242: the purpose a booking stores — always one of the Arabic list. A label of the English list stands for the
+ * Arabic purpose at the same place, but only while the two lists are the same length (the owner edits each from
+ * the dashboard); anything else is no purpose at all.
+ */
+export function storedPurpose(typed: string, arabic: string[], english: string[]): string | null {
+  if (arabic.includes(typed)) return typed;
+  const at = english.indexOf(typed);
+  return at >= 0 && english.length === arabic.length ? (arabic[at] ?? null) : null;
+}
+
 export class HqService {
   private chain: Promise<unknown> = Promise.resolve();
 
@@ -358,8 +369,11 @@ export class HqService {
     if (space && minutesOf(input.time) + hours * slotMinutes > minutesOf(close)) {
       throw new RequestError('bad_span', 'المدة المطلوبة تتجاوز ساعات العمل، اختر وقتًا أبكر أو مدة أقصر');
     }
-    const purpose = space ? HQ_SPACE_LABELS[space] : input.purpose.trim();
-    if (!space && !content.purposes.includes(purpose)) throw new RequestError('bad_purpose', 'اختر الغرض من الزيارة');
+    // M242: the English app sends the purpose as it shows it; the booking keeps the Arabic one (the reception
+    // reads Arabic). Before this an English booking of a plain visit was always refused with `bad_purpose`.
+    const typed = input.purpose.trim();
+    const purpose = space ? HQ_SPACE_LABELS[space] : content.purposes.includes(typed) ? typed : storedPurpose(typed, content.purposes, (await this.content('en')).purposes);
+    if (!purpose) throw new RequestError('bad_purpose', 'اختر الغرض من الزيارة');
     const note = input.note.trim().slice(0, 300);
     const walletYear = space ? HqService.yearKeyOf(me) : null;
     const total = content.walletHours ?? 24;

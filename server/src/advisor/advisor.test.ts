@@ -8,7 +8,9 @@ import { MOCK_CODE, MockHubClient } from '../hub/mock.js';
 import { MOCK_MEMBERSHIP_PAY_URL, MOCK_MEMBERSHIP_URL, MOCK_SITE_URL } from '../hub/mockChat.js';
 import { SNAPSHOT_KEY } from '../projectsBank/service.js';
 import type { FeedSnapshot, PublicProject } from '../projectsBank/types.js';
+import { EnglishCache } from '../englishCache.js';
 import { MemoryKV } from '../store.js';
+import { englishLabels } from './routes.js';
 import { BlockList, isSystemNoise, stripUrls, toActions, type AdvisorAction, type AdvisorMessage } from './sanitize.js';
 
 const kv = new MemoryKV();
@@ -214,4 +216,49 @@ test('M160: the hub’s sign-in bookkeeping rows never reach the app', () => {
   assert.equal(isSystemNoise(row('system', '   ')), true);
   assert.equal(isSystemNoise(row('system', 'تم تحويل المحادثة إلى موظف')), false);
   assert.equal(isSystemNoise(row('assistant', 'سجّل الدخول على vcmem.com')), false);
+});
+
+// M242 (complaint «عربي في وضع الإنجليزية»): the buttons under a reply reached the English app in Arabic, and a
+// tapped Arabic quick reply is sent as the member's message — so the brain answered it in Arabic.
+test('the English app gets the labels under a reply in English; the reply itself is never rewritten', async () => {
+  const lines: Record<string, string> = { 'بنك المشاريع': 'Projects Bank', 'كيف أشترك؟': 'How do I subscribe?', 'صفحة الشراكات': 'The partnerships page' };
+  const asked: string[][] = [];
+  const cache = new EnglishCache(new MemoryKV(), {
+    mode: 'openai',
+    translate: async (texts) => {
+      asked.push(texts);
+      return texts.map((text) => lines[text] ?? '');
+    },
+  });
+  const reply: AdvisorMessage = {
+    id: 9,
+    role: 'assistant',
+    text: 'هذا رد المستشار كما كتبه',
+    at: '2026-11-16T09:00:00.000Z',
+    by: null,
+    image: null,
+    audio: null,
+    file: null,
+    actions: [
+      { type: 'quick_replies', options: ['بنك المشاريع', 'كيف أشترك؟', 'Already English'] },
+      { type: 'link', label: 'صفحة الشراكات', url: 'https://vcmem.com/partnerships' },
+      { type: 'screen', screen: 'projects', label: 'بنك المشاريع' },
+      { type: 'membership' },
+    ],
+  };
+  const [shown] = await englishLabels([reply], cache, 'en');
+  assert.ok(shown);
+  assert.equal(shown.text, 'هذا رد المستشار كما كتبه', "the reply is the brain's own words");
+  assert.deepEqual(shown.actions, [
+    { type: 'quick_replies', options: ['Projects Bank', 'How do I subscribe?', 'Already English'] },
+    { type: 'link', label: 'The partnerships page', url: 'https://vcmem.com/partnerships' },
+    { type: 'screen', screen: 'projects', label: 'Projects Bank' },
+    { type: 'membership' },
+  ]);
+  // The labels repeat from reply to reply: the second time costs no model call.
+  await englishLabels([reply], cache, 'en');
+  assert.equal(asked.length, 1);
+  // The Arabic app, and a server without a translator cache, get the reply as it came.
+  assert.deepEqual(await englishLabels([reply], cache, 'ar'), [reply]);
+  assert.deepEqual(await englishLabels([reply], undefined, 'en'), [reply]);
 });

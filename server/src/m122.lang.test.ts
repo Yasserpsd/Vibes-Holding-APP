@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
+import { CODES_EN, errorInEnglish, localizeError, PATTERNS_EN, SENTENCES_EN } from './errorEnglish.js';
 import { AI_BY, EnglishSweep } from './content/englishSweep.js';
 import { readEdits } from './content/edits.js';
 import { HOME_SEED } from './content/home.js';
@@ -174,4 +178,72 @@ test('M239: the Arabic app reads English-only videos through their stored Arabic
   await (service as unknown as { writeArabic(v: unknown[]): Promise<void> }).writeArabic([{ ...video }]);
   assert.equal((await service.list({ page: 1, limit: 10 }, 'ar')).items[0]?.title, 'نص عربي');
   assert.equal((await service.list({ page: 1, limit: 10 }, 'en')).items[0]?.title, 'Market Outlook');
+});
+
+// M242 (complaint «عربي في وضع الإنجليزية»): every refusal was written in Arabic only, so the English app showed
+// its general «something went wrong». The fixed English sentences live in errorEnglish.ts — no AI call.
+const ARABIC_LETTER = /[؀-ۿ]/;
+
+test('M242: the English app reads a refusal in English; the Arabic app reads it as before', async () => {
+  const ask = (method: 'GET' | 'POST', url: string, lang: 'ar' | 'en', payload?: Record<string, unknown>) =>
+    app.inject({ method, url, ...(payload ? { payload } : {}), headers: { 'x-app-lang': lang } });
+  const refusals: [method: 'GET' | 'POST', url: string, payload: Record<string, unknown> | undefined, status: number, code: string, arabic: string, english: string][] = [
+    ['GET', '/api/projects/999999', undefined, 404, 'not_found', 'المشروع غير موجود', 'This project does not exist.'],
+    ['GET', '/api/projects/abc', undefined, 400, 'bad_request', 'رقم المشروع غير صالح', 'The project number is not valid.'],
+    ['GET', '/api/me', undefined, 401, 'unauthorized', 'سجّل الدخول أولًا', 'Sign in first.'],
+    ['GET', '/api/news/zzz', undefined, 400, 'invalid', 'رقم الخبر غير صالح', 'The news item number is not valid.'],
+    ['GET', '/api/no-such-route', undefined, 404, 'not_found', 'المسار غير موجود', 'This address does not exist.'],
+    ['GET', '/api/golden/offer/zz', undefined, 404, 'not_found', 'الشركة غير موجودة', 'This company does not exist.'],
+    // The generic validation sentence (a field of the wrong type has no Arabic message of its own).
+    ['POST', '/api/auth/login', { login: 5 }, 400, 'invalid', 'البيانات غير مكتملة أو غير صحيحة', 'Some of the details are missing or not valid.'],
+    ['POST', '/api/auth/register', { name: 'Lana Carter', phone: '0512340999', email: 'lana@gmail..com', password: 'secret1', persona: 'investor' }, 400, 'invalid', 'اكتب بريدًا إلكترونيًا صحيحًا (مثل name@example.com)', 'Enter a valid email (for example name@example.com).'],
+    // A sentence of the hub's own, with no twin: the general English of its code.
+    ['POST', '/api/auth/login', { login: 'lang-en@test.local', password: 'wrong-pass' }, 401, 'bad_login', '', 'The email or mobile number, or the password, is wrong.'],
+  ];
+  for (const [method, url, payload, status, code, arabic, english] of refusals) {
+    const inEnglish = await ask(method, url, 'en', payload);
+    assert.deepEqual([inEnglish.statusCode, inEnglish.json().error.code, inEnglish.json().error.message], [status, code, english], `${method} ${url}`);
+    assert.equal(inEnglish.headers['cache-control'], 'no-store', 'rule 8 holds on a refusal');
+    const inArabic = await ask(method, url, 'ar', payload);
+    assert.deepEqual([inArabic.statusCode, inArabic.json().error.code], [status, code]);
+    if (arabic) assert.equal(inArabic.json().error.message, arabic, `${method} ${url} (Arabic unchanged)`);
+    else assert.match(inArabic.json().error.message, ARABIC_LETTER);
+  }
+});
+
+test('M242: an answer that is not a refusal, or is already English, passes through untouched', async () => {
+  const home = await app.inject({ method: 'GET', url: '/api/home', headers: { 'x-app-lang': 'en' } });
+  assert.equal(home.statusCode, 200);
+  assert.ok(home.json().hero.title, 'a normal answer is not rewritten');
+  assert.deepEqual(localizeError({ error: { code: 'update_required', message: 'Please update Investors Club from the store.' } }, 'en'), { error: { code: 'update_required', message: 'Please update Investors Club from the store.' } });
+  const arabic = { error: { code: 'not_found', message: 'المشروع غير موجود' } };
+  assert.equal(localizeError(arabic, 'ar'), arabic, 'an Arabic request is never touched');
+  assert.deepEqual(localizeError({ error: { code: 'not_found', message: 'المشروع غير موجود', details: { id: 7 } } }, 'en'), { error: { code: 'not_found', message: 'This project does not exist.', details: { id: 7 } } });
+  // A number rides into the English sentence as it came.
+  assert.equal(errorInEnglish('wallet_exhausted', 'رصيد ساعاتك السنوي لا يكفي: المتبقي 3 من 24 ساعة'), 'Your annual hours balance is not enough: 3 of 24 hours left.');
+  assert.equal(errorInEnglish('invalid', 'اختر 5 اهتمامات كحد أقصى'), 'Choose at most 5 interests.');
+  // No twin and no general sentence for the code: nothing is invented; the Arabic stands.
+  assert.equal(errorInEnglish('some_new_code', 'جملة جديدة بلا مقابل'), null);
+  assert.deepEqual(localizeError({ error: { code: 'some_new_code', message: 'جملة جديدة بلا مقابل' } }, 'en'), { error: { code: 'some_new_code', message: 'جملة جديدة بلا مقابل' } });
+});
+
+test('M242: every English sentence still has its Arabic in the code, and follows the house wording', () => {
+  const sources: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') && entry.name !== 'errorEnglish.ts') sources.push(readFileSync(path, 'utf8'));
+    }
+  };
+  walk(dirname(fileURLToPath(import.meta.url)));
+  const code = sources.join('\n');
+  // An Arabic sentence edited at its source must not silently lose its English twin.
+  const stale = Object.keys(SENTENCES_EN).filter((arabic) => !code.includes(arabic));
+  assert.deepEqual(stale, [], 'these Arabic sentences are no longer in the server code');
+  const english = [...Object.values(SENTENCES_EN), ...Object.values(CODES_EN), ...PATTERNS_EN.map(([, write]) => write(['', '3', '5']))];
+  for (const sentence of english) {
+    assert.ok(sentence.trim().length > 3 && !ARABIC_LETTER.test(sentence), sentence);
+    assert.ok(!/\bfree\b|e-mail|administration|guarantee|profit/i.test(sentence), `house wording: ${sentence}`);
+  }
 });

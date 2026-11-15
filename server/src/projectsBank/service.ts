@@ -22,13 +22,40 @@ import type {
 export const SNAPSHOT_KEY = 'projectsBank:snapshot';
 
 export const SORT_LABELS: Record<ProjectsSort, string> = {
-  // M116 (owner): «الأعلى تقييمًا» leads — the default face of the bank follows the ratings.
+  // M242 (owner, 2026-11-16): «اكتشف» leads — the bank opens on the order that changes every day.
+  // (M116 had «الأعلى تقييمًا» first; with two ratings in the whole bank its first cards never changed.)
+  discover: 'اكتشف',
   top: 'الأعلى تقييمًا',
   latest: 'الأحدث',
   views: 'الأكثر مشاهدة',
-  discover: 'اكتشف',
   golden: 'المشاريع الذهبية',
 };
+
+/**
+ * M242: the day of the bank's rotating order — the Riyadh calendar day as a number, so the order turns at
+ * 00:00 Riyadh (21:00 UTC). One day and no shorter: the adviser's daily tip names a project from this order.
+ */
+export function rotationDay(now = Date.now()): number {
+  return Math.floor((now + 3 * 3_600_000) / 86_400_000);
+}
+
+/** True when `lastMovedMs` (the `projects` sync version) falls on an earlier rotation day than `now`: the order has turned since. */
+export function rotationTurned(lastMovedMs: number, now = Date.now()): boolean {
+  return rotationDay(lastMovedMs) < rotationDay(now);
+}
+
+/**
+ * The day's hand: a stable shuffle of these projects for one rotation day. The same day gives the same
+ * order (so paging stays consistent within the day); another day or another `salt` gives a different one.
+ */
+export function dayOrder(projects: PublicProject[], day: number, salt = 0): (a: PublicProject, b: PublicProject) => number {
+  const ranks = new Map(projects.map((project) => [project.id, hash32(project.id * 2654435761 + day + salt)]));
+  const rank = (project: PublicProject): number => ranks.get(project.id) ?? 0;
+  return (a, b) => rank(a) - rank(b) || b.id - a.id;
+}
+
+/** «الأعلى تقييمًا» deals its unrated tail with a different hand from «اكتشف». */
+const TOP_SALT = 7919;
 
 type IndexedProject = { project: PublicProject; search: string };
 
@@ -148,7 +175,10 @@ export class ProjectsService {
       const terms = normalizeForSearch(query.q).split(' ').filter(Boolean);
       rows = rows.filter((row) => terms.every((term) => row.search.includes(term)));
     }
-    const sorted = sortProjects(rows.map((row) => row.project), query.sort, this.deps.ratingOf);
+    // M242: the rotating orders follow the day the caller names (a later page of a list that began before
+    // midnight), else today's. The answer says which day it was dealt under.
+    const day = query.day ?? rotationDay();
+    const sorted = sortProjects(rows.map((row) => row.project), query.sort, this.deps.ratingOf, day);
     const start = (query.page - 1) * query.limit;
     const items = sorted.slice(start, start + query.limit);
     return {
@@ -158,6 +188,7 @@ export class ProjectsService {
       total: sorted.length,
       hasMore: start + items.length < sorted.length,
       updatedAt: this.fetchedAt,
+      day,
     };
   }
 
@@ -219,16 +250,19 @@ function byLatest(a: PublicProject, b: PublicProject): number {
   return (b.modifiedAt ?? '').localeCompare(a.modifiedAt ?? '') || b.id - a.id;
 }
 
-function sortProjects(projects: PublicProject[], sort: ProjectsSort, ratingOf?: (id: number) => { stars: number | null; count: number }): PublicProject[] {
+function sortProjects(projects: PublicProject[], sort: ProjectsSort, ratingOf: RatingLookup | undefined, day: number): PublicProject[] {
   const copy = [...projects];
   switch (sort) {
-    // M116: the rated projects first (stars, then how many rated), the rest in their latest order.
+    // M116: the rated projects first (stars, then how many rated).
+    // M242: equal ratings and the whole unrated tail follow the day's hand, no longer the last-edit date:
+    // with two ratings in the bank the tail IS the list, and it stood still for weeks.
     case 'top': {
-      if (!ratingOf) return copy.sort(byLatest);
+      const hand = dayOrder(copy, day, TOP_SALT);
+      if (!ratingOf) return copy.sort(hand);
       return copy.sort((a, b) => {
         const ra = ratingOf(a.id);
         const rb = ratingOf(b.id);
-        return (rb.stars ?? 0) - (ra.stars ?? 0) || rb.count - ra.count || byLatest(a, b);
+        return (rb.stars ?? 0) - (ra.stars ?? 0) || rb.count - ra.count || hand(a, b);
       });
     }
     case 'views':
@@ -240,12 +274,9 @@ function sortProjects(projects: PublicProject[], sort: ProjectsSort, ratingOf?: 
           (a.featuredOrder ?? Number.MAX_SAFE_INTEGER) - (b.featuredOrder ?? Number.MAX_SAFE_INTEGER) ||
           byLatest(a, b),
       );
-    case 'discover': {
-      // Stable shuffle that changes once a day, so paging stays consistent within the day.
-      const daySeed = Math.floor(Date.now() / 86_400_000);
-      const rank = (project: PublicProject): number => hash32(project.id * 2654435761 + daySeed);
-      return copy.sort((a, b) => rank(a) - rank(b));
-    }
+    case 'discover':
+      // Stable shuffle that changes once a Riyadh day (M242: it turned at 03:00 Riyadh, the UTC day, before).
+      return copy.sort(dayOrder(copy, day));
     case 'latest':
     default:
       return copy.sort(byLatest);

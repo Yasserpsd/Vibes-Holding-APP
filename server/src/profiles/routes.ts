@@ -3,11 +3,13 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, MEMBER_ONLY_UPSELL, optionalSession, parse, sentOnly, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
+import { cleanEmail } from '../hub/phone.js';
 import { langOf } from '../lang.js';
 import type { PersonLocalizer } from './english.js';
 import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type ProfilesService } from './service.js';
 
-export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService; english?: PersonLocalizer };
+export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService; english?: PersonLocalizer; /** M242: the management's note on an application, in English for the English app. */ notes?: EnglishCache };
 
 const linkSchema = z.object({
   label: z.string().trim().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا').default(''),
@@ -26,7 +28,8 @@ const applySchema = z.object({
   benefit: z.array(z.string().trim().min(3).max(200)).max(10).default([]),
   seeking: z.string().trim().max(600).default(''),
   phone: z.string().trim().max(40).default(''),
-  email: z.string().trim().max(190).default(''),
+  // M242: cleaned like every other address; still optional, and never a new reason to refuse the page.
+  email: z.string().trim().max(190).default('').transform(cleanEmail),
   links: z.array(linkSchema).max(5).default([]),
 });
 
@@ -57,7 +60,7 @@ const configSchema = z.object({ intro: z.string().trim().min(10).max(500) });
 const idSchema = z.object({ id: z.string().uuid() });
 
 /** M11 «شخصية ومسيرة»: the public people, the member's own application, and the dashboard review. */
-export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (app, { service, auth, english }) => {
+export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (app, { service, auth, english, notes }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
   const whoIs = optionalSession(auth);
@@ -102,7 +105,12 @@ export const profilesRoutes: FastifyPluginAsync<ProfilesRoutesOptions> = async (
       if (!current) return;
       const [config, mine] = await Promise.all([service.config(), service.mine(current.session.contactId)]);
       // Owner (2026-11-04): the same English intro the people list shows.
-      return { intro: english ? await english.intro(config.intro, langOf(request)) : config.intro, profile: mine ? myProfile(mine) : null };
+      const lang = langOf(request);
+      const profile = mine ? myProfile(mine) : null;
+      // M242: the management's note on the application (why it was sent back) reads in English in the English app.
+      // The member's own fields are his words and stay as he wrote them.
+      const note = profile?.note && notes ? ((await notes.textsSoon([profile.note], lang))[0] ?? profile.note) : (profile?.note ?? '');
+      return { intro: english ? await english.intro(config.intro, lang) : config.intro, profile: profile ? { ...profile, note } : null };
     }),
   );
 

@@ -3,15 +3,17 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse, sessionGuard } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import type { EnglishCache } from '../englishCache.js';
+import { langOf } from '../lang.js';
 import type { ContactService } from './service.js';
 
-export type ContactRoutesOptions = { service: ContactService; auth: AuthService };
+export type ContactRoutesOptions = { service: ContactService; auth: AuthService; /** M242: the management's replies in English for the English app. */ english?: EnglishCache };
 
 const sendSchema = z.object({ text: z.string().min(1, 'اكتب رسالتك أولًا').max(2000, 'الرسالة أطول من المسموح') });
 const memberSchema = z.object({ contactId: z.coerce.number().int().positive() });
 
 /** M36: «راسل الإدارة» — the member's thread, and the dashboard's list, thread and reply. */
-export const contactRoutes: FastifyPluginAsync<ContactRoutesOptions> = async (app, { service, auth }) => {
+export const contactRoutes: FastifyPluginAsync<ContactRoutesOptions> = async (app, { service, auth, english }) => {
   const requireSession = sessionGuard(auth);
   const requireAdmin = dashboardGuard(auth);
 
@@ -21,7 +23,15 @@ export const contactRoutes: FastifyPluginAsync<ContactRoutesOptions> = async (ap
       const current = await requireSession(request, reply);
       if (!current) return;
       const me = await auth.me(current.session);
-      return { messages: await service.mine(me) };
+      const messages = await service.mine(me);
+      const lang = langOf(request);
+      if (!english || lang !== 'en') return { messages };
+      // M242: the management's replies read in English in the English app (display only: the thread keeps what
+      // was typed). The member's own lines come back exactly as he wrote them, in any language.
+      const replies = messages.filter((message) => message.from === 'admin');
+      const shown = await english.textsSoon(replies.map((message) => message.text), lang);
+      const inEnglish = new Map(replies.map((message, index) => [message.id, shown[index] ?? message.text]));
+      return { messages: messages.map((message) => (message.from === 'admin' ? { ...message, text: inEnglish.get(message.id) ?? message.text } : message)) };
     }),
   );
 

@@ -104,7 +104,67 @@ export function normLogin(input: string, countryCode?: string): string {
   return phoneIntl(countryCode ?? 'sa', raw) || normPhone(raw);
 }
 
+/** What a refused address is answered with (code `invalid`: every bundle has a sentence for it). */
+export const EMAIL_INVALID_TEXT = 'اكتب بريدًا إلكترونيًا صحيحًا (مثل name@example.com)';
+
+/** Marks nobody sees: zero-width and direction characters a paste from a chat carries, the byte-order mark, the soft hyphen. */
+const FORMAT_CHARS = /[​-‏‪-‮⁠-⁩؜﻿­]/g;
+const ARABIC_DIGITS = /[٠-٩]/g;
+const PERSIAN_DIGITS = /[۰-۹]/g;
+
+/**
+ * M242 (complaint «إيميل صحيح ويترفض»): an address as the member meant it. The hub checks with WordPress
+ * is_email(), which refuses what the member cannot see or does not count as wrong — an invisible direction mark
+ * pasted with the address, digits typed on an Arabic layout, a full stop after it, `mailto:`, angle brackets.
+ * Those are removed here; nothing that can be part of a real address is touched. Every route that takes an
+ * address uses this one function, so sign-in finds exactly what sign-up stored.
+ */
+export function cleanEmail(input: string): string {
+  let text = input
+    .replace(FORMAT_CHARS, '')
+    .replace(ARABIC_DIGITS, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(PERSIAN_DIGITS, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .trim();
+  text = text.replace(/^mailto:/i, '').trim();
+  if (text.startsWith('<') && text.endsWith('>')) text = text.slice(1, -1).trim();
+  return text
+    .replace(/[.,،;\s]+$/u, '')
+    .toLowerCase();
+}
+
+/**
+ * The shape the hub accepts (WordPress is_email): six characters or more, one `@`, an ASCII local part, and a
+ * domain of two labels or more, each of letters, digits and inner hyphens. Judges a CLEANED address.
+ */
+export function isEmailShape(email: string): boolean {
+  if (email.length < 6 || email.length > 190) return false;
+  const at = email.indexOf('@');
+  if (at < 1 || at !== email.lastIndexOf('@')) return false;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/.test(local)) return false;
+  if (domain.includes('..')) return false;
+  const labels = domain.split('.');
+  return labels.length >= 2 && labels.every((label) => /^[a-z0-9-]+$/.test(label) && !label.startsWith('-') && !label.endsWith('-'));
+}
+
+/** A clean, well-shaped address, or '' when the text is not one. */
 export function normEmail(input: string): string {
-  const email = input.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? email : '';
+  const email = cleanEmail(input);
+  return isEmailShape(email) ? email : '';
+}
+
+/**
+ * M242: what KIND of text a refused sign-up, sign-in or reset carried — booleans only, for one log line.
+ * Nothing of the address or the number itself is ever returned.
+ */
+export function inputFlags(raw: string): { looksEmail: boolean; hadFormatChar: boolean; hadNonAsciiDigit: boolean; hadTrailingPunct: boolean; hadUpper: boolean } {
+  const visible = raw.replace(FORMAT_CHARS, '').trim();
+  return {
+    looksEmail: raw.includes('@'),
+    hadFormatChar: raw.replace(FORMAT_CHARS, '').length !== raw.length,
+    hadNonAsciiDigit: /[٠-٩۰-۹]/.test(raw),
+    hadTrailingPunct: /[.,،;]$/u.test(visible),
+    hadUpper: /[A-Z]/.test(raw),
+  };
 }

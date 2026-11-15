@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
 import { loadConfig } from './config.js';
 import { STUDIO_WHATSAPP } from './content/services.js';
+import { EnglishCache } from './englishCache.js';
+import { storedPurpose } from './hq/service.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { MemoryKV } from './store.js';
 import { TemplateBlurbWriter } from './videos/blurbs.js';
@@ -224,6 +227,88 @@ test('HQ: member books → admin confirms → QR pass → verify; others are ref
   assert.equal(cancelled.json().visit.status, 'cancelled');
   const slotsAfter = await get(`/api/hq/slots?date=${date}`, memberToken);
   assert.equal(slotsAfter.json().slots[0].available, true);
+});
+
+// M242: the English app sends the purpose label it shows; the server knew the Arabic list only, so no plain
+// visit could be booked in English at all.
+test('HQ: a visit is booked from the English app, and the booking keeps the Arabic purpose', async () => {
+  const english = (url: string, method: 'GET' | 'POST', payload?: Record<string, unknown>) =>
+    app.inject({ method, url, ...(payload ? { payload } : {}), headers: { authorization: `Bearer ${memberToken}`, 'x-app-lang': 'en' } });
+  const overview = (await english('/api/hq', 'GET')).json() as { days: { date: string }[]; times: string[]; content: { purposes: string[] } };
+  assert.deepEqual(overview.content.purposes.slice(0, 2), ['Meeting room booking', 'Business meeting'], 'the English app shows English purposes');
+  const date = overview.days[1]?.date as string;
+  const time = overview.times[0] as string;
+
+  const booked = await english('/api/hq/visits', 'POST', { date, time, purpose: 'Business meeting', note: '' });
+  assert.equal(booked.statusCode, 200, booked.body);
+  // The reception reads the Arabic purpose, whatever language the member booked in.
+  const listed = (await get('/api/admin/hq/visits?status=pending', memberToken)).json().visits as { id: string; purpose: string }[];
+  assert.equal(listed.find((visit) => visit.id === booked.json().visit.id)?.purpose, 'اجتماع عمل');
+
+  // A label of neither list is still refused, in English or in Arabic.
+  const nextDate = overview.days[2]?.date as string;
+  const odd = await english('/api/hq/visits', 'POST', { date: nextDate, time, purpose: 'Something else', note: '' });
+  assert.deepEqual([odd.statusCode, odd.json().error.code], [400, 'bad_purpose']);
+
+  // The rule itself: an English label maps by its place, and only while the two lists are the same length.
+  const arabic = ['اجتماع عمل', 'حضور فعالية', 'أخرى'];
+  assert.equal(storedPurpose('Attending an event', arabic, ['Business meeting', 'Attending an event', 'Other']), 'حضور فعالية');
+  assert.equal(storedPurpose('حضور فعالية', arabic, []), 'حضور فعالية');
+  assert.equal(storedPurpose('Attending an event', arabic, ['Business meeting', 'Attending an event']), null, 'lists of different lengths: no guess');
+  assert.equal(storedPurpose('Filming', arabic, ['Business meeting', 'Attending an event', 'Other']), null);
+
+  await english(`/api/hq/visits/${booked.json().visit.id as string}/cancel`, 'POST', {});
+});
+
+// M242: the booking is stored in Arabic and the management types its note in Arabic; the English app showed both as stored.
+test('HQ: the English app reads its visits in English — the purpose, and the note the management typed', async () => {
+  const ask = (url: string, method: 'GET' | 'POST', lang: 'ar' | 'en', payload?: Record<string, unknown>) =>
+    app.inject({ method, url, ...(payload ? { payload } : {}), headers: { authorization: `Bearer ${memberToken}`, 'x-app-lang': lang } });
+  const overview = (await ask('/api/hq', 'GET', 'en')).json() as { days: { date: string }[]; times: string[] };
+  const booked = await ask('/api/hq/visits', 'POST', 'en', { date: overview.days[3]?.date, time: overview.times[0], purpose: 'Business meeting', note: 'ملاحظتي كما كتبتها' });
+  assert.equal(booked.statusCode, 200, booked.body);
+  assert.equal(booked.json().visit.purpose, 'Business meeting', 'the answer to the English app names the purpose in English');
+  const id = booked.json().visit.id as string;
+  const note = 'أهلًا بك، نراك في قاعة الاجتماعات';
+  const confirmed = await post(`/api/admin/hq/visits/${id}/decision`, { status: 'confirmed', note }, memberToken);
+  assert.equal(confirmed.statusCode, 200, confirmed.body);
+
+  // No English yet for that note (no translator in this app): it is answered as typed, at once — never an error, never a wait.
+  const first = (await ask('/api/hq/visits', 'GET', 'en')).json().visits.find((visit: { id: string }) => visit.id === id);
+  assert.deepEqual([first.purpose, first.adminNote, first.note], ['Business meeting', note, 'ملاحظتي كما كتبتها']);
+
+  // Once the note has its English (the cache the translator fills), the English app reads it; the Arabic app does not change.
+  await kv.set(`translate:text:${createHash('sha256').update(note).digest('hex').slice(0, 32)}`, 'Welcome, see you in the meeting room');
+  const inEnglish = (await ask('/api/hq/visits', 'GET', 'en')).json().visits.find((visit: { id: string }) => visit.id === id);
+  assert.deepEqual([inEnglish.purpose, inEnglish.adminNote], ['Business meeting', 'Welcome, see you in the meeting room']);
+  assert.equal(inEnglish.note, 'ملاحظتي كما كتبتها', "the member's own note is never rewritten");
+  const pass = (await ask(`/api/hq/visits/${id}/pass`, 'GET', 'en')).json().pass;
+  assert.deepEqual([pass.visit.purpose, pass.visit.adminNote], ['Business meeting', 'Welcome, see you in the meeting room']);
+  const inArabic = (await ask('/api/hq/visits', 'GET', 'ar')).json().visits.find((visit: { id: string }) => visit.id === id);
+  assert.deepEqual([inArabic.purpose, inArabic.adminNote], ['اجتماع عمل', note]);
+
+  const cancelled = await ask(`/api/hq/visits/${id}/cancel`, 'POST', 'en', {});
+  assert.equal(cancelled.json().visit.purpose, 'Business meeting');
+});
+
+test('a text with no English yet is answered as stored at once, and in English the next time', async () => {
+  let release!: () => void;
+  const slow = new Promise<void>((resolve) => (release = resolve));
+  const cache = new EnglishCache(new MemoryKV(), {
+    mode: 'openai',
+    translate: async (texts) => {
+      await slow;
+      return texts.map(() => 'The management note in English');
+    },
+  });
+  const typed = ['ملاحظة كتبتها الإدارة', 'Already English'];
+  const started = Date.now();
+  assert.deepEqual(await cache.textsSoon(typed, 'en', 30), typed, 'the page does not wait for the translator');
+  assert.ok(Date.now() - started < 500);
+  assert.deepEqual(await cache.textsSoon(typed, 'ar', 30), typed, 'the Arabic app is never touched');
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(await cache.textsSoon(typed, 'en', 30), ['The management note in English', 'Already English']);
 });
 
 test('videos: the channel feed fills the library, curated picks come first, blurbs are written once', async () => {

@@ -46,6 +46,8 @@ import { legalRoutes } from './legal/routes.js';
 import { InvitesService } from './invites/service.js';
 import { EnglishSweep } from './content/englishSweep.js';
 import { EnglishCache } from './englishCache.js';
+import { localizeError } from './errorEnglish.js';
+import { langOf } from './lang.js';
 import { PostsEnglish } from './posts/english.js';
 import { contentRoutes } from './content/routes.js';
 import { discountsRoutes } from './discounts/routes.js';
@@ -94,7 +96,7 @@ import { LivePbBridge, MockPbBridge, OffPbBridge, type PbBridge } from './projec
 import { DailyProjectService } from './projectsBank/daily.js';
 import { WorkshopNudgeService } from './agenda/nudges.js';
 import { projectsRoutes } from './projectsBank/routes.js';
-import { ProjectsService } from './projectsBank/service.js';
+import { ProjectsService, rotationTurned } from './projectsBank/service.js';
 import { ImageVariants } from './media/images.js';
 import { BunnyStream } from './media/bunny.js';
 import { mediaRoutes } from './media/routes.js';
@@ -213,6 +215,11 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     if (neverStored(request.routeOptions.url ?? '') || neverStored(routedPath(request.url))) reply.header('cache-control', 'no-store');
   });
 
+  // M242: the English app reads a refusal in English. One place for every route — the guards, the validation
+  // answers, the handlers' own replies and the two handlers at the bottom of this file all pass through here.
+  // Fixed sentences written in errorEnglish.ts: no AI call, and an Arabic request is never touched.
+  app.addHook('preSerialization', async (request, _reply, payload) => localizeError(payload, langOf(request)));
+
   // M195: the forced-update floor (dashboard value or MIN_APP_VERSION) — an app binary below it gets 426 on every
   // /api call. Installed here, before any route plugin, so every context inherits the hook.
   // M239: it judges proof only, and each platform's floor follows the version really live in its store (asked hourly;
@@ -271,7 +278,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // Fire and forget: a version that kv could not save is logged, never an unhandled rejection.
   const moved = (...keys: SyncKey[]): void => void sync.bump(...keys).catch((error: unknown) => app.log.error({ err: error, keys }, 'sync version not saved'));
   // M116 «تقييمات المشاريع»: stars + comments; one kv read at boot fills the sync summary cache.
-  const ratings = new RatingsService({ kv });
+  // M242: a saved rating moves the `projects` version, so the stars and the «الأعلى تقييمًا» order reach open apps.
+  const ratings = new RatingsService({ kv, onChange: () => moved('projects') });
   await ratings.start();
   const projects = new ProjectsService({
     kv,
@@ -294,8 +302,22 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       : new OffTranslator(),
   });
   useProjectsEnglish(projectsEnglish);
+  // M242: the bank's daily order («اكتشف», the tail of «الأعلى تقييمًا») turns at midnight Riyadh. The `projects`
+  // version moves with it, so every open app — on every bundle already installed — re-reads its lists by itself
+  // within about a minute; the same check heals a turn that passed while the server was restarting.
+  const turnRotation = (): void =>
+    void sync
+      .versions()
+      .then((versions) => {
+        if (rotationTurned(versions.projects)) moved('projects');
+      })
+      .catch((error: unknown) => app.log.error({ err: error }, 'projects rotation check failed'));
+  const rotationTimer = setInterval(turnRotation, 60_000);
+  rotationTimer.unref();
+  app.addHook('onClose', async () => clearInterval(rotationTimer));
   // Native golden offer pages, pulled from each company's web /offer/ page (PROJECT_BRIEF §5.1).
-  const golden = new GoldenOffersService({ kv, config, log: app.log, fetchImpl, onChange: () => moved('content') });
+  // M242: the offer pages are put into English behind each refresh (the cache is built further down, with the translator).
+  const golden = new GoldenOffersService({ kv, config, log: app.log, fetchImpl, onChange: () => moved('content'), english: { texts: (list, lang) => goldenEnglish.texts(list, lang) } });
   // The server's own mock hub comes with a demo club, so the dashboard can be checked locally.
   const hubClient: HubClient =
     hub ??
@@ -337,6 +359,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const videos = new VideosService({ kv, config, log: app.log, blurbs: blurbWriter, translator, translatorAr, fetchImpl });
   // Owner (2026-11-04): short texts with no English copy (request answers, workshop file titles, invite texts) — translated once, cached.
   const englishCache = new EnglishCache(kv, translator);
+  // M242: the golden companies' offer pages — their own cache prefix, so a page's texts are translated once.
+  const goldenEnglish = new EnglishCache(kv, translator, 'golden');
   // M122: the English sweep — finds Arabic showing in the English content and translates it by itself.
   const englishSweep = new EnglishSweep({ kv, translator, log: app.log, bump: () => sync.bump('content') });
   // «رسائل الإدارة»: admin posts and events from the dashboard, shown first on the app's home (M9).
@@ -388,6 +412,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     log: app.log,
     publicUrl: config.PUBLIC_URL,
     push: autoPush ? push : undefined,
+    // M242: the decision push is transactional — it goes out whatever the automatic-push switch says.
+    notify: push,
     muted: () => companion.mutedIds(),
     whatsapp,
   });
@@ -709,7 +735,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   const intents = config.OPENAI_API_KEY ? new IntentDetector({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, hq, kv }) : undefined;
   // M148: voice replies — the same key; the app plays the clip.
   const speech = config.OPENAI_API_KEY ? new SpeechSynthesizer({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
-  await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents, speech });
+  await app.register(advisorRoutes, { service: advisor, auth, voice, filler, intents, speech, english: englishCache });
   await app.register(newsRoutes, { service: news, auth, kv, interests });
   // M176: the home's live price strip (gold, silver, oil, Bitcoin) — real quotes, shared 10-minute cache.
   await app.register(marketsRoutes, { service: markets });
@@ -717,15 +743,15 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M177: the daily AI-written ad for the next open workshop — the app's once-a-day opening popup.
   await app.register(workshopAdRoutes, { service: new WorkshopAdService({ kv, log: app.log, agenda, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl }) });
   await app.register(videosRoutes, { service: videos });
-  await app.register(hqRoutes, { service: hq, auth });
+  await app.register(hqRoutes, { service: hq, auth, english: englishCache });
   await app.register(cardRoutes, { service: card, auth });
-  await app.register(contactRoutes, { service: contact, auth });
+  await app.register(contactRoutes, { service: contact, auth, english: englishCache });
   // M118c: the English app's spotlight people — translated once per profile change, cached in kv.
   const personLocalizer = new PersonLocalizer(
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: PEOPLE_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer });
+  await app.register(profilesRoutes, { service: profiles, auth, english: personLocalizer, notes: englishCache });
   await app.register(workshopsRoutes, { service: workshops, auth });
   await app.register(formsRoutes, { service: forms, auth, notify: notifyRecipients, kv, files: formFiles });
   await app.register(agendaRoutes, { service: agenda, auth, autoPush, translator, nudges, media, english: englishCache });

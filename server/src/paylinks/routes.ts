@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { cleanEmail } from '../hub/phone.js';
 import type { PayLinksService } from './service.js';
 
 export type PayLinksRoutesOptions = { service: PayLinksService; auth: AuthService };
@@ -18,7 +19,8 @@ const createSchema = z.object({
     .object({
       name: z.string().trim().max(120).default(''),
       phone: z.string().trim().max(30).default(''),
-      email: z.string().trim().max(190).default(''),
+      // M242: cleaned like every other address (the invoice mail goes to it).
+      email: z.string().trim().max(190).default('').transform(cleanEmail),
     })
     .default({ name: '', phone: '', email: '' }),
 });

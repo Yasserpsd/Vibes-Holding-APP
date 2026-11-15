@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
@@ -26,6 +27,9 @@ class LeveledHub implements HubClient {
 
 const hub = new LeveledHub();
 const mailer = new LogMailer();
+const kv = new MemoryKV();
+/** Where the translation cache keeps the English of one text (englishCache.ts): a test fills it instead of calling a model. */
+const englishKey = (text: string) => `translate:text:${createHash('sha256').update(text).digest('hex').slice(0, 32)}`;
 let built: BuiltApp;
 let app: BuiltApp['app'];
 let memberToken = '';
@@ -47,7 +51,7 @@ async function signUp(email: string, phone: string, persona: 'neutral' | 'entrep
 }
 
 before(async () => {
-  built = await buildApp({ config, kv: new MemoryKV(), hub, mailer });
+  built = await buildApp({ config, kv, hub, mailer });
   app = built.app;
   // «+member@» makes the mock account an active member; the plain address stays unactivated (and a hub admin).
   const member = await signUp('m36+member@gmail.com', '0558618811', 'investor');
@@ -153,4 +157,28 @@ test('the reply lands in the member thread, and his next message starts a new wa
 
   assert.equal((await send('POST', '/api/admin/contact/999999/reply', { text: 'رد' }, adminToken)).statusCode, 404);
   assert.equal((await send('POST', `/api/admin/contact/${memberId}/reply`, { text: '' }, adminToken)).statusCode, 400);
+});
+
+// M242 (complaint «عربي في وضع الإنجليزية»): the management types its replies in Arabic.
+test('the English app reads the management replies in English; the member reads his own lines as he wrote them', async () => {
+  type Line = { from: string; text: string };
+  const thread = async (lang: 'ar' | 'en') => (await app.inject({ method: 'GET', url: '/api/contact', headers: { ...bearer(memberToken), 'x-app-lang': lang } })).json().messages as Line[];
+  const reply = 'أهلًا بك، تفاصيل الشراكات تصلك خلال يومين.';
+  const own = 'شكرًا لكم، في الانتظار.';
+
+  // No English for the reply yet (this app has no translator): it is answered as typed, at once.
+  const asTyped = await thread('en');
+  assert.equal(asTyped.find((line) => line.from === 'admin')?.text, reply);
+
+  // The reply gets its English; so does — on purpose — one of the member's own sentences.
+  await kv.set(englishKey(reply), 'Welcome. The partnership details will reach you within two days.');
+  await kv.set(englishKey(own), 'Thank you, I will wait.');
+  const inEnglish = await thread('en');
+  assert.equal(inEnglish.find((line) => line.from === 'admin')?.text, 'Welcome. The partnership details will reach you within two days.');
+  const mine = inEnglish.filter((line) => line.from === 'member').map((line) => line.text);
+  assert.ok(mine.includes(own), "the member's own line is never rewritten, even when an English copy of it exists");
+  assert.deepEqual(mine, asTyped.filter((line) => line.from === 'member').map((line) => line.text));
+
+  // The Arabic app reads the thread exactly as stored.
+  assert.equal((await thread('ar')).find((line) => line.from === 'admin')?.text, reply);
 });

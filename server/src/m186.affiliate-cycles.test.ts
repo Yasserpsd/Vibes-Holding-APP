@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import Fastify from 'fastify';
 
-import { AFFILIATE_CONFIG_KEY, AFFILIATES_KEY, AffiliateService, DEFAULT_AFFILIATE_CONFIG, type AffiliateRecord } from './affiliate/service.js';
+import { AFFILIATE_CONFIG_KEY, AFFILIATES_KEY, AffiliateService, DEFAULT_AFFILIATE_CONFIG, PAYOUTS_KEY, type AffiliateRecord } from './affiliate/service.js';
 import { MockHubClient } from './hub/mock.js';
 import type { HubContact } from './hub/types.js';
 import { InvitesService } from './invites/service.js';
@@ -153,4 +153,83 @@ test('an affiliate approved before M186 keeps 250 for the referrals already paid
   assert.deepEqual(record?.earnings?.map((entry) => entry.amount), [250]);
   assert.equal(record?.cycles?.length, 1);
   assert.equal((await service.balance(member.contactId)).earned, 250);
+});
+
+/** M242: counts the saves per key, so «read-only» is something a test can see. */
+class CountingKV extends MemoryKV {
+  private readonly saves = new Map<string, number>();
+
+  override async set(key: string, value: unknown): Promise<void> {
+    this.saves.set(key, (this.saves.get(key) ?? 0) + 1);
+    await super.set(key, value);
+  }
+
+  count(...keys: string[]): number {
+    return keys.reduce((sum, key) => sum + (this.saves.get(key) ?? 0), 0);
+  }
+}
+
+// M242: GET /api/affiliate calls sync() for every signed-in phone (the home card asks at each launch and each
+// return to the app; a pending applicant asks every minute). It used to rewrite both documents on every call.
+test('a visit writes nothing unless an approved affiliate has something new', async () => {
+  const kv = new CountingKV();
+  const notifier = new Notifier({ mailer: new LogMailer(), recipients: ['admin@vcmem.com'], log, appEnv: 'test' });
+  const invites = new InvitesService({ kv, hub: new MockHubClient(), notifier, log });
+  const service = new AffiliateService({ kv, invites, notifier, log, publicUrl: '' });
+  const saves = () => kv.count(AFFILIATES_KEY, PAYOUTS_KEY);
+  const t0 = new Date();
+  const at = (days: number) => new Date(t0.getTime() + days * DAY);
+  const noMembership = { active: false, endDate: null };
+
+  // An account that never applied.
+  await service.sync(4242, t0, noMembership);
+  assert.equal(saves(), 0);
+
+  // An application waiting for the decision.
+  await service.apply(member, APPLY, t0);
+  await service.acceptAgreement(member.contactId, t0);
+  const whilePending = saves();
+  await service.sync(member.contactId, t0, noMembership);
+  await service.sync(member.contactId, at(0.01), noMembership);
+  assert.equal(saves(), whilePending, 'a pending applicant asks every minute: no write');
+  assert.equal((await service.find(member.contactId))?.membership, undefined, 'and nothing is stamped on a record that is not approved');
+
+  // Approved: the first visit stamps the membership as first seen (both documents saved once).
+  await service.decide(member.contactId, 'approved', '', 'الإدارة', t0);
+  const whenApproved = saves();
+  await service.sync(member.contactId, t0, noMembership);
+  const afterFirstVisit = saves();
+  assert.equal(afterFirstVisit, whenApproved + 2);
+  const firstSeen = (await service.find(member.contactId))?.membership?.seenAt;
+  assert.equal(firstSeen, t0.toISOString());
+
+  // The same state seen again, and the ten-minute sweep: nothing written.
+  await service.sync(member.contactId, at(0.01), noMembership);
+  await service.sync(member.contactId, at(0.02), noMembership);
+  await service.sweep(at(0.03));
+  assert.equal(saves(), afterFirstVisit);
+  assert.equal((await service.find(member.contactId))?.membership?.seenAt, firstSeen);
+
+  // Something new still lands: a paying referral is stamped…
+  await invites.recordFromRegister(invitee(96), member.contactId, member.name, member.code);
+  await service.sync(member.contactId, at(0.5), noMembership);
+  assert.equal(saves(), afterFirstVisit, 'a registration that has not paid changes nothing');
+  await invites.onActivated(96, at(1));
+  await service.sync(member.contactId, at(1), noMembership);
+  assert.equal(saves(), afterFirstVisit + 2);
+  assert.deepEqual((await service.find(member.contactId))?.earnings?.map((entry) => entry.amount), [250]);
+  await service.sync(member.contactId, at(1.1), noMembership);
+  assert.equal(saves(), afterFirstVisit + 2, 'and is stamped once');
+
+  // …and so is a membership that changed.
+  await service.sync(member.contactId, at(2), { active: true, endDate: at(300).toISOString() });
+  assert.equal(saves(), afterFirstVisit + 4);
+  assert.equal((await service.balance(member.contactId)).member, true);
+
+  // The counter running out is a change too: the renewal request is filed once.
+  await service.sweep(at(31));
+  assert.equal(saves(), afterFirstVisit + 6);
+  assert.ok((await service.find(member.contactId))?.renewalRequestedAt);
+  await service.sweep(at(32));
+  assert.equal(saves(), afterFirstVisit + 6);
 });

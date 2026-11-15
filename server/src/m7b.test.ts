@@ -33,6 +33,8 @@ type Ticket = { status: 'ok'; id: string } | { status: 'error'; message: string;
 const pushBatches: PushMessage[][] = [];
 let ticketFor: (to: string) => Ticket = () => ({ status: 'ok', id: 'ticket' });
 let subscriber: Record<string, unknown> | null = null;
+/** M242: how the RevenueCat REST stub misbehaves — a network failure, or no answer at all. */
+let storeFailure: 'throw' | 'hang' | null = null;
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const fetchStub: typeof fetch = async (input, init) => {
@@ -44,6 +46,13 @@ const fetchStub: typeof fetch = async (input, init) => {
   }
   if (url.startsWith('https://api.revenuecat.com/v1/subscribers/')) {
     assert.equal((init?.headers as Record<string, string>).authorization, 'Bearer sk_test_secret_key_for_rest_check');
+    if (storeFailure === 'throw') throw new TypeError('fetch failed');
+    if (storeFailure === 'hang') {
+      // Never answers: only the caller's own deadline (the abort signal) ends it.
+      const signal = init?.signal;
+      assert.ok(signal, 'the RevenueCat call carries a deadline');
+      return new Promise<Response>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason as Error)));
+    }
     return subscriber ? json({ request_date_ms: Date.now(), subscriber }) : json({ message: 'down' }, 503);
   }
   throw new Error(`unexpected fetch ${url}`);
@@ -208,9 +217,26 @@ test('store purchase: webhook retries and the app sync never activate twice; the
   // The app's sync: REST check activates when the webhook has not, once.
   const before = await get('/api/me', syncToken);
   assert.equal(before.json().me.membership.status, 'unactivated');
+  // M242: RevenueCat refusing (503), failing or not answering in time no longer fails the sync with a 502:
+  // the store check is skipped and the hub is re-read, so the app still gets the account.
   subscriber = null;
   const down = await post('/api/membership/sync', {}, syncToken);
-  assert.equal(down.statusCode, 502, down.body);
+  assert.equal(down.statusCode, 200, down.body);
+  assert.deepEqual([down.json().checked, down.json().entitlementActive, down.json().activation], [false, null, 'none']);
+  assert.equal(down.json().me.membership.status, 'unactivated');
+  storeFailure = 'throw';
+  const broken = await post('/api/membership/sync', {}, syncToken);
+  assert.equal(broken.statusCode, 200, broken.body);
+  assert.equal(broken.json().checked, false);
+  storeFailure = 'hang';
+  built.membership.storeTimeoutMs = 40;
+  const started = Date.now();
+  const silent = await post('/api/membership/sync', {}, syncToken);
+  assert.equal(silent.statusCode, 200, silent.body);
+  assert.equal(silent.json().checked, false);
+  assert.ok(Date.now() - started < 2_000, 'a silent RevenueCat is given up on at the deadline');
+  built.membership.storeTimeoutMs = 8_000;
+  storeFailure = null;
   subscriber = {
     entitlements: { membership: { expires_date: new Date(expires).toISOString(), purchase_date: new Date(now).toISOString(), product_identifier: 'club_membership_annual' } },
     subscriptions: { 'club_membership_annual:annual': { store: 'play_store', is_sandbox: true, store_transaction_id: 'GPA.777' } },

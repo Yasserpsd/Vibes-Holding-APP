@@ -8,7 +8,7 @@ import { bannerImages, opportunityImage, serviceImages } from '../content/images
 import { isArabic } from '../content/i18n.js';
 import type { AppLang } from '../lang.js';
 import { localizeProject } from '../projectsBank/lang.js';
-import type { ProjectsService } from '../projectsBank/service.js';
+import { rotationDay, type ProjectsService } from '../projectsBank/service.js';
 import type { PublicProject } from '../projectsBank/types.js';
 import type { PushMessage, PushService } from '../push/service.js';
 import { riyadhDay } from '../riyadh.js';
@@ -40,8 +40,12 @@ const TICK_MS = 10 * 60_000;
 const SEND_HOUR = 11;
 
 const riyadhHour = (now: number): number => new Date(now + 3 * 3_600_000).getUTCHours();
-/** A stable daily index for the rotations: the day number, Riyadh calendar. */
-const dayIndex = (now: number): number => Math.floor((now + 3 * 3_600_000) / 86_400_000);
+/**
+ * A stable daily index for the rotations: the day number, Riyadh calendar.
+ * M242: the very day the Projects Bank deals its «اكتشف» order under, so the tip names one project for the whole day
+ * (the bank's order turned at 03:00 Riyadh before, and the tip changed its project with it).
+ */
+const dayIndex = (now: number): number => rotationDay(now);
 
 export type CompanionPersona = 'investor' | 'entrepreneur' | 'neutral';
 export const COMPANION_PERSONAS: readonly CompanionPersona[] = ['investor', 'entrepreneur', 'neutral'];
@@ -217,7 +221,7 @@ export class CompanionService {
   /** The live values the tips may name: the day's bank pick and this month's automatic code. */
   private async context(now: number, lang: AppLang = 'ar'): Promise<Record<string, string | null>> {
     const index = dayIndex(now);
-    const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12 });
+    const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12, day: index });
     // M239 (owner, 2026-11-14): the English tip names the project and sector in English. The day's pick walks on to the
     // next project whose English title and sector are clean; none clean = no name (the project tip leaves the pool).
     let bankPick: PublicProject | null = null;
@@ -278,7 +282,7 @@ export class CompanionService {
     const index = dayIndex(now);
     const golden = await getGoldenContent(this.deps.kv);
     const goldenPick = golden.companies.length ? golden.companies[index % golden.companies.length] : null;
-    const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12 });
+    const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12, day: index });
     const bankPick = bank.items.length ? bank.items[index % bank.items.length] : null;
     const nextEvent = (await this.deps.agenda.forViewer(null, 'ar', now)).find((event) => !event.past) ?? null;
 

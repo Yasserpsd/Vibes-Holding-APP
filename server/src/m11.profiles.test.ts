@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
@@ -27,6 +28,7 @@ class LeveledHub implements HubClient {
 
 const hub = new LeveledHub();
 const mailer = new LogMailer();
+const kv = new MemoryKV();
 let built: BuiltApp;
 let app: BuiltApp['app'];
 let memberToken = '';
@@ -64,7 +66,7 @@ async function signUp(email: string, phone: string): Promise<{ token: string; id
 }
 
 before(async () => {
-  built = await buildApp({ config, kv: new MemoryKV(), hub, mailer });
+  built = await buildApp({ config, kv, hub, mailer });
   app = built.app;
   const member = await signUp('m11+member@gmail.com', '0558618821');
   memberToken = member.token;
@@ -166,6 +168,16 @@ test('a rejection needs a note and the member reads it; re-applying returns to p
 
   const mine = await get('/api/profiles/me', memberToken);
   assert.match(mine.json().profile.note as string, /تفاصيل أدق/);
+
+  // M242: the management's note reads in English in the English app once it has its English (the translation
+  // cache; a test fills it instead of calling a model). The member's own fields are never rewritten.
+  const inEnglish = () => app.inject({ method: 'GET', url: '/api/profiles/me', headers: { ...bearer(memberToken), 'x-app-lang': 'en' } });
+  assert.match((await inEnglish()).json().profile.note as string, /تفاصيل أدق/, 'no English yet: the note as typed, never an empty one');
+  await kv.set(`translate:text:${createHash('sha256').update('أضف تفاصيل أدق عن مسيرتك المهنية.').digest('hex').slice(0, 32)}`, 'Add more precise details about your career.');
+  const english = (await inEnglish()).json().profile as { note: string; fields: { bio: string } };
+  assert.equal(english.note, 'Add more precise details about your career.');
+  assert.equal(english.fields.bio, mine.json().profile.fields.bio);
+  assert.match((await get('/api/profiles/me', memberToken)).json().profile.note as string, /تفاصيل أدق/, 'the Arabic app reads it as typed');
 
   const again = await send('POST', '/api/profiles/apply', application, memberToken);
   assert.equal(again.json().profile.status, 'pending');

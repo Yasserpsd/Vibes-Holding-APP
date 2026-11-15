@@ -83,7 +83,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       const offer = offers.get(code);
       return {
         company: { code: company.code, name: company.name, tagline: company.tagline, logoUrl: company.logoUrl },
-        blocks: offer?.blocks ?? [],
+        // M242: the English app gets the page's English copy (golden/service.ts); until it exists, the Arabic one.
+        blocks: (langOf(request) === 'en' ? (offer?.blocksEn ?? offer?.blocks) : offer?.blocks) ?? [],
         fetchedAt: offer?.fetchedAt ?? null,
         disclaimer: content.disclaimer,
       };

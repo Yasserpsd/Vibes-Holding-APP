@@ -69,7 +69,11 @@ export function publicReview(review: Review, contactId?: number | null): PublicR
   };
 }
 
-type Deps = { kv: KV };
+type Deps = {
+  kv: KV;
+  /** M242: called after every saved change (a rating, a dashboard entry, hide, delete, pinned stars), so open apps re-read the stars and the «الأعلى تقييمًا» order (/api/sync). */
+  onChange?: () => void;
+};
 
 export class RatingsService {
   private chain: Promise<unknown> = Promise.resolve();
@@ -89,6 +93,7 @@ export class RatingsService {
       const result = change(doc);
       await this.deps.kv.set(RATINGS_KEY, doc);
       this.recompute(doc);
+      this.deps.onChange?.();
       return result;
     });
     this.chain = run.catch(() => undefined);

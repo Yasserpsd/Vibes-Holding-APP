@@ -140,6 +140,8 @@ export type HubResponse = {
   created?: 0 | 1 | boolean | string;
   /** `member_status` (M44): whether a contact matched the phone/e-mail. */
   found?: boolean;
+  /** `member_status`: where the match came from — 'members_list' is a name on the paid-members list with no contact row (M242 reads it). */
+  source?: string;
   sent?: boolean;
   /** `reset_request` since plugin 2.26.3 (M197): the inbox the code went to, masked, and the Apple/Google sign-up. */
   sent_to?: string;

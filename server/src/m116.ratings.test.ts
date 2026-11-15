@@ -154,9 +154,10 @@ test('the pinned stars win over the average and can be cleared', async () => {
   assert.equal(cleared.json().summary.stars, 4.5);
 });
 
-test('«الأعلى تقييمًا» leads the sorts and orders the bank; every project carries its rating', async () => {
+// M242 (owner, 2026-11-16): «اكتشف» is the first chip now; «الأعلى تقييمًا» follows it and still puts the rated project first.
+test('«اكتشف» leads the sorts; «الأعلى تقييمًا» orders the bank by rating; every project carries its rating', async () => {
   const sorts = (await get('/api/projects/filters')).json().sorts as { key: string }[];
-  assert.equal(sorts[0]?.key, 'top');
+  assert.deepEqual(sorts.slice(0, 2).map((sort) => sort.key), ['discover', 'top']);
   const page = await get('/api/projects?sort=top');
   assert.equal(page.statusCode, 200);
   const items = page.json().items as { id: number; rating: { stars: number | null; count: number } }[];
@@ -165,6 +166,39 @@ test('«الأعلى تقييمًا» leads the sorts and orders the bank; every
   assert.equal(first.id, 1, 'the rated project leads');
   assert.equal(first.rating.stars, 4.5);
   assert.equal(second.rating.count, 0);
+});
+
+// M242: a rating used to reach other phones only at their next cold start — nothing told /api/sync.
+test('a saved rating moves the projects sync version, so open apps re-read the stars and the order', async () => {
+  const versionNow = async () => ((await get('/api/sync')).json().v as { projects: number }).projects;
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const before = await versionNow();
+  const added = await send('POST', '/api/admin/ratings/2/reviews', { name: 'نورة العتيبي', stars: 5, comment: 'عرض واضح ومقنع' }, adminToken);
+  assert.equal(added.statusCode, 201, added.body);
+  await settle();
+  const afterEntry = await versionNow();
+  assert.ok(afterEntry > before, 'a dashboard entry moved it');
+  const rated = await send('POST', '/api/projects/2/reviews', { stars: 3, comment: 'يحتاج إلى توضيح أكثر' }, raterToken);
+  assert.equal(rated.statusCode, 200, rated.body);
+  await settle();
+  const afterMember = await versionNow();
+  assert.ok(afterMember > afterEntry, 'a member rating moved it');
+  // Reading the reviews is not a change.
+  await get('/api/projects/2/reviews');
+  await settle();
+  assert.equal(await versionNow(), afterMember);
+});
+
+// M242: the daily order turns at midnight Riyadh; a later page may name the day its list began under.
+test('a page says which rotation day dealt it, and only today or yesterday can be asked for', async () => {
+  const today = (await get('/api/projects?sort=discover')).json().day as number;
+  assert.equal(today, Math.floor((Date.now() + 3 * 3_600_000) / 86_400_000));
+  assert.equal((await get(`/api/projects?sort=discover&page=2&limit=1&day=${today - 1}`)).json().day, today - 1, 'a list opened before midnight keeps its day');
+  assert.equal((await get(`/api/projects?sort=discover&day=${today - 2}`)).json().day, today, 'an older day is not honoured');
+  assert.equal((await get(`/api/projects?sort=discover&day=${today + 1}`)).json().day, today, 'nor a day that has not come');
+  const odd = await get('/api/projects?sort=discover&day=abc');
+  assert.equal(odd.statusCode, 200, 'an unreadable day is ignored, never an error');
+  assert.equal(odd.json().day, today);
 });
 
 test('a member review from the app can only be hidden or deleted, never rewritten', async () => {

@@ -186,6 +186,29 @@ function rethrowNoAccount(error: unknown): never {
   throw error;
 }
 
+/** M242: what the hub knows of a typed e-mail or mobile (AuthService.accountState). */
+export type AccountState = 'none' | 'passwordless' | 'account' | 'unknown';
+
+// The state found while refusing a sign-in or a reset rides on the error itself, for the refusal log line.
+const refusalStates = new WeakMap<object, AccountState>();
+function withState<T extends object>(error: T, state: AccountState): T {
+  refusalStates.set(error, state);
+  return error;
+}
+export function accountStateOf(error: unknown): AccountState | undefined {
+  return typeof error === 'object' && error !== null ? refusalStates.get(error) : undefined;
+}
+
+/**
+ * M242: the club knows this person, but no app account was ever made for him. The code stays `no_account`:
+ * every bundle already carries that answer to the sign-up screen, and sign-up adopts the known contact.
+ */
+function knownWithoutAccount(login: string): string {
+  return login.includes('@')
+    ? 'بريدك معروف لدى النادي، لكن لم يُنشأ له حساب في التطبيق بعد — أنشئ حسابك بالبريد نفسه ورقم جوالك'
+    : 'رقم جوالك معروف لدى النادي، لكن لم يُنشأ له حساب في التطبيق بعد — أنشئ حسابك بالرقم نفسه وبريدك الإلكتروني';
+}
+
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
@@ -325,6 +348,12 @@ type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: Fasti
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
+  /**
+   * M242: `forget()` stamps the contact with a growing number. A hub read that began before the stamp carries an
+   * answer older than the change that caused it (a store activation), and must not put that answer back in the cache.
+   */
+  private forgetStamp = 0;
+  private readonly forgottenAt = new Map<number, number>();
   /** M165: accounts whose stale copy is being refreshed from the hub right now. */
   private readonly revalidating = new Set<string>();
   private readonly honoraryCache = new Map<number, { value: boolean; at: number }>();
@@ -364,7 +393,8 @@ export class AuthService {
       .map((key) => (key === 'other' && input.interestsOther?.trim() ? `أخرى: ${input.interestsOther.trim()}` : interestLabel(key)))
       .join('، ');
     const uuid = newUuid();
-    const result = await this.deps.hub.call('register', {
+    const result = await this.deps.hub
+      .call('register', {
       uuid,
       ip,
       name: input.name,
@@ -386,7 +416,18 @@ export class AuthService {
       ...(referral ? { referral, ...(representative ? { referral_kind: 'representative' } : {}) } : {}),
       ...(interests ? { interests } : {}),
       ...(proven ? { phone_proven: 1 } : {}),
-    });
+      })
+      .catch(async (cause: unknown) => {
+        // M242: the hub's `exists` sentence names «البريد أو الجوال»; a member with a new, correct e-mail and a
+        // number already on another account read it as his e-mail being refused. The sentence now names the detail.
+        // The code stays `exists`, so every bundle behaves as before.
+        if (cause instanceof HubError && cause.code === 'exists') {
+          const taken = await this.takenDetail(input.email, hubNumber(input.phone, input.country));
+          if (taken === 'phone') throw new AuthError('exists', 'رقم الجوال هذا مسجّل لحساب آخر — سجّل الدخول برقم الجوال، أو استخدم «نسيت كلمة المرور»', 409);
+          if (taken === 'email') throw new AuthError('exists', 'هذا البريد مسجّل لحساب آخر — سجّل الدخول، أو استخدم «نسيت كلمة المرور»', 409);
+        }
+        throw cause;
+      });
     if (referral && this.deps.invites && result.contact) {
       await this.deps.invites.recordFromRegister(result.contact, Number(result.referred_by ?? 0), String(result.referred_name ?? ''), referral);
     }
@@ -432,8 +473,13 @@ export class AuthService {
     } catch (cause) {
       // M128 (owner): a sign-in with NO account behind it gets its own answer («حسابك غير مسجل»),
       // so the app carries the person straight to registration instead of a wrong-password message.
-      if (cause instanceof HubError && (cause.status === 401 || cause.status === 404) && !(await this.accountExists(normalized))) {
-        throw new AuthError('no_account', 'لا يوجد حساب مسجل بهذه البيانات — أنشئ حسابك الجديد أولًا', 404);
+      // M242: so does someone the club knows who never set an app password (paid on the website before the
+      // app, an earlier contact) — he was told «wrong password» for a password that never existed.
+      if (cause instanceof HubError && (cause.status === 401 || cause.status === 404)) {
+        const state = await this.accountState(normalized);
+        if (state === 'none') throw withState(new AuthError('no_account', 'لا يوجد حساب مسجل بهذه البيانات — أنشئ حسابك الجديد أولًا', 404), state);
+        if (state === 'passwordless') throw withState(new AuthError('no_account', knownWithoutAccount(normalized), 404), state);
+        withState(cause, state);
       }
       throw cause;
     }
@@ -447,18 +493,42 @@ export class AuthService {
   }
 
   /**
-   * M128: true when the hub knows this e-mail or phone (member_status looks the contact up without
-   * a session). Any doubt — odd input, a hub hiccup, an old hub — answers true, so the regular
-   * wrong-password message stands and nobody is bounced to registration by mistake.
+   * M128 + M242: what the hub knows of this e-mail or phone (member_status looks it up without a session).
+   * `none`: nobody. `passwordless`: a person the club knows who has no app account yet — a contact row without
+   * a password, or a name on the members list only. `account`: an app account. Any doubt — odd input, a hub
+   * hiccup, an old hub — is `unknown`, so the regular wrong-password message stands and nobody is bounced to
+   * registration by mistake.
    */
-  private async accountExists(login: string): Promise<boolean> {
+  private async accountState(login: string): Promise<AccountState> {
     const body = login.includes('@') ? { email: login } : /^\d{8,15}$/.test(login) ? { phone: login } : null;
-    if (!body) return true;
+    if (!body) return 'unknown';
     try {
       const result = await this.deps.hub.call('member_status', body);
-      return result.found !== false;
+      if (result.found === false) return 'none';
+      if (result.found !== true) return 'unknown';
+      if (result.contact) return result.contact.has_account === 1 ? 'account' : result.contact.has_account === 0 ? 'passwordless' : 'unknown';
+      return result.source === 'members_list' ? 'passwordless' : 'unknown';
     } catch {
-      return true;
+      return 'unknown';
+    }
+  }
+
+  /**
+   * M242: the hub answers `exists` for the e-mail OR the mobile, in one sentence the member reads as «my e-mail
+   * is refused». Which one is it? Each is asked alone; only an app account counts. Both, neither, or a lookup
+   * that fails: null, and the hub's own sentence stands.
+   */
+  private async takenDetail(email: string, phone: string): Promise<'email' | 'phone' | null> {
+    const digits = phone.replace(/\D+/g, '');
+    const taken = async (body: { email: string } | { phone: string }): Promise<boolean> => {
+      const result = await this.deps.hub.call('member_status', body);
+      return result.found === true && result.contact?.has_account === 1;
+    };
+    try {
+      const [byEmail, byPhone] = await Promise.all([taken({ email }), /^\d{8,15}$/.test(digits) ? taken({ phone: digits }) : Promise.resolve(false)]);
+      return byEmail === byPhone ? null : byEmail ? 'email' : 'phone';
+    } catch {
+      return null;
     }
   }
 
@@ -794,6 +864,18 @@ export class AuthService {
       if (entry.me.id === contactId) this.meCache.delete(uuid);
     }
     this.honoraryCache.delete(contactId);
+    // M242: reads already on their way to the hub are older than this moment (see fetchMe).
+    if (this.forgottenAt.size > 10_000) this.forgottenAt.clear();
+    this.forgottenAt.set(contactId, (this.forgetStamp += 1));
+  }
+
+  /**
+   * M242: the account this session last got from the hub, when one is still kept. Never a hub call, and never a
+   * copy older than `me()` itself would answer (a day): past that age the hub must be asked, so nothing is returned.
+   */
+  peek(session: SessionRecord): Me | null {
+    const cached = this.meCache.get(session.uuid);
+    return cached && Date.now() - cached.at < ME_STALE_MAX_MS ? cached.me : null;
   }
 
   /**
@@ -836,12 +918,16 @@ export class AuthService {
   }
 
   private async fetchMe(uuid: string): Promise<Me> {
+    const startedAt = this.forgetStamp;
     // The app gives up after 15 s: a hub that is slower than 10 s is treated as down, not waited for.
     const result = await this.deps.hub.call('account', { uuid }, { timeoutMs: ME_HUB_TIMEOUT_MS });
     if (!result.contact || !result.contact.has_account) {
       this.meCache.delete(uuid);
       throw new AuthError('session_expired', 'انتهت الجلسة، سجّل الدخول من جديد', 401);
     }
+    // M242: the account was forgotten while this read was on its way (a membership activated meanwhile): the
+    // caller gets the answer, the cache does not — a copy from before the change would stand for a minute as final.
+    if ((this.forgottenAt.get(result.contact.id) ?? 0) > startedAt) return toMe(result.contact);
     return this.remember(uuid, result.contact);
   }
 
@@ -942,6 +1028,8 @@ export class AuthService {
   /** M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither. */
   async requestReset(login: string, ip: string, country?: string, channel?: 'whatsapp' | 'mail'): Promise<{ sentTo: string; provider: string; via: string }> {
     // M203: `channel` comes from a bundle that can name WhatsApp on its screen; an older one keeps both (hub 2.27.0).
+    // M242 (coordinator's decision): the «known to the club, no app account» answer stays on the sign-in route
+    // only. The reset keeps the hub's own answers — no new state for a stranger to read here, no extra hub lookup.
     const result = await this.deps.hub.call('reset_request', { login: normLogin(login, country), ip, ...(channel ? { channel } : {}) }).catch(rethrowNoAccount);
     const sentTo = typeof result.sent_to === 'string' ? result.sent_to : '';
     const provider = result.provider === 'apple' || result.provider === 'google' ? result.provider : '';

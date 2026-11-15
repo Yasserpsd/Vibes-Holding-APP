@@ -12,7 +12,7 @@ import type { DailyProjectService } from './daily.js';
 import { PbImageProxy } from './images.js';
 import { localizeFilters, localizePage, localizeProject } from './lang.js';
 import type { RatingsService } from '../ratings/service.js';
-import type { ProjectsService } from './service.js';
+import { rotationDay, type ProjectsService } from './service.js';
 import { PROJECT_SORTS, type ProjectsPage, type PublicProject } from './types.js';
 
 export type ProjectsRoutesOptions = { service: ProjectsService; auth: AuthService; access: ProjectAccessService; brief: BriefService; interests?: InterestsService; ratings?: RatingsService; publicUrl?: string; fetchImpl?: typeof fetch; daily?: DailyProjectService };
@@ -28,6 +28,8 @@ const listQuerySchema = z.object({
   sort: z.enum(PROJECT_SORTS).default('latest'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  /** M242: the rotation day of the list's first page (the `day` of an earlier answer); anything unreadable is ignored. */
+  day: z.coerce.number().int().optional().catch(undefined),
 });
 
 const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
@@ -95,7 +97,11 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
   app.get('/api/projects', async (request, reply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) return badRequest(reply, 'معاملات البحث غير صالحة');
-    const { mine, ...rest } = query.data;
+    const { mine, day: askedDay, ...rest } = query.data;
+    // M242: the daily order turns at midnight Riyadh. A later page that names yesterday's day (the list was
+    // opened before the turn) is dealt from yesterday's order, so no project comes twice; any other value is today.
+    const today = rotationDay();
+    const day = askedDay === today - 1 ? askedDay : today;
     // M107: «حسب اهتماماتي» filters by the signed-in member's saved interests; without any it changes nothing.
     let forInterests: string[] | undefined;
     if (mine === '1' && interests) {
@@ -103,7 +109,7 @@ export const projectsRoutes: FastifyPluginAsync<ProjectsRoutesOptions> = async (
       const prefs = who ? await interests.mine(who.session.contactId) : null;
       forInterests = prefs?.keys;
     }
-    return proxiedPage(localizePage(service.list({ ...rest, forInterests }), langOf(request)));
+    return proxiedPage(localizePage(service.list({ ...rest, day, forInterests }), langOf(request)));
   });
 
   app.get('/api/projects/filters', async (request) => localizeFilters(service.filters(), langOf(request)));

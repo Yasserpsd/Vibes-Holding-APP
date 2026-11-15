@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import type { AuthService } from '../auth/service.js';
+import { cleanEmail } from '../hub/phone.js';
 import type { WaResult, WhatsappService } from './service.js';
 
 /** One body for the hub's `whatsapp.send` event and the dashboard's test send. */
@@ -18,7 +19,8 @@ export const sendSchema = z
     service: z.string().trim().max(200).optional(),
     code: z.string().regex(/^\d{4,8}$/).optional(),
     invoiceNo: z.union([z.string().trim().min(1).max(40), z.number().int().positive()]).optional(),
-    email: z.string().trim().email().max(200).optional(),
+    // M242: cleaned like every other address.
+    email: z.string().max(400).transform(cleanEmail).pipe(z.string().email().max(200)).optional(),
     /** The caller's own id for this message (payment id…): a repeated call with the same one sends nothing new. */
     ref: z.string().trim().min(1).max(80).optional(),
   })
