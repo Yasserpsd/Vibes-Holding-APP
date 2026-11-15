@@ -31,6 +31,7 @@ let app: BuiltApp['app'];
 let memberToken = '';
 let memberId = 0;
 let adminToken = '';
+let adminId = 0;
 
 const bearer = (token?: string) => (token ? { authorization: `Bearer ${token}` } : {});
 const get = (url: string, token?: string) => app.inject({ method: 'GET', url, headers: bearer(token) });
@@ -52,7 +53,9 @@ before(async () => {
   const member = await signUp('m36+member@gmail.com', '0558618811', 'investor');
   memberToken = member.token;
   memberId = member.id;
-  adminToken = (await signUp('m36.admin@gmail.com', '0558618812', 'neutral')).token;
+  const admin = await signUp('m36.admin@gmail.com', '0558618812', 'neutral');
+  adminToken = admin.token;
+  adminId = admin.id;
   // The writing member is a plain member, not one of the club's admins.
   hub.members.add(memberId);
   await get('/api/me?fresh=1', memberToken);
@@ -62,16 +65,22 @@ after(async () => {
   await app.close();
 });
 
-test('the thread needs a session, and an active annual membership is the door', async () => {
+test('the thread needs a session; M241: an account without the annual membership writes too', async () => {
   assert.equal((await get('/api/contact')).statusCode, 401);
   assert.equal((await send('POST', '/api/contact', { text: 'سلام' })).statusCode, 401);
 
-  // A verified account without an active membership is turned to the membership screen.
-  const refused = await get('/api/contact', adminToken);
-  assert.equal(refused.statusCode, 403);
-  assert.equal(refused.json().error.code, 'membership_required');
-  const refusedSend = await send('POST', '/api/contact', { text: 'سلام' }, adminToken);
-  assert.equal(refusedSend.statusCode, 403);
+  // M241 (owner): the annual membership is no longer the door — every signed-in account has a thread.
+  const opened = await get('/api/contact', adminToken);
+  assert.equal(opened.statusCode, 200, opened.body);
+  assert.deepEqual(opened.json().messages, []);
+  const before = mailer.sent.length;
+  const sent = await send('POST', '/api/contact', { text: 'السلام عليكم، لدي استفسار قبل الاشتراك.' }, adminToken);
+  assert.equal(sent.statusCode, 201, sent.body);
+  assert.equal(mailer.sent.length, before + 1);
+  // The management is told who is writing: this account holds no annual membership.
+  assert.match(mailer.sent.at(-1)?.text ?? '', /العضوية السنوية: غير مفعّلة/);
+  const rows = (await get('/api/admin/contact', adminToken)).json().threads as { contactId: number; annual?: boolean }[];
+  assert.equal(rows.find((entry) => entry.contactId === adminId)?.annual, false);
 });
 
 test('the member writes: one thread, one mail per waiting burst, his screen shows the words', async () => {
@@ -86,6 +95,7 @@ test('the member writes: one thread, one mail per waiting burst, his screen show
   const mail = mailer.sent.at(-1);
   assert.match(mail?.subject ?? '', /رسالة جديدة من عضو/);
   assert.match(mail?.text ?? '', /شراكات قطاع التقنية/);
+  assert.match(mail?.text ?? '', /العضوية السنوية: فعّالة/);
   assert.match(mail?.text ?? '', new RegExp(`I-${String(memberId).padStart(10, '0')}`));
 
   // A second message while the first still waits does not mail again.

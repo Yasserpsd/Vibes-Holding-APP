@@ -615,13 +615,15 @@ export class Notifier {
   }
 
   /** M36: a member wrote to the management in «راسل الإدارة» and waits for an answer. */
-  memberMessage(member: { name: string; phone: string; email: string; cardNumber: string; personaLabel: string }, text: string): void {
+  memberMessage(member: { name: string; phone: string; email: string; cardNumber: string; personaLabel: string; annual?: boolean }, text: string): void {
     this.dispatch(`رسالة جديدة من عضو: ${member.name || '—'}`, [
       `بعث أحد الأعضاء رسالة إلى الإدارة من ${APP_NAME} وينتظر الرد.`,
       '',
       ...personLines(member),
       member.cardNumber ? `رقم العضوية: ${member.cardNumber}` : null,
       member.personaLabel ? `الفئة: ${member.personaLabel}` : null,
+      // M241: «راسل الإدارة» is open to every account, so the mail says who holds the annual membership.
+      member.annual === undefined ? null : `العضوية السنوية: ${member.annual ? 'فعّالة' : 'غير مفعّلة'}`,
       '',
       `نص الرسالة:`,
       text,

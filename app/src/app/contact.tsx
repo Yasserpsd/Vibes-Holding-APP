@@ -21,15 +21,17 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
- * M36: «راسل الإدارة» — a member with an active annual membership writes to the management at any
- * time; a guest is walked to sign-in and an unactivated account to the membership screen. The
- * thread polls while open, and the management's reply also lands as a push (PushRegistrar).
+ * M36: «راسل الإدارة» — every signed-in account writes to the management at any time (M241, owner:
+ * the annual membership is no longer the door); a guest is walked to sign-in. The thread polls
+ * while open, and the management's reply also lands as a push (PushRegistrar).
  */
 export default function ContactScreen() {
-  const { status, me } = useAuth();
+  const { status } = useAuth();
   const router = useRouter();
-  const active = status === 'signedIn' && me?.membership.status === 'active';
-  const query = useContactThread(active);
+  const signedIn = status === 'signedIn';
+  const query = useContactThread(signedIn);
+  // A server older than M241 still answers 403 to an account without the membership: the old door
+  // shows until that server is updated, instead of a raw error.
   const refusedMeanwhile = query.error instanceof ApiError && query.error.status === 403;
 
   let body;
@@ -42,8 +44,8 @@ export default function ContactScreen() {
         <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
       </View>
     );
-  } else if (!active || refusedMeanwhile) {
-    // The brief's door: without an active annual membership the member meets the membership screen.
+  } else if (refusedMeanwhile) {
+    // Only an older server refuses now (see above): its answer keeps the membership door it expects.
     body = (
       <View style={styles.gate}>
         <FadeInView>

@@ -29,6 +29,7 @@ function ThreadRow({ row, open, onOpen }: { row: ContactThreadSummary; open: boo
         <span className="pills">
           {row.unread > 0 ? <Pill tone="gold">{formatNumber(row.unread)} بانتظار الرد</Pill> : <Pill tone="ok">تم الرد</Pill>}
           {row.personaLabel ? <Pill tone="muted">{row.personaLabel}</Pill> : null}
+          {row.annual === false ? <Pill tone="muted">بدون عضوية سنوية</Pill> : null}
           <bdi dir="ltr" className="muted hint">{row.cardNumber}</bdi>
         </span>
       </button>
@@ -153,7 +154,7 @@ export function MemberMail() {
   return (
     <>
       <SectionHead title="رسائل الأعضاء" hint={state.data ? `بانتظار الرد: ${formatNumber(waiting)}` : undefined} onReload={state.reload} busy={state.loading} />
-      <p className="muted">«راسل الإدارة» في التطبيق: متاح لأصحاب العضوية السنوية الفعّالة فقط. ردّك يصل للعضو داخل التطبيق مع إشعار على جهازه.</p>
+      <p className="muted">«راسل الإدارة» في التطبيق: متاح لكل حساب مسجّل، بعضوية سنوية أو بدونها. ردّك يصل للعضو داخل التطبيق مع إشعار على جهازه.</p>
       <div className={openId ? 'split open' : 'split'}>
         <div className="split-list">
           <div className="filters">

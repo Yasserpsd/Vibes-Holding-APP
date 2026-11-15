@@ -294,6 +294,8 @@ export type ContactThreadSummary = {
   name: string;
   personaLabel: string;
   cardNumber: string;
+  /** M241: false = the writer holds no active annual membership; absent on threads older than M241. */
+  annual?: boolean;
   lastText: string;
   lastFrom: 'member' | 'admin';
   updatedAt: string;

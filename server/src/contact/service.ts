@@ -7,8 +7,9 @@ import type { PushService } from '../push/service.js';
 import type { KV } from '../store.js';
 
 /**
- * M36: «راسل الإدارة» — a member with an ACTIVE annual membership writes to the management at any
- * time; anyone else is turned to the membership screen (the server refuses too, the door of truth).
+ * M36: «راسل الإدارة» — every signed-in account writes to the management at any time. M241 (owner,
+ * 2026-11-15: «يقدر اي حد يبعت رسالة للإدارة»): the annual membership is no longer the door; the
+ * thread only records whether the writer holds one, so the dashboard and the mail can tell.
  * One thread per member, stored on this server as operational data (like card print requests; the
  * hub stays the registry of accounts, rule 2): the dashboard answers, the reply lands back in the
  * app thread with a push, and the management is mailed when a member starts waiting for an answer.
@@ -35,6 +36,8 @@ export type ContactThread = {
   email: string;
   personaLabel: string;
   cardNumber: string;
+  /** M241: an active annual membership at his latest message; absent on threads older than M241 (members only then). */
+  annual?: boolean;
   messages: ContactMessage[];
   /** The member's last look at the screen (kept for a future badge). */
   memberSeenAt: string | null;
@@ -49,6 +52,7 @@ export type ContactThreadSummary = {
   name: string;
   personaLabel: string;
   cardNumber: string;
+  annual?: boolean;
   lastText: string;
   lastFrom: 'member' | 'admin';
   updatedAt: string;
@@ -92,6 +96,7 @@ export class ContactService {
       name: thread.name,
       personaLabel: thread.personaLabel,
       cardNumber: thread.cardNumber,
+      annual: thread.annual,
       lastText: (last?.text ?? '').slice(0, 140),
       lastFrom: last?.from ?? 'member',
       updatedAt: thread.updatedAt,
@@ -101,15 +106,8 @@ export class ContactService {
     await this.deps.kv.set(CONTACT_INDEX_KEY, { threads: index.slice(0, MAX_THREADS) });
   }
 
-  private static requireMembership(me: Me): void {
-    if (me.membership.status !== 'active') {
-      throw new RequestError('membership_required', 'مراسلة الإدارة متاحة لأعضاء النادي بعضوية سنوية فعّالة', 403);
-    }
-  }
-
   /** The member's own thread; opening it records his look (his unread lives in the app's badge later). */
   async mine(me: Me, now = new Date()): Promise<ContactMessage[]> {
-    ContactService.requireMembership(me);
     return this.run(async () => {
       const thread = await this.loadThread(me.id);
       if (!thread) return [];
@@ -121,7 +119,6 @@ export class ContactService {
 
   /** The member writes; the management is mailed when his message starts waiting (not per message). */
   async send(me: Me, text: string, now = new Date()): Promise<ContactMessage> {
-    ContactService.requireMembership(me);
     const trimmed = text.trim();
     if (!trimmed) throw new RequestError('empty_message', 'اكتب رسالتك أولًا', 400);
     if (trimmed.length > MAX_TEXT) throw new RequestError('message_too_long', 'الرسالة أطول من المسموح', 400);
@@ -145,6 +142,7 @@ export class ContactService {
       thread.email = me.email || thread.email;
       thread.personaLabel = me.personaLabel || thread.personaLabel;
       thread.cardNumber = me.cardNumber || thread.cardNumber;
+      thread.annual = me.membership.status === 'active';
       const previous = thread.messages[thread.messages.length - 1];
       thread.messages.push(message);
       thread.memberSeenAt = now.toISOString();
@@ -152,7 +150,7 @@ export class ContactService {
       await this.saveThread(thread);
       // First waiting message of a burst: the thread was empty or already answered.
       if (!previous || previous.from === 'admin') {
-        this.deps.notifier.memberMessage({ name: thread.name, phone: thread.phone, email: thread.email, cardNumber: thread.cardNumber, personaLabel: thread.personaLabel }, trimmed);
+        this.deps.notifier.memberMessage({ name: thread.name, phone: thread.phone, email: thread.email, cardNumber: thread.cardNumber, personaLabel: thread.personaLabel, annual: thread.annual }, trimmed);
       }
       return message;
     });
