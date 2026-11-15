@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { FilterOption } from '@/api/types';
 import { AppButton } from '@/components/AppButton';
@@ -7,7 +8,7 @@ import { Chip } from '@/components/Chip';
 import { GoldHairline } from '@/components/lux';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatProjectCount } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -29,17 +30,19 @@ type Props = {
  * Choices apply immediately — the count on the button follows the live query.
  */
 export function ProjectFiltersSheet({ open, onClose, sectors, stages, sector, stage, onSector, onStage, total }: Props) {
+  const insets = useSafeAreaInsets();
   const active = Boolean(sector || stage);
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => undefined}>
+        {/* The bottom inset keeps «عرض النتائج» clear of the iPhone home indicator and the Android gesture bar. */}
+        <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.md }]} onPress={() => undefined}>
           <View style={styles.grabber} />
           <View style={styles.titleRow}>
             <Ionicons name="options-outline" size={18} color={colors.gold} />
             <Text style={styles.title}>{t('projects.filterTitle')}</Text>
             {active ? (
-              <Pressable onPress={() => (onSector(undefined), onStage(undefined))} accessibilityRole="button" hitSlop={8}>
+              <Pressable onPress={() => (onSector(undefined), onStage(undefined))} accessibilityRole="button" hitSlop={14}>
                 <Text style={styles.clear}>{t('projects.filterClear')}</Text>
               </Pressable>
             ) : null}
@@ -76,7 +79,7 @@ export function ProjectFiltersSheet({ open, onClose, sectors, stages, sector, st
             ) : null}
           </ScrollView>
           <AppButton
-            label={typeof total === 'number' ? `${t('projects.filterDone')} — ${t('projects.count', { count: formatNumber(total) })}` : t('projects.filterDone')}
+            label={typeof total === 'number' ? `${t('projects.filterDone')} — ${formatProjectCount(total)}` : t('projects.filterDone')}
             icon="checkmark-outline"
             onPress={onClose}
           />
@@ -92,7 +95,6 @@ const styles = themedStyles(() => ({
     maxHeight: '80%',
     gap: spacing.sm,
     padding: spacing.md,
-    paddingBottom: spacing.lg,
     borderTopStartRadius: radii.xl,
     borderTopEndRadius: radii.xl,
     borderWidth: 1,

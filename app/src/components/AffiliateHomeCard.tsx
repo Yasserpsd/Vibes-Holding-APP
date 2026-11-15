@@ -88,7 +88,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldLight },
+  statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldLightText },
   statLabel: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textSecondary },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },

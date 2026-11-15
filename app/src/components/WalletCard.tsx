@@ -32,7 +32,9 @@ export function WalletCard({ block }: { block?: NonNullable<HomeContent['wallet'
   const wallet = useProjectsWallet(me ? String(me.id) : null);
   const balance = wallet.data?.balance ?? null;
   const total = balance ? balance.credits + balance.granted : 0;
-  const member = wallet.data?.isMember === true;
+  // While the wallet loads (or fails) an active member must not be told to «activate your membership»:
+  // the account's own status stands in until the bank's answer arrives.
+  const member = wallet.data ? wallet.data.isMember === true : me?.membership.status === 'active';
   const exhausted = member && balance !== null && balance.left <= 0;
   const title = block?.title ?? t('wallet.title');
   const subtitle =
@@ -102,7 +104,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldLight },
+  statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.goldLightText },
   statLabel: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textSecondary },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   cta: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.gold },

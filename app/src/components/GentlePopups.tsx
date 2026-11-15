@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -20,6 +20,8 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
  * self-opening popup. M209: the unconfirmed-number reminder left for its own host (WhatsappVerifyHost), which opens
  * AFTER this popup and the intro film; while this popup is up it holds the screen so that one waits.
  */
+const QUIET_PREFIXES = ['/auth', '/welcome', '/profile-edit', '/phone-confirm', '/checkout', '/payment', '/form', '/watch'];
+
 export function GentlePopups() {
   const { status, me, confirmed } = useAuth();
   const pathname = usePathname();
@@ -34,7 +36,8 @@ export function GentlePopups() {
   const [answered, setAnswered] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  const quiet = pathname.startsWith('/auth') || pathname.startsWith('/profile-edit') || pathname.startsWith('/phone-confirm');
+  // Never over the sign-up flow, the form it points to, a checkout or payment, or the fullscreen player.
+  const quiet = QUIET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   const candidate = account === null || quiet ? null : data.due ? 'data' : null;
   // The intro film (and any popup already up) goes first: the claim is retried when the screen frees.
   const free = useAutoPopupFree();
@@ -62,15 +65,18 @@ export function GentlePopups() {
   if (formOpen) return <CompletionForm missing={missing} onLater={() => close(data.snooze)} />;
   const fields = missing.map((key) => t(`dataNudge.field.${key}`)).join(t('dataNudge.separator'));
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={() => close(data.snooze)}>
+    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={() => close(data.snooze)}>
       <View style={styles.backdrop}>
         <PopIn style={styles.wrap}>
           <GlassCard golden radius={radii.xxl} style={styles.card}>
-            <View style={styles.ring}>
-              <Ionicons name="person-circle-outline" size={36} color={colors.gold} />
-            </View>
-            <Text style={styles.title}>{t('dataNudge.title')}</Text>
-            <Text style={styles.text}>{t('dataNudge.text', { fields })}</Text>
+            {/* The words scroll inside the card (a large system font, a long list of fields); the two buttons always stay on screen. */}
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+              <View style={styles.ring}>
+                <Ionicons name="person-circle-outline" size={36} color={colors.gold} />
+              </View>
+              <Text style={styles.title}>{t('dataNudge.title')}</Text>
+              <Text style={styles.text}>{t('dataNudge.text', { fields })}</Text>
+            </ScrollView>
             <AppButton label={t('dataNudge.cta')} icon="create-outline" onPress={() => setFormOpen(true)} />
             <AppButton label={t('dataNudge.later')} variant="outline" onPress={() => close(data.snooze)} />
           </GlassCard>
@@ -82,8 +88,9 @@ export function GentlePopups() {
 
 const styles = themedStyles(() => ({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.overlay },
-  wrap: { width: '100%', maxWidth: 380 },
-  card: { padding: spacing.lg, gap: spacing.sm, alignItems: 'stretch' },
+  wrap: { width: '100%', maxWidth: 380, maxHeight: '86%' },
+  card: { padding: spacing.lg, gap: spacing.sm, alignItems: 'stretch', flexShrink: 1 },
+  content: { gap: spacing.sm },
   ring: { alignSelf: 'center' },
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: colors.textPrimary, textAlign: 'center' },
   text: { ...typography.body, color: colors.textMuted, textAlign: 'center' },

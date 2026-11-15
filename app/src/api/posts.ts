@@ -18,7 +18,8 @@ export type Post = {
   pinned: boolean;
   publishedAt: string | null;
   /** Bridge v2: a plain message or an event. Older servers send neither key: treat the post as a plain message. */
-  kind?: 'post' | 'event' | 'poll';
+  /** `popup` (M232) never comes in the feed; a push or a link can still open one by its id, and it reads as a plain message. */
+  kind?: 'post' | 'event' | 'poll' | 'popup';
   event?: PostEvent | null;
   /**
    * M29: the message reached this member because it is for everyone, for his category, or for him

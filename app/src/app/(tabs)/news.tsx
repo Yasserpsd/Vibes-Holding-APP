@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Image, RefreshControl, Text, View } from 'react-native';
 
 import { cardImageOf, useAgenda } from '@/api/agenda';
@@ -15,10 +15,12 @@ import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale, SkeletonCards } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
+import { StateView } from '@/components/StateView';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
+import { sized } from '@/lib/imageUrl';
 import { countNew, markSeen, useSeenMarks } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -100,10 +102,20 @@ export default function InboxScreen() {
   }, [posts.data, agenda.data, projects.data, people.data, tips.data]);
 
   const loading = posts.isLoading && agenda.isLoading;
+  // Every source failed and nothing is cached: say so instead of «nothing new yet».
+  const failed = items.length === 0 && posts.isError && agenda.isError && projects.isError && people.isError;
   const unreadPosts = countNew((posts.data?.posts ?? []).map((post) => post.publishedAt), seen.posts);
 
+  // The spinner stays until every list has answered (a controlled `refreshing={false}` snapped it shut at once).
+  const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
-    await Promise.all([posts.refetch(), agenda.refetch(), projects.refetch(), people.refetch(), tips.refetch()]);
+    setRefreshing(true);
+    try {
+      // The day's suggestion is for signed-in members only: a guest's pull must not call its endpoint.
+      await Promise.all([posts.refetch(), agenda.refetch(), projects.refetch(), people.refetch(), status === 'signedIn' ? tips.refetch() : undefined]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
@@ -111,7 +123,7 @@ export default function InboxScreen() {
       aboveTabBar
       title={t('tabs.inbox')}
       subtitle={t('inbox.subtitle')}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
     >
       {/* M75c (owner): the unread count sits right beside «رسائل الإدارة». */}
       <FadeInView>
@@ -119,6 +131,8 @@ export default function InboxScreen() {
       </FadeInView>
       {loading ? (
         <SkeletonCards count={5} />
+      ) : failed ? (
+        <StateView error={posts.error} onRetry={() => void onRefresh()} />
       ) : items.length === 0 ? (
         <Text style={styles.empty}>{t('inbox.empty')}</Text>
       ) : (
@@ -134,9 +148,9 @@ export default function InboxScreen() {
           <PressScale onPress={() => router.push(todayTip.route as Href)} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={todayTip.title}>
             <GlassCard golden style={styles.tipCard}>
               {/* M214: the day's suggestion opens on the picture of what it offers. */}
-              <Image source={todayTip.image ? { uri: todayTip.image } : clubEmblem} style={[styles.tipImage, !todayTip.image && styles.tipImageEmblem]} resizeMode={todayTip.image ? 'cover' : 'contain'} accessibilityIgnoresInvertColors />
+              <Image source={todayTip.image ? { uri: sized(todayTip.image, 340) } : clubEmblem} style={[styles.tipImage, !todayTip.image && styles.tipImageEmblem]} resizeMode={todayTip.image ? 'cover' : 'contain'} accessibilityIgnoresInvertColors />
               <View style={styles.tipHead}>
-                <Ionicons name="bulb" size={18} color={colors.goldLight} />
+                <Ionicons name="bulb" size={18} color={colors.goldLightText} />
                 <Text style={styles.tipEyebrow}>{t('inbox.tipToday')}</Text>
               </View>
               <Text style={styles.tipTitle}>{todayTip.title}</Text>
@@ -175,16 +189,23 @@ function InboxRow({ item, fresh, onPress }: { item: InboxItem; fresh: boolean; o
             </Text>
           ) : null}
         </View>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.thumb} resizeMode="cover" />
-        ) : (
-          <View style={[styles.thumb, styles.thumbEmblem]}>
-            <Image source={clubEmblem} style={styles.emblem} resizeMode="contain" />
-          </View>
-        )}
+        <InboxThumb uri={item.image} />
       </GlassCard>
     </PressScale>
   );
+}
+
+/** The row's picture; the club emblem stands in when there is none or it fails to load. */
+function InboxThumb({ uri }: { uri: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!uri || failed) {
+    return (
+      <View style={[styles.thumb, styles.thumbEmblem]}>
+        <Image source={clubEmblem} style={styles.emblem} resizeMode="contain" />
+      </View>
+    );
+  }
+  return <Image source={{ uri: sized(uri, 54) }} style={styles.thumb} resizeMode="cover" onError={() => setFailed(true)} />;
 }
 
 const styles = themedStyles(() => ({
@@ -193,7 +214,7 @@ const styles = themedStyles(() => ({
   tipImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: radii.md, backgroundColor: colors.surfaceElevated, marginBottom: spacing.xs },
   tipImageEmblem: { aspectRatio: 16 / 7 },
   tipHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  tipEyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight, textAlign: textStart },
+  tipEyebrow: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText, textAlign: textStart },
   tipTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 27, color: colors.textPrimary, textAlign: textStart },
   tipBody: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
@@ -209,7 +230,7 @@ const styles = themedStyles(() => ({
   iconBoxFresh: { backgroundColor: colors.gold, boxShadow: shadows.glowGoldFaint },
   texts: { flex: 1, gap: 2 },
   kindRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  kind: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  kind: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLightText },
   freshDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.goldNeon, boxShadow: shadows.glowGoldFaint },
   time: { ...typography.caption, fontSize: 11, color: colors.textMuted, marginStart: 'auto' },
   title: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },

@@ -1,13 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useState, type Ref, type RefObject } from 'react';
+import { Pressable, Text, View, type ScrollView } from 'react-native';
 
+import { errorMessage } from '@/api/client';
 import { AGREED, useFormDef, useMyFormSubmissions, useSubmitForm, type FormDef, type FormField as FormFieldDef } from '@/api/forms';
 import type { Me } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { ErrorSummary, FieldError, RequiredMark } from '@/components/form/FormParts';
+import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { FormFileField } from '@/components/FormFileField';
 import { GlassCard } from '@/components/lux';
@@ -28,8 +31,9 @@ import { colors, radii, spacing, typography } from '@/theme/tokens';
  * and a meetup page renders it under the meetup's video and pitch. The server defines the
  * fields and validates the answers; access gates (sign-in, membership, closed, already sent)
  * show their friendly face here.
+ * The hosting screen may pass its ScrollView ref: a failed submit then scrolls to the first red field.
  */
-export function FormEmbed({ formKey }: { formKey: string | undefined }) {
+export function FormEmbed({ formKey, scrollRef }: { formKey: string | undefined; scrollRef?: RefObject<ScrollView | null> }) {
   const router = useRouter();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useFormDef(formKey);
@@ -39,6 +43,8 @@ export function FormEmbed({ formKey }: { formKey: string | undefined }) {
   if (!data) return <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />;
 
   const { form } = data;
+  // A once-only form waits for the member's own submissions, so the form never flashes before «already sent».
+  if (form.once && signedIn && mine.isLoading) return <StateView loading />;
   const alreadySent = form.once && (mine.data?.submissions.some((entry) => entry.formKey === form.key) ?? false);
 
   if (!form.open) {
@@ -87,10 +93,12 @@ export function FormEmbed({ formKey }: { formKey: string | undefined }) {
       {/* M170 (owner, 2026-10-31): a signed-in NON-MEMBER reads the condition before he fills the form —
           the page stays open to everyone, the project simply waits for the membership. Guests see nothing extra. */}
       {form.nonMemberNotice && me && me.membership.status !== 'active' ? <MemberNotice text={form.nonMemberNotice} /> : null}
-      <Form key={form.key} form={form} me={me} signedIn={signedIn} />
+      <Form key={form.key} form={form} me={me} signedIn={signedIn} scrollRef={scrollRef} />
     </>
   );
 }
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /** What the signed-in account already answers; the member can still edit every field. */
 function prefillOf(field: FormFieldDef, me: Me | null): string {
@@ -102,15 +110,22 @@ function prefillOf(field: FormFieldDef, me: Me | null): string {
   return space < 0 ? '' : me.name.slice(space + 1);
 }
 
-function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: boolean }) {
+function Form({ form, me, signedIn, scrollRef }: { form: FormDef; me: Me | null; signedIn: boolean; scrollRef?: RefObject<ScrollView | null> }) {
   const submit = useSubmitForm(form.key);
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries(form.fields.map((field) => [field.key, prefillOf(field, me)])));
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   // M193: an attachment still on its way holds the submit button.
   const [uploading, setUploading] = useState(false);
+  // The red-error discipline of every form (M195): the red field + its message, a summary on top, a scroll to the first one.
+  const marks = useFormErrors<string>(scrollRef);
 
-  const setAnswer = (fieldKey: string, value: string) => setAnswers((current) => ({ ...current, [fieldKey]: value }));
+  const setAnswer = (fieldKey: string, value: string) => {
+    setAnswers((current) => ({ ...current, [fieldKey]: value }));
+    marks.clear(fieldKey);
+    // The line under the button described the old problem; the next submit writes a fresh one.
+    setProblem(null);
+  };
 
   const send = () => {
     if (submit.isPending) return;
@@ -118,14 +133,37 @@ function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: 
       setProblem(t('form.file.wait'));
       return;
     }
+    const found: Record<string, string> = {};
+    // The line under the button names the first problem, for a long form scrolled far from the red field.
+    let firstProblem: string | null = null;
     for (const field of form.fields) {
-      if (field.required && !(answers[field.key] ?? '').trim()) {
-        setProblem(field.type === 'agree' ? t('form.agree', { field: field.label }) : t('form.missing', { field: field.label }));
-        return;
+      const value = (answers[field.key] ?? '').trim();
+      let message: string | null = null;
+      let sentence: string | null = null;
+      if (field.required && !value) {
+        message = field.type === 'agree' ? t('form.agree', { field: field.label }) : field.type === 'select' ? t('form.error.choose') : t('form.error.required');
+        sentence = field.type === 'agree' ? message : t('form.missing', { field: field.label });
+      } else if (value && field.prefill === 'email' && !EMAIL_SHAPE.test(value)) {
+        message = t('form.error.email');
+        sentence = message;
+      }
+      if (message) {
+        found[field.key] = message;
+        firstProblem ??= sentence;
       }
     }
+    if (marks.fail(found, form.fields.map((field) => field.key))) {
+      setProblem(firstProblem);
+      return;
+    }
     setProblem(null);
-    submit.mutate(answers, { onSuccess: () => setSent(true) });
+    submit.mutate(answers, {
+      onSuccess: () => {
+        setSent(true);
+        // The confirmation sits at the top of the page; the long form had scrolled the member down.
+        scrollRef?.current?.scrollTo({ y: 0, animated: true });
+      },
+    });
   };
 
   if (sent) {
@@ -146,6 +184,7 @@ function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: 
   return (
     // M85 (owner): the whole registration form sits on one paper sheet.
     <PaperCard pinned>
+      <ErrorSummary count={marks.count} />
       {/* M142: every field but the consent box can be spoken. */}
       <VoiceFill
         fields={form.fields
@@ -165,16 +204,20 @@ function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: 
       {form.fields.map((field, index) => (
         <FadeInView key={field.key} delay={entranceDelay(index)}>
           {field.type === 'file' ? (
-            <FormFileField
-              formKey={form.key}
-              label={field.label}
-              signedIn={signedIn}
-              value={answers[field.key] ?? ''}
-              onChange={(value) => setAnswer(field.key, value)}
-              onBusy={setUploading}
-            />
+            <View ref={marks.anchor(field.key)} collapsable={false} style={styles.fileBox}>
+              <FormFileField
+                formKey={form.key}
+                label={field.label}
+                required={field.required}
+                signedIn={signedIn}
+                value={answers[field.key] ?? ''}
+                onChange={(value) => setAnswer(field.key, value)}
+                onBusy={setUploading}
+              />
+              {marks.errors[field.key] ? <FieldError text={marks.errors[field.key] ?? ''} /> : null}
+            </View>
           ) : (
-            <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} />
+            <Field field={field} value={answers[field.key] ?? ''} onChange={(value) => setAnswer(field.key, value)} error={marks.errors[field.key]} anchorRef={marks.anchor(field.key)} />
           )}
         </FadeInView>
       ))}
@@ -185,7 +228,7 @@ function Form({ form, me, signedIn }: { form: FormDef; me: Me | null; signedIn: 
       ) : null}
       {submit.error ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={submit.error.message} support />
+          <Notice tone="warning" text={errorMessage(submit.error)} support />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(form.fields.length)}>
@@ -212,53 +255,70 @@ function MemberNotice({ title, text, delay = 0 }: { title?: string; text: string
   );
 }
 
-function Field({ field, value, onChange }: { field: FormFieldDef; value: string; onChange: (value: string) => void }) {
+function Field({ field, value, onChange, error, anchorRef }: { field: FormFieldDef; value: string; onChange: (value: string) => void; error?: string; anchorRef: Ref<View> }) {
   const paper = usePaper();
   if (field.type === 'agree') {
     const on = value === AGREED;
     return (
-      <View style={[styles.agree, paper && styles.paperAgree, on && paper && styles.paperAgreeOn]}>
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: on }}
-          style={styles.agreeRow}
-          onPress={() => onChange(on ? '' : AGREED)}
-        >
-          {on ? (
-            <PopIn>
-              <Ionicons name="checkbox" size={24} color={paper ? colors.paperGold : colors.gold} />
-            </PopIn>
-          ) : (
-            <Ionicons name="square-outline" size={24} color={paper ? colors.paperMuted : colors.textMuted} />
-          )}
-          <Text style={[styles.agreeLabel, paper && styles.paperAgreeLabel]}>{field.label}</Text>
-        </Pressable>
-        {field.url ? <AppButton label={t('form.openAgreement')} variant="outline" icon="open-outline" onPress={() => void openLink(field.url ?? '')} /> : null}
+      <View ref={anchorRef} collapsable={false} style={styles.fileBox}>
+        <View style={[styles.agree, paper && styles.paperAgree, on && paper && styles.paperAgreeOn, error ? styles.agreeError : null]}>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: on }}
+            style={styles.agreeRow}
+            onPress={() => onChange(on ? '' : AGREED)}
+          >
+            {on ? (
+              <PopIn>
+                <Ionicons name="checkbox" size={24} color={paper ? colors.paperGold : colors.gold} />
+              </PopIn>
+            ) : (
+              <Ionicons name="square-outline" size={24} color={paper ? colors.paperMuted : colors.textMuted} />
+            )}
+            <Text style={[styles.agreeLabel, paper && styles.paperAgreeLabel]}>{field.label}</Text>
+          </Pressable>
+          {field.url ? <AppButton label={t('form.openAgreement')} variant="outline" icon="open-outline" onPress={() => void openLink(field.url ?? '')} /> : null}
+        </View>
+        {error ? <FieldError text={error} /> : null}
       </View>
     );
   }
   if (field.type === 'select') {
     return (
-      <View style={styles.select}>
-        <Text style={[styles.selectLabel, paper && styles.paperSelectLabel]}>{field.label}</Text>
+      <View ref={anchorRef} collapsable={false} style={styles.select}>
+        <Text style={[styles.selectLabel, paper && styles.paperSelectLabel]}>
+          {field.label}
+          {field.required ? <RequiredMark /> : null}
+        </Text>
         <View style={styles.chips}>
           {(field.options ?? []).map((option) => (
             <Chip key={option} label={option} selected={value === option} dimmed={Boolean(value)} onPress={() => onChange(value === option ? '' : option)} />
           ))}
         </View>
+        {error ? <FieldError text={error} /> : null}
       </View>
     );
   }
+  // Phone and e-mail are Latin whatever the form says: typed left-to-right inside the right-to-left form, with their own keyboard.
+  const phone = field.prefill === 'phone';
+  const email = field.prefill === 'email';
+  const latin = Boolean(field.latin) || phone || email;
   return (
     <FormField
       label={field.label}
+      required={field.required}
       value={value}
       onChangeText={onChange}
       placeholder={field.placeholder}
       multiline={field.type === 'textarea'}
-      latin={field.latin}
-      autoCapitalize={field.latin ? 'none' : undefined}
-      autoCorrect={field.latin ? false : undefined}
+      latin={latin}
+      error={error}
+      anchorRef={anchorRef}
+      keyboardType={phone ? 'phone-pad' : email ? 'email-address' : undefined}
+      textContentType={phone ? 'telephoneNumber' : email ? 'emailAddress' : undefined}
+      autoComplete={phone ? 'tel' : email ? 'email' : undefined}
+      autoCapitalize={latin ? 'none' : undefined}
+      autoCorrect={latin ? false : undefined}
       maxLength={field.type === 'textarea' ? 2000 : 300}
     />
   );
@@ -279,6 +339,8 @@ const styles = themedStyles(() => ({
   // M85: the agreement box on paper.
   paperAgree: { backgroundColor: colors.paperCard, borderColor: colors.paperBorder },
   paperAgreeOn: { borderColor: colors.paperGold },
+  agreeError: { borderColor: colors.danger },
+  fileBox: { gap: spacing.xs },
   paperAgreeLabel: { color: colors.paperInk },
   paperSelectLabel: { color: colors.paperInkSoft },
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },

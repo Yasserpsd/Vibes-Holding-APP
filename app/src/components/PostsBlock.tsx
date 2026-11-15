@@ -102,7 +102,7 @@ export function PostCard({ post }: { post: Post }) {
           ) : null}
           {event && (event.place || event.onlineUrl) ? (
             <View style={styles.eventPlace}>
-              <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={paper ? colors.paperGold : colors.goldLight} />
+              <Ionicons name={event.place ? 'location-outline' : 'videocam-outline'} size={14} color={paper ? colors.paperGold : colors.goldLightText} />
               <Text style={[styles.eventPlaceText, paper && styles.inkSoftPaper]} numberOfLines={1}>
                 {event.place ? (event.onlineUrl ? t('posts.placeAndOnline', { place: event.place }) : event.place) : t('posts.online')}
               </Text>
@@ -115,12 +115,12 @@ export function PostCard({ post }: { post: Post }) {
           ) : null}
           <View style={styles.metaRow}>
             {post.publishedAt ? <Text style={[styles.time, paper && styles.timePaper]}>{formatRelativeTime(post.publishedAt)}</Text> : null}
-            {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={paper ? colors.paperGold : colors.goldLight} /> : null}
+            {post.youtubeId || post.video?.url ? <Ionicons name="play-circle-outline" size={16} color={paper ? colors.paperGold : colors.goldLightText} /> : null}
           </View>
         </View>
   );
   return (
-    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={paper ? radii.xl : radii.lg}>
+    <PressScale onPress={() => router.push(`/posts/${post.id}` as Href)} glow glowRadius={paper ? radii.xl : radii.lg} accessibilityRole="button" accessibilityLabel={post.title}>
       {paper ? (
         // The golden pin head and the hair of tilt come from PaperCard itself.
         <PaperCard pinned style={styles.paperCard}>
@@ -168,7 +168,7 @@ const styles = themedStyles(() => ({
   audience: { flexDirection: 'row' },
   audienceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.goldLight },
   audienceBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: colors.goldInk },
-  eventWhen: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, flexShrink: 1 },
+  eventWhen: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLightText, flexShrink: 1 },
   eventPlace: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   eventPlaceText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

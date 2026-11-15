@@ -45,6 +45,8 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
   const [error, setError] = useState<string | null>(null);
   const [gated, setGated] = useState(false);
   const autoStarted = useRef(false);
+  // A second tap in the same frame passes the `unlocking` state (it updates after the render): the ref closes that gap.
+  const inFlight = useRef(false);
   const accessState = query.data?.state;
   useEffect(() => {
     if (!autoStart || autoStarted.current || accessState !== 'can_unlock') return;
@@ -79,7 +81,8 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
   }
 
   const unlock = async () => {
-    if (unlocking) return;
+    if (unlocking || inFlight.current) return;
+    inFlight.current = true;
     setUnlocking(true);
     setError(null);
     try {
@@ -98,9 +101,11 @@ export function ProjectUnlock({ projectId, projectTitle, hasPitchDeck, autoStart
       setConfirming(false);
       setError(errorMessage(cause));
       setGated(isProfileGate(cause));
-      // The balance ran out, the membership lapsed or the project became golden meanwhile: read the state again.
-      if (cause instanceof ApiError && !isProfileGate(cause) && [402, 403, 409].includes(cause.status)) void query.refetch();
+      // The balance ran out, the membership lapsed, the project became golden meanwhile, or the answer got lost on the
+      // way after the server already took the project: read the state again so the page shows what the server holds.
+      if (!isProfileGate(cause)) void query.refetch();
     } finally {
+      inFlight.current = false;
       setUnlocking(false);
     }
   };
@@ -159,7 +164,7 @@ function Frame({ icon, text, quiet = false, children }: { icon: IoniconName; tex
   return (
     <GlassCard golden={!quiet} radius={radii.lg} style={styles.box}>
       <View style={styles.row}>
-        <Ionicons name={icon} size={20} color={quiet ? colors.textMuted : colors.goldLight} />
+        <Ionicons name={icon} size={20} color={quiet ? colors.textMuted : colors.goldLightText} />
         <Text style={[styles.text, quiet && styles.textQuiet]}>{text}</Text>
       </View>
       {children}
@@ -182,7 +187,7 @@ function UnlockedBox({ contact, balance, projectTitle }: { contact: ProjectConta
           </PopIn>
           <Text style={styles.title}>{t('unlock.contactTitle')}</Text>
         </View>
-        {contact ? <ContactList contact={contact} projectTitle={projectTitle} /> : null}
+        {contact ? <ContactList contact={contact} projectTitle={projectTitle} /> : <Text style={styles.hint}>{t('unlock.empty')}</Text>}
         {balance ? (
           <FadeInView delay={entranceDelay(5)} offset={10}>
             <BalanceRow balance={balance} />

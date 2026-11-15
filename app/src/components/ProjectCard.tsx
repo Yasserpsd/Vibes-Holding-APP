@@ -7,6 +7,8 @@ import { GlassCard } from '@/components/lux';
 import { PressScale, Sheen } from '@/components/motion';
 import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
+import { textDir } from '@/i18n/direction';
+import { rangeDashes } from '@/components/Highlight';
 import { formatNumber } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -76,31 +78,35 @@ export function ProjectCard({ project, onPress, onContact, onAskAdvisor }: Props
             </View>
           ) : null}
           <View style={styles.viewsPill}>
-            <Ionicons name="eye-outline" size={13} color={colors.goldLight} />
+            <Ionicons name="eye-outline" size={13} color={colors.goldLightText} />
             <Text style={styles.viewsText}>{formatNumber(project.viewsCount)}</Text>
           </View>
         </View>
         <View style={styles.body}>
-          <Text style={styles.title} numberOfLines={2}>
+          {/* M177: a title or blurb opening with a Latin brand or a number follows its own letters, not the first character. */}
+          <Text style={[styles.title, textDir(project.title)]} numberOfLines={2}>
             {project.title}
           </Text>
           {/* M116: the stars on EVERY project — empty outlines until the first rating (owner). */}
           {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}
           {project.companyName ? (
-            <Text style={styles.company} numberOfLines={1}>
+            <Text style={[styles.company, textDir(project.companyName)]} numberOfLines={1}>
               {project.companyName}
             </Text>
           ) : null}
           {project.excerpt ? (
-            <Text style={styles.excerpt} numberOfLines={2}>
-              {project.excerpt}
+            <Text style={[styles.excerpt, textDir(project.excerpt)]} numberOfLines={2}>
+              {rangeDashes(project.excerpt)}
             </Text>
           ) : null}
           {project.sector ? (
             <View style={styles.metaRow}>
-              <Text style={styles.tag} numberOfLines={1}>
-                {project.sector.name}
-              </Text>
+              {/* The padding sits on a View: Android measures a padded Text too narrow and clips the last letter. */}
+              <View style={styles.tag}>
+                <Text style={styles.tagText} numberOfLines={1}>
+                  {project.sector.name}
+                </Text>
+              </View>
             </View>
           ) : null}
           {showContact || onAskAdvisor ? (
@@ -205,7 +211,7 @@ const styles = themedStyles(() => ({
     ...typography.caption,
     fontSize: 11,
     lineHeight: 16,
-    color: colors.goldLight,
+    color: colors.goldLightText,
   },
   viewsPill: {
     position: 'absolute',
@@ -230,7 +236,7 @@ const styles = themedStyles(() => ({
   company: {
     ...typography.caption,
     fontFamily: fonts.medium,
-    color: colors.goldLight,
+    color: colors.goldLightText,
   },
   excerpt: {
     ...typography.caption,
@@ -244,21 +250,24 @@ const styles = themedStyles(() => ({
     marginTop: spacing.xs,
   },
   tag: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.goldLight,
     paddingVertical: 2,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     backgroundColor: colors.goldSoft,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  tagText: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.goldLightText,
   },
   viewsText: {
     ...typography.caption,
     fontSize: 11,
     lineHeight: 16,
-    color: colors.goldLight,
+    color: colors.goldLightText,
   },
   actions: {
     flexDirection: 'row',
@@ -274,6 +283,7 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+    minHeight: 44,
     paddingVertical: spacing.sm - 1,
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
@@ -285,13 +295,14 @@ const styles = themedStyles(() => ({
     fontFamily: fonts.semiBold,
     fontSize: 13,
     lineHeight: 20,
-    color: colors.goldLight,
+    color: colors.goldLightText,
   },
   contactCta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+    minHeight: 44,
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: colors.gold,

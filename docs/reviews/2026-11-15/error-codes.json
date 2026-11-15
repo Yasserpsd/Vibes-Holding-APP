@@ -1,0 +1,222 @@
+{
+  "errors.code.totp_bad_code": {
+    "ar": "الرمز غير صحيح. تأكد من وقت جهازك وحاول مرة أخرى.",
+    "en": "The code is not correct. Check your phone's time and try again."
+  },
+  "errors.code.totp_locked": {
+    "ar": "محاولات خاطئة كثيرة. ابدأ تسجيل الدخول من جديد.",
+    "en": "Too many wrong attempts. Start signing in again."
+  },
+  "errors.code.totp_expired": {
+    "ar": "انتهت المهلة. ابدأ من جديد.",
+    "en": "Time ran out. Please start again."
+  },
+  "errors.code.totp_code_needed": {
+    "ar": "أدخل رمز تطبيق المصادقة الحالي أولًا.",
+    "en": "Enter the current code from your authenticator app first."
+  },
+  "errors.code.totp_required": {
+    "ar": "ادخل اللوحة من جديد برمز تطبيق المصادقة.",
+    "en": "Sign in to the dashboard again with your authenticator app code."
+  },
+  "errors.code.totp_off": {
+    "ar": "الحماية الإضافية بتطبيق المصادقة غير مفعّلة.",
+    "en": "Extra protection with an authenticator app is not enabled."
+  },
+  "errors.code.totp_mandatory": {
+    "ar": "حسابات إدارة النادي لا يمكنها إيقاف تطبيق المصادقة.",
+    "en": "Club management accounts cannot turn off the authenticator app."
+  },
+  "errors.code.already_registered": {
+    "ar": "سبق أن سجّلنا طلبك، ولا حاجة إلى إعادة التسجيل.",
+    "en": "We already have your registration, so there is no need to register again."
+  },
+  "errors.code.closed": {
+    "ar": "التسجيل مغلق حاليًا.",
+    "en": "Registration is currently closed."
+  },
+  "errors.code.full": {
+    "ar": "هذا الوقت غير متاح. اختر وقتًا آخر.",
+    "en": "This time is not available. Choose another time."
+  },
+  "errors.code.not_cancellable": {
+    "ar": "لا يمكن إلغاء هذا الحجز.",
+    "en": "This booking cannot be cancelled."
+  },
+  "errors.code.wallet_exhausted": {
+    "ar": "رصيد ساعاتك السنوي لا يكفي لهذا الحجز.",
+    "en": "Your annual hours balance is not enough for this booking."
+  },
+  "errors.code.already_voted": {
+    "ar": "سبق أن سجّلت صوتك في هذا الاستفتاء ولا يمكن تغييره.",
+    "en": "You have already voted in this poll, and the vote cannot be changed."
+  },
+  "errors.code.poll_closed": {
+    "ar": "انتهى هذا الاستفتاء ولم يعد التصويت متاحًا.",
+    "en": "This poll has ended and voting is no longer available."
+  },
+  "errors.code.membership_required": {
+    "ar": "هذه الخدمة متاحة بعد تفعيل العضوية السنوية.",
+    "en": "This service is available once your annual membership is active."
+  },
+  "errors.code.not_member": {
+    "ar": "هذه الميزة حصرية لأعضاء نادي المستثمرين. انضم الآن للاستفادة من جميع مزايا العضوية.",
+    "en": "This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits."
+  },
+  "errors.code.phone_proof_required": {
+    "ar": "أكّد رقمك عبر واتساب لإكمال التسجيل.",
+    "en": "Confirm your number on WhatsApp to complete your registration."
+  },
+  "errors.code.phone_proof_busy": {
+    "ar": "تعذّر إرسال الرمز الآن. حاول لاحقًا أو تواصل مع الدعم.",
+    "en": "We could not send the code right now. Try again later or contact support."
+  },
+  "errors.code.phone_no_whatsapp": {
+    "ar": "هذا الرقم غير مفعّل على واتساب. اكتب رقمًا مفعّلًا لإكمال التسجيل.",
+    "en": "This number is not active on WhatsApp. Enter a number that is, to complete your registration."
+  },
+  "errors.code.phone_code_off": {
+    "ar": "رمز واتساب غير مفعّل حاليًا.",
+    "en": "The WhatsApp code is not enabled at the moment."
+  },
+  "errors.code.phone_first_reopen": {
+    "ar": "أغلق التطبيق وافتحه من جديد لإكمال التسجيل.",
+    "en": "Close the app and open it again to complete your registration."
+  },
+  "errors.code.invite_code": {
+    "ar": "كود الدعوة غير صحيح. راجعه مع من دعاك، أو امسحه وأكمل التسجيل.",
+    "en": "The invite code is not correct. Check it with the person who invited you, or clear it and continue registering."
+  },
+  "errors.code.invite_unavailable": {
+    "ar": "تعذّر استخدام كود الدعوة حاليًا. امسحه وأكمل.",
+    "en": "The invite code cannot be used at the moment. Clear it and continue."
+  },
+  "errors.code.short_code": {
+    "ar": "الرمز من 3 إلى 5 حروف لاتينية، ويمكن أن ينتهي برقم واحد من 2 إلى 9.",
+    "en": "The code is 3 to 5 Latin letters and may end with one digit from 2 to 9."
+  },
+  "errors.code.short_code_taken": {
+    "ar": "هذا الرمز مستخدم لممثل آخر، أو يشبهه في الكتابة.",
+    "en": "This code is used by another affiliate, or looks too similar to one."
+  },
+  "errors.code.affiliate_exists": {
+    "ar": "لديك طلب سابق في برنامج الممثلين: أنت ممثل معتمد بالفعل، أو طلبك قيد مراجعة الإدارة.",
+    "en": "You already have an application in the Affiliates Program: you are an approved affiliate, or your application is under review by the management."
+  },
+  "errors.code.agreement_pending": {
+    "ar": "لم يوافق مقدّم الطلب على الاتفاقية بعد.",
+    "en": "The applicant has not accepted the agreement yet."
+  },
+  "errors.code.not_affiliate": {
+    "ar": "هذه الخدمة لممثلي نادي المستثمرين المعتمدين.",
+    "en": "This service is for approved Investors Club affiliates."
+  },
+  "errors.code.no_application": {
+    "ar": "قدّم طلب الانضمام أولًا.",
+    "en": "Submit your application to join first."
+  },
+  "errors.code.no_balance": {
+    "ar": "لا يوجد رصيد متاح للسحب حاليًا.",
+    "en": "There is no balance available to withdraw at the moment."
+  },
+  "errors.code.payout_min": {
+    "ar": "يتاح سحب الأرباح بعد اكتمال الحد الأدنى من الأعضاء المسدّدين لرسوم العضوية عبر رمزك.",
+    "en": "Payouts open once the minimum number of referred members have paid the membership fee."
+  },
+  "errors.code.payout_open": {
+    "ar": "لديك طلب سحب قيد المراجعة بالفعل.",
+    "en": "You already have a withdrawal request under review."
+  },
+  "errors.code.store_unavailable": {
+    "ar": "تعذّر التحقق من الاشتراك الآن. حاول بعد قليل.",
+    "en": "We could not verify the subscription right now. Try again shortly."
+  },
+  "errors.code.social_token": {
+    "ar": "تعذّر التحقق من الحساب. حاول من جديد.",
+    "en": "We could not verify the account. Please try again."
+  },
+  "errors.code.social_off": {
+    "ar": "هذه الطريقة غير مفعّلة حاليًا. سجّل بالبريد الإلكتروني وكلمة المرور.",
+    "en": "This sign-in method is not enabled at the moment. Use your email and password."
+  },
+  "errors.code.social_keys": {
+    "ar": "تعذّر الاتصال بمزوّد الدخول. حاول بعد قليل.",
+    "en": "We could not reach the sign-in provider. Try again shortly."
+  },
+  "errors.code.invalid_email": {
+    "ar": "عنوان البريد الإلكتروني غير صالح.",
+    "en": "The email address is not valid."
+  },
+  "errors.code.invalid_field": {
+    "ar": "أحد الحقول غير مكتمل أو غير صحيح. راجع النموذج ثم أعد الإرسال.",
+    "en": "One of the fields is incomplete or not valid. Review the form and send it again."
+  },
+  "errors.code.invalid_media": {
+    "ar": "تعذّر قبول الملف. تأكد من صلاحيته وحجمه ثم ارفعه من جديد.",
+    "en": "The file could not be accepted. Check that it is valid and within the size limit, then upload it again."
+  },
+  "errors.code.media_processing": {
+    "ar": "الفيديو قيد المعالجة لدى خادم الفيديو. أعد الحفظ بعد دقيقة.",
+    "en": "The video is still being processed by the video server. Save again in a minute."
+  },
+  "errors.code.unsupported_type": {
+    "ar": "نوع الملف غير مدعوم.",
+    "en": "This file type is not supported."
+  },
+  "errors.code.message_too_long": {
+    "ar": "النص أطول من المسموح.",
+    "en": "The text is longer than allowed."
+  },
+  "errors.code.empty_message": {
+    "ar": "اكتب نص الرسالة أولًا.",
+    "en": "Write your message first."
+  },
+  "errors.code.already_requested": {
+    "ar": "طلبك السابق ما زال قيد التنفيذ لدى الإدارة.",
+    "en": "Your previous request is still being processed by the management."
+  },
+  "errors.code.no_credit": {
+    "ar": "انتهى رصيدك في بنك المشاريع لهذا العام.",
+    "en": "Your Projects Bank balance for this year has been used up."
+  },
+  "errors.code.exhausted": {
+    "ar": "استُنفدت مرات استخدام هذا الكود.",
+    "en": "This code has reached its usage limit."
+  },
+  "errors.code.expired": {
+    "ar": "انتهت صلاحية هذا الكود.",
+    "en": "This code has expired."
+  },
+  "errors.code.not_started": {
+    "ar": "هذا الكود لم يبدأ بعد.",
+    "en": "This code is not active yet."
+  },
+  "errors.code.not_payable": {
+    "ar": "هذه الخدمة لا تُدفع من داخل التطبيق.",
+    "en": "In-app payment is not available for this service."
+  },
+  "errors.code.not_confirmed": {
+    "ar": "لم يُؤكَّد هذا الطلب بعد.",
+    "en": "This has not been confirmed yet."
+  },
+  "errors.code.persona_unsupported": {
+    "ar": "تغيير الفئة غير متاح حاليًا. حاول لاحقًا.",
+    "en": "Changing your category is not available at the moment. Try again later."
+  },
+  "errors.code.update_required": {
+    "ar": "هذا الإصدار من التطبيق قديم ولم يعد يعمل. يرجى تحديث تطبيق Investors Club من المتجر.",
+    "en": "This version of the app is out of date and no longer works. Please update Investors Club from the store."
+  },
+  "errors.code.pb_unreachable": {
+    "ar": "تعذّر الاتصال ببنك المشاريع الآن. حاول بعد قليل.",
+    "en": "The Projects Bank cannot be reached right now. Try again shortly."
+  },
+  "errors.code.pb_error": {
+    "ar": "استجابة غير متوقعة من بنك المشاريع.",
+    "en": "The Projects Bank returned an unexpected answer."
+  },
+  "errors.code.hub_not_supported": {
+    "ar": "هذه الخدمة غير متاحة حاليًا.",
+    "en": "This service is not available at the moment."
+  }
+}

@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { errorMessage } from '@/api/client';
+import { ApiError, errorMessage } from '@/api/client';
 import { reportServiceRequest, useService, type Service, type ServiceAction, type ServiceField } from '@/api/content';
 import { amountLabel, paymentsApi, useMonthlyDeal } from '@/api/payments';
 import { useAuth } from '@/auth/AuthProvider';
@@ -12,6 +12,7 @@ import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { RequiredMark } from '@/components/form/FormParts';
 import { FormField } from '@/components/FormField';
 import { LockedNotice } from '@/components/LockedNotice';
 import { SarText } from '@/components/SarText';
@@ -46,6 +47,8 @@ export default function ServiceScreen() {
   // A retry from the payment screen brings the previous answers back through the `answers` param.
   const [answers, setAnswers] = useState<Record<string, string>>(() => parseAnswers(answersParam));
   const [handedOver, setHandedOver] = useState(false);
+  // A second tap while WhatsApp is still opening must not report the same request to the management twice.
+  const handingOver = useRef(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [payGated, setPayGated] = useState(false);
@@ -58,6 +61,15 @@ export default function ServiceScreen() {
   useAdvisorScreen(advisorContext);
 
   if (!data) {
+    // A service key that no longer exists (an old link or notification): say so and lead to the list, a retry would only fail again.
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <Screen>
+          <StateView empty emptyText={t('errors.code.not_found')} />
+          <AppButton label={t('nav.services')} variant="outline" icon="grid-outline" onPress={() => router.replace('/services')} />
+        </Screen>
+      );
+    }
     return (
       <Screen>
         <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />
@@ -74,15 +86,33 @@ export default function ServiceScreen() {
   const showUpsell = Boolean(data.upsell && !data.isMember && !service.locked && memberPerk);
 
   const handOver = async (action: Extract<ServiceAction, { type: 'whatsapp' }>) => {
-    // The management hears about the request right away, even if WhatsApp is closed without sending.
-    reportServiceRequest(service.key, answers);
-    const lines = action.fields.map((field) => ({ label: field.label, value: answers[field.key] ?? '' }));
-    const text = composeRequest(action.message, lines, me ? { name: me.name, phone: me.phone } : null);
-    setHandedOver(await openWhatsApp(action.phone, text));
+    if (handingOver.current) return;
+    // M241: the request's details are required here as they are before a payment — the first empty one is named.
+    const missing = action.fields.find((field) => !(answers[field.key] ?? '').trim());
+    if (missing) {
+      setPayGated(false);
+      setPayError(t('form.missing', { field: missing.label }));
+      return;
+    }
+    setPayError(null);
+    handingOver.current = true;
+    try {
+      // The management hears about the request right away, even if WhatsApp is closed without sending.
+      reportServiceRequest(service.key, answers);
+      const lines = action.fields.map((field) => ({ label: field.label, value: answers[field.key] ?? '' }));
+      const text = composeRequest(action.message, lines, me ? { name: me.name, phone: me.phone } : null);
+      setHandedOver(await openWhatsApp(action.phone, text));
+    } catch {
+      // WhatsApp could not be opened: the button stays, the member may try again.
+      setHandedOver(false);
+    } finally {
+      handingOver.current = false;
+    }
   };
 
   // The server creates the gateway intention; the checkout opens in the in-app browser; the status is polled from the server.
   const pay = async () => {
+    if (paying) return;
     const action = service.action;
     if (action?.type === 'paymob') {
       const missing = action.fields.find((field) => !(answers[field.key] ?? '').trim());
@@ -330,7 +360,10 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
   if (field.options?.length) {
     return (
       <View style={styles.field}>
-        <Text style={[styles.fieldLabel, paper && styles.paperFieldLabel]}>{field.label}</Text>
+        <Text style={[styles.fieldLabel, paper && styles.paperFieldLabel]}>
+          {field.label}
+          <RequiredMark />
+        </Text>
         <View style={styles.chips}>
           {field.options.map((option) => (
             <Chip key={option} label={option} selected={value === option} dimmed={Boolean(value)} onPress={() => onChange(value === option ? '' : option)} />
@@ -339,7 +372,8 @@ function FieldInput({ field, value, onChange }: { field: ServiceField; value: st
       </View>
     );
   }
-  return <FormField label={field.label} value={value} onChangeText={onChange} placeholder={field.placeholder} />;
+  // M241: every detail of a service request is required (checked before the payment and before WhatsApp).
+  return <FormField label={field.label} required value={value} onChangeText={onChange} placeholder={field.placeholder} />;
 }
 
 const styles = themedStyles(() => ({
@@ -376,7 +410,7 @@ const styles = themedStyles(() => ({
   price: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textPrimary },
   // M182e: the pre-support list price, struck.
   wasPrice: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textMuted, textDecorationLine: 'line-through' },
-  member: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLight },
+  member: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.goldLightText },
   summary: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   paragraph: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   panel: {
@@ -390,7 +424,7 @@ const styles = themedStyles(() => ({
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, flexWrap: 'wrap' },
   priceLabel: { ...typography.caption, color: colors.textSecondary },
   priceValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.gold },
-  priceNote: { ...typography.caption, color: colors.goldLight },
+  priceNote: { ...typography.caption, color: colors.goldLightText },
   payHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   // M85: the same texts, in ink on the paper sheet.
   paperTitle: { ...typography.subtitle, color: colors.paperGold, textAlign: textStart },

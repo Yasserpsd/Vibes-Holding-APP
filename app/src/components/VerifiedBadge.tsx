@@ -3,6 +3,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import type { Me } from '@/api/auth';
 import { t } from '@/i18n';
+import { lazyTokens } from '@/theme/styles';
 import { brand, colors } from '@/theme/tokens';
 
 /**
@@ -21,10 +22,11 @@ export function badgeTierOf(me: Pick<Me, 'phoneVerified' | 'membership'> | null 
   return me.membership?.status === 'active' ? 'member' : 'verified';
 }
 
-const LOOK: Record<BadgeTier, { seal: string; glow: string | null; opacity: number }> = {
-  verified: { seal: '#9AA3AF', glow: null, opacity: 0.75 },
+// Read lazily: the grey seal follows the theme (the knock-out disc under it is the page colour in both themes).
+const LOOK: Record<BadgeTier, { seal: string; glow: string | null; opacity: number }> = lazyTokens(() => ({
+  verified: { seal: colors.textMuted, glow: null, opacity: 0.75 },
   member: { seal: brand.gold, glow: '0 0 10px rgba(231, 173, 63, 0.7)', opacity: 1 },
-};
+}));
 
 export function VerifiedBadge({ tier, size = 24, style }: { tier: BadgeTier; size?: number; style?: StyleProp<ViewStyle> }) {
   const look = LOOK[tier];
@@ -47,7 +49,7 @@ export function VerifiedBadge({ tier, size = 24, style }: { tier: BadgeTier; siz
         style,
       ]}
     >
-      <View style={{ position: 'absolute', width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25, backgroundColor: '#FFFFFF' }} />
+      <View style={{ position: 'absolute', width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25, backgroundColor: colors.white }} />
       <MaterialCommunityIcons name="check-decagram" size={size * 0.86} color={look.seal} />
     </View>
   );

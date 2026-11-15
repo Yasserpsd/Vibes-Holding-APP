@@ -46,6 +46,14 @@
         "bundleIdentifier": "com.vcmem.investorsclub",
         "appleTeamId": "2A6QQ55CX3"
       }
+    },
+    "internal": {
+      "android": { "applicationId": "com.vcmem.investorsclub", "track": "internal" },
+      "ios": {
+        "ascAppId": "6825963092",
+        "bundleIdentifier": "com.vcmem.investorsclub",
+        "appleTeamId": "2A6QQ55CX3"
+      }
     }
   }
 }

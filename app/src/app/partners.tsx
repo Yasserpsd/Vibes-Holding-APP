@@ -15,6 +15,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { themedStyles } from '@/theme/styles';
@@ -111,7 +112,7 @@ function PartnerCard({ partner }: { partner: Partner }) {
       <View style={styles.partnerHead}>
         <View style={styles.logoBox}>
           {partner.logoUrl ? (
-            <Image source={{ uri: partner.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={partner.name} />
+            <Image source={{ uri: sized(partner.logoUrl, 56) }} style={styles.logo} resizeMode="contain" accessibilityLabel={partner.name} />
           ) : (
             <Ionicons name="business-outline" size={28} color={colors.gold} />
           )}
@@ -131,9 +132,9 @@ function PartnerCard({ partner }: { partner: Partner }) {
       {/* Owner (2026-10-25): «الشراء من الشريك» leaves — whoever wants to order goes straight to WhatsApp. */}
       {partner.whatsapp ? (
         <AppButton label={t('partners.contact')} icon="logo-whatsapp" onPress={() => void openWhatsApp(partner.whatsapp, t('partners.contactMessage', { name: partner.name }))} />
-      ) : (
+      ) : partner.url ? (
         <AppButton label={t('partners.visit')} icon="cart-outline" onPress={() => void openLink(partner.url)} />
-      )}
+      ) : null}
     </GlassCard>
   );
 }
@@ -159,7 +160,7 @@ const styles = themedStyles(() => ({
     fontFamily: fonts.bold,
     fontSize: 36,
     lineHeight: 48,
-    color: colors.goldLight,
+    color: colors.goldLightText,
     writingDirection: 'ltr',
     letterSpacing: 8,
     textAlign: 'center',

@@ -6,7 +6,7 @@ import { GlassCard, GoldHairline } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { PopIn, PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
@@ -14,6 +14,7 @@ import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = { service: Service; onPress: () => void };
+
 
 /**
  * M220 (owner, 2026-11-09: «شكله حد علق … محتاج تغيير كامل»): the services tile is now dark glass
@@ -24,6 +25,9 @@ type Props = { service: Service; onPress: () => void };
  */
 export function ServiceTile({ service, onPress }: Props) {
   const { locked } = service;
+  // «Save 1,000 SAR with your membership» is far longer than the Arabic sentence and would end in «…» on a
+  // half-width tile, so English reserves two lines for it (read at render time, never at module scope).
+  const savingsLines = getLang() === 'en' ? 2 : 1;
   return (
     // M120 (owner): tapping a members-only service answers with the subscribe popup, not the page.
     <PressScale onPress={locked ? showMembershipGate : onPress} wrapStyle={styles.wrap} accessibilityRole="button" accessibilityLabel={service.title}>
@@ -62,7 +66,7 @@ export function ServiceTile({ service, onPress }: Props) {
           {service.memberLabel ?? service.priceLabel ?? ''}
         </SarText>
         {/* M109b: the membership saving, loud on every priced tile (reserved so rows stay even). */}
-        <SarText style={[styles.savings, locked && styles.lockedText]} numberOfLines={1}>
+        <SarText style={[styles.savings, locked && styles.lockedText, { minHeight: 16 * savingsLines }]} numberOfLines={savingsLines}>
           {service.savingsSar ? t('service.save', { amount: formatNumber(service.savingsSar) }) : ''}
         </SarText>
       </GlassCard>

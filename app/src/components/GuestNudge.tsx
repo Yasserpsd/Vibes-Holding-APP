@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
+import { claimAutoPopup, useAutoPopupFree, usePopupHold } from '@/lib/popupGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -26,19 +27,25 @@ export function GuestNudge() {
   const { locked, ready } = useGuestGate();
   const [visible, setVisible] = useState(false);
   const shown = useRef(false);
+  // M128 (owner): one self-opening popup per launch. The nudge waits while another popup is up (or the forced-update
+  // cover), takes the launch's slot, and holds the screen while open so nothing (the workshop ad) opens on top of it.
+  const free = useAutoPopupFree();
+  usePopupHold(visible);
 
   const first = segments[0];
   const atGate = first === 'welcome' || first === 'auth';
   const browsing = status === 'guest' && ready && !locked && !atGate;
 
   useEffect(() => {
-    if (!browsing || shown.current) return;
+    if (!browsing || !free || shown.current) return;
     const timer = setTimeout(() => {
+      // The slot is taken (another automatic popup already opened this launch) or a popup is up right now: no nudge.
+      if (!claimAutoPopup()) return;
       shown.current = true;
       setVisible(true);
     }, NUDGE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [browsing]);
+  }, [browsing, free]);
 
   const dismiss = () => setVisible(false);
   const go = (path: '/auth/register' | '/auth/login') => {
@@ -48,7 +55,7 @@ export function GuestNudge() {
 
   if (!visible) return null;
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={dismiss}>
+    <Modal transparent animationType="fade" statusBarTranslucent visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
           <GlassCard golden radius={radii.xxl} style={styles.card}>

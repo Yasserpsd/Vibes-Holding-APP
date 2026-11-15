@@ -8,7 +8,7 @@ const IS_PRODUCTION = APP_ENV === 'production';
 
 const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
 // The version of the binary this tree builds. Bump it with every store build (ASC never attaches a lower one).
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.3.4';
 // OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
 // M239: the server's forced-update floor relies on two facts, so they are enforced here — a store build never
 // takes the override (its runtime is always its own version), and a bundle is never published to a runtime NEWER
@@ -29,6 +29,15 @@ const BRAND_GOLD = '#C9A227';
 const GOOGLE_SERVICES = process.env.GOOGLE_SERVICES_JSON;
 // Public value: the test API. Production gets its URL from EXPO_PUBLIC_API_URL only.
 const TEST_API_URL = 'https://api-test.vibesholdingsa.com';
+// M241: a bundle whose environment and API disagree is never built or published (a test bundle reached the
+// production channel twice through a wrong EAS environment). Only the two blatant mismatches stop the export.
+const CONFIGURED_API = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
+if (IS_PRODUCTION && CONFIGURED_API === TEST_API_URL) {
+  throw new Error('APP_ENV=production with the TEST API URL: check the EAS environment (--environment production).');
+}
+if (!IS_PRODUCTION && /^https:\/\/api\.vibesholdingsa\.com\/?$/.test(CONFIGURED_API)) {
+  throw new Error('The production API URL without APP_ENV=production: check the EAS environment (--environment production).');
+}
 // M239 (owner, 2026-11-14): iOS permission prompts follow the phone's language. The plugin values below are the
 // default-locale (English) Info.plist text; locales/ar.json + en.json carry the per-language InfoPlist.strings.
 const MIC_EN = 'The app uses the microphone to record your voice question for the advisor.';
@@ -47,6 +56,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 1.3.2 (owner, 2026-11-10): new store build for the relationship screenshots + ad-platform readiness; new runtime.
   // 1.3.3 (owner, 2026-11-14: «بيلد جديد بكل التعديلات»): M239 — English/Arabic iOS permission texts (native), the binary's own
   // version sent to the forced-update floor, three-line texts, language fixes; new runtime (OTAs now go to five).
+  // 1.3.4 (owner, 2026-11-15: «لازم نعمل بيلد جديد فورا»): M241 — the full review pass; native: R8 (M240), no Android
+  // auto-backup of the session file, three unused Android permissions removed; new runtime (OTAs now go to six).
   version: APP_VERSION,
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',
@@ -93,6 +104,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/images/adaptive-icon.png',
     },
     predictiveBackGestureEnabled: false,
+    // M241 (review): the session token has a plain mirror file in the app's documents folder (M125), and Android's
+    // auto-backup copied it to Google and to a new phone, which then opened signed in. Native: 1.3.4 and later.
+    allowBackup: false,
+    // M241 (review): in the release manifest from the template, used by no module of this app.
+    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'],
     ...(GOOGLE_SERVICES ? { googleServicesFile: GOOGLE_SERVICES } : {}),
   },
   // Mobile only: keeps expo export and eas update from bundling a web build.

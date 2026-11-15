@@ -230,7 +230,7 @@ export function useAboutContent() {
 }
 
 /** The lock state depends on the account, so the cache key follows the session. */
-function useAccountKey(): string {
+export function useAccountKey(): string {
   const { status, me } = useAuth();
   return status === 'signedIn' && me ? `${me.id}:${me.membership.status}` : 'guest';
 }

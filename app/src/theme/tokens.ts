@@ -16,6 +16,11 @@ const darkColors = {
   goldNeon: '#FFD865',
   // Ink for text sitting on gold surfaces (buttons, gold bubbles).
   goldInk: '#141005',
+  // Review 2026-11-15: gold as a TEXT or ICON colour. Same as gold / goldLight in the dark; the light
+  // palette swaps in a deeper gold (#7F6218: 5.7:1 on white, 4.6:1 on the gold wash) because #B8842A
+  // and #D9A83C read at 3.3:1 and 2.2:1 there. Use these for small gold text, never as a fill.
+  goldText: '#D9A83C',
+  goldLightText: '#F2CE74',
 
   black: '#070708',
   surface: '#131316',
@@ -25,14 +30,14 @@ const darkColors = {
   white: '#FFFFFF',
   textPrimary: '#FFFFFF',
   textSecondary: '#B9B9C0',
-  textMuted: '#7E7E86',
+  textMuted: '#86868E',
   // M128 (owner): placeholders only — barely-there gray so an empty field never looks prefilled.
   textFaint: '#55555E',
 
   // M196: text that sits ON a photo (over gradients.scrim) — the photo is dark in both themes.
   onPhoto: '#FFFFFF',
   onPhotoSoft: '#B9B9C0',
-  onPhotoMuted: '#7E7E86',
+  onPhotoMuted: '#9B9BA3',
   onPhotoGold: '#F2CE74',
 
   // Translucent accents shared by the cards.
@@ -52,13 +57,17 @@ const darkColors = {
   whatsapp: '#25D366',
   warning: '#D9A21B',
   danger: '#E05252',
+  // Review 2026-11-15: ink for text on a danger-red surface (the «عاجل» pill) — white in both themes.
+  onDanger: '#FFFFFF',
+  // Review 2026-11-15: the stage behind a video player — black in both themes.
+  stage: '#000000',
 
   // M85 «paper» light zones (owner): ivory surfaces with ink text, breaking the single dark tone.
   paper: '#FAF7F0',
   paperCard: '#FFFFFF',
   paperInk: '#17130A',
   paperInkSoft: '#57503F',
-  paperMuted: '#8C8472',
+  paperMuted: '#736B59',
   // M128: the paper fields' placeholder — same barely-there idea on the light surface.
   paperFaint: '#BDB6A6',
   paperBorder: '#E7E0D1',
@@ -78,6 +87,8 @@ const lightColors: ColorTokens = {
   goldDark: '#8A6D1D',
   goldNeon: '#C9922E',
   goldInk: '#141005',
+  goldText: '#7F6218',
+  goldLightText: '#7F6218',
 
   black: '#F4F6FA',
   surface: '#FFFFFF',
@@ -87,13 +98,13 @@ const lightColors: ColorTokens = {
   white: '#FFFFFF',
   textPrimary: '#0D274A',
   textSecondary: '#3E5068',
-  textMuted: '#6B7A90',
+  textMuted: '#5F6F86',
   textFaint: '#A9B4C4',
 
   // M196: text that sits ON a photo (over gradients.scrim) — the photo is dark in both themes.
   onPhoto: '#FFFFFF',
   onPhotoSoft: '#B9B9C0',
-  onPhotoMuted: '#7E7E86',
+  onPhotoMuted: '#9B9BA3',
   onPhotoGold: '#F2CE74',
 
   goldSoft: 'rgba(184, 132, 42, 0.14)',
@@ -104,16 +115,18 @@ const lightColors: ColorTokens = {
   overlay: 'rgba(13, 39, 74, 0.55)',
   wash: 'rgba(244, 246, 250, 0.82)',
 
-  success: '#1E8E63',
+  success: '#177A53',
   whatsapp: '#25D366',
-  warning: '#B8842A',
+  warning: '#8F6A12',
   danger: '#D92D20',
+  onDanger: '#FFFFFF',
+  stage: '#000000',
 
   paper: '#FAF7F0',
   paperCard: '#FFFFFF',
   paperInk: '#17130A',
   paperInkSoft: '#57503F',
-  paperMuted: '#8C8472',
+  paperMuted: '#736B59',
   paperFaint: '#BDB6A6',
   paperBorder: '#E7E0D1',
   paperGold: '#8A6D1D',
@@ -165,6 +178,10 @@ const darkGradients = {
   screen: 'linear-gradient(180deg, #121014 0%, #070708 34%)',
   /** M96: bottom-up dark scrim that makes text readable on top of a photo. */
   scrim: 'linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0) 78%)',
+  /** Review 2026-11-15: the lit filament under screen titles (GoldHairline). */
+  hairline: 'linear-gradient(90deg, rgba(230, 186, 84, 0) 0%, rgba(242, 206, 116, 0.9) 50%, rgba(230, 186, 84, 0) 100%)',
+  /** Review 2026-11-15: the light band that sweeps a golden card's rim (GoldSweep). */
+  rim: 'linear-gradient(90deg, rgba(242, 206, 116, 0) 0%, rgba(242, 206, 116, 0) 38%, rgba(242, 206, 116, 0.95) 50%, rgba(242, 206, 116, 0) 62%, rgba(242, 206, 116, 0) 100%)',
 } as const;
 
 export type GradientTokens = { -readonly [K in keyof typeof darkGradients]: string };
@@ -176,6 +193,9 @@ const lightGradients: GradientTokens = {
   goldWash: 'linear-gradient(160deg, rgba(184, 132, 42, 0.14) 0%, rgba(184, 132, 42, 0.03) 55%, rgba(255, 255, 255, 0) 100%)',
   screen: 'linear-gradient(180deg, #FFFFFF 0%, #F4F6FA 34%)',
   scrim: darkGradients.scrim,
+  // The pale filament and rim light vanish on white: in the light they are the deeper gold.
+  hairline: 'linear-gradient(90deg, rgba(184, 132, 42, 0) 0%, rgba(184, 132, 42, 0.85) 50%, rgba(184, 132, 42, 0) 100%)',
+  rim: 'linear-gradient(90deg, rgba(184, 132, 42, 0) 0%, rgba(184, 132, 42, 0) 38%, rgba(184, 132, 42, 0.9) 50%, rgba(184, 132, 42, 0) 62%, rgba(184, 132, 42, 0) 100%)',
 };
 
 export const gradients: GradientTokens = { ...darkGradients };
@@ -299,7 +319,7 @@ export const formPalettes: Record<FormTone, FormPalette> = {
     cardBorder: '#DCE3EE',
     ink: brand.navy,
     inkSoft: '#3E5068',
-    muted: '#6B7A90',
+    muted: '#5F6F86',
     placeholder: '#A9B4C4',
     field: '#FFFFFF',
     fieldBorder: '#C9D3E0',
@@ -313,7 +333,8 @@ export const formPalettes: Record<FormTone, FormPalette> = {
     buttonBg: brand.gold,
     buttonBorder: brand.goldDeep,
     buttonText: brand.navy,
-    accent: brand.goldDeep,
+    // Review 2026-11-15: a deeper gold for text and outlines on the white card (#b8842a read at 3.3:1).
+    accent: '#8A6D1D',
     danger: brand.danger,
     dangerBg: brand.dangerSoft,
     noticeBg: brand.goldPale,

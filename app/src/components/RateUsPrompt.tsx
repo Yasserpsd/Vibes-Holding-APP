@@ -11,7 +11,7 @@ import { FadeInView, PressScale } from '@/components/motion';
 import { env } from '@/config/env';
 import { t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
-import { claimAutoPopup } from '@/lib/popupGate';
+import { claimAutoPopup, usePopupHold } from '@/lib/popupGate';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -82,14 +82,17 @@ async function openStoreReview(): Promise<void> {
 
 export function RateUsPrompt() {
   const segments = useSegments();
-  const { me } = useAuth();
+  const { me, confirmed } = useAuth();
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   // One attempt per JS launch: a member who taps «لاحقًا» is not asked again until the next week.
   const attempted = useRef(false);
+  // Holds the screen while the sheet is up, so a sequenced popup (the WhatsApp confirmation) never opens beside it.
+  usePopupHold(visible);
 
   const onTabs = segments[0] === '(tabs)';
-  const eligible = (env.isProduction || __DEV__) && me !== null && onTabs;
+  // `confirmed`: a sheet opened from the saved account and torn down by a 401 sign-out crashed Fabric on Android (see GentlePopups).
+  const eligible = (env.isProduction || __DEV__) && me !== null && confirmed && onTabs;
 
   useEffect(() => {
     if (!eligible || attempted.current) return;
@@ -131,7 +134,7 @@ export function RateUsPrompt() {
 
   if (!visible) return null;
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={later}>
+    <Modal transparent animationType="fade" statusBarTranslucent visible={visible} onRequestClose={later}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={later} accessibilityLabel={t('rateUs.later')} />
         <FadeInView offset={32} style={[styles.sheetWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>

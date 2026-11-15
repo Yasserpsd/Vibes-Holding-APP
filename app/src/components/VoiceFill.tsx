@@ -68,16 +68,21 @@ function VoiceFillInner({ fields, values, onFill, country, disabled = false }: P
   }, [pulse, recording]);
 
   const start = async () => {
-    const permission = await mod.AudioModule.requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(t('voiceFill.title'), t('advisor.voiceNoPermission'));
-      return;
+    try {
+      const permission = await mod.AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(t('voiceFill.title'), t('advisor.voiceNoPermission'));
+        return;
+      }
+      await mod.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setOutcome(null);
+      setRecording(true);
+    } catch (cause) {
+      // A busy microphone (a call, another app) or a refused session: say so instead of an unhandled rejection.
+      Alert.alert(t('voiceFill.title'), errorMessage(cause));
     }
-    await mod.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-    setOutcome(null);
-    setRecording(true);
   };
 
   const stop = async () => {

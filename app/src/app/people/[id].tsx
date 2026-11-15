@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { usePerson } from '@/api/people';
@@ -16,6 +16,11 @@ import { textStart } from '@/i18n/direction';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
+
+/** WhatsApp and mail belong to their own apps: open them directly, and fall back to the in-app browser only if the phone refuses. */
+const openExternal = (url: string) => {
+  void Linking.openURL(url).catch(() => openLink(url));
+};
 
 /** M11: one club figure's public page — photo, bio, journey milestones and links. */
 export default function PersonScreen() {
@@ -97,13 +102,13 @@ export default function PersonScreen() {
               <GlassCard style={styles.card}>
                 <Text style={styles.sectionTitle}>{t('people.contact')}</Text>
                 {data.phone ? (
-                  <PressScale style={styles.link} onPress={() => void openLink(`https://wa.me/${(data.phone ?? '').replace(/\D/g, '')}`)} accessibilityRole="link">
+                  <PressScale style={styles.link} onPress={() => openExternal(`https://wa.me/${(data.phone ?? '').replace(/\D/g, '')}`)} accessibilityRole="link">
                     <Ionicons name="logo-whatsapp" size={18} color={colors.gold} />
                     <Text style={styles.linkText} numberOfLines={1}>{`${t('people.contactWhatsapp')} — ${'‎'}${data.phone}`}</Text>
                   </PressScale>
                 ) : null}
                 {data.email ? (
-                  <PressScale style={styles.link} onPress={() => void openLink(`mailto:${data.email}`)} accessibilityRole="link">
+                  <PressScale style={styles.link} onPress={() => openExternal(`mailto:${data.email}`)} accessibilityRole="link">
                     <Ionicons name="mail-outline" size={18} color={colors.gold} />
                     <Text style={styles.linkText} numberOfLines={1}>{data.email}</Text>
                   </PressScale>
@@ -191,7 +196,7 @@ const styles = themedStyles(() => ({
   dotActive: { backgroundColor: colors.gold, borderColor: colors.goldLight, boxShadow: shadows.glowGoldFaint },
   railLine: { flex: 1, width: 2, borderRadius: 1, backgroundColor: colors.borderGoldSoft, marginTop: 2, marginBottom: -spacing.sm },
   milestoneText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
-  link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, minHeight: 44 },
   linkText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   // M73: the facts row under the name and the spotlight list sections.
   facts: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.xs },

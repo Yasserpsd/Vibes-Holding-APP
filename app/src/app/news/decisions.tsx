@@ -1,13 +1,16 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 
 import { useDecisions } from '@/api/news';
 import { entranceDelay, FadeInView } from '@/components/motion';
-import { NewsCard } from '@/components/news/NewsCard';
+import { NewsCard, PageFooter } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
+
+// One stable component: an inline arrow would remount every separator on each render.
+const Separator = () => <View style={styles.separator} />;
 
 /** The fixed section, the same for everyone: official decisions, laws and regulations, newest first. */
 export default function DecisionsScreen() {
@@ -33,9 +36,9 @@ export default function DecisionsScreen() {
         ListEmptyComponent={
           <StateView loading={list.isPending} error={list.error} onRetry={() => list.refetch()} empty={!list.isPending && !list.error} emptyText={t('news.decisionsEmptyList')} />
         }
-        ListFooterComponent={list.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}
+        ListFooterComponent={<PageFooter loading={list.isFetchingNextPage} failed={list.isFetchNextPageError} onRetry={() => void list.fetchNextPage()} />}
         onEndReached={() => {
-          if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+          if (list.hasNextPage && !list.isFetchingNextPage && !list.isFetchNextPageError) void list.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
         refreshControl={
@@ -48,7 +51,7 @@ export default function DecisionsScreen() {
           />
         }
         contentContainerStyle={styles.content}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={Separator}
       />
     </View>
   );
@@ -59,5 +62,4 @@ const styles = themedStyles(() => ({
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   intro: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
   separator: { height: spacing.sm },
-  footer: { paddingVertical: spacing.md },
 }));

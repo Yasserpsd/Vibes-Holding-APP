@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem } from '@/api/news';
@@ -10,7 +10,7 @@ import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/As
 import { Chip } from '@/components/Chip';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
-import { NewsCard } from '@/components/news/NewsCard';
+import { NewsCard, PageFooter } from '@/components/news/NewsCard';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
@@ -20,6 +20,9 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 // The decisions strip snaps card by card: the compact NewsCard width (260) plus the strip gap.
 const STRIP_SNAP = 260 + spacing.sm;
+
+// One stable component: an inline arrow would remount every separator on each render.
+const Separator = () => <View style={styles.separator} />;
 
 export default function NewsListScreen() {
   const router = useRouter();
@@ -86,6 +89,12 @@ export default function NewsListScreen() {
               <NewsCard key={item.id} item={item} compact onPress={() => openItem(item)} />
             ))}
           </ScrollView>
+        ) : decisions.isError ? (
+          // A failed load must not read as «no decisions»: say it and let the member retry with a tap.
+          <PressScale onPress={() => void decisions.refetch()} accessibilityRole="button" style={styles.sectionRetry}>
+            <Ionicons name="refresh" size={14} color={colors.goldLightText} />
+            <Text style={styles.sectionLink}>{t('errors.generic')} · {t('common.retry')}</Text>
+          </PressScale>
         ) : (
           <Text style={styles.sectionEmpty}>{decisions.isPending ? t('news.decisionsLoading') : t('news.decisionsEmpty')}</Text>
         )}
@@ -147,9 +156,9 @@ export default function NewsListScreen() {
             emptyText={t('news.emptyTopic')}
           />
         }
-        ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}
+        ListFooterComponent={<PageFooter loading={feed.isFetchingNextPage} failed={feed.isFetchNextPageError} onRetry={() => void feed.fetchNextPage()} />}
         onEndReached={() => {
-          if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
+          if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
         refreshControl={
@@ -165,7 +174,7 @@ export default function NewsListScreen() {
           />
         }
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={Separator}
       />
     </SafeAreaView>
   );
@@ -179,11 +188,13 @@ const styles = themedStyles(() => ({
   block: { gap: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.gold },
-  headerLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  headerLinkText: { ...typography.caption, color: colors.goldLight },
+  // 44 pt tall: the link text alone is about 20.
+  headerLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 },
+  headerLinkText: { ...typography.caption, color: colors.goldLightText },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
   sectionTitle: { ...typography.subtitle, color: colors.textPrimary },
-  sectionLink: { ...typography.caption, color: colors.goldLight },
+  sectionLink: { ...typography.caption, color: colors.goldLightText },
+  sectionRetry: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 },
   sectionEmpty: { ...typography.caption, color: colors.textMuted },
   strip: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
   // The card chrome (border, surface, glow) comes from the golden GlassCard.
@@ -208,7 +219,6 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  countPillText: { ...typography.caption, fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLight },
+  countPillText: { ...typography.caption, fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLightText },
   separator: { height: spacing.sm },
-  footer: { paddingVertical: spacing.md },
 }));

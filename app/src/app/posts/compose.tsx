@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { adminMessagesApi, type MemberHit, type MessageAudience } from '@/api/posts';
@@ -75,7 +75,8 @@ export default function ComposeScreen() {
     }
   };
 
-  const send = async () => {
+  // A sent message reaches phones with a push and cannot be recalled: the admin confirms before it leaves.
+  const send = () => {
     setError(null);
     setDone(null);
     if (!title.trim() || !body.trim()) {
@@ -88,6 +89,14 @@ export default function ComposeScreen() {
     }
     const target: MessageAudience =
       audience === 'all' ? { type: 'all' } : audience === 'member' && member ? { type: 'member', contactId: member.id, name: member.name } : { type: 'persona', persona: audience as 'neutral' | 'entrepreneur' | 'investor' };
+    Alert.alert(t('posts.confirmSend.title'), t('posts.confirmSend.text'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('compose.send'), onPress: () => void deliver(target) },
+    ]);
+  };
+
+  const deliver = async (target: MessageAudience) => {
+    if (busy) return;
     setBusy(true);
     try {
       const result = await adminMessagesApi.send({ title: title.trim(), body: body.trim(), audience: target });
@@ -184,7 +193,7 @@ export default function ComposeScreen() {
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(4)}>
-        <AppButton label={busy ? t('compose.sending') : t('compose.send')} icon="send" loading={busy} onPress={() => (busy ? null : void send())} />
+        <AppButton label={busy ? t('compose.sending') : t('compose.send')} icon="send" loading={busy} onPress={() => (busy ? null : send())} />
       </FadeInView>
       {done ? <AppButton label={t('compose.backToInbox')} variant="outline" icon="mail-open-outline" onPress={() => router.back()} /> : null}
     </Screen>

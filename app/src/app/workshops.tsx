@@ -57,7 +57,7 @@ export default function WorkshopsScreen() {
               <WorkshopCard workshop={workshop} texts={data} signedIn={signedIn} registered={registered.has(workshop.id)} />
             </FadeInView>
           ))}
-          <Notice tone="info" text={data.note} />
+          {data.note ? <Notice tone="info" text={data.note} /> : null}
         </>
       )}
     </Screen>

@@ -40,9 +40,14 @@ export function installNotificationHandler(): void {
   const notifications = loadNotifications();
   if (!notifications || handlerInstalled) return;
   handlerInstalled = true;
-  notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-  });
+  // Runs at module scope of the root layout: a throw here would be a launch crash for every member.
+  try {
+    notifications.setNotificationHandler({
+      handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+    });
+  } catch (error) {
+    console.warn('notification handler failed', error instanceof Error ? error.message : String(error));
+  }
 }
 
 let currentToken: string | null = null;

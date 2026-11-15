@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { authApi } from '@/api/auth';
+import { errorMessage } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -17,6 +18,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 export function DeletionBanner({ account }: { account: string }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ['delete-state', account],
     queryFn: () => authApi.deleteState(),
@@ -29,9 +31,13 @@ export function DeletionBanner({ account }: { account: string }) {
   const cancel = async () => {
     if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       await authApi.deleteCancel();
       await queryClient.invalidateQueries({ queryKey: ['delete-state'] });
+    } catch (cause) {
+      // Offline or refused: the countdown stays on screen and says so, instead of an unhandled rejection.
+      setError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -43,6 +49,7 @@ export function DeletionBanner({ account }: { account: string }) {
         <Ionicons name="hourglass-outline" size={20} color={colors.warning} />
         <Text style={styles.text}>{t('deleteAccount.countdown', { days: String(scheduled.daysLeft) })}</Text>
       </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       <AppButton label={t('deleteAccount.cancel')} variant="outline" icon="arrow-undo-outline" loading={busy} onPress={() => void cancel()} />
     </View>
   );
@@ -59,4 +66,5 @@ const styles = themedStyles(() => ({
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   text: { ...typography.caption, fontSize: 14, lineHeight: 22, fontFamily: fonts.semiBold, color: colors.warning, flex: 1, textAlign: textStart },
+  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
 }));

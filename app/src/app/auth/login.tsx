@@ -1,5 +1,5 @@
 import { Link, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
 import { authApi, phoneStepPath, useAuthConfig } from '@/api/auth';
@@ -20,8 +20,10 @@ import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, sessionExpired, dismissSessionExpired } = useAuth();
   const { data: config } = useAuthConfig();
+  // The «انتهت الجلسة» line is shown once: it is forgotten when the member leaves this screen.
+  useEffect(() => dismissSessionExpired, [dismissSessionExpired]);
   // M126: the phone is the first-class identifier — a number from any country or an e-mail.
   const [identifier, setIdentifier] = useState<Identifier>(EMPTY_IDENTIFIER);
   const [password, setPassword] = useState('');
@@ -74,6 +76,12 @@ export default function LoginScreen() {
 
   return (
     <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
+      {/* The saved session was refused when the app opened: say why the member must sign in again, once. */}
+      {sessionExpired ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={t('errors.code.session_expired')} />
+        </FadeInView>
+      ) : null}
       {config?.adminOnly ? (
         <FadeInView delay={entranceDelay(0)}>
           <Notice text={t('auth.login.adminOnly')} />
@@ -125,5 +133,5 @@ export default function LoginScreen() {
 
 const styles = themedStyles(() => ({
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
-  link: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
+  link: { ...typography.body, color: colors.goldLightText, textAlign: 'center', paddingVertical: spacing.sm },
 }));

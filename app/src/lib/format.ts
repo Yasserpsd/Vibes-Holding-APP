@@ -5,6 +5,13 @@ export function formatNumber(value: number): string {
   return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+/** M241: an amount in riyals that keeps its halalas — «1,250» for a whole amount, «37.50» otherwise. */
+export function formatSar(value: number): string {
+  if (Number.isInteger(value)) return formatNumber(value);
+  const [whole = '0', cents = '00'] = value.toFixed(2).split('.');
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${cents}`;
+}
+
 export function formatMillionsSar(millions: number): string {
   return t('common.millionSar', { amount: formatNumber(millions) });
 }
@@ -65,6 +72,12 @@ function arabicCount(count: number, singular: string, dual: string, plural: stri
   if (count === 1) return singular;
   if (count === 2) return dual;
   return `${formatNumber(count)} ${count <= 10 ? plural : singular}`;
+}
+
+/** M241: the Projects Bank counters — «مشروع»، «مشروعان»، «5 مشاريع»، «25 مشروع» (EN: "5 projects"). */
+export function formatProjectCount(count: number): string {
+  if (getLang() === 'en') return count === 1 ? '1 project' : `${formatNumber(count)} projects`;
+  return arabicCount(count, 'مشروع', 'مشروعان', 'مشاريع');
 }
 
 /** Icons pass: a services group's size under its header — «خدمة»، «خدمتان»، «5 خدمات» (EN: "5 services"). */
@@ -140,9 +153,19 @@ export function formatArabicDateTime(iso: string): string {
   return `${formatArabicDate(day)} · ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** An event's date as the dashboard saved it: a day ("2026-10-05") or an exact time, shown in the device's local time. */
+/** M241: "12 سبتمبر 2026 · 14:05" on the Riyadh clock (UTC+3, no daylight saving), for event times: a member abroad reads the club's hour. */
+export function formatRiyadhDateTime(iso: string): string {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return iso;
+  const riyadh = new Date(instant.getTime() + 3 * 3_600_000);
+  const two = (value: number) => String(value).padStart(2, '0');
+  const day = `${riyadh.getUTCFullYear()}-${two(riyadh.getUTCMonth() + 1)}-${two(riyadh.getUTCDate())}`;
+  return `${formatArabicDate(day)} · ${two(riyadh.getUTCHours())}:${two(riyadh.getUTCMinutes())}`;
+}
+
+/** An event's date as the dashboard saved it: a day ("2026-10-05") or an exact time, shown on the Riyadh clock. */
 export function formatEventDate(value: string): string {
   const date = value.trim();
   // A day alone has no time to show; parsed as a date it would be UTC midnight, a made-up hour on the member's phone.
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatArabicDate(date) : formatArabicDateTime(date);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatArabicDate(date) : formatRiyadhDateTime(date);
 }

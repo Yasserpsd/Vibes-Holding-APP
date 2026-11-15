@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,23 +18,30 @@ import { colors, spacing, typography } from '@/theme/tokens';
  * the app. The phone downloads the file to its cache; iOS's WebView draws a PDF natively, Android's cannot, so
  * there pdf.js draws every page on a canvas. «تحميل على الجوال» hands the same link to the system browser,
  * which saves it to the phone. Anything that is not a PDF (a slides page, a drive link) opens in the browser.
+ * Rule 4: the link only ever reaches this screen from the unlocked member's own contact card (ProjectUnlock);
+ * the screen itself holds nothing but that link and a file in the OS cache, and it opens http(s) links only.
+ * The founder's PDF is untrusted input for pdf.js: font eval stays off (isEvalSupported:false, CVE-2024-4367).
  */
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+
+/** How long the viewer may stay on the spinner before the screen offers the browser instead. */
+const VIEW_TIMEOUT_MS = 45_000;
 
 const VIEWER = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
 <style>html,body{margin:0;background:#0b0b0d}canvas{display:block;width:100%;margin:0 0 8px;background:#fff}</style>
 <script src="${PDFJS}/pdf.min.js"></script></head><body><div id="pages"></div><script>
+if(typeof pdfjsLib==='undefined'){window.ReactNativeWebView.postMessage('failed');}else{
 pdfjsLib.GlobalWorkerOptions.workerSrc='${PDFJS}/pdf.worker.min.js';
 window.showPdf=async function(b64){try{
 var raw=atob(b64),bytes=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-var pdf=await pdfjsLib.getDocument({data:bytes}).promise,box=document.getElementById('pages'),ratio=Math.min(window.devicePixelRatio||1,2);
+var pdf=await pdfjsLib.getDocument({data:bytes,isEvalSupported:false}).promise,box=document.getElementById('pages'),ratio=Math.min(window.devicePixelRatio||1,2);
 for(var n=1;n<=pdf.numPages;n++){var page=await pdf.getPage(n),base=page.getViewport({scale:1}),scale=(window.innerWidth/base.width)*ratio,view=page.getViewport({scale:scale});
 var canvas=document.createElement('canvas');canvas.width=view.width;canvas.height=view.height;box.appendChild(canvas);
 await page.render({canvasContext:canvas.getContext('2d'),viewport:view}).promise;
 if(n===1)window.ReactNativeWebView.postMessage('shown');}
 }catch(e){window.ReactNativeWebView.postMessage('failed');}};
-window.ReactNativeWebView.postMessage('ready');
+window.ReactNativeWebView.postMessage('ready');}
 </script></body></html>`;
 
 /** The cache file of one link: same link, same file (opening it again is instant). */
@@ -48,25 +55,40 @@ async function downloadDeck(url: string): Promise<{ uri: string; pdf: boolean }>
   const target = cacheFileOf(url);
   const existing = await FileSystem.getInfoAsync(target);
   if (existing.exists && (existing.size ?? 0) > 0) return { uri: target, pdf: true };
-  const result = await FileSystem.downloadAsync(url, target);
-  if (result.status < 200 || result.status >= 300) throw new Error(`deck ${result.status}`);
+  // The download lands in a partial file and is moved into place only once it is whole: a download cut short
+  // (call, app killed) never leaves a half PDF that the next opening would trust.
+  const part = `${target}.part`;
+  await FileSystem.deleteAsync(part, { idempotent: true });
+  const result = await FileSystem.downloadAsync(url, part);
+  if (result.status < 200 || result.status >= 300) {
+    await FileSystem.deleteAsync(part, { idempotent: true });
+    throw new Error(`deck ${result.status}`);
+  }
   const type = Object.entries(result.headers).find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? '';
   // The first bytes decide when the server labels the file vaguely (octet-stream).
-  const head = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.Base64, position: 0, length: 4 }).catch(() => '');
+  const head = await FileSystem.readAsStringAsync(part, { encoding: FileSystem.EncodingType.Base64, position: 0, length: 4 }).catch(() => '');
   const pdf = /pdf/i.test(type) || head.startsWith('JVBERi'); // «%PDF» in base64
-  if (!pdf) await FileSystem.deleteAsync(target, { idempotent: true });
-  return { uri: target, pdf };
+  if (!pdf) {
+    await FileSystem.deleteAsync(part, { idempotent: true });
+    return { uri: target, pdf: false };
+  }
+  await FileSystem.moveAsync({ from: part, to: target });
+  return { uri: target, pdf: true };
 }
 
 export default function DeckScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { url, title } = useLocalSearchParams<{ url: string; title?: string }>();
+  const { url: rawUrl, title } = useLocalSearchParams<{ url: string; title?: string }>();
+  // A deep link can carry anything: only a real web link is ever downloaded or handed to the browser.
+  const url = typeof rawUrl === 'string' && /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : '';
   const webview = useMemo(() => loadWebView(), []);
   const ref = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
+  // The viewer's own progress: the file can be downloaded and still fail to draw (offline CDN, damaged PDF).
+  const [phase, setPhase] = useState<'loading' | 'shown' | 'failed'>('loading');
   const deck = useQuery({
     queryKey: ['deck', url],
-    queryFn: () => downloadDeck(url ?? ''),
+    queryFn: () => downloadDeck(url),
     enabled: Boolean(url && webview),
     staleTime: Infinity,
     retry: 1,
@@ -75,10 +97,31 @@ export default function DeckScreen() {
   const outside = Boolean(url) && (!webview || (deck.data !== undefined && !deck.data.pdf));
   useEffect(() => {
     // Not a PDF, or a binary without the WebView: the browser is the right place for it.
-    if (outside && url) void openLink(url).then(() => router.back());
+    if (!outside || !url) return;
+    void openLink(url).then(() => {
+      // Opened from a link, there may be nothing behind this screen to go back to: the home takes its place.
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+    });
   }, [outside, url, router]);
 
-  if (!url) return null;
+  // The first page never arrived (pdf.js stalled without throwing): the failed view offers the browser.
+  const viewing = Boolean(url) && !outside && Boolean(deck.data?.pdf);
+  useEffect(() => {
+    if (!viewing || phase !== 'loading') return;
+    const timer = setTimeout(() => setPhase('failed'), VIEW_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [viewing, phase]);
+
+  if (!url) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.center}>
+          <Notice tone="warning" text={t('deck.failed')} />
+        </View>
+      </View>
+    );
+  }
   const download = () => void Linking.openURL(url).catch(() => openLink(url));
 
   if (outside || !webview) return <View style={styles.screen} />;
@@ -90,6 +133,7 @@ export default function DeckScreen() {
       const base64 = await FileSystem.readAsStringAsync(deck.data.uri, { encoding: FileSystem.EncodingType.Base64 });
       ref.current?.injectJavaScript(`window.showPdf(${JSON.stringify(base64)});true;`);
     } catch {
+      setPhase('failed');
       void openLink(url);
     }
   };
@@ -97,7 +141,7 @@ export default function DeckScreen() {
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: title || t('deck.title') }} />
-      {deck.error ? (
+      {deck.error || phase === 'failed' ? (
         <View style={styles.center}>
           <Notice tone="warning" text={t('deck.failed')} />
           <AppButton label={t('deck.openOutside')} icon="open-outline" onPress={() => void openLink(url)} />
@@ -107,19 +151,44 @@ export default function DeckScreen() {
           <ActivityIndicator color={colors.gold} />
           <Text style={styles.loadingText}>{t('deck.loading')}</Text>
         </View>
-      ) : Platform.OS === 'ios' ? (
-        <WebView source={{ uri: deck.data.uri }} originWhitelist={['*']} allowingReadAccessToURL={FileSystem.cacheDirectory ?? undefined} allowFileAccess style={styles.web} />
       ) : (
-        <WebView
-          ref={ref as never}
-          source={{ html: VIEWER, baseUrl: 'https://cdnjs.cloudflare.com/' }}
-          originWhitelist={['*']}
-          style={styles.web}
-          onMessage={(event: { nativeEvent: { data: string } }) => {
-            if (event.nativeEvent.data === 'ready') void sendPdf();
-            if (event.nativeEvent.data === 'failed') void openLink(url);
-          }}
-        />
+        <View style={styles.web}>
+          {Platform.OS === 'ios' ? (
+            <WebView
+              source={{ uri: deck.data.uri }}
+              originWhitelist={['*']}
+              allowingReadAccessToURL={FileSystem.cacheDirectory ?? undefined}
+              allowFileAccess
+              style={styles.web}
+              onLoadEnd={() => setPhase((current) => (current === 'loading' ? 'shown' : current))}
+              onError={() => setPhase('failed')}
+            />
+          ) : (
+            <WebView
+              ref={ref as never}
+              source={{ html: VIEWER, baseUrl: 'https://cdnjs.cloudflare.com/' }}
+              originWhitelist={['*']}
+              style={styles.web}
+              onMessage={(event: { nativeEvent: { data: string } }) => {
+                const message = event.nativeEvent.data;
+                if (message === 'ready') void sendPdf();
+                if (message === 'shown') setPhase('shown');
+                if (message === 'failed') {
+                  setPhase('failed');
+                  void openLink(url);
+                }
+              }}
+              onError={() => setPhase('failed')}
+            />
+          )}
+          {/* The file is on the phone, but the pages take a moment to draw: never a bare dark screen meanwhile. */}
+          {phase === 'loading' ? (
+            <View style={styles.overlay} pointerEvents="none">
+              <ActivityIndicator color={colors.gold} />
+              <Text style={styles.loadingText}>{t('deck.loading')}</Text>
+            </View>
+          ) : null}
+        </View>
       )}
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <AppButton label={t('deck.download')} icon="download-outline" onPress={download} />
@@ -132,6 +201,7 @@ const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   web: { flex: 1, backgroundColor: colors.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: spacing.md, backgroundColor: colors.black },
   loadingText: { ...typography.caption, color: colors.textSecondary },
   bar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: colors.black, borderTopWidth: 1, borderTopColor: colors.border },
 }));

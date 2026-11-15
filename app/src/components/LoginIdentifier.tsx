@@ -75,6 +75,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               key={mode}
               style={[styles.pill, selected && styles.pillSelected]}
               onPress={() => switchMode(mode)}
+              hitSlop={{ top: 4, bottom: 4 }}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
             >
@@ -89,7 +90,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
         <View style={styles.phoneRow}>
           {countries?.length ? (
             <View style={styles.dialBox}>
-              <CountryPicker compact countries={countries} selected={value.country} onSelect={(code) => onChange({ ...value, country: code })} />
+              <CountryPicker compact disabled={!editable} countries={countries} selected={value.country} onSelect={(code) => onChange({ ...value, country: code })} />
             </View>
           ) : null}
           <View style={styles.phoneField}>
@@ -140,7 +141,7 @@ const styles = themedStyles(() => ({
   pill: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radii.pill },
   pillSelected: { backgroundColor: colors.goldSoft, borderWidth: 1, borderColor: colors.borderGold },
   pillText: { ...typography.caption, color: colors.textSecondary },
-  pillTextSelected: { color: colors.goldLight },
+  pillTextSelected: { color: colors.goldLightText },
   phoneRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   // Skips the field's label line (caption lineHeight 20 + gap xs) so the dial box tops the input.
   dialBox: { marginTop: 24 },

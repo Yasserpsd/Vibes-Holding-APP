@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Text, View } from 'react-native';
 
 import type { NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
@@ -33,7 +33,8 @@ export function BreakingPill() {
 
 const pillStyles = themedStyles(() => ({
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radii.pill, backgroundColor: colors.danger },
-  text: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 16, color: '#FFFFFF' },
+  // White in both themes: the pill is the danger red in both.
+  text: { fontFamily: fonts.bold, fontSize: 10, lineHeight: 16, color: colors.white },
 }));
 
 /** A news item exactly as the source published it: title, snippet, outlet and time, plus the link to the original page. */
@@ -44,9 +45,11 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
       <GlassCard radius={radii.xl} style={[styles.card, compact && styles.compact]}>
         <View style={styles.meta}>
           {isBreaking(item.publishedAt) ? <BreakingPill /> : null}
-          <Text style={styles.source} numberOfLines={1}>
-            {item.source.name}
-          </Text>
+          <View style={styles.sourcePill}>
+            <Text style={styles.source} numberOfLines={1}>
+              {item.source.name}
+            </Text>
+          </View>
           <Text style={styles.time}>{formatRelativeTime(item.publishedAt)}</Text>
           {item.decision ? (
             <View style={styles.badge}>
@@ -73,13 +76,15 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
           <View style={styles.footer}>
             <View style={styles.tags}>
               {item.topics.slice(0, 2).map((topic) => (
-                <Text key={topic.key} style={styles.tag} numberOfLines={1}>
-                  {topic.label}
-                </Text>
+                <View key={topic.key} style={styles.tagPill}>
+                  <Text style={styles.tag} numberOfLines={1}>
+                    {topic.label}
+                  </Text>
+                </View>
               ))}
             </View>
-            <PressScale onPress={() => void openLink(item.url)} accessibilityRole="link" hitSlop={8} style={styles.readLink}>
-              <Ionicons name="open-outline" size={14} color={colors.goldLight} />
+            <PressScale onPress={() => void openLink(item.url)} accessibilityRole="link" hitSlop={12} style={styles.readLink}>
+              <Ionicons name="open-outline" size={14} color={colors.goldLightText} />
               <Text style={styles.readText} numberOfLines={1}>
                 {t('news.readSource')}
               </Text>
@@ -87,6 +92,18 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
           </View>
         ) : null}
       </GlassCard>
+    </PressScale>
+  );
+}
+
+/** The bottom of a paged news list: a spinner while the next page loads, a retry when it failed (instead of silently stopping). */
+export function PageFooter({ loading, failed, onRetry }: { loading: boolean; failed: boolean; onRetry: () => void }) {
+  if (loading) return <ActivityIndicator color={colors.gold} style={styles.pageFooter} />;
+  if (!failed) return null;
+  return (
+    <PressScale onPress={onRetry} accessibilityRole="button" style={styles.retry}>
+      <Ionicons name="refresh" size={16} color={colors.goldLightText} />
+      <Text style={styles.retryText}>{t('common.retry')}</Text>
     </PressScale>
   );
 }
@@ -103,6 +120,8 @@ function ImageFallback() {
 /** The source's picture fades in once it arrives, instead of popping over the placeholder block. */
 function FadingImage({ uri }: { uri: string }) {
   const [reveal] = useState(() => new Animated.Value(0));
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ImageFallback />;
   return (
     <View style={styles.image}>
       <Animated.Image
@@ -110,6 +129,7 @@ function FadingImage({ uri }: { uri: string }) {
         resizeMode="cover"
         style={[styles.imageFill, { opacity: reveal }]}
         onLoad={() => Animated.timing(reveal, { toValue: 1, duration: 360, useNativeDriver: true }).start()}
+        onError={() => setFailed(true)}
       />
     </View>
   );
@@ -122,18 +142,9 @@ const styles = themedStyles(() => ({
   },
   compact: { width: 260, paddingVertical: spacing.sm + 4 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  source: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 18,
-    fontFamily: fonts.medium,
-    color: colors.goldLight,
-    flexShrink: 1,
-    paddingVertical: 1,
-    paddingHorizontal: spacing.sm + 2,
-    borderRadius: radii.pill,
-    backgroundColor: colors.goldSoft,
-  },
+  // Padding and background sit on a View: Android measures a padded Text too narrow and truncates it.
+  sourcePill: { flexShrink: 1, paddingVertical: 1, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: colors.goldSoft },
+  source: { ...typography.caption, fontSize: 12, lineHeight: 18, fontFamily: fonts.medium, color: colors.goldLightText },
   time: { ...typography.caption, color: colors.textMuted },
   badge: {
     flexDirection: 'row',
@@ -158,15 +169,11 @@ const styles = themedStyles(() => ({
   imageFill: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   tags: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  tag: {
-    ...typography.caption,
-    flexShrink: 1,
-    color: colors.textSecondary,
-    paddingVertical: 1,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
-  },
+  tagPill: { flexShrink: 1, paddingVertical: 1, paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
+  tag: { ...typography.caption, color: colors.textSecondary },
   readLink: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
-  readText: { ...typography.caption, color: colors.goldLight, flexShrink: 0 },
+  readText: { ...typography.caption, color: colors.goldLightText, flexShrink: 0 },
+  pageFooter: { paddingVertical: spacing.md },
+  retry: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, minHeight: 44, paddingVertical: spacing.sm },
+  retryText: { ...typography.caption, color: colors.goldLightText },
 }));

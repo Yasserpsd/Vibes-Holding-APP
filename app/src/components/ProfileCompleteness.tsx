@@ -8,6 +8,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { PopIn } from '@/components/motion';
 import { t } from '@/i18n';
+import { isRTL } from '@/i18n/direction';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
 import { claimAutoPopup } from '@/lib/popupGate';
 import { themedStyles } from '@/theme/styles';
@@ -20,8 +21,6 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
  */
 const NUDGE_KEY = 'investorsclub.profileNudgeAt';
 const NUDGE_DAYS = 7;
-// Left/right style props mirror under RTL unless the app turned the swap off; the arc colours follow.
-const MIRRORED = I18nManager.isRTL && I18nManager.doLeftAndRightSwapInRTL;
 
 /** The profile fields that count, equally weighted: only what the member can fill in the app's editor. */
 export function profileCompletion(me: Me): number {
@@ -41,6 +40,9 @@ export function CompletionMeter({ percent, size, children }: { percent: number; 
   const stroke = 3;
   const quarter = frame / 4;
   const sweep = Math.max(0, Math.min(100, percent)) * 3.6;
+  // Left/right style props mirror under RTL unless the app turned the swap off; the arc's transparent side follows.
+  // Read while rendering (the app's own direction), never once at module load.
+  const mirrored = isRTL() && I18nManager.doLeftAndRightSwapInRTL;
   const halves = [
     // The right half shows 0°–180° (from the top, clockwise); the left half the rest.
     { key: 'right', shift: quarter, deg: Math.min(sweep, 180), base: 45 },
@@ -59,6 +61,7 @@ export function CompletionMeter({ percent, size, children }: { percent: number; 
             <View
               style={[
                 styles.arc,
+                mirrored ? styles.arcGapLeft : styles.arcGapRight,
                 {
                   width: frame,
                   height: frame,
@@ -143,8 +146,9 @@ const styles = themedStyles(() => ({
     top: 0,
     borderColor: colors.gold,
     borderTopColor: 'transparent',
-    [MIRRORED ? 'borderLeftColor' : 'borderRightColor']: 'transparent',
   },
+  arcGapLeft: { borderLeftColor: 'transparent' },
+  arcGapRight: { borderRightColor: 'transparent' },
   badgeWrap: { position: 'absolute', bottom: -2, alignSelf: 'center' },
   badge: {
     paddingHorizontal: spacing.sm,

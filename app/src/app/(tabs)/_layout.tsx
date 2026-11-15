@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { Animated, StyleSheet, View, type ColorValue } from 'react-native';
+import { Animated, Platform, StyleSheet, View, type ColorValue } from 'react-native';
 
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
 import { PopIn } from '@/components/motion';
@@ -85,6 +85,9 @@ export default function TabsLayout() {
           boxShadow: shadows.lift,
         },
         tabBarLabelStyle: typography.tabLabel,
+        // Android resizes the window for the keyboard, so the bar would ride above it and eat the
+        // composer's room (advisor chat, searches); it steps aside while typing. iOS keeps its bar.
+        tabBarHideOnKeyboard: Platform.OS === 'android',
       }}
     >
       {TABS.map((tab) =>
@@ -97,6 +100,8 @@ export default function TabsLayout() {
               title: t(tab.title),
               tabBarIcon: ({ focused }) => <AdvisorDockButton focused={focused} />,
               tabBarLabel: () => null,
+              // No visible label, so the screen reader needs one of its own.
+              tabBarAccessibilityLabel: t(tab.title),
             }}
             listeners={{
               tabPress: (event) => {

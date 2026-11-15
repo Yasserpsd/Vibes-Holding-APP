@@ -77,6 +77,23 @@ export function hasAdsAttribution(): boolean {
 }
 
 /**
+ * iOS shows the tracking prompt only while the app is active; asked while another system prompt (the notification
+ * permission, Face ID) or the app switcher holds the screen, it is skipped and the launch counts as refused. So the
+ * request waits until the app is active again. An unknown state is treated as active.
+ */
+function whenActive(): Promise<void> {
+  const held = () => AppState.currentState === 'inactive' || AppState.currentState === 'background';
+  if (!held()) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const subscription = AppState.addEventListener('change', () => {
+      if (held()) return;
+      subscription.remove();
+      resolve();
+    });
+  });
+}
+
+/**
  * iOS: the App Tracking Transparency prompt (Arabic + English text in app.config.ts), true only when
  * granted. Android has no such prompt and resolves true at once.
  */
@@ -88,6 +105,7 @@ async function askTrackingPermission(): Promise<boolean> {
     const tracking = require('expo-tracking-transparency') as TrackingModule;
     const current = await tracking.getTrackingPermissionsAsync();
     if (current.status !== 'undetermined' || !current.canAskAgain) return current.granted;
+    await whenActive();
     // 2026-11-10 audit: a short, honest explanation first (one «متابعة» button, no reward, the system
     // prompt always follows), so fewer members refuse a dialog they do not understand.
     await new Promise<void>((resolve) =>

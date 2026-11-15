@@ -155,12 +155,15 @@ export function StructuredText({ text, variant = 'dark' }: { text: string; varia
 function MediaBlock({ block }: { block: { kind: 'image' | 'video'; url: string } }) {
   const router = useRouter();
   const [ratio, setRatio] = useState(16 / 9);
+  const imageUri = block.kind === 'image' ? sized(block.url, 720) : null;
+  // The shape is read from the SAME sized file that is drawn (one download), and only when that link changes —
+  // `block` is a new object on every parent render, so keying on it re-measured the photo each time.
   useEffect(() => {
-    if (block.kind !== 'image') return;
-    Image.getSize(block.url, (w, h) => (w > 0 && h > 0 ? setRatio(Math.max(0.6, w / h)) : undefined), () => undefined);
-  }, [block]);
-  if (block.kind === 'image') {
-    return <Image source={{ uri: sized(block.url, 720) }} style={[styles.media, { aspectRatio: ratio }]} resizeMode="cover" />;
+    if (!imageUri) return;
+    Image.getSize(imageUri, (w, h) => (w > 0 && h > 0 ? setRatio(Math.max(0.6, w / h)) : undefined), () => undefined);
+  }, [imageUri]);
+  if (imageUri) {
+    return <Image source={{ uri: imageUri }} style={[styles.media, { aspectRatio: ratio }]} resizeMode="cover" />;
   }
   const youtube = youtubeIdOf(block.url);
   return (
@@ -215,9 +218,10 @@ function PaperBlocks({ blocks }: { blocks: Block[] }) {
 
 const styles = themedStyles(() => ({
   media: { width: '100%', borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, overflow: 'hidden', marginVertical: spacing.xs },
-  videoTile: { aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B0B0D' },
+  // The tile keeps `media`'s themed surface; a YouTube poster covers it anyway.
+  videoTile: { aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center' },
   play: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
-  heading: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 26, color: colors.goldLight, textAlign: textStart },
+  heading: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 26, color: colors.goldLightText, textAlign: textStart },
   // M176: the white-sheet palette — ink text, dark gold accents, air between the thoughts.
   paperBody: { gap: spacing.sm + 2 },
   paperHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -248,10 +252,10 @@ const styles = themedStyles(() => ({
     marginTop: 2,
   },
   factTexts: { flex: 1, gap: 2 },
-  factLabel: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLight, textAlign: textStart },
+  factLabel: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLightText, textAlign: textStart },
   factText: { ...typography.body, color: colors.textPrimary, textAlign: textStart },
   bullet: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   diamond: { color: colors.gold, fontSize: 9, lineHeight: 26 },
   bulletText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
-  lit: { fontFamily: fonts.semiBold, color: colors.goldLight },
+  lit: { fontFamily: fonts.semiBold, color: colors.goldLightText },
 }));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { usePathname, useRouter, type Href } from 'expo-router';
-import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname, useRouter, useSegments, type Href } from 'expo-router';
+import { useEffect, useState, type ComponentProps } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
@@ -20,7 +20,8 @@ const TABS: TabDefinition[] = [
   { key: 'home', path: '/', title: 'tabs.home', icon: 'home', iconOutline: 'home-outline' },
   { key: 'projects', path: '/projects', title: 'tabs.projects', icon: 'briefcase', iconOutline: 'briefcase-outline' },
   { key: 'advisor', path: '/advisor', title: 'tabs.advisor', icon: 'sparkles', iconOutline: 'sparkles-outline' },
-  { key: 'news', path: '/news', title: 'tabs.inbox', icon: 'mail', iconOutline: 'mail-outline' },
+  // The group is spelled out: «/news» alone also names the news list (app/news/index), which is not this tab.
+  { key: 'news', path: '/(tabs)/news', title: 'tabs.inbox', icon: 'mail', iconOutline: 'mail-outline' },
   { key: 'account', path: '/account', title: 'tabs.account', icon: 'person', iconOutline: 'person-outline' },
 ];
 
@@ -31,7 +32,8 @@ const TAB_PATHS = new Set(['/', '/projects', '/advisor', '/news', '/account']);
 /** Which tab a detail screen belongs to, so the bar keeps a lit section while browsing deep pages. */
 function sectionOf(path: string): string {
   if (path.startsWith('/project') || path.startsWith('/golden')) return 'projects';
-  if (path.startsWith('/news') || path.startsWith('/posts')) return 'news';
+  // The inbox tab lights for the management's messages only; news pages belong to the home's news door.
+  if (path.startsWith('/posts')) return 'news';
   if (
     path.startsWith('/membership') ||
     path.startsWith('/payment') ||
@@ -43,6 +45,21 @@ function sectionOf(path: string): string {
   )
     return 'account';
   return 'home';
+}
+
+/** Android resizes the window for the keyboard, which lifts this in-flow bar above it; the bar steps aside while typing (the (tabs) bar does the same). */
+function useKeyboardOpenOnAndroid(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const shown = Keyboard.addListener('keyboardDidShow', () => setOpen(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setOpen(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  return open;
 }
 
 /**
@@ -61,7 +78,12 @@ export function GlobalTabBar() {
   const advisorContext = useCurrentAdvisorContext();
   // M99: mirror the (tabs) bar — a tab the persona hides leaves this twin too.
   const hiddenTabs = useHiddenTabs();
-  if (TAB_PATHS.has(pathname) || HIDDEN.some((prefix) => pathname.startsWith(prefix))) return null;
+  const keyboardOpen = useKeyboardOpenOnAndroid();
+  const segments = useSegments();
+  // The inbox tab and the news list both answer to «/news»; only the tab has the navigator's own bar,
+  // so on the news list (first segment «news») this twin must show.
+  const newsList = pathname === '/news' && segments[0] === 'news';
+  if (keyboardOpen || (TAB_PATHS.has(pathname) && !newsList) || HIDDEN.some((prefix) => pathname.startsWith(prefix))) return null;
   const active = sectionOf(pathname);
   const badgeOf = (key: string): number =>
     key === 'news' ? badges.inbox : key === 'projects' ? badges.projects : key === 'home' ? badges.home : key === 'account' ? badges.account : 0;

@@ -19,6 +19,7 @@ import { StructuredText } from '@/components/StructuredText';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDate, formatRelativeTime } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { playVideo } from '@/lib/player';
 import { themedStyles } from '@/theme/styles';
@@ -88,8 +89,8 @@ export default function PostScreen() {
             </FadeInView>
           ) : null}
           {post.images.map((uri, index) => (
-            <FadeInView key={uri} delay={entranceDelay(6 + index)}>
-              <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+            <FadeInView key={`${index}:${uri}`} delay={entranceDelay(6 + index)}>
+              <Image source={{ uri: sized(uri, 400) }} style={styles.image} resizeMode="contain" accessibilityLabel={post.title} />
             </FadeInView>
           ))}
           {post.links.map((link, index) => (
@@ -236,7 +237,7 @@ function VideoTile({ url, poster, posterFit, label, title }: { url: string; post
   const router = useRouter();
   return (
     <PressScale accessibilityLabel={label} onPress={() => playVideo(router, { url, title: title ?? label, poster })} glow glowRadius={radii.lg} style={styles.video}>
-      {poster ? <Image source={{ uri: poster }} style={styles.videoImage} resizeMode={posterFit} /> : <View style={styles.videoImage} />}
+      {poster ? <Image source={{ uri: sized(poster, 400) }} style={styles.videoImage} resizeMode={posterFit} /> : <View style={styles.videoImage} />}
       <View style={styles.play}>
         <Ionicons name="play" size={28} color={colors.goldInk} />
       </View>
@@ -280,8 +281,8 @@ const styles = themedStyles(() => ({
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.md },
   optionBar: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm + 2 },
   optionLabel: { ...typography.body, flex: 1, color: colors.textPrimary, textAlign: textStart },
-  optionLabelMine: { fontFamily: fonts.semiBold, color: colors.goldLight },
-  optionVotes: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLight, writingDirection: 'ltr' },
+  optionLabelMine: { fontFamily: fonts.semiBold, color: colors.goldLightText },
+  optionVotes: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLightText, writingDirection: 'ltr' },
   pollMeta: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   event: { gap: spacing.md, padding: spacing.md },
   eventRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

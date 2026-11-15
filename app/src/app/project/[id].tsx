@@ -3,7 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Animated, Image, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { goldenCodeForUrl, useGolden, useProject } from '@/api/queries';
+import { goldenCodeForUrl, useGolden, useProject, useProjectBrief } from '@/api/queries';
 import { useAdvisorScreen, useAskAdvisor, useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
 import { Highlight } from '@/components/Highlight';
@@ -15,7 +15,7 @@ import { RateProjectModal } from '@/components/project/RateProjectModal';
 import { StarsRow } from '@/components/Stars';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { isRTL, textStart } from '@/i18n/direction';
+import { isRTL, textDir, textStart } from '@/i18n/direction';
 import { trackProjectView } from '@/lib/adsAttribution';
 import { formatNumber } from '@/lib/format';
 import { topicIcon, type IoniconName } from '@/lib/icons';
@@ -31,6 +31,10 @@ export default function ProjectScreen() {
   const query = useProject(id);
   const golden = useGolden();
   const project = query.data?.project;
+  // The same cached query the «ملخص المستشار» block reads (no second request). The brief carries the disclaimer;
+  // when it settled without data the founder's own text below gets the disclaimer instead — never both.
+  const brief = useProjectBrief(project ? String(project.id) : undefined);
+  const briefMissing = Boolean(project) && !brief.isPending && !brief.data;
   // §5.1: a partner page that belongs to a golden company opens as the native offer page.
   const partnerCode = goldenCodeForUrl(golden.data, project?.goldenPartnerUrl ?? null);
   const advisorContext = project ? ({ type: 'project', id: project.id, title: project.title } as const) : null;
@@ -75,14 +79,14 @@ export default function ProjectScreen() {
                   setPage(Math.min(project.gallery.length - 1, Math.max(0, index)));
                 }}
               >
-                {project.gallery.map((uri) => (
-                  <GalleryImage key={uri} uri={uri} width={imageWidth} />
+                {project.gallery.map((uri, index) => (
+                  <GalleryImage key={`${index}:${uri}`} uri={uri} width={imageWidth} />
                 ))}
               </ScrollView>
               {project.gallery.length > 1 ? (
                 <View style={styles.dots}>
                   {project.gallery.map((uri, index) => (
-                    <View key={uri} style={[styles.dot, index === page && styles.dotActive]} />
+                    <View key={`${index}:${uri}`} style={[styles.dot, index === page && styles.dotActive]} />
                   ))}
                 </View>
               ) : null}
@@ -113,7 +117,7 @@ export default function ProjectScreen() {
           ) : null}
 
           <FadeInView delay={30}>
-            <Text style={styles.title}>{project.title}</Text>
+            <Text style={[styles.title, textDir(project.title)]}>{project.title}</Text>
             {/* M116d (owner): a tap on the stars under the name opens the rating sheet right away. */}
             {project.rating ? (
               <PressScale onPress={() => setRateOpen(true)} accessibilityRole="button" accessibilityLabel={t('ratings.add')} wrapStyle={styles.titleStars}>
@@ -123,15 +127,16 @@ export default function ProjectScreen() {
           </FadeInView>
           {project.titleEn ? (
             <FadeInView delay={50}>
-              <Text style={styles.titleEn}>{project.titleEn}</Text>
+              <Text style={[styles.titleEn, textDir(project.titleEn)]}>{project.titleEn}</Text>
             </FadeInView>
           ) : null}
 
           <FadeInView delay={70}>
             <View style={styles.tags}>
-              {project.sector ? <Text style={styles.tag}>{project.sector.name}</Text> : null}
-              {project.stage ? <Text style={styles.tag}>{project.stage.name}</Text> : null}
-              {project.number ? <Text style={styles.tag}>{t('project.number', { number: project.number })}</Text> : null}
+              {/* The padding sits on a View: Android measures a padded Text too narrow and clips the last letter. */}
+              {project.sector ? <Tag label={project.sector.name} /> : null}
+              {project.stage ? <Tag label={project.stage.name} /> : null}
+              {project.number ? <Tag label={t('project.number', { number: project.number })} /> : null}
             </View>
           </FadeInView>
 
@@ -184,7 +189,7 @@ export default function ProjectScreen() {
           {/* M80 (owner): the original text hides behind «اقرأ المزيد», collapsed by default. */}
           {project.details ?? project.detailsEn ? (
             <FadeInView delay={240}>
-              <ReadMore text={project.details ?? project.detailsEn ?? ''} />
+              <ReadMore text={project.details ?? project.detailsEn ?? ''} disclaimer={briefMissing} />
             </FadeInView>
           ) : null}
 
@@ -204,8 +209,18 @@ export default function ProjectScreen() {
   );
 }
 
+function Tag({ label }: { label: string }) {
+  return (
+    <View style={styles.tag}>
+      <Text style={styles.tagText} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 /** M80: the project's raw description behind an «اقرأ المزيد» expander — a tap reveals the original wording. */
-function ReadMore({ text }: { text: string }) {
+function ReadMore({ text, disclaimer }: { text: string; disclaimer: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={styles.section}>
@@ -214,7 +229,7 @@ function ReadMore({ text }: { text: string }) {
         <Text style={styles.sectionTitle}>{t('project.about')}</Text>
         <View style={styles.readMorePill}>
           <Text style={styles.readMorePillText}>{open ? t('project.readLess') : t('project.readMore')}</Text>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.goldLight} />
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.goldLightText} />
         </View>
       </PressScale>
       {open ? (
@@ -222,12 +237,14 @@ function ReadMore({ text }: { text: string }) {
           <RichText text={text} />
         </FadeInView>
       ) : null}
+      {/* A valuation in the founder's text always carries the disclaimer; with the brief shown it is already on the page. */}
+      {disclaimer ? <Text style={styles.disclaimer}>{t('project.disclaimer')}</Text> : null}
     </View>
   );
 }
 
 // M95 (owner): long content rotates through soft accents so pages never read single-toned.
-const GOLD_ACCENT = lazyTokens(() => ({ ink: colors.goldLight, bg: colors.goldSoft, border: colors.borderGoldSoft }));
+const GOLD_ACCENT = lazyTokens(() => ({ ink: colors.goldLightText, bg: colors.goldSoft, border: colors.borderGoldSoft }));
 // M196: the pale inks of the dark theme vanish on white, so the light theme gets their deep cousins.
 const RICH_ACCENTS = lazyTokens(() => {
   const light = getThemeName() === 'light';
@@ -412,21 +429,22 @@ const styles = themedStyles(() => ({
   titleEn: { ...typography.body, color: colors.textSecondary },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: {
-    ...typography.caption,
-    color: colors.goldLight,
     paddingVertical: 4,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
+    maxWidth: '100%',
   },
+  tagText: { ...typography.caption, color: colors.goldLightText },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.md },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, maxWidth: '70%' },
   metaText: { ...typography.caption, color: colors.textSecondary },
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.gold },
   body: { ...typography.body, color: colors.textSecondary },
+  disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   readMoreHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   readMorePill: {
     flexDirection: 'row',
@@ -440,7 +458,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldSoft,
     marginStart: 'auto',
   },
-  readMorePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  readMorePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText },
   // M80: the signposted «عن المشروع».
   rich: { gap: spacing.sm },
   richHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
@@ -454,7 +472,7 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.borderGoldSoft,
   },
-  richHeadingText: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.goldLight, flex: 1, textAlign: textStart },
+  richHeadingText: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.goldLightText, flex: 1, textAlign: textStart },
   richBullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingStart: spacing.xs },
   richDiamond: { fontSize: 9, lineHeight: 24, color: colors.gold },
   richBulletText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },

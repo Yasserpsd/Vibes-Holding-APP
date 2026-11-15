@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Share, Text, View } from 'react-native';
+import { RefreshControl, Share, Text, View } from 'react-native';
 
 import { useAffiliate, affiliateApi, type AffiliateCycle, type AffiliatePayout, type AffiliateReferral } from '@/api/affiliate';
 import { errorMessage } from '@/api/client';
@@ -16,7 +16,7 @@ import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { formatArabicDate, formatNumber } from '@/lib/format';
+import { formatArabicDate, formatNumber, formatSar } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
 
@@ -36,6 +36,27 @@ export default function AffiliateScreen() {
   const overview = useAffiliate(status === 'signedIn');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Pull down to see a newer state at once (the approval, a new referral, a paid payout).
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await overview.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // The account is still being restored: no sign-in prompt flashes at a signed-in member.
+  if (status === 'loading') {
+    return (
+      <Screen title={t('affiliate.title')}>
+        <Stack.Screen options={{ title: t('nav.affiliate') }} />
+        <StateView loading />
+      </Screen>
+    );
+  }
 
   if (status !== 'signedIn' || !me) {
     return (
@@ -63,16 +84,22 @@ export default function AffiliateScreen() {
   };
 
   const share = async () => {
-    if (!data?.shareText) return;
+    // An older server sends no ready sentence: the personal link alone is still worth sharing.
+    const message = data?.shareText || data?.link;
+    if (!message) return;
     try {
-      await Share.share({ message: data.shareText });
+      await Share.share({ message });
     } catch {
       // The member closed the share sheet or the system refused it; nothing to do.
     }
   };
 
   return (
-    <Screen title={t('affiliate.title')} subtitle={t('affiliate.subtitle')}>
+    <Screen
+      title={t('affiliate.title')}
+      subtitle={t('affiliate.subtitle')}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
+    >
       <Stack.Screen options={{ title: t('nav.affiliate') }} />
 
       {!data ? (
@@ -83,21 +110,21 @@ export default function AffiliateScreen() {
           <FadeInView delay={entranceDelay(0)}>
             <GlassCard radius={radii.lg} style={styles.balanceCard}>
               <Text style={styles.balanceLabel}>{t('affiliate.available')}</Text>
-              <SarText style={styles.balanceValue}>{`${formatNumber(data.balance.available)} ريال`}</SarText>
+              <SarText style={styles.balanceValue}>{`${formatSar(data.balance.available)} ريال`}</SarText>
               <View style={styles.balanceRow}>
                 <BalanceCell label={t('affiliate.paidCount')} value={formatNumber(data.balance.paid)} />
                 <BalanceCell label={t('affiliate.unpaidCount')} value={formatNumber(data.balance.unpaid)} />
-                <BalanceCell label={t('affiliate.withdrawn')} value={formatNumber(data.balance.withdrawn)} />
+                <BalanceCell label={t('affiliate.withdrawn')} value={formatSar(data.balance.withdrawn)} />
               </View>
               <SarText style={styles.commissionNote}>
                 {data.balance.commissionMember === undefined
-                  ? t('affiliate.commissionNote', { amount: formatNumber(data.balance.commission) })
+                  ? t('affiliate.commissionNote', { amount: formatSar(data.balance.commission) })
                   : data.balance.member
-                    ? t('affiliate.commissionMember', { amount: formatNumber(data.balance.commission) })
-                    : t('affiliate.commissionBase', { amount: formatNumber(data.balance.commission), member: formatNumber(data.balance.commissionMember) })}
+                    ? t('affiliate.commissionMember', { amount: formatSar(data.balance.commission) })
+                    : t('affiliate.commissionBase', { amount: formatSar(data.balance.commission), member: formatSar(data.balance.commissionMember) })}
               </SarText>
               {data.balance.bonuses ? (
-                <SarText style={styles.commissionNote}>{t('affiliate.bonuses', { amount: formatNumber(data.balance.bonuses) })}</SarText>
+                <SarText style={styles.commissionNote}>{t('affiliate.bonuses', { amount: formatSar(data.balance.bonuses) })}</SarText>
               ) : null}
             </GlassCard>
           </FadeInView>
@@ -111,10 +138,17 @@ export default function AffiliateScreen() {
           <FadeInView delay={entranceDelay(1)}>
             <View style={styles.linkBox}>
               <Text style={styles.linkLabel}>{t('affiliate.linkLabel')}</Text>
-              {data.link ? <Text style={styles.link}>{`${LRM}${data.link}`}</Text> : null}
+              {/* `selectable`: a long press selects and copies the link or the code on both platforms. */}
+              {data.link ? (
+                <Text style={styles.link} selectable>
+                  {`${LRM}${data.link}`}
+                </Text>
+              ) : null}
               {/* M202 (owner): the short code alone; the long membership number is gone from this screen. */}
               <Text style={styles.codeLine}>{t('affiliate.codeLabel')}</Text>
-              <Text style={styles.shortCode}>{`${LRM}${data.code ?? ''}`}</Text>
+              <Text style={styles.shortCode} selectable>
+                {`${LRM}${data.code ?? ''}`}
+              </Text>
             </View>
           </FadeInView>
 
@@ -239,9 +273,9 @@ function CycleCard({ cycle }: { cycle: AffiliateCycle }) {
       </View>
       {cycle.state === 'running' ? <Text style={styles.cycleNote}>{t('affiliate.cycleEnds', { date: formatArabicDate(cycle.endAt) })}</Text> : null}
       {cycle.achieved ? (
-        <SarText style={styles.cycleNote}>{t('affiliate.cycleAchieved', { bonus: formatNumber(cycle.bonus) })}</SarText>
+        <SarText style={styles.cycleNote}>{t('affiliate.cycleAchieved', { bonus: formatSar(cycle.bonus) })}</SarText>
       ) : cycle.state === 'running' && cycle.bonus > 0 ? (
-        <SarText style={styles.cycleNote}>{t('affiliate.cycleBonusHint', { target: formatNumber(cycle.target), bonus: formatNumber(cycle.bonus) })}</SarText>
+        <SarText style={styles.cycleNote}>{t('affiliate.cycleBonusHint', { target: formatNumber(cycle.target), bonus: formatSar(cycle.bonus) })}</SarText>
       ) : null}
       {cycle.state === 'renewal' ? <Notice tone="info" text={t('affiliate.cycleRenewal')} /> : null}
     </GlassCard>
@@ -273,7 +307,7 @@ function PayoutRow({ payout }: { payout: AffiliatePayout }) {
     <GlassCard radius={radii.md} style={styles.row}>
       <Ionicons name="cash-outline" size={20} color={payout.status === 'paid' ? colors.gold : colors.textMuted} />
       <View style={styles.rowText}>
-        <SarText style={styles.rowName}>{`${formatNumber(payout.amount)} ريال`}</SarText>
+        <SarText style={styles.rowName}>{`${formatSar(payout.amount)} ريال`}</SarText>
         <Text style={styles.rowState}>{`${t(stateKey)} · ${formatArabicDate(payout.requestedAt)}`}</Text>
         {payout.adminNote && !(getLang() === 'en' && /[؀-ۿ]/.test(payout.adminNote)) ? <Text style={styles.rowState}>{payout.adminNote}</Text> : null}
       </View>

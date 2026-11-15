@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Text, View } from 'react-native';
 
@@ -11,7 +12,9 @@ import { entranceDelay, FadeInView, PopIn, Sheen, usePulse } from '@/components/
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
-import { t, type StringKey } from '@/i18n';
+import { SupportLink } from '@/components/SupportLink';
+import { env } from '@/config/env';
+import { getLang, t, type StringKey } from '@/i18n';
 import { trackServicePurchase } from '@/lib/adsAttribution';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDateTime } from '@/lib/format';
@@ -39,6 +42,10 @@ const STATE: Record<PaymentStatus, { title: StringKey; text: StringKey; color: s
   },
 }));
 
+// How long a payment may stay «created» before the waiting text gains the support line.
+const LATE_AFTER_MS = 2 * 60_000;
+const ARABIC_LETTERS = /[؀-ۿ]/;
+
 /** One payment: the status as the server knows it (from the gateway callback), the details, and the way back. */
 export default function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,6 +63,24 @@ export default function PaymentScreen() {
     if (watched.status === 'created') sawCreated.current = true;
     else if (watched.status === 'paid' && sawCreated.current) trackServicePurchase(watched);
   }, [watched]);
+  // The «مدفوعاتي» list under this screen must not keep showing «بانتظار الدفع» once the server has settled the payment.
+  const queryClient = useQueryClient();
+  const settledStatus = watched && watched.status !== 'created' ? watched.status : null;
+  useEffect(() => {
+    if (settledStatus) void queryClient.invalidateQueries({ queryKey: ['payments', 'mine'] });
+  }, [settledStatus, queryClient]);
+  // A payment still «created» two minutes after it was made: the confirmation is late, so the support line joins
+  // the waiting text. The timer only marks WHICH payment turned late; the status itself stays the server's.
+  const waitingSince = watched?.status === 'created' ? watched.createdAt : null;
+  const [lateSince, setLateSince] = useState<string | null>(null);
+  useEffect(() => {
+    if (!waitingSince) return;
+    const age = Date.now() - Date.parse(waitingSince);
+    const left = Number.isNaN(age) ? LATE_AFTER_MS : LATE_AFTER_MS - age;
+    const timer = setTimeout(() => setLateSince(waitingSince), Math.max(0, left));
+    return () => clearTimeout(timer);
+  }, [waitingSince]);
+  const late = waitingSince !== null && lateSince === waitingSince;
 
   if (!data) {
     return (
@@ -67,8 +92,15 @@ export default function PaymentScreen() {
 
   const { payment } = data;
   const state = STATE[payment.status];
-  // M111: the checkout renders embedded inside the app («الدفع جوا نفس الصفحة», owner).
-  const reopen = () => router.push({ pathname: '/checkout/[id]', params: { id: payment.id } });
+  // M111: the checkout renders embedded inside the app («الدفع جوا نفس الصفحة», owner). `replace`, not `push`:
+  // the checkout ends by replacing itself with this screen, so a push left two copies of it in the stack.
+  const reopen = () => router.replace({ pathname: '/checkout/[id]', params: { id: payment.id } });
+  // The gateway's own words are shown only when they are in the app's language (Arabic letters in Arabic, none
+  // in English); a raw technical line in the other language is dropped and the general sentence stands alone.
+  const reason =
+    payment.status === 'failed' && payment.failureReason && ARABIC_LETTERS.test(payment.failureReason) === (getLang() === 'ar') ? payment.failureReason : null;
+  // M110: the server's printable invoice page (paid payments only), opened inside the app.
+  const invoiceUrl = payment.status === 'paid' && payment.invoiceNo && env.apiBaseUrl ? `${env.apiBaseUrl}/pay/invoice/${encodeURIComponent(payment.id)}` : null;
 
   return (
     <Screen>
@@ -88,8 +120,14 @@ export default function PaymentScreen() {
           </PopIn>
           <Text style={[styles.stateTitle, { color: state.color }]}>{t(state.title)}</Text>
           <Text style={styles.stateText}>{t(state.text)}</Text>
+          {payment.status === 'created' && late ? (
+            <>
+              <Text style={styles.stateText}>{t('payment.createdLate')}</Text>
+              <SupportLink problem={`${t('payment.created.title')} — ${payment.serviceTitle} — ${t('payment.id')}: ${payment.id}`} />
+            </>
+          ) : null}
           {payment.status === 'paid' ? <WhatsappNote kind="invoice" /> : null}
-          {payment.status === 'failed' && payment.failureReason ? <Text style={styles.reason}>{t('payment.gatewayReason', { reason: payment.failureReason })}</Text> : null}
+          {reason ? <Text style={styles.reason}>{t('payment.gatewayReason', { reason })}</Text> : null}
           {payment.status === 'paid' && heroSize ? <Sheen width={heroSize.width} height={heroSize.height} /> : null}
         </View>
       </FadeInView>
@@ -105,12 +143,20 @@ export default function PaymentScreen() {
             ))}
           <Row label={t('payment.createdAt')} value={formatArabicDateTime(payment.createdAt)} />
           {payment.paidAt ? <Row label={t('payment.paidAt')} value={formatArabicDateTime(payment.paidAt)} /> : null}
+          {payment.status === 'paid' && payment.invoiceNo ? <Row label={t('payment.invoiceNo')} value={String(payment.invoiceNo)} latin /> : null}
           {payment.transactionId ? <Row label={t('payment.gatewayId')} value={payment.transactionId} latin /> : null}
           <Row label={t('payment.id')} value={payment.id} latin />
         </GlassCard>
       </FadeInView>
 
       <FadeInView delay={entranceDelay(2)} style={styles.actions}>
+        {invoiceUrl ? (
+          <AppButton
+            label={t('payment.viewInvoice')}
+            icon="document-text-outline"
+            onPress={() => router.push({ pathname: '/webpage', params: { url: invoiceUrl, title: t('payment.viewInvoice') } } as Href)}
+          />
+        ) : null}
         {payment.status === 'created' ? <AppButton label={t('payment.openCheckout')} icon="card-outline" onPress={() => void reopen()} /> : null}
         {payment.status === 'created' ? <AppButton label={t('payment.refreshStatus')} variant="outline" icon="refresh-outline" onPress={() => void refetch()} /> : null}
         {payment.status === 'failed' ? (

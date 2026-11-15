@@ -60,6 +60,7 @@ export default function HqAdminScreen() {
   };
 
   const verify = async () => {
+    if (!code.trim()) return;
     setActionError(null);
     try {
       setVerifyResult(await hqApi.verify(code.trim()));
@@ -134,7 +135,7 @@ const styles = themedStyles(() => ({
   name: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   latin: { writingDirection: 'ltr' },
-  status: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  status: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   action: { flex: 1 },
   // The scanned code is checked inside a gold-framed card: the desk's own little stage.

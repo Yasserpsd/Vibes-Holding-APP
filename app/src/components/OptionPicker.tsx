@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type Ref } from 'react';
-import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FieldError } from '@/components/form/FormParts';
@@ -61,6 +61,8 @@ export function OptionPicker({ label, options, selected, onSelect, placeholder, 
       </Pressable>
       {error ? <FieldError text={error} /> : hint ? <Text style={[styles.hint, { color: palette.muted }]}>{hint}</Text> : null}
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+        {/* The search field opens the keyboard at once: the sheet rises above it so the end of the list stays reachable. */}
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={[styles.sheet, { backgroundColor: palette.card, borderColor: palette.cardBorder }]} onPress={() => undefined}>
             <TextInput
@@ -100,12 +102,14 @@ export function OptionPicker({ label, options, selected, onSelect, placeholder, 
             />
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
 const styles = themedStyles(() => ({
+  flex: { flex: 1 },
   field: { gap: spacing.xs },
   label: { ...typography.caption, textAlign: textStart },
   input: {

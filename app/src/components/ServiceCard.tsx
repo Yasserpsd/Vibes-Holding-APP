@@ -19,7 +19,7 @@ export function ServiceCard({ service, onPress }: Props) {
   const { locked } = service;
   return (
     // M120 (owner): tapping a members-only service answers with the subscribe popup, not the page.
-    <PressScale onPress={locked ? showMembershipGate : onPress}>
+    <PressScale onPress={locked ? showMembershipGate : onPress} accessibilityRole="button" accessibilityLabel={service.title}>
       <GlassCard style={[styles.card, locked && styles.lockedCard]}>
         <View style={[styles.iconBox, !locked && styles.iconBoxLit]}>
           <Ionicons name={iconFor(service.icon)} size={22} color={locked ? colors.textMuted : colors.gold} />
@@ -31,7 +31,7 @@ export function ServiceCard({ service, onPress }: Props) {
             </Text>
             {locked ? (
               <View style={styles.lock}>
-                <Ionicons name="lock-closed" size={11} color={colors.goldLight} />
+                <Ionicons name="lock-closed" size={11} color={colors.goldLightText} />
                 <Text style={styles.lockText}>{t('services.membersOnly')}</Text>
               </View>
             ) : null}
@@ -101,11 +101,11 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: colors.goldSoft,
   },
-  lockText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  lockText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLightText },
   summary: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 2 },
   price: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.textPrimary },
-  member: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  member: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText },
   ctaRow: { flexDirection: 'row', marginTop: spacing.xs },
   ctaPill: {
     flexDirection: 'row',

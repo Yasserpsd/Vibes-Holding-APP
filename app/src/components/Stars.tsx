@@ -24,7 +24,8 @@ export function StarsRow({ value, count, size = 14 }: { value: number | null; co
           <Ionicons key={index} name={name} size={size} color={value === null ? colors.goldDark : colors.gold} />
         ))}
       </View>
-      {value !== null ? <Text style={[styles.value, { fontSize: size - 1, lineHeight: size + 4 }]}>{value}</Text> : null}
+      {/* One decimal at most: an average like 4.3333 must never reach the member. */}
+      {value !== null ? <Text style={[styles.value, { fontSize: size - 1, lineHeight: size + 4 }]}>{String(Math.round(value * 10) / 10)}</Text> : null}
       {value !== null && count !== undefined && count > 0 ? (
         <Text style={[styles.count, { fontSize: size - 2, lineHeight: size + 4 }]}>({count})</Text>
       ) : null}

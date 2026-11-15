@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { useServices, type ServiceGroupKey } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
@@ -14,7 +15,7 @@ import { WalletCard } from '@/components/WalletCard';
 import { t } from '@/i18n';
 import { formatServiceCount } from '@/lib/format';
 import type { IoniconName } from '@/lib/icons';
-import { spacing } from '@/theme/tokens';
+import { colors, spacing } from '@/theme/tokens';
 
 // Icons pass (owner's priority 1): each group's own golden badge on its header.
 const GROUP_ICONS: Record<ServiceGroupKey, IoniconName> = {
@@ -28,7 +29,17 @@ export default function ServicesScreen() {
   const router = useRouter();
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useServices();
+  const [refreshing, setRefreshing] = useState(false);
   useAdvisorScreen({ type: 'screen', id: 'services', title: data?.title ?? t('nav.services') });
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (!data) {
     return (
@@ -42,7 +53,11 @@ export default function ServicesScreen() {
   let order = 0;
 
   return (
-    <Screen title={data.title} subtitle={data.intro}>
+    <Screen
+      title={data.title}
+      subtitle={data.intro}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
+    >
       {/* LockedNotice animates its own entrance — wrapping it again would stall the lock's pop. */}
       {!data.isMember ? <LockedNotice text={data.lockedText} guest={status !== 'signedIn'} /> : null}
       {/* M144 (owner): «رصيد بنك المشاريع» inside the services — balance, open a project, or renew. */}
@@ -51,6 +66,7 @@ export default function ServicesScreen() {
           <WalletCard />
         </FadeInView>
       ) : null}
+      {data.services.length === 0 ? <StateView empty emptyText={t('common.noResults')} /> : null}
       {data.groups.map((group) => {
         const items = data.services.filter((service) => service.group === group.key);
         if (!items.length) return null;
@@ -74,7 +90,6 @@ export default function ServicesScreen() {
   );
 }
 
-/** Icons pass: the services in numbers — how many, how many are members-only, and the total member saving. */
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
 });

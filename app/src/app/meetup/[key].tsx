@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Text, View, type ScrollView } from 'react-native';
 
 import { useMeetupsContent, type Meetup } from '@/api/content';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
@@ -24,17 +25,20 @@ export default function MeetupScreen() {
   const { data, isLoading, error, refetch } = useMeetupsContent();
   const meetup: Meetup | undefined = data?.meetups.find((entry) => entry.key === key);
   useAdvisorScreen(meetup ? { type: 'service', id: `meetup-${meetup.key}`, title: meetup.title } : null);
+  // The registration form scrolls the page to its first red field.
+  const scrollRef = useRef<ScrollView | null>(null);
 
   if (!meetup) {
     return (
       <Screen>
-        <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />
+        {/* Content loaded but this key is not in it (a stale deep link): say so instead of a blank screen. */}
+        <StateView loading={isLoading} error={error} empty={Boolean(data)} onRetry={() => void refetch()} />
       </Screen>
     );
   }
 
   return (
-    <Screen title={meetup.title} subtitle={meetup.tagline || undefined}>
+    <Screen scrollRef={scrollRef} title={meetup.title} subtitle={meetup.tagline || undefined}>
       <Stack.Screen options={{ title: `${meetup.badge} ${meetup.title}` }} />
       {meetup.videoUrl ? (
         <FadeInView>
@@ -60,7 +64,7 @@ export default function MeetupScreen() {
       <FadeInView delay={entranceDelay(3)}>
         <SectionHeader icon="create-outline" title={meetup.cta} subtitle={t('meetups.formHint')} />
       </FadeInView>
-      <FormEmbed formKey={meetup.formKey} />
+      <FormEmbed formKey={meetup.formKey} scrollRef={scrollRef} />
     </Screen>
   );
 }
@@ -80,6 +84,6 @@ const styles = themedStyles(() => ({
     experimental_backgroundImage: gradients.goldWash,
   },
   featureBody: { flex: 1, gap: 2 },
-  featureTitle: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight, textAlign: textStart },
+  featureTitle: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLightText, textAlign: textStart },
   featureText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
 }));

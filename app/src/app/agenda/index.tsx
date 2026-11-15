@@ -51,14 +51,19 @@ export default function AgendaScreen() {
   );
 }
 
-export function EventDateBadge({ date, size = 'md', highlight = false }: { date: string; size?: 'sm' | 'md'; highlight?: boolean }) {
+/**
+ * The date chip. On a card it sits ON the photo (dark in both themes), so it keeps its dark glass;
+ * `onPage` is for the event page, where it sits on the page itself and follows the theme.
+ */
+export function EventDateBadge({ date, size = 'md', highlight = false, onPage = false }: { date: string; size?: 'sm' | 'md'; highlight?: boolean; onPage?: boolean }) {
   const day = date.slice(8, 10);
-  const month = new Date(`${date}T12:00:00Z`).toLocaleDateString(getLang() === 'en' ? 'en' : 'ar', { month: 'short' });
+  // The date is a plain calendar day: read it in UTC so a phone far east of Riyadh never flips the month at a month end.
+  const month = new Date(`${date}T12:00:00Z`).toLocaleDateString(getLang() === 'en' ? 'en' : 'ar', { month: 'short', timeZone: 'UTC' });
   const small = size === 'sm';
   return (
-    <View style={[styles.badge, small && styles.badgeSm, highlight && styles.badgeGlow]}>
-      <Text style={[styles.badgeDay, small && styles.badgeDaySm]}>{day}</Text>
-      <Text style={styles.badgeMonth}>{month}</Text>
+    <View style={[styles.badge, onPage && styles.badgeOnPage, small && styles.badgeSm, highlight && styles.badgeGlow]}>
+      <Text style={[styles.badgeDay, onPage && styles.badgeDayOnPage, small && styles.badgeDaySm]}>{day}</Text>
+      <Text style={[styles.badgeMonth, onPage && styles.badgeMonthOnPage]}>{month}</Text>
     </View>
   );
 }
@@ -185,4 +190,8 @@ const styles = themedStyles(() => ({
   badgeDay: { color: colors.gold, fontFamily: fonts.bold, fontSize: 22, lineHeight: 26 },
   badgeDaySm: { fontSize: 18, lineHeight: 22 },
   badgeMonth: { ...typography.caption, color: colors.onPhotoSoft },
+  // On the page (not over a photo) the chip is a themed surface: same look in the dark, readable in the light.
+  badgeOnPage: { backgroundColor: colors.surface },
+  badgeDayOnPage: { color: colors.goldText },
+  badgeMonthOnPage: { color: colors.textSecondary },
 }));

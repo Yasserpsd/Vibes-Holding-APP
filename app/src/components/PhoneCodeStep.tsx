@@ -54,6 +54,8 @@ export function PhoneCodeStep({ step, onSubmit, onBack, submitLabel, helpText, i
     try {
       await onSubmit(value);
     } catch (cause) {
+      // The four digits go with the failure: the next four typed or pasted finish the step again at once.
+      setCode('');
       setError(errorMessage(cause));
     } finally {
       setBusy(false);

@@ -27,7 +27,7 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
   const primary = variant === 'primary';
   // M195: inside a FormCard the button wears the club identity — flat gold with navy text (no neon).
   const palette = useFormPalette();
-  const color = palette ? (primary ? palette.buttonText : palette.accent) : primary ? colors.goldInk : colors.gold;
+  const color = palette ? (primary ? palette.buttonText : palette.accent) : primary ? colors.goldInk : colors.goldText;
   const formStyle = palette
     ? primary
       ? { backgroundColor: palette.buttonBg, borderColor: palette.buttonBorder, experimental_backgroundImage: undefined, boxShadow: undefined }
@@ -64,6 +64,8 @@ export function AppButton({ label, onPress, variant = 'primary', icon, style, di
 
 const styles = themedStyles(() => ({
   base: {
+    // 44 pt is the smallest comfortable touch target (a one-line label already measures 48).
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

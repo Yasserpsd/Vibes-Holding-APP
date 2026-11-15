@@ -51,7 +51,7 @@ const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'person
  * the number on WhatsApp; bio, interests, member type and company are asked later in the profile.
  * M211 (owner, 2026-11-07): the number is confirmed right here, before the account exists, and the form does not go
  * through without it.
- * M212 (owner, 2026-11-07: Â«ÙÙØ³ ØµÙØ­Ø© Ø§ÙØªØ³Ø¬ÙÙ Ø¹Ø§Ø¯Ù Ø¬Ø¯Ø§â¦ Ø¨Ø³ ÙÙØ§ ÙÙÙÙ ÙÙ Ø¨ÙØªÙÙ ÙØ£ÙØ¯ Ø±ÙÙ ÙØ§ØªØ³ Ø§Ø¨Â»): a first Google/Apple
+ * M212 (owner, 2026-11-07: «نفس صفحة التسجيل عادي جدا… بس لما يكون في بوتون يأكد رقم واتس اب»): a first Google/Apple
  * sign-in lands on this same form (name and e-mail filled by the provider, no password), and the WhatsApp button
  * appears only once the number is complete and right.
  */

@@ -40,7 +40,7 @@ export function UpsellCard({ upsell }: { upsell: ServicesUpsell }) {
       <GlassCard golden radius={radii.lg} style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
-            <Ionicons name="sparkles" size={18} color={colors.goldLight} />
+            <Ionicons name="sparkles" size={18} color={colors.goldLightText} />
           </View>
           <View style={styles.cardTexts}>
             <Text style={styles.cardTitle}>{upsell.title}</Text>

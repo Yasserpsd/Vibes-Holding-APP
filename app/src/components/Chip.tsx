@@ -44,6 +44,8 @@ export function Chip({ label, selected = false, dimmed = false, onPress }: Props
           onPressOut={() => to(1)}
           accessibilityRole="button"
           accessibilityState={{ selected }}
+          // The pill is ~28 pt tall: the slop lifts the touch area to the 44 pt minimum without changing the layout.
+          hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
           style={[
             styles.chip,
             palette ? styles.chipForm : null,

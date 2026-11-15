@@ -168,7 +168,7 @@ function StageStepper({ stage }: { stage: Brief['stage'] }) {
           const done = known && index < stage.index;
           const current = known && index === stage.index;
           return (
-            <View key={label} style={styles.step}>
+            <View key={`${index}:${label}`} style={styles.step}>
               <View style={styles.track}>
                 {/* The line towards the previous step; in the RTL row that is the right half. */}
                 <View style={styles.lineSlot}>
@@ -212,8 +212,8 @@ function Points({ title, icon, tone, items }: { title: string; icon: IoniconName
         </PopIn>
         <Text style={styles.blockTitle}>{title}</Text>
       </View>
-      {items.map((item) => (
-        <View key={item} style={styles.point}>
+      {items.map((item, index) => (
+        <View key={`${index}:${item}`} style={styles.point}>
           <View style={[styles.bullet, { backgroundColor: tone }]} />
           {/* M95: figures inside a point take the section's own tone — greens for strengths, amber for risks. */}
           <Highlight text={item} style={styles.pointText} tone={tone} />
@@ -290,14 +290,14 @@ const styles = themedStyles(() => ({
   labelCell: { width: '36%', flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm, borderEndWidth: StyleSheet.hairlineWidth, borderEndColor: colors.border, backgroundColor: colors.goldFaint },
   labelIcon: { marginTop: 3 },
   valueCell: { flex: 1, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm },
-  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight, textAlign: textStart, flex: 1 },
+  labelText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLightText, textAlign: textStart, flex: 1 },
   valueText: { ...typography.caption, fontSize: 14, lineHeight: 22, color: colors.textPrimary, textAlign: textStart },
 
   blockTitle: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
   stage: { gap: spacing.sm },
   stageHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   stagePill: { paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.goldFaint, maxWidth: '70%' },
-  stagePillText: { ...typography.caption, color: colors.goldLight },
+  stagePillText: { ...typography.caption, color: colors.goldLightText },
   steps: { flexDirection: 'row', alignItems: 'flex-start' },
   step: { flex: 1, alignItems: 'center', gap: spacing.xs },
   track: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
@@ -309,7 +309,7 @@ const styles = themedStyles(() => ({
   nodeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.gold },
   stepLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 2 },
   stepLabelDone: { color: colors.textSecondary },
-  stepLabelCurrent: { fontFamily: fonts.semiBold, color: colors.goldLight },
+  stepLabelCurrent: { fontFamily: fonts.semiBold, color: colors.goldLightText },
   stageNote: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 
   points: { gap: spacing.xs + 2 },

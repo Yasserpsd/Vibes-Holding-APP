@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useNewsItem } from '@/api/news';
@@ -36,7 +37,7 @@ export default function NewsItemScreen() {
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
           {item.image ? (
             <FadeInView delay={entranceDelay(0)}>
-              <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+              <HeroImage uri={item.image} />
             </FadeInView>
           ) : null}
           <FadeInView delay={entranceDelay(1)}>
@@ -91,7 +92,7 @@ export default function NewsItemScreen() {
           </FadeInView>
           <FadeInView delay={entranceDelay(8)}>
             <GlassCard style={styles.noteCard}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.goldLight} />
+              <Ionicons name="information-circle-outline" size={20} color={colors.goldLightText} />
               <Text style={styles.noteText}>{t('news.sourceNote')}</Text>
             </GlassCard>
           </FadeInView>
@@ -101,12 +102,19 @@ export default function NewsItemScreen() {
   );
 }
 
+/** The source's picture; if it fails to load the empty grey block is dropped instead of sitting above the headline. */
+function HeroImage({ uri }: { uri: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return <Image source={{ uri }} style={styles.image} resizeMode="cover" onError={() => setFailed(true)} />;
+}
+
 const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.black },
   content: { padding: spacing.md, gap: spacing.md },
   image: { width: '100%', height: 200, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, boxShadow: shadows.lift },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  source: { ...typography.body, color: colors.goldLight },
+  source: { ...typography.body, color: colors.goldLightText },
   // Padding sits on a View: Android measures a padded Text too narrow and truncates it.
   tierPill: { paddingHorizontal: spacing.sm, borderRadius: radii.pill, backgroundColor: colors.surfaceElevated },
   tier: { ...typography.caption, color: colors.textSecondary },
@@ -133,7 +141,7 @@ const styles = themedStyles(() => ({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: {
     ...typography.caption,
-    color: colors.goldLight,
+    color: colors.goldLightText,
     paddingVertical: 4,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,

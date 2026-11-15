@@ -10,7 +10,8 @@ import { Chip } from '@/components/Chip';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { textEnd, textStart } from '@/i18n/direction';
+import { textDir, textEnd, textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
@@ -52,14 +53,14 @@ export function MessageBubble({ message, showQuickReplies, onQuickReply, onAct, 
     <>
       {message.role === 'staff' ? <Text style={styles.by}>{message.by ? t('advisor.staffBy', { name: message.by }) : t('advisor.staff')}</Text> : null}
       {message.image ? (
-        <Image source={{ uri: message.image }} style={styles.image} resizeMode="cover" accessibilityLabel={t('advisor.attachedImage')} />
+        <Image source={{ uri: sized(message.image, 220) }} style={styles.image} resizeMode="cover" accessibilityLabel={t('advisor.attachedImage')} />
       ) : null}
       {message.file ? <FileChip file={message.file} mine={mine} /> : null}
       {message.text && !(message.file && message.text === t('advisor.file.sent', { name: message.file.name })) ? (
         <RichText
           text={message.text}
           style={[styles.text, mine ? styles.textMine : styles.textTheirs]}
-          linkColor={mine ? colors.goldInk : colors.goldLight}
+          linkColor={mine ? colors.goldInk : colors.goldLightText}
           plain={mine}
         />
       ) : null}
@@ -142,7 +143,7 @@ function FileChip({ file, mine }: { file: AdvisorFile; mine: boolean }) {
   const body = (
     <>
       <Ionicons name="document-text" size={18} color={color} />
-      <Text style={[styles.fileName, { color }]} numberOfLines={1}>
+      <Text style={[styles.fileName, { color }, textDir(file.name)]} numberOfLines={1}>
         {file.name}
       </Text>
       {file.size > 0 ? <Text style={[styles.fileSize, { color }]}>{formatFileSize(file.size)}</Text> : null}
@@ -164,7 +165,7 @@ function SpeakButton({ id, text }: { id: number; text: string }) {
   };
   const label = state === 'playing' ? t('advisor.speak.stop') : state === 'loading' ? t('advisor.speak.loading') : t('advisor.speak.play');
   return (
-    <PressScale onPress={press} glow={state === 'playing'} glowRadius={radii.pill} style={[styles.speak, state !== 'idle' && styles.speakActive]} accessibilityLabel={label}>
+    <PressScale onPress={press} glow={state === 'playing'} glowRadius={radii.pill} hitSlop={7} style={[styles.speak, state !== 'idle' && styles.speakActive]} accessibilityLabel={label}>
       {state === 'loading' ? (
         <ActivityIndicator color={colors.gold} size="small" />
       ) : (
@@ -176,9 +177,11 @@ function SpeakButton({ id, text }: { id: number; text: string }) {
 
 function ActionButton({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
   return (
-    <PressScale onPress={onPress} glow glowRadius={radii.pill} wrapStyle={styles.actionWrap} style={styles.action}>
+    <PressScale onPress={onPress} glow glowRadius={radii.pill} hitSlop={6} wrapStyle={styles.actionWrap} style={styles.action}>
       <Ionicons name={icon} size={16} color={colors.gold} />
-      <Text style={styles.actionLabel}>{label}</Text>
+      <Text style={styles.actionLabel} numberOfLines={1}>
+        {label}
+      </Text>
     </PressScale>
   );
 }
@@ -212,7 +215,7 @@ const styles = themedStyles(() => ({
   timeTheirs: { color: colors.textMuted },
   widgets: { gap: spacing.xs, marginTop: spacing.xs, maxWidth: '86%' },
   quick: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
-  actionWrap: { alignSelf: 'flex-start' },
+  actionWrap: { alignSelf: 'flex-start', maxWidth: '100%' },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -224,7 +227,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: colors.goldFaint,
   },
-  actionLabel: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold },
+  actionLabel: { ...typography.caption, fontFamily: fonts.medium, color: colors.gold, flexShrink: 1 },
   card: { gap: spacing.xs, padding: spacing.md },
   cardTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   cardPrice: { ...typography.body, color: colors.gold, textAlign: textStart },

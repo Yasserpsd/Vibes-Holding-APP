@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Image, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Text, View } from 'react-native';
 
 import { useProjectReviews } from '@/api/queries';
 import type { ProjectReview } from '@/api/types';
@@ -12,6 +12,7 @@ import { StarsRow } from '@/components/Stars';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -38,7 +39,9 @@ export function ProjectReviews({ projectId }: { projectId: string }) {
         {summary && summary.stars !== null ? <StarsRow value={summary.stars} count={summary.count} size={15} /> : null}
       </View>
 
-      {reviews.length === 0 ? <Text style={styles.empty}>{t('ratings.empty')}</Text> : null}
+      {/* «No reviews yet» only once the list really answered empty — never while it loads or after it failed. */}
+      {query.isPending ? <ActivityIndicator color={colors.gold} /> : null}
+      {query.data && reviews.length === 0 ? <Text style={styles.empty}>{t('ratings.empty')}</Text> : null}
       {reviews.map((review) => (
         <ReviewRow key={review.id} review={review} />
       ))}
@@ -55,7 +58,7 @@ function ReviewRow({ review }: { review: ProjectReview }) {
     <View style={styles.review}>
       <View style={styles.avatar}>
         {review.photoUrl && !photoBroken ? (
-          <Image source={{ uri: review.photoUrl }} style={styles.avatarImage} onError={() => setPhotoBroken(true)} />
+          <Image source={{ uri: sized(review.photoUrl, 38) }} style={styles.avatarImage} onError={() => setPhotoBroken(true)} />
         ) : (
           <Ionicons name="person" size={18} color={colors.goldDark} />
         )}

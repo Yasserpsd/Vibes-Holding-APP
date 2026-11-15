@@ -25,6 +25,14 @@ export default function PaymentsScreen() {
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useMyPayments(status === 'signedIn');
 
+  // The account is still being read from the device: no «sign in» prompt for a signed-in member.
+  if (status === 'loading') {
+    return (
+      <Screen title={t('payments.title')}>
+        <StateView loading />
+      </Screen>
+    );
+  }
   if (status !== 'signedIn') {
     return (
       <Screen title={t('payments.title')}>
@@ -44,9 +52,7 @@ export default function PaymentsScreen() {
             </FadeInView>
           ))
         ) : (
-          <FadeInView>
-            <Text style={styles.empty}>{t('payments.empty')}</Text>
-          </FadeInView>
+          <StateView empty emptyText={t('payments.empty')} />
         )
       ) : (
         <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />
@@ -75,7 +81,7 @@ function PaymentRow({ payment, onPress }: { payment: Payment; onPress: () => voi
         <SarText style={styles.amount}>{`${amountLabel(payment)}${payment.memberPrice ? ` · ${t('payments.memberPrice')}` : ''}`}</SarText>
         <View style={styles.footer}>
           <Text style={styles.meta}>{formatArabicDateTime(payment.createdAt)}</Text>
-          <Ionicons name={chevronForward()} size={16} color={colors.goldLight} />
+          <Ionicons name={chevronForward()} size={16} color={colors.goldLightText} />
         </View>
       </GlassCard>
     </PressScale>
@@ -93,5 +99,4 @@ const styles = themedStyles(() => ({
   amount: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 22, color: colors.gold, textAlign: textStart },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   meta: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
-  empty: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
 }));

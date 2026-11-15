@@ -43,6 +43,14 @@ export default function InviteScreen() {
   // V2: the code box is the hero — a light band sweeps it, so its size is measured once laid out.
   const [codeSize, setCodeSize] = useState<{ width: number; height: number } | null>(null);
 
+  if (status === 'loading') {
+    return (
+      <Screen title={t('invite.title')}>
+        <Stack.Screen options={{ title: t('nav.invite') }} />
+        <StateView loading />
+      </Screen>
+    );
+  }
   if (status !== 'signedIn' || !me) {
     return (
       <Screen title={t('invite.title')}>

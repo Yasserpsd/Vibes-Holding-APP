@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -33,6 +34,7 @@ type Step = 'reason' | 'code' | 'done';
 export default function DeleteAccountScreen() {
   const { me } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('reason');
   const [reason, setReason] = useState<ReasonKey | null>(null);
   const [message, setMessage] = useState('');
@@ -92,6 +94,8 @@ export default function DeleteAccountScreen() {
     try {
       const answer = await authApi.deleteConfirm(code.trim(), typedWord);
       setDaysLeft(answer.daysLeft);
+      // The countdown band of حسابي caches its answer for a minute: refresh it so it shows the moment the member returns.
+      void queryClient.invalidateQueries({ queryKey: ['delete-state'] });
       setStep('done');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -147,8 +151,10 @@ export default function DeleteAccountScreen() {
 
   return (
     <Screen title={t('deleteAccount.title')} subtitle={t('deleteAccount.subtitle')}>
-      <FadeInView delay={entranceDelay(0)}>
+      <FadeInView delay={entranceDelay(0)} style={styles.stack}>
         <Notice tone="warning" text={t('deleteAccount.warning')} />
+        {/* An Apple/Google account has no password of its own yet: the line says where to set one before the prompt asks for it. */}
+        <Notice text={t('deleteAccount.socialHint')} />
       </FadeInView>
 
       <FadeInView delay={entranceDelay(1)}>
@@ -198,6 +204,7 @@ export default function DeleteAccountScreen() {
 
 const styles = themedStyles(() => ({
   card: { gap: spacing.sm, padding: spacing.md },
+  stack: { gap: spacing.sm },
   sectionTitle: { ...typography.subtitle, color: colors.textPrimary, textAlign: textStart },
   reasonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs + 2 },
   reasonLabel: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },

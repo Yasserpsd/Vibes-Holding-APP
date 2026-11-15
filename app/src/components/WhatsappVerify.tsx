@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { authApi, useAuthConfig, type PhoneStepResult } from '@/api/auth';
 import { errorMessage } from '@/api/client';
@@ -214,9 +214,9 @@ function Body({ onClose }: { onClose: () => void }) {
           </View>
           {error ? <Notice tone="warning" text={error} support /> : null}
           <AppButton label={t('wa.popup.confirm')} icon="logo-whatsapp" loading={busy} onPress={() => void sendToSaved()} />
-          <Text onPress={() => setEditing(true)} style={[styles.link, { color: palette.accent }]} accessibilityRole="button">
-            {t('phoneAlert.wrongNumber')}
-          </Text>
+          <Pressable onPress={() => setEditing(true)} accessibilityRole="button" hitSlop={12}>
+            <Text style={[styles.link, { color: palette.accent }]}>{t('phoneAlert.wrongNumber')}</Text>
+          </Pressable>
         </>
       )}
 

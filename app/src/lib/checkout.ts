@@ -1,13 +1,15 @@
 import Constants from 'expo-constants';
 import { Linking } from 'react-native';
 
+import { env } from '@/config/env';
 import { colors } from '@/theme/tokens';
 import { loadWebBrowser } from '@/lib/openLink';
 
 /** The app's deep-link scheme (investorsclub-preview in test builds, investorsclub in production). */
 export function appScheme(): string {
   const scheme = Constants.expoConfig?.scheme;
-  return (Array.isArray(scheme) ? scheme[0] : scheme) ?? 'investorsclub-preview';
+  // A config without a scheme falls back by environment, so a production app never builds a preview return link.
+  return (Array.isArray(scheme) ? scheme[0] : scheme) ?? (env.isProduction ? 'investorsclub' : 'investorsclub-preview');
 }
 
 export function paymentReturnUrl(paymentId: string): string {

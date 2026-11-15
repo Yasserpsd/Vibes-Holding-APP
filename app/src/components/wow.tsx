@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthProvider';
+import { useReducedMotion } from '@/components/motion';
 import { t } from '@/i18n';
 import { isRTL } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
@@ -21,9 +22,11 @@ const TICKER_SPEED_PX_PER_SEC = 32;
 export function GoldTicker({ items }: { items: string[] }) {
   const [width, setWidth] = useState(0);
   const [shift] = useState(() => new Animated.Value(0));
+  // Review 2026-11-15: «reduce motion» stops the endless tape; one copy of the row stays put.
+  const reduced = useReducedMotion();
 
   useEffect(() => {
-    if (!width) return;
+    if (!width || reduced) return;
     shift.setValue(0);
     // The row slides one full copy of itself, then snaps back unseen: an endless tape.
     const loop = Animated.loop(
@@ -36,7 +39,7 @@ export function GoldTicker({ items }: { items: string[] }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [width, shift]);
+  }, [width, shift, reduced]);
 
   if (items.length === 0) return null;
   // Under RTL the tape travels the other way, so the reader always meets the text head-on.
@@ -76,14 +79,16 @@ export function GoldTicker({ items }: { items: string[] }) {
 export function GoldSweep({ radius = radii.lg, thickness = 1.5, duration = 5200 }: { radius?: number; thickness?: number; duration?: number }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [turn] = useState(() => new Animated.Value(0));
+  const reduced = useReducedMotion();
 
   useEffect(() => {
+    if (reduced) return;
     // Perf (owner, 2026-10-19: «الموبايل بيهنج»): the rim light sweeps TWICE on mount, then rests.
     // An endless rotation of a big gradient layer on every such card kept weaker GPUs busy forever.
     const sweep = Animated.loop(Animated.timing(turn, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }), { iterations: 2 });
     sweep.start();
     return () => sweep.stop();
-  }, [turn, duration]);
+  }, [turn, duration, reduced]);
 
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   // The spinning square must cover the card's diagonal at every angle.
@@ -104,8 +109,7 @@ export function GoldSweep({ radius = radii.lg, thickness = 1.5, duration = 5200 
             width: span,
             height: span,
             transform: [{ rotate }],
-            experimental_backgroundImage:
-              'linear-gradient(90deg, rgba(242,206,116,0) 0%, rgba(242,206,116,0) 38%, rgba(242,206,116,0.95) 50%, rgba(242,206,116,0) 62%, rgba(242,206,116,0) 100%)',
+            experimental_backgroundImage: gradients.rim,
           }}
         />
       ) : null}
@@ -311,6 +315,9 @@ export function GoldDust({ count = 8, height = 120 }: { count?: number; height?:
       })),
     [count, height],
   );
+  // Review 2026-11-15: the dust is an endless loop, so it rests under «reduce motion» (M152's rule).
+  const reduced = useReducedMotion();
+  if (reduced) return null;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'visible' }]}>
       {motes.map((mote, index) => (
@@ -361,13 +368,14 @@ const styles = themedStyles(() => ({
   tickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs + 2 },
   tickerItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm },
   tickerDiamond: { fontSize: 8, lineHeight: 18, color: colors.gold },
-  tickerText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  tickerText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText },
   // The countdown.
   countdown: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
   countdownTitle: { ...typography.caption, color: colors.textSecondary },
   // M96: the on-card version — tight enough to sit inside the event photo's scrim.
   countdownCompact: { alignItems: 'center', gap: 2 },
-  countdownCompactLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.goldLight },
+  // Sits on the event photo's scrim, so it wears the on-photo gold in both themes.
+  countdownCompactLabel: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16, color: colors.onPhotoGold },
   flipCardSm: { minWidth: 34, paddingVertical: 2, paddingHorizontal: spacing.xs + 2 },
   flipDigitsSm: { fontSize: 15, lineHeight: 22 },
   flipColonSm: { fontSize: 14, lineHeight: 30 },
@@ -384,7 +392,7 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     boxShadow: shadows.glowGoldFaint,
   },
-  flipDigits: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, color: colors.goldLight },
+  flipDigits: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, color: colors.goldLightText },
   flipLabel: { ...typography.caption, fontSize: 10, lineHeight: 14, color: colors.textMuted },
   flipColon: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 40, color: colors.gold },
   // Confetti and dust.

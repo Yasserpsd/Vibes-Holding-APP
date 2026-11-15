@@ -118,13 +118,20 @@ export default function SecurityTotpScreen() {
             </View>
             <Text style={styles.sectionTitle}>{t('security.totpState')}</Text>
             <View style={[styles.pill, enabled && styles.pillOn]}>
-              <Text style={[styles.pillText, enabled && styles.pillTextOn]}>{status.isLoading ? '…' : enabled ? t('security.totpOn') : t('security.totpOffState')}</Text>
+              <Text style={[styles.pillText, enabled && styles.pillTextOn]}>{!status.data ? '…' : enabled ? t('security.totpOn') : t('security.totpOffState')}</Text>
             </View>
           </View>
           <Text style={styles.hint}>{t('security.totpExplain')}</Text>
           {enabled && status.data ? <Text style={styles.hint}>{t('security.totpBackupLeft', { count: status.data.backupLeft })}</Text> : null}
           {done ? <Notice tone="success" text={done} /> : null}
-          {mode === 'idle' ? (
+          {/* The state is unknown until the server answers: never offer «تفعيل» to an account that may already have it on. */}
+          {mode === 'idle' && !status.data && status.isError ? (
+            <>
+              <Notice tone="warning" text={errorMessage(status.error)} support />
+              <AppButton label={t('common.retry')} variant="outline" icon="refresh-outline" onPress={() => void status.refetch()} />
+            </>
+          ) : null}
+          {mode === 'idle' && status.data ? (
             <>
               <GoldHairline />
               {enabled ? (

@@ -4,12 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
 import { useHq } from '@/api/hq';
+import { useAuth } from '@/auth/AuthProvider';
 import { useGuestGate } from '@/auth/GuestGate';
 import { AppButton } from '@/components/AppButton';
 import { GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { Notice } from '@/components/Notice';
 import { languageChoiceOffered, t } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -25,6 +28,7 @@ const clubLogo = require('../../assets/images/club-logo.png');
 export default function WelcomeScreen() {
   const router = useRouter();
   const { locked, startGuest } = useGuestGate();
+  const { sessionExpired, dismissSessionExpired } = useAuth();
   const { data: config } = useAuthConfig();
   const theatre = useHq().data?.photos?.[0] ?? null;
 
@@ -32,7 +36,7 @@ export default function WelcomeScreen() {
 
   return (
     <GoldGradient variant="screen" style={styles.backdrop}>
-      {theatre ? <Image source={{ uri: theatre }} style={styles.theatre} resizeMode="cover" blurRadius={2} /> : null}
+      {theatre ? <Image source={{ uri: sized(theatre, 480) }} style={styles.theatre} resizeMode="cover" blurRadius={2} /> : null}
       <View style={styles.theatreWash} pointerEvents="none" />
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -43,6 +47,12 @@ export default function WelcomeScreen() {
             <Text style={styles.subtitle}>{t('welcome.subtitle')}</Text>
           </FadeInView>
           <View style={styles.actions}>
+            {/* The saved session was refused when the app opened: say why the member is back at the gate, once. */}
+            {sessionExpired ? (
+              <FadeInView delay={entranceDelay(3)}>
+                <Notice tone="warning" text={t('errors.code.session_expired')} />
+              </FadeInView>
+            ) : null}
             <FadeInView delay={entranceDelay(3)}>
               <AppButton label={t('welcome.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
             </FadeInView>
@@ -52,7 +62,15 @@ export default function WelcomeScreen() {
               </FadeInView>
             )}
             <FadeInView delay={entranceDelay(5)}>
-              <AppButton label={t('welcome.guest')} variant="outline" icon="eye-outline" onPress={startGuest} />
+              <AppButton
+                label={t('welcome.guest')}
+                variant="outline"
+                icon="eye-outline"
+                onPress={() => {
+                  dismissSessionExpired();
+                  startGuest();
+                }}
+              />
             </FadeInView>
             <FadeInView delay={entranceDelay(6)}>
               <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
@@ -84,5 +102,5 @@ const styles = themedStyles(() => ({
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   actions: { gap: spacing.sm + 4, marginTop: spacing.md },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-  language: { ...typography.body, color: colors.goldLight, textAlign: 'center', paddingVertical: spacing.sm },
+  language: { ...typography.body, color: colors.goldLightText, textAlign: 'center', paddingVertical: spacing.sm },
 }));

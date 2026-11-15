@@ -135,7 +135,7 @@ const styles = themedStyles(() => ({
   all: { alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.goldSoft },
   allText: { alignSelf: 'stretch', textAlign: 'center' },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  label: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart, flexShrink: 1 },
+  label: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLightText, textAlign: textStart, flexShrink: 1 },
   price: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
   change: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   pct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },

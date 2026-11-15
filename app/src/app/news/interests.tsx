@@ -27,15 +27,27 @@ export default function InterestsScreen() {
   const router = useRouter();
   const { status } = useAuth();
   const signedIn = status === 'signedIn';
+  const restoring = status === 'loading';
   const query = useInterests();
   const save = useSaveInterests();
   // Untouched until the first tap: the saved interests, or the persona's suggestion for a new member.
   const [picked, setPicked] = useState<string[] | null>(null);
   const [other, setOther] = useState<string | null>(null);
+  // True after a tap that was ignored because the maximum is already picked; any accepted change clears it.
+  const [limitHit, setLimitHit] = useState(false);
   const data = query.data;
   const selected = picked ?? (data ? (data.saved ? (data.mine?.keys ?? []) : data.suggested) : null);
   const otherText = other ?? data?.mine?.other ?? '';
   const shownCount = useCountUp(selected?.length ?? 0, 450);
+
+  // The saved session is still being read: do not flash the sign-in notice at a member who is signed in.
+  if (restoring) {
+    return (
+      <Screen title={t('nav.interests')}>
+        <StateView loading />
+      </Screen>
+    );
+  }
 
   if (!signedIn) {
     return (
@@ -59,8 +71,13 @@ export default function InterestsScreen() {
   }
 
   const max = data.max;
-  const toggle = (key: string) =>
-    setPicked(selected.includes(key) ? selected.filter((item) => item !== key) : selected.length >= max ? selected : [...selected, key]);
+  const toggle = (key: string) => {
+    const adding = !selected.includes(key);
+    // A tap beyond the maximum changes nothing: say why instead of staying silent.
+    const refused = adding && selected.length >= max;
+    setLimitHit(refused);
+    if (!refused) setPicked(adding ? [...selected, key] : selected.filter((item) => item !== key));
+  };
   const suggestedLabels = data.suggested.map((key) => data.interests.find((item) => item.key === key)?.label).filter(Boolean);
 
   const submit = async () => {
@@ -83,6 +100,13 @@ export default function InterestsScreen() {
           </PopIn>
         ))}
       </View>
+      {limitHit ? (
+        <FadeInView offset={6} duration={240}>
+          <Text style={styles.limit} accessibilityLiveRegion="polite">
+            {t('interests.maxReached', { max })}
+          </Text>
+        </FadeInView>
+      ) : null}
       {selected.includes('other') ? (
         <FadeInView offset={8}>
           <FormField label={t('interests.otherLabel')} value={otherText} onChangeText={setOther} placeholder={t('interests.otherPlaceholder')} maxLength={120} />
@@ -91,7 +115,12 @@ export default function InterestsScreen() {
       {suggestedLabels.length > 0 && !data.saved ? (
         <FadeInView delay={entranceDelay(4)} style={styles.suggestion}>
           <Text style={styles.suggestionText}>{t('news.interests.suggested', { topics: suggestedLabels.join(t('common.listSeparator')) })}</Text>
-          <AppButton label={t('news.interests.useSuggested')} variant="outline" icon="checkmark-done-outline" onPress={() => setPicked(data.suggested)} />
+          <AppButton label={t('news.interests.useSuggested')} variant="outline" icon="checkmark-done-outline"
+            onPress={() => {
+              setLimitHit(false);
+              setPicked(data.suggested);
+            }}
+          />
         </FadeInView>
       ) : null}
       {save.error ? (
@@ -116,6 +145,7 @@ export default function InterestsScreen() {
 
 const styles = themedStyles(() => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  limit: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   suggestion: { gap: spacing.sm },
   suggestionText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },

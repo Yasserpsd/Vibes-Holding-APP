@@ -1,17 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FadeInView, usePulse } from '@/components/motion';
+import { EmbedError, STAGE_BLACK, useEmbedLive } from '@/components/YouTubeEmbed';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { textDir, textStart } from '@/i18n/direction';
 import { linkParam, loadVideo, loadWebView, youtubeIdOf } from '@/lib/player';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 type VideoModule = typeof import('expo-video');
+
+// A YouTube id is 6 to 20 URL-safe characters; anything else in the `yt` param (a hand-made deep link) never reaches the embed page.
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{6,20}$/;
 
 /**
  * M19 («أي فيديو يتم فتحه داخل التطبيق… مش محتاج تطلع برا الأبلكيشن أبدًا»): one player screen.
@@ -22,11 +26,14 @@ type VideoModule = typeof import('expo-video');
 export default function WatchScreen() {
   const params = useLocalSearchParams<{ url?: string; yt?: string; title?: string; poster?: string }>();
   const url = linkParam(params.url);
-  const youtubeId = typeof params.yt === 'string' && params.yt ? params.yt : url ? youtubeIdOf(url) : null;
+  const youtubeId = typeof params.yt === 'string' && YOUTUBE_ID.test(params.yt) ? params.yt : url ? youtubeIdOf(url) : null;
   const title = typeof params.title === 'string' ? params.title : '';
 
   const webview = useMemo(() => loadWebView(), []);
   const video = useMemo(() => loadVideo(), []);
+  // The embed is unmounted while another screen covers this one or the Android app sits in the background (sound must stop).
+  const live = useEmbedLive();
+  const [attempt, setAttempt] = useState(0);
 
   // Error 153: YouTube rejects an embed URL loaded directly (no Referer). The embed must sit in an
   // iframe inside a page with a real origin — baseUrl supplies it (M93).
@@ -38,10 +45,11 @@ export default function WatchScreen() {
     : null;
 
   let player = null;
-  if (embedHtml && webview) {
+  if (embedHtml && webview && live) {
     const WebView = webview.WebView;
     player = (
       <WebView
+        key={attempt}
         source={{ html: embedHtml, baseUrl: 'https://www.vcmem.com' }}
         style={styles.web}
         containerStyle={styles.webContainer}
@@ -51,6 +59,7 @@ export default function WatchScreen() {
         setSupportMultipleWindows={false}
         startInLoadingState
         renderLoading={() => <LoadingGhost />}
+        renderError={() => <EmbedError onRetry={() => setAttempt((count) => count + 1)} />}
         // «مش عايز أي حد يخرج من الأبلكيشن نهائي»: intent/vnd.youtube links would open the
         // YouTube app and YouTube site pages (watch, channel) would replace the player; both
         // are blocked — the embed and anything it needs (consent, static) load freely.
@@ -61,6 +70,7 @@ export default function WatchScreen() {
       />
     );
   }
+  const parked = Boolean(embedHtml && webview && !live);
   // The uploaded-video player brings its own box and control bar (M192).
   const native = !player && !youtubeId && url && video ? <NativePlayer module={video} url={url} /> : null;
 
@@ -69,17 +79,18 @@ export default function WatchScreen() {
       <Stack.Screen options={title ? { title } : undefined} />
       {native ?? (
         <View style={styles.playerBox}>
-          {player ?? (
-            <View style={styles.fallbackBox}>
-              <Text style={styles.fallbackText}>{t('watch.unavailable')}</Text>
-            </View>
-          )}
+          {player ??
+            (parked ? null : (
+              <View style={styles.fallbackBox}>
+                <Text style={styles.fallbackText}>{t('watch.unavailable')}</Text>
+              </View>
+            ))}
         </View>
       )}
       <ScrollView contentContainerStyle={styles.below}>
         {title ? (
           <FadeInView delay={40}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={[styles.title, textDir(title)]}>{title}</Text>
           </FadeInView>
         ) : null}
       </ScrollView>
@@ -144,15 +155,25 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
   const [quality, setQuality] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [time, setTime] = useState({ at: 0, total: 0 });
+  const [failed, setFailed] = useState(false);
+  const focused = useIsFocused();
+
+  // Another screen on top of this one must not leave the sound running.
+  useEffect(() => {
+    if (!focused) player.pause();
+  }, [focused, player]);
 
   // The JS scrubber's clock: twice a second, independent of the native controls.
   useEffect(() => {
     tickEvery(player, 0.5);
     const sub = player.addListener('timeUpdate', ({ currentTime }) => setTime({ at: currentTime, total: player.duration || 0 }));
     const playingSub = player.addListener('playingChange', ({ isPlaying }) => setPlaying(isPlaying));
+    // An expired signed link, a dead file or no network ends in 'error': say so instead of a silent black box.
+    const statusSub = player.addListener('statusChange', ({ status }) => setFailed(status === 'error'));
     return () => {
       sub.remove();
       playingSub.remove();
+      statusSub.remove();
     };
   }, [player]);
 
@@ -182,6 +203,16 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
       player.play();
     });
     await player.replaceAsync(rendition.uri ?? url).catch(() => ready.remove());
+  };
+
+  const retry = () => {
+    setFailed(false);
+    // The retry loads the adaptive stream again, so the quality button goes back to «تلقائي».
+    setQuality(null);
+    player
+      .replaceAsync(url)
+      .then(() => player.play())
+      .catch(() => setFailed(true));
   };
 
   const seek = (seconds: number) => {
@@ -227,11 +258,16 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
     </>
   );
 
+  // A failed load closes the fullscreen sheet so the error and its retry are what the member sees.
+  const showWide = wide && !failed;
+
   return (
     <>
-      <View style={styles.playerBox}>{wide ? null : <VideoView style={styles.media} player={player} contentFit="contain" nativeControls />}</View>
-      {wide ? null : controls}
-      <Modal visible={wide} animationType="fade" supportedOrientations={['portrait']} statusBarTranslucent onRequestClose={() => setWide(false)}>
+      <View style={styles.playerBox}>
+        {showWide ? null : failed ? <EmbedError onRetry={retry} /> : <VideoView style={styles.media} player={player} contentFit="contain" nativeControls />}
+      </View>
+      {showWide || failed ? null : controls}
+      <Modal visible={showWide} animationType="fade" supportedOrientations={['portrait']} statusBarTranslucent onRequestClose={() => setWide(false)}>
         <StatusBar hidden />
         <View style={styles.wideStage}>
           <View style={{ width: screen.height, height: screen.width, transform: [{ rotate: '90deg' }] }}>
@@ -249,7 +285,7 @@ function NativePlayer({ module: video, url }: { module: VideoModule; url: string
 function BarButton({ icon, label, hint, active = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; hint: string; active?: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.barButton, (pressed || active) && styles.barButtonOn]} accessibilityRole="button" accessibilityLabel={hint} hitSlop={6}>
-      <Ionicons name={icon} size={20} color={colors.goldLight} />
+      <Ionicons name={icon} size={20} color={colors.goldLightText} />
       <Text style={styles.barLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -302,30 +338,31 @@ function clock(seconds: number): string {
 
 const styles = themedStyles(() => ({
   page: { flex: 1, backgroundColor: colors.black },
-  playerBox: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.black },
-  web: { flex: 1, backgroundColor: colors.black },
-  webContainer: { backgroundColor: colors.black },
+  // The video stage is black in both themes (light mode's «black» token is paper).
+  playerBox: { width: '100%', aspectRatio: 16 / 9, backgroundColor: STAGE_BLACK },
+  web: { flex: 1, backgroundColor: STAGE_BLACK },
+  webContainer: { backgroundColor: STAGE_BLACK },
   media: { width: '100%', height: '100%' },
   // Media controls keep the universal left-to-right order (back on the left, time running rightwards) even in Arabic.
   scrub: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm, backgroundColor: colors.surface },
   scrubTime: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.textSecondary, minWidth: 52, textAlign: 'center' },
-  scrubTrack: { flex: 1, height: 36, justifyContent: 'center' },
+  scrubTrack: { flex: 1, height: 44, justifyContent: 'center' },
   scrubRail: { height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' },
   scrubFill: { height: 4, backgroundColor: colors.gold },
-  scrubKnob: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: colors.goldLight, top: 9 },
+  scrubKnob: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: colors.goldLight, top: 13 },
   bar: { direction: 'ltr', flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },
   barButton: { alignItems: 'center', gap: 2, minWidth: 64, paddingVertical: 6, paddingHorizontal: spacing.sm, borderRadius: radii.md },
   barButtonOn: { backgroundColor: colors.surfaceElevated },
   barLabel: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
   qualities: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface },
-  quality: { paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGold },
+  quality: { minHeight: 44, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGold },
   qualityOn: { backgroundColor: colors.gold },
-  qualityText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLight },
+  qualityText: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.goldLightText },
   qualityTextOn: { color: colors.goldInk },
-  wideStage: { flex: 1, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  wideStage: { flex: 1, backgroundColor: STAGE_BLACK, alignItems: 'center', justifyContent: 'center' },
   // Landscape edges hold the notch and the home bar: keep the controls clear of both.
   wideControls: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 44, paddingBottom: spacing.sm, backgroundColor: colors.glass },
-  ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: colors.black },
+  ghostWrap: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, padding: spacing.md, backgroundColor: STAGE_BLACK },
   ghost: {
     flex: 1,
     borderRadius: radii.lg,

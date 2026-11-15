@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { advisorApi, type AdvisorGate, type AdvisorProfile, type HqProposal } from '@/api/advisor';
 import { errorMessage } from '@/api/client';
 import { hqApi } from '@/api/hq';
-import type { PendingFile } from '@/components/advisor/FileButton';
+import { FILE_MAX_BYTES, type PendingFile } from '@/components/advisor/FileButton';
 import type { ChatMessage } from '@/components/advisor/useAdvisorChat';
 import { readBase64 } from '@/components/advisor/VoiceButton';
 import { useAuth } from '@/auth/AuthProvider';
@@ -36,6 +36,11 @@ import { useAdvisorChat } from './useAdvisorChat';
 
 /** Height of the bottom tab bar on iOS (React Navigation's default), needed to offset the keyboard. */
 const IOS_TAB_BAR_HEIGHT = 49;
+
+/** The app-action check runs before the message shows: past this wait the advisor answers as usual. */
+const INTENT_WAIT_MS = 8000;
+/** Closer than this to the newest message, the list follows new content; further up the member is reading. */
+const NEAR_END = 120;
 
 type Props = { context: ChatContext | null; opening?: ChatOpening | null; onClearContext: () => void };
 type Item = { message: ChatMessage; dayLabel: string | null };
@@ -80,9 +85,16 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   // The opening the member already answered; a new one (another portal or service) shows again.
   const [answeredOpening, setAnsweredOpening] = useState<ChatOpening | null>(null);
   const listRef = useRef<FlatList<Item>>(null);
-  // M148: leaving the chat silences a playing reply.
-  useEffect(() => () => stopSpeech(), []);
+  // The tab stays mounted when the member leaves it, so «leaving» is a blur, not an unmount.
+  // M148: a playing reply stops when the chat loses focus (and on unmount, which also ends the focus).
+  useFocusEffect(useCallback(() => () => stopSpeech(), []));
   const latestContext = useRef(context);
+  // One send at a time, from the composer and from every chip: the app-action check runs before `chat.sending` flips.
+  const submitting = useRef(false);
+  // Whether the member is at the newest message (true) or scrolled up to read (false): the list follows new
+  // content and the keyboard only in the first case.
+  const stickToEnd = useRef(true);
+  const dragging = useRef(false);
 
   useEffect(() => {
     latestContext.current = context;
@@ -98,8 +110,10 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     return null;
   }, [chat.messages]);
 
-  const submit = async (text: string) => {
-    if ((!text.trim() && !attachment) || chat.sending) return;
+  /** A message that did not go comes back to the field; whatever the member typed meanwhile stays after it. */
+  const restoreDraft = (text: string) => setDraft((current) => (current ? `${text} ${current}` : text));
+
+  const deliver = async (text: string) => {
     setDraft('');
     setAnsweredOpening(opening);
     // M151: a PDF goes straight to the advisor (no app-intent pass): the file is read into base64 here.
@@ -113,13 +127,21 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
       } catch {
         chat.addLocal(null, t('advisor.file.failed'), []);
         setAttachment(pending);
+        restoreDraft(text);
         setActBusy(false);
         return;
       }
       setActBusy(false);
-      const outcome = await chat.send(text, toApiContext(context), { name: pending.name, size: pending.size, base64 });
+      // Some providers (cloud storage) report no size when the file is picked: the bytes just read are the truth.
+      const bytes = Math.floor((base64.length * 3) / 4);
+      if (bytes > FILE_MAX_BYTES) {
+        chat.addLocal(null, t('advisor.file.tooBig'), []);
+        restoreDraft(text);
+        return;
+      }
+      const outcome = await chat.send(text, toApiContext(context), { name: pending.name, size: pending.size || bytes, base64 });
       if (!outcome.accepted) {
-        setDraft((current) => current || text);
+        restoreDraft(text);
         setAttachment(pending);
       }
       if (outcome.contextRefused && latestContext.current === context) onClearContext();
@@ -128,9 +150,15 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     // M145: an app action (HQ booking card, a screen, a prefilled service) is answered by the app itself
     // and never reaches the hub; anything else goes to the advisor as before.
     setActBusy(true);
+    let slowTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const intent = await advisorApi.intent(text, pendingHq.current);
-      if (intent.action) {
+      // On a slow network the check must not hold the message back: after 8 seconds it is given up
+      // (the race keeps a handler on the request, so a late failure is not an unhandled rejection).
+      const slow = new Promise<null>((resolve) => {
+        slowTimer = setTimeout(() => resolve(null), INTENT_WAIT_MS);
+      });
+      const intent = await Promise.race([advisorApi.intent(text, pendingHq.current), slow]);
+      if (intent?.action) {
         pendingHq.current = intent.action.type === 'hq_book' && intent.action.missing.length ? intent.action.proposal : null;
         chat.addLocal(text, intent.reply ?? '', [intent.action]);
         return;
@@ -138,13 +166,26 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     } catch {
       // The hub answers instead.
     } finally {
+      clearTimeout(slowTimer);
       setActBusy(false);
     }
     const outcome = await chat.send(text, toApiContext(context));
-    if (!outcome.accepted) setDraft((current) => current || text);
+    if (!outcome.accepted) restoreDraft(text);
     // An older server took the message only without its context: the pill would claim what the advisor never
     // received. A context the member opened while the message was on its way is a different one and stays.
     if (outcome.contextRefused && latestContext.current === context) onClearContext();
+  };
+
+  const submit = async (text: string) => {
+    if ((!text.trim() && !attachment) || chat.sending || submitting.current) return;
+    submitting.current = true;
+    // The member's own message always scrolls into view, wherever they were reading.
+    stickToEnd.current = true;
+    try {
+      await deliver(text);
+    } finally {
+      submitting.current = false;
+    }
   };
 
   /** M145: a card's request — navigation, a re-check after a pick, or the booking itself. */
@@ -187,6 +228,11 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   const nearlyOut = showAdvisorBalance(dailyLeft, me?.membership.aiDailyLimit);
   const busy = chat.sending || actBusy || chat.status !== 'ready';
   const showOpening = Boolean(opening) && answeredOpening !== opening;
+
+  const trackScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    stickToEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < NEAR_END;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -243,8 +289,33 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
                 {chat.waiting ? <Typing name={botNameOf(chat.profile)} /> : null}
               </>
             }
-            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+            // New content scrolls into view only while the member is at the newest message: a reply that
+            // arrives while they read older messages no longer pulls them down.
+            onContentSizeChange={() => {
+              if (!stickToEnd.current) return;
+              dragging.current = false;
+              listRef.current?.scrollToEnd({ animated: true });
+            }}
+            // The keyboard (or a growing field) shrinks the list from below: the newest message stays in view,
+            // unless the member scrolled up to read.
+            onLayout={() => {
+              if (stickToEnd.current) listRef.current?.scrollToEnd({ animated: false });
+            }}
+            // Only the member's own drags say where they are reading: the list's own scrolls never do.
+            onScrollBeginDrag={() => {
+              dragging.current = true;
+            }}
+            onScroll={(event) => {
+              if (dragging.current) trackScroll(event);
+            }}
+            onScrollEndDrag={trackScroll}
+            onMomentumScrollEnd={(event) => {
+              dragging.current = false;
+              trackScroll(event);
+            }}
+            scrollEventThrottle={64}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           />
         )}
 
@@ -261,7 +332,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
             <View style={styles.context}>
               <Ionicons name={CONTEXT_ICONS[context.type]} size={16} color={colors.gold} />
               <Text style={styles.contextText} numberOfLines={1}>{t('advisor.askingAbout', { title: context.title })}</Text>
-              <Pressable onPress={onClearContext} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('advisor.clearContext')}>
+              <Pressable onPress={onClearContext} hitSlop={14} accessibilityRole="button" accessibilityLabel={t('advisor.clearContext')}>
                 <Ionicons name="close-circle" size={18} color={colors.textMuted} />
               </Pressable>
             </View>
@@ -388,9 +459,9 @@ function GateNotice({ gate, onDismiss, onMembership }: { gate: AdvisorGate; onDi
     <FadeInView offset={10} duration={260}>
       <GlassCard golden radius={radii.md} style={styles.gate}>
         <View style={styles.gateRow}>
-          <Ionicons name={gate.membership ? 'lock-closed-outline' : 'time-outline'} size={20} color={colors.goldLight} />
+          <Ionicons name={gate.membership ? 'lock-closed-outline' : 'time-outline'} size={20} color={colors.goldLightText} />
           <Text style={styles.gateText}>{hubText(gate.text, GATE_KEYS[gate.expired ? 'expired' : gate.type])}</Text>
-          <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+          <Pressable onPress={onDismiss} hitSlop={14} accessibilityRole="button" accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={18} color={colors.textMuted} />
           </Pressable>
         </View>

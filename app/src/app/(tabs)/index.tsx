@@ -73,10 +73,11 @@ export default function HomeScreen() {
   // M152: the blocks' own queries (same keys as inside PeopleBlock, AgendaBlock, MeetupsBlock and the
   // Projects Bank carousel) start in the FIRST wave with the home, not half a second later when the
   // blocks mount — measured on the test API: ten requests in parallel finish in under a second.
-  usePeople();
-  useAgenda();
-  useMeetupsContent();
-  useProjectsList({ q: '', sort: 'discover' });
+  const people = usePeople();
+  const agenda = useAgenda();
+  const meetups = useMeetupsContent();
+  const bank = useProjectsList({ q: '', sort: 'discover' });
+  const hq = useHq();
   const [refreshing, setRefreshing] = useState(false);
   // M102: the entrepreneur's collapsed services grid.
   const [gridOpen, setGridOpen] = useState(false);
@@ -91,8 +92,23 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([home.refetch(), services.refetch(), videos.refetch(), partners.refetch(), latestPosts.refetch()]);
-    setRefreshing(false);
+    try {
+      // Every block of the home refreshes, not only the first five; one failing request never stops the rest or the spinner.
+      await Promise.allSettled([
+        home.refetch(),
+        services.refetch(),
+        videos.refetch(),
+        partners.refetch(),
+        latestPosts.refetch(),
+        people.refetch(),
+        agenda.refetch(),
+        meetups.refetch(),
+        bank.refetch(),
+        hq.refetch(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const content = home.data;
@@ -125,7 +141,9 @@ export default function HomeScreen() {
     }
   };
 
-  const greeting = status === 'signedIn' && me ? t('home.greeting', { name: displayProfile(me).name.split(' ')[0] }) : '';
+  // A legacy account with an empty name gets no greeting at all (never «أهلاً ،»).
+  const firstName = status === 'signedIn' && me ? (displayProfile(me).name ?? '').trim().split(/\s+/)[0] : '';
+  const greeting = firstName ? t('home.greeting', { name: firstName }) : '';
   const featured = videos.data?.pages[0]?.featured ?? [];
 
   // M74: the home follows the account's persona — a signed-in account without one reads the neutral variant.
@@ -457,7 +475,7 @@ function AdvisorCompanionCard({ block, onChip, onOpen }: { block: NonNullable<Ho
       </View>
       <View style={styles.advisorChips}>
         {block.chips.map((chip) => (
-          <PressScale key={chip.label} onPress={() => onChip(chip.route)} glow glowRadius={radii.pill} accessibilityRole="button" accessibilityLabel={chip.label} style={styles.advisorChip}>
+          <PressScale key={chip.label} onPress={() => onChip(chip.route)} glow glowRadius={radii.pill} accessibilityRole="button" accessibilityLabel={chip.label} hitSlop={6} style={styles.advisorChip}>
             <Text style={styles.advisorChipText}>{chip.label}</Text>
           </PressScale>
         ))}
@@ -569,7 +587,7 @@ function PartnerMini({ partner, onPress }: { partner: Partner; onPress: () => vo
       <GlassCard radius={radii.lg} style={styles.mini}>
         <View style={styles.miniLogoBox}>
           {partner.logoUrl ? (
-            <Image source={{ uri: partner.logoUrl }} style={styles.miniLogo} resizeMode="contain" accessibilityLabel={partner.name} />
+            <Image source={{ uri: sized(partner.logoUrl, MINI_LOGO) }} style={styles.miniLogo} resizeMode="contain" accessibilityLabel={partner.name} />
           ) : (
             <View style={styles.miniLogoFallback}>
               <Ionicons name="business-outline" size={28} color={colors.gold} />

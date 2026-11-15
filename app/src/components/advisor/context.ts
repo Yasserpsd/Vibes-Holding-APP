@@ -159,7 +159,9 @@ export function startersFor(context: ChatContext): string[] {
     case 'video':
       return starters('video');
     case 'portal':
-      return starters(context.id === 'entrepreneur' ? 'entrepreneur' : 'investor');
+      // The neutral portal opens with the server's own copy; until that loads (or when it fails) its starters
+      // are the general ones, never the investor's: a neutral member has not chosen a side.
+      return starters(context.id === 'entrepreneur' ? 'entrepreneur' : context.id === 'investor' ? 'investor' : 'screen.home');
     case 'screen':
       return starters(SCREEN_LISTS[context.id] ?? 'screen.other');
   }

@@ -42,7 +42,7 @@ export default function MarketsScreen() {
   const groups = order.map((group) => ({ group, items: quotes.filter((quote) => quote.group === group) }));
   return (
     <Screen>
-      <Pressable style={styles.ask} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
+      <Pressable style={styles.ask} hitSlop={6} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
         <Ionicons name="sparkles" size={16} color={colors.gold} />
         <Text style={styles.askText}>{t('markets.askAdvisor')}</Text>
       </Pressable>
@@ -94,7 +94,7 @@ const styles = themedStyles(() => ({
   askText: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.gold },
   rowAsk: { padding: spacing.xs },
   live: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginBottom: spacing.sm },
-  groupTitle: { ...typography.subtitle, fontSize: 16, color: colors.goldLight, textAlign: textStart, marginTop: spacing.md, marginBottom: spacing.xs },
+  groupTitle: { ...typography.subtitle, fontSize: 16, color: colors.goldLightText, textAlign: textStart, marginTop: spacing.md, marginBottom: spacing.xs },
   card: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radii.lg },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.sm },
   divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderGoldSoft },

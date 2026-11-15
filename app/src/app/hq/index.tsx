@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useHqWallet, useMyVisits, type Visit, type VisitStatus } from '@/api/hq';
@@ -27,6 +27,10 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const STATUS_COLOR: Record<VisitStatus, string> = lazyTokens(() => ({ pending: colors.warning, confirmed: colors.success, rejected: colors.danger, cancelled: colors.textMuted }));
 
+/** The map link opens the maps app itself (the in-app browser would keep it on a web page); the in-app browser is the fallback. */
+const openMap = (url: string) => {
+  void Linking.openURL(url).catch(() => openLink(url));
+};
 /** HQ page: address, tour, rules, and (for paid members) booking plus the member's visits. */
 export default function HqScreen() {
   const router = useRouter();
@@ -38,6 +42,7 @@ export default function HqScreen() {
   const wallet = useHqWallet(status === 'signedIn' && data?.access === 'member');
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   useAdvisorScreen({ type: 'screen', id: 'hq', title: data?.content.title ?? t('nav.hq') });
 
   const onRefresh = async () => {
@@ -57,13 +62,24 @@ export default function HqScreen() {
   const { content } = data;
   const days = content.hours.days.map(weekdayName).filter(Boolean).join(t('common.listSeparator'));
   const cancel = async (visit: Visit) => {
+    if (cancellingId) return;
+    setCancellingId(visit.id);
     setActionError(null);
     try {
       await hqApi.cancel(visit.id);
       await queryClient.invalidateQueries({ queryKey: ['hq'] });
     } catch (cause) {
       setActionError(errorMessage(cause));
+    } finally {
+      setCancellingId(null);
     }
+  };
+  // One tap must never drop a booking: the member confirms first (a pending request or a confirmed seat alike).
+  const confirmCancel = (visit: Visit) => {
+    Alert.alert(t('hq.cancelBooking'), undefined, [
+      { text: t('common.close'), style: 'cancel' },
+      { text: t('hq.cancelBooking'), style: 'destructive', onPress: () => void cancel(visit) },
+    ]);
   };
 
   const photos = data.photos ?? [];
@@ -94,7 +110,7 @@ export default function HqScreen() {
             <Text style={styles.rowText}>{t('hq.hours', { days, open: content.hours.open, close: content.hours.close })}</Text>
           </View>
           <View style={styles.actions}>
-            <AppButton label={t('hq.openMap')} variant="outline" icon="map-outline" onPress={() => void openLink(content.mapUrl)} style={styles.action} />
+            <AppButton label={t('hq.openMap')} variant="outline" icon="map-outline" onPress={() => openMap(content.mapUrl)} style={styles.action} />
             <AppButton label={t('hq.tour')} variant="outline" icon="play-circle-outline" onPress={() => void openLink(`https://www.youtube.com/watch?v=${content.tourVideoId}`)} style={styles.action} />
           </View>
           {/* M76 (owner): right after the map — a DIRECT booking CTA, the first actionable thing. */}
@@ -145,7 +161,7 @@ export default function HqScreen() {
             visits.data.visits.length ? (
               visits.data.visits.map((visit, index) => (
                 <FadeInView key={visit.id} delay={entranceDelay(index)}>
-                  <VisitRow visit={visit} onPass={() => router.push({ pathname: '/hq/pass/[id]', params: { id: visit.id } })} onCancel={() => void cancel(visit)} />
+                  <VisitRow visit={visit} onPass={() => router.push({ pathname: '/hq/pass/[id]', params: { id: visit.id } })} onCancel={() => confirmCancel(visit)} />
                 </FadeInView>
               ))
             ) : (
@@ -204,12 +220,12 @@ const styles = themedStyles(() => ({
   action: { flexGrow: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.goldFaint },
-  chipText: { ...typography.caption, color: colors.goldLight },
+  chipText: { ...typography.caption, color: colors.goldLightText },
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bulletText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart, flex: 1 },
   empty: { ...typography.body, color: colors.textMuted, textAlign: textStart },
   // M109a: the live hours counter above the booking button.
-  walletLine: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldLight, textAlign: textStart, marginBottom: spacing.sm },
+  walletLine: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldLightText, textAlign: textStart, marginBottom: spacing.sm },
   visit: { gap: spacing.xs, padding: spacing.md },
   visitHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   visitDate: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, flex: 1 },
@@ -219,6 +235,6 @@ const styles = themedStyles(() => ({
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },
   badgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16 },
   cancelWrap: { flexShrink: 0 },
-  cancel: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  cancel: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   cancelText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.danger },
 }));

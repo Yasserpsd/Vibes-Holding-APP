@@ -20,7 +20,7 @@ export function SupportLink({ problem }: { problem?: string | null }) {
   if (problem !== undefined) {
     return (
       <FadeInView offset={6}>
-        <PressScale onPress={() => void openSupportWhatsApp(problem)} style={styles.line} accessibilityRole="link" accessibilityLabel={`${t('support.link')} ${SUPPORT_WHATSAPP}`}>
+        <PressScale onPress={() => void openSupportWhatsApp(problem)} hitSlop={10} style={styles.line} accessibilityRole="link" accessibilityLabel={`${t('support.link')} ${SUPPORT_WHATSAPP}`}>
           <Ionicons name="logo-whatsapp" size={18} color={colors.whatsapp} />
           <Text style={styles.lineText}>{t('support.link')}</Text>
           <Text style={styles.lineNumber}>{NUMBER}</Text>
@@ -29,7 +29,7 @@ export function SupportLink({ problem }: { problem?: string | null }) {
     );
   }
   return (
-    <PressScale onPress={() => void openContactWhatsApp()} style={styles.line} accessibilityRole="link" accessibilityLabel={`${t('support.link')} ${SUPPORT_WHATSAPP}`}>
+    <PressScale onPress={() => void openContactWhatsApp()} hitSlop={10} style={styles.line} accessibilityRole="link" accessibilityLabel={`${t('support.link')} ${SUPPORT_WHATSAPP}`}>
       <Ionicons name="logo-whatsapp" size={16} color={colors.whatsapp} />
       <Text style={styles.lineText}>{t('support.link')}</Text>
       <Text style={styles.lineNumber}>{NUMBER}</Text>

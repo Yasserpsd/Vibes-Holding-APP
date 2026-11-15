@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image, RefreshControl, Switch, Text, View } from 'react-native';
+import { Alert, Image, RefreshControl, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
@@ -29,6 +29,7 @@ import { getLang, languageChoiceOffered, t, tOptional } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
 import { chooseTheme } from '@/theme/theme';
 import { chevronForward, textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { markSeen } from '@/lib/seen';
 
 import { themedStyles } from '@/theme/styles';
@@ -84,9 +85,19 @@ export default function AccountScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  // One tap on a settings row must not end the session: a new sign-in costs a WhatsApp code (M203).
+  const confirmSignOut = () =>
+    Alert.alert(t('account.menu.signOut'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('account.menu.signOut'), style: 'destructive', onPress: () => void signOut() },
+    ]);
 
   return (
     <Screen aboveTabBar watermark refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
@@ -115,7 +126,7 @@ export default function AccountScreen() {
               icon="logo-whatsapp"
               label={t('wa.menu.title')}
               onPress={me.phoneVerified ? () => undefined : showWhatsappVerify}
-              iconColor={me.phoneVerified ? WA_GREEN : colors.textMuted}
+              iconColor={me.phoneVerified ? colors.whatsapp : colors.textMuted}
               trailing={
                 me.phoneVerified ? (
                   <Text style={styles.verifiedText}>{t('wa.menu.verified')}</Text>
@@ -175,7 +186,7 @@ export default function AccountScreen() {
           {/* M196: light or dark, the member's call. */}
           <MenuRow icon="contrast-outline" label={t('account.menu.theme')} onPress={chooseTheme} />
           {me?.isAdmin ? <MenuRow icon="key-outline" label={t('account.menu.hqAdmin')} onPress={() => router.push('/hq/admin')} /> : null}
-          <MenuRow icon="log-out-outline" label={t('account.menu.signOut')} onPress={() => void signOut()} />
+          <MenuRow icon="log-out-outline" label={t('account.menu.signOut')} onPress={confirmSignOut} />
         </MenuGroup>
       </FadeInView>
 
@@ -197,9 +208,7 @@ export default function AccountScreen() {
   );
 }
 
-// M209e (owner, 2026-11-07: «أخضر منوّر لما يكون موثّق»): the WhatsApp row's icon and «موثّق» light up in WhatsApp green.
-const WA_GREEN = '#25D366';
-
+// M209e (owner, 2026-11-07: «أخضر منوّر لما يكون موثّق»): the WhatsApp row's icon and «موثّق» light up in WhatsApp green (colors.whatsapp).
 function ProfileHeader({ me }: { me: Me }) {
   // M109e: the English app shows the member's own data in English (display only).
   const shown = displayProfile(me);
@@ -214,7 +223,7 @@ function ProfileHeader({ me }: { me: Me }) {
         <CompletionMeter percent={percent} size={78}>
           <GoldGradient style={styles.avatarRing}>
             {me.avatarUrl ? (
-              <Image source={{ uri: me.avatarUrl }} style={styles.avatar} accessibilityLabel={me.name} />
+              <Image source={{ uri: sized(me.avatarUrl, 70) }} style={styles.avatar} accessibilityLabel={me.name} />
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarInitial}>{initial}</Text>
@@ -316,7 +325,7 @@ const styles = themedStyles(() => ({
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   badge: { position: 'absolute', bottom: -4, end: -6 },
-  verifiedText: { ...typography.caption, color: WA_GREEN },
+  verifiedText: { ...typography.caption, color: colors.whatsapp },
   unverifiedText: { ...typography.caption, color: colors.textMuted, opacity: 0.7 },
   avatarRing: {
     width: 78,
@@ -340,7 +349,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: colors.goldSoft,
   },
-  adminBadgeText: { ...typography.caption, color: colors.goldLight, fontSize: 11 },
+  adminBadgeText: { ...typography.caption, color: colors.goldLightText, fontSize: 11 },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   contact: { ...typography.caption, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr' },
   // M79: the titled groups.

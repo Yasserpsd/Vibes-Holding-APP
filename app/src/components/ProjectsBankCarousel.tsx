@@ -6,7 +6,7 @@ import { useProjectsList } from '@/api/queries';
 import type { PublicProject } from '@/api/types';
 import { GlassCard } from '@/components/lux';
 import { PressScale } from '@/components/motion';
-import { textStart } from '@/i18n/direction';
+import { textDir, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -83,12 +83,20 @@ export function ProjectsBankCarousel() {
         <Animated.View style={{ opacity }}>
           <Image source={{ uri: project.image }} style={styles.image} resizeMode="cover" resizeMethod="resize" accessibilityLabel={project.title} />
           <View style={styles.overlay}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={[styles.title, textDir(project.title)]} numberOfLines={1}>
               {project.title}
             </Text>
             <View style={styles.metaRow}>
-              {project.sector ? <Text style={styles.meta}>{project.sector.name}</Text> : null}
-              {project.stage ? <Text style={styles.meta}>{project.stage.name}</Text> : null}
+              {project.sector ? (
+                <Text style={[styles.meta, styles.metaShrink]} numberOfLines={1}>
+                  {project.sector.name}
+                </Text>
+              ) : null}
+              {project.stage ? (
+                <Text style={[styles.meta, styles.metaShrink]} numberOfLines={1}>
+                  {project.stage.name}
+                </Text>
+              ) : null}
             </View>
           </View>
         </Animated.View>
@@ -120,6 +128,7 @@ const styles = themedStyles(() => ({
   title: { ...typography.body, fontFamily: fonts.bold, color: colors.onPhoto, textAlign: textStart },
   metaRow: { flexDirection: 'row', gap: spacing.sm },
   meta: { ...typography.caption, color: colors.onPhotoGold },
+  metaShrink: { flexShrink: 1 },
   dots: {
     position: 'absolute',
     top: spacing.sm,

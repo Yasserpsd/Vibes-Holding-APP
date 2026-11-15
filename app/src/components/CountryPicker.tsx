@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type Ref } from 'react';
-import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import type { Country } from '@/api/auth';
 import { FieldError } from '@/components/form/FormParts';
@@ -21,6 +21,8 @@ type Props = {
   onSelect: (code: string) => void;
   /** M126: flag + dial code only — sits beside the phone field on the login screen. */
   compact?: boolean;
+  /** The field stays visible but cannot open the sheet (the country of a reset code that is already on its way). */
+  disabled?: boolean;
   /** M195: inside a form the picker carries its own label and red state like a FormField. */
   label?: string;
   error?: string | null;
@@ -32,7 +34,7 @@ type Props = {
  * Search matches the Arabic name, the English name and the dial code.
  * M195: inside a FormCard it is drawn exactly like the other fields (same height, radius, border, colours).
  */
-export function CountryPicker({ countries, selected, onSelect, compact = false, label, error, anchorRef }: Props) {
+export function CountryPicker({ countries, selected, onSelect, compact = false, disabled = false, label, error, anchorRef }: Props) {
   const palette = useFormPalette();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -63,9 +65,10 @@ export function CountryPicker({ countries, selected, onSelect, compact = false, 
     <View ref={anchorRef} style={styles.wrap} collapsable={false}>
       {label ? <Text style={[styles.label, palette ? { color: error ? palette.danger : palette.inkSoft } : null]}>{label}</Text> : null}
       <Pressable
-        style={[styles.field, compact && styles.fieldCompact, fieldForm]}
-        onPress={() => setOpen(true)}
+        style={[styles.field, compact && styles.fieldCompact, fieldForm, disabled && styles.fieldDisabled]}
+        onPress={disabled ? undefined : () => setOpen(true)}
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
         accessibilityLabel={compact && current ? `${countryLabel(current)} +${current.dial}` : (label ?? t('auth.register.country'))}
       >
         <Text style={styles.flag}>{current?.flag ?? ''}</Text>
@@ -79,6 +82,8 @@ export function CountryPicker({ countries, selected, onSelect, compact = false, 
       </Pressable>
       {error ? <FieldError text={error} /> : null}
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+        {/* The search field opens the keyboard at once: the sheet rises above it, or the last countries of the list sit under the keys. */}
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={[styles.sheet, palette ? { backgroundColor: palette.card, borderColor: palette.cardBorder } : null]} onPress={() => undefined}>
             <TextInput
@@ -119,12 +124,14 @@ export function CountryPicker({ countries, selected, onSelect, compact = false, 
             />
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
 const styles = themedStyles(() => ({
+  flex: { flex: 1 },
   wrap: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   field: {
@@ -141,6 +148,7 @@ const styles = themedStyles(() => ({
   },
   // The compact form keeps the same height as a FormField input so the login row lines up.
   fieldCompact: { alignSelf: 'stretch', paddingHorizontal: spacing.sm + 4 },
+  fieldDisabled: { opacity: 0.6 },
   fieldText: { ...typography.body, color: colors.textPrimary, flex: 1, textAlign: textStart },
   flag: { fontSize: 18 },
   dial: { ...typography.caption, color: colors.textMuted },
@@ -175,7 +183,7 @@ const styles = themedStyles(() => ({
   },
   rowActive: { backgroundColor: colors.goldSoft },
   rowText: { ...typography.body, color: colors.textSecondary, flex: 1, textAlign: textStart },
-  rowTextActive: { color: colors.goldLight },
+  rowTextActive: { color: colors.goldLightText },
   rowTextBold: { fontFamily: fonts.semiBold },
   empty: { ...typography.body, color: colors.textMuted, textAlign: 'center', padding: spacing.md },
 }));

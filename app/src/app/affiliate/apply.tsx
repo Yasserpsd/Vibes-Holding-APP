@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import type { ScrollView } from 'react-native';
 
@@ -34,6 +34,15 @@ export default function AffiliateApplyScreen() {
   const overview = useAffiliate(status === 'signedIn');
   const scrollRef = useRef<ScrollView | null>(null);
 
+  // The account is still being restored: no sign-in prompt flashes at a signed-in member.
+  if (status === 'loading') {
+    return (
+      <Screen title={t('affiliate.applyTitle')}>
+        <Stack.Screen options={{ title: t('nav.affiliate') }} />
+        <StateView loading />
+      </Screen>
+    );
+  }
   if (status !== 'signedIn') {
     return (
       <Screen title={t('affiliate.applyTitle')}>
@@ -115,7 +124,9 @@ function ApplyForm({ data, scrollRef }: { data: AffiliateOverview; scrollRef: Re
         heardFromNote: '',
       });
       await queryClient.invalidateQueries({ queryKey: ['affiliate'] });
-      router.back();
+      // Opened from a link there may be nothing behind this screen: land on the programme page instead.
+      if (router.canGoBack()) router.back();
+      else router.replace('/affiliate' as Href);
     } catch (cause) {
       setSubmitError(errorMessage(cause));
     } finally {

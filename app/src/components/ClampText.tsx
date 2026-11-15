@@ -53,13 +53,14 @@ export function ClampText({ text, lines = 3, style }: Props) {
           onPress={() => setOpen((current) => !current)}
           accessibilityRole="button"
           accessibilityLabel={open ? t('project.readLess') : t('project.readMore')}
+          hitSlop={10}
           wrapStyle={centered ? styles.toggleCenter : styles.toggleStart}
           style={[styles.pill, paper && styles.paperPill]}
         >
           <Text style={[styles.pillText, paper && styles.paperPillText]} numberOfLines={1}>
             {open ? t('project.readLess') : t('project.readMore')}
           </Text>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={paper ? colors.paperGold : colors.goldLight} />
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={paper ? colors.paperGold : colors.goldLightText} />
         </PressScale>
       ) : null}
     </View>
@@ -84,6 +85,6 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldFaint,
   },
   paperPill: { borderColor: colors.paperBorder, backgroundColor: colors.paper },
-  pillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLight },
+  pillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldLightText },
   paperPillText: { color: colors.paperGold },
 }));

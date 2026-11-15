@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,7 +16,7 @@ import { FadeInView, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
+import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -75,6 +76,9 @@ type ThreadQuery = ReturnType<typeof useContactThread>;
 function Thread({ query }: { query: ThreadQuery }) {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  // M241: the screen sits under the stack's opaque header, so on iOS the keyboard padding is short by the header's
+  // height unless it is passed as the offset. Read from the context (useHeaderHeight() throws where no header exists).
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -113,9 +117,16 @@ function Thread({ query }: { query: ThreadQuery }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.thread} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.thread}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+    >
       {query.isPending ? (
         <StateView loading />
+      ) : query.isError && !query.data ? (
+        // The thread did not load: say so (an empty «لا رسائل» would hide the earlier messages) and offer a retry.
+        <StateView error={query.error} onRetry={() => void query.refetch()} />
       ) : (
         <ScrollView ref={scroller} style={styles.messages} contentContainerStyle={styles.messagesContent}>
           {messages.length === 0 ? (
@@ -219,7 +230,9 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
-    textAlign: textStart,
+    // A TextInput reads left/right as the physical sides: its start follows the language (textStart would put Arabic on the left).
+    textAlign: inputStart(),
+    writingDirection: isRTL() ? 'rtl' : 'ltr',
   },
   // Focus lights the field: a golden border with the faintest halo.
   inputFocused: { borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
@@ -233,6 +246,7 @@ const styles = themedStyles(() => ({
   },
   sendDisabled: { opacity: 0.5 },
   // The paper plane flies forward in the RTL layout.
-  sendIcon: { transform: [{ scaleX: -1 }] },
+  // The paper plane flies toward the reading direction: mirrored for Arabic only.
+  sendIcon: { transform: isRTL() ? [{ scaleX: -1 }] : [] },
   hint: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs, backgroundColor: colors.surface },
 }));

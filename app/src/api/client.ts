@@ -112,7 +112,12 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     throw new ApiError(message, response.status, code);
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    // A 2xx whose body is empty or not JSON (a proxy page, a cut connection): a typed error, never a raw SyntaxError.
+    throw new ApiError(t('errors.generic'), response.status, 'bad_response');
+  }
 }
 
 /**

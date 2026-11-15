@@ -1,4 +1,5 @@
-import type { ReactElement, ReactNode, RefObject } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { useContext, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View, type RefreshControlProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -30,10 +31,16 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
   // The bottom padding keeps the last element clear of the floating «اسأل المستشار» button. Without a tab bar or
   // a bottom safe-area edge under it, the scroll view runs to the physical bottom edge and the inset counts too.
   const clearance = useAskAdvisorClearance(aboveTabBar || edges.includes('bottom'));
+  // Review 2026-11-15 (iOS): under the stack's opaque header this view starts one header-height down the screen,
+  // and the keyboard padding came out short by that much — the last field of a long form stayed under the keyboard.
+  // The context is read directly (never useHeaderHeight(), which throws where no navigator provides it): the stack
+  // gives the header height, or 0 for a screen without a header. expo-router 57 ships react-navigation inside itself,
+  // so the context comes from its own entry, not from @react-navigation/elements (not installed here).
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
   return (
     <SafeAreaView style={styles.safeArea} edges={edges}>
       {watermark ? <EmblemWatermark /> : null}
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingBottom: clearance }]}

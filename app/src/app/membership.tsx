@@ -28,10 +28,12 @@ export default function MembershipScreen() {
   const { data, isLoading, error, refetch } = useMembershipContent();
   useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? t('nav.membership') });
 
-  if (!data) {
+  // `status === 'loading'`: the account is still being read from the device; the status card would
+  // otherwise show «زائر» for a moment to a signed-in member.
+  if (!data || status === 'loading') {
     return (
       <Screen>
-        <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />
+        <StateView loading={isLoading || status === 'loading'} error={error} onRetry={() => void refetch()} />
       </Screen>
     );
   }

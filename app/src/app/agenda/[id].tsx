@@ -25,6 +25,7 @@ import { EventDateBadge } from './index';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatEventDays, formatNumber } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -73,6 +74,8 @@ export default function AgendaEventScreen() {
         onError: (cause) => {
           setError(cause.message);
           setGated(isProfileGate(cause));
+          // The top button books from the head of the page; the refusal shows in the booking block below it.
+          scrollRef.current?.scrollTo({ y: Math.max(0, bookingY - 16), animated: true });
         },
       },
     );
@@ -106,11 +109,11 @@ export default function AgendaEventScreen() {
           {/* M77 (owner): the BIG image leads the page — all details below it. */}
           {event.imageUrl ? (
             <FadeInView offset={8}>
-              <Image source={{ uri: event.imageUrl }} style={styles.heroImage} resizeMode="cover" accessibilityLabel={event.title} />
+              <Image source={{ uri: sized(event.imageUrl, 400) }} style={styles.heroImage} resizeMode="cover" accessibilityLabel={event.title} />
             </FadeInView>
           ) : null}
           <FadeInView style={styles.head} offset={10}>
-            <EventDateBadge date={event.date} highlight />
+            <EventDateBadge date={event.date} highlight onPage />
             <View style={styles.headText}>
               <Text style={styles.title}>{event.title}</Text>
               <Text style={styles.meta}>{`${formatEventDays(event.dates, event.date)}${timeLine(event) ? ` · ${timeLine(event)}` : ''}`}</Text>
@@ -191,7 +194,7 @@ export default function AgendaEventScreen() {
             <FadeInView delay={200}>
               <GlassCard golden style={styles.memberCta}>
                 <View style={styles.memberCtaHead}>
-                  <Ionicons name="ribbon-outline" size={22} color={colors.goldLight} />
+                  <Ionicons name="ribbon-outline" size={22} color={colors.goldLightText} />
                   <SarText style={styles.memberCtaTitle}>
                     {(event.memberFeeSar ?? 0) > 0
                       ? t('agenda.memberCtaTitleFee', { fee: String(event.memberFeeSar), full: String(event.feeSar) })
@@ -268,7 +271,7 @@ const styles = themedStyles(() => ({
   // M173: the membership door under the prices — golden, one sentence, one button.
   memberCta: { gap: spacing.sm, padding: spacing.md, boxShadow: shadows.glowGoldFaint },
   memberCtaHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  memberCtaTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 26, color: colors.goldLight, flex: 1, textAlign: textStart },
+  memberCtaTitle: { ...typography.subtitle, fontSize: 17, lineHeight: 26, color: colors.goldLightText, flex: 1, textAlign: textStart },
   memberCtaText: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   infoCard: {
     gap: spacing.sm,
@@ -279,7 +282,7 @@ const styles = themedStyles(() => ({
   // M107: both prices side by side, then the saving line under them.
   prices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, flex: 1 },
   memberPill: { backgroundColor: colors.surfaceElevated },
-  savings: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  savings: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   // M182e: the struck list price beside the club-support discount pill.
   supportRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   wasPrice: { ...typography.caption, fontSize: 14, color: colors.textMuted, textDecorationLine: 'line-through' },
@@ -306,7 +309,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGold,
     backgroundColor: colors.goldSoft,
   },
-  feeText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  feeText: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   // The confirmed moment glows — celebratory, but classy.
   confirmGlow: { borderRadius: radii.md, boxShadow: shadows.glowGold },
 }));

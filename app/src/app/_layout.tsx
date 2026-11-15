@@ -5,15 +5,16 @@ import {
   IBMPlexSansArabic_700Bold,
   useFonts,
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { requireOptionalNativeModule } from 'expo';
 import { LocaleProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 
+import { ApiError } from '@/api/client';
 import { AuthProvider } from '@/auth/AuthProvider';
 import { GuestGate, GuestGateProvider } from '@/auth/GuestGate';
 import { GlobalTabBar } from '@/components/GlobalTabBar';
@@ -44,12 +45,40 @@ import { loadTheme } from '@/theme/theme';
 import { colors, fonts, getThemeName, typography } from '@/theme/tokens';
 
 installNotificationHandler();
-SplashScreen.preventAutoHideAsync();
+// A rejection here (no activity yet) must never surface as an unhandled promise at launch.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/**
+ * Launch watchdog: the splash screen is held until the fonts, the saved language/theme and the cached content are
+ * back. Each of them is guarded against errors, but a secure-store or file read that never answers (a stalled Android
+ * Keystore, a locked iPhone keychain) would keep the splash up for ever. After this long the app opens anyway, with
+ * whatever is ready.
+ */
+const LAUNCH_WATCHDOG_MS = 12_000;
+/**
+ * An update that finishes downloading later than this after the launch is NOT applied by force: by then the member
+ * may be typing in a form. It stays «pending»: the restart banner (UpdateGate) offers it and the next launch applies it.
+ */
+const AUTO_RELOAD_WINDOW_MS = 30_000;
+/** A phone that keeps the app alive for days: back in the foreground with a check older than this, look for an update again. */
+const UPDATE_RECHECK_MS = 3 * 60 * 60_000;
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 60_000, retry: 1 },
+    queries: {
+      staleTime: 60_000,
+      // One more try for a lost connection, a 5xx, a deadline (408) or a rate limit (429). Any other 4xx is final:
+      // asking again for a 401 / 403 / 404 / 426 only doubles the call and delays the error state by a second.
+      retry: (failures, error) => failures < 1 && !(error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429),
+    },
   },
+});
+
+// TanStack's refetch-on-focus listens to a browser window, which a phone does not have: the app's own foreground
+// state drives it, so what is stale on screen refreshes when the member comes back to the app.
+focusManager.setEventListener((handleFocus) => {
+  const subscription = AppState.addEventListener('change', (state) => handleFocus(state === 'active'));
+  return () => subscription.remove();
 });
 
 // M196: a function, not a constant — it reads the active palette at render, after loadTheme().
@@ -107,18 +136,52 @@ export default function RootLayout() {
   // swallowed: the default next-launch path still stands behind it.
   useEffect(() => {
     if (!requireOptionalNativeModule('ExpoUpdates')) return;
+    const startedAt = Date.now();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const updates = require('expo-updates') as typeof import('expo-updates');
+    let lastCheckAt = 0;
+    let busy = true;
     void updates
       .checkForUpdateAsync()
-      .then((check) => (check.isAvailable ? updates.fetchUpdateAsync() : null))
-      .then((fetched) => (fetched?.isNew ? updates.reloadAsync() : undefined))
-      .catch(() => undefined);
+      .then((check) => {
+        lastCheckAt = Date.now();
+        return check.isAvailable ? updates.fetchUpdateAsync() : null;
+      })
+      // Late on a slow network = the member is already using the app: no forced reload (see AUTO_RELOAD_WINDOW_MS).
+      .then((fetched) => (fetched?.isNew && Date.now() - startedAt <= AUTO_RELOAD_WINDOW_MS ? updates.reloadAsync() : undefined))
+      .catch(() => undefined)
+      .finally(() => {
+        busy = false;
+      });
+    // Back in the foreground with a check older than three hours: look again and download behind the screen. NEVER a
+    // reload here — the «restart» banner (UpdateGate) offers it and the next launch applies it. A failed look (no
+    // network) does not count as a check, so the next return to the foreground tries again.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || busy || Date.now() - lastCheckAt < UPDATE_RECHECK_MS) return;
+      busy = true;
+      void updates
+        .checkForUpdateAsync()
+        .then((check) => {
+          lastCheckAt = Date.now();
+          return check.isAvailable ? updates.fetchUpdateAsync() : null;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          busy = false;
+        });
+    });
+    return () => subscription.remove();
   }, []);
 
-  const ready = (fontsLoaded || fontError !== null) && i18nReady && cacheReady;
+  const [watchdog, setWatchdog] = useState(false);
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
+    const timer = setTimeout(() => setWatchdog(true), LAUNCH_WATCHDOG_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const ready = watchdog || ((fontsLoaded || fontError !== null) && i18nReady && cacheReady);
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync().catch(() => undefined);
   }, [ready]);
 
   if (!ready) {

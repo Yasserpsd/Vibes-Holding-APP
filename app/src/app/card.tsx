@@ -16,6 +16,7 @@ import { GlassCard, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { StateView } from '@/components/StateView';
 import { VoiceFill } from '@/components/VoiceFill';
 import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -43,6 +44,13 @@ const SILVER = {
   soft: 'rgba(182, 186, 196, 0.16)',
   glow: '0 0 24px rgba(182, 186, 196, 0.18)',
 } as const;
+// The card is black in both themes, so its gold is fixed too (the logo's champagne scale): the light theme's
+// deeper golds are tuned for white paper and made the slab look dull.
+const GOLD = {
+  bright: '#F2CE74',
+  body: '#D9A83C',
+  dark: '#A67C22',
+} as const;
 
 /**
  * M30: «كارت العضوية» — a gold business card on black: club name, the member's name with an
@@ -60,6 +68,15 @@ export default function CardScreen() {
   const partners = usePartners();
   const promoCode = partners.data?.promo?.code ?? null;
 
+  // The account is still being read from the device: no «sign in» prompt for a signed-in member.
+  if (status === 'loading') {
+    return (
+      <Screen title={t('nav.card')}>
+        <Stack.Screen options={{ title: t('nav.card') }} />
+        <StateView loading />
+      </Screen>
+    );
+  }
   if (status !== 'signedIn' || !me) {
     return (
       <Screen title={t('nav.card')}>
@@ -81,10 +98,10 @@ export default function CardScreen() {
   const contacts = [holder.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
   // M103: one layout, two metals — VIP gold for the active member, faded silver for the rest.
   const metal = {
-    frame: active ? colors.gold : SILVER.dark,
-    inner: active ? colors.goldDark : SILVER.dark,
-    bright: active ? colors.goldLight : SILVER.bright,
-    body: active ? colors.gold : SILVER.body,
+    frame: active ? GOLD.body : SILVER.dark,
+    inner: active ? GOLD.dark : SILVER.dark,
+    bright: active ? GOLD.bright : SILVER.bright,
+    body: active ? GOLD.body : SILVER.body,
     glow: active ? shadows.glowGoldStrong : SILVER.glow,
   };
 
@@ -116,11 +133,11 @@ export default function CardScreen() {
             {active ? (
               <View style={styles.vipBadge}>
                 <Ionicons name="diamond" size={11} color={colors.goldInk} />
-                <Text style={styles.vipText}>VIP</Text>
+                <Text style={styles.vipText} numberOfLines={1}>VIP</Text>
               </View>
             ) : (
               <View style={styles.inactiveBadge}>
-                <Text style={styles.inactiveBadgeText}>{t('card.notActiveBadge')}</Text>
+                <Text style={styles.inactiveBadgeText} numberOfLines={1}>{t('card.notActiveBadge')}</Text>
               </View>
             )}
           </View>
@@ -133,8 +150,8 @@ export default function CardScreen() {
             </Text>
             <View style={styles.holderMetaRow}>
               {category ? (
-                <View style={[styles.categoryPill, { backgroundColor: active ? colors.gold : SILVER.body }]}>
-                  <Text style={styles.categoryText}>{category}</Text>
+                <View style={[styles.categoryPill, { backgroundColor: active ? GOLD.body : SILVER.body }]}>
+                  <Text style={styles.categoryText} numberOfLines={1}>{category}</Text>
                 </View>
               ) : null}
               {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
@@ -175,7 +192,7 @@ export default function CardScreen() {
               <View style={styles.cell}>
                 <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
                 <View style={styles.daysRow}>
-                  <Ionicons name="hourglass-outline" size={13} color={colors.gold} />
+                  <Ionicons name="hourglass-outline" size={13} color={GOLD.body} />
                   <Text style={[styles.cellValue, { color: metal.bright }]}>{t('card.daysValue', { days: daysShown })}</Text>
                 </View>
               </View>
@@ -217,7 +234,7 @@ export default function CardScreen() {
 
 /** A thin metallic divider: dark metal melting into bright and back — gold or silver with the membership. */
 function GoldRule({ active }: { active: boolean }) {
-  const steps = active ? [colors.goldDark, colors.gold, colors.goldLight, colors.gold, colors.goldDark] : [SILVER.dark, SILVER.body, SILVER.bright, SILVER.body, SILVER.dark];
+  const steps = active ? [GOLD.dark, GOLD.body, GOLD.bright, GOLD.body, GOLD.dark] : [SILVER.dark, SILVER.body, SILVER.bright, SILVER.body, SILVER.dark];
   return (
     <View style={styles.rule}>
       {steps.map((tone, index) => (
@@ -385,21 +402,24 @@ function PrintBlock({ active }: { active: boolean }) {
 }
 
 const CARD_BLACK = '#0B0A08';
+// The card is black in BOTH themes: its frame and logo disc must not follow `colors.black` (near-white in
+// the light theme), and the text on it uses the onPhoto* tokens (light on dark in both themes).
+const CARD_FRAME_BLACK = '#070708';
 
 const styles = themedStyles(() => ({
   // The card: a gold slab on black — double gold frame, deep warm black, a gold glow around it.
   card: {
     borderRadius: radii.lg,
     borderWidth: 2,
-    borderColor: colors.gold,
-    backgroundColor: colors.black,
+    borderColor: GOLD.body,
+    backgroundColor: CARD_FRAME_BLACK,
     padding: 5,
     boxShadow: shadows.glowGoldStrong,
   },
   cardInner: {
     borderRadius: radii.lg - 5,
     borderWidth: 1,
-    borderColor: colors.goldDark,
+    borderColor: GOLD.dark,
     backgroundColor: CARD_BLACK,
     paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.md + 2,
@@ -407,23 +427,23 @@ const styles = themedStyles(() => ({
     overflow: 'hidden',
   },
   // Engraved gold circles, barely there, like guilloché on a bank card.
-  ring: { position: 'absolute', borderColor: colors.gold, opacity: 0.09 },
+  ring: { position: 'absolute', borderColor: GOLD.body, opacity: 0.09 },
   ringLarge: { width: 230, height: 230, borderRadius: 115, borderWidth: 22, top: -95, start: -85 },
   ringSmall: { width: 130, height: 130, borderRadius: 65, borderWidth: 12, bottom: -55, end: -45 },
   // A diagonal sheen band across the metal.
-  sheen: { position: 'absolute', width: 520, height: 74, backgroundColor: colors.goldLight, opacity: 0.05, top: 26, start: -120, transform: [{ rotate: '-16deg' }] },
+  sheen: { position: 'absolute', width: 520, height: 74, backgroundColor: GOLD.bright, opacity: 0.05, top: 26, start: -120, transform: [{ rotate: '-16deg' }] },
   // Thin corner accents.
-  corner: { position: 'absolute', width: 26, height: 26, borderColor: colors.gold, opacity: 0.75 },
+  corner: { position: 'absolute', width: 26, height: 26, borderColor: GOLD.body, opacity: 0.75 },
   cornerTopStart: { top: 10, start: 10, borderTopWidth: 1.5, borderStartWidth: 1.5, borderTopStartRadius: 8 },
   cornerBottomEnd: { bottom: 10, end: 10, borderBottomWidth: 1.5, borderEndWidth: 1.5, borderBottomEndRadius: 8 },
 
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
-  logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: colors.gold, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' },
+  logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: GOLD.body, backgroundColor: CARD_FRAME_BLACK, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 32, height: 32 },
   headText: { flex: 1, gap: 1 },
-  club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: colors.gold, textAlign: textStart },
-  clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: colors.goldLight, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
-  categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: colors.gold },
+  club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: GOLD.body, textAlign: textStart },
+  clubEn: { fontFamily: fonts.medium, fontSize: 9, lineHeight: 13, color: GOLD.bright, letterSpacing: 3.5, textAlign: textStart, writingDirection: 'ltr', opacity: 0.9 },
+  categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: GOLD.body },
   categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.goldInk },
   // M103: the silvered, faded shell of the unactivated card.
   cardFaded: { opacity: 0.88 },
@@ -435,7 +455,7 @@ const styles = themedStyles(() => ({
     paddingVertical: 4,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.gold,
+    backgroundColor: GOLD.body,
     experimental_backgroundImage: gradients.gold,
     boxShadow: shadows.glowGold,
   },
@@ -460,24 +480,25 @@ const styles = themedStyles(() => ({
     fontFamily: fonts.bold,
     fontSize: 26,
     lineHeight: 38,
-    color: colors.goldLight,
+    color: GOLD.bright,
     letterSpacing: 0.4,
     textAlign: textStart,
     textShadowColor: 'rgba(0, 0, 0, 0.9)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 4,
   },
-  holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: textStart },
+  holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.onPhotoSoft, textAlign: textStart },
 
   numberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   numberCell: { flex: 1 },
-  numberBlock: { gap: 1 },
-  numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, color: colors.textMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
+  // flexShrink: a long promo code must not squeeze the membership number out of the row on a narrow phone.
+  numberBlock: { gap: 1, flexShrink: 1 },
+  numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, color: colors.onPhotoMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
   number: {
     fontFamily: fonts.semiBold,
     fontSize: 22,
     lineHeight: 30,
-    color: colors.gold,
+    color: GOLD.body,
     textAlign: textStart,
     writingDirection: 'ltr',
     letterSpacing: 3,
@@ -486,16 +507,16 @@ const styles = themedStyles(() => ({
     textShadowRadius: 3,
   },
 
-  footer: { flexDirection: 'row', gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.goldDark, paddingTop: spacing.sm + 2 },
+  footer: { flexDirection: 'row', gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: GOLD.dark, paddingTop: spacing.sm + 2 },
   cell: { flex: 1, gap: 2 },
-  cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: textStart },
-  cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, color: colors.goldLight, textAlign: textStart },
+  cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.onPhotoMuted, textAlign: textStart },
+  cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, color: GOLD.bright, textAlign: textStart },
   daysRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // M103: the unactivated line reads clearly on the silver card.
   inactive: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: SILVER.bright, textAlign: textStart },
 
   contacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 },
-  contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.textSecondary, textAlign: textStart, flexShrink: 1 },
+  contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.onPhotoSoft, textAlign: textStart, flexShrink: 1 },
 
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   print: { gap: spacing.sm, padding: spacing.md },
@@ -509,7 +530,7 @@ const styles = themedStyles(() => ({
   // M163: the member's request as it stands — in flight, delivered, declined — with his own receipt button.
   statusBox: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.surfaceElevated },
   statusHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  statusTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldLight, textAlign: textStart },
+  statusTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.goldLightText, textAlign: textStart },
   statusLine: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   lostTitle: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart, marginTop: spacing.xs },
 }));

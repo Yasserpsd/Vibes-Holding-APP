@@ -130,6 +130,10 @@ export function PopIn({ children, delay = 0, style }: { children: ReactNode; del
  */
 export function Wiggle({ children, delay = 0, repeatEvery, style }: { children: ReactNode; delay?: number; repeatEvery?: number; style?: StyleProp<ViewStyle> }) {
   const [swing] = useState(() => new Animated.Value(0));
+  // Review 2026-11-15: the repeating nudge is an endless loop, so it follows M152's rule and rests under
+  // «reduce motion»; the one-shot shake still runs.
+  const reduced = useReducedMotion();
+  const repeat = reduced ? undefined : repeatEvery;
   useEffect(() => {
     const shake = () =>
       Animated.sequence([
@@ -138,12 +142,12 @@ export function Wiggle({ children, delay = 0, repeatEvery, style }: { children: 
         Animated.timing(swing, { toValue: 0.6, duration: 120, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         Animated.timing(swing, { toValue: 0, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]);
-    const animation = repeatEvery
-      ? Animated.loop(Animated.sequence([Animated.delay(delay), shake(), Animated.delay(repeatEvery)]))
+    const animation = repeat
+      ? Animated.loop(Animated.sequence([Animated.delay(delay), shake(), Animated.delay(repeat)]))
       : Animated.sequence([Animated.delay(delay), shake()]);
     animation.start();
     return () => animation.stop();
-  }, [swing, delay, repeatEvery]);
+  }, [swing, delay, repeat]);
   return (
     <Animated.View style={[style, { transform: [{ rotate: swing.interpolate({ inputRange: [-1, 1], outputRange: ['-9deg', '9deg'] }) }] }]}>
       {children}
@@ -256,7 +260,13 @@ export function GlowButton({ children, enabled = true, strong = false, radius = 
 /** A soft opacity loop for skeletons and waiting states. */
 export function usePulse(from = 0.4, to = 1, duration = 700): Animated.Value {
   const [pulse] = useState(() => new Animated.Value(from));
+  // Review 2026-11-15: under «reduce motion» the skeleton holds still at a mid value (visible, not breathing).
+  const reduced = useReducedMotion();
   useEffect(() => {
+    if (reduced) {
+      pulse.setValue((from + to) / 2);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: to, duration, useNativeDriver: true }),
@@ -265,7 +275,7 @@ export function usePulse(from = 0.4, to = 1, duration = 700): Animated.Value {
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse, from, to, duration]);
+  }, [pulse, from, to, duration, reduced]);
   return pulse;
 }
 
@@ -311,7 +321,9 @@ export function useCountUp(target: number, duration = 800): number {
 /** A light band sweeping across gold surfaces (the membership card's metal sheen). */
 export function Sheen({ width, height, band = 90, duration = 2600, delay = 1200 }: { width: number; height: number; band?: number; duration?: number; delay?: number }) {
   const [progress] = useState(() => new Animated.Value(0));
+  const reduced = useReducedMotion();
   useEffect(() => {
+    if (reduced) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(progress, { toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
@@ -321,7 +333,7 @@ export function Sheen({ width, height, band = 90, duration = 2600, delay = 1200 
     );
     loop.start();
     return () => loop.stop();
-  }, [progress, duration, delay]);
+  }, [progress, duration, delay, reduced]);
   const travel = width + band * 2;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>

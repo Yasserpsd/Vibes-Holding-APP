@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/lux';
 import { PopIn, PressScale } from '@/components/motion';
 import { getLang, t } from '@/i18n';
 import { loadSetting, saveSetting } from '@/lib/deviceStore';
+import { sized } from '@/lib/imageUrl';
 import { clearIntroDue, INTRO_DEVICE_SEEN_KEY, introAccountSeenKey, introIsDue } from '@/lib/introGate';
 import { playVideo } from '@/lib/player';
 import { autoPopupsBlocked, markAutoPopupUsed, usePopupHold } from '@/lib/popupGate';
@@ -34,7 +35,8 @@ const INTRO = {
 export function useIntroFilm(): { url: string; poster: string } {
   const intro = INTRO[getLang()];
   const hqPhoto = useHq().data?.photos?.[0] ?? null;
-  return { url: intro.url, poster: hqPhoto ?? intro.thumb };
+  // The HQ photo is one of ours: ask for it at the width it is drawn (the home's HQ banner shares the same cached variant).
+  return { url: intro.url, poster: hqPhoto ? sized(hqPhoto, 360) : intro.thumb };
 }
 
 /** The film as a card: poster with a play button, opening the in-app player. Used by «عنّا». */
@@ -102,7 +104,7 @@ export function IntroVideoPopup() {
 
   if (phase !== 'open') return null;
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={dismiss}>
+    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
           <GlassCard golden radius={radii.xxl} style={styles.popCard}>

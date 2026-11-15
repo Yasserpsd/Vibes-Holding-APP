@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { t } from '@/i18n';
 
@@ -18,7 +19,8 @@ export type Payment = {
   memberPrice: boolean;
   status: PaymentStatus;
   /** M107: `code` = confirmed by a 100% discount code, no gateway and no checkout. */
-  provider: 'paymob' | 'moyasar' | 'mock' | 'code';
+  /** `hub` = a payment made on the club's websites, listed here with an empty `checkoutUrl` (server M132). */
+  provider: 'paymob' | 'moyasar' | 'mock' | 'code' | 'hub';
   /** M107: the discount applied, when any. */
   discountCode?: string | null;
   discountPercent?: number | null;
@@ -55,14 +57,22 @@ export function useMonthlyDeal(): MonthlyDeal | null {
   return query.data?.monthly ?? null;
 }
 
-/** One payment; polls every few seconds while the gateway's callback is still awaited. */
+/** How long an open screen keeps asking about a payment that is still `created`. */
+const PAYMENT_POLL_MS = 10 * 60_000;
+
+/**
+ * One payment; polls every few seconds while the gateway's callback is still awaited.
+ * An abandoned checkout stops being asked about after ten minutes on the screen: the last state stays,
+ * and opening the screen again (or pulling to refresh) asks the server again.
+ */
 export function usePayment(id: string | undefined) {
+  const [openedAt] = useState(() => Date.now());
   return useQuery({
     queryKey: ['payments', 'one', id],
     queryFn: () => paymentsApi.get(id ?? ''),
     enabled: Boolean(id),
     staleTime: 5_000,
-    refetchInterval: (query) => (query.state.data?.payment.status === 'created' ? 3_000 : false),
+    refetchInterval: (query) => (query.state.data?.payment.status === 'created' && Date.now() - openedAt < PAYMENT_POLL_MS ? 3_000 : false),
   });
 }
 

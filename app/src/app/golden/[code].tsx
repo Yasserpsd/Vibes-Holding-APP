@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { errorMessage } from '@/api/client';
+import { ApiError, errorMessage } from '@/api/client';
 import { sendGoldenInterest, useGoldenOffer } from '@/api/queries';
 import type { OfferBlock } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
@@ -17,6 +17,7 @@ import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -37,9 +38,11 @@ export default function GoldenOfferScreen() {
   const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   if (!offer) {
+    // A shared link with a code the club does not have: asking again can never succeed, so no retry button.
+    const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
       <View style={styles.screen}>
-        <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
+        {notFound ? <StateView empty emptyText={t('offer.notFound')} /> : <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />}
       </View>
     );
   }
@@ -59,7 +62,7 @@ export default function GoldenOfferScreen() {
               }}
             >
               <View style={styles.logoBox}>
-                <Image source={{ uri: offer.company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={offer.company.name} />
+                <Image source={{ uri: sized(offer.company.logoUrl, 72) }} style={styles.logo} resizeMode="contain" accessibilityLabel={offer.company.name} />
               </View>
               <View style={styles.heroTexts}>
                 <Text style={styles.heroName}>{offer.company.name}</Text>
@@ -102,7 +105,7 @@ function Block({ block }: { block: OfferBlock }) {
         </View>
       );
     case 'image':
-      return <Image source={{ uri: block.url }} style={styles.image} resizeMode="cover" accessibilityIgnoresInvertColors />;
+      return <Image source={{ uri: sized(block.url, 400) }} style={styles.image} resizeMode="cover" accessibilityIgnoresInvertColors />;
     case 'text':
     default:
       return <Text style={styles.paragraph}>{block.text}</Text>;
@@ -141,6 +144,8 @@ function InterestSheet({ visible, code, companyName, onClose }: SheetProps) {
     try {
       await sendGoldenInterest(code, { name: name.trim(), phone: phone.trim(), note: note.trim() });
       setSent(true);
+      // The note went with this request: the next opening of the sheet starts clean.
+      setNote('');
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -151,7 +156,10 @@ function InterestSheet({ visible, code, companyName, onClose }: SheetProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel={t('common.close')} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* The app's modal pattern (WhatsappVerify, PhoneConfirmAlert, the rating sheet): the wrapper fills the
+          window and shrinks for the keyboard on Android («height»), so the bottom-aligned sheet rides above the
+          keys. «height» on a wrapper that only hugs the sheet would push it down instead, hence the full height. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} pointerEvents="box-none" style={styles.sheetWrap}>
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.handle} />
           {sent ? (
@@ -199,7 +207,7 @@ const styles = themedStyles(() => ({
   heroTexts: { flex: 1, gap: 2 },
   heroName: { ...typography.subtitle, color: colors.gold, textAlign: textStart },
   heroTagline: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-  heading: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 30, color: colors.goldLight, textAlign: textStart, marginTop: spacing.sm },
+  heading: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 30, color: colors.goldLightText, textAlign: textStart, marginTop: spacing.sm },
   heading1: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 36, color: colors.gold },
   heading3: { fontSize: 17, lineHeight: 26, color: colors.textPrimary },
   paragraph: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
@@ -210,7 +218,8 @@ const styles = themedStyles(() => ({
   pendingBox: { padding: spacing.lg },
   pendingText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
   disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.md },
-  backdrop: { flex: 1, backgroundColor: colors.overlay },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.overlay },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     gap: spacing.md,
     paddingHorizontal: spacing.lg,

@@ -31,7 +31,11 @@ function fileUri(): string | null {
 }
 
 function keepQuery(queryKey: readonly unknown[]): boolean {
-  return typeof queryKey[0] === 'string' && KEEP_ROOTS.has(queryKey[0]);
+  if (typeof queryKey[0] !== 'string' || !KEEP_ROOTS.has(queryKey[0])) return false;
+  // The member's ticket (name and QR) and the signed recording links never go to disk (keys in api/agenda.ts:
+  // ['agenda', 'ticket', …] and ['agenda', 'recordings', …]). The same test drops them from an older file on restore.
+  if (queryKey[0] === 'agenda' && (queryKey[1] === 'ticket' || queryKey[1] === 'recordings')) return false;
+  return true;
 }
 
 /** Fills the cache from the last launch's file (call after initI18n). Never throws: a missing or bad file is an empty cache. */
@@ -59,15 +63,35 @@ export function persistQueryCache(client: QueryClient): () => void {
   let writing: Promise<void> = Promise.resolve();
   const flush = () => {
     timer = null;
-    const snapshot: Snapshot = {
-      savedAt: Date.now(),
-      lang: getLang(),
-      state: dehydrate(client, { shouldDehydrateQuery: (query) => query.state.status === 'success' && keepQuery(query.queryKey), shouldDehydrateMutation: () => false }),
-    };
-    const text = JSON.stringify(snapshot);
-    writing = writing.then(() => FileSystem.writeAsStringAsync(uri, text)).catch(() => undefined);
+    // Runs from a timer: a throw (an odd value that JSON cannot hold) would be an uncaught error, a crash in a release build.
+    try {
+      const snapshot: Snapshot = {
+        savedAt: Date.now(),
+        lang: getLang(),
+        state: dehydrate(client, { shouldDehydrateQuery: (query) => query.state.status === 'success' && keepQuery(query.queryKey), shouldDehydrateMutation: () => false }),
+      };
+      const text = JSON.stringify(snapshot);
+      writing = writing.then(() => FileSystem.writeAsStringAsync(uri, text)).catch(() => undefined);
+    } catch {
+      // This snapshot is skipped; the next change writes a new one.
+    }
   };
-  const unsubscribe = client.getQueryCache().subscribe(() => {
+  // A removal is written at once: sign-out clears the whole cache, and an app killed inside the usual one-second
+  // delay would keep the signed-out member's content in the file until the next launch. The cache reports each
+  // removed query synchronously, one by one, while `clear()` is still emptying it, so the write waits for the end
+  // of that synchronous run (a microtask): one write, taken when every removal of the run is done.
+  let removalQueued = false;
+  const unsubscribe = client.getQueryCache().subscribe((event) => {
+    if (event.type === 'removed') {
+      if (removalQueued) return;
+      removalQueued = true;
+      void Promise.resolve().then(() => {
+        removalQueued = false;
+        if (timer) clearTimeout(timer);
+        flush();
+      });
+      return;
+    }
     timer ??= setTimeout(flush, WRITE_DELAY_MS);
   });
   return () => {

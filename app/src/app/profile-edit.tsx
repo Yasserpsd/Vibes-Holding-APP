@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { authApi, useAuthConfig, type PhoneStepResult, type ProfilePatch } from '@/api/auth';
+import { authApi, useAuthConfig, type Country, type PhoneStepResult, type ProfilePatch } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -22,6 +22,26 @@ import { localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
+/**
+ * The country and the national digits of the number as the hub shows it: a Saudi number comes as 05… (or its nine
+ * digits), every other country as dial code + number. The longest dial code whose remainder fits the country's
+ * length wins; Saudi when nothing matches or the list has not arrived.
+ */
+function splitStoredPhone(stored: string, countries: Country[] | undefined): { country: string; local: string } {
+  const digits = stored.replace(/\D+/g, '').replace(/^00/, '');
+  const saudi = { country: 'sa', local: localPhoneDigits(stored) };
+  if (!countries || !digits || digits.startsWith('0') || (digits.length === 9 && digits.startsWith('5'))) return saudi;
+  let best: { code: string; dial: string } | null = null;
+  for (const item of countries) {
+    const dial = item.dial.replace(/\D+/g, '');
+    if (!dial || !digits.startsWith(dial)) continue;
+    const rest = digits.length - dial.length;
+    if (rest < (item.min ?? 4) || rest > (item.max ?? 12)) continue;
+    if (!best || dial.length > best.dial.length) best = { code: item.code, dial };
+  }
+  return best ? { country: best.code, local: digits.slice(best.dial.length).replace(/^0+/, '') } : saudi;
+}
+
 export default function ProfileEditScreen() {
   const router = useRouter();
   // M203: a sign-in that passed by e-mail lands here: the number on file never received its code.
@@ -31,10 +51,15 @@ export default function ProfileEditScreen() {
   // The member changes the mobile number from here (owner, 2026-10-30); the e-mail stays the account's
   // identity and only the club's admins change it. The number is sent only when it was actually edited.
   // M215: the +966 picker already stands beside the field, so the saved 05… shows without its zero; an untouched number is not sent.
-  const [phone, setPhone] = useState(localPhoneDigits(me?.phone ?? ''));
-  const [countryCode, setCountryCode] = useState('sa');
+  // The picker starts on the country of the stored number (a foreign number was shown, and saved again, under +966).
+  // Until the member touches the number or the picker, both follow the account and the country list as they arrive.
+  const stored = splitStoredPhone(me?.phone ?? '', config?.countries);
+  const [typedPhone, setPhone] = useState<string | null>(null);
+  const [pickedCountry, setCountryCode] = useState<string | null>(null);
+  const phone = typedPhone ?? stored.local;
+  const countryCode = pickedCountry ?? stored.country;
   const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
-  const phoneChanged = phone !== localPhoneDigits(me?.phone ?? '');
+  const phoneChanged = phone !== stored.local;
   // M161 (owner): the contact e-mail (invoices, club mails) is the member's to change; the sign-in e-mail is not.
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const contactEmailChanged = contactEmail.trim().toLowerCase() !== (me?.contactEmail ?? '').trim().toLowerCase();
@@ -160,6 +185,7 @@ export default function ProfileEditScreen() {
             label={t('profile.contactEmail')}
             latin
             autoCapitalize="none"
+            autoCorrect={false}
             keyboardType="email-address"
             textContentType="emailAddress"
             value={contactEmail}
@@ -203,13 +229,13 @@ export default function ProfileEditScreen() {
         <FormField label={t('profile.city')} value={form.city} onChangeText={set('city')} textContentType="addressCity" />
       </FadeInView>
       <FadeInView delay={entranceDelay(4)}>
-        <FormField label={t('profile.website')} latin autoCapitalize="none" keyboardType="url" value={form.website} onChangeText={set('website')} placeholder="https://" />
+        <FormField label={t('profile.website')} latin autoCapitalize="none" autoCorrect={false} keyboardType="url" value={form.website} onChangeText={set('website')} placeholder="https://" />
       </FadeInView>
       <FadeInView delay={entranceDelay(5)}>
         <FormField label={t('profile.bio')} multiline value={form.bio} onChangeText={set('bio')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(6)}>
-        <FormField label={t('profile.social')} latin autoCapitalize="none" multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
+        <FormField label={t('profile.social')} latin autoCapitalize="none" autoCorrect={false} multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
       </FadeInView>
       {/* M198 (owner): the password changed from here once — it now lives in حسابي ← إعدادات الأمان only. */}
       {error ? (

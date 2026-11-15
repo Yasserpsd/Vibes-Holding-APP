@@ -29,20 +29,24 @@ export function SectionHeader({ title, subtitle, cta, onPress, badge = 0, icon }
           {icon ? (
             <PopIn delay={120}>
               <View style={styles.iconBadge}>
-                <Ionicons name={icon} size={14} color={colors.gold} />
+                <Ionicons name={icon} size={14} color={colors.goldText} />
               </View>
             </PopIn>
           ) : null}
           <Text style={styles.title}>{title}</Text>
           {badge > 0 ? (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badge > 9 ? '+9' : `+${badge}`}</Text>
+              <Text style={styles.badgeText} numberOfLines={1}>
+                {badge > 9 ? '+9' : `+${badge}`}
+              </Text>
             </View>
           ) : null}
           {cta && onPress ? (
-            <PressScale onPress={onPress} hitSlop={8} accessibilityRole="button" wrapStyle={styles.ctaWrap} style={styles.cta}>
-              <Text style={styles.ctaText}>{cta}</Text>
-              <Ionicons name={chevronForward()} size={14} color={colors.gold} />
+            <PressScale onPress={onPress} hitSlop={10} accessibilityRole="button" wrapStyle={styles.ctaWrap} style={styles.cta}>
+              <Text style={styles.ctaText} numberOfLines={1}>
+                {cta}
+              </Text>
+              <Ionicons name={chevronForward()} size={14} color={colors.goldText} />
             </PressScale>
           ) : null}
         </View>
@@ -93,7 +97,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldSoft,
     boxShadow: shadows.glowGoldFaint,
   },
-  ctaText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 19, color: colors.goldLight },
+  ctaText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 19, color: colors.goldLightText },
   // M75: the unread «+N» pill.
   badge: {
     minWidth: 22,
@@ -104,5 +108,5 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     boxShadow: shadows.glowGoldFaint,
   },
-  badgeText: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 17, color: '#141005' },
+  badgeText: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 17, color: colors.goldInk },
 }));

@@ -2,7 +2,9 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
 import { authApi, type PhoneStepResult } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
+import { AppButton } from '@/components/AppButton';
 import { entranceDelay, FadeInView } from '@/components/motion';
+import { Notice } from '@/components/Notice';
 import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
@@ -36,6 +38,20 @@ export default function PhoneCodeScreen() {
     else router.replace('/account');
     if (result.fixPhone) router.push('/profile-edit?fixPhone=1' as Href);
   };
+
+  // No step token (a stale link or a restored screen without its params): there is nothing to confirm, so the way back is offered.
+  if (!step.stepToken) {
+    return (
+      <Screen title={t('phoneCode.title')}>
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={t('auth.totp.expired')} />
+        </FadeInView>
+        <FadeInView delay={entranceDelay(1)}>
+          <AppButton label={t('auth.verify.backToLogin')} icon="arrow-undo-outline" onPress={() => router.replace('/auth/login')} />
+        </FadeInView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen title={t('phoneCode.title')} subtitle={t('phoneCode.subtitle')}>

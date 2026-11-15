@@ -6,7 +6,7 @@ import type { FilterOption } from '@/api/types';
 import { FadeInView, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatProjectCount } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -91,10 +91,10 @@ export function ActiveSectorBanner({ option, total, onClear }: { option: FilterO
           <Text style={styles.bannerTitle} numberOfLines={2}>
             {t('projects.showingSector', { name: option.name })}
           </Text>
-          {typeof total === 'number' ? <Text style={styles.bannerCount}>{t('projects.count', { count: formatNumber(total) })}</Text> : null}
+          {typeof total === 'number' ? <Text style={styles.bannerCount}>{formatProjectCount(total)}</Text> : null}
         </View>
         <PressScale onPress={onClear} accessibilityRole="button" accessibilityLabel={t('projects.clearSector')} hitSlop={8} style={styles.bannerClear}>
-          <Ionicons name="close" size={14} color={colors.goldLight} />
+          <Ionicons name="close" size={14} color={colors.goldLightText} />
           <Text style={styles.bannerClearText}>{t('projects.clearSector')}</Text>
         </PressScale>
       </View>
@@ -158,7 +158,7 @@ const styles = themedStyles(() => ({
   iconCircleSelected: { backgroundColor: 'rgba(20,16,5,0.14)' },
   name: { ...typography.caption, fontSize: 12, lineHeight: 17, minHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   nameSelected: { fontFamily: fonts.bold, color: colors.goldInk },
-  count: { ...typography.caption, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLight },
+  count: { ...typography.caption, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldLightText },
   countSelected: { color: colors.goldInk },
   banner: {
     flexDirection: 'row',
@@ -180,7 +180,7 @@ const styles = themedStyles(() => ({
   },
   bannerText: { flex: 1, gap: 2 },
   bannerTitle: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
-  bannerCount: { ...typography.caption, fontSize: 12, color: colors.goldLight, textAlign: textStart },
+  bannerCount: { ...typography.caption, fontSize: 12, color: colors.goldLightText, textAlign: textStart },
   bannerClear: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -191,5 +191,5 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.borderGold,
   },
-  bannerClearText: { ...typography.caption, fontSize: 12, color: colors.goldLight },
+  bannerClearText: { ...typography.caption, fontSize: 12, color: colors.goldLightText },
 }));

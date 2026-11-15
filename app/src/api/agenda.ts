@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiGet, apiRequest } from './client';
+import { useAccountKey } from './content';
 import type { Payment } from './payments';
 
 // M41 «أجندة النادي» — mirrors server/src/agenda/routes.ts.
@@ -63,17 +64,21 @@ export type AgendaTicket = {
   state: 'upcoming' | 'active' | 'expired';
 };
 
+// The fees, `mine`, `mustPay`, the ticket and the recordings differ per account (and per membership status), so every
+// agenda key carries the account: a guest who signs in never sees the guest prices from a cache still fresh.
 export function useAgenda() {
+  const account = useAccountKey();
   return useQuery({
-    queryKey: ['agenda'],
+    queryKey: ['agenda', 'list', account],
     queryFn: () => apiGet<{ events: AgendaEvent[] }>('/api/agenda'),
     staleTime: 30_000,
   });
 }
 
 export function useAgendaEvent(id: string | undefined) {
+  const account = useAccountKey();
   return useQuery({
-    queryKey: ['agenda', 'event', id],
+    queryKey: ['agenda', 'event', id, account],
     queryFn: () => apiGet<{ event: AgendaEvent }>(`/api/agenda/${encodeURIComponent(id ?? '')}`),
     enabled: Boolean(id),
     staleTime: 15_000,
@@ -104,8 +109,9 @@ export function useAgendaDiscount() {
 
 /** M107: the confirmed attendee's ticket (QR). */
 export function useAgendaTicket(eventId: string | undefined, enabled: boolean) {
+  const account = useAccountKey();
   return useQuery({
-    queryKey: ['agenda', 'ticket', eventId],
+    queryKey: ['agenda', 'ticket', eventId, account],
     queryFn: () => apiGet<{ ticket: AgendaTicket }>(`/api/agenda/${encodeURIComponent(eventId ?? '')}/ticket`),
     enabled: Boolean(eventId) && enabled,
     staleTime: 60_000,
@@ -117,8 +123,9 @@ export type AgendaFileLink = { title: string; url: string };
 
 /** M191: the workshop recordings' playable links — the server answers them to ACTIVE annual members only. */
 export function useAgendaRecordings(eventId: string | undefined, enabled: boolean) {
+  const account = useAccountKey();
   return useQuery({
-    queryKey: ['agenda', 'recordings', eventId],
+    queryKey: ['agenda', 'recordings', eventId, account],
     queryFn: () => apiGet<{ recordings: AgendaRecordingLink[]; files?: AgendaFileLink[] }>(`/api/agenda/${encodeURIComponent(eventId ?? '')}/recordings`),
     enabled: Boolean(eventId) && enabled,
     // The CDN links are signed for hours; refresh well before they lapse.

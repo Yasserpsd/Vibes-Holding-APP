@@ -15,8 +15,9 @@ import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
 import { ActiveSectorBanner, SectorStrip } from '@/components/SectorStrip';
 import { StateView } from '@/components/StateView';
 import { t, tOptional } from '@/i18n';
+import { inputStart, isRTL } from '@/i18n/direction';
 import { markSeen } from '@/lib/seen';
-import { formatNumber, formatSectorCount } from '@/lib/format';
+import { formatProjectCount, formatSectorCount } from '@/lib/format';
 import { useDebounced } from '@/lib/useDebounced';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -45,6 +46,8 @@ export default function ProjectsScreen() {
   // M107 «حسب اهتماماتي»: keeps only the projects matching my saved interests.
   const [mine, setMine] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // The «حسب اهتماماتي» filter belongs to a signed-in account: signing out drops it with the chip.
+  const mineOn = mine && signedIn;
   const q = useDebounced(search.trim());
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'projects', title: t('tabs.projects') }, true);
@@ -56,7 +59,7 @@ export default function ProjectsScreen() {
   );
 
   const filters = useProjectFilters();
-  const list = useProjectsList({ q, sort, sector, stage, mine: mine ? '1' : undefined });
+  const list = useProjectsList({ q, sort, sector, stage, mine: mineOn ? '1' : undefined });
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   const sorts = filters.data?.sorts ?? DEFAULT_SORTS;
@@ -96,7 +99,7 @@ export default function ProjectsScreen() {
             placeholder={t('projects.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.gold}
-            style={styles.searchInput}
+            style={[styles.searchInput, { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' }]}
             returnKeyType="search"
             autoCorrect={false}
           />
@@ -111,7 +114,7 @@ export default function ProjectsScreen() {
       <FadeInView delay={entranceDelay(2)}>
         {/* One row: the sorts, then «فلترة» opening the sheet (the sector/stage chip rows used to crowd the header). */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {signedIn ? <Chip label={t('projects.mine')} selected={mine} onPress={() => setMine((value) => !value)} /> : null}
+          {signedIn ? <Chip label={t('projects.mine')} selected={mineOn} onPress={() => setMine((value) => !value)} /> : null}
           {sorts.map((option) => (
             <Chip key={option.key} label={tOptional(`projects.sort.${option.key}`) ?? option.label} selected={sort === option.key} onPress={() => setSort(option.key)} />
           ))}
@@ -120,9 +123,10 @@ export default function ProjectsScreen() {
               onPress={() => setFiltersOpen(true)}
               accessibilityRole="button"
               accessibilityLabel={t('projects.filterTitle')}
+              hitSlop={8}
               style={[styles.filterButton, (sector || stage) && styles.filterButtonActive]}
             >
-              <Ionicons name="options-outline" size={15} color={sector || stage ? colors.goldInk : colors.goldLight} />
+              <Ionicons name="options-outline" size={15} color={sector || stage ? colors.goldInk : colors.goldLightText} />
               <Text style={[styles.filterButtonText, (sector || stage) && styles.filterButtonTextActive]}>{t('projects.filter')}</Text>
             </PressScale>
           ) : null}
@@ -199,9 +203,19 @@ export default function ProjectsScreen() {
             emptyText={t('projects.empty')}
           />
         }
-        ListFooterComponent={list.isFetchingNextPage ? <ActivityIndicator color={colors.gold} style={styles.footer} /> : null}
+        ListFooterComponent={
+          list.isFetchingNextPage ? (
+            <ActivityIndicator color={colors.gold} style={styles.footer} />
+          ) : list.isFetchNextPageError ? (
+            // A page that failed to load must not strand the rest of the bank: one tap asks for it again.
+            <PressScale onPress={() => void list.fetchNextPage()} accessibilityRole="button" accessibilityLabel={t('common.retry')} style={styles.footerRetry}>
+              <Ionicons name="refresh-outline" size={16} color={colors.goldLightText} />
+              <Text style={styles.footerRetryText}>{t('common.retry')}</Text>
+            </PressScale>
+          ) : null
+        }
         onEndReached={() => {
-          if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+          if (list.hasNextPage && !list.isFetchingNextPage && !list.isFetchNextPageError) void list.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
         refreshControl={
@@ -214,8 +228,9 @@ export default function ProjectsScreen() {
           />
         }
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       />
       <ProjectFiltersSheet
         open={filtersOpen}
@@ -232,10 +247,16 @@ export default function ProjectsScreen() {
   );
 }
 
+/** One shared component: an inline arrow would remount every separator on each keystroke of the search. */
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
 /** Icons pass: the bank's headline figure, counting up into its pill. */
 function BankTotal({ total }: { total: number }) {
   const shown = useCountUp(total, 600);
-  return <Text style={styles.statPillText}>{t('projects.count', { count: formatNumber(shown) })}</Text>;
+  // Whole numbers only: the helper picks the Arabic noun form from the count itself («مشروعان»، «5 مشاريع»).
+  return <Text style={styles.statPillText}>{formatProjectCount(Math.round(shown))}</Text>;
 }
 
 const styles = themedStyles(() => ({
@@ -246,7 +267,7 @@ const styles = themedStyles(() => ({
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.gold },
   goldenLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  goldenLinkText: { ...typography.caption, color: colors.goldLight },
+  goldenLinkText: { ...typography.caption, color: colors.goldLightText },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,7 +298,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldFaint,
   },
   filterButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold, boxShadow: shadows.glowGoldFaint },
-  filterButtonText: { ...typography.caption, color: colors.goldLight },
+  filterButtonText: { ...typography.caption, color: colors.goldLightText },
   filterButtonTextActive: { color: colors.goldInk, fontFamily: fonts.semiBold },
   activeFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   // Icons pass: the count's golden stat pills.
@@ -293,7 +314,21 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  statPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight },
+  statPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLightText },
   separator: { height: spacing.sm },
   footer: { paddingVertical: spacing.md },
+  footerRetry: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    marginVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldFaint,
+  },
+  footerRetryText: { ...typography.caption, color: colors.goldLightText },
 }));

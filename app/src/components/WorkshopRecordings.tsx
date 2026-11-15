@@ -48,11 +48,11 @@ export function WorkshopRecordings({ eventId, titles, files, past = false }: { e
         </View>
       ) : null}
       <View style={styles.head}>
-        <Ionicons name="play-circle" size={26} color={colors.goldLight} />
+        <Ionicons name="play-circle" size={26} color={colors.goldLightText} />
         <Text style={styles.title}>{t(titles.length > 0 ? 'agenda.recordingsTitle' : 'agenda.filesTitle')}</Text>
       </View>
       <View style={styles.badge}>
-        <Ionicons name="ribbon-outline" size={14} color={colors.goldLight} />
+        <Ionicons name="ribbon-outline" size={14} color={colors.goldLightText} />
         <Text style={styles.badgeText} numberOfLines={1}>
           {t('agenda.recordingsBadge')}
         </Text>
@@ -83,7 +83,8 @@ export function WorkshopRecordings({ eventId, titles, files, past = false }: { e
                   )}
                   {custom ? null : <View style={styles.bannerScrim} pointerEvents="none" />}
                   <View style={[styles.bannerIcon, !member && styles.bannerIconLocked]}>
-                    <Ionicons name={member ? 'play' : 'lock-closed'} size={22} color={member ? colors.black : colors.goldLight} />
+                    {/* goldInk, not black: in light mode colors.black is the pale page colour and would wash out on the gold disc. */}
+                    <Ionicons name={member ? 'play' : 'lock-closed'} size={22} color={member ? colors.goldInk : colors.goldLightText} />
                   </View>
                   {custom ? null : (
                     <Text style={styles.bannerTitle} numberOfLines={2}>
@@ -146,7 +147,7 @@ const styles = themedStyles(() => ({
   missedTitle: { ...typography.subtitle, fontSize: 19, lineHeight: 30, color: colors.textPrimary, textAlign: textStart },
   missedBody: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textSecondary, textAlign: textStart },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { ...typography.subtitle, fontSize: 18, lineHeight: 28, color: colors.goldLight, flex: 1, textAlign: textStart },
+  title: { ...typography.subtitle, fontSize: 18, lineHeight: 28, color: colors.goldLightText, flex: 1, textAlign: textStart },
   badge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -158,7 +159,7 @@ const styles = themedStyles(() => ({
     borderWidth: 1,
     borderColor: colors.borderGold,
   },
-  badgeText: { ...typography.caption, color: colors.goldLight },
+  badgeText: { ...typography.caption, color: colors.goldLightText },
   banners: { gap: spacing.sm, paddingVertical: spacing.xs },
   banner: { aspectRatio: 3 / 4, borderRadius: radii.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGold, backgroundColor: colors.surfaceElevated, justifyContent: 'flex-end', padding: spacing.md, boxShadow: shadows.glowGoldFaint },
   bannerLocked: { opacity: 0.6 },

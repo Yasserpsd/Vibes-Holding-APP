@@ -48,7 +48,7 @@ export function MembershipStatusCard({ membership, texts, activationNote, title,
             <View style={styles.badgeRow}>
               <Text style={styles.title}>{honorary ? t('membership.honorary') : (title ?? t('membership.annual'))}</Text>
               <PopIn delay={160} style={[styles.badge, { backgroundColor: tone }]}>
-                <Text style={styles.badgeText}>{label}</Text>
+                <Text style={styles.badgeText} numberOfLines={1}>{label}</Text>
               </PopIn>
             </View>
             <Text style={styles.status}>{honorary ? t('membership.status.honorary') : (texts?.[status] ?? t(`membership.status.${status}`))}</Text>
@@ -86,6 +86,6 @@ const styles = themedStyles(() => ({
   badgeText: { ...typography.caption, color: colors.goldInk, fontSize: 12 },
   status: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   meta: { gap: 2, paddingStart: spacing.xl + spacing.sm },
-  metaText: { ...typography.caption, color: colors.goldLight, textAlign: textStart },
+  metaText: { ...typography.caption, color: colors.goldLightText, textAlign: textStart },
   note: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 }));

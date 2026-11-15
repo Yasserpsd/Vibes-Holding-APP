@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { FileButton, fileInputAvailable, formatFileSize, type PendingFile } from '@/components/advisor/FileButton';
+import { stopSpeech } from '@/components/advisor/speech';
 import { VoiceButton, voiceInputAvailable } from '@/components/advisor/VoiceButton';
 import { GlowButton, PopIn, PressScale } from '@/components/motion';
 import { t } from '@/i18n';
-import { inputStart } from '@/i18n/direction';
+import { inputStart, isRTL, textDir, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
@@ -29,6 +30,16 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
   const canSend = !busy && !listening && hasContent;
   const showSpinner = busy && hasContent;
   const [focused, setFocused] = useState(false);
+  // A transcript arrives seconds after the tap: it joins what the field holds NOW, not what it held then.
+  const latestValue = useRef(value);
+  useEffect(() => {
+    latestValue.current = value;
+  }, [value]);
+  // The mic and a playing reply share the audio session: listening silences the reply first.
+  const listen = (on: boolean) => {
+    if (on) stopSpeech();
+    setListening(on);
+  };
   // Crossfade between the send mark and the spinner instead of swapping them cold.
   const [cross] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -40,17 +51,22 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
         <PopIn>
           <View style={styles.attachment}>
             <Ionicons name="document-text" size={18} color={colors.gold} />
-            <Text style={styles.attachmentName} numberOfLines={1}>
+            <Text style={[styles.attachmentName, textDir(attachment.name)]} numberOfLines={1}>
               {attachment.name}
             </Text>
-            <Text style={styles.attachmentSize}>{formatFileSize(attachment.size)}</Text>
+            {attachment.size > 0 ? <Text style={styles.attachmentSize}>{formatFileSize(attachment.size)}</Text> : null}
             {!busy && onDetach ? (
-              <Pressable onPress={onDetach} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('advisor.file.remove')}>
+              <Pressable onPress={onDetach} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('advisor.file.remove')}>
                 <Ionicons name="close-circle" size={20} color={colors.textMuted} />
               </Pressable>
             ) : null}
           </View>
         </PopIn>
+      ) : fileInputAvailable() && onAttach ? (
+        // The limit is said before a file is picked; the picked file takes this line's place.
+        <Text style={styles.fileHint} numberOfLines={1}>
+          {t('advisor.file.hint')}
+        </Text>
       ) : null}
       <View style={styles.bar}>
         <TextInput
@@ -62,14 +78,22 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
           multiline
           maxLength={4000}
           textAlign={inputStart()}
-          editable={!busy}
+          // Stays editable while a message is on its way: a field that locks gives up the keyboard after every
+          // send (and the list jumps with it). `canSend` keeps a second send from going out.
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           accessibilityLabel={t('advisor.messageLabel')}
         />
         {fileInputAvailable() && onAttach && !attachment ? <FileButton disabled={busy || listening} onFile={onAttach} /> : null}
         {voiceInputAvailable() ? (
-          <VoiceButton disabled={busy} onBusy={setListening} onText={(text) => onChange(value.trim() ? `${value.trim()} ${text}` : text)} />
+          <VoiceButton
+            disabled={busy}
+            onBusy={listen}
+            onText={(text) => {
+              const current = latestValue.current.trim();
+              onChange(current ? `${current} ${text}` : text);
+            }}
+          />
         ) : null}
         {/* M152: the ready send button breathes with a soft golden halo — «أفهم إن ده بوتون». */}
         <GlowButton enabled={canSend}>
@@ -83,7 +107,7 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
         >
           <PopIn key={canSend ? 'ready' : 'idle'}>
             <Animated.View style={{ opacity: cross.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
-              <Ionicons name="send" size={20} color={colors.goldInk} style={styles.sendIcon} />
+              <Ionicons name="send" size={20} color={colors.goldInk} style={isRTL() ? styles.sendIcon : undefined} />
             </Animated.View>
             <Animated.View style={[StyleSheet.absoluteFill, styles.spinner, { opacity: cross }]}>
               <ActivityIndicator color={colors.goldInk} size="small" />
@@ -125,6 +149,7 @@ const styles = themedStyles(() => ({
   },
   attachmentName: { flex: 1, color: colors.textPrimary, fontFamily: fonts.medium, fontSize: 14, writingDirection: 'ltr' },
   attachmentSize: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 12, writingDirection: 'ltr' },
+  fileHint: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, textAlign: textStart, marginHorizontal: spacing.md, marginTop: spacing.xs },
   input: {
     flex: 1,
     minHeight: 44,
@@ -153,6 +178,6 @@ const styles = themedStyles(() => ({
   sendReady: { experimental_backgroundImage: gradients.gold, boxShadow: shadows.glowGold },
   sendDisabled: { backgroundColor: colors.goldDark, opacity: 0.6 },
   spinner: { alignItems: 'center', justifyContent: 'center' },
-  // Ionicons "send" points to the right; the reading direction here is right-to-left.
+  // Ionicons "send" points to the right: mirrored only in Arabic, where the reading direction is right-to-left.
   sendIcon: { transform: [{ scaleX: -1 }] },
 }));

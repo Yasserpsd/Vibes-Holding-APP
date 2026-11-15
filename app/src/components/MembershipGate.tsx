@@ -1,15 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
 
-import { membershipApi, useStoreConfig } from '@/api/membership';
+import { useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { Floating, PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
+import { StoreLegalLinks, storePriceLabel, syncMembershipOnce } from '@/components/StorePurchaseCard';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
@@ -18,7 +19,7 @@ import {
   hasStorePurchases,
   identifyPurchases,
   purchaseMembership,
-  riyalPrice,
+  restoreMembership,
   storeKeyFor,
   storeName,
   type StoreOffer,
@@ -51,7 +52,9 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 // One store-offer fetch per launch, shared by the popup and the home card.
 let cachedOffer: StoreOffer | null = null;
 
-type Phase = 'idle' | 'busy' | 'activating' | 'done' | 'pending';
+// `storePending`: the store itself is still processing the payment (Android pending purchase) — a calm wait,
+// not a failure; `restoring` is the «استعادة المشتريات» button of that state at work.
+type Phase = 'idle' | 'busy' | 'activating' | 'done' | 'pending' | 'storePending' | 'restoring';
 
 /** The members-only popup + the one-time post-registration nudge. Rendered once in the root layout. */
 export function MembershipGateHost() {
@@ -90,7 +93,7 @@ export function MembershipGateHost() {
   }, [visible, signedIn, config, me]);
 
   const dismiss = () => {
-    if (phase === 'busy' || phase === 'activating') return;
+    if (phase === 'busy' || phase === 'activating' || phase === 'restoring') return;
     setVisible(false);
   };
   const go = (path: '/membership' | '/auth/login') => {
@@ -102,17 +105,18 @@ export function MembershipGateHost() {
   const settle = useCallback(async () => {
     setPhase('activating');
     for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt += 1) {
-      try {
-        const result = await membershipApi.sync();
+      const started = Date.now();
+      // null = server busy, offline or no answer within the cap: try again below.
+      const result = await syncMembershipOnce();
+      if (result) {
         setMe(result.me);
         if (result.me.membership.status === 'active') {
           setPhase('done');
           return;
         }
-      } catch {
-        // Server busy or offline: try again below.
       }
-      await wait(SETTLE_DELAY_MS);
+      // An attempt that already took its time is not followed by another pause.
+      if (Date.now() - started < SETTLE_DELAY_MS) await wait(SETTLE_DELAY_MS);
     }
     setPhase('pending');
   }, [setMe]);
@@ -138,6 +142,8 @@ export function MembershipGateHost() {
     }
     const result = await purchaseMembership(config, current);
     if (result.status === 'cancelled') return setPhase('idle');
+    // The store is still processing the payment: a calm wait — no error, and no second Subscribe while it shows.
+    if (result.status === 'pending') return setPhase('storePending');
     if (result.status === 'failed') {
       setError(result.message);
       return setPhase('idle');
@@ -145,12 +151,31 @@ export function MembershipGateHost() {
     await settle();
   };
 
+  // «استعادة المشتريات» stays within reach while the store's pending notice shows.
+  const restore = async () => {
+    if (!config || phase !== 'storePending') return;
+    setError(null);
+    setPhase('restoring');
+    const result = await restoreMembership(config);
+    if ('error' in result) {
+      setError(result.error);
+      return setPhase('storePending');
+    }
+    if (!result.entitled) {
+      setError(t('store.noPrevious', { store: storeName() }));
+      return setPhase('storePending');
+    }
+    await settle();
+  };
+
   if (!visible) return null;
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={dismiss}>
+    <Modal transparent statusBarTranslucent animationType="fade" visible={visible} onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
           <GlassCard golden radius={radii.xxl} style={styles.card}>
+            {/* On a short screen the popup scrolls inside itself instead of running off the edges. */}
+            <ScrollView contentContainerStyle={styles.cardBody} bounces={false} showsVerticalScrollIndicator={false}>
             <View style={styles.lockRing}>
               <Ionicons name="lock-closed" size={24} color={colors.goldInk} />
             </View>
@@ -166,13 +191,27 @@ export function MembershipGateHost() {
                 <Notice tone="warning" text={t('store.pending')} />
                 <AppButton label={t('common.close')} variant="outline" onPress={() => setVisible(false)} />
               </>
+            ) : phase === 'storePending' || phase === 'restoring' ? (
+              <>
+                <Notice text={t('store.pending')} />
+                {error ? (<><Text style={styles.error}>{error}</Text><SupportLink problem={error} /></>) : null}
+                <AppButton label={t('store.restore')} variant="outline" icon="refresh-outline" loading={phase === 'restoring'} onPress={() => void restore()} />
+                <AppButton label={t('common.close')} variant="ghost" onPress={dismiss} />
+              </>
             ) : (
               <>
                 {signedIn && offer ? (
                   <View style={styles.priceRow}>
-                    <SarText style={styles.price}>{riyalPrice(offer.product.priceString)}</SarText>
+                    <SarText style={styles.price}>{storePriceLabel(offer.product.priceString)}</SarText>
                     <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
                   </View>
+                ) : null}
+                {/* The renewal terms and the Terms / Privacy links sit beside the button that opens the store sheet. */}
+                {signedIn ? (
+                  <>
+                    <Text style={styles.legal}>{t('store.legal', { store: storeName() })}</Text>
+                    {config ? <StoreLegalLinks config={config} onOpen={() => setVisible(false)} centered /> : null}
+                  </>
                 ) : null}
                 {error ? (<><Text style={styles.error}>{error}</Text><SupportLink problem={error} /></>) : null}
                 {signedIn ? (
@@ -191,6 +230,7 @@ export function MembershipGateHost() {
                 </PressScale>
               </>
             )}
+            </ScrollView>
           </GlassCard>
         </PopIn>
       </View>
@@ -245,7 +285,7 @@ export function MembershipHomeCard() {
           <Text style={styles.homeSubtitle}>{t('gate.homeText')}</Text>
           {offer ? (
             <Text style={styles.homePrice}>
-              <SarText style={styles.homePrice}>{riyalPrice(offer.product.priceString)}</SarText>
+              <SarText style={styles.homePrice}>{storePriceLabel(offer.product.priceString)}</SarText>
               <Text style={styles.homePeriod}>{` ${t('store.period', { store: storeName() })}`}</Text>
             </Text>
           ) : null}
@@ -262,8 +302,10 @@ export function MembershipHomeCard() {
 
 const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  popWrap: { alignSelf: 'stretch' },
-  card: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
+  popWrap: { alignSelf: 'stretch', maxHeight: '100%' },
+  card: { flexShrink: 1 },
+  cardBody: { gap: spacing.sm, padding: spacing.md, alignItems: 'stretch' },
+  legal: { ...typography.caption, fontSize: 11, lineHeight: 16, color: colors.textMuted, textAlign: 'center' },
   lockRing: {
     width: 56,
     height: 56,

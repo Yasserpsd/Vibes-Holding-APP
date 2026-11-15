@@ -39,6 +39,7 @@ export default function MeetupsScreen() {
           <ClampText style={styles.intro} text={intro} />
         </FadeInView>
       ) : null}
+      {meetups.length === 0 ? <StateView empty /> : null}
       {meetups.map((meetup, index) => (
         <FadeInView key={meetup.key} delay={entranceDelay(index, 70)}>
           <MeetupCard meetup={meetup} onPress={() => router.push(`/meetup/${meetup.key}` as Href)} />

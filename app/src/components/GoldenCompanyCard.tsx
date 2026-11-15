@@ -7,6 +7,7 @@ import { GlassCard } from '@/components/lux';
 import { Sheen } from '@/components/motion';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
@@ -26,7 +27,7 @@ export function GoldenCompanyCard({ company }: Props) {
       <GoldSweep radius={radii.lg} />
       <View style={styles.header}>
         <View style={styles.logoBox}>
-          <Image source={{ uri: company.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={company.name} />
+          <Image source={{ uri: sized(company.logoUrl, LOGO_SIZE) }} style={styles.logo} resizeMode="contain" accessibilityLabel={company.name} />
           {/* A light band sweeps the logo box like brushed metal. */}
           <Sheen width={LOGO_SIZE} height={LOGO_SIZE} />
         </View>

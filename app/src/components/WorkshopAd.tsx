@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Text, View } from 'react-native';
+import { Image, Modal, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { apiGet } from '@/api/client';
 import { useHq } from '@/api/hq';
@@ -56,6 +56,9 @@ export function WorkshopAdPopup() {
   const free = useAutoPopupFree();
   const [done, setDone] = useState(false);
   usePopupHold(visible);
+  // A small phone or a large system font makes the card taller than the screen: it scrolls inside this cap
+  // so «لاحقًا» (the only way out on iOS) is always reachable.
+  const { height: windowHeight } = useWindowDimensions();
   const query = useQuery({ queryKey: ['workshop-ad'], queryFn: () => apiGet<{ ad: WorkshopAd | null }>('/api/workshop-ad'), staleTime: 30 * 60_000 });
   const hqPhoto = useHq().data?.photos?.[0] ?? null;
   const ad = query.data?.ad ?? null;
@@ -87,10 +90,11 @@ export function WorkshopAdPopup() {
   const when = `${formatEventDays(ad.dates, ad.date)}${ad.time ? ` · ${LRM}${ad.time}` : ''}`;
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={dismiss}>
+    <Modal transparent statusBarTranslucent animationType="fade" visible onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <PopIn style={styles.popWrap}>
-          <GlassCard golden radius={radii.xxl} style={styles.card}>
+          <GlassCard golden radius={radii.xxl} style={[styles.card, { maxHeight: Math.round(windowHeight * 0.88) }]}>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={styles.cardContent}>
             <PressScale onPress={open} accessibilityRole="button" accessibilityLabel={ad.title}>
               <View style={styles.photoBox}>
                 {photo ? <Image source={{ uri: sized(photo, 600) }} style={styles.photo} resizeMode="cover" /> : <View style={styles.photo} />}
@@ -126,6 +130,7 @@ export function WorkshopAdPopup() {
             </View>
             <AppButton label={ad.cta} icon="flash-outline" onPress={open} />
             <AppButton label={t('workshopAd.later')} variant="outline" onPress={dismiss} />
+            </ScrollView>
           </GlassCard>
         </PopIn>
       </View>
@@ -136,7 +141,8 @@ export function WorkshopAdPopup() {
 const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   popWrap: { alignSelf: 'stretch' },
-  card: { gap: spacing.sm, padding: spacing.md },
+  card: { padding: spacing.md },
+  cardContent: { gap: spacing.sm },
   photoBox: { borderRadius: radii.lg, overflow: 'hidden' },
   photo: { width: '100%', height: 190, backgroundColor: colors.surfaceElevated },
   badge: {
@@ -157,7 +163,7 @@ const styles = themedStyles(() => ({
   headline: { ...typography.title, fontSize: 21, lineHeight: 33, color: colors.gold, textAlign: textStart, marginTop: spacing.xs },
   body: { ...typography.body, fontSize: 15, lineHeight: 25, color: colors.textPrimary, textAlign: textStart },
   facts: { gap: 2, paddingVertical: spacing.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.borderGoldSoft },
-  title: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.goldLight, textAlign: textStart },
+  title: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: colors.goldLightText, textAlign: textStart },
   when: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   fee: { ...typography.caption, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
   // M182e: the struck list price beside the club-support discount pill.

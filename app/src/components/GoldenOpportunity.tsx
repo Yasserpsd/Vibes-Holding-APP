@@ -9,7 +9,8 @@ import type { PublicProject } from '@/api/types';
 import { PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StarsRow } from '@/components/Stars';
-import { chevronForward, textStart } from '@/i18n/direction';
+import { chevronForward, textDir, textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -69,7 +70,8 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
           </View>
           {showImage ? (
             <Image
-              source={{ uri: project.image ?? undefined }}
+              // A Projects Bank photo passes through sized() untouched by design; an uploaded one gets its small variant.
+              source={{ uri: sized(project.image, 400) }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
               // Android decodes at the card's size instead of the photo's — the home stops paying for full-resolution bitmaps.
@@ -86,7 +88,7 @@ export function GoldenOpportunity({ block }: { block: NonNullable<HomeContent['o
               {project.sector ? <Pill text={project.sector.name} /> : null}
               {project.stage ? <Pill text={project.stage.name} /> : null}
             </View>
-            <Text style={styles.title} numberOfLines={2}>
+            <Text style={[styles.title, textDir(project.title)]} numberOfLines={2}>
               {project.title}
             </Text>
             {project.rating ? <StarsRow value={project.rating.stars} count={project.rating.count} /> : null}

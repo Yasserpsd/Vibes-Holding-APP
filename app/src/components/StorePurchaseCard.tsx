@@ -3,7 +3,8 @@ import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
-import { membershipApi, useStoreConfig } from '@/api/membership';
+import { errorMessage } from '@/api/client';
+import { membershipApi, useStoreConfig, type StoreConfig, type SyncResult } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
@@ -29,11 +30,33 @@ import {
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
-type Phase = 'loading' | 'ready' | 'unavailable' | 'busy' | 'activating' | 'done' | 'pending';
+// `storePending`: the store itself is still processing the payment (Android pending purchase) — a calm wait, not a failure.
+type Phase = 'loading' | 'ready' | 'unavailable' | 'busy' | 'activating' | 'done' | 'pending' | 'storePending';
 
 const SETTLE_ATTEMPTS = 8;
 const SETTLE_DELAY_MS = 3000;
+const SETTLE_ATTEMPT_MS = 8000;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One server sync, given up after about 8 seconds: a hanging request must not stretch the «جارٍ تفعيل عضويتك» wait
+ * to minutes. null = no answer this time — the next attempt asks again; only the server's answer activates.
+ */
+export async function syncMembershipOnce(): Promise<SyncResult | null> {
+  try {
+    return await Promise.race([membershipApi.sync(), wait(SETTLE_ATTEMPT_MS).then(() => null)]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The store's price string as the member reads it: Android sometimes wraps the symbol in invisible
+ * right-to-left / left-to-right marks, which stopped riyalPrice() from recognising «SAR 1,900.00».
+ */
+export function storePriceLabel(priceString: string): string {
+  return riyalPrice(priceString.replace(/[‎‏؜]/g, ''));
+}
 
 /**
  * Annual membership purchase through the store (CLAUDE.md rule 3). The price comes from the store,
@@ -41,7 +64,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
  */
 export function StorePurchaseCard({ title }: { title: string }) {
   const { me, setMe } = useAuth();
-  const { data: config, isLoading } = useStoreConfig(Boolean(me));
+  const { data: config, isLoading, error: configError, refetch: refetchConfig } = useStoreConfig(Boolean(me));
   const [phase, setPhase] = useState<Phase>('loading');
   const phaseRef = useRef<Phase>('loading');
   const [offer, setOffer] = useState<StoreOffer | null>(null);
@@ -61,7 +84,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
 
   useEffect(() => {
     if (!config || contactId === null || !apiKey || !supported) return;
-    if (phaseRef.current === 'activating' || phaseRef.current === 'done' || phaseRef.current === 'pending') return;
+    if (phaseRef.current === 'activating' || phaseRef.current === 'done' || phaseRef.current === 'pending' || phaseRef.current === 'storePending') return;
     let cancelled = false;
     go('loading');
     (async () => {
@@ -97,27 +120,31 @@ export function StorePurchaseCard({ title }: { title: string }) {
   const settle = useCallback(async () => {
     go('activating');
     for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt += 1) {
-      try {
-        const result = await membershipApi.sync();
+      const started = Date.now();
+      // null = server busy, offline or no answer within the cap: try again below.
+      const result = await syncMembershipOnce();
+      if (result) {
         setMe(result.me);
         if (result.me.membership.status === 'active') {
           go('done');
           return;
         }
-      } catch {
-        // Server busy or offline: try again below.
       }
-      await wait(SETTLE_DELAY_MS);
+      // An attempt that already took its time is not followed by another pause.
+      if (Date.now() - started < SETTLE_DELAY_MS) await wait(SETTLE_DELAY_MS);
     }
     go('pending');
   }, [go, setMe]);
 
   const buy = async () => {
-    if (!config || !offer) return;
+    // A second tap while the store sheet is opening must not start a second purchase.
+    if (!config || !offer || phaseRef.current !== 'ready') return;
     setError(null);
     go('busy');
     const result = await purchaseMembership(config, offer);
     if (result.status === 'cancelled') return go('ready');
+    // The store is still processing the payment: a calm wait — no error, and no second Subscribe while it shows.
+    if (result.status === 'pending') return go('storePending');
     if (result.status === 'failed') {
       setError(result.message);
       return go('ready');
@@ -126,17 +153,18 @@ export function StorePurchaseCard({ title }: { title: string }) {
   };
 
   const restore = async () => {
-    if (!config) return;
+    const from = phaseRef.current;
+    if (!config || (from !== 'ready' && from !== 'unavailable' && from !== 'storePending')) return;
     setError(null);
     go('busy');
     const result = await restoreMembership(config);
     if ('error' in result) {
       setError(result.error);
-      return go('ready');
+      return go(from);
     }
     if (!result.entitled) {
       setError(t('store.noPrevious', { store: storeName() }));
-      return go('ready');
+      return go(from);
     }
     await settle();
   };
@@ -157,7 +185,16 @@ export function StorePurchaseCard({ title }: { title: string }) {
       </FadeInView>
     );
   }
-  if (!config || !apiKey) return active ? null : <Notice text={t('store.comingSoon', { store: storeName() })} />;
+  if (!config) {
+    // The store settings did not arrive (offline, server busy): say so, with a retry — «يتوفر قريبًا» would be untrue.
+    return active ? null : (
+      <View style={styles.configError}>
+        <Notice tone="warning" text={errorMessage(configError)} />
+        <AppButton label={t('common.retry')} variant="outline" icon="refresh" onPress={() => void refetchConfig()} />
+      </View>
+    );
+  }
+  if (!apiKey) return active ? null : <Notice text={t('store.comingSoon', { store: storeName() })} />;
   if (!supported) return active ? null : <Notice tone="warning" text={t('store.unsupported')} />;
   if (active) {
     return manageUrl ? <AppButton label={t('store.manage', { store: storeName() })} variant="outline" icon="settings-outline" onPress={() => void openLink(manageUrl)} /> : null;
@@ -176,18 +213,19 @@ export function StorePurchaseCard({ title }: { title: string }) {
           {phase === 'busy' ? <Progress text={t('store.opening', { store: storeName() })} /> : null}
           {phase === 'activating' ? <Progress text={t('store.activating')} /> : null}
           {phase === 'unavailable' ? <Text style={styles.muted}>{t('store.unavailable')}</Text> : null}
+          {phase === 'storePending' ? <Notice text={t('store.pending')} /> : null}
           {phase === 'ready' && offer ? (
             <>
               <PopIn style={styles.priceRow}>
-                <SarText style={styles.price}>{riyalPrice(offer.product.priceString)}</SarText>
+                <SarText style={styles.price}>{storePriceLabel(offer.product.priceString)}</SarText>
                 <Text style={styles.period}>{t('store.period', { store: storeName() })}</Text>
               </PopIn>
               <AppButton label={t('store.subscribe')} icon="card-outline" onPress={() => void buy()} />
             </>
           ) : null}
-          {phase === 'ready' || phase === 'unavailable' ? (
-            <PressScale onPress={() => void restore()} style={styles.restore} wrapStyle={styles.restoreWrap}>
-              <Ionicons name="refresh-outline" size={16} color={colors.goldLight} />
+          {phase === 'ready' || phase === 'unavailable' || phase === 'storePending' ? (
+            <PressScale onPress={() => void restore()} style={styles.restore} wrapStyle={styles.restoreWrap} hitSlop={8}>
+              <Ionicons name="refresh-outline" size={16} color={colors.goldLightText} />
               <Text style={styles.restoreText}>{t('store.restore')}</Text>
             </PressScale>
           ) : null}
@@ -197,12 +235,7 @@ export function StorePurchaseCard({ title }: { title: string }) {
           {t('store.legal', { store: storeName() })}
         </Text>
         {config.environment === 'test' ? <Text style={styles.legal}>{t('store.testEnv')}</Text> : null}
-        {config.termsUrl || config.privacyUrl ? (
-          <View style={styles.links}>
-            {config.termsUrl ? <LinkText label={t('store.terms')} url={config.termsUrl} /> : null}
-            {config.privacyUrl ? <LinkText label={t('store.privacy')} url={config.privacyUrl} /> : null}
-          </View>
-        ) : null}
+        <StoreLegalLinks config={config} />
       </GlassCard>
     </View>
   );
@@ -223,11 +256,26 @@ export function legalUrl(url: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}lang=${getLang()}`;
 }
 
-function LinkText({ label, url }: { label: string; url: string }) {
+/** Terms of use and privacy policy beside the price, as the stores ask; `onOpen` lets a popup close itself first. */
+export function StoreLegalLinks({ config, onOpen, centered = false }: { config: Pick<StoreConfig, 'termsUrl' | 'privacyUrl'>; onOpen?: () => void; centered?: boolean }) {
+  if (!config.termsUrl && !config.privacyUrl) return null;
+  return (
+    <View style={[styles.links, centered && styles.linksCentered]}>
+      {config.termsUrl ? <LinkText label={t('store.terms')} url={config.termsUrl} onOpen={onOpen} /> : null}
+      {config.privacyUrl ? <LinkText label={t('store.privacy')} url={config.privacyUrl} onOpen={onOpen} /> : null}
+    </View>
+  );
+}
+
+function LinkText({ label, url, onOpen }: { label: string; url: string; onOpen?: () => void }) {
   const router = useRouter();
   // M116d (owner): club pages open INSIDE the app — the hosting domain never shows.
+  const open = () => {
+    onOpen?.();
+    router.push({ pathname: '/webpage', params: { url: legalUrl(url), title: label } } as Href);
+  };
   return (
-    <PressScale onPress={() => router.push({ pathname: '/webpage', params: { url: legalUrl(url), title: label } } as Href)} accessibilityRole="link">
+    <PressScale onPress={open} accessibilityRole="link" style={styles.linkTap}>
       <Text style={styles.link}>{label}</Text>
     </PressScale>
   );
@@ -245,10 +293,14 @@ const styles = themedStyles(() => ({
   progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   muted: { ...typography.body, color: colors.textSecondary, textAlign: textStart, flex: 1 },
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
+  configError: { gap: spacing.sm },
   restoreWrap: { alignSelf: 'flex-start' },
-  restore: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
-  restoreText: { ...typography.caption, color: colors.goldLight },
+  // 44 pt tap target: Apple requires «Restore purchases» to be easy to reach.
+  restore: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 },
+  restoreText: { ...typography.caption, color: colors.goldLightText },
   legal: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   links: { flexDirection: 'row', gap: spacing.md },
-  link: { ...typography.caption, color: colors.goldLight, textDecorationLine: 'underline' },
+  linksCentered: { justifyContent: 'center' },
+  linkTap: { minHeight: 44, justifyContent: 'center' },
+  link: { ...typography.caption, color: colors.goldLightText, textDecorationLine: 'underline' },
 }));

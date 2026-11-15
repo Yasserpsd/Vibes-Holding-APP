@@ -22,6 +22,15 @@ export function FieldError({ text }: { text: string }) {
   );
 }
 
+/**
+ * M241: the small star after the label of a required field, in the form theme's error red. It sits INSIDE
+ * the label's Text (`<Text>{label}<RequiredMark /></Text>`), so it follows the label's size and direction.
+ */
+export function RequiredMark() {
+  const palette = useFormPalette() ?? formPalettes.light;
+  return <Text style={{ color: palette.danger }}>{' *'}</Text>;
+}
+
 type FieldGroupProps = {
   label: string;
   children: ReactNode;

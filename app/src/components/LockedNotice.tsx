@@ -26,7 +26,7 @@ export function LockedNotice({ text, guest }: Props) {
         <View style={styles.row}>
           <PopIn delay={160}>
             <View style={styles.lockChip}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.goldLight} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.goldLightText} />
             </View>
           </PopIn>
           <Text style={styles.text}>{text}</Text>

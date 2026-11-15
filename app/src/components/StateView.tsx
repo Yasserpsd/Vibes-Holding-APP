@@ -36,7 +36,7 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
           {/* M84e: the offline cloud nudges every few seconds — the eye lands on the retry. */}
           <Wiggle delay={400} repeatEvery={3600}>
             <View style={styles.iconRing}>
-              <Ionicons name="cloud-offline-outline" size={32} color={colors.goldLight} />
+              <Ionicons name="cloud-offline-outline" size={32} color={colors.goldLightText} />
             </View>
           </Wiggle>
         </FadeInView>
@@ -59,7 +59,7 @@ export function StateView({ loading, error, onRetry, empty, emptyText }: Props) 
         <FadeInView offset={10}>
           <Animated.View style={{ opacity: pulse }}>
             <View style={styles.iconRing}>
-              <Ionicons name="search-outline" size={32} color={colors.goldLight} />
+              <Ionicons name="search-outline" size={32} color={colors.goldLightText} />
             </View>
           </Animated.View>
         </FadeInView>

@@ -55,6 +55,28 @@ function mergeMessages(current: ChatMessage[], incoming: AdvisorMessage[]): Chat
   return [...current, ...fresh].sort((a, b) => a.id - b.id);
 }
 
+/** One entry per id; of two copies the one with the stable client key wins, so the bubble does not remount. */
+function dedupe(messages: ChatMessage[]): ChatMessage[] {
+  const at = new Map<number, number>();
+  const result: ChatMessage[] = [];
+  for (const message of messages) {
+    const index = at.get(message.id);
+    if (index === undefined) {
+      at.set(message.id, result.length);
+      result.push(message);
+    } else if (message.clientKey !== undefined && result[index]?.clientKey === undefined) {
+      result[index] = message;
+    }
+  }
+  return result;
+}
+
+/** A reload brings the hub's history; what the app holds itself (a message still on its way, an action card) stays. */
+function keepLocal(history: AdvisorMessage[], current: ChatMessage[]): ChatMessage[] {
+  const local = current.filter((message) => message.id >= OPTIMISTIC_BASE);
+  return local.length ? dedupe([...history, ...local]) : history;
+}
+
 /**
  * The account's hub conversation: loads the history, sends messages, and polls for replies
  * (fast while the workflow is answering, slow otherwise so staff replies from the console still
@@ -68,6 +90,8 @@ export function useAdvisorChat() {
   const optimisticCount = useRef(0);
   const polling = useRef(false);
   const loadedOnce = useRef(false);
+  // A poll that finishes while a message is on its way would show the hub's copy next to the optimistic one.
+  const sendingRef = useRef(false);
 
   const noteIds = (messages: AdvisorMessage[]) => {
     for (const message of messages) {
@@ -81,7 +105,7 @@ export function useAdvisorChat() {
       const result = await advisorApi.history();
       lastId.current = 0;
       noteIds(result.messages);
-      setState((prev) => ({ ...prev, status: 'ready', messages: result.messages, profile: result.profile, loadError: null }));
+      setState((prev) => ({ ...prev, status: 'ready', messages: keepLocal(result.messages, prev.messages), profile: result.profile, loadError: null }));
       if (result.me) setMe(result.me);
     } catch (error) {
       setState((prev) => ({ ...prev, status: prev.messages.length ? 'ready' : 'error', loadError: errorMessage(error) }));
@@ -89,10 +113,11 @@ export function useAdvisorChat() {
   }, [setMe]);
 
   const poll = useCallback(async () => {
-    if (polling.current) return;
+    if (polling.current || sendingRef.current) return;
     polling.current = true;
     try {
       const result = await advisorApi.poll(lastId.current);
+      if (sendingRef.current) return;
       noteIds(result.messages);
       setState((prev) => ({
         ...prev,
@@ -135,7 +160,8 @@ export function useAdvisorChat() {
   const send = useCallback(
     async (text: string, context: AdvisorContext | null, file: OutgoingFile | null = null): Promise<SendOutcome> => {
       const trimmed = text.trim();
-      if (!trimmed && !file) return { accepted: false, contextRefused: false };
+      if ((!trimmed && !file) || sendingRef.current) return { accepted: false, contextRefused: false };
+      sendingRef.current = true;
       optimisticCount.current += 1;
       const tempId = OPTIMISTIC_BASE + optimisticCount.current;
       const draft: ChatMessage = {
@@ -157,17 +183,20 @@ export function useAdvisorChat() {
         if (result.me) setMe(result.me);
         if (result.gate) {
           const gate = result.gate;
+          sendingRef.current = false;
           setState((prev) => ({ ...prev, messages: prev.messages.filter((message) => message.id !== tempId), sending: false, gate }));
           return { accepted: false, contextRefused };
         }
         const id = result.messageId;
         if (id !== null) lastId.current = Math.max(lastId.current, id);
+        sendingRef.current = false;
         setState((prev) => ({
           ...prev,
+          // A reload that ran meanwhile may already hold the hub's copy of this message: one entry per id.
           messages:
             id === null
               ? prev.messages.filter((message) => message.id !== tempId)
-              : prev.messages.map((message) => (message.id === tempId ? { ...message, id } : message)),
+              : dedupe(prev.messages.map((message) => (message.id === tempId ? { ...message, id } : message))),
           sending: false,
           waiting: result.waiting,
           human: result.human,
@@ -175,6 +204,7 @@ export function useAdvisorChat() {
         if (id === null) void load();
         return { accepted: true, contextRefused };
       } catch (error) {
+        sendingRef.current = false;
         setState((prev) => ({ ...prev, messages: prev.messages.filter((message) => message.id !== tempId), sending: false, sendError: errorMessage(error) }));
         // The hub may have stored the message even when its workflow failed: resync.
         void load();

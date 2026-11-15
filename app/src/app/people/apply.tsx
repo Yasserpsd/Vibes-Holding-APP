@@ -1,5 +1,6 @@
 import { Stack, useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { ScrollView } from 'react-native';
 
 import { useApplyProfile, useMyProfile, type MyProfile, type PersonLink } from '@/api/people';
 import { useAuth } from '@/auth/AuthProvider';
@@ -31,6 +32,7 @@ export default function ApplyProfileScreen() {
   const { me, status } = useAuth();
   const signedIn = status === 'signedIn' && Boolean(me);
   const mine = useMyProfile(signedIn);
+  const scrollRef = useRef<ScrollView>(null);
 
   if (!signedIn) {
     return (
@@ -46,7 +48,7 @@ export default function ApplyProfileScreen() {
   const profile = mine.data?.profile ?? null;
 
   return (
-    <Screen title={t('people.title')} subtitle={mine.data?.intro ?? ''}>
+    <Screen scrollRef={scrollRef} title={t('people.title')} subtitle={mine.data?.intro ?? ''}>
       <Stack.Screen options={{ title: t('nav.peopleApply') }} />
       {!mine.data ? (
         <StateView loading={mine.isLoading} error={mine.error} onRetry={() => void mine.refetch()} />
@@ -57,13 +59,20 @@ export default function ApplyProfileScreen() {
         </>
       ) : (
         // Mounted only once the saved words are known, so the fields start from them without an effect.
-        <ApplyForm key={profile?.id ?? 'new'} profile={profile} me={me} onOpenProfile={(id) => router.push(`/people/${id}` as Href)} />
+        <ApplyForm
+          key={profile?.id ?? 'new'}
+          profile={profile}
+          me={me}
+          onOpenProfile={(id) => router.push(`/people/${id}` as Href)}
+          // The «تم الإرسال» notice sits at the head of the long form: bring it into view.
+          onSent={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+        />
       )}
     </Screen>
   );
 }
 
-function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; me: ReturnType<typeof useAuth>['me']; onOpenProfile: (id: string) => void }) {
+function ApplyForm({ profile, me, onOpenProfile, onSent }: { profile: MyProfile | null; me: ReturnType<typeof useAuth>['me']; onOpenProfile: (id: string) => void; onSent: () => void }) {
   const apply = useApplyProfile();
   // The freshest submission prefills the form: the waiting draft when there is one, else the saved words.
   const fields = profile ? (profile.draft ?? profile.fields) : null;
@@ -101,7 +110,12 @@ function ApplyForm({ profile, me, onOpenProfile }: { profile: MyProfile | null; 
         email: email.trim(),
         links: linksFromText(links),
       },
-      { onSuccess: () => setSent(true) },
+      {
+        onSuccess: () => {
+          setSent(true);
+          onSent();
+        },
+      },
     );
   };
 

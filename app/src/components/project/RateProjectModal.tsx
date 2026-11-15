@@ -67,14 +67,16 @@ export function RateProjectModal({ projectId, visible, onClose }: { projectId: s
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('ratings.close')} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none" style={styles.wrap}>
+      {/* The app's modal pattern (WhatsappVerify, PhoneConfirmAlert): a dialog window does not resize for the
+          keyboard on Android, so the full-height wrapper shrinks there and the sheet rides above the keys. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} pointerEvents="box-none" style={styles.wrap}>
         <View style={styles.sheet}>
           <View style={styles.head}>
             <Ionicons name="star" size={18} color={colors.gold} />
             <Text style={styles.title}>{myReview ? t('ratings.edit') : t('ratings.add')}</Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('ratings.close')}>
+            <Pressable onPress={onClose} hitSlop={14} accessibilityRole="button" accessibilityLabel={t('ratings.close')}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>

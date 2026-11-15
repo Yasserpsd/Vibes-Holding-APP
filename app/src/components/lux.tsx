@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useReducedMotion } from '@/components/motion';
 import { colors, gradients, radii, shadows } from '@/theme/tokens';
 
 /**
@@ -73,7 +74,13 @@ type NeonPulseProps = {
  */
 export function NeonPulse({ radius = radii.lg, intensity = 'soft', duration = 2200 }: NeonPulseProps) {
   const [glow] = useState(() => new Animated.Value(0.35));
+  // Review 2026-11-15: the endless breathing holds still at a mid glow under «reduce motion».
+  const reduced = useReducedMotion();
   useEffect(() => {
+    if (reduced) {
+      glow.setValue(0.7);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glow, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
@@ -82,7 +89,7 @@ export function NeonPulse({ radius = radii.lg, intensity = 'soft', duration = 22
     );
     loop.start();
     return () => loop.stop();
-  }, [glow, duration]);
+  }, [glow, duration, reduced]);
   return (
     <Animated.View
       pointerEvents="none"
@@ -109,8 +116,7 @@ export function GoldHairline({ style }: { style?: StyleProp<ViewStyle> }) {
           height: StyleSheet.hairlineWidth * 2,
           borderRadius: 1,
           backgroundColor: colors.goldDark,
-          experimental_backgroundImage:
-            'linear-gradient(90deg, rgba(230,186,84,0) 0%, rgba(242,206,116,0.9) 50%, rgba(230,186,84,0) 100%)',
+          experimental_backgroundImage: gradients.hairline,
         },
         style,
       ]}

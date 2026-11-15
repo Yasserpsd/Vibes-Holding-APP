@@ -10,6 +10,8 @@ import { colors, fonts, spacing } from '@/theme/tokens';
 
 /** How long in the background before the lock asks for the face again. */
 const RELOCK_AFTER_MS = 45_000;
+/** How long the opening cover waits for the saved setting before it gives way. */
+const READ_TIMEOUT_MS = 4_000;
 
 /**
  * M118d: the biometric gate over the whole app. While the lock is on (security settings), a cold
@@ -17,7 +19,9 @@ const RELOCK_AFTER_MS = 45_000;
  * it. Binaries without the native module never lock (the setting also cannot be turned on there).
  */
 export function AppLockGate() {
-  const [locked, setLocked] = useState(false);
+  // null = the setting is still being read: the cover stands without the prompt, so the app's content never shows
+  // first on a cold start; false = open; true = locked, waiting for the face/fingerprint.
+  const [locked, setLocked] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
   const hiddenAt = useRef<number | null>(null);
 
@@ -31,11 +35,18 @@ export function AppLockGate() {
   };
 
   useEffect(() => {
+    // The member is never trapped: a read that fails, or one that does not answer in time, means «not locked».
+    const watchdog = setTimeout(() => setLocked((current) => current ?? false), READ_TIMEOUT_MS);
     void (async () => {
-      if ((await lockEnabled()) && (await lockAvailable())) {
-        setLocked(true);
-        void tryUnlock();
+      let on = false;
+      try {
+        on = (await lockEnabled()) && (await lockAvailable());
+      } catch {
+        on = false;
       }
+      clearTimeout(watchdog);
+      setLocked(on);
+      if (on) void tryUnlock();
     })();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
@@ -52,11 +63,16 @@ export function AppLockGate() {
         }
       })();
     });
-    return () => subscription.remove();
+    return () => {
+      clearTimeout(watchdog);
+      subscription.remove();
+    };
     // Mount-once gate; the handlers re-read the setting on every event.
   }, []);
 
-  if (!locked) return null;
+  if (locked === false) return null;
+  // Still reading the setting: the bare cover, with no prompt and nothing to press.
+  if (locked === null) return <View style={styles.cover} />;
   return (
     <View style={styles.cover}>
       <Image source={require('../../assets/images/club-emblem.png')} style={styles.emblem} resizeMode="contain" />

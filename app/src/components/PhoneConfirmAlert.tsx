@@ -122,12 +122,12 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: 
             ) : null}
             {step ? (
               <View style={styles.links}>
-                <PressScale onPress={() => void resend()} disabled={cooldown > 0 || busy} accessibilityRole="button">
+                <PressScale onPress={() => void resend()} disabled={cooldown > 0 || busy} accessibilityRole="button" hitSlop={12}>
                   <Text style={[styles.link, cooldown > 0 ? styles.linkOff : null]}>
                     {cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('phoneCode.resendWhatsapp')}
                   </Text>
                 </PressScale>
-                <PressScale onPress={onWrongNumber} accessibilityRole="button">
+                <PressScale onPress={onWrongNumber} accessibilityRole="button" hitSlop={12}>
                   <Text style={styles.link}>{t('phoneAlert.wrongNumber')}</Text>
                 </PressScale>
               </View>
@@ -135,7 +135,7 @@ export function PhoneConfirmAlert({ onLater, onDone, onWrongNumber, required }: 
               <>
                 <AppButton label={t('phoneAlert.cta')} icon="logo-whatsapp" loading={busy} onPress={() => void ask()} />
                 {/* Owner (2026-11-06): the member changes his number himself, any time; the new one proves itself with its own WhatsApp code. */}
-                <PressScale onPress={onWrongNumber} accessibilityRole="button" style={styles.links}>
+                <PressScale onPress={onWrongNumber} accessibilityRole="button" style={styles.links} hitSlop={12}>
                   <Text style={styles.link}>{t('phoneAlert.wrongNumber')}</Text>
                 </PressScale>
               </>

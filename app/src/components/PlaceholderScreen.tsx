@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FadeInView, Floating } from '@/components/motion';
@@ -19,7 +19,8 @@ type Props = {
 export function PlaceholderScreen({ title, description, children }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
+      {/* Scrollable: the guest's account carries up to seven buttons, more than a small phone (or a large font) can show at once. */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Floating>
           <View style={styles.emblemWrap}>
             <View style={styles.halo} />
@@ -41,7 +42,7 @@ export function PlaceholderScreen({ title, description, children }: Props) {
             </View>
           </FadeInView>
         )}
-      </View>
+      </ScrollView>
       <Text style={styles.footer}>
         {t(env.isProduction ? 'account.version' : 'account.versionPreview', { version: env.appVersion })}
       </Text>
@@ -56,10 +57,11 @@ const styles = themedStyles(() => ({
     experimental_backgroundImage: gradients.screen,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     gap: spacing.md,
   },
   emblemWrap: {
@@ -100,7 +102,7 @@ const styles = themedStyles(() => ({
   },
   badgeText: {
     ...typography.caption,
-    color: colors.goldLight,
+    color: colors.goldLightText,
   },
   footer: {
     ...typography.caption,

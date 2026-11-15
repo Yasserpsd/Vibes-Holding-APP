@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useVideos, type Video } from '@/api/videos';
 import { useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
@@ -13,7 +13,7 @@ import { t } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { openLink } from '@/lib/openLink';
 import { playVideo } from '@/lib/player';
-import { spacing } from '@/theme/tokens';
+import { colors, spacing } from '@/theme/tokens';
 
 // The featured strip's card width; the snap interval adds the gap so every swipe lands on a card.
 const STRIP_CARD_WIDTH = 240;
@@ -21,7 +21,7 @@ const STRIP_CARD_WIDTH = 240;
 /** The club's YouTube library: curated picks first, then every upload, newest first; videos play in-app (M19). */
 export default function VideosScreen() {
   const router = useRouter();
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useVideos();
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isRefetching } = useVideos();
   const first = data?.pages[0];
   const askAdvisor = useAskAdvisor();
   // The floating button asks about the library; each card asks about its own video.
@@ -39,7 +39,11 @@ export default function VideosScreen() {
   const items = data.pages.flatMap((page) => page.items);
 
   return (
-    <Screen title={first.title} subtitle={first.intro}>
+    <Screen
+      title={first.title}
+      subtitle={first.intro}
+      refreshControl={<RefreshControl refreshing={isRefetching && !isFetchingNextPage} onRefresh={() => void refetch()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
+    >
       {first.featured.length ? (
         <>
           <SectionHeader icon="star-outline" title={first.featuredTitle} />
@@ -71,7 +75,7 @@ export default function VideosScreen() {
       ) : (
         <StateView empty emptyText={t('videos.empty')} />
       )}
-      {hasNextPage ? <AppButton label={isFetchingNextPage ? t('common.loadingMore') : t('common.loadMore')} variant="outline" icon="chevron-down" onPress={() => void fetchNextPage()} /> : null}
+      {hasNextPage ? <AppButton label={isFetchingNextPage ? t('common.loadingMore') : t('common.loadMore')} variant="outline" icon="chevron-down" loading={isFetchingNextPage} onPress={() => void fetchNextPage()} /> : null}
       <AppButton label={t('videos.channel')} variant="outline" icon="logo-youtube" onPress={() => void openLink(first.channelUrl)} />
     </Screen>
   );

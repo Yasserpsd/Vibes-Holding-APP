@@ -1,7 +1,7 @@
 import { useState, type Ref } from 'react';
 import { Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { FieldError } from '@/components/form/FormParts';
+import { FieldError, RequiredMark } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { inputStart, isRTL, textStart } from '@/i18n/direction';
@@ -16,6 +16,8 @@ type Props = TextInputProps & {
   /** M207: a caution that does not block the form; it shows once the member has left the field. */
   warning?: string | null;
   error?: string | null;
+  /** M241: a required field wears a small red star after its label. */
+  required?: boolean;
   /** Latin content (e-mail, phone, password) is typed left-to-right in both languages. */
   latin?: boolean;
   /** M195: the row the screen scrolls to when this field holds the first error (useFormErrors.anchor). */
@@ -28,7 +30,7 @@ type Props = TextInputProps & {
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, hintOnFocus = false, warning, error, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus = false, warning, error, required = false, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // M85: inside a PaperCard the field wears the light palette on its own.
   const paper = usePaper();
@@ -43,11 +45,15 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, la
     : null;
   return (
     <View ref={anchorRef} style={styles.field} collapsable={false}>
-      <Text style={[styles.label, paper && styles.paperLabel, form ? { color: error ? form.danger : form.inkSoft } : null]}>{label}</Text>
+      <Text style={[styles.label, paper && styles.paperLabel, form ? { color: error ? form.danger : form.inkSoft } : null]}>
+        {label}
+        {required ? <RequiredMark /> : null}
+      </Text>
       <TextInput
         ref={inputRef}
         placeholderTextColor={form ? form.placeholder : paper ? colors.paperFaint : colors.textFaint}
         selectionColor={form ? form.fieldFocus : paper ? colors.paperGold : colors.gold}
+        accessibilityLabel={label}
         multiline={multiline}
         {...inputProps}
         onFocus={(event) => {
@@ -69,14 +75,15 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, la
           style,
         ]}
       />
+      {/* On a form card or on paper the message wears the light palette's red; the dark black-and-gold screens keep the token red. */}
       {error ? (
-        form ? (
+        form || paper ? (
           <FieldError text={error} />
         ) : (
           <Text style={styles.error}>{error}</Text>
         )
       ) : warning && !focused ? (
-        form ? (
+        form || paper ? (
           <FieldError text={warning} />
         ) : (
           <Text style={styles.error}>{warning}</Text>

@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { chevronForward, textStart } from '@/i18n/direction';
 import type { IoniconName } from '@/lib/icons';
+import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { themedStyles } from '@/theme/styles';
@@ -41,7 +42,7 @@ export default function AboutScreen() {
         <Floating>
           <View style={styles.logoHalo}>
             <Image
-              source={data.logoUrl ? { uri: data.logoUrl } : require('../../assets/images/club-logo.png')}
+              source={data.logoUrl ? { uri: sized(data.logoUrl, 96) } : require('../../assets/images/club-logo.png')}
               style={styles.logo}
               resizeMode="contain"
               accessibilityLabel={t('common.clubName')}
@@ -83,7 +84,7 @@ export default function AboutScreen() {
       <GlassCard style={styles.card}>
         <ContactRow icon="logo-whatsapp" label={t('about.management')} value={data.contact.management} onPress={() => void openWhatsApp(data.contact.management, t('about.managementGreeting'))} />
         <ContactRow icon="mic-outline" label={t('about.studio')} value={data.contact.studio} onPress={() => void openWhatsApp(data.contact.studio, t('about.studioGreeting'))} border />
-        <ContactRow icon="mail-outline" label={t('about.email')} value={data.contact.email} onPress={() => void Linking.openURL(`mailto:${data.contact.email}`)} border />
+        <ContactRow icon="mail-outline" label={t('about.email')} value={data.contact.email} onPress={() => void Linking.openURL(`mailto:${data.contact.email}`).catch(() => undefined)} border />
         {data.contact.websites.map((site) => (
           <ContactRow key={site.url} icon="globe-outline" label={site.label} value={site.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} onPress={() => void openLink(site.url)} border />
         ))}
@@ -105,7 +106,7 @@ function Section({ section }: { section: AboutSection }) {
       <View style={styles.sectionHeader}>
         {section.logoUrl ? (
           <View style={styles.sectionLogoBox}>
-            <Image source={{ uri: section.logoUrl }} style={styles.sectionLogo} resizeMode="contain" accessibilityLabel={section.title} />
+            <Image source={{ uri: sized(section.logoUrl, 44) }} style={styles.sectionLogo} resizeMode="contain" accessibilityLabel={section.title} />
           </View>
         ) : null}
         <Text style={styles.sectionTitle}>{section.title}</Text>

@@ -1,0 +1,119 @@
+# rev-news-videos — news tab, news screens, video library and player
+
+Session: `rev-news-videos`, 2026-11-15. Files read once each: the 12 listed in the task. All paths below are under `app/src/`.
+Nothing was run on a device (only the Android-run session may); every fix is checked by `tsc` + `eslint` only.
+
+Note: `app/(tabs)/news.tsx` is the «بريد وارد» inbox since M173/M232b — it holds no news items. The news list is `app/news/index.tsx`.
+
+## Fixed
+
+Coordinator's decisions, second round (2026-11-15) — applied
+- Decision 2 — `components/YouTubeEmbed.tsx:72`: the error view (`EmbedError`) now reads `watch.failed`. The same component is the uploaded-video error view in `app/watch.tsx:267` and the YouTube one at `app/watch.tsx:62`, so all three show the new sentence.
+- Decision 3 — `app/news/interests.tsx:37`, `:74–80`, `:103–109`, `:148`: a tap beyond the maximum now shows `interests.maxReached` (with `{max}`) under the chips; any accepted change, or «اختيار المقترح» (`:119–122`), clears it.
+- Decision 4 — `components/NewsCarousel.tsx:53`: the module-scope `I18nManager.isRTL` read is gone; the direction is `isRTL()` read while rendering, passed to the pager (`:96`, `:115`) and used by the drag (`:81`, `:84`) and the card offsets (`:128`). Effect for the member: in English the strip now turns the English way (the old constant was `true` on every cold start, English included).
+- Decision 5 — `components/news/NewsCard.tsx:37`: `#FFFFFF` → `colors.white` (white in both palettes; the pill is the danger red in both). `components/NewsCarousel.tsx:276` `#0E0E14` is KEPT as a literal, now with a comment (`:274`): it is the base of a photo card whose text uses the `onPhoto` tokens, dark in both themes; a theme surface would put white text on white in the light mode when the story has no photo.
+- Decision 6 — confirmed with expo-router's own matcher (installed 57.0.21, `fork/getStateFromPath.js`, run on a copy of the route table; no app code run): `/news` → `news/index` (the news list), `/(tabs)/news` → the inbox tab, `/news/interests`, `/news/decisions`, `/news/<id>` → their own screens. So the home's «كل الأخبار» (`components/NewsCarousel.tsx:137`), the fallback in `app/news/interests.tsx:87` and the links in `app/news/index.tsx:63`, `:75` all open the news list side, and rev-home's `/(tabs)/news` is the right address for the inbox.
+
+Owner's own request — who asked: the owner, typed directly in this session's message box on 2026-11-15 (not relayed by any session): «عايز برده لما افتح فيديو يوتيوب يفضل في نفس الصفحة ويفتحلي الفيديو ميودنيش لصفحة تانية ياريت». Every file and line it touched:
+- `components/YouTubeEmbed.tsx` — `:2` imports (`useId`, `useSyncExternalStore`); `:32–44` the single playback slot (`activeSlot`, `subscribeSlot`, `takeSlot`); `:46–66` new `useInlinePlayback()`; `:86` and `:96` `YouTubeEmbed` uses it in place of its local `playing` state; `:111–115` `YouTubeEmbed` renders the shared player; `:118` type `WebViewModule`; `:120–153` new `YouTubePlayer` (the WebView block moved out of `YouTubeEmbed` unchanged: same HTML, same `baseUrl`, same navigation block).
+- `components/VideoCard.tsx` — `:2`, `:8`, `:13` imports; `:19` prop comment; `:32–37` id, WebView module, slot and player; `:39–40` the card press starts the inline player and the card is disabled while it plays; `:43–58` thumbnail and play mark shown only while not playing; `:89–90` `thumbBox` clips (`overflow: 'hidden'`).
+- No other file. `app/videos/index.tsx` and `app/(tabs)/index.tsx` were not edited for this: they already pass `onPress` (the watch screen), which the card now uses only as the fallback.
+- What it does: a YouTube video now plays inside its own card instead of opening the watch screen — the video library (featured strip and list) and the home video strip (`app/(tabs)/index.tsx:343`, same card). While it plays, the card stops taking presses so touches reach the player's controls; «اسأل المستشار» on the card still works.
+- One inline video at a time across the app (starting another stops the one before it; the meetup and service embeds share the same slot); the slot is released when the screen is covered, the Android app goes to the background, or the card leaves the page.
+- The watch screen stays for uploaded (Bunny) videos, for a video that is not on YouTube, and for a binary without the WebView module (`onPress` fallback).
+- NOT covered (files of other sessions, exact edits under «Shared-file changes» item 7): the video tile in admin messages, the inline video block in structured text, and the intro film — these still open the watch screen.
+- Not tried on a device.
+
+Player (`app/watch.tsx`, `components/YouTubeEmbed.tsx`)
+- `components/YouTubeEmbed.tsx:21` — new `useEmbedLive()`: on Android `react-native-webview` ignores the host pause (`RNCWebView.onHostPause` is empty), so a YouTube embed kept playing sound after the app went to the background, and on both platforms under a screen pushed on top. The WebView is now unmounted while the screen is covered or (Android) the app is in the background.
+- `app/watch.tsx:35` — the watch screen uses it: the embed is removed while not live and comes back when the member returns.
+- `components/YouTubeEmbed.tsx:52` — the inline embed (meetup and service pages) goes back to its thumbnail when covered or backgrounded, so returning never starts sound by itself.
+- `app/watch.tsx:163` — uploaded (Bunny) video: paused when another screen covers the player (position kept).
+- `app/watch.tsx:172`, `:262` — uploaded video had no error state: an expired signed link or no network left a silent black box. Now the `statusChange` → `error` state shows a message with «إعادة المحاولة» (reloads the stream, quality back to «تلقائي»), and closes the fullscreen sheet so the retry is visible.
+- `app/watch.tsx:62`, `components/YouTubeEmbed.tsx:145` — YouTube WebView had no error view (Android showed the white «Webpage not available» page). `renderError` now shows the same message + retry (remounts the WebView). Iframe + `baseUrl` recipe (error 153) untouched.
+- `app/watch.tsx:18` — the `yt` route param went into the embed HTML unchecked; a hand-made deep link could inject markup into a page with the vcmem.com origin. It must now match the YouTube id pattern, else the id is taken from `url`.
+- `app/watch.tsx:342` (+ `web`, `webContainer`, `wideStage`, `ghostWrap`), `components/YouTubeEmbed.tsx` box styles — the video stage used `colors.black`, which is paper `#F4F6FA` in light mode: light bars around the picture and a near-white fullscreen stage. The stage is now black in both themes (`STAGE_BLACK`).
+- `app/watch.tsx:349` — scrubber touch height 36 → 44 pt (knob re-centred). `app/watch.tsx:358` — quality pills 32 → 44 pt.
+- `app/watch.tsx:93` — the title under the player takes its direction from its own letters (a Latin-leading title in the Arabic layout).
+
+News
+- `components/news/NewsCard.tsx:47`, `:78` — the source pill and the topic pills had padding + background on the `Text` itself; Android measures a padded Text too narrow and truncates it. Padding moved to a wrapping View (same rule already used in `news/[id].tsx`).
+- `components/news/NewsCard.tsx:123` — a source picture that fails to load left an empty grey square; it now falls back to the branded newspaper block.
+- `components/news/NewsCard.tsx:85` — «اقرأ من المصدر» touch area 42 → 50 pt.
+- `components/news/NewsCard.tsx:99` — new `PageFooter`: when loading the next page failed, the list just stopped with no sign. Now a «إعادة المحاولة» row; used in `app/news/index.tsx:159` and `app/news/decisions.tsx:39` (and `onEndReached` no longer hammers a failing page).
+- `app/news/index.tsx:92` — a failed decisions load read «لا توجد قرارات جديدة حاليًا» (untrue). It now says the load failed, with a tap to retry.
+- `app/news/index.tsx:25`, `app/news/decisions.tsx` — the inline `ItemSeparatorComponent` arrow remounted every separator on each render; now one stable component.
+- `app/news/index.tsx:192` — «اهتماماتي» and the decisions retry row are 44 pt tall.
+- `app/news/[id].tsx:106` — a hero picture that fails to load is dropped instead of leaving a 200 pt grey block above the headline.
+- `app/news/interests.tsx:42` — while the saved session was still loading (`status === 'loading'`) a signed-in member saw the «سجّل الدخول» notice flash; now the loading state.
+- `components/NewsCarousel.tsx:47` — the auto-rotation timer (JS-driven animation every 4.5 s) kept running while the home tab was hidden; it stops when the screen is not focused.
+- `components/NewsCarousel.tsx:172` — carousel dots: 18 pt touch target → 44 pt tall.
+- `components/NewsCarousel.tsx:220` — slide picture falls back to the newspaper block when it fails to load.
+
+Inbox tab (`app/(tabs)/news.tsx`)
+- `:199` — row thumbnails loaded the full uploaded original for a 54 pt square; now through `sized()`, with the club emblem when the picture fails. `:151` — the day's-tip picture through `sized()` too.
+- `:112` — pull-to-refresh spinner snapped shut at once (`refreshing={false}`); it now stays until every list answers. A guest's pull no longer calls the signed-in-only tips endpoint.
+- `:106` — when every source failed and nothing is cached the tab said «لا جديد حتى الآن»; it now shows the error state with retry.
+
+Videos
+- `components/VideoCard.tsx:47` — thumbnail through `sized()` (pass-through for YouTube, real saving if a thumbnail is ever hosted on `/media/posts/`).
+- `components/VideoCard.tsx:61` — title and blurb take their direction from their own letters (English-only title in Arabic mode and the reverse, M239).
+- `components/VideoCard.tsx:73` — «اسأل المستشار» pill touch area 38 → 46 pt.
+- `app/videos/index.tsx:45` — the library had no pull-to-refresh; added. `:78` — «تحميل المزيد» is disabled with a spinner while a page is loading (double taps restarted the fetch).
+
+No change needed: `components/WatchRibbon.tsx`.
+
+### Applied choices A–F — KEPT by the coordinator (decision 1, second round)
+
+These were applied before the coordinator's rule «choices are proposals only» and listed apart; the coordinator decided all six stay. Row C changed since: the player error now reads `watch.failed`; the decisions strip still reads `errors.generic · common.retry`.
+
+| # | Change | Where | What the member notices | To revert |
+|---|---|---|---|---|
+| A | YouTube embed unmounted while the Android app is in the background or another screen covers it | `components/YouTubeEmbed.tsx:21` (`useEmbedLive`), used at `app/watch.tsx:35` and inside `useInlinePlayback` (`components/YouTubeEmbed.tsx:54`) | Sound stops (it used to keep playing on Android); on return the video starts from the beginning, and an inline video shows its thumbnail again | `app/watch.tsx:35` and `components/YouTubeEmbed.tsx:54`: replace `const live = useEmbedLive();` with `const live = true;` |
+| B | Uploaded video pauses when another screen covers the player | `app/watch.tsx:163` | Paused on return instead of still playing; position kept | delete the `useEffect` at `:162–164` |
+| C | Wording of the new error views: existing `errors.network` for a failed player, `errors.generic · common.retry` for a failed decisions strip | `components/YouTubeEmbed.tsx:72`, `app/news/index.tsx:92` | New sentences in places that had none (the states themselves were missing) | swap the key once `watch.failed` exists (shared-file item 3) |
+| D | Player stage painted with a literal black, not a token (no token exists; `colors.black` is paper in light mode) | `components/YouTubeEmbed.tsx:14` (`STAGE_BLACK`), used in `app/watch.tsx:342` and four styles below | Black bars and black fullscreen in light mode instead of near-white | replace `STAGE_BLACK` with `colors.black`, or with a new `colors.stage` token (shared-file item 6) |
+| E | Home carousel stops auto-rotating while the home screen is not in front | `components/NewsCarousel.tsx:47` | Nothing visible; on return it turns again after 4.5 s | drop `!focused ||` and `focused,` in the timer effect |
+| F | Pull-to-refresh added to the video library | `app/videos/index.tsx:45` | A new gesture on that page | remove the `refreshControl` prop |
+
+## Problems not fixed
+
+- **medium — two screens own the URL `/news` (being fixed by rev-home).** `app/(tabs)/news.tsx` (inbox) and `app/news/index.tsx` (news list) both resolve to `/news`. Now confirmed with the router's own matcher (see decision 6 above): `/news` is the news list, so `GlobalTabBar`'s «بريد وارد» button (`router.navigate('/news')`, shown on detail screens) opened the news list instead of the inbox. rev-home is moving it to `/(tabs)/news`, which the matcher resolves to the inbox. My files need no change. Still not seen on a device.
+- **deferred by the coordinator («not now»):** a header for `news/index`, rebuilding the video library as a `FlatList`, keeping the YouTube position. Not applied.
+- **low — gold as text in my files.** `theme/tokens.ts` now has `goldText` / `goldLightText` (rev-design, for gold used as a text or icon colour in the light mode). My files still colour link and pill text with `colors.gold` / `colors.goldLight` (for example `app/news/index.tsx` `headerLinkText`, `sectionLink`; `components/news/NewsCard.tsx` `source`, `readText`, `retryText`; `components/VideoCard.tsx` `askText`). A sweep was not in the decisions, so it is not applied; only the new `limit` line in `app/news/interests.tsx:148` uses `goldLightText`.
+- **outside my files — `npx tsc --noEmit` fails on `src/components/FormEmbed.tsx(211,17)`**: TS2322, the prop `required` does not exist on that component's `Props`. Another session's edit in progress; not touched.
+- **medium — YouTube restarts from the beginning after it was parked.** Unmounting is the only way to silence the embed without the IFrame API; keeping the position needs `enablejsapi=1` + a `pauseVideo` postMessage, which changes the embed URL that cured error 153 — it must be tried on a real phone first. Uploaded videos keep their position (paused, not unmounted). Neither kind remembers the position after the screen is closed.
+- **low — rotated fullscreen on Android not verified.** It sizes the rotated box from `useWindowDimensions()` inside a `statusBarTranslucent` Modal; on a phone with a 3-button navigation bar the window can be shorter than the Modal. Android back closes fullscreen first (`onRequestClose`) — correct in code. Needs the Android-run session's eyes.
+- **low — iOS background for the YouTube embed not parked.** `app.config.ts` declares no background-audio mode, so WKWebView should suspend media itself; left as is to keep the position on iOS. Not verified on the owner's iPhone.
+- **low — the video library is not a FlatList.** `app/videos/index.tsx` renders every loaded card inside the shared `Screen` ScrollView (20 more per «تحميل المزيد»). Fine for tens of videos; a FlatList means rebuilding the page around `Screen`.
+- **low — `news/index` has no header or back button.** It is not declared in `app/_layout.tsx` (unlike `videos/index`), so `headerShown: false` applies and the page draws its own title; the member leaves by swipe, Android back or the bottom bar. May be deliberate.
+- **low — «رقم اليوم».** `NumberOfDayCard` shows `number.text` chosen by the server beside the story's own title and source. Rule 7 holds only if the server lifts the figure verbatim from the source text — a server check, not done here.
+- **info — rule 7 in the app: clean.** `NewsItem` carries only `title`, `snippet`, `url`, `image`, `publishedAt`, `source`, `topics`, `decision`, `lang`; cards, carousel and the item page show exactly those plus «اقرأ من المصدر» (in-app browser through `openLink`), and `news.sourceNote` says so. There is no translated-title field, so nothing needs a «translated» mark; an English item in the Arabic layout is shown in its own language and direction. The advisor's daily tip in the inbox is labelled «مقترح لك», not news.
+- **info — geo filter (M221) and interests list.** The geo filter lives only in `server/src/news/geo.ts`; the app sends no country and has no control for it. The app holds no copy of the interests list — the screen renders `GET /api/interests` (labels follow `x-app-lang`).
+- **info — dead source URL.** The in-app browser opens and shows its own error page; returning lands on the same scroll position (the list stays mounted under the stack).
+
+## Shared-file changes needed
+
+Status after the second round: item 1 is with rev-home; items 3 and 4 are DONE (the coordinator added both strings, and my files use them); item 2 is deferred («not now»); item 6 is half done (`colors.white` exists and is used; a `stage` token is still optional). Items 5 and 7 are open.
+
+1. `app/src/components/GlobalTabBar.tsx:23` (after a device check of the `/news` item above): `path: '/news'` → `path: '/(tabs)/news'` for the inbox tab, keeping `/news` for the list; line 34 keeps the highlight rule or drops `path.startsWith('/news')` so news pages stop lighting the inbox tab.
+2. `app/src/app/_layout.tsx` near line 156 (optional, owner's call): add `<Stack.Screen name="news/index" options={{ ...detailHeader(), title: t('news.title') }} />`; if added, remove the inline title row in `app/news/index.tsx`.
+3. `app/src/i18n/strings/ar.json` + `en.json`: add `"watch.failed": "تعذّر تشغيل الفيديو. تأكد من اتصالك بالإنترنت ثم أعد المحاولة."` / `"The video could not be played. Check your connection and try again."`; then in `components/YouTubeEmbed.tsx:72` change `t('errors.network')` → `t('watch.failed')`.
+4. `app/src/i18n/strings/ar.json` + `en.json`: add `"interests.maxReached": "يمكنك اختيار {max} اهتمامات كحد أقصى."` / `"You can pick up to {max} interests."` for the ignored 4th tap.
+5. `app/src/i18n/strings/en.json` `news.latest`: "Saudi business news from trusted sources" does not match the Arabic «أحدث أخبار الأعمال من مصادر موثوقة» → "The latest business news from trusted sources".
+6. `app/src/theme/tokens.ts` (optional): a `stage: '#000000'` colour in both palettes to replace the local `STAGE_BLACK` (`components/YouTubeEmbed.tsx:14`), and an `onDanger` white for `BreakingPill` (`components/news/NewsCard.tsx`, literal `#FFFFFF`).
+7. To finish the owner's «YouTube plays in the same page» request outside my files — each of these still calls `playVideo(...)` and opens the watch screen for a YouTube link. In each, when `youtubeIdOf(url)` is not null render `<YouTubeEmbed url={url} title={…} />` (from `@/components/YouTubeEmbed`; it is a 16:9 box with its own thumbnail and play mark) instead of the pressable tile, and keep the existing tile + `playVideo` for anything else:
+   - `app/src/app/posts/[id].tsx:236` `VideoTile` (admin-message videos): first line of the component `if (youtubeIdOf(url)) return <YouTubeEmbed url={url} title={title ?? label} />;`
+   - `app/src/components/StructuredText.tsx:168` (inline video block): `if (youtube) return <YouTubeEmbed url={block.url} title="" />;` before the `PressScale`.
+   - `app/src/components/IntroVideo.tsx:44` and `:100` (intro film card and popup): the popup dismisses itself before playing, so it needs a decision on where the film should play; the card can take `YouTubeEmbed` directly if `film.url` is a YouTube link.
+   - `app/src/components/WorkshopRecordings.tsx:75` needs nothing: recordings are uploaded files, not YouTube.
+
+## Checks run
+
+- Second round: `npx eslint` on `YouTubeEmbed.tsx`, `news/interests.tsx`, `NewsCarousel.tsx`, `news/NewsCard.tsx`, `VideoCard.tsx`, `watch.tsx` → exit 0. `npx tsc --noEmit` → exit 2 with ONE error, in `src/components/FormEmbed.tsx(211,17)` (not my file, see «Problems not fixed»); no error in any file of this area.
+- Second round: the `/news` question was answered by running expo-router's own `getStateFromPath` on a hand-copied route table (a read-only script in the session scratchpad; nothing in the repo was run or changed).
+- `npx tsc --noEmit` in `app/` → exit 0, no output (run again after the inline-playback change).
+- `npx eslint` on the 12 files of this area → exit 0, no output; `YouTubeEmbed.tsx`, `VideoCard.tsx`, `watch.tsx` and `videos/index.tsx` linted again after the inline-playback change → exit 0.
+- For the Android-run session, added: (e) in the video library tap a YouTube card — it must play inside the card; tap a second card — the first must stop; the page must still scroll with a finger on the playing video.
+- Not run: any device or emulator. For the Android-run session: (a) play a YouTube video, press Home — sound must stop, and the video restarts on return; (b) airplane mode on the watch screen for a YouTube and a workshop recording — message + retry; (c) light mode — black player stage; (d) rotated fullscreen fills the screen, back closes it first.
+- Line endings: several of these files flipped between LF and CRLF on disk during the session (git prints «LF will be replaced by CRLF»); `git diff --stat` for this area is 11 files, +244 −97, no whole-file rewrites.

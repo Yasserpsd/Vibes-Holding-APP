@@ -47,6 +47,23 @@ export async function loadSavedAccount<T>(): Promise<T | null> {
   }
 }
 
+/**
+ * A pitch deck the member opened is cached as `deck-<hash>.pdf` (app/deck.tsx). Rule 4: none of them outlives the
+ * session, so they go at sign-out. Never throws: a missing or unreadable cache folder leaves nothing to clean.
+ */
+export async function clearDeckFiles(): Promise<void> {
+  try {
+    const dir = FileSystem.cacheDirectory;
+    if (!dir) return;
+    const names = await FileSystem.readDirectoryAsync(dir);
+    await Promise.all(
+      names.filter((name) => name.startsWith('deck-')).map((name) => FileSystem.deleteAsync(`${dir}${name}`, { idempotent: true }).catch(() => undefined)),
+    );
+  } catch {
+    // Nothing to clean.
+  }
+}
+
 export async function saveAccount(account: unknown | null): Promise<void> {
   const uri = accountUri();
   if (!uri) return;

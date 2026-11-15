@@ -1,4 +1,7 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+
+import { useAuth } from '@/auth/AuthProvider';
 
 import { apiGet, apiRequest } from './client';
 import type { GoldenContent, GoldenOffer, ProjectAccess, ProjectBrief, ProjectReview, ProjectReviews, ProjectUnlockResult, ProjectsBalance, ProjectsFilters, ProjectsPage, ProjectsSort, PublicProject } from './types';
@@ -61,12 +64,26 @@ export function useProjectAccess(id: string | undefined, account: string | null)
   });
 }
 
+/** Wallet cards waiting for an unlock to finish (a few can be mounted at once: home, account, services). */
+const unlockListeners = new Set<() => void>();
+
 /** M99c: the member's Projects Bank wallet — his balance and how many projects he opened. */
 export type ProjectsWallet = { isMember: boolean; balance: ProjectsBalance | null; unlockedCount: number };
 
 export function useProjectsWallet(account: string | null) {
+  const queryClient = useQueryClient();
+  const { me } = useAuth();
+  // The card sits on tabs that stay mounted under the project page: an unlock refreshes its balance at once.
+  useEffect(() => {
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ['projects-wallet'] });
+    unlockListeners.add(refresh);
+    return () => {
+      unlockListeners.delete(refresh);
+    };
+  }, [queryClient]);
   return useQuery({
-    queryKey: ['projects-wallet', account ?? ''],
+    // The membership status is part of the key: buying or losing the membership must not keep the old «isMember» answer.
+    queryKey: ['projects-wallet', account ?? '', me?.membership.status ?? 'none'],
     queryFn: () => apiGet<ProjectsWallet>('/api/projects/wallet'),
     enabled: Boolean(account),
     staleTime: 60_000,
@@ -75,7 +92,11 @@ export function useProjectsWallet(account: string | null) {
 }
 
 export const projectsApi = {
-  unlock: (id: string) => apiRequest<ProjectUnlockResult>('POST', `/api/projects/${encodeURIComponent(id)}/unlock`, { body: {} }),
+  unlock: async (id: string) => {
+    const result = await apiRequest<ProjectUnlockResult>('POST', `/api/projects/${encodeURIComponent(id)}/unlock`, { body: {} });
+    unlockListeners.forEach((listener) => listener());
+    return result;
+  },
   // M116: rate a project (any signed-in account; resubmitting updates the same review).
   review: (id: string, stars: number, comment: string) =>
     apiRequest<{ ok: true; review: ProjectReview; summary: ProjectReviews['summary'] }>('POST', `/api/projects/${encodeURIComponent(id)}/reviews`, { body: { stars, comment } }),

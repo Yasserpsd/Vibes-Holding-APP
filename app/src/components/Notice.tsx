@@ -15,7 +15,7 @@ type Props = { text: string; tone?: 'info' | 'warning' | 'success'; support?: bo
 export function Notice({ text, tone = 'info', support = false }: Props) {
   // M195: inside a FormCard the notice follows the form identity (gold wash, navy ink; red for a warning).
   const palette = useFormPalette();
-  const color = tone === 'warning' ? (palette ? palette.danger : colors.warning) : tone === 'success' ? colors.success : palette ? palette.accent : colors.goldLight;
+  const color = tone === 'warning' ? (palette ? palette.danger : colors.warning) : tone === 'success' ? colors.success : palette ? palette.accent : colors.goldLightText;
   const formBox = palette ? (tone === 'warning' ? { backgroundColor: palette.dangerBg, borderColor: palette.danger } : { backgroundColor: palette.noticeBg, borderColor: palette.noticeBorder }) : null;
   const formText = palette ? { color: tone === 'warning' ? palette.danger : palette.noticeText } : null;
   const formChip = palette ? { backgroundColor: 'transparent' } : null;

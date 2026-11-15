@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 
 import { usePass, type PassState } from '@/api/hq';
+import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { FadeInView, PopIn, Sheen } from '@/components/motion';
 import { Screen } from '@/components/Screen';
@@ -23,20 +24,27 @@ const STATE: Record<PassState, { text: StringKey; color: string; icon: 'time-out
 /** The entry pass of a confirmed visit, laid out as a ticket: who, which day and time, when it was booked, and the QR. */
 export default function PassScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, isLoading, error, refetch } = usePass(id);
+  const router = useRouter();
+  const { status } = useAuth();
+  // A pass opened from a notification on a cold start waits for the restored session instead of failing once with no token.
+  const { data, isLoading, error, refetch } = usePass(status === 'signedIn' && typeof id === 'string' ? id : undefined);
   // The gold head is measured once laid out, so the metal sheen knows how far to travel.
   const [headSize, setHeadSize] = useState<{ width: number; height: number } | null>(null);
 
   if (!data) {
     return (
       <Screen>
-        <StateView loading={isLoading} error={error} onRetry={() => void refetch()} />
+        {status === 'guest' ? (
+          <AppButton label={t('agenda.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+        ) : (
+          <StateView loading={status === 'loading' || isLoading} error={error} onRetry={() => void refetch()} />
+        )}
       </Screen>
     );
   }
 
   const { pass } = data;
-  const state = STATE[pass.state];
+  const state = STATE[pass.state] ?? STATE.upcoming;
   const weekday = weekdayOf(pass.visit.date);
 
   return (
@@ -137,7 +145,7 @@ const styles = themedStyles(() => ({
   name: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.textPrimary, textAlign: textStart },
   grid: { flexDirection: 'row', gap: spacing.md },
   cell: { flex: 1, gap: 2 },
-  value: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 22, color: colors.goldLight, textAlign: textStart },
+  value: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 22, color: colors.goldLightText, textAlign: textStart },
   note: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   tear: { height: NOTCH, flexDirection: 'row', alignItems: 'center' },
   dashes: { flex: 1, marginHorizontal: NOTCH / 2, borderTopWidth: 1, borderColor: colors.goldDark, borderStyle: 'dashed' },
@@ -146,7 +154,7 @@ const styles = themedStyles(() => ({
   notchEnd: { end: -NOTCH / 2 },
   stub: { alignItems: 'center', gap: spacing.sm, padding: spacing.md, paddingTop: spacing.sm },
   // The QR stays on pristine white — the scanner's needs beat the theme here.
-  qrBox: { padding: spacing.sm, borderRadius: radii.md, backgroundColor: colors.white },
+  qrBox: { padding: spacing.sm, borderRadius: radii.md, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
   qr: { width: 200, height: 200 },
   code: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.textMuted, textAlign: 'center', writingDirection: 'ltr' },
   state: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.pill, borderWidth: 1, backgroundColor: colors.surfaceElevated },

@@ -46,7 +46,8 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
   // M130b (owner: «تقليب الصور تقيل»): the set's other photos download behind the first one,
   // so every swap shows an already-cached image instead of a loading hitch. Never fatal.
   useEffect(() => {
-    for (const entry of key.split('|').slice(1)) void Image.prefetch(entry).catch(() => undefined);
+    // The SIZED address: the slide draws `sized(url, 360)`, so prefetching the original warmed a different cache entry (and downloaded the full picture for nothing).
+    for (const entry of key.split('|').slice(1)) void Image.prefetch(sized(entry, 360)).catch(() => undefined);
   }, [key]);
 
   // M130b (owner: «الصور تظهر كاملة، متبقاش مقصوصة»): each photo's natural shape sizes the box,
@@ -56,8 +57,9 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
   const [ratios, setRatios] = useState<Record<string, number>>({});
   useEffect(() => {
     for (const entry of key.split('|')) {
+      // Measured on the same sized variant the slide draws (same shape, and the download is shared).
       Image.getSize(
-        entry,
+        sized(entry, 360),
         (w, h) => {
           if (w > 0 && h > 0) setRatios((current) => (current[entry] ? current : { ...current, [entry]: w / h }));
         },

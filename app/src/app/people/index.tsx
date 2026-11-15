@@ -77,7 +77,7 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
             {[person.title, person.company].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        <Ionicons name={chevronForward()} size={18} color={colors.goldLight} />
+        <Ionicons name={chevronForward()} size={18} color={colors.goldLightText} />
       </GlassCard>
     </PressScale>
   );
@@ -98,7 +98,7 @@ const styles = themedStyles(() => ({
     borderColor: colors.borderGoldSoft,
     backgroundColor: colors.goldFaint,
   },
-  countPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLight },
+  countPillText: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldLightText },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

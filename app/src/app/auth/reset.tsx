@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
@@ -17,6 +17,9 @@ import { textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
+/** Seconds before «أعد الإرسال» works again (the e-mail code screen waits the same). */
+const RESEND_SECONDS = 60;
+
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const { data: config } = useAuthConfig();
@@ -30,8 +33,16 @@ export default function ResetPasswordScreen() {
   const [sent, setSent] = useState<{ sentTo: string; provider: string; via: string }>({ sentTo: '', provider: '', via: '' });
   const [resent, setResent] = useState(false);
 
+  // The same brake as the sign-in code screens: one message, then the button counts down before the next.
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
+
   const request = async (again = false) => {
-    if (busy) return;
+    if (busy || (again && cooldown > 0)) return;
     if (!identifierValid(identifier)) {
       setError(t('auth.reset.loginRequired'));
       return;
@@ -49,6 +60,7 @@ export default function ResetPasswordScreen() {
       const result = await authApi.resetRequest(login, country);
       setSent({ sentTo: result.sentTo ?? '', provider: result.provider ?? '', via: result.via ?? '' });
       setResent(again);
+      setCooldown(RESEND_SECONDS);
       setStep('confirm');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -134,8 +146,17 @@ export default function ResetPasswordScreen() {
       ) : (
         <FadeInView key="confirm-submit" delay={entranceDelay(1)}>
           <AppButton label={t('auth.reset.save')} icon="key-outline" loading={busy} onPress={() => void confirm()} />
-          <Pressable accessibilityRole="button" onPress={() => void request(true)} disabled={busy} style={styles.resend} hitSlop={8}>
-            <Text style={styles.resendText}>{t('auth.reset.resend')}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy || cooldown > 0 }}
+            onPress={() => void request(true)}
+            disabled={busy || cooldown > 0}
+            style={styles.resend}
+            hitSlop={8}
+          >
+            <Text style={[styles.resendText, cooldown > 0 && styles.resendWaiting]}>
+              {cooldown > 0 ? t('auth.verify.resendIn', { seconds: cooldown }) : t('auth.reset.resend')}
+            </Text>
           </Pressable>
           {/* M204 (owner): WhatsApp only, with no e-mail way out; a member the code cannot reach writes to the support line. */}
           <SupportLink problem={t('auth.reset.noCode')} />
@@ -151,4 +172,5 @@ const styles = themedStyles(() => ({
   error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   resend: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.xs },
   resendText: { ...typography.caption, color: colors.gold, textDecorationLine: 'underline' },
+  resendWaiting: { color: colors.textMuted, textDecorationLine: 'none' },
 }));

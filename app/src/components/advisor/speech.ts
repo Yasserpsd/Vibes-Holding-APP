@@ -14,6 +14,9 @@ export type SpeechState = 'idle' | 'loading' | 'playing';
 
 type Player = ReturnType<NonNullable<typeof audio>['createAudioPlayer']>;
 
+/** Mirrors `speakSchema` in server/src/advisor/routes.ts. */
+const SPEAK_MAX_CHARS = 4000;
+
 const clips = new Map<number, string>();
 const listeners = new Set<() => void>();
 let active: { id: number; state: SpeechState; player: Player | null; run: number } | null = null;
@@ -49,7 +52,8 @@ export function stopSpeech() {
 async function clipFor(id: number, text: string): Promise<string> {
   const known = clips.get(id);
   if (known) return known;
-  const { audio: base64 } = await advisorApi.speak(text);
+  // The server reads at most 4000 characters: a longer reply is read up to there instead of failing.
+  const { audio: base64 } = await advisorApi.speak(text.slice(0, SPEAK_MAX_CHARS));
   const dir = FileSystem.cacheDirectory;
   if (!dir) throw new Error('no_cache_dir');
   const uri = `${dir}advisor-speech-${id}.mp3`;

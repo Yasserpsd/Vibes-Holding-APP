@@ -9,7 +9,8 @@ type PurchasesPackage = import('react-native-purchases').PurchasesPackage;
 type PurchasesStoreProduct = import('react-native-purchases').PurchasesStoreProduct;
 
 export type StoreOffer = { kind: 'package'; pkg: PurchasesPackage; product: PurchasesStoreProduct } | { kind: 'product'; product: PurchasesStoreProduct };
-export type PurchaseResult = { status: 'purchased'; entitled: boolean } | { status: 'cancelled' } | { status: 'failed'; message: string };
+// `pending`: the store accepted the order but the payment waits (Ask to Buy, a slow card, a cash method) — not a failure.
+export type PurchaseResult = { status: 'purchased'; entitled: boolean } | { status: 'cancelled' } | { status: 'pending' } | { status: 'failed'; message: string };
 
 // react-native-purchases is native. Binaries built before it was added (every preview build up to
 // M7 part 2 A) do not contain it: the native module registry is checked before the package is
@@ -48,8 +49,10 @@ export function storeName(): string {
 export function riyalPrice(priceString: string): string {
   const CURRENCY = /(?:SAR|ر\.س\.?|ريال)/u;
   const AMOUNT = /[0-9٠-٩][0-9٠-٩.,٬٫،\s]*/u;
-  const lead = priceString.match(new RegExp(`^\\s*${CURRENCY.source}\\s*(${AMOUNT.source})$`, 'u'));
-  const trail = priceString.match(new RegExp(`^\\s*(${AMOUNT.source})\\s*${CURRENCY.source}\\s*$`, 'u'));
+  // Spaces and the invisible direction marks the stores put around an Arabic price (LRM, RLM, Arabic letter mark).
+  const GAP = '[\\s\\u200e\\u200f\\u061c]*';
+  const lead = priceString.match(new RegExp(`^${GAP}${CURRENCY.source}${GAP}(${AMOUNT.source})$`, 'u'));
+  const trail = priceString.match(new RegExp(`^${GAP}(${AMOUNT.source})${GAP}${CURRENCY.source}${GAP}$`, 'u'));
   const amount = (lead?.[1] ?? trail?.[1])?.trim().replace(/[.,٫][0٠]{2}$/u, '');
   // M239 (owner, 2026-11-14): an English app on an Arabic-language phone must not show Arabic-Indic digits.
   const shown = (text: string) => (getLang() === 'en' ? latinDigits(text) : text);
@@ -158,6 +161,7 @@ export async function purchaseMembership(config: StoreConfig, offer: StoreOffer)
   } catch (error) {
     const failure = (error ?? {}) as StoreFailure;
     if (failure.userCancelled || failure.code === purchases.PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) return { status: 'cancelled' };
+    if (failure.code === purchases.PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR) return { status: 'pending' };
     return { status: 'failed', message: storeErrorMessage(purchases, failure.code) };
   }
 }

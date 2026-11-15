@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { authApi, type Me } from '@/api/auth';
 import { ApiError, setAuthToken, setUnauthorizedHandler } from '@/api/client';
 import { pushApi } from '@/api/push';
-import { loadSavedAccount, loadToken, saveAccount, saveToken } from '@/auth/storage';
+import { clearDeckFiles, loadSavedAccount, loadToken, saveAccount, saveToken } from '@/auth/storage';
 import { currentPushToken } from '@/lib/notifications';
 import { resetPurchases } from '@/lib/purchases';
 
@@ -20,6 +21,10 @@ type AuthContextValue = {
    * and a 401 may still sign it out: nothing that opens by itself (a popup) may trust `me` until this is true.
    */
   confirmed: boolean;
+  /** The saved session was refused when the app opened: the gate and the sign-in screen show «انتهت الجلسة» once. */
+  sessionExpired: boolean;
+  /** Forgets that notice (it was seen, or the visitor chose to continue as a guest). */
+  dismissSessionExpired: () => void;
   /** Stores the session after login or verification. */
   signIn: (token: string, me: Me) => Promise<void>;
   /** Ends the session on the server (best effort) and locally. */
@@ -38,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMeState] = useState<Me | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const tokenRef = useRef<string | null>(null);
 
   const clearLocal = useCallback(async () => {
@@ -51,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('guest');
     await saveToken(null);
     void saveAccount(null);
+    // Rule 4: the pitch decks this account opened are cached files; they leave with the session.
+    void clearDeckFiles();
     // Owner (2026-11-02): a signed-out member kept seeing member screens from the cache — person
     // details with unlocked contacts (CLAUDE.md rule 4), his inbox, card, unlocked services. The
     // enumerated removals missed keys, so the WHOLE cache goes: every screen refetches as a guest
@@ -88,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         if (error instanceof ApiError && error.status === 401) {
           await clearLocal();
+          // The member opened the app and found himself a guest: the gate and the sign-in screen say why, once.
+          if (!cancelled) setSessionExpired(true);
         } else {
           // Offline or server trouble: keep the session and show the app; data loads later.
           setStatus('signedIn');
@@ -113,12 +123,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMeState(account);
       setConfirmed(true);
       setHasSession(true);
+      setSessionExpired(false);
       setStatus('signedIn');
       await saveToken(token);
       void saveAccount(account);
       // The guest feed lacks the member's targeted messages (M29): fetch the inbox as him.
       queryClient.removeQueries({ queryKey: ['posts'] });
       queryClient.removeQueries({ queryKey: ['post'] });
+      // Everything a guest loaded is asked again as the member (locked cards, prices, his own lists).
+      void queryClient.invalidateQueries();
     },
     [queryClient],
   );
@@ -167,9 +180,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void saveAccount(account);
   }, []);
 
+  // The app opened offline with a live session but no saved account (`signedIn` with no `me`): nothing asked the
+  // server again, so screens kept saying «سجّل الدخول». Coming back to the app asks once more.
+  useEffect(() => {
+    if (status !== 'signedIn' || me) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refresh();
+    });
+    return () => subscription.remove();
+  }, [status, me, refresh]);
+
+  const dismissSessionExpired = useCallback(() => setSessionExpired(false), []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, me, hasSession, confirmed, signIn, signOut, refresh, setMe }),
-    [status, me, hasSession, confirmed, signIn, signOut, refresh, setMe],
+    () => ({ status, me, hasSession, confirmed, sessionExpired, dismissSessionExpired, signIn, signOut, refresh, setMe }),
+    [status, me, hasSession, confirmed, sessionExpired, dismissSessionExpired, signIn, signOut, refresh, setMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

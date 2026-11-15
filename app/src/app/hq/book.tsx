@@ -89,6 +89,8 @@ export default function BookVisitScreen() {
     } catch (cause) {
       setSubmitError(errorMessage(cause));
       setGated(isProfileGate(cause));
+      // The slot may have just been taken by someone else: show the live availability, not the stale list.
+      void slots.refetch();
     } finally {
       setBusy(false);
     }
@@ -191,6 +193,7 @@ export default function BookVisitScreen() {
                 key={slot.time}
                 label={slot.available ? t('hqBook.slot', { from: slot.time, to: slot.endTime }) : t('hqBook.slotFull', { time: slot.time })}
                 selected={slot.time === time}
+                dimmed={!slot.available}
                 onPress={() => (slot.available ? setTime(slot.time) : null)}
               />
             ))}
@@ -235,7 +238,7 @@ const styles = themedStyles(() => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   // M109a: the live hours counter under the space picker.
   walletBox: { gap: spacing.xs, marginTop: spacing.sm },
-  walletLine: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldLight, textAlign: textStart },
+  walletLine: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldLightText, textAlign: textStart },
   walletHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hintSpace: { marginTop: spacing.md },

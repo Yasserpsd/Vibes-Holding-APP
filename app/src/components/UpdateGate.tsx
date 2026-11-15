@@ -9,6 +9,7 @@ import { setUpdateRequiredHandler } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
 import { FormCard } from '@/components/form/FormTheme';
 import { t } from '@/i18n';
+import { textStart } from '@/i18n/direction';
 import { blockAutoPopups } from '@/lib/popupGate';
 import { brand, fonts, formPalettes, spacing, typography } from '@/theme/tokens';
 
@@ -73,7 +74,7 @@ function ForcedUpdate({ message, storeUrls }: { message: string; storeUrls?: App
           <Text style={styles.title}>{t('update.required.title')}</Text>
         </View>
         <Text style={styles.body}>{message || t('update.required.body')}</Text>
-        {url ? <AppButton label={t('update.required.button')} icon="open-outline" onPress={() => void Linking.openURL(url)} /> : null}
+        {url ? <AppButton label={t('update.required.button')} icon="open-outline" onPress={() => void Linking.openURL(url).catch(() => undefined)} /> : null}
       </FormCard>
     </View>
     </Modal>
@@ -135,7 +136,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
   },
   bannerText: { flex: 1, gap: 2 },
-  bannerTitle: { ...typography.caption, fontFamily: fonts.bold, fontSize: 14, color: brand.gold, textAlign: 'left' },
-  bannerBody: { ...typography.caption, color: '#D5DEEB', textAlign: 'left' },
+  bannerTitle: { ...typography.caption, fontFamily: fonts.bold, fontSize: 14, color: brand.gold, textAlign: textStart },
+  bannerBody: { ...typography.caption, color: '#D5DEEB', textAlign: textStart },
   bannerButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },
 });

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter, type Href } from 'expo-router';
+import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, I18nManager, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useHomeNews, useNumberOfDay, type NewsItem } from '@/api/news';
 import { GlassCard } from '@/components/lux';
@@ -10,7 +10,7 @@ import { MarketsStrip } from '@/components/MarketsStrip';
 import { FadeInView, PressScale } from '@/components/motion';
 import { SectionHeader } from '@/components/SectionHeader';
 import { t } from '@/i18n';
-import { textDir, textStart } from '@/i18n/direction';
+import { isRTL, textDir, textStart } from '@/i18n/direction';
 import { formatRelativeTime } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
@@ -21,8 +21,6 @@ const SLIDES = 8;
 // The next card peeks in at the reading end so the strip reads as something to flip through.
 const PEEK = 32;
 const GAP = 10;
-// Transforms are physical: the next card sits toward the reading end (left in Arabic, right in English).
-const DIR = I18nManager.isRTL ? -1 : 1;
 
 /**
  * M176 (owner, 2026-11-01, «خلي الأخبار تحت شوية وتتحرك كاروسيل… تشد أكتر»): the news door became a
@@ -43,13 +41,19 @@ export function NewsCarousel() {
   const items = useMemo(() => (feed.data?.items ?? []).slice(0, SLIDES), [feed.data]);
   const [width, setWidth] = useState(0);
   const [touched, setTouched] = useState(false);
+  // Off the screen (another tab, a pushed page) the strip stops turning: no timer and no animation frames nobody sees.
+  const focused = useIsFocused();
   const [position] = useState(() => new Animated.Value(0));
   const touch = useCallback(() => setTouched(true), []);
   const cardWidth = width ? width - PEEK : 0;
   const step = cardWidth + GAP;
-  // The pager's handlers are created once; they read the live count and step from `live`.
+  // Transforms are physical: the next card sits toward the reading end (left in Arabic, right in English).
+  // Read while rendering from the language: `I18nManager.isRTL` at module scope is true on every cold start
+  // of this binary, English included (see i18n/direction.ts), which turned the English strip the Arabic way.
+  const dir = isRTL() ? -1 : 1;
+  // The pager's handlers are created once; they read the live count, step and direction from `live`.
   const [pager] = useState(() => {
-    const live = { count: 0, step: 0, at: 0, now: 0, base: 0, onIndex: (_index: number) => {}, onTouch: () => {} };
+    const live = { count: 0, step: 0, dir: 1, at: 0, now: 0, base: 0, onIndex: (_index: number) => {}, onTouch: () => {} };
     const wrap = (value: number) => ((Math.round(value) % live.count) + live.count) % live.count;
     // JS-driven on purpose (owner, 2026-11-02: blank carousel on real phones with the native driver).
     const go = (target: number) => {
@@ -74,10 +78,10 @@ export function NewsCarousel() {
       },
       // Dragging toward the reading start brings the next card in (rightward in Arabic).
       onPanResponderMove: (_event, gesture) => {
-        if (live.step) position.setValue(live.base - (DIR * gesture.dx) / live.step);
+        if (live.step) position.setValue(live.base - (live.dir * gesture.dx) / live.step);
       },
       onPanResponderRelease: (_event, gesture) => {
-        const forward = DIR === -1 ? gesture.dx > 0 : gesture.dx < 0;
+        const forward = live.dir === -1 ? gesture.dx > 0 : gesture.dx < 0;
         const far = live.count > 1 && (Math.abs(gesture.dx) > live.step * 0.22 || Math.abs(gesture.vx) > 0.35);
         go(far ? (forward ? Math.floor(live.now) + 1 : Math.ceil(live.now) - 1) : Math.round(live.now));
       },
@@ -86,9 +90,10 @@ export function NewsCarousel() {
     });
     return {
       pan,
-      sync: (count: number, size: number) => {
+      sync: (count: number, size: number, direction: number) => {
         live.count = count;
         live.step = size;
+        live.dir = direction;
       },
       next: () => go(Math.round(live.at) + 1),
       jump: (slot: number) => go(Math.round(live.at) + offsetOf(slot)),
@@ -107,22 +112,22 @@ export function NewsCarousel() {
     };
   });
 
-  useEffect(() => pager.sync(items.length, step), [pager, items.length, step]);
+  useEffect(() => pager.sync(items.length, step, dir), [pager, items.length, step, dir]);
 
   useEffect(() => {
-    if (touched || items.length < 2 || !width) return;
+    if (touched || !focused || items.length < 2 || !width) return;
     const timer = setInterval(pager.next, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [touched, items.length, width, pager]);
+  }, [touched, focused, items.length, width, pager]);
 
   // Card `slot` sits (slot − position) cards away, folded into [−half, count − half) so the fold stays off-screen.
   const translates = useMemo(() => {
     const count = items.length;
     const half = Math.floor(count / 2);
     return items.map((_item, slot) =>
-      Animated.multiply(Animated.subtract(Animated.modulo(Animated.add(Animated.multiply(position, -1), slot + half + count * 1000), count || 1), half), DIR * step),
+      Animated.multiply(Animated.subtract(Animated.modulo(Animated.add(Animated.multiply(position, -1), slot + half + count * 1000), count || 1), half), dir * step),
     );
-  }, [items, position, step]);
+  }, [items, position, step, dir]);
 
   if (!items.length) return null;
   const shown = width ? items : items.slice(0, 1);
@@ -166,7 +171,8 @@ function CarouselDots({ items, pager, onTouch }: { items: NewsItem[]; pager: Pag
       {items.map((entry, dot) => (
         <Pressable
           key={entry.id}
-          hitSlop={6}
+          // A 6 pt dot gets a 44 pt tall target; the sides stay narrow so neighbouring dots never overlap.
+          hitSlop={{ top: 19, bottom: 19, left: 3, right: 3 }}
           onPress={() => {
             onTouch();
             pager.jump(dot);
@@ -213,11 +219,13 @@ function NumberOfDayCard() {
 }
 
 function NewsSlide({ item, onPress }: { item: NewsItem; onPress: () => void }) {
+  // A picture that fails to load gives way to the newspaper block, like an item without one.
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={item.title}>
       <GlassCard style={styles.card}>
-        {item.image ? (
-          <Image source={{ uri: sized(item.image, 480) }} style={styles.image} resizeMode="cover" />
+        {item.image && !imageFailed ? (
+          <Image source={{ uri: sized(item.image, 480) }} style={styles.image} resizeMode="cover" onError={() => setImageFailed(true)} />
         ) : (
           <View style={[styles.image, styles.imageFallback]}>
             <Ionicons name="newspaper-outline" size={36} color={colors.gold} />
@@ -248,7 +256,7 @@ const styles = themedStyles(() => ({
   body: { padding: spacing.md, gap: spacing.xs },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sourcePill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.goldSoft, borderWidth: 1, borderColor: colors.borderGoldSoft, maxWidth: '60%' },
-  source: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLight },
+  source: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLightText },
   time: { ...typography.caption, color: colors.textMuted, flex: 1, textAlign: textStart },
   // Two reserved lines each: every card in the pager keeps one height.
   title: { ...typography.subtitle, fontSize: 17, lineHeight: 27, minHeight: 54, color: colors.textPrimary, textAlign: textStart },
@@ -263,6 +271,8 @@ const styles = themedStyles(() => ({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.borderGold,
+    // A literal on purpose: this is a photo card, dark in both themes (its text uses the onPhoto tokens);
+    // a theme surface would turn it white in the light mode under white text when the story has no photo.
     backgroundColor: '#0E0E14',
     boxShadow: shadows.glowGold,
   },

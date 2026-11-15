@@ -56,7 +56,7 @@ const styles = themedStyles(() => ({
   card: { gap: spacing.xs, padding: spacing.md, overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   check: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
-  title: { ...typography.subtitle, fontSize: 16, lineHeight: 24, color: colors.goldLight, flex: 1, textAlign: textStart },
+  title: { ...typography.subtitle, fontSize: 16, lineHeight: 24, color: colors.goldLightText, flex: 1, textAlign: textStart },
   codePill: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radii.pill, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.gold, backgroundColor: colors.goldSoft },
   code: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 22, color: colors.gold, letterSpacing: 1.5 },
   line: { ...typography.body, fontSize: 15, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },

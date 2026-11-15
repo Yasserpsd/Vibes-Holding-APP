@@ -17,6 +17,7 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const SEEN_KEY = 'investorsclub.adminPopups.seen';
 const SEEN_MAX = 60;
+const QUIET_PREFIXES = ['/auth', '/welcome', '/profile-edit', '/phone-confirm', '/checkout', '/payment', '/form', '/watch'];
 
 /**
  * M232 (owner: «أقدر أضيف بوب اب من داشبورد»): a popup the management published from the dashboard («أدوات التواصل»).
@@ -26,7 +27,8 @@ const SEEN_MAX = 60;
 export function AdminPopup() {
   const { status, me } = useAuth();
   const pathname = usePathname();
-  const quiet = pathname.startsWith('/auth') || pathname.startsWith('/phone-confirm');
+  // Never over the sign-up flow (a guest's gate included), a form, a checkout or payment, or the fullscreen player.
+  const quiet = QUIET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   const popups = usePopups(status === 'signedIn' && me ? String(me.id) : 'guest', status !== 'loading').data?.popups;
   /** Ids this device already showed; null until the stored list loads (nothing opens before it). */
   const [seen, setSeen] = useState<string[] | null>(null);
@@ -73,7 +75,7 @@ export function AdminPopup() {
   const link = open.link;
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={close}>
+    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={close}>
       <View style={styles.backdrop}>
         <PopIn style={styles.wrap}>
           <GlassCard golden radius={radii.xxl} style={styles.card}>
@@ -103,7 +105,8 @@ export function AdminPopup() {
 const styles = themedStyles(() => ({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.overlay },
   wrap: { width: '100%', maxWidth: 380, maxHeight: '86%' },
-  card: { padding: spacing.lg, gap: spacing.sm, alignItems: 'stretch' },
+  // flexShrink: a long body scrolls inside the card; without it the card outgrew the wrapper and pushed «إغلاق» off the screen.
+  card: { padding: spacing.lg, gap: spacing.sm, alignItems: 'stretch', flexShrink: 1 },
   content: { gap: spacing.sm },
   image: { width: '100%', aspectRatio: 16 / 9, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   title: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: colors.textPrimary, textAlign: 'center' },

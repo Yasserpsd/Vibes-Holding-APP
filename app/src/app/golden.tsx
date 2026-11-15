@@ -15,6 +15,7 @@ import { StateView } from '@/components/StateView';
 import { GoldSweep } from '@/components/wow';
 import { t } from '@/i18n';
 import { formatMillionsSar, formatNumber } from '@/lib/format';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -60,7 +61,7 @@ export default function GoldenScreen() {
           >
             <View style={styles.logoBox}>
               <Image
-                source={{ uri: content.umbrella.logoUrl }}
+                source={{ uri: sized(content.umbrella.logoUrl, 120) }}
                 style={styles.logo}
                 resizeMode="contain"
                 accessibilityLabel={content.umbrella.name}
@@ -86,6 +87,7 @@ export default function GoldenScreen() {
         </GlassCard>
       </FadeInView>
 
+      {companies.length === 0 ? <Text style={styles.empty}>{t('golden.empty')}</Text> : null}
       {companies.map((company, index) => (
         <FadeInView key={company.code} delay={140 + entranceDelay(index, 70)}>
           <GoldenCompanyCard company={company} />
@@ -131,6 +133,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.goldSoft,
   },
   valueLabel: { ...typography.caption, color: colors.textMuted },
-  valueText: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.goldLight },
+  valueText: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 28, color: colors.goldLightText },
+  empty: { ...typography.body, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.lg },
   disclaimer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.md },
 }));
