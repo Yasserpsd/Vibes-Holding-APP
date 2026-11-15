@@ -4,6 +4,7 @@ import { after, before, test } from 'node:test';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { GOLDEN_SEED, ensureGoldenSeed } from './content/golden.js';
+import { MOCK_CODE } from './hub/mock.js';
 import { SNAPSHOT_KEY } from './projectsBank/service.js';
 import type { FeedSnapshot, PublicProject } from './projectsBank/types.js';
 import { MemoryKV } from './store.js';
@@ -61,10 +62,77 @@ after(async () => {
   await app.close();
 });
 
-test('health reports the cached feed', async () => {
+/** Everything the detailed health answer carries beyond the public three keys. */
+const HEALTH_DETAIL_KEYS = ['storage', 'projectsBank', 'hub', 'news', 'golden', 'videos', 'mail', 'payments', 'membership', 'push', 'uploads', 'backup', 'bridge'];
+
+test('public health says only that the server is up', async () => {
   const res = await app.inject({ method: 'GET', url: '/health' });
   assert.equal(res.statusCode, 200);
-  assert.equal(res.json().projectsBank.count, 3);
+  const body = res.json();
+  assert.deepEqual(Object.keys(body).sort(), ['env', 'ok', 'time']);
+  assert.deepEqual([body.ok, body.env], [true, 'test']);
+  assert.ok(!Number.isNaN(Date.parse(body.time)), body.time);
+  for (const key of HEALTH_DETAIL_KEYS) assert.equal(key in body, false, key);
+});
+
+test('the health detail needs a dashboard session and reports the cached feed', async () => {
+  const guest = await app.inject({ method: 'GET', url: '/api/admin/health' });
+  assert.equal(guest.statusCode, 401);
+  assert.equal(guest.headers['cache-control'], 'no-store');
+
+  // Every verified account of the mock hub is an admin.
+  const registered = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: { name: 'سالم العتيبي', country: 'sa', phone: '0558318731', email: 'health.admin@gmail.com', password: 'secret123', persona: 'neutral', bio: 'حساب إدارة لاختبار حالة الخادم.' },
+  });
+  assert.equal(registered.statusCode, 200, registered.body);
+  const verified = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: registered.json().pendingToken, code: MOCK_CODE } });
+  assert.equal(verified.statusCode, 200, verified.body);
+
+  const res = await app.inject({ method: 'GET', url: '/api/admin/health', headers: { authorization: `Bearer ${verified.json().token as string}` } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal(res.headers['cache-control'], 'no-store');
+  const body = res.json();
+  assert.deepEqual(Object.keys(body).sort(), ['env', 'ok', 'time', ...HEALTH_DETAIL_KEYS].sort());
+  assert.equal(body.projectsBank.count, 3);
+  // The plugin test rig (phase D) reads this field before and after a Projects Bank webhook.
+  assert.equal(body.projectsBank.updatedAt, snapshot.fetchedAt);
+  assert.equal(body.hub.mode, 'mock');
+
+  // The router percent-decodes a path before matching it, so an escaped spelling is the same route:
+  // guarded and no-store all the same (the raw text of the URL is not what decides).
+  const escapedGuest = await app.inject({ method: 'GET', url: '/%61pi/admin/health' });
+  assert.deepEqual([escapedGuest.statusCode, escapedGuest.headers['cache-control']], [401, 'no-store']);
+  const escaped = await app.inject({ method: 'GET', url: '/%61pi/admin/health', headers: { authorization: `Bearer ${verified.json().token as string}` } });
+  assert.equal(escaped.statusCode, 200, escaped.body);
+  assert.equal(escaped.json().hub.mode, 'mock');
+  assert.equal(escaped.headers['cache-control'], 'no-store');
+});
+
+test('an escaped spelling of /api/ stays no-store', async () => {
+  const list = await app.inject({ method: 'GET', url: '/ap%69/projects' });
+  assert.deepEqual([list.statusCode, list.headers['cache-control']], [200, 'no-store']);
+  // No route matched: judged on the decoded path.
+  const unknown = await app.inject({ method: 'GET', url: '/%61pi/nothing-here' });
+  assert.deepEqual([unknown.statusCode, unknown.headers['cache-control']], [404, 'no-store']);
+});
+
+test('HSTS is sent by the deployed service only', async () => {
+  // The test runner, like a local server, answers over plain http: no header anywhere.
+  for (const url of ['/health', '/api/projects', '/pay/return', '/nothing']) {
+    assert.equal((await app.inject({ method: 'GET', url })).headers['strict-transport-security'], undefined, url);
+  }
+
+  // Railway names the public domain of the production and the test deployments alike; both sit behind https.
+  const deployed = (await buildApp({ config: loadConfig({ LOG_LEVEL: 'silent', RAILWAY_PUBLIC_DOMAIN: 'api-test.example.com' }), kv: new MemoryKV() })).app;
+  try {
+    for (const url of ['/health', '/api/projects', '/api/admin/health', '/pay/return', '/nothing']) {
+      assert.equal((await deployed.inject({ method: 'GET', url })).headers['strict-transport-security'], 'max-age=31536000', url);
+    }
+  } finally {
+    await deployed.close();
+  }
 });
 
 test('lists projects newest first with no-store caching', async () => {

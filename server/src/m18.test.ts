@@ -108,7 +108,7 @@ test('with ADMIN_OTP off the dashboard signs in with the hub password alone', as
   const body = res.json();
   assert.equal(body.me.isAdmin, true);
   assert.equal((await get(plainApp, '/api/admin/posts', body.token)).statusCode, 200);
-  assert.equal((await plainApp.inject({ method: 'GET', url: '/health' })).json().hub.adminOtp, 'off');
+  assert.equal((await get(plainApp, '/api/admin/health', body.token)).json().hub.adminOtp, 'off');
 });
 
 test('the password alone gives a challenge, never a session, and the code is only in the mail body', async () => {
@@ -231,12 +231,15 @@ test('the live hub without SMTP mails the code THROUGH the hub (M112); a hub tha
   try {
     await liveHub.call('register', { uuid: 'app-setup', ip: '127.0.0.1', ...account, job_title: '', page_url: 'app://register' });
     await liveHub.call('verify', { uuid: 'app-setup', code: MOCK_CODE, ip: '127.0.0.1' });
-    // M112: a live hub IS a mail channel (HubMailer), so the OTP no longer reports no_mail…
-    assert.equal((await built.app.inject({ method: 'GET', url: '/health' })).json().hub.adminOtp, 'on');
+    // M112: a live hub IS a mail channel (HubMailer), so the OTP no longer stands at no_mail (that answers
+    // `otp_mail_off`, without trying). The health detail that names the state sits behind the dashboard session,
+    // which nobody can open here, so the sign-in answer is the proof: the send was tried…
     // …but this test hub has no send_mail op, so the send fails and the dashboard still refuses.
     const res = await post(built.app, '/api/admin/auth/login', { login: account.email, password: account.password });
     assert.equal(res.statusCode, 503, res.body);
     assert.equal(res.json().error.code, 'otp_mail_failed');
+    // The public health answer no longer tells a stranger how the second step stands.
+    assert.equal((await built.app.inject({ method: 'GET', url: '/health' })).json().hub, undefined);
   } finally {
     await built.app.close();
   }

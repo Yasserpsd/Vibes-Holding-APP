@@ -216,12 +216,16 @@ test('payments: services are paid through the gateway; only the signed callback 
   const page = await get(`/pay/mock/${third.id}`);
   assert.equal(page.statusCode, 200);
   assert.ok(page.body.includes('بوابة دفع تجريبية') && page.body.includes('15,000'), page.body.slice(0, 200));
+  // Payment pages are never kept by a browser, a proxy or a CDN.
+  assert.equal(page.headers['cache-control'], 'no-store');
   const done = await app.inject({ method: 'POST', url: `/pay/mock/${third.id}/complete`, payload: 'result=success', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
   assert.equal(done.statusCode, 303, done.body);
+  assert.equal(done.headers['cache-control'], 'no-store');
   const location = String(done.headers.location);
   assert.ok(location.startsWith('/pay/return?'), location);
   const back = await get(location);
   assert.equal(back.statusCode, 200);
+  assert.equal(back.headers['cache-control'], 'no-store');
   assert.ok(back.body.includes('تم الدفع بنجاح') && back.body.includes('investorsclub-preview://payment/'), back.body.slice(0, 300));
   const settled = await get(`/api/payments/${third.id}`, memberToken);
   assert.equal(settled.json().payment.status, 'paid');

@@ -177,6 +177,8 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
   );
 
   // M113b: the company stamp on the invoice (served from the repo; mail clients load it by URL).
+  // The one cacheable answer under /pay/*: it carries no member data. Every page here leaves with
+  // `Cache-Control: no-store`, set for the whole /pay/ prefix by the root hook in app.ts.
   let stamp: Buffer | null = null;
   try {
     stamp = readFileSync(join(process.cwd(), 'assets', 'invoice-stamp.png'));

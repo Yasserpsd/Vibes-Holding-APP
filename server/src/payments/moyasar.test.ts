@@ -174,9 +174,52 @@ test('a payment through Moyasar records the invoice and the per-payment callback
   const page = await get(`/pay/invoice/${paymentId}`);
   assert.equal(page.statusCode, 200);
   assert.ok(page.body.includes(String(paid?.invoiceNo)) && page.body.includes('بيانات البائع'), page.body.slice(0, 300));
+  // The invoice carries the buyer's name and amounts: never kept by a browser, a proxy or a CDN.
+  assert.equal(page.headers['cache-control'], 'no-store');
   // An unpaid payment has no invoice page.
   const { paymentId: unpaid } = await startLinkPayment(5);
-  assert.equal((await get(`/pay/invoice/${unpaid}`)).statusCode, 404);
+  const none = await get(`/pay/invoice/${unpaid}`);
+  assert.equal(none.statusCode, 404);
+  assert.equal(none.headers['cache-control'], 'no-store');
+});
+
+test('every answer under /pay/ is no-store; only the stamp picture, which carries no member data, stays cacheable', async () => {
+  const unknown = await get('/pay/nothing-here');
+  assert.equal(unknown.statusCode, 404);
+  assert.equal(unknown.headers['cache-control'], 'no-store');
+  const stamp = await get('/pay/invoice-stamp.png');
+  assert.equal(stamp.statusCode, 200);
+  assert.equal(stamp.headers['cache-control'], 'public, max-age=86400');
+});
+
+test('an escaped spelling of /pay/ reaches the same pages and stays no-store', async () => {
+  // The router percent-decodes a path before matching it, so /%70ay/... is served by the /pay/... handlers:
+  // the rule follows the matched route, not the raw text of the URL.
+  const { paymentId, invoiceId } = await startLinkPayment(70);
+  fake.invoices.set(invoiceId, { status: 'paid', amount: 7_000, transactionId: 'tr_escaped', failureReason: null });
+  await post(`/api/payments/moyasar/callback?payment=${paymentId}`, { id: invoiceId });
+  await settle();
+  const paid = await built.payments.byId(paymentId);
+  assert.ok(paid?.invoiceNo, 'invoice number assigned');
+
+  const invoice = await get(`/%70ay/invoice/${paymentId}`);
+  assert.equal(invoice.statusCode, 200);
+  assert.ok(invoice.body.includes(String(paid.invoiceNo)), invoice.body.slice(0, 300));
+  assert.equal(invoice.headers['cache-control'], 'no-store');
+
+  const plain = await get(`/pay/return?payment=${paymentId}`);
+  for (const url of [`/%70ay/return?payment=${paymentId}`, `/pa%79/return?payment=${paymentId}`, `/pay/%72eturn?payment=${paymentId}`]) {
+    const page = await get(url);
+    assert.deepEqual([page.statusCode, page.body], [200, plain.body], url);
+    assert.equal(page.headers['cache-control'], 'no-store', url);
+  }
+
+  // No route matched: judged on the decoded path, like the plain spelling.
+  const unknown = await get('/%70ay/nothing-here');
+  assert.deepEqual([unknown.statusCode, unknown.headers['cache-control']], [404, 'no-store']);
+  // The stamp picture keeps its own answer under any spelling.
+  const stamp = await get('/%70ay/invoice-stamp.png');
+  assert.deepEqual([stamp.statusCode, stamp.headers['cache-control']], [200, 'public, max-age=86400']);
 });
 
 test('an amount mismatch from the API fails the payment instead of paying it', async () => {
@@ -193,6 +236,7 @@ test('the return page confirms a pending Moyasar payment against the API before 
   const page = await get(`/pay/return?payment=${paymentId}`);
   assert.equal(page.statusCode, 200);
   assert.ok(page.body.includes('تم الدفع بنجاح'), page.body.slice(0, 400));
+  assert.equal(page.headers['cache-control'], 'no-store');
   assert.equal((await built.payments.byId(paymentId))?.status, 'paid');
 });
 
@@ -207,6 +251,8 @@ test('a permanent link mints a fresh invoice per visitor and every sale settles 
   const second = await get(`/pay/link/${link.id}`);
   assert.deepEqual([first.statusCode, second.statusCode], [302, 302]);
   assert.notEqual(first.headers.location, second.headers.location);
+  // A kept redirect would hand every visitor the same invoice.
+  assert.equal(first.headers['cache-control'], 'no-store');
 
   // The second visitor pays: that sale settles by itself and stamps the link.
   const invoiceId = String(second.headers.location).split('/').at(-1) ?? '';
@@ -219,6 +265,7 @@ test('a permanent link mints a fresh invoice per visitor and every sale settles 
 
   const missing = await get('/pay/link/00000000-0000-4000-8000-000000000000');
   assert.equal(missing.statusCode, 404);
+  assert.equal(missing.headers['cache-control'], 'no-store');
 });
 
 test('a callback that names nothing known answers ok and settles nothing', async () => {

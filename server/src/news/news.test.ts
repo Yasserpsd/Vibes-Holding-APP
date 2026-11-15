@@ -178,7 +178,16 @@ test('refresh keeps only verified, on-topic items and reports source failures', 
   assert.equal(status.decisions, 1);
   assert.equal(status.sources.find((source) => source.id === 'broken')?.ok, false);
   assert.equal(status.sources.find((source) => source.id === 'off'), undefined);
-  const health = await app.inject({ method: 'GET', url: '/health' });
+  // The health detail is for the dashboard's admins (every verified mock-hub account is one).
+  const register = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: { name: 'ماجد الحربي', country: 'sa', phone: '0558318741', email: 'news.health@gmail.com', password: 'secret1', persona: 'neutral', bio: 'حساب إدارة لاختبار حالة الأخبار' },
+  });
+  const verify = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { pendingToken: register.json().pendingToken, code: '123456' } });
+  assert.equal(verify.statusCode, 200, verify.body);
+  const health = await app.inject({ method: 'GET', url: '/api/admin/health', headers: { authorization: `Bearer ${verify.json().token as string}` } });
+  assert.equal(health.statusCode, 200, health.body);
   assert.equal(health.json().news.visible, 3);
 });
 

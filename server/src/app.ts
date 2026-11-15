@@ -13,6 +13,7 @@ import { agendaRoutes } from './agenda/routes.js';
 import { AgendaService } from './agenda/service.js';
 import { analyticsRoutes } from './analytics/routes.js';
 import { AnalyticsService, type EventKey } from './analytics/service.js';
+import { dashboardGuard, guard } from './auth/guard.js';
 import { authRoutes } from './auth/routes.js';
 import { backupRoutes } from './backup/routes.js';
 import { BackupService } from './backup/service.js';
@@ -168,6 +169,21 @@ function trimOrigin(value: string): string {
   return origin;
 }
 
+/** Paths whose answers no browser, proxy or CDN may keep: the API and the payment pages. */
+function neverStored(path: string): boolean {
+  return path.startsWith('/api/') || path.startsWith('/pay/');
+}
+
+/** A request URL's path as the router reads it: without the query, percent-escapes decoded. */
+function routedPath(url: string): string {
+  const path = url.split('?', 1)[0] ?? url;
+  try {
+    return decodeURI(path);
+  } catch {
+    return path;
+  }
+}
+
 export type BuiltApp = { app: FastifyInstance; projects: ProjectsService; golden: GoldenOffersService; news: NewsService; videos: VideosService; payments: PaymentsService; notifier: Notifier; membership: MembershipService; push: PushService; media: MediaService; sync: SyncService; dashboard: DashboardService; feed: FeedService; analytics: AnalyticsService; companion: CompanionService; marketAlerts: MarketAlertsService; englishSweep: EnglishSweep; postsEnglish: PostsEnglish; projectsEnglish: ProjectsEnglish };
 
 const MEGABYTE = 1024 * 1024;
@@ -184,9 +200,17 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M165: JSON answers travel compressed (the registration config alone is 35 KB plain); phones ask for gzip by themselves.
   await app.register(compress, { global: true, threshold: 1024, encodings: ['gzip', 'deflate'] });
 
-  // API responses are never cached by CDNs or proxies (CLAUDE.md rule 8).
+  // API responses are never cached by CDNs or proxies (CLAUDE.md rule 8), and neither are the payment pages under
+  // /pay/* (an invoice carries a member's name and amounts, the return page a payment id). A handler that sets its
+  // own cache-control afterwards wins: only the invoice stamp picture does.
+  // The deployed service (production and test, both behind https; same marker as the bucket rules below) also tells
+  // browsers to stay on https. A local server and the test runner answer over plain http and never send it.
+  const deployed = Boolean(config.RAILWAY_PUBLIC_DOMAIN);
   app.addHook('onRequest', async (request, reply) => {
-    if (request.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
+    if (deployed) reply.header('strict-transport-security', 'max-age=31536000');
+    // Judged on the route that matched (the router percent-decodes a path first, so /%70ay/return is /pay/return and
+    // the raw text alone could be dodged), and on the decoded path for the answers no route matched (unknown 404s).
+    if (neverStored(request.routeOptions.url ?? '') || neverStored(routedPath(request.url))) reply.header('cache-control', 'no-store');
   });
 
   // M195: the forced-update floor (dashboard value or MIN_APP_VERSION) — an app binary below it gets 426 on every
@@ -413,7 +437,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
       forcePathStyle: config.S3_FORCE_PATH_STYLE === '1',
       log: app.log,
     });
-    // The dashboard's browsers send files straight to the bucket; not awaited, a failure shows in /health.
+    // The dashboard's browsers send files straight to the bucket; not awaited, a failure shows in /api/admin/health.
     // Only the deployed service writes the rules: a local server pointed at the same bucket must not replace them.
     void bucket.allowOrigins(config.RAILWAY_PUBLIC_DOMAIN ? [...adminOrigins] : []);
     mediaStore = bucket;
@@ -588,7 +612,12 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   backup.start();
   app.addHook('onClose', async () => backup.stop());
 
-  app.get('/health', async () => ({
+  // Public liveness answer (Railway's healthcheck, uptime probes): nothing about how the server is set up.
+  app.get('/health', async () => ({ ok: true, env: config.APP_ENV, time: new Date().toISOString() }));
+
+  // The operational detail (hub, mail, payments, push, uploads, backup, bridges) is for the dashboard's admins only.
+  const requireDashboard = dashboardGuard(auth);
+  const healthDetail = () => ({
     ok: true,
     env: config.APP_ENV,
     storage: config.DATABASE_URL ? 'postgres' : 'memory',
@@ -626,7 +655,15 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     backup: backup.getStatus(),
     // Versions of the hub and Projects Bank bridges as last checked (the check runs in the background).
     bridge: { ...dashboard.bridgeKnown(), pbMode: pbBridge.mode, brief: brief.mode, hubWebhook: Boolean(config.HUB_WEBHOOK_SECRET) },
-  }));
+  });
+  app.get(
+    '/api/admin/health',
+    guard(async (request, reply) => {
+      const admin = await requireDashboard(request, reply);
+      if (!admin) return;
+      return healthDetail();
+    }),
+  );
 
   // M109i: the complete-profile gate over every booking/registration starter (admins exempt).
   registerProfileGate(app, auth);

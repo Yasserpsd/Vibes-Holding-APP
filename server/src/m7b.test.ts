@@ -102,7 +102,8 @@ test('store settings: public keys and product ids for the app, secrets stay out'
     restCheck: true,
   });
   assert.ok(!store.body.includes('sk_test'));
-  const health = await get('/health');
+  // Every mock-hub account is an admin: the health detail answers the member's own session.
+  const health = await get('/api/admin/health', memberToken);
   assert.deepEqual(health.json().membership.store, { android: true, ios: false, product: 'club_membership_annual', entitlement: 'membership', restCheck: true });
   assert.equal(health.json().push.tokens, 0);
 });
@@ -172,7 +173,7 @@ test('HQ decision and payment result reach the member as push notifications', as
   assert.deepEqual([dropped.json().sent, dropped.json().failed, dropped.json().dropped], [0, 1, 1]);
   assert.equal((await get('/api/admin/push/tokens', memberToken)).json().total, 0);
   ticketFor = () => ({ status: 'ok', id: 'ticket' });
-  assert.equal((await get('/health')).json().push.lastError, 'DeviceNotRegistered');
+  assert.equal((await get('/api/admin/health', memberToken)).json().push.lastError, 'DeviceNotRegistered');
 });
 
 test('store purchase: webhook retries and the app sync never activate twice; the member gets a push', async () => {

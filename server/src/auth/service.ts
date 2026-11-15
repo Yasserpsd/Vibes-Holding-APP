@@ -964,6 +964,20 @@ export class AuthService {
     }
   }
 
+  /**
+   * M241: the Google / Apple twin of `passwordMatches`, for the account that never had a password its owner knows.
+   * Sign-in maps a provider identity to its hub account by the provider-verified e-mail alone (`social_login` finds the
+   * contact by that e-mail, see `socialLogin`), so a verified token stands for THIS account only when its e-mail is the
+   * account's own. The account is re-read through its own session and the hub is never asked to sign the identity in:
+   * this check cannot create, verify or touch any account — an identity of another account, or of none, does not match.
+   */
+  async socialProofMatches(session: SessionRecord, identity: SocialIdentity): Promise<boolean> {
+    // Same rule as sign-in: an e-mail the provider does not vouch for maps to no account.
+    if (!identity.emailVerified) return false;
+    const own = (await this.me(session, true)).email.trim().toLowerCase();
+    return own.length > 0 && own === identity.email.trim().toLowerCase();
+  }
+
   async deleteAccount(token: string, session: SessionRecord, password: string): Promise<void> {
     await this.deps.hub.call('delete_account', { uuid: session.uuid, password });
     this.meCache.delete(session.uuid);

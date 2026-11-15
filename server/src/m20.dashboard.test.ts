@@ -89,7 +89,7 @@ after(async () => {
   await app.close();
 });
 
-const READS = ['/api/admin/home', '/api/admin/accounts', '/api/admin/accounts/1', '/api/admin/hub-payments', '/api/admin/tickets', '/api/admin/leads', '/api/admin/threads', '/api/admin/threads/1', '/api/admin/mail', '/api/admin/audit'];
+const READS = ['/api/admin/home', '/api/admin/accounts', '/api/admin/accounts/1', '/api/admin/hub-payments', '/api/admin/tickets', '/api/admin/leads', '/api/admin/threads', '/api/admin/threads/1', '/api/admin/mail', '/api/admin/audit', '/api/admin/health'];
 const WRITES = ['/api/admin/accounts/1/grant', '/api/admin/accounts/1/role', '/api/admin/accounts/1/pb-grant', '/api/admin/threads/1/reply'];
 
 test('every dashboard route needs a hub admin session and answers no-store', async () => {
@@ -118,6 +118,10 @@ test('with ADMIN_OTP on, a session without the e-mailed code is refused', async 
   const res = await guarded.inject({ method: 'GET', url: '/api/admin/home', headers: { authorization: `Bearer ${adminToken}` } });
   assert.equal(res.statusCode, 403);
   assert.equal(res.json().error.code, 'otp_required');
+  // The health detail sits behind the same guard.
+  const health = await guarded.inject({ method: 'GET', url: '/api/admin/health', headers: { authorization: `Bearer ${adminToken}` } });
+  assert.equal(health.statusCode, 403);
+  assert.equal(health.json().error.code, 'otp_required');
   await guarded.close();
 });
 
@@ -152,7 +156,7 @@ test('home: hub stats with a zero-filled daily series, app payments, store, push
   const before = hub.count('admin_stats');
   await get('/api/admin/home?days=14', adminToken);
   assert.equal(hub.count('admin_stats'), before);
-  const health = (await app.inject({ method: 'GET', url: '/health' })).json();
+  const health = (await get('/api/admin/health', adminToken)).json();
   assert.equal(health.bridge.hub.version, MOCK_HUB_VERSION);
   assert.equal(health.bridge.pbMode, 'mock');
 });

@@ -8,7 +8,7 @@ import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { mobileRule } from '../hub/countries.js';
 import { COUNTRIES, EMAIL_POLICY_TEXT, GENERIC_PATTERN, PHONE_POLICY_TEXT } from '../hub/phone.js';
-import { dashboardGuard, guard, parse, sessionGuard } from './guard.js';
+import { dashboardGuard, guard, parse, RequestError, sessionGuard } from './guard.js';
 import type { Mailer } from '../mail/mailer.js';
 import type { PushService } from '../push/service.js';
 import { DELETION_GRACE_DAYS, type AccountDeletionStore } from './deletion.js';
@@ -20,7 +20,8 @@ import { RateLimiter } from './rateLimit.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { maskNumber } from './phoneCode.js';
 import { ACTION_CODE_CAPABILITY, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
-import type { SocialVerifier } from './social.js';
+import type { SessionRecord } from './sessions.js';
+import type { SocialIdentity, SocialVerifier } from './social.js';
 
 export type AuthRoutesOptions = {
   service: AuthService;
@@ -142,7 +143,30 @@ const profileSchema = z
   })
   .partial();
 // M79: the deliberate delete flow sends WHY (a picked reason or the member's own words) so the owner learns from it.
-const deleteSchema = z.object({ password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), reason: z.string().trim().max(500).optional() });
+// M241: an account born from Google / Apple has no password its owner knows, so the proof may be a fresh provider
+// token instead — the very body of `POST /api/auth/social`, under `social`. One of the two is required.
+// The proof that does not decide is inert, whatever a screen serialises in its key: beside a typed password `social`
+// is dropped unread (as every extra key was before M241), and an empty or null password beside a proof counts as absent.
+const oneProof = (raw: unknown): unknown => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const { password, social, ...rest } = raw as Record<string, unknown>;
+  if (typeof password === 'string' && password !== '') return { ...rest, password };
+  if (social !== undefined && social !== null && (password === undefined || password === null || password === '')) return { ...rest, social };
+  return raw;
+};
+const deleteSchema = z.preprocess(
+  oneProof,
+  z
+    .object({
+      password: z.string().min(1, 'كلمة المرور مطلوبة').max(200).optional(),
+      social: socialSchema.optional(),
+      reason: z.string().trim().max(500).optional(),
+    })
+    .refine((body) => body.password !== undefined || body.social !== undefined, {
+      message: 'أدخل كلمة المرور أو أكّد هويتك بحساب جوجل أو أبل',
+      path: ['password'],
+    }),
+);
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
 export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp }) => {
@@ -186,6 +210,31 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     return true;
   };
   const requireSession = sessionGuard(service);
+
+  /**
+   * M241: what opens the deletion steps. A typed password is checked the way it always was. Without one, the fresh
+   * Google / Apple token is verified exactly as at sign-in (signature, issuer, audience, expiry) and must belong to the
+   * signed-in account itself; an identity of another account, or of no account, is refused and nothing is ever created.
+   */
+  const proveOwner = async (session: SessionRecord, body: z.infer<typeof deleteSchema>): Promise<void> => {
+    if (body.password !== undefined) {
+      if (!(await service.passwordMatches(session, body.password))) throw new RequestError('bad_password', 'كلمة المرور غير صحيحة', 403);
+      return;
+    }
+    if (!body.social) throw new RequestError('invalid', 'أدخل كلمة المرور أو أكّد هويتك بحساب جوجل أو أبل', 400);
+    let identity: SocialIdentity;
+    try {
+      identity = await social.verify(body.social.provider, body.social.token);
+    } catch (error) {
+      // The app treats every 401 that carries its session token as a dead session and signs the member out;
+      // a refused proof is not that, so the verifier's code and message travel with a 403 here.
+      if (error instanceof RequestError && error.status === 401) throw new RequestError(error.code, error.message, 403);
+      throw error;
+    }
+    if (!(await service.socialProofMatches(session, identity))) {
+      throw new RequestError('social_mismatch', 'هذا الحساب لا يطابق حسابك في النادي — أكّد بحساب جوجل أو أبل الذي تسجّل به الدخول', 403);
+    }
+  };
 
   app.get('/api/auth/config', async (request) => ({
     countries: COUNTRIES.map((country) => ({
@@ -738,13 +787,15 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (!auth) return;
       const body = parse(deleteSchema, request.body, reply);
       if (!body) return;
+      // M241: the hub's instant deletion takes the password itself, so a provider proof needs the scheduled flow.
+      if (!deletion && body.password === undefined) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      // M241: verifying a token can reach the provider's key server, so the proof shares the three-step route's limit.
+      if (body.password === undefined && limited('delete-start', 10, request, reply)) return;
       const me = await service.me(auth.session);
-      if (!(await service.passwordMatches(auth.session, body.password))) {
-        return reply.code(403).send({ error: { code: 'bad_password', message: 'كلمة المرور غير صحيحة' } });
-      }
+      await proveOwner(auth.session, body);
       if (!deletion) {
         // Old tests without the store keep the original instant behaviour.
-        await service.deleteAccount(auth.token, auth.session, body.password);
+        await service.deleteAccount(auth.token, auth.session, body.password ?? '');
         notifier?.accountDeletionRequested({ email: me.email, name: me.name, phone: me.phone, note: body.reason ?? '', ip: request.ip });
         return { ok: true };
       }
@@ -772,9 +823,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (await deletion.statusOf(me.id)) {
         return reply.code(409).send({ error: { code: 'already_scheduled', message: 'حذف حسابك مجدول بالفعل' } });
       }
-      if (!(await service.passwordMatches(auth.session, body.password))) {
-        return reply.code(403).send({ error: { code: 'bad_password', message: 'كلمة المرور غير صحيحة' } });
-      }
+      await proveOwner(auth.session, body);
       // M122: the deletion code mail follows the app language the request came in.
       const en = langOf(request) === 'en';
       let via: 'whatsapp' | 'email' = 'email';

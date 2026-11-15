@@ -258,6 +258,7 @@ test('videos: the channel feed fills the library, curated picks come first, blur
   assert.equal((await get('/api/videos/bad')).statusCode, 400);
   assert.equal((await get('/api/videos/AAAAAAAAAAA')).statusCode, 404);
 
-  const health = await get('/health');
+  // Every mock-hub account is an admin: the health detail answers the member's own session.
+  const health = await get('/api/admin/health', memberToken);
   assert.equal(health.json().videos.count, 2);
 });
