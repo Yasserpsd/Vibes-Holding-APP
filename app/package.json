@@ -52,6 +52,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "doctor": "expo-doctor",
+    "ota": "node --use-system-ca scripts/ota-all.mjs",
+    "ota:check": "node --use-system-ca scripts/ota-all.mjs --check",
     "postinstall": "patch-package"
   },
   "private": true
