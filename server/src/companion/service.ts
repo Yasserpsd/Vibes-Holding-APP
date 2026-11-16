@@ -284,7 +284,8 @@ export class CompanionService {
     const goldenPick = golden.companies.length ? golden.companies[index % golden.companies.length] : null;
     const bank = this.deps.projects.list({ sort: 'discover', page: 1, limit: 12, day: index });
     const bankPick = bank.items.length ? bank.items[index % bank.items.length] : null;
-    const nextEvent = (await this.deps.agenda.forViewer(null, 'ar', now)).find((event) => !event.past) ?? null;
+    // A closed event (a cancelled workshop stays on the agenda, closed) is never the day's «next event».
+    const nextEvent = (await this.deps.agenda.forViewer(null, 'ar', now)).find((event) => !event.past && event.open) ?? null;
 
     const context: Context = {
       golden: goldenPick?.name ?? null,
