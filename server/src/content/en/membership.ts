@@ -146,5 +146,5 @@ export const MEMBERSHIP_EN: Translation<MembershipContent> = {
     active: 'Your membership is active.',
     expired: 'Your membership has ended; please renew your membership.',
   },
-  activationNote: 'Subscribing to the annual membership from inside the app arrives with the next release through the app store.',
+  activationNote: 'You can subscribe to the annual membership from inside the app through the app store.',
 };

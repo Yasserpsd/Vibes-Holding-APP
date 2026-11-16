@@ -225,9 +225,10 @@ export const MEMBERSHIP_SEED: MembershipContent = {
     active: 'عضويتك فعّالة.',
     expired: 'انتهت عضويتك، يرجى تجديدها.',
   },
-  activationNote: 'الاشتراك في العضوية السنوية من داخل التطبيق يتوفر مع الإصدار القادم عبر متجر التطبيقات.',
-  version: 9,
-  updatedAt: '2026-11-02T00:00:00.000Z',
+  // M241 (owner, 2026-11-16): the in-app subscription is live since 1.3.4, so the note no longer says «next release».
+  activationNote: 'يمكنك الاشتراك في العضوية السنوية من داخل التطبيق عبر متجر التطبيقات.',
+  version: 10,
+  updatedAt: '2026-11-16T00:00:00.000Z',
 };
 
 /** Writes the seed when no membership content exists yet, or when the stored seed is older than this one. */
