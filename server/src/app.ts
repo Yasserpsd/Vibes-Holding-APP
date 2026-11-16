@@ -111,6 +111,7 @@ import { registerProfileGate } from './profiles/gate.js';
 import { profilesRoutes } from './profiles/routes.js';
 import { ProfilesService } from './profiles/service.js';
 import { PostsHubSync } from './posts/hubSync.js';
+import { PostOpens } from './posts/opens.js';
 import { postsRoutes } from './posts/routes.js';
 import { PostsService, postMediaUrls } from './posts/service.js';
 import { companionRoutes } from './companion/routes.js';
@@ -368,6 +369,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M180: every admin message in English (title, body, links, poll options), whichever way it was written.
   const postsEnglish = new PostsEnglish({ service: posts, translator, log: app.log });
   const polls = new PollsService(kv);
+  const postOpens = new PostOpens(kv, async () => (await posts.listAll()).map((post) => post.id));
   const markets = new MarketsService({ log: app.log, fetchImpl });
   const advisor = new AdvisorService({ hub: hubClient, projects, news, kv, log: app.log, posts, videos, markets, ratingOf: (id) => ratings.summary(id) });
   // Management notifications: the hosting mailbox (SMTP) with the hub's HTTPS wp_mail channel as
@@ -593,7 +595,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // the project brief, the websites' feed and the hub hand-over of published posts.
   // M117: the three-step, 30-day account deletion; the due-day sweep (below) mails the management to execute.
   const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier, deletion });
+  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier, deletion, postOpens });
   const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
   const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
   // M170 «مشروع اليوم»: one AI-chosen project a day to every device, at/after 12:00 Riyadh; the tick retries until it goes out.
@@ -789,7 +791,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     const found = await hubClient.call('member_status', { contact_id: contactId });
     return found.contact?.id === contactId && isHonorary(found.contact);
   });
-  await app.register(postsRoutes, { service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, persona, ref) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, persona, ref }) });
+  await app.register(postsRoutes, { opens: postOpens, service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, persona, ref) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, persona, ref }) });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests, legacy });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
   const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER

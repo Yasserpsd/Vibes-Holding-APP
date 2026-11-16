@@ -12,9 +12,10 @@ import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
 import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
+import type { PostOpens } from './opens.js';
 import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void };
+export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -84,13 +85,13 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { opens, service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
   /** Who is reading: a guest — or a member the hub cannot confirm right now — sees only what is for everyone (M29). */
-  const viewerOf = async (request: FastifyRequest): Promise<PostViewer> => {
-    const current = await maybeSession(request);
+  const viewerOf = async (request: FastifyRequest): Promise<PostViewer> => viewerFrom(await maybeSession(request));
+  const viewerFrom = (current: Awaited<ReturnType<typeof maybeSession>>): PostViewer => {
     if (!current?.me) return null;
     const me = current.me;
     return { contactId: me.id, persona: me.persona, honorary: me.membership.kind === 'honorary', name: firstName(me.name), nameEn: firstName(me.en?.name) };
@@ -216,9 +217,12 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const params = parse(idSchema, request.params, reply);
       if (!params) return;
       const post = await service.get(params.id);
-      const viewer = await viewerOf(request);
+      const current = await maybeSession(request);
+      const viewer = viewerFrom(current);
       // A targeted post answers the wrong viewer exactly like a missing one: its existence is private too.
       if (!post || post.status !== 'published' || !canSee(post, viewer)) return reply.code(404).send(NOT_FOUND);
+      // M243: the member opened the message — recorded for the dashboard, never awaited by the reader.
+      if (current?.me) void opens?.record(post.id, { contactId: current.me.id, name: current.me.name ?? '', persona: current.me.persona ?? '' });
       return { post: await viewerPost(post, viewer, langOf(request)) };
     }),
   );
@@ -252,7 +256,24 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const posts = await Promise.all(
         listed.map(async (post) => (post.kind === 'poll' ? { ...post, pollResults: await polls.view(post, null, admin.level === 'admin') } : post)),
       );
-      return { posts, devices: (await push.summary()).total };
+      // M243: how many members opened each message; the names wait behind /api/admin/posts/:id/opens.
+      const opened = opens ? await opens.counts(posts.map((post) => post.id)) : {};
+      return { posts: posts.map((post) => ({ ...post, opened: opened[post.id] ?? 0 })), devices: (await push.summary()).total };
+    }),
+  );
+
+  /** M243: the members who opened one message, latest first. Names are the admin's only, like the poll voters. */
+  app.get(
+    '/api/admin/posts/:id/opens',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      if (admin.level !== 'admin') return reply.code(403).send({ error: { code: 'admins_only', message: 'أسماء من فتحوا الرسالة متاحة للمدير فقط' } });
+      const post = await service.get(params.id);
+      if (!post) return reply.code(404).send(NOT_FOUND);
+      return { opens: opens ? await opens.list(post.id) : [] };
     }),
   );
 
@@ -328,6 +349,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (!(await service.remove(params.id))) return reply.code(404).send(NOT_FOUND);
       await dropUnused(post, null);
       if (isPoll(post)) await polls.remove(post.id);
+      await opens?.forget(post.id);
       await hubSync.removed(post, admin.session.uuid);
       await sync.bump('posts');
       return { ok: true };

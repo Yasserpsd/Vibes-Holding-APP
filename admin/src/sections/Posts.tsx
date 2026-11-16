@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type Post, type PostAudience } from '../api';
+import { api, type Post, type PostAudience, type PostOpen } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
 import { personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
@@ -52,6 +52,65 @@ function PollResults({ post }: { post: Post }) {
         {results.closesAt ? ` · ${results.closed ? 'أُغلق' : 'يُغلق'} ${formatEventDate(results.closesAt)}` : ''}
         {results.resultsVisible ? '' : ' · النتائج للوحة فقط'}
       </span>
+    </div>
+  );
+}
+
+/** Arabic counting: one, two, 3–10 (plural), 11 and over (singular accusative). */
+function counted(count: number, [one, two, few, many]: [string, string, string, string]): string {
+  if (count === 1) return one;
+  if (count === 2) return two;
+  return `${formatNumber(count)} ${count % 100 >= 3 && count % 100 <= 10 ? few : many}`;
+}
+
+/**
+ * M243 (owner: «اعرف مين فتح المقال ... واقدر اضغط علي العضو اشوف مين ده»): how many members opened the message; the
+ * admin unfolds the names (latest first) and a name opens the member's sheet. A moderator sees the number only.
+ */
+function Opens({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
+  const { openMember } = useShell();
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<PostOpen[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (post.status !== 'published' || post.kind === 'popup') return null;
+  const count = post.opened ?? 0;
+  const label = count === 0 ? 'لم يفتحها أي عضو بعد' : `فتحها ${counted(count, ['عضو واحد', 'عضوان', 'أعضاء', 'عضوًا'])}`;
+  if (!isAdmin || count === 0) return <p className="muted">👁 {label}</p>;
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (!next) return;
+    setError(null);
+    try {
+      setRows((await api.postOpens(post.id)).opens);
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  return (
+    <div className="post-opens">
+      <button type="button" className="link" onClick={() => void toggle()} aria-expanded={open}>
+        👁 {label} · {open ? 'إخفاء الأسماء' : 'عرض الأسماء'}
+      </button>
+      {open && error ? <p className="muted">{error}</p> : null}
+      {open && !error && rows === null ? <p className="muted">جارٍ التحميل…</p> : null}
+      {open && rows ? (
+        <ul className="list">
+          {rows.map((row) => (
+            <li key={row.contactId}>
+              <button type="button" className="list-row" onClick={() => openMember(row.contactId)}>
+                <span className="list-main">
+                  <strong>{row.name || `حساب رقم ${row.contactId}`}</strong>
+                  <span className="muted">
+                    {personaLabel(row.persona) || 'بدون فئة'} · فتحها {formatDateTime(row.last)}
+                    {row.count > 1 ? ` · ${counted(row.count, ['مرة واحدة', 'مرتان', 'مرات', 'مرة'])} (أول مرة ${formatDateTime(row.first)})` : ''}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -181,6 +240,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 </p>
                 <HubSync post={post} />
                 <PollResults post={post} />
+                <Opens post={post} isAdmin={isAdmin} />
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
                   {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>}

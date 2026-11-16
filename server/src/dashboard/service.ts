@@ -104,7 +104,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore; /** M243: a deleted account leaves the messages' read lists. */ postOpens?: { forgetContact(contactId: number): Promise<void> } };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -514,6 +514,7 @@ export class DashboardService {
       await this.deps.auth.endSessions(contactId);
       await this.deps.push.forgetContact(contactId);
       await this.deps.deletion?.cancel(contactId);
+      await this.deps.postOpens?.forgetContact(contactId);
       this.bust('hub', 'pb');
       if (!result.already) {
         const email = result.email || account.email;

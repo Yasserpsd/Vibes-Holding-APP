@@ -21,6 +21,9 @@ export type TotpSetup = { setupToken: string; secret: string; uri: string; secon
 export type PostLink = { label: string; url: string };
 /** An uploaded video: both values are `url`s the uploads endpoint returned. */
 export type PostVideo = { url: string; poster: string | null };
+/** M243: one member who opened a management message. */
+export type PostOpen = { contactId: number; name: string; persona: string; first: string; last: string; count: number };
+
 export type Post = {
   id: string;
   title: string;
@@ -45,6 +48,8 @@ export type Post = {
   /** M31: the poll behind a `kind: 'poll'` post, and its live counts as the admin list attaches them. */
   poll?: PostPoll | null;
   pollResults?: PollResults | null;
+  /** M243: how many members opened the message in the app (signed-in members only, since M243). */
+  opened?: number;
   /** M232: a popup's last day (a day or an exact time); null = until it is unpublished. */
   popup?: { until: string | null } | null;
   /** How the last hand-over to the hub went: the websites and the assistant hear a post through it. */
@@ -646,6 +651,8 @@ export const api = {
   me: () => call<{ me: Me }>('GET', '/api/me?fresh=1'),
   logout: (token?: string) => call<unknown>('POST', '/api/auth/logout', {}, token),
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
+  /** M243: the members who opened one message, latest first (admins only). */
+  postOpens: (id: string) => call<{ opens: PostOpen[] }>('GET', `/api/admin/posts/${encodeURIComponent(id)}/opens`),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),
   cardRequestStatus: (id: string, status: RequestStatus, note = '') => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/status`, { status, note }),
