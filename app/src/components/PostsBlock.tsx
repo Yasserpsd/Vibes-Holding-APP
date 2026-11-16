@@ -14,7 +14,7 @@ import { sized } from '@/lib/imageUrl';
 import { isPostUnread, markAllPostsRead, useReadPosts } from '@/lib/readPosts';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
-import { withoutMediaLines } from '@/components/StructuredText';
+import { firstImageLine, withoutMediaLines } from '@/components/StructuredText';
 
 export const HOME_POSTS_LIMIT = 3;
 
@@ -31,9 +31,14 @@ export function postPreview(body: string): string {
   return withoutMediaLines(body.replace(GREETING_LINE, ''));
 }
 
-/** First image of the post, else the YouTube thumbnail, else the uploaded video's poster, else nothing. */
+/**
+ * First image of the post, else the first photo placed inside its text (M243), else the YouTube thumbnail, else the
+ * uploaded video's poster, else nothing.
+ */
 function thumbnailOf(post: Post): string | null {
   if (post.images[0]) return post.images[0];
+  const inline = post.body ? firstImageLine(post.body) : null;
+  if (inline) return inline;
   if (post.youtubeId) return `https://img.youtube.com/vi/${post.youtubeId}/hqdefault.jpg`;
   return post.video?.poster || null;
 }

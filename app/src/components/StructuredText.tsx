@@ -42,6 +42,18 @@ export function withoutMediaLines(text: string): string {
     .trim();
 }
 
+/**
+ * M243 (owner: «ليه مش ظاهرة بالصورة مع اني ضايف صورة»): the first photo placed inside the text — the dashboard drops
+ * it in as its own line — so a card can lead with it when the post has no image of its own.
+ */
+export function firstImageLine(text: string): string | null {
+  for (const raw of text.split(/\r?\n/u)) {
+    const line = raw.trim();
+    if (URL_LINE.test(line) && IMAGE_URL.test(line)) return line;
+  }
+  return null;
+}
+
 /** M176: a short line that asks or announces («لماذا لم نحضر؟», «والسبب بسيط:») reads as a sub-heading. */
 const HEADING_MAX = 60;
 

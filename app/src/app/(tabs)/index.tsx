@@ -164,10 +164,10 @@ export default function HomeScreen() {
   const baseOrder: HomeSectionKey[] = [...(variant?.order ?? []), ...DEFAULT_ORDER.filter((key) => !(variant?.order ?? []).includes(key))].filter(
     (key) => !hidden.has(key),
   );
-  // M177 (owner, 2026-11-01): «رسائل الإدارة» right after the golden opportunities (or first), the meetups a few blocks lower.
+  // M243 (owner, 2026-11-16: «رسائل الإدارة تظهر اول شئ في التطبيق قبل الورشة وكل شئ»): the messages left the persona
+  // order — they render at the very top, above the hero (see the return below). The meetups stay a few blocks lower.
   const order: HomeSectionKey[] = baseOrder.filter((key) => key !== 'posts' && key !== 'meetups');
-  if (baseOrder.includes('posts')) order.splice(order.indexOf('opportunity') + 1, 0, 'posts');
-  if (baseOrder.includes('meetups')) order.splice(Math.min(order.length, order.indexOf('posts') + 4), 0, 'meetups');
+  if (baseOrder.includes('meetups')) order.splice(Math.min(order.length, order.indexOf('opportunity') + 4), 0, 'meetups');
   const ctaOf = (key: HomeSectionKey): HomeCta | null => variant?.ctas?.[key] ?? null;
   const pushRoute = (route: string) => router.push(route as Href);
 
@@ -359,6 +359,8 @@ export default function HomeScreen() {
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
       {/* M242 (owner): an unread management message is the first thing on the page, above everything else. */}
       <UnreadMessagesStrip />
+      {/* M243 (owner): «رسائل الإدارة» are the first block of the home, before the workshop and the hero. */}
+      {baseOrder.includes('posts') ? <PostsBlock /> : null}
       {/* M177 (owner): the next workshop, once a day, in the day's AI-written words — the first thing every open shows. */}
       <WorkshopAdPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}

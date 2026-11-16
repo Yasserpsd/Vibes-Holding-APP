@@ -15,7 +15,7 @@ import { isPostUnread, useReadPosts } from '@/lib/readPosts';
 import { themedStyles } from '@/theme/styles';
 import { colors, typography } from '@/theme/tokens';
 
-/** Every «رسائل الإدارة» post, pinned first, then newest; older pages load on demand. M29: it is the member's inbox. */
+/** Every «رسائل الإدارة» post, newest first (M243: a pin keeps its date); older pages load on demand. M29: it is the member's inbox. */
 export default function PostsScreen() {
   const query = usePosts();
   const { me } = useAuth();

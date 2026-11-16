@@ -54,7 +54,7 @@ export type PostsPage = { posts: Post[]; more: boolean };
 
 const PAGE_SIZE = 10;
 
-/** The newest posts for the home block (pinned first, as the server orders them). */
+/** The newest posts for the home block (newest first, as the server orders them since M243). */
 export function useLatestPosts(limit = 3) {
   return useQuery({
     queryKey: ['posts', 'latest', limit],
@@ -64,8 +64,8 @@ export function useLatestPosts(limit = 3) {
 }
 
 /**
- * All posts, paged. The server returns pinned posts on the first page only and pages the rest by
- * `before` = the publish time of the last non-pinned post.
+ * All posts, paged, newest first. M243: a pinned post keeps its own date, so the cursor is simply
+ * `before` = the publish time of the last post on the page.
  */
 export function usePosts() {
   return useInfiniteQuery({
@@ -74,7 +74,7 @@ export function usePosts() {
     initialPageParam: '' as string,
     getNextPageParam: (lastPage) => {
       if (!lastPage.more) return undefined;
-      const last = [...lastPage.posts].reverse().find((post) => !post.pinned && post.publishedAt);
+      const last = [...lastPage.posts].reverse().find((post) => post.publishedAt);
       return last?.publishedAt ?? undefined;
     },
     staleTime: 2 * 60_000,

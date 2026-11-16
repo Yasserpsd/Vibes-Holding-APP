@@ -253,12 +253,16 @@ export class PostsService {
     return this.load();
   }
 
-  /** Published posts the viewer may read: pinned first, then newest; `before` pages by publishedAt. */
+  /**
+   * Published posts the viewer may read, newest first; `before` pages by publishedAt.
+   * M243 (owner, 2026-11-16: «لو في رسالة جديدة هي اللي تظهر في البداية»): a pin no longer jumps the queue — it only
+   * dresses the message as the paper sheet. A pinned post sits at its own date like any other.
+   */
   async listPublished(limit: number, before?: string, viewer: PostViewer = null): Promise<{ posts: Post[]; more: boolean }> {
     // M232: a popup is not a message in the inbox; it opens by itself (listPopups).
     const published = (await this.load()).filter((post) => post.status === 'published' && post.kind !== 'popup' && canSee(post, viewer));
-    const ordered = [...published.filter((post) => post.pinned), ...published.filter((post) => !post.pinned)];
-    const from = before ? ordered.filter((post) => !post.pinned && (post.publishedAt ?? '') < before) : ordered;
+    const ordered = [...published].sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''));
+    const from = before ? ordered.filter((post) => (post.publishedAt ?? '') < before) : ordered;
     return { posts: from.slice(0, limit), more: from.length > limit };
   }
 
