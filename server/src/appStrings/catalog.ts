@@ -1623,7 +1623,11 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "badge.member": "عضو موثّق بعضوية فعّالة",
     "ads.attPrimer.title": "قبل أن تبدأ",
     "ads.attPrimer.body": "سيطلب منك جهازك الآن السماح بالتتبع. موافقتك تساعدنا على معرفة الإعلان الذي عرّفك بالنادي، فنصل إلى المهتمين بعالم الأعمال بتكلفة أقل. يمكنك تغيير اختيارك في أي وقت من إعدادات الجهاز.",
-    "ads.attPrimer.continue": "متابعة"
+    "ads.attPrimer.continue": "متابعة",
+    "ads.consent.title": "مشاركة بياناتك لقياس الإعلانات",
+    "ads.consent.body": "لنعرف أي إعلان عرّفك بالنادي، نشارك مع شريك القياس AppsFlyer رقم عضويتك وبريدك الإلكتروني ورقم جوالك بعد تشفيرها على جهازك. لا نشارك اسمك، ونستخدم ذلك لقياس الإعلانات فقط. إن لم توافق فلن نشارك أيًّا منها، ويعمل التطبيق كاملًا في الحالتين.",
+    "ads.consent.allow": "أوافق",
+    "ads.consent.decline": "لا أوافق"
   },
   "en": {
     "tabs.home": "Home",
@@ -3248,7 +3252,11 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "badge.member": "Verified member with an active membership",
     "ads.attPrimer.title": "Before you start",
     "ads.attPrimer.body": "Your phone will now ask whether to allow tracking. Allowing it helps us know which ad introduced you to the club, so we reach people interested in business at a lower cost. You can change this at any time in your device settings.",
-    "ads.attPrimer.continue": "Continue"
+    "ads.attPrimer.continue": "Continue",
+    "ads.consent.title": "Sharing your details to measure ads",
+    "ads.consent.body": "To know which ad introduced you to the club, we share your membership number, e-mail and mobile number with our measurement partner AppsFlyer, hashed on your device first. We never share your name and use this only to measure ads. If you decline, none of it is shared and the app works fully either way.",
+    "ads.consent.allow": "I agree",
+    "ads.consent.decline": "I do not agree"
   },
   "groups": {
     "tabs": "شريط التبويب السفلي",

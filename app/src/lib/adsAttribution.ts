@@ -13,9 +13,9 @@ import { loadSetting, saveSetting } from '@/lib/deviceStore';
  * 1.3.0 do not contain it: the native registry is checked before the package is required (the same
  * pattern as lib/purchases.ts and auth/social.ts) and every function here is a no-op there, which
  * keeps OTA updates safe. Event names leave the device; the member's numeric id, and since 2026-11-10
- * (owner) the e-mail and mobile HASHED by the SDK (lib/adsUserPii.ts), only after the iOS tracking
- * permission is granted (Android has no such prompt). Never a name. The dev key is a public app key
- * (EXPO_PUBLIC_APPSFLYER_DEV_KEY).
+ * (owner) the e-mail and mobile HASHED by the SDK (lib/adsUserPii.ts), only after the member agreed:
+ * the iOS tracking permission, or on Android (M242, owner 2026-11-16) one in-app question answered once.
+ * Never a name. The dev key is a public app key (EXPO_PUBLIC_APPSFLYER_DEV_KEY).
  */
 
 /** The App Store id of «Investors Club» (public; AppsFlyer needs it on iOS only). */
@@ -95,10 +95,10 @@ function whenActive(): Promise<void> {
 
 /**
  * iOS: the App Tracking Transparency prompt (Arabic + English text in app.config.ts), true only when
- * granted. Android has no such prompt and resolves true at once.
+ * granted. Never used on Android (see askAndroidConsent), where it resolves false.
  */
 async function askTrackingPermission(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return true;
+  if (Platform.OS !== 'ios') return false;
   if (!requireOptionalNativeModule('ExpoTrackingTransparency')) return false;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -119,6 +119,41 @@ async function askTrackingPermission(): Promise<boolean> {
     // Unavailable counts as refused: AppsFlyer still measures without the advertising id.
     return false;
   }
+}
+
+const ANDROID_CONSENT_KEY = 'adsAttribution.androidConsent';
+
+/**
+ * M242 (owner, 2026-11-16): Android had no consent step, so the member id and the hashed e-mail / mobile left the
+ * phone from the first launch. Android now asks ONCE and keeps the answer on the device. A refusal keeps both gates
+ * closed exactly like a refused iOS prompt (installs and anonymous events still count). Unanswered counts as refused
+ * until the member answers, and the question comes back on the next launch.
+ */
+async function askAndroidConsent(): Promise<boolean> {
+  let saved: string | null = null;
+  try {
+    saved = await loadSetting(ANDROID_CONSENT_KEY);
+  } catch {
+    saved = null;
+  }
+  if (saved === 'granted') return true;
+  if (saved === 'denied') return false;
+  await whenActive();
+  return new Promise<boolean>((resolve) => {
+    const answer = (granted: boolean) => {
+      void saveSetting(ANDROID_CONSENT_KEY, granted ? 'granted' : 'denied').catch(() => undefined);
+      resolve(granted);
+    };
+    Alert.alert(
+      t('ads.consent.title'),
+      t('ads.consent.body'),
+      [
+        { text: t('ads.consent.decline'), style: 'cancel', onPress: () => answer(false) },
+        { text: t('ads.consent.allow'), onPress: () => answer(true) },
+      ],
+      { cancelable: false },
+    );
+  });
 }
 
 /**
@@ -198,11 +233,16 @@ export function startAdsAttribution(): Promise<void> {
     };
     let survived: ReturnType<typeof setTimeout> | undefined;
     try {
-      const consent = await askTrackingPermission();
-      customerIdGate.setConsent(consent);
-      piiGate.setConsent(consent);
+      const applyConsent = (allowed: boolean) => {
+        customerIdGate.setConsent(allowed);
+        piiGate.setConsent(allowed);
+      };
+      // iOS: the system prompt must come BEFORE init. Android (M242): the question is asked below, in parallel,
+      // so install attribution never waits for an answer; the gates open only if the member agrees.
+      if (Platform.OS === 'ios') applyConsent(await askTrackingPermission());
       // The guard covers the native calls only (the 1.3.0 (5) crash was inside init).
       if (!(await armLaunchGuard())) return;
+      if (Platform.OS !== 'ios') void askAndroidConsent().then(applyConsent).catch(() => applyConsent(false));
       // Alive 15 s after the native calls, or sent to the background = no launch crash.
       survived = setTimeout(markLaunchOk, 15000);
       const background = AppState.addEventListener('change', (state) => {
