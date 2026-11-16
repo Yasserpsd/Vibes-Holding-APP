@@ -103,10 +103,13 @@ export default function InboxScreen() {
     for (const tip of (tips.data?.tips ?? []).slice(1)) {
       out.push({ id: tip.id, kind: 'tip', title: tip.title, subtitle: tip.body, time: `${tip.day}T11:00:00+03:00`, image: tip.image ?? null, route: tip.route as Href });
     }
-    // Events sort by WHEN they happen (soonest of the upcoming first), everything else by newest.
+    // M244 (owner, 2026-11-16: «رسائل الإدارة ... اول حاجه في البريد الوارد»): the management's messages open the
+    // list, in the server's order (newest first). Events sort by WHEN they happen (soonest of the upcoming first),
+    // everything else by newest.
+    const messages = out.filter((item) => item.kind === 'post');
     const events = out.filter((item) => item.kind === 'event');
-    const rest = out.filter((item) => item.kind !== 'event').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
-    return [...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
+    const rest = out.filter((item) => item.kind !== 'event' && item.kind !== 'post').sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''));
+    return [...messages, ...events.slice(0, 2), ...rest, ...events.slice(2), ...finished];
   }, [posts.data, agenda.data, projects.data, people.data, tips.data, read]);
 
   const loading = posts.isLoading && agenda.isLoading;

@@ -37,11 +37,10 @@ import { WalletCard } from '@/components/WalletCard';
 import { StateView } from '@/components/StateView';
 import { VideoCard } from '@/components/VideoCard';
 import { t } from '@/i18n';
-import { chevronForward, markParagraphs, textDir, textStart } from '@/i18n/direction';
+import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
-import { useUnreadPosts } from '@/lib/readPosts';
 import { markSeen } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -164,10 +163,12 @@ export default function HomeScreen() {
   const baseOrder: HomeSectionKey[] = [...(variant?.order ?? []), ...DEFAULT_ORDER.filter((key) => !(variant?.order ?? []).includes(key))].filter(
     (key) => !hidden.has(key),
   );
-  // M243 (owner, 2026-11-16: «رسائل الإدارة تظهر اول شئ في التطبيق قبل الورشة وكل شئ»): the messages left the persona
-  // order — they render at the very top, above the hero (see the return below). The meetups stay a few blocks lower.
+  // M177 (owner, 2026-11-01): «رسائل الإدارة» right after the golden opportunities (or first), the meetups a few blocks lower.
+  // M244 (owner, 2026-11-16: «اول حاجه لوجو زي ما كان»): the M243 move to the top of the home was a misreading — he
+  // meant the top of «بريد وارد» (news.tsx). The hero leads again and nothing sits above it.
   const order: HomeSectionKey[] = baseOrder.filter((key) => key !== 'posts' && key !== 'meetups');
-  if (baseOrder.includes('meetups')) order.splice(Math.min(order.length, order.indexOf('opportunity') + 4), 0, 'meetups');
+  if (baseOrder.includes('posts')) order.splice(order.indexOf('opportunity') + 1, 0, 'posts');
+  if (baseOrder.includes('meetups')) order.splice(Math.min(order.length, order.indexOf('posts') + 4), 0, 'meetups');
   const ctaOf = (key: HomeSectionKey): HomeCta | null => variant?.ctas?.[key] ?? null;
   const pushRoute = (route: string) => router.push(route as Href);
 
@@ -357,10 +358,6 @@ export default function HomeScreen() {
 
   return (
     <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
-      {/* M242 (owner): an unread management message is the first thing on the page, above everything else. */}
-      <UnreadMessagesStrip />
-      {/* M243 (owner): «رسائل الإدارة» are the first block of the home, before the workshop and the hero. */}
-      {baseOrder.includes('posts') ? <PostsBlock /> : null}
       {/* M177 (owner): the next workshop, once a day, in the day's AI-written words — the first thing every open shows. */}
       <WorkshopAdPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}
@@ -412,50 +409,6 @@ export default function HomeScreen() {
         </View>
       </FadeInView>
     </Screen>
-  );
-}
-
-/**
- * M242 (owner, 2026-11-16: «رسائل الإدارة حاجة مهمة جدا في الأبلكيشن»): the gold strip that crowns the home while a
- * management message is unread. One message: its title, and a tap opens it. Several: their count, and a tap
- * opens «بريد وارد». It leaves by itself once the messages are read (lib/readPosts).
- */
-function UnreadMessagesStrip() {
-  const router = useRouter();
-  const unread = useUnreadPosts();
-  const first = unread[0];
-  if (!first) return null;
-  const single = unread.length === 1;
-  const head = single ? t('inbox.newFromManagement') : t('inbox.newFromManagementCount', { count: unread.length });
-  const open = () => (single ? router.push(`/posts/${first.id}` as Href) : router.navigate('/(tabs)/news' as Href));
-  return (
-    <FadeInView offset={8}>
-      <PressScale onPress={open} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={single ? `${head}: ${first.title}. ${t('inbox.openMessage')}` : head}>
-        <GoldGradient style={styles.unreadStrip}>
-          <Ionicons name="mail-unread" size={22} color={colors.goldInk} />
-          <View style={styles.unreadTexts}>
-            {/* The label has the whole first line to itself and shrinks before it is ever cut: beside the action it
-                read «New message from the m…» in English (final emulator pass, 2026-11-16). */}
-            <Text style={styles.unreadHead} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {head}
-            </Text>
-            {/* Second line: the title (it follows its own letters, one line) and the action at the end. The action
-                barely grows with the system font, so the title keeps the room. */}
-            {single ? (
-              <View style={styles.unreadSecond}>
-                <Text style={[styles.unreadTitle, textDir(first.title)]} numberOfLines={1}>
-                  {markParagraphs(first.title)}
-                </Text>
-                <Text style={styles.unreadCta} numberOfLines={1} maxFontSizeMultiplier={1.1}>
-                  {t('inbox.openMessage')}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Ionicons name={chevronForward()} size={18} color={colors.goldInk} />
-        </GoldGradient>
-      </PressScale>
-    </FadeInView>
   );
 }
 
@@ -685,24 +638,6 @@ const styles = themedStyles(() => ({
   heroDivider: { width: 72, marginTop: spacing.xs, alignSelf: 'center' },
   heroTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: 'center' },
   heroSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-  // M242: the unread-message strip — full gold, ink on gold, at least 48 pt tall.
-  unreadStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 48,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.lg,
-    boxShadow: shadows.glowGold,
-  },
-  unreadTexts: { flex: 1, gap: 1 },
-  unreadHead: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.goldInk, textAlign: textStart },
-  unreadSecond: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  // No flex: the title is as wide as its words (so it starts where the label starts, whatever its language)
-  // and only shrinks when the line is full.
-  unreadTitle: { ...typography.caption, fontFamily: fonts.medium, color: colors.goldInk, flexShrink: 1 },
-  unreadCta: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 19, color: colors.goldInk, flexShrink: 0, marginStart: 'auto' },
   // M102: the HQ photo crowning the home.
   hqBanner: {
     width: '100%',
