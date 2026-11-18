@@ -1,5 +1,7 @@
-/** Arabic wording with Latin digits and the Gregorian calendar, as everywhere else in the project. */
-const LOCALE = 'ar-SA-u-ca-gregory-nu-latn';
+import { isEn, tx } from './i18n';
+
+/** Arabic wording with Latin digits and the Gregorian calendar, as everywhere else in the project; English mode spells the same dates in English. */
+export const LOCALE = isEn ? 'en-GB-u-ca-gregory-nu-latn' : 'ar-SA-u-ca-gregory-nu-latn';
 const RIYADH = 'Asia/Riyadh';
 
 const numberFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
@@ -17,7 +19,7 @@ const CURRENCIES: Record<string, string> = { SAR: 'ريال', EGP: 'جنيه', U
 /** A hub row may come with no currency at all (null, not only a missing key): the club charges in riyals. An unknown code shows as it came. */
 function currencyName(code: string | null | undefined): string {
   const key = String(code || 'SAR').toUpperCase();
-  return CURRENCIES[key] ?? key;
+  return tx(CURRENCIES[key] ?? key);
 }
 
 /** "1,899 ريال". Aggregates carry no currency of their own: the club's payments are in riyals. */
@@ -53,11 +55,23 @@ export function formatDay(day: string | null | undefined, style: 'medium' | 'sho
 /** An event's `date`: a bare day stays a day, an exact time shows its Riyadh hour too. */
 export const formatEventDate = (value: string): string => (/^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDay(value) : formatDateTime(value));
 
+/** English mode counts with a numeral and a plain singular or plural, keyed by the Arabic plural. */
+const EN_UNITS: Record<string, [string, string]> = {
+  أيام: ['day', 'days'],
+  مشاريع: ['project', 'projects'],
+  دقائق: ['minute', 'minutes'],
+  ساعات: ['hour', 'hours'],
+};
+
 /**
  * Arabic counted noun: singular and dual without a numeral, 3 to 10 with the plural, 11 to 99 with the accusative
  * singular (يومًا), and the hundreds follow their last two digits.
  */
 export function arabicCount(count: number, singular: string, dual: string, plural: string, accusative = singular, one = singular): string {
+  if (isEn) {
+    const unit = EN_UNITS[plural];
+    return `${formatNumber(count)} ${unit ? unit[count === 1 ? 0 : 1] : tx(count === 1 ? singular : plural)}`;
+  }
   if (count === 1) return one;
   if (count === 2) return dual;
   const rest = count % 100;
@@ -68,20 +82,21 @@ export function arabicCount(count: number, singular: string, dual: string, plura
 export const formatDays = (days: number, dual = 'يومان'): string => arabicCount(days, 'يوم', dual, 'أيام', 'يومًا', 'يوم واحد');
 export const formatProjects = (count: number, dual = 'مشروعان'): string => arabicCount(count, 'مشروع', dual, 'مشاريع', 'مشروعًا', 'مشروع واحد');
 /** Days left on a membership: «اليوم» when it ends today. */
-export const daysText = (days: number): string => (days <= 0 ? 'اليوم' : formatDays(days));
+export const daysText = (days: number): string => (days <= 0 ? tx('اليوم') : formatDays(days));
 
 /** "قبل 5 دقائق" / "أمس" / a spelled-out date for anything older. */
 export function formatRelative(value: string | null | undefined, now = Date.now()): string {
   const then = parseTime(value);
   if (Number.isNaN(then)) return '—';
   const minutes = Math.round((now - then) / 60_000);
-  if (minutes < 1) return 'الآن';
-  if (minutes < 60) return `قبل ${arabicCount(minutes, 'دقيقة', 'دقيقتين', 'دقائق')}`;
+  const ago = (span: string): string => (isEn ? `${span} ago` : `قبل ${span}`);
+  if (minutes < 1) return tx('الآن');
+  if (minutes < 60) return ago(arabicCount(minutes, 'دقيقة', 'دقيقتين', 'دقائق'));
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `قبل ${arabicCount(hours, 'ساعة', 'ساعتين', 'ساعات')}`;
+  if (hours < 24) return ago(arabicCount(hours, 'ساعة', 'ساعتين', 'ساعات'));
   const days = Math.round(hours / 24);
-  if (days === 1) return 'أمس';
-  if (days < 7) return `قبل ${arabicCount(days, 'يوم', 'يومين', 'أيام')}`;
+  if (days === 1) return tx('أمس');
+  if (days < 7) return ago(arabicCount(days, 'يوم', 'يومين', 'أيام'));
   return dateFormat.format(then + 3 * 3_600_000);
 }
 

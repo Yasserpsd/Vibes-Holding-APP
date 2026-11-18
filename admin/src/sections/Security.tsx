@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { api, ApiError, type TotpStatus } from '../api';
+import { LOCALE } from '../format';
 import { BackupCodes, cleanCode, codeReady, EnrolSteps } from '../Totp';
 
 type Mode = 'idle' | 'relink' | 'backup';
@@ -67,7 +68,7 @@ export function Security() {
     }
   }
 
-  const enabledAt = status?.enabledAt ? new Date(status.enabledAt).toLocaleDateString('ar-SA-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
+  const enabledAt = status?.enabledAt ? new Date(status.enabledAt).toLocaleDateString(LOCALE, { year: 'numeric', month: 'long', day: 'numeric' }) : null;
 
   return (
     <div className="stack">

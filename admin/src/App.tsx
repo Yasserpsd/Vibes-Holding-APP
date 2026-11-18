@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, session, type Me } from './api';
+import { LangSwitch } from './LangSwitch';
 import { Login } from './Login';
 import { Affiliates } from './sections/Affiliates';
 import { Agenda } from './sections/Agenda';
@@ -243,6 +244,7 @@ export function App() {
           <nav className="rail-nav" aria-label="أقسام اللوحة">{sections.map(navButton)}</nav>
           <div className="rail-foot">
             <span className="muted">{me.name || me.email}{me.isAdmin ? '' : ' — موديريتور'}</span>
+            <LangSwitch />
             <button className="link" type="button" onClick={logout}>خروج</button>
           </div>
         </aside>
@@ -253,6 +255,7 @@ export function App() {
             <span>لوحة الإدارة</span>
           </div>
           <span className="muted topbar-name">{me.name}</span>
+          <LangSwitch />
           <button className="icon-button" type="button" onClick={logout} aria-label="خروج">
             <Icon name="logout" size={18} />
           </button>

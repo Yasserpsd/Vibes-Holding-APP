@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import { api } from '../api';
 import { BarChart, Donut, type ChartPoint, type DonutSlice } from '../Chart';
-import { formatDay, formatMoney, formatNumber } from '../format';
+import { formatDay, formatMoney, formatNumber, LOCALE } from '../format';
 import type { AnalyticsDay, AnalyticsResult, Home as HomeData, Personas } from '../types';
 import { Async, Boundary, Chips, ErrorCard, SectionHead, useLoad } from '../ui';
 
@@ -59,7 +59,7 @@ const SCREEN_LABELS: Record<string, string> = {
 };
 const screenLabel = (screen: string): string => SCREEN_LABELS[screen] ?? screen;
 
-const monthFormat = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const monthFormat = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 /** Days folded into weeks (Sunday first, as the Saudi week) or months; `day` keeps the bucket's first day. */
 function grouped(points: ChartPoint[], mode: Grouping): ChartPoint[] {

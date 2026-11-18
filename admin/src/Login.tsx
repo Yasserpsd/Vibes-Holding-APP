@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { api, ApiError, session, type AdminLoginResult, type Me } from './api';
+import { LangSwitch } from './LangSwitch';
 import { BackupCodes, cleanCode, codeReady, EnrolSteps } from './Totp';
 
 type Props = { onSignedIn: (me: Me) => void };
@@ -150,6 +151,7 @@ export function Login({ onSignedIn }: Props) {
       <form className="card" onSubmit={submit}>
         <h1>لوحة إدارة نادي المستثمرين</h1>
         <p className="muted">الدخول لحسابات إدارة النادي والموديريتور فقط.</p>
+        <LangSwitch />
         {enrolled ? (
           <>
             <p className="ok" role="status">تم ربط تطبيق المصادقة بحسابك. من الآن يطلب الدخول رمز التطبيق بعد كلمة المرور.</p>

@@ -125,7 +125,7 @@ function WordingRow({ item, lang, maxLength, open, onToggle, save, onSaved, onFa
   return (
     <article className={open ? 'wording on' : 'wording'}>
       <button type="button" className="wording-head" onClick={onToggle} aria-expanded={open}>
-        <span className="wording-text" dir={lang === 'en' ? 'ltr' : 'rtl'}>
+        <span className="wording-text" lang={lang} dir={lang === 'en' ? 'ltr' : 'rtl'}>
           {edit?.value ?? own}
         </span>
         {edit ? <Pill tone="gold">معدَّل</Pill> : null}
@@ -146,11 +146,11 @@ function WordingRow({ item, lang, maxLength, open, onToggle, save, onSaved, onFa
           {item.placeholders.length > 0 ? <p className="muted">ما بين القوسين {item.placeholders.map((name) => <bdi key={name} dir="ltr">{name} </bdi>)}يضع التطبيق مكانه قيمة (رقم أو اسم): أبقه كما هو.</p> : null}
           {edit ? (
             <p className="muted">
-              النص الأصلي: <bdi dir={lang === 'en' ? 'ltr' : 'rtl'}>{own}</bdi> · عدّله {edit.by || 'مدير'} في {formatDateTime(edit.at)}
+              النص الأصلي: <bdi lang={lang} dir={lang === 'en' ? 'ltr' : 'rtl'}>{own}</bdi> · عدّله {edit.by || 'مدير'} في {formatDateTime(edit.at)}
             </p>
           ) : null}
           <p className="muted">
-            في {lang === 'ar' ? 'النسخة الإنجليزية' : 'النسخة العربية'}: <bdi dir={lang === 'ar' ? 'ltr' : 'rtl'}>{other}</bdi>
+            في {lang === 'ar' ? 'النسخة الإنجليزية' : 'النسخة العربية'}: <bdi lang={lang === 'ar' ? 'en' : 'ar'} dir={lang === 'ar' ? 'ltr' : 'rtl'}>{other}</bdi>
           </p>
           <div className="row">
             <button className="primary" type="submit" disabled={Boolean(problem) || unchanged || busy}>
