@@ -82,7 +82,7 @@ test('a reply and a message from the management to one member are announced on W
   assert.equal(message.statusCode, 201, message.body);
   for (let i = 0; i < 100 && sent.length === before; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(sent.length, before + 1);
-  assert.equal(sent.at(-1)?.template, 'club_admin_message');
+  assert.equal(sent.at(-1)?.template, 'club_account_notice'); // M251: the Utility template, approved here in both languages
   assert.equal(JSON.stringify(sent).includes('نص الرسالة'), false, 'the words of a message never leave the app');
 
   // M236: a message for everyone reaches every verified account once, the member above included.
@@ -91,7 +91,7 @@ test('a reply and a message from the management to one member are announced on W
   for (let i = 0; i < 200 && !sent.slice(before + 1).some((entry) => entry.to === '966558323502'); i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
   const wave = sent.slice(before + 1);
   assert.ok(wave.length >= 2, 'the admin and the member at least');
-  assert.ok(wave.every((entry) => entry.template === 'club_admin_message'));
+  assert.ok(wave.every((entry) => entry.template === 'club_account_notice'));
   assert.equal(new Set(wave.map((entry) => entry.to)).size, wave.length, 'one message per number');
   assert.equal(wave.filter((entry) => entry.to === '966558323502').length, 1);
 });

@@ -6,7 +6,7 @@ import type { Mailer } from '../mail/mailer.js';
 import type { KV } from '../store.js';
 import type { NewTemplate, WaTemplate, WhatsappClient } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
-import { amountText, firstName, nameFor, NOTICE_KINDS, pickTemplate, planDelivery, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type NoticeKind, type TemplateVars, type WaKind, type WaLang } from './templates.js';
+import { amountText, firstName, nameFor, NOTICE_KINDS, pickTemplate, planDelivery, PREFERRED_TEMPLATES, TEMPLATE_NAMES, toLang, WA_KINDS, type DeliveryPlan, type NoticeKind, type TemplateVars, type WaKind, type WaLang } from './templates.js';
 
 /** What every send answers. `error` explains a fallback too (channel `email`/`none` + why WhatsApp was not used). */
 export type WaResult = { channel: 'whatsapp' | 'email' | 'none'; messageId?: string; error?: string };
@@ -214,11 +214,20 @@ export class WhatsappService {
     }
   }
 
+  /** M251: the kind's newer template when Meta approved it in this language, else the kind's own. */
+  private async pickFor(kind: WaKind, lang: WaLang): Promise<WaTemplate | null> {
+    const preferred = PREFERRED_TEMPLATES[kind];
+    if (preferred) {
+      const first = pickTemplate(await this.templatesOf(kind, false, preferred).catch(() => []), lang);
+      if (first?.status === 'APPROVED') return first;
+    }
+    return pickTemplate(await this.templatesOf(kind), lang);
+  }
+
   /** Approved or not, the templates of one kind as Meta lists them (cached ten minutes; stale copy when Meta is down). */
-  private async templatesOf(kind: WaKind, fresh = false): Promise<WaTemplate[]> {
+  private async templatesOf(kind: WaKind, fresh = false, name: string = TEMPLATE_NAMES[kind]): Promise<WaTemplate[]> {
     const client = this.deps.client;
     if (!client) return [];
-    const name = TEMPLATE_NAMES[kind];
     const now = (this.deps.now ?? Date.now)();
     const hit = this.cache.get(name);
     if (!fresh && hit && now - hit.at < TEMPLATE_TTL_MS) return hit.templates;
@@ -272,7 +281,8 @@ export class WhatsappService {
   async templateOverview(): Promise<{ name: string; language: string; status: string; category: string | null; body: string }[]> {
     const rows: { name: string; language: string; status: string; category: string | null; body: string }[] = [];
     for (const kind of WA_KINDS) {
-      for (const template of await this.templatesOf(kind, true)) {
+      const preferred = PREFERRED_TEMPLATES[kind];
+      for (const template of [...(await this.templatesOf(kind, true)), ...(preferred ? await this.templatesOf(kind, true, preferred) : [])]) {
         const body = template.components.find((component) => component.type.toUpperCase() === 'BODY')?.text ?? '';
         rows.push({ name: template.name, language: template.language, status: template.status, category: template.category ?? null, body });
       }
@@ -295,7 +305,7 @@ export class WhatsappService {
       let template: WaTemplate | null | undefined = null;
       if (this.enabled && phone) {
         try {
-          template = pickTemplate(await this.templatesOf(kind), lang);
+          template = await this.pickFor(kind, lang);
         } catch (error) {
           this.deps.log.warn({ err: error, kind }, 'whatsapp template lookup failed');
           template = undefined;
@@ -410,7 +420,10 @@ export class WhatsappService {
         if (now - Date.parse(record.updatedAt) < wait) continue;
         const lang = toLang(record.lang);
         const params = record.params ?? [lang === 'en' ? 'Member' : 'عضونا'];
-        const sent = await this.sendPlanned({ use: 'whatsapp', template: record.template as string, language: record.lang, params }, { phone: record.to, kind: record.kind as WaKind, lang, ref: record.ref, attempt: attempt + 1 });
+        // The try leaves on the template the kind uses today (a refusal of the Marketing one is retried as Utility).
+        const current = await this.pickFor(record.kind as WaKind, lang).catch(() => null);
+        const using = current?.status === 'APPROVED' ? { template: current.name, language: current.language } : { template: record.template as string, language: record.lang };
+        const sent = await this.sendPlanned({ use: 'whatsapp', ...using, params }, { phone: record.to, kind: record.kind as WaKind, lang, ref: record.ref, attempt: attempt + 1 });
         if (sent.messageId) out.retried += 1;
       }
       if (out.retried || out.mailed) this.deps.log.info(out, 'whatsapp refused messages tried again');

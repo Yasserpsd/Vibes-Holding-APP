@@ -24,15 +24,15 @@ class RecordingMailer implements Mailer {
   }
 }
 
-function build() {
-  const sent: { to: string; language: string; body: string[] }[] = [];
+function build(extra: WaTemplate[] = []) {
+  const sent: { to: string; template: string; language: string; body: string[] }[] = [];
   const clock = { now: Date.parse('2026-11-18T15:37:00Z') };
   const mailer = new RecordingMailer();
   const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
     const address = new URL(String(url));
-    if (address.pathname.endsWith('/message_templates')) return new Response(JSON.stringify({ data: TEMPLATES }), { status: 200 });
-    const message = JSON.parse(String(init?.body)) as { to: string; template: { language: { code: string }; components?: { type: string; parameters: { text: string }[] }[] } };
-    sent.push({ to: message.to, language: message.template.language.code, body: (message.template.components ?? []).find((part) => part.type === 'body')?.parameters.map((parameter) => parameter.text) ?? [] });
+    if (address.pathname.endsWith('/message_templates')) return new Response(JSON.stringify({ data: [...TEMPLATES, ...extra].filter((item) => item.name === address.searchParams.get('name')) }), { status: 200 });
+    const message = JSON.parse(String(init?.body)) as { to: string; template: { name: string; language: { code: string }; components?: { type: string; parameters: { text: string }[] }[] } };
+    sent.push({ to: message.to, template: message.template.name, language: message.template.language.code, body: (message.template.components ?? []).find((part) => part.type === 'body')?.parameters.map((parameter) => parameter.text) ?? [] });
     return new Response(JSON.stringify({ messages: [{ id: `wamid.${sent.length}` }] }), { status: 200 });
   }) as typeof fetch;
   const service = new WhatsappService({
@@ -100,7 +100,7 @@ test('m251: a retry that arrives ends the chain; other failures and delivered no
 
   clock.now += 2 * HOUR;
   assert.deepEqual(await service.retryRefused(), { retried: 1, mailed: 0 });
-  assert.deepEqual(sent[3], { to: '966503844438', language: 'en', body: ['Majed'] });
+  assert.deepEqual(sent[3], { to: '966503844438', template: 'club_admin_message', language: 'en', body: ['Majed'] });
   await service.ingestWebhook(status('wamid.4', 'delivered'));
 
   clock.now += 48 * HOUR;
@@ -119,4 +119,18 @@ test('m251: every member of a chosen list has his own ref, so none is answered �
     assert.equal(result.error, undefined);
   }
   assert.equal(sent.length, 3);
+});
+
+test('m251: the Utility template carries the notice where Meta approved it; the older one carries the other language', async () => {
+  const notice = (language: string, status: string): WaTemplate => ({ name: 'club_account_notice', language, status, components: [{ type: 'BODY', text: 'Hello {{1}}, there is a new notice on your account.' }] });
+  const { service, sent, clock } = build([notice('ar', 'APPROVED'), notice('en', 'PENDING')]);
+  await service.sendNotice('admin_message', { phone: '0503844438', lang: 'ar', name: 'ماجد العمري', ref: 'post:p4:7' });
+  await service.sendNotice('admin_message', { phone: '0503844439', lang: 'en', name: 'Salem', ref: 'post:p4:8' });
+  assert.deepEqual(sent.map((entry) => `${entry.template}/${entry.language}`), ['club_account_notice/ar', 'club_admin_message/en']);
+
+  // A refusal of the older template is tried again on whatever the kind uses at that moment.
+  await service.ingestWebhook(status('wamid.2', 'failed', 131049));
+  clock.now += 2 * HOUR;
+  assert.deepEqual(await service.retryRefused(), { retried: 1, mailed: 0 });
+  assert.equal(sent[2]?.template, 'club_admin_message');
 });

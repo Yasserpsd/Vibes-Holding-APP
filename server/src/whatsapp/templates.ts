@@ -119,6 +119,13 @@ export function amountText(amount: number, currency: string | null | undefined, 
   return `${formatAmount(amount)} ${code === 'SAR' ? 'ر.س' : code}`;
 }
 
+/**
+ * M251 (2026-11-18): Meta re-classed club_admin_message as Marketing and drops some of its sends (131049). The notice
+ * was filed again as `club_account_notice` and approved as Utility; it is used wherever the member's language is
+ * approved, and the older template carries the rest (scripts/m251-wa-templates.json).
+ */
+export const PREFERRED_TEMPLATES: Partial<Record<WaKind, string>> = { admin_message: 'club_account_notice' };
+
 /** The template of that language: an exact code first, then a regional one (en_US for en), APPROVED before the rest. */
 export function pickTemplate(templates: WaTemplate[], lang: WaLang): WaTemplate | null {
   const matches = templates.filter((template) => template.language === lang || template.language.startsWith(`${lang}_`));
