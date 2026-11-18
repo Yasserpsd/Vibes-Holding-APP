@@ -1,0 +1,16 @@
+[
+  {
+    "name": "club_account_notice",
+    "language": "ar",
+    "category": "UTILITY",
+    "body": "مرحبًا {{1}}، يوجد إشعار جديد على حسابك في Investors Club يخص عضويتك. يمكنك الاطلاع عليه من بريد الوارد في التطبيق.",
+    "bodyExamples": ["أحمد"]
+  },
+  {
+    "name": "club_account_notice",
+    "language": "en",
+    "category": "UTILITY",
+    "body": "Hello {{1}}, there is a new notice on your Investors Club account regarding your membership. You can read it in the Inbox in the app.",
+    "bodyExamples": ["Ahmed"]
+  }
+]
