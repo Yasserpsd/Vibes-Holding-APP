@@ -24,7 +24,30 @@ export type WaRecord = {
   ref: string | null;
   createdAt: string;
   updatedAt: string;
+  /** M251: which try this is (0 = the first send) and the template's values, kept only for the kinds that are tried again. */
+  attempt?: number;
+  params?: string[];
+  /** M251: nothing more will be tried for this refused message (the e-mail went out, or could not). */
+  closed?: boolean;
+  mailed?: boolean;
 };
+
+/**
+ * M251 (owner, 2026-11-18: «اجباري يوصل لكل الناس على واتس اب»): Meta drops some Marketing templates per recipient
+ * (error 131049, its own frequency cap) although the send was accepted. Those are sent again after these waits, counted
+ * from the refusal; when the last try is refused too, the same words go to the account's e-mail.
+ */
+export const RETRY_KINDS: ReadonlySet<string> = new Set(['admin_message']);
+export const RETRY_DELAYS_MS: readonly number[] = [3_600_000, 6 * 3_600_000, 24 * 3_600_000];
+const refusedByMeta = (record: WaRecord): boolean => record.status === 'failed' && /\b131049\b/.test(record.error ?? '');
+/** The account id a management-message ref ends with (`post:<id>:<account>`); null on the older refs. */
+const accountOfRef = (ref: string | null): number | null => {
+  const last = Number((ref ?? '').split(':')[2]);
+  return Number.isInteger(last) && last > 0 ? last : null;
+};
+
+export type WaDeliveryRow = { to: string; contactId: number | null; state: 'delivered' | 'sent' | 'retrying' | 'failed'; error: string | null; attempt: number; mailed: boolean; at: string };
+export type WaDelivery = { delivered: number; sent: number; retrying: number; failed: number; rows: WaDeliveryRow[] };
 
 export const WHATSAPP_LOG_KEY = 'whatsapp:messages';
 /** M236: a broadcast to every account writes hundreds of records at once; the newest ones must not push the day's codes and receipts out. */
@@ -66,6 +89,8 @@ type Deps = {
   mailOff?: ReadonlySet<string>;
   /** M204: Meta reported a `code` message as failed; the owner of the code sends it another way. */
   onCodeFailed?: (messageId: string) => Promise<unknown>;
+  /** M251: the e-mail of an account (the hub's, rule 2), for the message WhatsApp refused on every try. */
+  emailOf?: (contactId: number) => Promise<string | null>;
 };
 
 export class WhatsappService {
@@ -292,18 +317,20 @@ export class WhatsappService {
     }
   }
 
-  private async sendPlanned(plan: Extract<DeliveryPlan, { use: 'whatsapp' }>, meta: { phone: string; kind: WaKind; lang: WaLang; ref: string | null }, codeButton?: string): Promise<{ messageId?: string; error: string }> {
+  private async sendPlanned(plan: Extract<DeliveryPlan, { use: 'whatsapp' }>, meta: { phone: string; kind: WaKind; lang: WaLang; ref: string | null; attempt?: number }, codeButton?: string): Promise<{ messageId?: string; error: string }> {
     const client = this.deps.client;
     if (!client) return { error: 'whatsapp_disabled' };
+    // M251: a kind that is tried again keeps its values (a first name); a code is never stored.
+    const again = RETRY_KINDS.has(meta.kind) ? { params: plan.params, attempt: meta.attempt ?? 0 } : {};
     try {
       const messageId = await client.sendTemplate({ to: meta.phone, template: plan.template, language: plan.language, bodyParams: plan.params, ...(codeButton ? { codeButton } : {}) });
-      await this.addRecord({ to: meta.phone, kind: meta.kind, template: plan.template, lang: plan.language, waMessageId: messageId, status: 'accepted', error: null, ref: meta.ref });
+      await this.addRecord({ to: meta.phone, kind: meta.kind, template: plan.template, lang: plan.language, waMessageId: messageId, status: 'accepted', error: null, ref: meta.ref, ...again });
       this.deps.log.info({ kind: meta.kind, to: maskPhone(meta.phone), template: plan.template }, 'whatsapp template accepted by Meta');
       return { messageId, error: '' };
     } catch (error) {
       const text = error instanceof Error ? error.message : 'error';
       this.deps.log.warn({ kind: meta.kind, to: maskPhone(meta.phone), err: text }, 'whatsapp send failed');
-      await this.addRecord({ to: meta.phone, kind: meta.kind, template: plan.template, lang: plan.language, waMessageId: null, status: 'failed', error: text, ref: meta.ref }).catch(() => undefined);
+      await this.addRecord({ to: meta.phone, kind: meta.kind, template: plan.template, lang: plan.language, waMessageId: null, status: 'failed', error: text, ref: meta.ref, ...again }).catch(() => undefined);
       return { error: `meta_error: ${text}` };
     }
   }
@@ -353,6 +380,79 @@ export class WhatsappService {
 
   async recent(limit = 20): Promise<WaRecord[]> {
     return (await this.records()).slice(-limit).reverse();
+  }
+
+  /**
+   * M251: one pass over the messages Meta refused with its frequency cap (131049). A refusal old enough is sent again
+   * with the same template and values; after the last wait the account's e-mail gets the same words. Never throws.
+   */
+  async retryRefused(): Promise<{ retried: number; mailed: number }> {
+    const out = { retried: 0, mailed: 0 };
+    if (!this.enabled) return out;
+    try {
+      const now = (this.deps.now ?? Date.now)();
+      const records = await this.records();
+      // Only the newest record of one message to one number counts: an earlier try was already answered by a later one.
+      const due = records.filter((record) => RETRY_KINDS.has(record.kind) && record.ref && record.template && !record.closed && refusedByMeta(record)
+        && !records.some((other) => other !== record && other.kind === record.kind && other.ref === record.ref && other.to === record.to && other.createdAt > record.createdAt));
+      for (const record of due) {
+        const attempt = record.attempt ?? 0;
+        const wait = RETRY_DELAYS_MS[attempt];
+        if (wait === undefined) {
+          const mailed = await this.mailRefused(record);
+          await this.mutate((all) => {
+            const stored = all.find((entry) => entry.id === record.id);
+            if (stored) Object.assign(stored, { closed: true, mailed });
+          });
+          if (mailed) out.mailed += 1;
+          continue;
+        }
+        if (now - Date.parse(record.updatedAt) < wait) continue;
+        const lang = toLang(record.lang);
+        const params = record.params ?? [lang === 'en' ? 'Member' : 'عضونا'];
+        const sent = await this.sendPlanned({ use: 'whatsapp', template: record.template as string, language: record.lang, params }, { phone: record.to, kind: record.kind as WaKind, lang, ref: record.ref, attempt: attempt + 1 });
+        if (sent.messageId) out.retried += 1;
+      }
+      if (out.retried || out.mailed) this.deps.log.info(out, 'whatsapp refused messages tried again');
+    } catch (error) {
+      this.deps.log.warn({ err: error instanceof Error ? error.message : 'error' }, 'whatsapp retry pass failed');
+    }
+    return out;
+  }
+
+  /** M251: the e-mail that stands in for a management-message notice WhatsApp never delivered. */
+  private async mailRefused(record: WaRecord): Promise<boolean> {
+    try {
+      const contactId = accountOfRef(record.ref);
+      const address = contactId && this.deps.emailOf ? (await this.deps.emailOf(contactId))?.trim() : '';
+      if (!address || !this.deps.mailer) return false;
+      const name = record.params?.[0] ?? '';
+      const mail = toLang(record.lang) === 'en'
+        ? { subject: 'A new message from the Investors Club management', text: `Hello${name ? ` ${name}` : ''},\n\nYou have a new message from the Investors Club management. You can read it in the Inbox in the app.` }
+        : { subject: 'رسالة جديدة من إدارة Investors Club', text: `مرحبًا${name ? ` ${name}` : ''}،\n\nوصلتك رسالة جديدة من إدارة Investors Club. يمكنك الاطلاع عليها من بريد الوارد في التطبيق.` };
+      return await this.deps.mailer.send({ to: [address], ...mail });
+    } catch (error) {
+      this.deps.log.warn({ err: error instanceof Error ? error.message : 'error' }, 'whatsapp refused message could not be mailed');
+      return false;
+    }
+  }
+
+  /** M251: where one broadcast stands on WhatsApp, one row per number (its newest try), for the dashboard. */
+  async deliveryOf(kind: string, ref: string): Promise<WaDelivery> {
+    const latest = new Map<string, WaRecord>();
+    for (const record of await this.records()) {
+      if (record.kind === kind && record.ref && (record.ref === ref || record.ref.startsWith(`${ref}:`))) latest.set(`${record.ref}|${record.to}`, record);
+    }
+    const out: WaDelivery = { delivered: 0, sent: 0, retrying: 0, failed: 0, rows: [] };
+    for (const record of latest.values()) {
+      const attempt = record.attempt ?? 0;
+      const state = record.status === 'delivered' || record.status === 'read' ? 'delivered'
+        : record.status !== 'failed' ? 'sent'
+          : RETRY_KINDS.has(kind) && refusedByMeta(record) && !record.closed && attempt < RETRY_DELAYS_MS.length ? 'retrying' : 'failed';
+      out[state] += 1;
+      if (state !== 'delivered') out.rows.push({ to: record.to, contactId: accountOfRef(record.ref), state, error: record.error, attempt, mailed: record.mailed === true, at: record.updatedAt });
+    }
+    return out;
   }
 
   /** Meta's webhook: per-message delivery states and the member's own replies (kept minimal). Never throws. */

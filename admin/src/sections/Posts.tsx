@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type Post, type PostAudience, type PostOpen } from '../api';
+import { api, type Post, type PostAudience, type PostOpen, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
 import { personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
@@ -110,6 +110,79 @@ function Opens({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
             </li>
           ))}
         </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * M251 (owner: «اجباري يوصل لكل الناس على واتس اب»): where the message's WhatsApp notice stands — how many numbers it
+ * reached, and by name the ones it has not: still on its way, held back by WhatsApp and being tried again, or refused.
+ */
+function WhatsappDelivery({ post }: { post: Post }) {
+  const { openMember } = useShell();
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<PostWhatsapp | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  if (post.status !== 'published' || post.kind === 'popup') return null;
+  const names = new Map<number, string>();
+  if (post.audience?.type === 'members') for (const member of post.audience.members) names.set(member.contactId, member.name);
+  if (post.audience?.type === 'member') names.set(post.audience.contactId, post.audience.name);
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (!next) return;
+    setError(null);
+    try {
+      setData((await api.postOpens(post.id)).whatsapp ?? null);
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const total = data ? data.delivered + data.sent + data.retrying + data.failed : 0;
+  const stateText = (row: PostWhatsappRow) =>
+    row.state === 'sent'
+      ? 'في الطريق، لم يؤكد واتساب وصولها بعد'
+      : row.state === 'retrying'
+        ? 'حجبها واتساب مؤقتًا عن هذا الرقم، وتُعاد المحاولة تلقائيًا'
+        : row.mailed
+          ? 'لم تصل على واتساب، فأُرسلت إلى بريده الإلكتروني'
+          : 'لم تصل على واتساب';
+  return (
+    <div className="post-opens">
+      <button type="button" className="link" onClick={() => void toggle()} aria-expanded={open}>
+        💬 {open ? 'إخفاء حالة واتساب' : 'عرض حالة واتساب'}
+      </button>
+      {open && error ? <p className="muted">{error}</p> : null}
+      {open && !error && data === undefined ? <p className="muted">جارٍ التحميل…</p> : null}
+      {open && !error && data !== undefined && total === 0 ? <p className="muted">لا توجد رسائل واتساب مسجلة لهذه الرسالة</p> : null}
+      {open && data && total > 0 ? (
+        <>
+          <p className="muted">
+            {[
+              `وصلت إلى ${formatNumber(data.delivered)} من ${formatNumber(total)}`,
+              data.sent ? `في الطريق: ${formatNumber(data.sent)}` : '',
+              data.retrying ? `تُعاد المحاولة: ${formatNumber(data.retrying)}` : '',
+              data.failed ? `لم تصل: ${formatNumber(data.failed)}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          <ul className="list">
+            {data.rows.map((row) => (
+              <li key={`${row.to}-${row.at}`}>
+                <button type="button" className="list-row" disabled={row.contactId === null} onClick={() => (row.contactId === null ? undefined : openMember(row.contactId))}>
+                  <span className="list-main">
+                    <strong dir="auto">{(row.contactId !== null && names.get(row.contactId)) || (row.contactId !== null ? `حساب رقم ${row.contactId}` : `+${row.to}`)}</strong>
+                    <span className="muted">
+                      {`${stateText(row)} · ${formatDateTime(row.at)}`}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
     </div>
   );
@@ -241,6 +314,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 <HubSync post={post} />
                 <PollResults post={post} />
                 <Opens post={post} isAdmin={isAdmin} />
+                {isAdmin ? <WhatsappDelivery post={post} /> : null}
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
                   {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>}

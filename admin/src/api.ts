@@ -24,6 +24,10 @@ export type PostVideo = { url: string; poster: string | null };
 /** M243: one member who opened a management message. */
 export type PostOpen = { contactId: number; name: string; persona: string; first: string; last: string; count: number };
 
+/** M251: where a message's WhatsApp notice stands; `rows` lists only the numbers it has not reached yet. */
+export type PostWhatsappRow = { to: string; contactId: number | null; state: 'sent' | 'retrying' | 'failed'; error: string | null; attempt: number; mailed: boolean; at: string };
+export type PostWhatsapp = { delivered: number; sent: number; retrying: number; failed: number; rows: PostWhatsappRow[] };
+
 export type Post = {
   id: string;
   title: string;
@@ -652,7 +656,7 @@ export const api = {
   logout: (token?: string) => call<unknown>('POST', '/api/auth/logout', {}, token),
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   /** M243: the members who opened one message, latest first (admins only). */
-  postOpens: (id: string) => call<{ opens: PostOpen[] }>('GET', `/api/admin/posts/${encodeURIComponent(id)}/opens`),
+  postOpens: (id: string) => call<{ opens: PostOpen[]; whatsapp?: PostWhatsapp | null }>('GET', `/api/admin/posts/${encodeURIComponent(id)}/opens`),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),
   cardRequestStatus: (id: string, status: RequestStatus, note = '') => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/status`, { status, note }),

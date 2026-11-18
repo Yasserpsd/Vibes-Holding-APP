@@ -10,12 +10,13 @@ import { MediaService } from '../media/service.js';
 import type { PollsService, PollView } from '../polls/service.js';
 import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
+import type { WaDelivery } from '../whatsapp/service.js';
 import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
 import type { PostOpens } from './opens.js';
 import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void };
+export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void; /** M251: the WhatsApp delivery of one message's notice, for the dashboard. */ delivery?: (postId: string) => Promise<WaDelivery> };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -85,7 +86,7 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { opens, service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { opens, service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience, delivery }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -133,7 +134,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     const audience = audienceOf(post);
     // M238: every member of a chosen list hears it like the one member of a personal message.
     const named = audienceMemberIds(audience);
-    if (named.length) for (const contactId of named) tellMember?.(contactId, `post:${post.id}`);
+    // M251: each member has his own ref — one shared ref let the first send answer «already sent» for the rest of the list.
+    if (named.length) for (const contactId of named) tellMember?.(contactId, `post:${post.id}:${contactId}`);
     else tellAudience?.(uuid, audience.type === 'persona' ? audience.persona : null, `post:${post.id}`);
   };
 
@@ -273,7 +275,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (admin.level !== 'admin') return reply.code(403).send({ error: { code: 'admins_only', message: 'أسماء من فتحوا الرسالة متاحة للمدير فقط' } });
       const post = await service.get(params.id);
       if (!post) return reply.code(404).send(NOT_FOUND);
-      return { opens: opens ? await opens.list(post.id) : [] };
+      // M251: next to who opened it, where its WhatsApp notice stands (delivered, waiting, being tried again, refused).
+      return { opens: opens ? await opens.list(post.id) : [], whatsapp: delivery ? await delivery(post.id) : null };
     }),
   );
 

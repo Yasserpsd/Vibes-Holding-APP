@@ -1570,5 +1570,16 @@
  "السياحة والترفيه": "Tourism & Entertainment",
  "الرياضة": "Sports",
  "الذهب والفضة": "Gold & Silver",
- "النفط والبترول": "Oil"
+ "النفط والبترول": "Oil",
+ "في الطريق، لم يؤكد واتساب وصولها بعد": "On its way, WhatsApp has not confirmed delivery yet",
+ "حجبها واتساب مؤقتًا عن هذا الرقم، وتُعاد المحاولة تلقائيًا": "WhatsApp held it back from this number for now; it is retried automatically",
+ "لم تصل على واتساب، فأُرسلت إلى بريده الإلكتروني": "Not delivered on WhatsApp, so it was sent to their e-mail",
+ "لم تصل على واتساب": "Not delivered on WhatsApp",
+ "إخفاء حالة واتساب": "Hide WhatsApp status",
+ "عرض حالة واتساب": "Show WhatsApp status",
+ "لا توجد رسائل واتساب مسجلة لهذه الرسالة": "No WhatsApp messages are recorded for this message",
+ "وصلت إلى {0} من {1}": "Delivered to {0} of {1}",
+ "في الطريق: {0}": "On the way: {0}",
+ "تُعاد المحاولة: {0}": "Retrying: {0}",
+ "لم تصل: {0}": "Not delivered: {0}"
 }

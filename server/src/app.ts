@@ -402,7 +402,18 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     mailOff: new Set((config.WHATSAPP_MAIL_OFF ?? '').split(',').map((kind) => kind.trim()).filter((kind) => kind && kind !== 'invoice')),
     // M204: Meta could not deliver a sign-in/number code; a new one goes to the account's e-mail by itself.
     onCodeFailed: (messageId) => phoneCodes.deliveryFailed(messageId),
+    // M251: the address for a management-message notice WhatsApp refused on every try (the hub's, rule 2).
+    emailOf: async (contactId) => {
+      const { contact } = await hubClient.call('member_status', { contact_id: contactId });
+      return contact && contact.id === contactId ? String(contact.contact_email ?? '').trim() || contact.email || null : null;
+    },
   });
+  // M251: Meta's frequency cap (131049) drops some management-message notices; they are tried again by themselves.
+  if (whatsapp.enabled) {
+    const retryTimer = setInterval(() => void whatsapp.retryRefused(), 10 * 60_000);
+    retryTimer.unref();
+    app.addHook('onClose', async () => clearInterval(retryTimer));
+  }
   // «الدعوات» (M32): the hub stores who invited whom at registration; this list carries the manual gift work.
   const invites = new InvitesService({ kv, hub: hubClient, notifier, log: app.log });
   // «برنامج ممثلي نادي المستثمرين» (M184): applications, agreement mail, dashboard approval, referrals and payouts.
@@ -791,7 +802,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     const found = await hubClient.call('member_status', { contact_id: contactId });
     return found.contact?.id === contactId && isHonorary(found.contact);
   });
-  await app.register(postsRoutes, { opens: postOpens, service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, persona, ref) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, persona, ref }) });
+  await app.register(postsRoutes, { opens: postOpens, service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, persona, ref) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, persona, ref }), delivery: (postId) => whatsapp.deliveryOf('admin_message', `post:${postId}`) });
   await app.register(dashboardRoutes, { service: dashboard, auth, interests, legacy });
   // M158: the downloads card — devices per platform today, the stores' own installs once the keys are set; one snapshot per Riyadh day.
   const apple = config.ASC_ISSUER_ID && config.ASC_KEY_ID && config.ASC_PRIVATE_KEY && config.ASC_VENDOR_NUMBER
