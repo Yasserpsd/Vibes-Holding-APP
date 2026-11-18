@@ -26,7 +26,7 @@ class RecordingMailer implements Mailer {
 
 function build(extra: WaTemplate[] = []) {
   const sent: { to: string; template: string; language: string; body: string[] }[] = [];
-  const clock = { now: Date.parse('2026-11-18T15:37:00Z') };
+  const clock = { now: Date.parse('2026-11-18T06:30:00Z') };
   const mailer = new RecordingMailer();
   const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
     const address = new URL(String(url));
@@ -133,4 +133,41 @@ test('m251: the Utility template carries the notice where Meta approved it; the 
   clock.now += 2 * HOUR;
   assert.deepEqual(await service.retryRefused(), { retried: 1, mailed: 0 });
   assert.equal(sent[2]?.template, 'club_admin_message');
+});
+
+test('m252: a number refused on several messages hears ONE notice, never one per message, and none at night', async () => {
+  const { service, sent, clock } = build();
+  // 21:30 in Riyadh: three different messages to the same member, each held back by Meta.
+  clock.now = Date.parse('2026-11-18T18:30:00Z');
+  for (const post of ['a', 'b', 'c']) await service.sendNotice('admin_message', { phone: '0503844438', lang: 'ar', name: 'ماجد العمري', ref: `post:${post}:7` });
+  for (const id of ['wamid.1', 'wamid.2', 'wamid.3']) await service.ingestWebhook(status(id, 'failed', 131049));
+
+  // 22:30 in Riyadh: due, but nobody is messaged at night.
+  clock.now = Date.parse('2026-11-18T19:30:00Z');
+  assert.deepEqual(await service.retryRefused(), { retried: 0, mailed: 0 });
+  // The next morning: one notice for the three refusals, and later passes send nothing more.
+  clock.now = Date.parse('2026-11-19T06:30:00Z');
+  assert.deepEqual(await service.retryRefused(), { retried: 1, mailed: 0 });
+  assert.deepEqual(await service.retryRefused(), { retried: 0, mailed: 0 });
+  await service.ingestWebhook(status('wamid.4', 'delivered'));
+  clock.now += 3 * HOUR;
+  assert.deepEqual(await service.retryRefused(), { retried: 0, mailed: 0 });
+  assert.equal(sent.length, 4);
+});
+
+test('m252: a refusal from days ago is dropped, and one answered by a later notice to that number is dropped too', async () => {
+  const { service, sent, clock, mailer } = build();
+  await service.sendNotice('admin_message', { phone: '0503844438', lang: 'ar', name: 'ماجد العمري', ref: 'post:old:7' });
+  await service.ingestWebhook(status('wamid.1', 'failed', 131049));
+  await service.sendNotice('admin_message', { phone: '0503844439', lang: 'ar', name: 'سالم الحربي', ref: 'post:old:8' });
+  await service.ingestWebhook(status('wamid.2', 'failed', 131049));
+  // Two days pass; the second member is told of a newer message in between.
+  clock.now += 48 * HOUR;
+  await service.sendNotice('admin_message', { phone: '0503844439', lang: 'ar', name: 'سالم الحربي', ref: 'post:new:8' });
+  assert.equal(sent.length, 3);
+  assert.deepEqual(await service.retryRefused(), { retried: 0, mailed: 0 });
+  clock.now += 24 * HOUR;
+  assert.deepEqual(await service.retryRefused(), { retried: 0, mailed: 0 });
+  assert.equal(sent.length, 3);
+  assert.equal(mailer.sent.length, 0);
 });

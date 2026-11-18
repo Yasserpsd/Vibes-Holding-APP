@@ -39,6 +39,17 @@ export type WaRecord = {
  */
 export const RETRY_KINDS: ReadonlySet<string> = new Set(['admin_message']);
 export const RETRY_DELAYS_MS: readonly number[] = [3_600_000, 6 * 3_600_000, 24 * 3_600_000];
+/**
+ * M252 (owner, 2026-11-18: «وصل 4 مرات ورا بعض… تذكير واحد فقط»): the first deploy retried EVERY old refusal, so a
+ * member refused on four past messages got four notices at once. The notice is the same words whatever the message, so
+ * one number hears ONE: a refusal is dropped once a later notice went to that number, only the newest refusal per number
+ * is tried, a refusal left overdue longer than this is dropped, and nothing leaves at night (22:00–09:00 Riyadh).
+ */
+const RETRY_STALE_MS = 14 * 3_600_000;
+const quietHour = (now: number): boolean => {
+  const hour = new Date(now + 3 * 3_600_000).getUTCHours();
+  return hour >= 22 || hour < 9;
+};
 const refusedByMeta = (record: WaRecord): boolean => record.status === 'failed' && /\b131049\b/.test(record.error ?? '');
 /** The account id a management-message ref ends with (`post:<id>:<account>`); null on the older refs. */
 const accountOfRef = (ref: string | null): number | null => {
@@ -405,7 +416,27 @@ export class WhatsappService {
       // Only the newest record of one message to one number counts: an earlier try was already answered by a later one.
       const due = records.filter((record) => RETRY_KINDS.has(record.kind) && record.ref && record.template && !record.closed && refusedByMeta(record)
         && !records.some((other) => other !== record && other.kind === record.kind && other.ref === record.ref && other.to === record.to && other.createdAt > record.createdAt));
+      // M252: one number, one notice — see RETRY_STALE_MS.
+      const newest = new Map<string, WaRecord>();
+      const dropped = new Set<string>();
       for (const record of due) {
+        const told = records.some((other) => other.kind === record.kind && other.to === record.to && other.status !== 'failed' && other.createdAt > record.createdAt);
+        const stale = now - Date.parse(record.updatedAt) > (RETRY_DELAYS_MS[record.attempt ?? 0] ?? 0) + RETRY_STALE_MS;
+        const key = `${record.kind}|${record.to}`;
+        const held = newest.get(key);
+        if (told || stale) dropped.add(record.id);
+        else if (!held) newest.set(key, record);
+        else if (record.createdAt > held.createdAt) {
+          dropped.add(held.id);
+          newest.set(key, record);
+        } else dropped.add(record.id);
+      }
+      if (dropped.size) {
+        await this.mutate((all) => {
+          for (const stored of all) if (dropped.has(stored.id)) stored.closed = true;
+        });
+      }
+      for (const record of newest.values()) {
         const attempt = record.attempt ?? 0;
         const wait = RETRY_DELAYS_MS[attempt];
         if (wait === undefined) {
@@ -417,7 +448,7 @@ export class WhatsappService {
           if (mailed) out.mailed += 1;
           continue;
         }
-        if (now - Date.parse(record.updatedAt) < wait) continue;
+        if (now - Date.parse(record.updatedAt) < wait || quietHour(now)) continue;
         const lang = toLang(record.lang);
         const params = record.params ?? [lang === 'en' ? 'Member' : 'عضونا'];
         // The try leaves on the template the kind uses today (a refusal of the Marketing one is retried as Utility).
