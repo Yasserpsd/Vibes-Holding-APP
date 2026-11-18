@@ -222,3 +222,19 @@ test('the dashboard enters and orders profiles by hand and edits the owner\'s in
   assert.equal(removed.statusCode, 200);
   assert.equal((await get('/api/people')).json().people.length, 1);
 });
+
+test('every refused field names itself, and a link without https is completed for the member', async () => {
+  const refusal = async (patch: Record<string, unknown>) => {
+    const response = await send('POST', '/api/profiles/apply', { ...application, ...patch }, memberToken);
+    assert.equal(response.statusCode, 400);
+    return String(response.json().error.message);
+  };
+  assert.match(await refusal({ links: [{ label: '', url: 'instagram: Elham' }] }), /خانة الروابط/);
+  assert.match(await refusal({ bio: 'نبذة. '.repeat(300) }), /النبذة بحد أقصى 1200/);
+  assert.match(await refusal({ achievements: ['لا'] }), /كل إنجاز في سطر مستقل/);
+  assert.match(await refusal({ seeking: 'س'.repeat(601) }), /600 حرف/);
+
+  const accepted = await send('POST', '/api/profiles/apply', { ...application, links: [{ label: 'Instagram', url: 'instagram.com/username' }] }, memberToken);
+  assert.equal(accepted.statusCode, 201);
+  assert.ok(JSON.stringify(accepted.json()).includes('https://instagram.com/username'));
+});

@@ -11,26 +11,45 @@ import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type Pro
 
 export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService; english?: PersonLocalizer; /** M242: the management's note on an application, in English for the English app. */ notes?: EnglishCache };
 
+/** A member types «instagram.com/name» as often as a full address: the scheme is added for them. */
+const withScheme = (value: string): string => (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+function isWebLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
 const linkSchema = z.object({
   label: z.string().trim().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا').default(''),
-  url: z.string().trim().url('اكتب رابطًا صحيحًا يبدأ بـ https').max(200, 'الرابط بحد أقصى 200 حرف'),
+  url: z
+    .string()
+    .trim()
+    .transform(withScheme)
+    .pipe(z.string().refine(isWebLink, 'خانة الروابط تقبل رابطًا كاملًا في كل سطر، مثل: instagram.com/username').max(200, 'الرابط بحد أقصى 200 حرف')),
 });
 
+// Every limit carries its own sentence: a rule without one reached the member as «some details are not valid».
+const lines = (min: number, max: number, each: string, count: string) =>
+  z.array(z.string().trim().min(min, each).max(max, each)).max(10, count);
+
 const applySchema = z.object({
-  title: z.string().trim().min(2, 'اكتب وظيفتك أو منصبك').max(80),
-  company: z.string().trim().max(120).default(''),
+  title: z.string().trim().min(2, 'اكتب وظيفتك أو منصبك').max(80, 'الوظيفة أو المنصب بحد أقصى 80 حرفًا'),
+  company: z.string().trim().max(120, 'اسم الشركة بحد أقصى 120 حرفًا').default(''),
   // M73: the spotlight sections the owner asked for (2026-10-16).
-  specialty: z.string().trim().min(2, 'اكتب مجالك وخبرتك').max(160),
-  city: z.string().trim().min(2, 'اكتب مدينتك').max(80),
-  bio: z.string().trim().min(30, 'اكتب نبذة أوفى عن شخصيتك ومسيرتك').max(1200),
-  milestones: z.array(z.string().trim().min(3).max(140)).min(1, 'أضف محطة واحدة على الأقل من مسيرتك').max(10),
-  achievements: z.array(z.string().trim().min(3).max(300)).max(10).default([]),
-  benefit: z.array(z.string().trim().min(3).max(200)).max(10).default([]),
-  seeking: z.string().trim().max(600).default(''),
-  phone: z.string().trim().max(40).default(''),
+  specialty: z.string().trim().min(2, 'اكتب مجالك وخبرتك').max(160, 'المجال والخبرة بحد أقصى 160 حرفًا'),
+  city: z.string().trim().min(2, 'اكتب مدينتك').max(80, 'المدينة بحد أقصى 80 حرفًا'),
+  bio: z.string().trim().min(30, 'اكتب نبذة أوفى عن شخصيتك ومسيرتك').max(1200, 'النبذة بحد أقصى 1200 حرف'),
+  milestones: lines(3, 140, 'كل محطة في سطر مستقل، من 3 أحرف إلى 140 حرفًا', 'المحطات بحد أقصى 10 أسطر').min(1, 'أضف محطة واحدة على الأقل من مسيرتك'),
+  achievements: lines(3, 300, 'كل إنجاز في سطر مستقل، من 3 أحرف إلى 300 حرف', 'الإنجازات بحد أقصى 10 أسطر').default([]),
+  benefit: lines(3, 200, 'كل نقطة استفادة في سطر مستقل، من 3 أحرف إلى 200 حرف', 'نقاط الاستفادة بحد أقصى 10 أسطر').default([]),
+  seeking: z.string().trim().max(600, 'ما تبحث عنه من الأعضاء بحد أقصى 600 حرف').default(''),
+  phone: z.string().trim().max(40, 'رقم الجوال بحد أقصى 40 خانة').default(''),
   // M242: cleaned like every other address; still optional, and never a new reason to refuse the page.
-  email: z.string().trim().max(190).default('').transform(cleanEmail),
-  links: z.array(linkSchema).max(5).default([]),
+  email: z.string().trim().max(190, 'البريد الإلكتروني بحد أقصى 190 حرفًا').default('').transform(cleanEmail),
+  links: z.array(linkSchema).max(5, 'الروابط بحد أقصى 5 روابط').default([]),
 });
 
 const longLine = (max: number) => z.string().trim().min(1).max(max, `كل سطر بحد أقصى ${max} حرفًا — قسّم السطر الطويل إلى سطرين`);
