@@ -5,6 +5,7 @@ import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
 import { getLang, t } from '@/i18n';
+import { deviceCountry } from '@/lib/deviceCountry';
 import { emailFix, phoneCountryFix } from '@/lib/fixes';
 import { cleanEmail, isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
@@ -20,7 +21,8 @@ export type IdentifierMode = 'phone' | 'email';
 
 export type Identifier = { mode: IdentifierMode; country: string; value: string };
 
-export const EMPTY_IDENTIFIER: Identifier = { mode: 'phone', country: 'sa', value: '' };
+// M256: the dial code opens on the country the phone is in (lib/deviceCountry), Saudi Arabia when it does not tell.
+export const EMPTY_IDENTIFIER: Identifier = { mode: 'phone', country: deviceCountry(), value: '' };
 
 /** The request body fields for this identifier: the number plus its country, or the cleaned e-mail address. */
 export function identifierPayload(identifier: Identifier): { login: string; country?: string } {

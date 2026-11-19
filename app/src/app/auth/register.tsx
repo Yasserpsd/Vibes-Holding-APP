@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, type ScrollView } from 'react-native';
+import { Pressable, Text, type ScrollView, type TextInput } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -22,8 +22,10 @@ import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
 import { getLang, t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { deviceCountry } from '@/lib/deviceCountry';
 import { emailFix, nameFix, phoneCountryFix } from '@/lib/fixes';
 import { markIntroDue } from '@/lib/introGate';
+import { clearSignupDraft, loadSignupDraft, saveSignupDraft, type SignupDraft } from '@/lib/signupDraft';
 import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -91,7 +93,8 @@ export default function RegisterScreen() {
     : null;
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
   const scrollRef = useRef<ScrollView | null>(null);
-  const [form, setForm] = useState<Form>({ ...EMPTY, name: socialName?.trim() ?? '', email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' });
+  // M256: the picker opens on the country the phone is in (its time zone), Saudi Arabia when it does not tell.
+  const [form, setForm] = useState<Form>(() => ({ ...EMPTY, country: deviceCountry(), name: socialName?.trim() ?? '', email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' }));
   // M239 (owner, 2026-11-14: a right e-mail kept its red warning): the handlers read the newest values from here, never
   // from the render they were created in — an autofill writes a field and leaves it inside one render.
   const [newest] = useState(() => ({ form }));
@@ -107,6 +110,9 @@ export default function RegisterScreen() {
   const proofRef = useRef<PhoneProofHandle | null>(null);
   const { signIn } = useAuth();
   const queryClient = useQueryClient();
+  // M256: «التالي» on the keyboard goes to the next field instead of closing the keyboard.
+  const phoneInput = useRef<TextInput | null>(null);
+  const passwordInput = useRef<TextInput | null>(null);
 
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
   // M126 (owner): the dial code is right there, so the number never shows a leading zero.
@@ -149,6 +155,38 @@ export default function RegisterScreen() {
     // M211: the proof belongs to one number in one country.
     if (key === 'country') setProof(null);
   };
+  // M256: what was typed is kept on the phone for a day (never the password): a member who left for WhatsApp and
+  // found the app closed comes back to his form. Only the fields still empty are filled, so a link's invite code or
+  // a Google/Apple name is never overwritten.
+  const restore = (saved: SignupDraft) => {
+    const current = newest.form;
+    if (!current.phone && saved.phone) {
+      if (saved.country) set('country')(saved.country);
+      set('phone')(saved.phone);
+    }
+    if (!current.name && saved.name) set('name')(saved.name);
+    if (!current.email && saved.email) set('email')(saved.email);
+    if (!current.jobTitle && saved.jobTitle) set('jobTitle')(saved.jobTitle);
+    if (!current.inviteCode && saved.inviteCode) {
+      set('inviteCode')(saved.inviteCode);
+      setShowInvite(true);
+    }
+    if (!current.persona && (saved.persona === 'neutral' || saved.persona === 'entrepreneur' || saved.persona === 'investor')) set('persona')(saved.persona);
+  };
+  useEffect(() => {
+    let alive = true;
+    void loadSignupDraft().then((saved) => {
+      if (alive && saved) restore(saved);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the form opens
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => saveSignupDraft(form), 600);
+    return () => clearTimeout(timer);
+  }, [form]);
   const blur = (key: Field) => () => {
     // M253: the server's verdict on this exact value stands; the local check knows less.
     if (errors.errors[key] && refused.values[key] === newest.form[key]) return;
@@ -209,6 +247,7 @@ export default function RegisterScreen() {
           inviteCode: latest.inviteCode.trim() || undefined,
         });
         if (result.created) markIntroDue();
+        clearSignupDraft();
         await signIn(result.token, result.me);
         if (result.created) trackRegistration(social.provider, result.me);
         void queryClient.invalidateQueries({ queryKey: ['news'] });
@@ -228,6 +267,8 @@ export default function RegisterScreen() {
         inviteCode: latest.inviteCode.trim() || undefined,
         phoneProof: proven?.kind === 'done' ? proven.token : undefined,
       });
+      // M256: the account exists now — the kept draft has done its work.
+      clearSignupDraft();
       if (result.pending) {
         router.push({
           pathname: '/auth/verify',
@@ -342,6 +383,9 @@ export default function RegisterScreen() {
             onBlur={blur('name')}
             hint={t('auth.register.nameHint')}
             hintOnFocus
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => phoneInput.current?.focus()}
             warning={form.name.trim().length >= 2 && nameIssue(form.name) ? t('form.nameWarning') : null}
             textContentType="name"
           />
@@ -358,6 +402,7 @@ export default function RegisterScreen() {
             placeholder={phoneExample || undefined}
             hint={t('auth.register.phoneWhatsapp')}
             hintOnFocus
+            inputRef={phoneInput}
             error={errors.errors.phone}
             fix={fixes.phone}
             anchorRef={errors.anchor('phone')}
@@ -396,6 +441,9 @@ export default function RegisterScreen() {
             editable={!social}
             hint={social ? t('auth.register.socialEmailHint', { provider: social.label }) : undefined}
             onChangeText={set('email')}
+            returnKeyType={social ? 'done' : 'next'}
+            submitBehavior={social ? 'blurAndSubmit' : 'submit'}
+            onSubmitEditing={() => passwordInput.current?.focus()}
             error={errors.errors.email}
             warning={emailMeant && isEmail(form.email) ? t('form.fix.emailMeant') : null}
             fix={fixes.email}
@@ -409,6 +457,8 @@ export default function RegisterScreen() {
             secureTextEntry
             autoCapitalize="none"
             textContentType="newPassword"
+            inputRef={passwordInput}
+            returnKeyType="done"
             value={form.password}
             onChangeText={set('password')}
             hint={t('auth.register.passwordHint')}

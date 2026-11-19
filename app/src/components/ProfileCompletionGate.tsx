@@ -20,6 +20,7 @@ import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { FieldScrollProvider, useFieldScroller } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
 import { getLang, t, tOptional } from '@/i18n';
+import { deviceCountry } from '@/lib/deviceCountry';
 import { emailFix, nameFix, phoneCountryFix } from '@/lib/fixes';
 import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { brand, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
@@ -90,7 +91,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   const [name, setName] = useState(me?.name ?? '');
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('sa');
+  // M256: the picker opens on the country the phone is in.
+  const [countryCode, setCountryCode] = useState(deviceCountry);
   const [persona, setPersona] = useState<Persona | ''>('');
   const [jobTitle, setJobTitle] = useState(me?.jobTitle ?? '');
   // M206: Google and Apple sign-ups skip the register screen, so this is where a representative's code is typed.

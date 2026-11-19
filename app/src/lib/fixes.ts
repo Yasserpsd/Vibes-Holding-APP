@@ -1,3 +1,4 @@
+import { HOME_COUNTRY } from '@/lib/deviceCountry';
 import { cleanEmail, isEmail, nameIssue, phoneIssue, toAsciiDigits, type PhoneRules } from '@/lib/validation';
 
 /**
@@ -96,7 +97,12 @@ export function phoneCountryFix<C extends DialCountry>(value: string, selected: 
     // The longest dial code is the most exact claim on the number.
     .sort((a, b) => b.country.dial.length - a.country.dial.length);
   const best = matches[0];
-  if (!best) return null;
+  if (!best) {
+    // M256: no dial code in front — a complete number of the home country, typed while the picker stood elsewhere
+    // (the picker now opens on the country the phone is in, and a Saudi member can be abroad).
+    const home = selected === HOME_COUNTRY ? undefined : countries.find((land) => land.code === HOME_COUNTRY);
+    return home && phoneIssue(digits, home) === null ? { country: home, phone: digits } : null;
+  }
   // Two countries share a dial code (1, 7): no one right answer.
   return matches.filter((match) => match.country.dial === best.country.dial).length === 1 ? best : null;
 }
