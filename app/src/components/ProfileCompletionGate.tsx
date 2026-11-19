@@ -13,6 +13,7 @@ import { CountryPicker } from '@/components/CountryPicker';
 import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { ChipRow, ErrorSummary, FieldGroup, type FieldFix } from '@/components/form/FormParts';
 import { FormCard } from '@/components/form/FormTheme';
+import { SignupSteps } from '@/components/form/SignupSteps';
 import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
@@ -47,16 +48,27 @@ const personaLabel = (item: { key: Persona; label: string }): string => tOptiona
  * M204 (owner, 2026-11-06: «اي بيانات ناقصة يطلعه بوب اب جميل كده ويقدر يدوس لاحقا عادي»): no wall any more. A weekly
  * popup (GentlePopups) offers this form, and «لاحقًا» closes it at any moment.
  */
-export function gateMissing(me: Me | null | undefined): Field[] {
+export function gateMissing(me: Me | null | undefined): GateField[] {
   // M168: a newer server may name a field this bundle has no input for — never ask the member for it.
   if (!me || me.isAdmin) return [];
-  return (me.profileMissing ?? []).filter((key): key is Field => (ORDER as readonly string[]).includes(key) && (GATE_FIELDS as readonly string[]).includes(key));
+  return (me.profileMissing ?? []).filter((key): key is GateField => (GATE_ORDER as readonly string[]).includes(key) && (GATE_FIELDS as readonly string[]).includes(key));
 }
 
-type Field = 'name' | 'contactEmail' | 'phone' | 'persona' | 'jobTitle';
-const ORDER: Field[] = ['name', 'contactEmail', 'phone', 'persona', 'jobTitle'];
+/** The fields the server can report missing. */
+type GateField = 'name' | 'contactEmail' | 'phone' | 'persona' | 'jobTitle';
+const GATE_ORDER: GateField[] = ['name', 'contactEmail', 'phone', 'persona', 'jobTitle'];
+/** The inputs of the form: the server's fields, with the name asked in two (M258). */
+type Field = GateField | 'lastName';
+const ORDER: Field[] = ['name', 'lastName', 'contactEmail', 'phone', 'persona', 'jobTitle'];
 
-export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater: () => void }) {
+/** M258: the first word of a name, then the rest — the two fields of the form (sent back as one name). */
+const splitName = (value: string): { first: string; last: string } => {
+  const whole = value.replace(/\s+/g, ' ').trim();
+  const at = whole.indexOf(' ');
+  return at < 0 ? { first: whole, last: '' } : { first: whole.slice(0, at), last: whole.slice(at + 1) };
+};
+
+export function CompletionForm({ missing, onLater }: { missing: GateField[]; onLater: () => void }) {
   const { me, setMe } = useAuth();
   useEffect(() => {
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -88,7 +100,10 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- retryFields reads the latest queries when it fires
   }, [failed]);
-  const [name, setName] = useState(me?.name ?? '');
+  // M258 (owner, 2026-11-19): the name in two fields here too — `name` is the first name, `lastName` the family name.
+  const [name, setName] = useState(() => splitName(me?.name ?? '').first);
+  const [lastName, setLastName] = useState(() => splitName(me?.name ?? '').last);
+  const wholeName = `${name.trim()} ${lastName.trim()}`.replace(/\s+/g, ' ').trim();
   const [contactEmail, setContactEmail] = useState(me?.contactEmail ?? '');
   const [phone, setPhone] = useState('');
   // M256: the picker opens on the country the phone is in.
@@ -109,11 +124,14 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
   /** The verdict on one field for a given value — null when it is fine or not asked for. */
   const issueOf = (key: Field, value: string, land = country): string | null => {
-    if (!need(key)) return null;
+    // The family name is asked whenever the name is.
+    if (!need(key === 'lastName' ? 'name' : key)) return null;
     switch (key) {
       // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
       case 'name':
-        return value.trim().length < 2 ? t('form.error.name.empty') : null;
+        return value.trim().length < 2 ? t('form.error.firstName') : null;
+      case 'lastName':
+        return value.trim().length < 2 ? t('form.error.lastName') : null;
       case 'contactEmail':
         return isEmail(value) ? null : t('form.error.email');
       case 'phone': {
@@ -129,18 +147,18 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
         return null;
     }
   };
-  const current: Record<Field, string> = { name, contactEmail, phone, persona, jobTitle };
+  const current: Record<Field, string> = { name, lastName, contactEmail, phone, persona, jobTitle };
   // M239 (owner, 2026-11-14: a right e-mail kept its red warning on the sign-up form): a warning never outlives its
   // reason — an autofill can write a field and leave it inside one render, and the leave then judges the old value.
   const shown = form.errors;
   const clearError = form.clear;
   useEffect(() => {
-    const values = { name, contactEmail, jobTitle };
-    for (const key of ['name', 'contactEmail', 'jobTitle'] as const) {
+    const values = { name, lastName, contactEmail, jobTitle };
+    for (const key of ['name', 'lastName', 'contactEmail', 'jobTitle'] as const) {
       if (shown[key] && refused.values[key] !== values[key] && issueOf(key, values[key]) === null) clearError(key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
-  }, [name, contactEmail, jobTitle, shown, clearError, refused]);
+  }, [name, lastName, contactEmail, jobTitle, shown, clearError, refused]);
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {
@@ -158,7 +176,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     setBusy(true);
     try {
       const rest = {
-        ...(need('name') ? { name: name.trim() } : {}),
+        ...(need('name') ? { name: wholeName } : {}),
         ...(need('contactEmail') ? { contactEmail: cleanEmail(contactEmail) } : {}),
         ...(need('persona') && persona ? { persona } : {}),
         ...(need('jobTitle') ? { jobTitle: jobTitle.trim() } : {}),
@@ -200,10 +218,11 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   };
 
   // M253 (owner, 2026-11-19: «أي خطأ يحصل يظهر زرار فوري يحل المشكلة»): the one-tap corrections, as on the sign-up form.
-  const nameMeant = need('name') ? nameFix(name) : null;
+  const nameComplete = name.trim().length >= 2 && lastName.trim().length >= 2;
+  const nameMeant = need('name') && nameComplete ? nameFix(wholeName) : null;
   const emailMeant = need('contactEmail') ? emailFix(contactEmail) : null;
   const phoneLand = config && form.errors.phone ? phoneCountryFix(phone, countryCode, config.countries) : null;
-  const nameFixButton: FieldFix | null = nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => field('name', setName)(nameMeant) } : null;
+  const nameFixButton: FieldFix | null = nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => { const parts = splitName(nameMeant); field('name', setName)(parts.first); field('lastName', setLastName)(parts.last); } } : null;
   const emailFixButton: FieldFix | null = emailMeant ? { label: t('form.fix.use', { value: emailMeant }), onPress: () => field('contactEmail', setContactEmail)(emailMeant) } : null;
   const phoneFixButton: FieldFix | null = phoneLand
     ? {
@@ -240,6 +259,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
           </View>
           <Text style={styles.body}>{t('completeProfile.body')}</Text>
 
+          {/* M258: the member reads that a WhatsApp code follows his details. */}
+          {need('phone') ? <SignupSteps labels={[t('auth.register.step.details'), t('auth.register.step.code')]} current={step ? 1 : 0} /> : null}
           {step ? (
             <FormCard tone="light">
               <PhoneCodeStep
@@ -265,7 +286,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 ...(need('jobTitle') ? [{ key: 'jobTitle', label: t('completeProfile.jobTitle'), type: 'text' as const, required: true }] : []),
               ]}
               values={{
-                name,
+                name: wholeName,
                 phone,
                 persona: persona ? personaLabel({ key: persona, label: config?.personas.find((item) => item.key === persona)?.label ?? '' }) : '',
                 jobTitle,
@@ -274,7 +295,11 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
               disabled={waiting}
               onFill={(values) => {
                 form.reset();
-                if (values.name) setName(values.name);
+                if (values.name) {
+                  const parts = splitName(values.name);
+                  setName(parts.first);
+                  setLastName(parts.last);
+                }
                 if (values.phone) setPhone(values.phone);
                 const pickedPersona = config?.personas.find((item) => personaLabel(item) === values.persona || item.label === values.persona)?.key;
                 if (pickedPersona) setPersona(pickedPersona);
@@ -284,19 +309,30 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
             ) : null}
 
             {need('name') ? (
-              <FormField
-                label={t('completeProfile.name')}
-                value={name}
-                onChangeText={field('name', setName)}
-                hint={t('completeProfile.nameHint')}
-                hintOnFocus
-                warning={name.trim().length >= 2 && nameIssue(name) ? t('form.nameWarning') : null}
-                error={form.errors.name}
-                fix={nameFixButton}
-                anchorRef={form.anchor('name')}
-                onBlur={blur('name')}
-                textContentType="name"
-              />
+              <>
+                <FormField
+                  label={t('auth.register.firstName')}
+                  value={name}
+                  onChangeText={field('name', setName)}
+                  error={form.errors.name}
+                  anchorRef={form.anchor('name')}
+                  onBlur={blur('name')}
+                  textContentType="givenName"
+                  autoComplete="name-given"
+                />
+                <FormField
+                  label={t('auth.register.lastName')}
+                  value={lastName}
+                  onChangeText={field('lastName', setLastName)}
+                  warning={nameComplete && nameIssue(wholeName) ? t('form.nameWarning') : null}
+                  error={form.errors.lastName}
+                  fix={nameFixButton}
+                  anchorRef={form.anchor('lastName')}
+                  onBlur={blur('lastName')}
+                  textContentType="familyName"
+                  autoComplete="name-family"
+                />
+              </>
             ) : null}
 
             {need('contactEmail') ? (

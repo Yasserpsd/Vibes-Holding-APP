@@ -21,6 +21,7 @@ import { PhoneProofField, type PhoneProofHandle, type PhoneProofState } from '@/
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
+import { SupportLink } from '@/components/SupportLink';
 import { getLang, t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
 import { deviceCountry } from '@/lib/deviceCountry';
@@ -411,7 +412,6 @@ export default function RegisterScreen() {
         <FormCard tone="light">
           {stepsShown ? <SignupSteps labels={[t('auth.register.step.details'), t('auth.register.step.code'), t('auth.register.step.done')]} current={stepNow} /> : null}
           <ErrorSummary count={errors.count} />
-          <Notice text={t('auth.register.phonePolicy')} />
           <FormField
             label={t('auth.register.firstName')}
             value={form.name}
@@ -575,6 +575,8 @@ export default function RegisterScreen() {
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
         <Text style={styles.footnote}>{t('auth.register.footnote')}</Text>
+        {/* M258 (owner, 2026-11-19): help is one tap away from the first moment, not only after something went wrong. */}
+        <SupportLink />
       </FadeInView>
     </Screen>
   );
