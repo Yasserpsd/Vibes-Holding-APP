@@ -9,7 +9,8 @@ import { newToken } from './sessions.js';
  * `signin` = a member signing in; `number` = a signed-in member proving a new number; `signup` = M211: somebody with no
  * account yet proving the number he is about to register with.
  */
-export type PhoneCodePurpose = 'signin' | 'number' | 'signup';
+/** M259 adds `codelogin`: the code IS the sign-in (no password before it). WhatsApp only, like a number's proof. */
+export type PhoneCodePurpose = 'signin' | 'number' | 'signup' | 'codelogin';
 /** M204: WhatsApp first, always. `email` = WhatsApp did not carry this code, so it went to the account's address by itself. */
 export type PhoneCodeVia = 'whatsapp' | 'email';
 
@@ -291,6 +292,20 @@ export class PhoneCodeStore {
 
   async dropSocialSignup(token: string): Promise<void> {
     await this.kv.delete(socialSignupKey(token));
+  }
+
+  /**
+   * M259: the codes of a password-less sign-in one account may ask for in a day. Each code is five guesses at four
+   * digits (owner, 2026-11-19: «اعتمد 4 رموز فقط»), so the day's ceiling is what keeps guessing hopeless.
+   */
+  async spendCodeLogin(contactId: number, cap: number): Promise<boolean> {
+    const key = `code-login-day:${contactId}:${new Date().toISOString().slice(0, 10)}`;
+    return this.exclusive(key, async () => {
+      const spent = (await this.kv.get<number>(key)) ?? 0;
+      if (spent >= cap) return false;
+      await this.kv.set(key, spent + 1);
+      return true;
+    });
   }
 
   /** M211: nobody is signed in when these codes leave, so the day has a ceiling. False = today's ceiling is reached. */

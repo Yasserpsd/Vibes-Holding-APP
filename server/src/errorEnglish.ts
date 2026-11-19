@@ -23,6 +23,11 @@ export const SENTENCES_EN: Record<string, string> = {
   'محاولات كثيرة، حاول بعد قليل': 'Too many attempts. Try again shortly.',
   'محاولات كثيرة في وقت قصير، حاول بعد قليل': 'Too many attempts in a short time. Try again shortly.',
   'طلبات كثيرة في وقت قصير، حاول بعد قليل': 'Too many requests in a short time. Try again shortly.',
+  // M259: sign-in with a WhatsApp code (auth/service.ts).
+  'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور': 'Sign-in with a WhatsApp code is not available right now. Sign in with your password.',
+  'لا يوجد حساب مسجل بهذا الرقم — أنشئ حسابك الجديد أولًا': 'No account is registered with this number. Create your account first.',
+  'الدخول بالرمز غير متاح لهذا الحساب بعد. سجّل الدخول بكلمة المرور مرة واحدة، وبعدها يتاح لك الدخول بالرمز': 'Sign-in with a code is not available for this account yet. Sign in with your password once, and the code will be available after that.',
+  'استخدمت رموز الدخول المتاحة لهذا اليوم. سجّل الدخول بكلمة المرور أو حاول غدًا': 'You have used the sign-in codes available for today. Sign in with your password, or try again tomorrow.',
   // M253: the sentence under a refused field whose rule has none of its own (auth/guard.ts).
   'هذه الخانة مطلوبة': 'This field is required.',
   'أضف عنصرًا واحدًا على الأقل في هذه الخانة': 'Add at least one item in this field.',

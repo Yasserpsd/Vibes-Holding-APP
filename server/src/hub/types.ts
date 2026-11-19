@@ -88,6 +88,8 @@ export type HubOp =
   // Plugin 2.8.0 (M46): server-verified Google/Apple sign-in — find-or-create the contact by the verified e-mail.
   | 'social_login'
   | 'phone_check'
+  // Plugin 2.31.0 (M259): sign-in by a WhatsApp code the app server sent and checked; `check: 1` only asks.
+  | 'phone_login'
   | 'logout'
   | 'account'
   | 'profile'
@@ -133,6 +135,10 @@ export type HubResponse = {
   proven?: 1;
   /** Plugin 2.29.0 (M211) `phone_check`: an active account owns this number. */
   taken?: 0 | 1;
+  /** `phone_login` with `check: 1` (M259): this number may sign in by code; whose account, and its language. */
+  eligible?: 0 | 1;
+  contact_id?: number;
+  lang?: string;
   /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
   referred_by?: number;
   referred_name?: string;

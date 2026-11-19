@@ -107,6 +107,8 @@ export type AuthConfig = {
   registrationOpen: boolean;
   /** M211: the sign-up confirms the number on WhatsApp before the account exists. */
   phoneProofRequired?: boolean;
+  /** M259: the server and the hub can sign a member in with a WhatsApp code alone; an older server sends nothing. */
+  codeLogin?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };
@@ -218,6 +220,10 @@ export const authApi = {
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
     apiRequest<SignedInResult | TotpStepResult | PhoneStepResult | PhoneFirstResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),
+  // M259: sign-in with the number and a WhatsApp code, no password. The start sends the code; the verify signs in
+  // (an account with an authenticator app still gets its own step).
+  codeLoginStart: (phone: string, country: string) => apiRequest<PhoneStepResult>('POST', '/api/auth/code-login/start', { body: { phone, country }, token: null }),
+  codeLoginVerify: (stepToken: string, code: string) => apiRequest<SignedInResult | TotpStepResult>('POST', '/api/auth/code-login/verify', { body: { stepToken, code }, token: null }),
   // M203: the code that ends a sign-in. `fixPhone`: it came by e-mail, so the number is still unproven.
   phoneVerify: (stepToken: string, code: string) => apiRequest<SignedInResult & { fixPhone?: boolean }>('POST', '/api/auth/phone/verify', { body: { stepToken, code }, token: null }),
   phoneResend: (stepToken: string, via: 'whatsapp' | 'email') =>

@@ -251,7 +251,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     }
   };
   /** The address or number as it arrived, before any cleaning: only its kind is logged. */
-  const typedIn = (request: FastifyRequest, field: 'email' | 'login'): unknown => (request.body as Record<string, unknown> | null | undefined)?.[field];
+  const typedIn = (request: FastifyRequest, field: 'email' | 'login' | 'phone'): unknown => (request.body as Record<string, unknown> | null | undefined)?.[field];
 
   /**
    * M241: what opens the deletion steps. A typed password is checked the way it always was. Without one, the fresh
@@ -300,6 +300,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     registrationOpen: service.registrationOpen,
     // M211: the sign-up form confirms the number itself, before the account exists.
     phoneProofRequired: service.phoneProofRequired,
+    // M259: the sign-in screen offers «الدخول برمز واتساب» only where the code and the hub can carry it.
+    codeLogin: await service.codeLoginReady(),
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,
@@ -408,6 +410,30 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const { signupToken, phoneProof, ...profile } = body;
       const result = await service.completeSocialSignup(signupToken, phoneProof, request.ip, profile);
       return { ...result, me: await withEnglish(request, result.me) };
+    }),
+  );
+
+  // M259: sign-in with a WhatsApp code and no password. Paid messages and a door into an account: the limits are tight
+  // here (per address), in the store (one live step, an hourly budget, five tries a code) and per account per day.
+  app.post(
+    '/api/auth/code-login/start',
+    guard(async (request, reply) => {
+      const typed = typedIn(request, 'phone');
+      if (limited('code-login', 6, request, reply)) return noteRefusal('login', request, 'rate', typed);
+      const body = parse(phoneStartSchema, request.body, reply);
+      if (!body) return noteRefusal('login', request, 'invalid', typed, undefined, refusedField(phoneStartSchema, request.body));
+      return watched('login', request, typed, () => service.startCodeLogin(body.phone, body.country, request.ip, sourceOf(request)));
+    }),
+  );
+
+  app.post(
+    '/api/auth/code-login/verify',
+    guard(async (request, reply) => {
+      if (limited('code-login-code', 20, request, reply)) return;
+      const body = parse(phoneStepSchema, request.body, reply);
+      if (!body) return;
+      const result = await service.confirmCodeLogin(body.stepToken, body.code, request.ip, sourceOf(request));
+      return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
 

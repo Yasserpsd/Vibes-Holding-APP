@@ -30,6 +30,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
+  const [codeBusy, setCodeBusy] = useState(false);
 
   const submit = async () => {
     if (!identifierValid(identifier) || !password) {
@@ -74,6 +75,35 @@ export default function LoginScreen() {
       setBusy(false);
     }
   };
+
+  // M259 (owner, 2026-11-19: «الدخول برمز واتساب بدل كلمة المرور»): the number and a four-digit WhatsApp code sign the
+  // member in — nothing to remember. Offered only where the server says it can (a proven number; the server refuses
+  // the rest with the sentence that says to use the password once).
+  const codeLogin = async () => {
+    if (busy || codeBusy) return;
+    if (!identifierValid(identifier)) {
+      setFailure({ message: t('auth.login.requiredPhone'), code: 'local' });
+      return;
+    }
+    const phoneProblem = identifierPhoneProblem(identifier, config?.countries);
+    if (phoneProblem) {
+      setFailure({ message: phoneProblem, code: 'local' });
+      return;
+    }
+    setCodeBusy(true);
+    setFailure(null);
+    try {
+      const { login, country } = identifierPayload(identifier);
+      const step = await authApi.codeLoginStart(login, country ?? identifier.country);
+      router.push(`${phoneStepPath(step)}&flow=code` as Href);
+    } catch (cause) {
+      setFailure(failureOf(cause));
+      if (cause instanceof ApiError && cause.code === 'no_account') router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
+    } finally {
+      setCodeBusy(false);
+    }
+  };
+  const codeLoginShown = Boolean(config?.codeLogin) && identifier.mode === 'phone';
 
   return (
     <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
@@ -121,6 +151,11 @@ export default function LoginScreen() {
       <FadeInView delay={entranceDelay(4)}>
         <AppButton label={t('auth.login.submit')} icon="log-in-outline" loading={busy} onPress={() => void submit()} />
       </FadeInView>
+      {codeLoginShown ? (
+        <FadeInView delay={entranceDelay(4)}>
+          <AppButton label={t('auth.login.withCode')} variant="outline" icon="logo-whatsapp" loading={codeBusy} onPress={() => void codeLogin()} />
+        </FadeInView>
+      ) : null}
       <FadeInView delay={entranceDelay(5)}>
         <Link href="/auth/reset" asChild>
           <PressScale>

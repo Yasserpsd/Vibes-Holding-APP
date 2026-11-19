@@ -44,6 +44,10 @@ const envSchema = z.object({
   // M203 (owner, 2026-11-06): WhatsApp code at every new sign-in. off = nothing asked; on = bundles that can draw the step;
   // strict = older bundles are refused too (the owner decides when; a forced update cost members before, see M200).
   PHONE_CODE_MODE: z.enum(['off', 'on', 'strict']).default('off'),
+  // M259: sign-in with a WhatsApp code and no password. On wherever the WhatsApp code is on and the hub knows the
+  // op (plugin 2.31.0); `off` hides it at once. The codes one account may ask for in a day are capped.
+  CODE_LOGIN: z.enum(['off', 'on']).default('on'),
+  CODE_LOGIN_DAILY: z.coerce.number().int().min(1).max(20).default(3),
   // M211: sign-up codes leave before an account exists, so a hard daily ceiling guards the paid channel.
   PHONE_PROOF_DAILY_CAP: z.coerce.number().int().min(1).default(1500),
   // M203: the store reviewers sign in with no code (docs/STORES.md promises e-mail + password, no 2FA). Comma list.

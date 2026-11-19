@@ -303,6 +303,7 @@
   "auth.login.submit": "دخول",
   "auth.login.busy": "جارٍ الدخول…",
   "auth.login.forgot": "نسيت كلمة المرور؟",
+  "auth.login.withCode": "الدخول برمز واتساب",
   "auth.login.register": "إنشاء حساب جديد",
   "auth.social.google": "المتابعة بحساب Google",
   "auth.social.apple": "المتابعة بحساب Apple",

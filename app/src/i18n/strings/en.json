@@ -303,6 +303,7 @@
   "auth.login.submit": "Sign in",
   "auth.login.busy": "Signing in…",
   "auth.login.forgot": "Forgot your password?",
+  "auth.login.withCode": "Sign in with a WhatsApp code",
   "auth.login.register": "Create a new account",
   "auth.social.google": "Continue with Google",
   "auth.social.apple": "Continue with Apple",

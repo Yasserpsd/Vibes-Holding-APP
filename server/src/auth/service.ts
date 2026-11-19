@@ -180,6 +180,21 @@ function phoneCodeProblem(result: { reason: 'cooldown'; waitSeconds: number } | 
   return new AuthError('phone_code_send_failed', 'تعذر إرسال الرمز الآن، حاول بعد قليل أو تواصل مع الدعم', 503);
 }
 
+/**
+ * M259: what the hub answers a password-less sign-in with, as the member reads it. An older hub does not know the
+ * op; an account the hub will not open by code (staff, a number never proven, a number on two accounts) is told to
+ * use its password — one sentence for the three, so the answer says nothing about the account.
+ */
+function codeLoginRefusal(error: unknown): unknown {
+  if (!(error instanceof HubError)) return error;
+  if (error.code === 'hub_not_supported') return new AuthError('code_login_off', 'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور', 503);
+  if (error.code === 'no_account' || error.code === 'not_found') return new AuthError('no_account', 'لا يوجد حساب مسجل بهذا الرقم — أنشئ حسابك الجديد أولًا', 404);
+  if (error.code === 'phone_shared' || error.code === 'password_only' || error.code === 'phone_unproven') {
+    return new AuthError('code_login_password', 'الدخول بالرمز غير متاح لهذا الحساب بعد. سجّل الدخول بكلمة المرور مرة واحدة، وبعدها يتاح لك الدخول بالرمز', 403);
+  }
+  return error;
+}
+
 /** M197: the hub's «no account» answer on a reset becomes `no_account`, the code the app already translates (M128). */
 function rethrowNoAccount(error: unknown): never {
   if (error instanceof HubError && error.code === 'not_found') throw new HubError('no_account', error.message, 404);
@@ -1131,6 +1146,70 @@ export class AuthService {
 
   private get phoneCodeOn(): boolean {
     return this.deps.config.PHONE_CODE_MODE !== 'off' && Boolean(this.deps.phoneCodes) && (this.deps.whatsappEnabled?.() ?? false);
+  }
+
+  // ---- M259 (owner, 2026-11-19: «الدخول برمز واتساب بدل كلمة المرور»): the WhatsApp code alone signs a member in.
+
+  private codeLoginHub: { known: boolean; at: number } | null = null;
+
+  /**
+   * Whether the sign-in screen offers «الدخول برمز واتساب»: the switch, the WhatsApp code, and a hub that knows the
+   * op (asked once every ten minutes, with an empty number that links nothing).
+   */
+  async codeLoginReady(): Promise<boolean> {
+    if (this.deps.config.CODE_LOGIN === 'off' || !this.phoneCodeOn) return false;
+    if (this.codeLoginHub && Date.now() - this.codeLoginHub.at < 10 * 60_000) return this.codeLoginHub.known;
+    let known = true;
+    try {
+      await this.deps.hub.call('phone_login', { check: 1, phone: '', country: 'sa', ip: 'probe', source: 'ios' });
+    } catch (error) {
+      // Any refusal but «unknown op» comes from the op itself (the empty number is refused by it).
+      known = !(error instanceof HubError && (error.code === 'hub_not_supported' || error.code === 'forbidden' || error.code === 'hub_unreachable' || error.code === 'hub_config'));
+    }
+    this.codeLoginHub = { known, at: Date.now() };
+    return known;
+  }
+
+  /**
+   * The member typed his number and asked for a code. Nothing is sent before the hub says this number signs in by
+   * code: ONE active account, its number already proven on WhatsApp, not staff. The code goes on WhatsApp only.
+   */
+  async startCodeLogin(phone: string, country: string, ip: string, source: AppSource = 'app'): Promise<PhoneStepResult> {
+    if (!(await this.codeLoginReady())) throw new AuthError('code_login_off', 'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور', 503);
+    const store = this.requirePhoneCodes();
+    const digits = plainNumber(phone, country);
+    let known: HubResponse;
+    try {
+      known = await this.deps.hub.call('phone_login', { check: 1, ip, source, phone: digits, country });
+    } catch (error) {
+      throw codeLoginRefusal(error);
+    }
+    if (known.eligible !== 1 || typeof known.contact_id !== 'number') throw new AuthError('code_login_off', 'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور', 503);
+    if (!(await store.spendCodeLogin(known.contact_id, this.deps.config.CODE_LOGIN_DAILY))) {
+      throw new AuthError('code_login_spent', 'استخدمت رموز الدخول المتاحة لهذا اليوم. سجّل الدخول بكلمة المرور أو حاول غدًا', 429);
+    }
+    const dial = COUNTRIES.find((item) => item.code === country)?.dial.replace(/\D+/g, '') ?? '';
+    const target = typeof known.phone_local === 'string' && known.phone_local ? known.phone_local : `${dial}${digits}`;
+    const begun = await store.begin({ purpose: 'codelogin', uuid: newUuid(), contactId: known.contact_id, phone: target, newPhone: digits, country, email: '', lang: typeof known.lang === 'string' ? known.lang : '' });
+    if (!begun.ok) throw phoneCodeProblem(begun);
+    return this.phoneStepAnswer(begun.token, begun.via, target, '');
+  }
+
+  /**
+   * The code was right: the hub links this sign-in to the account of that number (it checks the account again), and
+   * the session starts. An account with an authenticator app still passes its own step; there is no second WhatsApp code.
+   */
+  async confirmCodeLogin(stepToken: string, code: string, ip: string, source: AppSource = 'app'): Promise<MemberLoginResult> {
+    const step = await this.checkPhoneCode(stepToken, code, 'codelogin');
+    let result: HubResponse;
+    try {
+      result = await this.deps.hub.call('phone_login', { uuid: step.uuid, ip, source, phone: step.newPhone ?? '', country: step.country ?? 'sa', page_url: 'app://code-login' });
+    } catch (error) {
+      throw codeLoginRefusal(error);
+    }
+    const contact = requireContact(result);
+    await this.gate(step.uuid, contact);
+    return this.signIn(step.uuid, contact);
   }
 
   /** M211: the sign-up confirms the number before the account exists. */

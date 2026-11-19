@@ -65,6 +65,22 @@ export class MockHubClient implements HubClient {
         const taken = [...this.contacts.values()].some((contact) => contact.verified && contact.phoneNorm === norm);
         return { ok: true, taken: taken ? 1 : 0, phone_norm: norm, phone_local: phoneLocal(norm) };
       }
+      case 'phone_login': {
+        // Plugin 2.31.0 (M259): one active account, its number proven, not staff; `check` only asks.
+        const norm = phoneIntl(str(body, 'country', 5).toLowerCase() || 'sa', str(body, 'phone', 40));
+        if (!norm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص', 400);
+        const owners = [...this.contacts.values()].filter((contact) => contact.verified && contact.passHash !== '' && contact.phoneNorm === norm);
+        if (!owners.length) throw new HubError('no_account', 'لا يوجد حساب مسجل بهذا الرقم', 404);
+        if (owners.length > 1) throw new HubError('phone_shared', 'هذا الرقم مسجل على أكثر من حساب', 409);
+        const owner = owners[0] as MockContact;
+        // The live hub refuses admins too; here every verified account is an admin (the mock's rule), so only a publisher shows the refusal.
+        if (owner.role === 'publisher') throw new HubError('password_only', 'هذا الحساب يسجّل الدخول بكلمة المرور', 403);
+        if (owner.phone === '' || owner.phoneVerified !== owner.phone) throw new HubError('phone_unproven', 'سجّل الدخول بكلمة المرور مرة واحدة لتأكيد رقمك', 403);
+        if (body.check === 1 || body.check === '1') return { ok: true, eligible: 1, contact_id: owner.id, phone_norm: norm, phone_local: phoneLocal(norm), lang: 'ar' } as HubResponse;
+        owner.lastLoginAt = Date.now();
+        this.visitors.set(this.uuid(body), owner.id);
+        return { ok: true, contact: this.publicContact(owner) };
+      }
       case 'social_login':
         return this.socialLogin(body);
       case 'logout':

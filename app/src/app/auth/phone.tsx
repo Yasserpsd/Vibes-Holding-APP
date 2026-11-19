@@ -9,7 +9,8 @@ import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { t } from '@/i18n';
 
-type Params = { stepToken?: string; via?: string; phone?: string; email?: string; seconds?: string; resendAfter?: string };
+/** M259: `flow=code` — this code IS the sign-in (no password came before it). */
+type Params = { stepToken?: string; via?: string; phone?: string; email?: string; seconds?: string; resendAfter?: string; flow?: string };
 
 /**
  * M203 (owner, 2026-11-06): after a sign-out, every new sign-in ends here, Apple and Google included. The session
@@ -32,6 +33,18 @@ export default function PhoneCodeScreen() {
   };
 
   const submit = async (code: string) => {
+    if (params.flow === 'code') {
+      const signed = await authApi.codeLoginVerify(step.stepToken, code);
+      // M140: an account with an authenticator app finishes on its code screen.
+      if ('totp' in signed) {
+        router.replace(`/auth/totp?stepToken=${encodeURIComponent(signed.stepToken)}` as Href);
+        return;
+      }
+      await signIn(signed.token, signed.me);
+      if (router.canDismiss()) router.dismissAll();
+      else router.replace('/account');
+      return;
+    }
     const result = await authApi.phoneVerify(step.stepToken, code);
     await signIn(result.token, result.me);
     if (router.canDismiss()) router.dismissAll();
