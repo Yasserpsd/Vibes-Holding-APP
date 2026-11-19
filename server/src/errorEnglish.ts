@@ -23,6 +23,14 @@ export const SENTENCES_EN: Record<string, string> = {
   'محاولات كثيرة، حاول بعد قليل': 'Too many attempts. Try again shortly.',
   'محاولات كثيرة في وقت قصير، حاول بعد قليل': 'Too many attempts in a short time. Try again shortly.',
   'طلبات كثيرة في وقت قصير، حاول بعد قليل': 'Too many requests in a short time. Try again shortly.',
+  // M253: the sentence under a refused field whose rule has none of its own (auth/guard.ts).
+  'هذه الخانة مطلوبة': 'This field is required.',
+  'أضف عنصرًا واحدًا على الأقل في هذه الخانة': 'Add at least one item in this field.',
+  'اختر أحد الخيارات المتاحة في هذه الخانة': 'Choose one of the available options in this field.',
+  'قيمة هذه الخانة غير صحيحة': 'The value of this field is not valid.',
+  'اكتب اسم الشركة لإكمال التسجيل': 'Enter the company name to complete your registration.',
+  'اكتب المدينة': 'Enter the city.',
+  'اكتب العنوان الذي تصل إليه البطاقة': 'Enter the address the card will be delivered to.',
 
   // Sign-up, sign-in and the account (auth/routes.ts, auth/service.ts, auth/social.ts, hub/phone.ts).
   'الاسم مطلوب': 'Your name is required.',
@@ -259,6 +267,12 @@ export const PATTERNS_EN: [pattern: RegExp, english: (match: RegExpMatchArray) =
   [/^محاولات دخول كثيرة لهذا الحساب، حاول بعد (\d+) دقيقة$/, (m) => `Too many sign-in attempts for this account. Try again in ${m[1]} minutes.`],
   [/^يمكنك تغيير فئتك مرة واحدة فقط خلال السنة — متبقٍ (\d+) يومًا\. يمكنك إرسال «طلب تغيير الفئة» إلى الإدارة\.$/, (m) => `You can change your category only once a year; ${m[1]} days left. You can send a category change request to the management.`],
   [/^أكمل تفاصيل الطلب قبل الدفع: /, () => 'Complete the details of the request before paying.'],
+  // M253: the sentences auth/guard.ts writes for a rule that has none of its own.
+  [/^النص أطول من المسموح، الحد الأقصى للأحرف: (\d+)$/, (m) => `The text is too long; the limit is ${m[1]} characters.`],
+  [/^العدد أكثر من المسموح، الحد الأقصى: (\d+)$/, (m) => `Too many items; the limit is ${m[1]}.`],
+  [/^القيمة أكبر من المسموح، الحد الأقصى: ([\d.]+)$/, (m) => `The value is too high; the limit is ${m[1]}.`],
+  [/^النص أقصر من المطلوب، الحد الأدنى للأحرف: (\d+)$/, (m) => `The text is too short; write at least ${m[1]} characters.`],
+  [/^القيمة أقل من المسموح، الحد الأدنى: ([\d.]+)$/, (m) => `The value is too low; the minimum is ${m[1]}.`],
 ];
 
 /** The general sentence of a code, for an Arabic sentence that has no twin above. */
@@ -327,6 +341,7 @@ export const CODES_EN: Record<string, string> = {
   social_off: 'This sign-in method is not enabled at the moment. Use your email and password.',
   social_keys: 'We could not reach the sign-in provider. Try again shortly.',
   invalid_field: 'One of the fields is incomplete or not valid. Review the form and send it again.',
+  field: 'This field is incomplete or not valid.',
   unsupported_type: 'This file type is not supported.',
   message_too_long: 'The text is longer than allowed.',
   empty_message: 'Write your message first.',
@@ -370,5 +385,14 @@ export function localizeError<T>(payload: T, lang: AppLang): T {
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (typeof message !== 'string' || !ARABIC.test(message)) return payload;
   const english = errorInEnglish(typeof code === 'string' ? code : '', message);
-  return english ? ({ ...payload, error: { ...error, message: english } } as T) : payload;
+  // M253: the sentence under each refused field is put in English too (code `field` is its general sentence).
+  const fields = (error as { fields?: unknown }).fields;
+  const englishFields = Array.isArray(fields)
+    ? fields.map((entry: unknown) => {
+        const text = (entry as { message?: unknown } | null)?.message;
+        return typeof text === 'string' && ARABIC.test(text) ? { ...(entry as object), message: errorInEnglish('field', text) ?? text } : entry;
+      })
+    : null;
+  if (!english && !englishFields) return payload;
+  return { ...payload, error: { ...error, ...(english ? { message: english } : {}), ...(englishFields ? { fields: englishFields } : {}) } } as T;
 }

@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, type ScrollView } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
-import { ApiError, errorMessage } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
-import { ChipRow, ErrorSummary, FieldGroup } from '@/components/form/FormParts';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { ChipRow, ErrorSummary, FieldGroup, type FieldFix } from '@/components/form/FormParts';
 import { FormCard } from '@/components/form/FormTheme';
 import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
@@ -19,8 +20,9 @@ import { PhoneProofField, type PhoneProofHandle, type PhoneProofState } from '@/
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
 import { StateView } from '@/components/StateView';
-import { t, tOptional } from '@/i18n';
+import { getLang, t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
+import { emailFix, nameFix, phoneCountryFix } from '@/lib/fixes';
 import { markIntroDue } from '@/lib/introGate';
 import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
@@ -42,6 +44,18 @@ const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '
 
 type Field = keyof Form;
 const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'persona', 'jobTitle'];
+/** M253: the order a refusal from the server is looked for in — the invite code can be refused too. */
+const SERVER_ORDER: Field[] = [...ORDER, 'inviteCode'];
+/** M253: the field a refusal belongs under when the server (or the hub behind it) names a code and no field. */
+const CODE_FIELDS: Partial<Record<string, Field>> = {
+  phone: 'phone',
+  phone_no_whatsapp: 'phone',
+  email_domain: 'email',
+  invalid_email: 'email',
+  exists: 'email',
+  invite_code: 'inviteCode',
+  invite_unavailable: 'inviteCode',
+};
 
 /**
  * The registration form. M195 (owner, 2026-11-04): the club identity (navy + gold, dark tone on the
@@ -54,6 +68,10 @@ const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'person
  * M212 (owner, 2026-11-07: «نفس صفحة التسجيل عادي جدا… بس لما يكون في بوتون يأكد رقم واتس اب»): a first Google/Apple
  * sign-in lands on this same form (name and e-mail filled by the provider, no password), and the WhatsApp button
  * appears only once the number is complete and right.
+ * M253 (owner, 2026-11-19: «أي خطأ يحصل يظهر زرار فوري يحل المشكلة… محدش يواجه أي مشكلة أثناء التسجيل»): a refusal
+ * from the server lands under its own field like a local one, and every field that has ONE right correction
+ * offers it as a button — the e-mail meant («gmial.com»), the name without digits and signs, the country a
+ * number was typed for, signing in when the account exists already, going on without a refused invite code.
  */
 export default function RegisterScreen() {
   const router = useRouter();
@@ -79,7 +97,9 @@ export default function RegisterScreen() {
   const [newest] = useState(() => ({ form }));
   const [showInvite, setShowInvite] = useState(Boolean(invite?.trim()));
   const errors = useFormErrors<Field>(scrollRef);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  // M253: what each field held when the server refused it — the red line stays until the member changes that value.
+  const [refused, setRefused] = useState<{ values: Partial<Record<Field, string>>; code: string }>({ values: {}, code: '' });
   const [busy, setBusy] = useState(false);
   const [proof, setProof] = useState<PhoneProofState>(null);
   // M227: the sign-up button was pressed before the number was proven; the proof then finishes the sign-up by itself.
@@ -130,6 +150,8 @@ export default function RegisterScreen() {
     if (key === 'country') setProof(null);
   };
   const blur = (key: Field) => () => {
+    // M253: the server's verdict on this exact value stands; the local check knows less.
+    if (errors.errors[key] && refused.values[key] === newest.form[key]) return;
     // Leaving the e-mail field shows the address as it will be sent (invisible marks, a trailing dot, capitals gone);
     // never while typing. The provider's own address of a Google/Apple sign-up is left as it came.
     if (key === 'email' && !social) {
@@ -153,16 +175,17 @@ export default function RegisterScreen() {
   const clearError = errors.clear;
   useEffect(() => {
     for (const key of ['name', 'email', 'password', 'jobTitle'] as const) {
-      if (shown[key] && issueOf(key, form) === null) clearError(key);
+      if (shown[key] && refused.values[key] !== form[key] && issueOf(key, form) === null) clearError(key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
-  }, [form, shown, clearError]);
+  }, [form, shown, clearError, refused]);
 
   /** `proven` is the proof that has just arrived, before the state caught up with it. */
   const submit = async (proven: PhoneProofState = proof) => {
     if (busy) return;
     const latest = newest.form;
-    setSubmitError(null);
+    setFailure(null);
+    setRefused({ values: {}, code: '' });
     // M227 (owner, 2026-11-11: a member pressed the button without confirming and did not understand a code was due):
     // a right number that is not proven yet gets its code at once, the page goes up to the code field, and the
     // sign-up finishes by itself when the code is right.
@@ -223,10 +246,52 @@ export default function RegisterScreen() {
     } catch (cause) {
       // M211: the proof outlived its half hour: the button comes back.
       if (cause instanceof ApiError && cause.code === 'phone_proof_required') setProof(null);
-      setSubmitError(errorMessage(cause));
+      // M253: the refusal goes under the field it is about (red border, its sentence, the screen at it).
+      if (cause instanceof ApiError && CODE_FIELDS[cause.code] === 'inviteCode') setShowInvite(true);
+      const taken = errors.fromServer(cause, SERVER_ORDER, { codes: CODE_FIELDS });
+      if (taken.length) {
+        setRefused({ values: Object.fromEntries(taken.map((key) => [key, latest[key]])), code: cause instanceof ApiError ? cause.code : '' });
+        return;
+      }
+      setFailure(failureOf(cause));
     } finally {
       setBusy(false);
     }
+  };
+
+  // M253: the one-tap corrections. Each is offered only when there is ONE right answer; the label says what a tap writes.
+  const nameMeant = nameFix(form.name);
+  const emailMeant = social ? null : emailFix(form.email);
+  const phoneLand = config && !proof && errors.errors.phone ? phoneCountryFix(form.phone, form.country, config.countries) : null;
+  const fixes: Partial<Record<Field, FieldFix | null>> = {
+    name: nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => set('name')(nameMeant) } : null,
+    email:
+      errors.errors.email && refused.code === 'exists' && refused.values.email === form.email
+        ? { label: t('form.fix.signIn'), icon: 'log-in-outline', onPress: () => router.replace({ pathname: '/auth/login', params: { email: cleanEmail(form.email) } }) }
+        : emailMeant
+          ? { label: t('form.fix.use', { value: emailMeant }), onPress: () => set('email')(emailMeant) }
+          : null,
+    phone: phoneLand
+      ? {
+          label: t('form.fix.country', { country: (getLang() === 'en' && phoneLand.country.nameEn) || phoneLand.country.name }),
+          icon: 'earth-outline',
+          onPress: () => {
+            set('country')(phoneLand.country.code);
+            set('phone')(phoneLand.phone);
+          },
+        }
+      : null,
+    inviteCode: errors.errors.inviteCode
+      ? {
+          label: t('form.fix.dropInvite'),
+          icon: 'arrow-forward-circle-outline',
+          onPress: () => {
+            set('inviteCode')('');
+            errors.clear('inviteCode');
+            void submit();
+          },
+        }
+      : null,
   };
 
   if (!config) {
@@ -259,7 +324,7 @@ export default function RegisterScreen() {
       ) : null}
       {social ? null : (
         <FadeInView delay={entranceDelay(0)}>
-          <SocialButtons onError={setSubmitError} />
+          <SocialButtons onError={(message) => setFailure({ message, code: 'social' })} />
         </FadeInView>
       )}
       <FadeInView delay={entranceDelay(1)}>
@@ -272,6 +337,7 @@ export default function RegisterScreen() {
             value={form.name}
             onChangeText={set('name')}
             error={errors.errors.name}
+            fix={fixes.name}
             anchorRef={errors.anchor('name')}
             onBlur={blur('name')}
             hint={t('auth.register.nameHint')}
@@ -293,6 +359,7 @@ export default function RegisterScreen() {
             hint={t('auth.register.phoneWhatsapp')}
             hintOnFocus
             error={errors.errors.phone}
+            fix={fixes.phone}
             anchorRef={errors.anchor('phone')}
             onBlur={blur('phone')}
           />
@@ -330,6 +397,8 @@ export default function RegisterScreen() {
             hint={social ? t('auth.register.socialEmailHint', { provider: social.label }) : undefined}
             onChangeText={set('email')}
             error={errors.errors.email}
+            warning={emailMeant && isEmail(form.email) ? t('form.fix.emailMeant') : null}
+            fix={fixes.email}
             anchorRef={errors.anchor('email')}
             onBlur={blur('email')}
           />
@@ -374,7 +443,13 @@ export default function RegisterScreen() {
             autoCapitalize="characters"
             autoCorrect={false}
             value={form.inviteCode}
-            onChangeText={set('inviteCode')}
+            onChangeText={(value) => {
+              set('inviteCode')(value);
+              errors.clear('inviteCode');
+            }}
+            error={errors.errors.inviteCode}
+            fix={fixes.inviteCode}
+            anchorRef={errors.anchor('inviteCode')}
             hint={t('auth.register.inviteCodeHint')}
             hintOnFocus
             placeholder="FAR2"
@@ -386,7 +461,7 @@ export default function RegisterScreen() {
           )}
 
           {/* The management's WhatsApp line right under the failure (owner, 2026-11-03: under every error, and in حسابي). */}
-          {submitError ? <Notice tone="warning" text={submitError} support /> : null}
+          <FormFailure failure={failure} onRetry={() => void submit()} />
           <AppButton label={t('auth.register.submit')} icon="person-add-outline" loading={busy} onPress={() => void submit()} />
         </FormCard>
       </FadeInView>

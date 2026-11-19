@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode, Ref } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useFormPalette } from '@/components/form/FormTheme';
 import { FadeInView, Wiggle } from '@/components/motion';
@@ -22,6 +22,31 @@ export function FieldError({ text }: { text: string }) {
   );
 }
 
+/** M253: what a field's correction button does — the label says exactly what a tap will write or open. */
+export type FieldFix = { label: string; onPress: () => void; icon?: keyof typeof Ionicons.glyphMap };
+
+/**
+ * M253 (owner, 2026-11-19: «أي خطأ يحصل يظهر زرار فوري يحل المشكلة»): the button under a field's red line. One
+ * tap puts the field right (the corrected e-mail, the country the number belongs to, the tidied links).
+ */
+export function FixButton({ fix }: { fix: FieldFix }) {
+  const palette = useFormPalette() ?? formPalettes.light;
+  return (
+    <FadeInView offset={4}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={fix.label}
+        onPress={fix.onPress}
+        hitSlop={6}
+        style={({ pressed }) => [styles.fix, { backgroundColor: palette.buttonBg, borderColor: palette.buttonBorder }, pressed ? styles.fixPressed : null]}
+      >
+        <Ionicons name={fix.icon ?? 'sparkles'} size={16} color={palette.buttonText} />
+        <Text style={[styles.fixText, { color: palette.buttonText }]}>{fix.label}</Text>
+      </Pressable>
+    </FadeInView>
+  );
+}
+
 /**
  * M241: the small star after the label of a required field, in the form theme's error red. It sits INSIDE
  * the label's Text (`<Text>{label}<RequiredMark /></Text>`), so it follows the label's size and direction.
@@ -36,18 +61,21 @@ type FieldGroupProps = {
   children: ReactNode;
   error?: string | null;
   hint?: string;
+  /** M253: the correction button under the red line. */
+  fix?: FieldFix | null;
   /** The row the screen scrolls to when this group holds the first error (useFormErrors.anchor). */
   anchorRef?: Ref<View>;
 };
 
 /** A labelled block (chips, pickers) that carries its own red state like a FormField. */
-export function FieldGroup({ label, children, error, hint, anchorRef }: FieldGroupProps) {
+export function FieldGroup({ label, children, error, hint, fix, anchorRef }: FieldGroupProps) {
   const palette = useFormPalette();
   return (
     <View ref={anchorRef} style={styles.group} collapsable={false}>
       <Text style={[styles.label, palette ? { color: palette.inkSoft } : null, error ? { color: (palette ?? formPalettes.light).danger } : null]}>{label}</Text>
       <View style={[styles.body, error ? [styles.bodyError, { borderColor: (palette ?? formPalettes.light).danger, backgroundColor: (palette ?? formPalettes.light).dangerBg }] : null]}>{children}</View>
       {error ? <FieldError text={error} /> : hint ? <Text style={[styles.hint, palette ? { color: palette.muted } : null]}>{hint}</Text> : null}
+      {fix ? <FixButton fix={fix} /> : null}
     </View>
   );
 }
@@ -79,6 +107,21 @@ const styles = themedStyles(() => ({
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   errorText: { ...typography.caption, fontFamily: fonts.medium, flex: 1, textAlign: textStart },
+  // M253: a real button (44 pt tall), at the start of the row under the red line.
+  fix: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    maxWidth: '100%',
+  },
+  fixPressed: { opacity: 0.75 },
+  fixText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 14, flexShrink: 1, textAlign: textStart },
   summary: {
     flexDirection: 'row',
     alignItems: 'center',

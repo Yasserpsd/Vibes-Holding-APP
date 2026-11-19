@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useState, type Ref, type RefObject } from 'react';
 import { Pressable, Text, View, type ScrollView } from 'react-native';
 
-import { errorMessage } from '@/api/client';
 import { AGREED, useFormDef, useMyFormSubmissions, useSubmitForm, type FormDef, type FormField as FormFieldDef } from '@/api/forms';
 import type { Me } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
@@ -11,6 +10,7 @@ import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { ErrorSummary, FieldError, RequiredMark } from '@/components/form/FormParts';
 import { useFormErrors } from '@/components/form/useFormErrors';
+import { FormFailure, failureOf } from '@/components/form/FormFailure';
 import { FormField } from '@/components/FormField';
 import { FormFileField } from '@/components/FormFileField';
 import { GlassCard } from '@/components/lux';
@@ -162,6 +162,10 @@ function Form({ form, me, signedIn, scrollRef }: { form: FormDef; me: Me | null;
         // The confirmation sits at the top of the page; the long form had scrolled the member down.
         scrollRef?.current?.scrollTo({ y: 0, animated: true });
       },
+      // M253: a field the server refused turns red with the server's sentence, and the screen goes to it.
+      onError: (cause) => {
+        marks.fromServer(cause, form.fields.map((field) => field.key));
+      },
     });
   };
 
@@ -227,7 +231,7 @@ function Form({ form, me, signedIn, scrollRef }: { form: FormDef; me: Me | null;
       ) : null}
       {submit.error ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={errorMessage(submit.error)} support />
+          <FormFailure failure={failureOf(submit.error)} onRetry={send} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(form.fields.length)}>

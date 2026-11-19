@@ -7,29 +7,21 @@ import type { EnglishCache } from '../englishCache.js';
 import { cleanEmail } from '../hub/phone.js';
 import { langOf } from '../lang.js';
 import type { PersonLocalizer } from './english.js';
+import { isWebLink, tidyLink } from './links.js';
 import { myProfile, publicPerson, publicPersonFull, type ProfileFields, type ProfilesService } from './service.js';
 
 export type ProfilesRoutesOptions = { service: ProfilesService; auth: AuthService; english?: PersonLocalizer; /** M242: the management's note on an application, in English for the English app. */ notes?: EnglishCache };
 
-/** A member types «instagram.com/name» as often as a full address: the scheme is added for them. */
-const withScheme = (value: string): string => (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`);
-function isWebLink(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.includes('.');
-  } catch {
-    return false;
-  }
-}
-
-const linkSchema = z.object({
-  label: z.string().trim().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا').default(''),
-  url: z
-    .string()
-    .trim()
-    .transform(withScheme)
-    .pipe(z.string().refine(isWebLink, 'خانة الروابط تقبل رابطًا كاملًا في كل سطر، مثل: instagram.com/username').max(200, 'الرابط بحد أقصى 200 حرف')),
-});
+// M253: a link is put right first (profiles/links.ts: «instagram: name», a missing scheme), then judged.
+const linkSchema = z
+  .object({ label: z.string().max(120).default(''), url: z.string().max(400) })
+  .transform(tidyLink)
+  .pipe(
+    z.object({
+      label: z.string().max(40, 'عنوان الرابط بحد أقصى 40 حرفًا'),
+      url: z.string().refine(isWebLink, 'خانة الروابط تقبل رابطًا كاملًا في كل سطر، مثل: instagram.com/username').max(200, 'الرابط بحد أقصى 200 حرف'),
+    }),
+  );
 
 // Every limit carries its own sentence: a rule without one reached the member as «some details are not valid».
 const lines = (min: number, max: number, each: string, count: string) =>

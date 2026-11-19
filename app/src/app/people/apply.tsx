@@ -1,10 +1,13 @@
 import { Stack, useRouter, type Href } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import type { ScrollView } from 'react-native';
 
-import { useApplyProfile, useMyProfile, type MyProfile, type PersonLink } from '@/api/people';
+import { useApplyProfile, useMyProfile, type MyProfile } from '@/api/people';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { ErrorSummary, type FieldFix } from '@/components/form/FormParts';
+import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -12,18 +15,70 @@ import { PaperCard } from '@/components/paper';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
 import { VoiceFill } from '@/components/VoiceFill';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
+import { badLines, badLinkLines, emailFix, firstLines, fitLines, linesOf, linksFromText, linksToText, withoutBadLinks } from '@/lib/fixes';
+import { cleanEmail, isEmail } from '@/lib/validation';
 
-const toLines = (list: string[]) => list.join('\n');
-const fromLines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
-const linksToText = (links: PersonLink[]) => links.map((link) => (link.label ? `${link.label} | ${link.url}` : link.url)).join('\n');
-function linksFromText(text: string): PersonLink[] {
-  return fromLines(text)
-    .map((line) => {
-      const parts = line.split('|').map((part) => part.trim());
-      return parts.length > 1 ? { label: parts[0] ?? '', url: parts.slice(1).join('|') } : { label: '', url: parts[0] ?? '' };
-    })
-    .filter((link) => link.url);
+type Key = 'title' | 'company' | 'specialty' | 'city' | 'bio' | 'milestones' | 'achievements' | 'benefit' | 'seeking' | 'phone' | 'email' | 'links';
+type Values = Record<Key, string>;
+
+/** The fields in the order they sit on the sheet: the screen goes to the first one that is wrong. */
+const ORDER: Key[] = ['title', 'company', 'specialty', 'city', 'bio', 'milestones', 'achievements', 'benefit', 'seeking', 'phone', 'email', 'links'];
+/** The lists typed one item per line, with the server's own limits (server/src/profiles/routes.ts). */
+const LISTS: Partial<Record<Key, { min: number; max: number; most: number }>> = {
+  milestones: { min: 3, max: 140, most: 10 },
+  achievements: { min: 3, max: 300, most: 10 },
+  benefit: { min: 3, max: 200, most: 10 },
+};
+const MOST_LINKS = 5;
+const BIO_MIN = 30;
+
+type Verdict = { message: string; fix?: { label: string; value: string } };
+
+/**
+ * M253 (owner's screenshot, 2026-11-19: this form answered «Some of the details entered are not valid» and named
+ * no field): the verdict on one field BEFORE anything is sent — the server's own rules, each with its sentence —
+ * and the one-tap correction where there is one right answer (a long line split in two, a line that is not a
+ * link removed, the e-mail meant).
+ */
+function verdict(key: Key, values: Values): Verdict | null {
+  const value = values[key].trim();
+  const comma = getLang() === 'ar' ? '، ' : ', ';
+  const list = LISTS[key];
+  if (list) {
+    const count = linesOf(value).length;
+    if (key === 'milestones' && !count) return { message: t('people.error.milestones') };
+    const bad = badLines(value, list.min, list.max);
+    if (bad.length) {
+      return { message: t('people.error.lines', { lines: bad.join(comma), min: list.min, max: list.max }), fix: { label: t('people.fix.lines'), value: fitLines(value, list.min, list.max) } };
+    }
+    if (count > list.most) return { message: t('people.error.tooMany', { most: list.most, count }), fix: { label: t('people.fix.first', { most: list.most }), value: firstLines(value, list.most) } };
+    return null;
+  }
+  switch (key) {
+    case 'title':
+      return value.length < 2 ? { message: t('people.error.title') } : null;
+    case 'specialty':
+      return value.length < 2 ? { message: t('people.error.specialty') } : null;
+    case 'city':
+      return value.length < 2 ? { message: t('people.error.city') } : null;
+    case 'bio':
+      return value.length < BIO_MIN ? { message: t('people.error.bio', { left: BIO_MIN - value.length }) } : null;
+    case 'email': {
+      if (!value || isEmail(value)) return null;
+      const meant = emailFix(value);
+      return { message: t('form.error.email'), ...(meant ? { fix: { label: t('form.fix.use', { value: meant }), value: meant } } : {}) };
+    }
+    case 'links': {
+      const bad = badLinkLines(value);
+      if (bad.length) return { message: t('people.error.links', { lines: bad.join(comma) }), fix: { label: t('people.fix.badLinks'), value: withoutBadLinks(value) } };
+      const count = linksFromText(value).length;
+      if (count > MOST_LINKS) return { message: t('people.error.tooMany', { most: MOST_LINKS, count }), fix: { label: t('people.fix.first', { most: MOST_LINKS }), value: firstLines(value, MOST_LINKS) } };
+      return null;
+    }
+    default:
+      return null;
+  }
 }
 
 /** M11: the member's own «شخصية ومسيرة» application — apply, read the review state, edit again. */
@@ -63,6 +118,7 @@ export default function ApplyProfileScreen() {
           key={profile?.id ?? 'new'}
           profile={profile}
           me={me}
+          scrollRef={scrollRef}
           onOpenProfile={(id) => router.push(`/people/${id}` as Href)}
           // The «تم الإرسال» notice sits at the head of the long form: bring it into view.
           onSent={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
@@ -72,52 +128,116 @@ export default function ApplyProfileScreen() {
   );
 }
 
-function ApplyForm({ profile, me, onOpenProfile, onSent }: { profile: MyProfile | null; me: ReturnType<typeof useAuth>['me']; onOpenProfile: (id: string) => void; onSent: () => void }) {
+type ApplyFormProps = {
+  profile: MyProfile | null;
+  me: ReturnType<typeof useAuth>['me'];
+  scrollRef: RefObject<ScrollView | null>;
+  onOpenProfile: (id: string) => void;
+  onSent: () => void;
+};
+
+function ApplyForm({ profile, me, scrollRef, onOpenProfile, onSent }: ApplyFormProps) {
   const apply = useApplyProfile();
   // The freshest submission prefills the form: the waiting draft when there is one, else the saved words.
   const fields = profile ? (profile.draft ?? profile.fields) : null;
-  const [title, setTitle] = useState(fields?.title ?? '');
-  const [company, setCompany] = useState(fields?.company ?? '');
   // M73: the spotlight sections (the contact fields start from the account; the member edits freely).
-  const [specialty, setSpecialty] = useState(fields?.specialty ?? '');
-  const [city, setCity] = useState(fields?.city ?? '');
-  const [bio, setBio] = useState(fields?.bio ?? '');
-  const [milestones, setMilestones] = useState(fields ? toLines(fields.milestones) : '');
-  const [achievements, setAchievements] = useState(fields?.achievements ? toLines(fields.achievements) : '');
-  const [benefit, setBenefit] = useState(fields?.benefit ? toLines(fields.benefit) : '');
-  const [seeking, setSeeking] = useState(fields?.seeking ?? '');
-  const [phone, setPhone] = useState(fields?.phone ?? me?.phone ?? '');
-  const [email, setEmail] = useState(fields?.email ?? me?.email ?? '');
-  const [links, setLinks] = useState(fields ? linksToText(fields.links) : '');
+  const [values, setValues] = useState<Values>(() => ({
+    title: fields?.title ?? '',
+    company: fields?.company ?? '',
+    specialty: fields?.specialty ?? '',
+    city: fields?.city ?? '',
+    bio: fields?.bio ?? '',
+    milestones: fields ? fields.milestones.join('\n') : '',
+    achievements: fields?.achievements ? fields.achievements.join('\n') : '',
+    benefit: fields?.benefit ? fields.benefit.join('\n') : '',
+    seeking: fields?.seeking ?? '',
+    phone: fields?.phone ?? me?.phone ?? '',
+    email: fields?.email ?? me?.email ?? '',
+    links: fields ? linksToText(fields.links) : '',
+  }));
+  const errors = useFormErrors<Key>(scrollRef);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [sent, setSent] = useState(false);
   const busy = apply.isPending;
+
+  // Typing never paints a new red line; an existing one goes the moment the value is right (the sign-up form's rule).
+  const set = (key: Key) => (value: string) => {
+    const draft = { ...values, [key]: value };
+    setValues(draft);
+    if (!verdict(key, draft)) errors.clear(key);
+  };
+  // Leaving a field judges it. A red line the server painted is not cleared here: only a changed value clears it.
+  const blur = (key: Key) => () => {
+    let draft = values;
+    // What the member cannot see or does not count as wrong is put right for them, as it will be sent.
+    if (key === 'links') {
+      const tidy = linksToText(linksFromText(values.links));
+      if (tidy !== values.links.trim() && !badLinkLines(values.links).length) draft = { ...values, links: tidy };
+    }
+    if (key === 'email' && values.email) {
+      const cleaned = cleanEmail(values.email);
+      if (cleaned !== values.email) draft = { ...values, email: cleaned };
+    }
+    if (draft !== values) setValues(draft);
+    const problem = verdict(key, draft);
+    if (problem) errors.set(key, problem.message);
+  };
+  /** The correction button of a field that is red for a reason this screen can put right. */
+  const fixOf = (key: Key): FieldFix | null => {
+    if (!errors.errors[key]) return null;
+    const fix = verdict(key, values)?.fix;
+    return fix ? { label: fix.label, onPress: () => set(key)(fix.value) } : null;
+  };
+  // A right-looking address that is one slip away from a known provider: a caution with its correction, never a block.
+  const emailMeant = !errors.errors.email && isEmail(values.email) ? emailFix(values.email) : null;
 
   const submit = () => {
     if (busy) return;
     setSent(false);
+    setFailure(null);
+    const next: Partial<Record<Key, string>> = {};
+    for (const key of ORDER) {
+      const problem = verdict(key, values);
+      if (problem) next[key] = problem.message;
+    }
+    if (errors.fail(next, ORDER)) return;
     apply.mutate(
       {
-        title: title.trim(),
-        company: company.trim(),
-        specialty: specialty.trim(),
-        city: city.trim(),
-        bio: bio.trim(),
-        milestones: fromLines(milestones),
-        achievements: fromLines(achievements),
-        benefit: fromLines(benefit),
-        seeking: seeking.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        links: linksFromText(links),
+        title: values.title.trim(),
+        company: values.company.trim(),
+        specialty: values.specialty.trim(),
+        city: values.city.trim(),
+        bio: values.bio.trim(),
+        milestones: linesOf(values.milestones),
+        achievements: linesOf(values.achievements),
+        benefit: linesOf(values.benefit),
+        seeking: values.seeking.trim(),
+        phone: values.phone.trim(),
+        email: cleanEmail(values.email),
+        links: linksFromText(values.links),
       },
       {
         onSuccess: () => {
           setSent(true);
           onSent();
         },
+        // M253: the server's refusal goes under the field it names; only a refusal about no field sits by the button.
+        onError: (cause) => {
+          if (!errors.fromServer(cause, ORDER).length) setFailure(failureOf(cause));
+        },
       },
     );
   };
+
+  /** What every field of the sheet shares: its value, its red line and correction, and its place for the scroll. */
+  const bind = (key: Key) => ({
+    value: values[key],
+    onChangeText: set(key),
+    onBlur: blur(key),
+    error: errors.errors[key],
+    fix: fixOf(key),
+    anchorRef: errors.anchor(key),
+  });
 
   return (
     <>
@@ -154,6 +274,7 @@ function ApplyForm({ profile, me, onOpenProfile, onSent }: { profile: MyProfile 
 
       {/* M85 (owner): the application fields sit on one paper sheet. */}
       <PaperCard pinned>
+      <ErrorSummary count={errors.count} />
       <VoiceFill
         fields={[
           { key: 'title', label: t('people.form.title'), type: 'text', required: true },
@@ -169,64 +290,66 @@ function ApplyForm({ profile, me, onOpenProfile, onSent }: { profile: MyProfile 
           { key: 'email', label: t('people.form.email'), type: 'email' },
           { key: 'links', label: t('people.form.links'), type: 'textarea' },
         ]}
-        values={{ title, company, specialty, city, bio, milestones, achievements, benefit, seeking, phone, email, links }}
-        onFill={(values) => {
-          setTitle(values.title ?? title);
-          setCompany(values.company ?? company);
-          setSpecialty(values.specialty ?? specialty);
-          setCity(values.city ?? city);
-          setBio(values.bio ?? bio);
-          setMilestones(values.milestones ?? milestones);
-          setAchievements(values.achievements ?? achievements);
-          setBenefit(values.benefit ?? benefit);
-          setSeeking(values.seeking ?? seeking);
-          setPhone(values.phone ?? phone);
-          setEmail(values.email ?? email);
-          setLinks(values.links ?? links);
+        values={values}
+        onFill={(filled) => {
+          const draft = { ...values };
+          for (const key of ORDER) draft[key] = filled[key] ?? values[key];
+          setValues(draft);
+          errors.reset();
         }}
       />
       <FadeInView delay={entranceDelay(1)}>
-        <FormField label={t('people.form.title')} value={title} onChangeText={setTitle} maxLength={80} />
+        <FormField label={t('people.form.title')} required maxLength={80} {...bind('title')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
-        <FormField label={t('people.form.company')} value={company} onChangeText={setCompany} maxLength={120} />
+        <FormField label={t('people.form.company')} maxLength={120} {...bind('company')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(3)}>
-        <FormField label={t('people.form.specialty')} hint={t('people.form.specialtyHint')} value={specialty} onChangeText={setSpecialty} maxLength={160} />
+        <FormField label={t('people.form.specialty')} required hint={t('people.form.specialtyHint')} maxLength={160} {...bind('specialty')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(4)}>
-        <FormField label={t('people.form.city')} value={city} onChangeText={setCity} maxLength={80} />
+        <FormField label={t('people.form.city')} required maxLength={80} {...bind('city')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(5)}>
-        <FormField label={t('people.form.bio')} hint={t('people.form.bioHint')} value={bio} onChangeText={setBio} maxLength={1200} multiline />
+        <FormField label={t('people.form.bio')} required hint={t('people.form.bioHint')} maxLength={1200} multiline {...bind('bio')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(6)}>
-        <FormField label={t('people.form.milestones')} value={milestones} onChangeText={setMilestones} multiline />
+        <FormField label={t('people.form.milestones')} required multiline {...bind('milestones')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(7)}>
-        <FormField label={t('people.form.achievements')} value={achievements} onChangeText={setAchievements} multiline />
+        <FormField label={t('people.form.achievements')} multiline {...bind('achievements')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(8)}>
-        <FormField label={t('people.form.benefit')} value={benefit} onChangeText={setBenefit} multiline />
+        <FormField label={t('people.form.benefit')} multiline {...bind('benefit')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(9)}>
-        <FormField label={t('people.form.seeking')} value={seeking} onChangeText={setSeeking} maxLength={600} multiline />
+        <FormField label={t('people.form.seeking')} maxLength={600} multiline {...bind('seeking')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(10)}>
-        <FormField label={t('people.form.phone')} value={phone} onChangeText={setPhone} maxLength={40} latin keyboardType="phone-pad" />
+        <FormField label={t('people.form.phone')} maxLength={40} latin keyboardType="phone-pad" {...bind('phone')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(11)}>
-        <FormField label={t('people.form.email')} value={email} onChangeText={setEmail} maxLength={190} latin keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+        <FormField
+          label={t('people.form.email')}
+          maxLength={190}
+          latin
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          {...bind('email')}
+          warning={emailMeant ? t('form.fix.emailMeant') : null}
+          fix={emailMeant ? { label: t('form.fix.use', { value: emailMeant }), onPress: () => set('email')(emailMeant) } : fixOf('email')}
+        />
       </FadeInView>
       <FadeInView delay={entranceDelay(12)}>
-        <FormField label={t('people.form.links')} value={links} onChangeText={setLinks} multiline latin autoCapitalize="none" autoCorrect={false} />
+        <FormField label={t('people.form.links')} hint={t('people.form.linksHint')} multiline latin autoCapitalize="none" autoCorrect={false} {...bind('links')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(13)}>
         <Notice tone="info" text={t('people.photoNote')} />
       </FadeInView>
-      {apply.error ? (
+      {failure ? (
         <FadeInView offset={8}>
-          <Notice tone="warning" text={apply.error.message} support />
+          <FormFailure failure={failure} onRetry={submit} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(14)}>

@@ -8,7 +8,7 @@ const IS_PRODUCTION = APP_ENV === 'production';
 
 const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
 // The version of the binary this tree builds. Bump it with every store build (ASC never attaches a lower one).
-const APP_VERSION = '1.3.4';
+const APP_VERSION = '1.3.5';
 // OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
 // M239: the server's forced-update floor relies on two facts, so they are enforced here — a store build never
 // takes the override (its runtime is always its own version), and a bundle is never published to a runtime NEWER
@@ -58,6 +58,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // version sent to the forced-update floor, three-line texts, language fixes; new runtime (OTAs now go to five).
   // 1.3.4 (owner, 2026-11-15: «لازم نعمل بيلد جديد فورا»): M241 — the full review pass; native: R8 (M240), no Android
   // auto-backup of the session file, three unused Android permissions removed; new runtime (OTAs now go to six).
+  // 1.3.5 (owner, 2026-11-19: «بيلد جديد بكل الحاجات الأخيرة… كل شئ يكون في ابديت»): M242–M253 inside the binary, so a store
+  // update needs no OTA on first launch; no native change; new runtime (OTAs now go to seven).
   version: APP_VERSION,
   scheme: IS_PRODUCTION ? 'investorsclub' : 'investorsclub-preview',
   orientation: 'portrait',

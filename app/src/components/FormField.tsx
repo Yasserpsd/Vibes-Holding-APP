@@ -1,7 +1,7 @@
 import { useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { FieldError, RequiredMark } from '@/components/form/FormParts';
+import { FieldError, FixButton, RequiredMark, type FieldFix } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { useFieldScroll } from '@/components/Screen';
@@ -17,6 +17,8 @@ type Props = TextInputProps & {
   /** M207: a caution that does not block the form; it shows once the member has left the field. */
   warning?: string | null;
   error?: string | null;
+  /** M253: the correction button under the field's red line or caution — one tap puts the field right. */
+  fix?: FieldFix | null;
   /** M241: a required field wears a small red star after its label. */
   required?: boolean;
   /** Latin content (e-mail, phone, password) is typed left-to-right in both languages. */
@@ -31,7 +33,7 @@ type Props = TextInputProps & {
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, hintOnFocus = false, warning, error, required = false, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus = false, warning, error, fix, required = false, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // Review 2026-11-16: the scroll view around the form keeps the row that holds the cursor above the keyboard
   // (Screen.tsx). The row is this whole block — label, input and the hint or error line — so all of it shows.
@@ -108,6 +110,8 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, re
       ) : hint && (!hintOnFocus || focused) ? (
         <Text numberOfLines={hintOnFocus ? 1 : undefined} style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
       ) : null}
+      {/* Typing never paints a new caution (owner, 2026-11-07): beside an error the button is always there; beside a caution it waits until the member leaves the field. */}
+      {fix && (error || !focused) ? <FixButton fix={fix} /> : null}
     </View>
   );
 }

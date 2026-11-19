@@ -120,7 +120,8 @@ export class FormsService {
     };
     for (const field of form.fields) {
       const problem = fieldProblem(field, raw[field.key] ?? '', optionsOf);
-      if (problem) throw new RequestError('invalid_field', problem, 400);
+      // M253: the refusal names its field, so the app paints that field red and goes to it.
+      if (problem) throw new RequestError('invalid_field', problem, 400, { field: field.key });
     }
     // M193: an attachment must really have arrived; its answer is kept as the canonical private link.
     const fileLinks = new Map<string, string>();

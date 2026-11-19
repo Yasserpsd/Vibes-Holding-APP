@@ -1,23 +1,24 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Text, View, type ScrollView } from 'react-native';
 
 import { authApi, useAuthConfig, type Country, type PhoneStepResult, type ProfilePatch } from '@/api/auth';
-import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
-import { ChipRow } from '@/components/form/FormParts';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { ChipRow, ErrorSummary } from '@/components/form/FormParts';
+import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
-import { SupportLink } from '@/components/SupportLink';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { emailFix, nameFix, phoneCountryFix } from '@/lib/fixes';
 import { cleanEmail, isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -41,6 +42,10 @@ function splitStoredPhone(stored: string, countries: Country[] | undefined): { c
   }
   return best ? { country: best.code, local: digits.slice(best.dial.length).replace(/^0+/, '') } : saudi;
 }
+
+type Key = 'name' | 'contactEmail' | 'phone' | 'jobTitle' | 'company' | 'city' | 'website' | 'bio' | 'social';
+/** The fields in the order they sit on the screen: the screen goes to the first one that is wrong. */
+const ORDER: Key[] = ['name', 'contactEmail', 'phone', 'jobTitle', 'company', 'city', 'website', 'bio', 'social'];
 
 export default function ProfileEditScreen() {
   const router = useRouter();
@@ -75,25 +80,26 @@ export default function ProfileEditScreen() {
   // M203: asked later, here, instead of at sign-up.
   const [memberType, setMemberType] = useState<'individual' | 'company' | ''>(me?.memberType ?? '');
   const [step, setStep] = useState<PhoneStepResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // M253 (owner, 2026-11-19): every problem sits under its own field in red, the screen goes to it, and a refusal
+  // from the server lands under the field it names; what is not about a field sits by the button with its way out.
+  const scrollRef = useRef<ScrollView | null>(null);
+  const marks = useFormErrors<Key>(scrollRef);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof typeof form) => (value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+    marks.clear(key);
+  };
 
   const save = async () => {
     if (busy) return;
-    if (form.name.trim().length < 2) {
-      setError(t('profile.nameRequired'));
-      return;
-    }
-    if (phoneChanged && phoneIssue(phone, country) !== null) {
-      setError(t('profile.phoneInvalid'));
-      return;
-    }
-    if (contactEmailChanged && !isEmail(contactEmail)) {
-      setError(t('profile.contactEmailInvalid'));
-      return;
-    }
+    setFailure(null);
+    const found: Partial<Record<Key, string>> = {};
+    if (form.name.trim().length < 2) found.name = t('profile.nameRequired');
+    if (contactEmailChanged && !isEmail(contactEmail)) found.contactEmail = t('profile.contactEmailInvalid');
+    if (phoneChanged && phoneIssue(phone, country) !== null) found.phone = t('profile.phoneInvalid');
+    if (marks.fail(found, ORDER)) return;
     const patch: ProfilePatch = {
       name: form.name.trim(),
       jobTitle: form.jobTitle.trim(),
@@ -107,7 +113,6 @@ export default function ProfileEditScreen() {
     // The address goes as the club stores it: no invisible marks, no trailing dot, lower case (lib/validation).
     if (contactEmailChanged) patch.contactEmail = cleanEmail(contactEmail);
     setBusy(true);
-    setError(null);
     try {
       const { me: updated } = await authApi.updateMe(patch);
       setMe(updated);
@@ -122,11 +127,17 @@ export default function ProfileEditScreen() {
       }
       router.back();
     } catch (cause) {
-      setError(errorMessage(cause));
+      const taken = marks.fromServer(cause, ORDER, { codes: { phone: 'phone', phone_no_whatsapp: 'phone', email_domain: 'contactEmail', invalid_email: 'contactEmail' } });
+      if (!taken.length) setFailure(failureOf(cause));
     } finally {
       setBusy(false);
     }
   };
+
+  // The one-tap corrections, as on the sign-up form: offered only when there is ONE right answer.
+  const nameMeant = marks.errors.name ? nameFix(form.name) : null;
+  const emailMeant = contactEmailChanged ? emailFix(contactEmail) : null;
+  const phoneLand = config && marks.errors.phone ? phoneCountryFix(phone, countryCode, config.countries) : null;
 
   if (!me) {
     return (
@@ -155,7 +166,8 @@ export default function ProfileEditScreen() {
   }
 
   return (
-    <Screen title={t('profile.title')} subtitle={t('profile.subtitle')}>
+    <Screen title={t('profile.title')} subtitle={t('profile.subtitle')} scrollRef={scrollRef}>
+      <ErrorSummary count={marks.count} />
       {fixPhone ? (
         <FadeInView delay={entranceDelay(0)}>
           <Notice tone="warning" text={t('phoneCode.fixPhone')} />
@@ -175,7 +187,15 @@ export default function ProfileEditScreen() {
           values={{ name: form.name, jobTitle: form.jobTitle, company: form.company, city: form.city, website: form.website, bio: form.bio, social: form.social }}
           onFill={(values) => setForm((current) => ({ ...current, ...values }))}
         />
-        <FormField label={t('profile.name')} value={form.name} onChangeText={set('name')} textContentType="name" />
+        <FormField
+          label={t('profile.name')}
+          value={form.name}
+          onChangeText={set('name')}
+          textContentType="name"
+          error={marks.errors.name}
+          fix={nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => set('name')(nameMeant) } : null}
+          anchorRef={marks.anchor('name')}
+        />
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
         <FormField label={t('profile.email')} latin editable={false} value={me.email} hint={t('profile.emailLocked')} />
@@ -191,7 +211,24 @@ export default function ProfileEditScreen() {
             textContentType="emailAddress"
             autoComplete="email"
             value={contactEmail}
-            onChangeText={setContactEmail}
+            onChangeText={(value) => {
+              setContactEmail(value);
+              marks.clear('contactEmail');
+            }}
+            error={marks.errors.contactEmail}
+            warning={emailMeant && isEmail(contactEmail) ? t('form.fix.emailMeant') : null}
+            fix={
+              emailMeant
+                ? {
+                    label: t('form.fix.use', { value: emailMeant }),
+                    onPress: () => {
+                      setContactEmail(emailMeant);
+                      marks.clear('contactEmail');
+                    },
+                  }
+                : null
+            }
+            anchorRef={marks.anchor('contactEmail')}
             // Leaving the field shows the address as it will be sent; never while typing.
             onBlur={() => setContactEmail((current) => cleanEmail(current))}
             hint={t('profile.contactEmailHint')}
@@ -209,7 +246,25 @@ export default function ProfileEditScreen() {
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           value={phone}
-          onChangeText={(value) => setPhone(localPhoneDigits(value, country))}
+          onChangeText={(value) => {
+            setPhone(localPhoneDigits(value, country));
+            marks.clear('phone');
+          }}
+          error={marks.errors.phone}
+          fix={
+            phoneLand
+              ? {
+                  label: t('form.fix.country', { country: (getLang() === 'en' && phoneLand.country.nameEn) || phoneLand.country.name }),
+                  icon: 'earth-outline',
+                  onPress: () => {
+                    setCountryCode(phoneLand.country.code);
+                    setPhone(phoneLand.phone);
+                    marks.clear('phone');
+                  },
+                }
+              : null
+          }
+          anchorRef={marks.anchor('phone')}
           placeholder={country?.example ? country.example.replace(/^0+/, '') : undefined}
           hint={`${t('profile.phoneHint')} ${t('phoneCode.phoneHint')}`}
         />
@@ -224,28 +279,27 @@ export default function ProfileEditScreen() {
         </View>
       </FadeInView>
       <FadeInView delay={entranceDelay(1)}>
-        <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} textContentType="jobTitle" />
+        <FormField label={t('profile.jobTitle')} value={form.jobTitle} onChangeText={set('jobTitle')} error={marks.errors.jobTitle} anchorRef={marks.anchor('jobTitle')} textContentType="jobTitle" />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
-        <FormField label={t('profile.company')} value={form.company} onChangeText={set('company')} textContentType="organizationName" />
+        <FormField label={t('profile.company')} value={form.company} onChangeText={set('company')} error={marks.errors.company} anchorRef={marks.anchor('company')} textContentType="organizationName" />
       </FadeInView>
       <FadeInView delay={entranceDelay(3)}>
-        <FormField label={t('profile.city')} value={form.city} onChangeText={set('city')} textContentType="addressCity" />
+        <FormField label={t('profile.city')} value={form.city} onChangeText={set('city')} error={marks.errors.city} anchorRef={marks.anchor('city')} textContentType="addressCity" />
       </FadeInView>
       <FadeInView delay={entranceDelay(4)}>
-        <FormField label={t('profile.website')} latin autoCapitalize="none" autoCorrect={false} keyboardType="url" value={form.website} onChangeText={set('website')} placeholder="https://" />
+        <FormField label={t('profile.website')} latin autoCapitalize="none" autoCorrect={false} keyboardType="url" value={form.website} onChangeText={set('website')} error={marks.errors.website} anchorRef={marks.anchor('website')} placeholder="https://" />
       </FadeInView>
       <FadeInView delay={entranceDelay(5)}>
-        <FormField label={t('profile.bio')} multiline value={form.bio} onChangeText={set('bio')} />
+        <FormField label={t('profile.bio')} multiline value={form.bio} onChangeText={set('bio')} error={marks.errors.bio} anchorRef={marks.anchor('bio')} />
       </FadeInView>
       <FadeInView delay={entranceDelay(6)}>
-        <FormField label={t('profile.social')} latin autoCapitalize="none" autoCorrect={false} multiline value={form.social} onChangeText={set('social')} hint={t('profile.socialHint')} />
+        <FormField label={t('profile.social')} latin autoCapitalize="none" autoCorrect={false} multiline value={form.social} onChangeText={set('social')} error={marks.errors.social} anchorRef={marks.anchor('social')} hint={t('profile.socialHint')} />
       </FadeInView>
       {/* M198 (owner): the password changed from here once — it now lives in حسابي ← إعدادات الأمان only. */}
-      {error ? (
+      {failure ? (
         <FadeInView offset={6}>
-          <Text style={styles.error}>{error}</Text>
-          <SupportLink problem={error} />
+          <FormFailure failure={failure} onRetry={() => void save()} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(7)}>
@@ -256,7 +310,6 @@ export default function ProfileEditScreen() {
 }
 
 const styles = themedStyles(() => ({
-  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   group: { gap: spacing.xs, marginBottom: spacing.sm },
   label: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
 }));

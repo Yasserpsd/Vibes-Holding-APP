@@ -229,7 +229,17 @@ test('every refused field names itself, and a link without https is completed fo
     assert.equal(response.statusCode, 400);
     return String(response.json().error.message);
   };
-  assert.match(await refusal({ links: [{ label: '', url: 'instagram: Elham' }] }), /خانة الروابط/);
+  // M253: «instagram: Elham» has one right answer and is put right (below); a bare «@name» names no network and is refused by name.
+  assert.match(await refusal({ links: [{ label: '', url: '@Elham' }] }), /خانة الروابط/);
+  const named = await send('POST', '/api/profiles/apply', { ...application, bio: 'قصيرة', links: [{ label: '', url: 'https://example.com' }, { label: '', url: 'لا يوجد' }] }, memberToken);
+  assert.equal(named.json().error.field, 'bio');
+  assert.deepEqual(
+    named.json().error.fields.map((entry: { field: string; index?: number }) => [entry.field, entry.index]),
+    [['bio', undefined], ['links', 1]],
+  );
+  const typedName = await send('POST', '/api/profiles/apply', { ...application, links: [{ label: '', url: 'instagram: Elham' }] }, memberToken);
+  assert.equal(typedName.statusCode, 201);
+  assert.ok(JSON.stringify(typedName.json()).includes('https://instagram.com/Elham'));
   assert.match(await refusal({ bio: 'نبذة. '.repeat(300) }), /النبذة بحد أقصى 1200/);
   assert.match(await refusal({ achievements: ['لا'] }), /كل إنجاز في سطر مستقل/);
   assert.match(await refusal({ seeking: 'س'.repeat(601) }), /600 حرف/);

@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text } from 'react-native';
 
 import { authApi, useAuthConfig } from '@/api/auth';
-import { errorMessage } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { AppButton } from '@/components/AppButton';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { FormField } from '@/components/FormField';
 import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PopIn } from '@/components/motion';
@@ -14,7 +15,6 @@ import { codeKeyboardType } from '@/components/PhoneCodeStep';
 import { Screen } from '@/components/Screen';
 import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
 import { toAsciiDigits } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
@@ -29,7 +29,10 @@ export default function ResetPasswordScreen() {
   const [identifier, setIdentifier] = useState<Identifier>(EMPTY_IDENTIFIER);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // M253: a refusal about the code or the new password sits under that field; anything else sits by the button with its way out.
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [fieldError, setFieldError] = useState<{ field: 'code' | 'password'; message: string } | null>(null);
+  const local = (message: string): void => setFailure({ message, code: 'local' });
   const [busy, setBusy] = useState(false);
   // M197: hub 2.26.3 names the inbox (masked) and the Apple/Google sign-up; an older hub sends neither.
   const [sent, setSent] = useState<{ sentTo: string; provider: string; via: string }>({ sentTo: '', provider: '', via: '' });
@@ -46,17 +49,18 @@ export default function ResetPasswordScreen() {
   const request = async (again = false) => {
     if (busy || (again && cooldown > 0)) return;
     if (!identifierValid(identifier)) {
-      setError(t('auth.reset.loginRequired'));
+      local(t('auth.reset.loginRequired'));
       return;
     }
     // M128: a wrong-length or wrong-start number never reaches the server.
     const phoneProblem = identifierPhoneProblem(identifier, config?.countries);
     if (phoneProblem) {
-      setError(phoneProblem);
+      local(phoneProblem);
       return;
     }
     setBusy(true);
-    setError(null);
+    setFailure(null);
+    setFieldError(null);
     try {
       const { login, country } = identifierPayload(identifier);
       const result = await authApi.resetRequest(login, country);
@@ -65,7 +69,7 @@ export default function ResetPasswordScreen() {
       setCooldown(RESEND_SECONDS);
       setStep('confirm');
     } catch (cause) {
-      setError(errorMessage(cause));
+      setFailure(failureOf(cause));
     } finally {
       setBusy(false);
     }
@@ -74,21 +78,24 @@ export default function ResetPasswordScreen() {
   const confirm = async () => {
     if (busy) return;
     if (!/^\d{4,6}$/.test(code)) {
-      setError(t('auth.verify.codeRequired'));
+      setFieldError({ field: 'code', message: t('auth.verify.codeRequired') });
       return;
     }
     if (password.length < 6) {
-      setError(t('auth.reset.passwordShort'));
+      setFieldError({ field: 'password', message: t('auth.reset.passwordShort') });
       return;
     }
     setBusy(true);
-    setError(null);
+    setFailure(null);
+    setFieldError(null);
     try {
       const { login, country } = identifierPayload(identifier);
       await authApi.resetConfirm(login, code, password, country);
       setStep('done');
     } catch (cause) {
-      setError(errorMessage(cause));
+      const refused = cause instanceof ApiError ? (cause.code === 'bad_code' ? 'code' : cause.fields.find((item) => item.field === 'password' || item.field === 'code')?.field) : undefined;
+      if (refused === 'code' || refused === 'password') setFieldError({ field: refused, message: failureOf(cause).message });
+      else setFailure(failureOf(cause));
     } finally {
       setBusy(false);
     }
@@ -130,15 +137,27 @@ export default function ResetPasswordScreen() {
         <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} editable={step === 'request'} />
         {step === 'confirm' ? (
           <>
-            <FormField label={t('auth.verify.code')} latin keyboardType={codeKeyboardType} textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(value) => setCode(toAsciiDigits(value).replace(/\D/g, ''))} />
-            <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password} onChangeText={setPassword} hint={t('auth.register.passwordHint')} />
+            <FormField label={t('auth.verify.code')} latin keyboardType={codeKeyboardType} textContentType="oneTimeCode" maxLength={6} value={code}
+              error={fieldError?.field === 'code' ? fieldError.message : null}
+              onChangeText={(value) => {
+                setCode(toAsciiDigits(value).replace(/\D/g, ''));
+                if (fieldError?.field === 'code') setFieldError(null);
+              }}
+            />
+            <FormField label={t('auth.reset.newPassword')} latin secureTextEntry autoCapitalize="none" textContentType="newPassword" value={password}
+              error={fieldError?.field === 'password' ? fieldError.message : null}
+              onChangeText={(value) => {
+                setPassword(value);
+                if (fieldError?.field === 'password') setFieldError(null);
+              }}
+              hint={t('auth.register.passwordHint')}
+            />
           </>
         ) : null}
       </FadeInView>
-      {error ? (
+      {failure ? (
         <FadeInView offset={8}>
-          <Text style={styles.error}>{error}</Text>
-          <SupportLink problem={error} />
+          <FormFailure failure={failure} onRetry={() => void (step === 'request' ? request() : confirm())} />
         </FadeInView>
       ) : null}
       {step === 'request' ? (
@@ -171,7 +190,6 @@ export default function ResetPasswordScreen() {
 const styles = themedStyles(() => ({
   fields: { gap: spacing.md },
   doneIcon: { alignSelf: 'center', marginTop: spacing.md },
-  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   resend: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: spacing.xs },
   resendText: { ...typography.caption, color: colors.goldText, textDecorationLine: 'underline' },
   resendWaiting: { color: colors.textMuted, textDecorationLine: 'none' },

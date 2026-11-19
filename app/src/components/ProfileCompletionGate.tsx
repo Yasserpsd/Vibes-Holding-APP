@@ -5,12 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, displayProfile, useAuthConfig, type Me, type Persona, type PhoneStepResult } from '@/api/auth';
 import { GATE_FIELDS } from '@/api/gateFields';
-import { errorMessage } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { CountryPicker } from '@/components/CountryPicker';
-import { ChipRow, ErrorSummary, FieldGroup } from '@/components/form/FormParts';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { ChipRow, ErrorSummary, FieldGroup, type FieldFix } from '@/components/form/FormParts';
 import { FormCard } from '@/components/form/FormTheme';
 import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
@@ -18,7 +19,8 @@ import { Notice } from '@/components/Notice';
 import { PhoneCodeStep } from '@/components/PhoneCodeStep';
 import { FieldScrollProvider, useFieldScroller } from '@/components/Screen';
 import { VoiceFill } from '@/components/VoiceFill';
-import { t, tOptional } from '@/i18n';
+import { getLang, t, tOptional } from '@/i18n';
+import { emailFix, nameFix, phoneCountryFix } from '@/lib/fixes';
 import { cleanEmail, isEmail, localPhoneDigits, nameIssue, phoneIssue } from '@/lib/validation';
 import { brand, fonts, formPalettes, radii, spacing, typography } from '@/theme/tokens';
 
@@ -97,7 +99,9 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   /** M203: the code step of the number; the fields come back with «تغيير الرقم». */
   const [step, setStep] = useState<PhoneStepResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  // M253: what each field held when the server refused it — the red line stays until the member changes that value.
+  const [refused, setRefused] = useState<{ values: Partial<Record<Field, string>> }>({ values: {} });
 
   const country = config?.countries.find((item) => item.code === countryCode) ?? config?.countries[0];
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
@@ -131,10 +135,10 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
   useEffect(() => {
     const values = { name, contactEmail, jobTitle };
     for (const key of ['name', 'contactEmail', 'jobTitle'] as const) {
-      if (shown[key] && issueOf(key, values[key]) === null) clearError(key);
+      if (shown[key] && refused.values[key] !== values[key] && issueOf(key, values[key]) === null) clearError(key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
-  }, [name, contactEmail, jobTitle, shown, clearError]);
+  }, [name, contactEmail, jobTitle, shown, clearError, refused]);
   const validate = () => {
     const next: Partial<Record<Field, string>> = {};
     for (const key of ORDER) {
@@ -146,7 +150,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
 
   const submit = async () => {
     if (busy) return;
-    setError(null);
+    setFailure(null);
+    setRefused({ values: {} });
     if (form.fail(validate(), ORDER)) return;
     setBusy(true);
     try {
@@ -165,7 +170,11 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
         else setStep(started);
       }
     } catch (cause) {
-      setError(errorMessage(cause));
+      // M253: the refusal goes under the field it is about (red border, its sentence, the screen at it).
+      const taken = form.fromServer(cause, ORDER, { codes: { phone: 'phone', phone_no_whatsapp: 'phone', email_domain: 'contactEmail', invalid_email: 'contactEmail' } });
+      if (taken.length) setRefused({ values: Object.fromEntries(taken.map((key) => [key, current[key]])) });
+      else setFailure(failureOf(cause));
+      if (cause instanceof ApiError && (cause.code === 'invite_code' || cause.code === 'invite_unavailable')) setShowInvite(true);
     } finally {
       setBusy(false);
     }
@@ -177,12 +186,35 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
     set(value);
     if (!issueOf(key, value)) form.clear(key);
   };
-  const blur = (key: Field) => () => form.check(key, issueOf(key, current[key]));
+  const blur = (key: Field) => () => {
+    // M253: the server's verdict on this exact value stands; the local check knows less.
+    if (form.errors[key] && refused.values[key] === current[key]) return;
+    form.check(key, issueOf(key, current[key]));
+  };
   const pickCountry = (code: string) => {
     setCountryCode(code);
     const land = config?.countries.find((item) => item.code === code) ?? country;
     if (phone && !issueOf('phone', phone, land)) form.clear('phone');
   };
+
+  // M253 (owner, 2026-11-19: «أي خطأ يحصل يظهر زرار فوري يحل المشكلة»): the one-tap corrections, as on the sign-up form.
+  const nameMeant = need('name') ? nameFix(name) : null;
+  const emailMeant = need('contactEmail') ? emailFix(contactEmail) : null;
+  const phoneLand = config && form.errors.phone ? phoneCountryFix(phone, countryCode, config.countries) : null;
+  const nameFixButton: FieldFix | null = nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => field('name', setName)(nameMeant) } : null;
+  const emailFixButton: FieldFix | null = emailMeant ? { label: t('form.fix.use', { value: emailMeant }), onPress: () => field('contactEmail', setContactEmail)(emailMeant) } : null;
+  const phoneFixButton: FieldFix | null = phoneLand
+    ? {
+        label: t('form.fix.country', { country: (getLang() === 'en' && phoneLand.country.nameEn) || phoneLand.country.name }),
+        icon: 'earth-outline',
+        onPress: () => {
+          setCountryCode(phoneLand.country.code);
+          setPhone(phoneLand.phone);
+          form.clear('phone');
+        },
+      }
+    : null;
+  const inviteRefused = failure?.code === 'invite_code' || failure?.code === 'invite_unavailable';
 
   return (
     // The status-bar inset sits on the cover itself, not inside the scrolled content: now that the form scrolls
@@ -258,6 +290,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                 hintOnFocus
                 warning={name.trim().length >= 2 && nameIssue(name) ? t('form.nameWarning') : null}
                 error={form.errors.name}
+                fix={nameFixButton}
                 anchorRef={form.anchor('name')}
                 onBlur={blur('name')}
                 textContentType="name"
@@ -273,6 +306,8 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   value={contactEmail}
                   onChangeText={field('contactEmail', setContactEmail)}
                   error={form.errors.contactEmail}
+                  warning={emailMeant && isEmail(contactEmail) ? t('form.fix.emailMeant') : null}
+                  fix={emailFixButton}
                   anchorRef={form.anchor('contactEmail')}
                   // Leaving the field shows the address as it will be sent; never while typing.
                   onBlur={() => {
@@ -298,6 +333,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
                   value={phone}
                   onChangeText={(value) => field('phone', setPhone)(localPhoneDigits(value, country))}
                   error={form.errors.phone}
+                  fix={phoneFixButton}
                   anchorRef={form.anchor('phone')}
                   onBlur={blur('phone')}
                   latin
@@ -366,7 +402,22 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
               </View>
             ) : null}
 
-            {error ? <Notice tone="warning" text={error} support /> : null}
+            <FormFailure
+              failure={failure}
+              onRetry={() => void submit()}
+              actions={[
+                inviteRefused
+                  ? {
+                      label: t('form.fix.clearInvite'),
+                      icon: 'close-circle-outline',
+                      onPress: () => {
+                        setInviteCode('');
+                        setFailure(null);
+                      },
+                    }
+                  : null,
+              ]}
+            />
             <AppButton label={busy ? t('completeProfile.saving') : t('completeProfile.save')} icon="checkmark-circle-outline" loading={busy} disabled={waiting} onPress={() => void submit()} />
             <AppButton label={t('dataNudge.later')} variant="outline" onPress={onLater} />
           </FormCard>

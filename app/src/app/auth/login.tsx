@@ -1,20 +1,19 @@
-import { Link, useRouter, type Href } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
 import { authApi, phoneStepPath, useAuthConfig } from '@/api/auth';
-import { ApiError, errorMessage } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { FormField } from '@/components/FormField';
 import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
-import { SupportLink } from '@/components/SupportLink';
 import { t } from '@/i18n';
-import { textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -25,24 +24,26 @@ export default function LoginScreen() {
   // The «انتهت الجلسة» line is shown once: it is forgotten when the member leaves this screen.
   useEffect(() => dismissSessionExpired, [dismissSessionExpired]);
   // M126: the phone is the first-class identifier — a number from any country or an e-mail.
-  const [identifier, setIdentifier] = useState<Identifier>(EMPTY_IDENTIFIER);
+  // M253: the sign-up form sends a member who already has an account here, with the address filled in.
+  const { email: knownEmail } = useLocalSearchParams<{ email?: string }>();
+  const [identifier, setIdentifier] = useState<Identifier>(knownEmail ? { mode: 'email', country: 'sa', value: knownEmail } : EMPTY_IDENTIFIER);
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (!identifierValid(identifier) || !password) {
-      setError(t(identifier.mode === 'phone' ? 'auth.login.requiredPhone' : 'auth.login.requiredEmail'));
+      setFailure({ message: t(identifier.mode === 'phone' ? 'auth.login.requiredPhone' : 'auth.login.requiredEmail'), code: 'local' });
       return;
     }
     // M128: a wrong-length or wrong-start number never reaches the server.
     const phoneProblem = identifierPhoneProblem(identifier, config?.countries);
     if (phoneProblem) {
-      setError(phoneProblem);
+      setFailure({ message: phoneProblem, code: 'local' });
       return;
     }
     setBusy(true);
-    setError(null);
+    setFailure(null);
     try {
       const { login, country } = identifierPayload(identifier);
       const result = await authApi.login(login, password, country);
@@ -64,7 +65,7 @@ export default function LoginScreen() {
       if (router.canDismiss()) router.dismissAll();
       else router.replace('/account');
     } catch (cause) {
-      setError(errorMessage(cause));
+      setFailure(failureOf(cause));
       // M128 (owner): no account behind these details → straight to registration, with a notice there.
       if (cause instanceof ApiError && cause.code === 'no_account') {
         router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
@@ -88,7 +89,7 @@ export default function LoginScreen() {
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(1)}>
-        <SocialButtons onError={setError} />
+        <SocialButtons onError={(message) => setFailure({ message, code: 'social' })} />
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
         <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} />
@@ -107,10 +108,14 @@ export default function LoginScreen() {
           returnKeyType="go"
         />
       </FadeInView>
-      {error ? (
+      {/* M253: the refusal with the button that ends it — a new password for a wrong one, another try for a lost connection. */}
+      {failure ? (
         <FadeInView offset={8}>
-          <Text style={styles.error}>{error}</Text>
-          <SupportLink problem={error} />
+          <FormFailure
+            failure={failure}
+            onRetry={() => void submit()}
+            actions={[failure.code === 'bad_login' || failure.code === 'bad_password' ? { label: t('auth.login.forgot'), icon: 'key-outline', onPress: () => router.push('/auth/reset') } : null]}
+          />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(4)}>
@@ -133,6 +138,5 @@ export default function LoginScreen() {
 }
 
 const styles = themedStyles(() => ({
-  error: { ...typography.caption, color: colors.danger, textAlign: textStart },
   link: { ...typography.body, color: colors.goldLightText, textAlign: 'center', paddingVertical: spacing.sm },
 }));

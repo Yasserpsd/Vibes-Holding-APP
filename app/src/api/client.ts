@@ -5,15 +5,40 @@ import { env } from '@/config/env';
 import { getLang, t, tOptional } from '@/i18n';
 import { whatsappGateHolds } from '@/lib/whatsappGate';
 
+/** M253: one refused field of the body the app sent — which one, which line of it, and the sentence for under it. */
+export type FieldProblem = { field: string; path: string; index?: number; message: string };
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code: string,
+    /** M253: the fields the server refused, each with its own sentence (empty for a refusal that is not about a field). */
+    readonly fields: FieldProblem[] = [],
   ) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+const ARABIC_TEXT = /[؀-ۿ]/;
+
+/** The refused fields as the server named them; the English app never shows an Arabic sentence under a field. */
+function fieldProblems(raw: unknown): FieldProblem[] {
+  if (!Array.isArray(raw)) return [];
+  const english = getLang() !== 'ar';
+  const problems: FieldProblem[] = [];
+  for (const entry of raw as { field?: unknown; path?: unknown; index?: unknown; message?: unknown }[]) {
+    if (!entry || typeof entry.field !== 'string' || !entry.field) continue;
+    const text = typeof entry.message === 'string' ? entry.message : '';
+    problems.push({
+      field: entry.field,
+      path: typeof entry.path === 'string' ? entry.path : entry.field,
+      ...(typeof entry.index === 'number' ? { index: entry.index } : {}),
+      message: text && !(english && ARABIC_TEXT.test(text)) ? text : t('form.error.fieldGeneric'),
+    });
+  }
+  return problems;
 }
 
 type Params = Record<string, string | number | boolean | undefined | null>;
@@ -98,10 +123,12 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
   if (!response.ok) {
     let code = 'http_error';
     let message = t('errors.generic');
+    let fields: FieldProblem[] = [];
     try {
-      const body = (await response.json()) as { error?: { code?: string; message?: string } };
+      const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: unknown } };
       code = body.error?.code ?? code;
       message = localMessage(code, body.error?.message) ?? message;
+      fields = fieldProblems(body.error?.fields);
     } catch {
       // Non-JSON error body: keep the generic message.
     }
@@ -109,7 +136,7 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
     const expiredSession = response.status === 401 && token && token === currentToken && code !== 'bad_login';
     if (expiredSession) onUnauthorized?.();
     if (response.status === 426 || code === 'update_required') onUpdateRequired?.(message);
-    throw new ApiError(message, response.status, code);
+    throw new ApiError(message, response.status, code, fields);
   }
 
   try {
@@ -121,14 +148,15 @@ export async function apiRequest<T>(method: Method, path: string, options: Reque
 }
 
 /**
- * The server and the hub write their messages in Arabic. The English version shows its own text for the
- * codes it knows, and never an Arabic sentence: an unknown code falls back to the general message.
+ * The server and the hub write their messages in Arabic, and the server puts its own refusals in English for the
+ * English app (M242). M253 (owner's screenshot, 2026-11-19: «Some of the details entered are not valid» for a
+ * refusal that had an exact sentence): the server's English sentence comes FIRST — it says what is wrong; the
+ * app's own text for the code is only the fallback, and an Arabic sentence is never shown in English.
  */
 function localMessage(code: string, serverMessage: string | undefined): string | null {
   if (getLang() === 'ar') return serverMessage ?? tOptional(`errors.code.${code}`);
-  const known = tOptional(`errors.code.${code}`);
-  if (known) return known;
-  return serverMessage && !/[؀-ۿ]/.test(serverMessage) ? serverMessage : null;
+  if (serverMessage && !ARABIC_TEXT.test(serverMessage)) return serverMessage;
+  return tOptional(`errors.code.${code}`);
 }
 
 export async function apiGet<T>(path: string, params?: Params): Promise<T> {

@@ -128,7 +128,8 @@ function ApplyForm({ data, scrollRef }: { data: AffiliateOverview; scrollRef: Re
       if (router.canGoBack()) router.back();
       else router.replace('/affiliate' as Href);
     } catch (cause) {
-      setSubmitError(errorMessage(cause));
+      // M253: a field the server refused turns red with the server's sentence; anything else sits by the button.
+      if (!form.fromServer(cause, ORDER).length) setSubmitError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
