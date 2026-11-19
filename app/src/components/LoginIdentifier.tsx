@@ -4,7 +4,8 @@ import { Pressable, Text, View } from 'react-native';
 import type { Country } from '@/api/auth';
 import { CountryPicker } from '@/components/CountryPicker';
 import { FormField } from '@/components/FormField';
-import { t } from '@/i18n';
+import { getLang, t } from '@/i18n';
+import { emailFix, phoneCountryFix } from '@/lib/fixes';
 import { cleanEmail, isEmail, localPhoneDigits, phoneIssue } from '@/lib/validation';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, spacing, typography } from '@/theme/tokens';
@@ -59,6 +60,9 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
   const placeholder = useMemo(() => (country?.example ? country.example.replace(/^0+/, '') : t('auth.login.phonePlaceholder')), [country]);
   // Live check: flag the number the moment it starts wrong or runs long; a short one waits for submit.
   const phoneBad = value.mode === 'phone' && phoneIssue(value.value, country) === 'bad';
+  // M255: the same one-tap corrections as the sign-up form — the country a number was typed for, the address meant.
+  const phoneLand = phoneBad && editable && countries ? phoneCountryFix(value.value, value.country, countries) : null;
+  const emailMeant = value.mode === 'email' && editable ? emailFix(value.value) : null;
 
   const switchMode = (mode: IdentifierMode) => {
     if (mode === value.mode || !editable) return;
@@ -117,6 +121,15 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               placeholder={placeholder}
               hint={t('auth.login.phoneHint')}
               error={phoneBad ? t('auth.phone.check', { format: placeholder }) : undefined}
+              fix={
+                phoneLand
+                  ? {
+                      label: t('form.fix.country', { country: (getLang() === 'en' && phoneLand.country.nameEn) || phoneLand.country.name }),
+                      icon: 'earth-outline',
+                      onPress: () => onChange({ ...value, country: phoneLand.country.code, value: phoneLand.phone }),
+                    }
+                  : null
+              }
             />
           </View>
         </View>
@@ -138,6 +151,8 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
             if (cleaned !== value.value) onChange({ ...value, value: cleaned });
           }}
           placeholder={t('auth.login.emailPlaceholder')}
+          warning={emailMeant ? t('form.fix.emailMeant') : null}
+          fix={emailMeant ? { label: t('form.fix.use', { value: emailMeant }), onPress: () => onChange({ ...value, value: emailMeant }) } : null}
         />
       )}
     </View>

@@ -1,10 +1,12 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useImperativeHandle, useRef, useState, type Ref } from 'react';
-import { Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { FieldError, FixButton, RequiredMark, type FieldFix } from '@/components/form/FormParts';
 import { useFormPalette } from '@/components/form/FormTheme';
 import { usePaper } from '@/components/paper';
 import { useFieldScroll } from '@/components/Screen';
+import { t } from '@/i18n';
 import { inputStart, isRTL, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -33,8 +35,12 @@ type Props = TextInputProps & {
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, hintOnFocus = false, warning, error, fix, required = false, latin = false, anchorRef, inputRef, style, multiline, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus = false, warning, error, fix, required = false, latin = false, anchorRef, inputRef, style, multiline, secureTextEntry, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
+  // M255 (owner, 2026-11-19): a password field carries an eye button — a mistyped password nobody could see was a
+  // quiet reason for «كلمة المرور غير صحيحة». The button sits BESIDE the field, never over the typed text.
+  const secret = Boolean(secureTextEntry);
+  const [revealed, setRevealed] = useState(false);
   // Review 2026-11-16: the scroll view around the form keeps the row that holds the cursor above the keyboard
   // (Screen.tsx). The row is this whole block — label, input and the hint or error line — so all of it shows.
   const fieldScroll = useFieldScroll();
@@ -64,13 +70,14 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, fi
           its Android background, and Android then resets the input's padding to the stock 4 dp inset: the typed
           text hugged the border for as long as the field was focused. Never collapsed, so the glow coming and
           going does not re-parent the input (which would drop the keyboard). */}
-      <View style={[styles.glowFrame, glow && styles.glowOn]} collapsable={false}>
+      <View style={[styles.glowFrame, glow && styles.glowOn, secret && styles.secretRow]} collapsable={false}>
       <TextInput
         ref={inputRef}
         placeholderTextColor={form ? form.placeholder : paper ? colors.paperFaint : colors.textFaint}
         selectionColor={form ? form.fieldFocus : paper ? colors.paperGold : colors.gold}
         accessibilityLabel={label}
         multiline={multiline}
+        secureTextEntry={secret && !revealed}
         {...inputProps}
         onFocus={(event) => {
           setFocused(true);
@@ -87,12 +94,24 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, fi
           paper && styles.paperInput,
           latin ? styles.latin : { textAlign: inputStart(), writingDirection: isRTL() ? 'rtl' : 'ltr' },
           multiline && styles.multiline,
+          secret && styles.secretInput,
           !form && focused && !error ? (paper ? styles.paperInputFocused : styles.inputFocused) : null,
           !form && error ? styles.inputError : null,
           formInput,
           style,
         ]}
       />
+      {secret ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t(revealed ? 'form.password.hide' : 'form.password.show')}
+          onPress={() => setRevealed((current) => !current)}
+          hitSlop={4}
+          style={[styles.eye, paper && styles.paperInput, form ? { backgroundColor: form.field, borderColor: form.fieldBorder } : null]}
+        >
+          <Ionicons name={revealed ? 'eye-off-outline' : 'eye-outline'} size={22} color={form ? form.inkSoft : paper ? colors.paperInkSoft : colors.textSecondary} />
+        </Pressable>
+      ) : null}
       </View>
       {/* On a form card or on paper the message wears the light palette's red; the dark black-and-gold screens keep the token red. */}
       {error ? (
@@ -133,6 +152,10 @@ const styles = themedStyles(() => ({
   },
   latin: { textAlign: 'left', writingDirection: 'ltr' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
+  // M255: the password field and its eye button share one row; the button is a square with the field's own outline.
+  secretRow: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.xs },
+  secretInput: { flex: 1 },
+  eye: { width: 50, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface },
   inputFocused: { borderColor: colors.gold },
   // Same corners as the input, so the glow follows its outline.
   glowFrame: { borderRadius: radii.md },

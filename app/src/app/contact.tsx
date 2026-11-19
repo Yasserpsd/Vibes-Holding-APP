@@ -5,7 +5,7 @@ import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { ApiError, errorMessage } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { contactApi, useContactThread, type ContactMessage } from '@/api/contact';
 import { useAuth } from '@/auth/AuthProvider';
 import { ADVISOR_DOCK_RISE } from '@/components/advisor/AskAdvisor';
@@ -13,6 +13,7 @@ import { AppButton } from '@/components/AppButton';
 import { GlassCard } from '@/components/lux';
 import { showMembershipGate } from '@/components/MembershipGate';
 import { FadeInView, PopIn, PressScale } from '@/components/motion';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { Notice } from '@/components/Notice';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
@@ -106,7 +107,7 @@ function Thread({ query }: { query: ThreadQuery }) {
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
   const [outbox, setOutbox] = useState<ContactMessage[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const scroller = useRef<ScrollView>(null);
 
   const messages = [...(query.data?.messages ?? []), ...outbox];
@@ -120,7 +121,7 @@ function Thread({ query }: { query: ThreadQuery }) {
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
-    setError(null);
+    setFailure(null);
     setText('');
     // The bubble appears at once; the server's copy replaces it on the next refetch.
     const echo: ContactMessage = { id: `local:${Date.now()}`, from: 'member', by: null, text: body, at: new Date().toISOString() };
@@ -133,7 +134,7 @@ function Thread({ query }: { query: ThreadQuery }) {
     } catch (cause) {
       setOutbox((current) => current.filter((entry) => entry.id !== echo.id));
       setText(body);
-      setError(errorMessage(cause));
+      setFailure(failureOf(cause));
     } finally {
       setSending(false);
     }
@@ -160,7 +161,8 @@ function Thread({ query }: { query: ThreadQuery }) {
           )}
         </ScrollView>
       )}
-      {error ? <Notice tone="warning" text={error} support /> : null}
+      {/* M255: the text is back in the box; one tap sends it again. */}
+      <FormFailure failure={failure} onRetry={() => void send()} />
       {/* No bottom inset here: with the keyboard closed the bottom bar under this screen already covers it, and
           with the keyboard open it only left a blank strip above the keys. */}
       <View style={styles.composer}>

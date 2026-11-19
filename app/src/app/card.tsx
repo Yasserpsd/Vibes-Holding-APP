@@ -6,11 +6,12 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { displayProfile } from '@/api/auth';
 import { cardApi, usePrintRequest, type CardDeliveryMethod } from '@/api/card';
-import { errorMessage } from '@/api/client';
 import { usePartners } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { GlassCard, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
@@ -23,6 +24,9 @@ import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
+
+type PrintField = 'city' | 'address' | 'phone' | 'note';
+const PRINT_ORDER: PrintField[] = ['city', 'address', 'phone', 'note'];
 
 const PERSONA_KEY: Record<string, StringKey> = { neutral: 'persona.neutral', entrepreneur: 'persona.entrepreneur', investor: 'persona.investor' };
 
@@ -259,7 +263,9 @@ function PrintBlock({ active }: { active: boolean }) {
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // M255: a problem with the city or the address sits under that field; anything else sits by the button with its way out.
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const marks = useFormErrors<PrintField>();
   const [sent, setSent] = useState(false);
 
   const [confirming, setConfirming] = useState(false);
@@ -272,15 +278,11 @@ function PrintBlock({ active }: { active: boolean }) {
   const declined = request?.status === 'rejected';
 
   const submit = async () => {
-    setError(null);
-    if (method === 'delivery' && city.trim().length < 2) {
-      setError(t('card.needCity'));
-      return;
-    }
-    if (method === 'delivery' && address.trim().length < 5) {
-      setError(t('card.needAddress'));
-      return;
-    }
+    setFailure(null);
+    const found: Partial<Record<PrintField, string>> = {};
+    if (method === 'delivery' && city.trim().length < 2) found.city = t('card.needCity');
+    if (method === 'delivery' && address.trim().length < 5) found.address = t('card.needAddress');
+    if (marks.fail(found, PRINT_ORDER)) return;
     setBusy(true);
     try {
       await cardApi.requestPrint({ method, city: method === 'delivery' ? city.trim() : undefined, address: method === 'delivery' ? address.trim() : undefined, phone: phone.trim() || undefined, note: note.trim() || undefined });
@@ -288,7 +290,7 @@ function PrintBlock({ active }: { active: boolean }) {
       setSent(true);
       setOpen(false);
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (!marks.fromServer(cause, PRINT_ORDER).length) setFailure(failureOf(cause));
     } finally {
       setBusy(false);
     }
@@ -297,13 +299,13 @@ function PrintBlock({ active }: { active: boolean }) {
   /** The member holds the card now (picked up at the HQ or delivered): the request closes from his side. */
   const confirmReceived = async () => {
     if (!request) return;
-    setError(null);
+    setFailure(null);
     setConfirming(true);
     try {
       await cardApi.confirmReceived(request.id);
       await queryClient.invalidateQueries({ queryKey: ['card'] });
     } catch (cause) {
-      setError(errorMessage(cause));
+      setFailure(failureOf(cause));
     } finally {
       setConfirming(false);
     }
@@ -335,7 +337,7 @@ function PrintBlock({ active }: { active: boolean }) {
           </Text>
           <Text style={styles.statusLine}>{t(request.method === 'pickup' ? 'card.pendingPickup' : 'card.printPending')}</Text>
           <Text style={styles.hint}>{t('card.receivedHint')}</Text>
-          {error ? <Notice tone="warning" text={error} support /> : null}
+          <FormFailure failure={failure} onRetry={() => void confirmReceived()} />
           <AppButton label={confirming ? t('card.sending') : t('card.receivedButton')} icon="checkmark-circle-outline" variant="outline" loading={confirming} onPress={() => (confirming ? null : void confirmReceived())} />
         </View>
       ) : open ? (
@@ -363,13 +365,53 @@ function PrintBlock({ active }: { active: boolean }) {
                   setNote(values.note ?? note);
                 }}
               />
-              <FormField label={t('card.city')} value={city} onChangeText={setCity} maxLength={80} />
-              <FormField label={t('card.address')} hint={t('card.addressHint')} value={address} onChangeText={setAddress} multiline maxLength={300} />
+              <FormField
+                label={t('card.city')}
+                value={city}
+                onChangeText={(value) => {
+                  setCity(value);
+                  marks.clear('city');
+                }}
+                maxLength={80}
+                error={marks.errors.city}
+              />
+              <FormField
+                label={t('card.address')}
+                hint={t('card.addressHint')}
+                value={address}
+                onChangeText={(value) => {
+                  setAddress(value);
+                  marks.clear('address');
+                }}
+                multiline
+                maxLength={300}
+                error={marks.errors.address}
+              />
             </>
           ) : null}
-          <FormField label={t('card.phoneField')} value={phone} onChangeText={setPhone} latin keyboardType="phone-pad" maxLength={30} />
-          <FormField label={t('card.noteField')} value={note} onChangeText={setNote} maxLength={300} />
-          {error ? <Notice tone="warning" text={error} support /> : null}
+          <FormField
+            label={t('card.phoneField')}
+            value={phone}
+            onChangeText={(value) => {
+              setPhone(value);
+              marks.clear('phone');
+            }}
+            latin
+            keyboardType="phone-pad"
+            maxLength={30}
+            error={marks.errors.phone}
+          />
+          <FormField
+            label={t('card.noteField')}
+            value={note}
+            onChangeText={(value) => {
+              setNote(value);
+              marks.clear('note');
+            }}
+            maxLength={300}
+            error={marks.errors.note}
+          />
+          <FormFailure failure={failure} onRetry={() => void submit()} />
           <AppButton label={busy ? t('card.sending') : t('card.submit')} icon="paper-plane-outline" loading={busy} onPress={() => (busy ? null : void submit())} />
         </FadeInView>
       ) : request && delivered ? (

@@ -513,6 +513,14 @@ export type InterestsReport = {
   others: { contactId: number; text: string; updatedAt: string }[];
 };
 
+/** M255 «أسباب تعثّر التسجيل» — mirrors server/src/auth/refusals.ts. Counts only. */
+export type RefusalReport = {
+  days: number;
+  from: string;
+  to: string;
+  steps: { step: 'register' | 'login' | 'reset'; label: string; passed: number; refused: number; reasons: { code: string; field: string; label: string; count: number; ios: number; android: number }[] }[];
+};
+
 /** M44 «روابط الدفع» — mirrors server/src/paylinks/service.ts. */
 export type PayLinkKind = 'membership' | 'workshop' | 'other';
 export type PayLink = {
@@ -775,6 +783,7 @@ export const api = {
   deleteRatingReview: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/ratings/reviews/${encodeURIComponent(id)}`),
   setRatingOverride: (projectId: number, stars: number | null) => call<{ ok: true; summary: { stars: number | null; count: number } }>('PUT', `/api/admin/ratings/${projectId}/override`, { stars }),
   interestsReport: () => call<InterestsReport>('GET', '/api/admin/interests'),
+  authRefusals: (days: number) => call<RefusalReport>('GET', `/api/admin/auth/refusals?days=${days}`),
   paylinks: () => call<{ links: PayLink[] }>('GET', '/api/admin/paylinks'),
   createPaylink: (input: PayLinkInput) => call<{ link: PayLink }>('POST', '/api/admin/paylinks', input),
   // M87b «المستشار اليومي»: the daily-push template pools, their preview, and the mute count.

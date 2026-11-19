@@ -3,12 +3,12 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { errorMessage } from '@/api/client';
 import { hqApi, useHq, useHqSlots, useHqWallet, type HqSpace } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
 import { Chip } from '@/components/Chip';
 import { FormField } from '@/components/FormField';
+import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { LockedNotice } from '@/components/LockedNotice';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Notice } from '@/components/Notice';
@@ -46,7 +46,7 @@ export default function BookVisitScreen() {
   const [purpose, setPurpose] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<Failure | null>(null);
   const [gated, setGated] = useState(false);
   const selectedDate = date ?? data?.days[0]?.date ?? null;
   const space: HqSpace | null = kind === 'visit' ? null : kind;
@@ -75,7 +75,7 @@ export default function BookVisitScreen() {
 
   const submit = async () => {
     if (!selectedDate || !time || (!space && !purpose)) {
-      setSubmitError(t(space ? 'hqBook.incompleteSpace' : 'hqBook.incomplete'));
+      setSubmitError({ message: t(space ? 'hqBook.incompleteSpace' : 'hqBook.incomplete'), code: 'local' });
       return;
     }
     setBusy(true);
@@ -87,7 +87,7 @@ export default function BookVisitScreen() {
       await queryClient.invalidateQueries({ queryKey: ['hq'] });
       router.back();
     } catch (cause) {
-      setSubmitError(errorMessage(cause));
+      setSubmitError(failureOf(cause));
       setGated(isProfileGate(cause));
       // The slot may have just been taken by someone else: show the live availability, not the stale list.
       void slots.refetch();
@@ -221,7 +221,7 @@ export default function BookVisitScreen() {
       {submitError ? (
         <FadeInView offset={8}>
           {/* M109i: the complete-profile refusal comes with its own door to the editor. */}
-          {gated ? <ProfileGateNotice text={submitError} /> : <Notice tone="warning" text={submitError} support />}
+          {gated ? <ProfileGateNotice text={submitError.message} /> : <FormFailure failure={submitError} onRetry={() => void submit()} />}
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(5)}>

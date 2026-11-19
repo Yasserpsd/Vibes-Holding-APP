@@ -14,6 +14,7 @@ import { AgendaService } from './agenda/service.js';
 import { analyticsRoutes } from './analytics/routes.js';
 import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { dashboardGuard, guard } from './auth/guard.js';
+import { RefusalCounter } from './auth/refusals.js';
 import { authRoutes } from './auth/routes.js';
 import { backupRoutes } from './backup/routes.js';
 import { BackupService } from './backup/service.js';
@@ -739,7 +740,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices, whatsapp });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals: new RefusalCounter(kv) });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   // M142: voice-filled forms — the same key; the member still submits himself.

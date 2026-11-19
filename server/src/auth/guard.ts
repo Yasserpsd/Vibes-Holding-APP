@@ -85,6 +85,12 @@ export function fieldProblems(issues: readonly { code?: string; message: string;
   return problems;
 }
 
+/** M255: the first field a body would be refused for ('' when it passes) — the sign-up counter names it, nothing else. */
+export function refusedField(schema: z.ZodType<unknown>, input: unknown): string {
+  const result = schema.safeParse(input);
+  return result.success ? '' : (fieldProblems(result.error.issues)[0]?.field ?? '');
+}
+
 export function parse<T>(schema: z.ZodType<T>, input: unknown, reply: FastifyReply): T | null {
   const result = schema.safeParse(input);
   if (result.success) return result.data;

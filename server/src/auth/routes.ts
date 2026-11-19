@@ -9,7 +9,8 @@ import { MOCK_CODE } from '../hub/mock.js';
 import { mobileRule } from '../hub/countries.js';
 import { cleanEmail, COUNTRIES, EMAIL_INVALID_TEXT, EMAIL_POLICY_TEXT, GENERIC_PATTERN, inputFlags, isEmailShape, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { HubError } from '../hub/types.js';
-import { dashboardGuard, guard, parse, RequestError, sessionGuard } from './guard.js';
+import { dashboardGuard, guard, parse, refusedField, RequestError, sessionGuard } from './guard.js';
+import type { RefusalCounter } from './refusals.js';
 import type { Mailer } from '../mail/mailer.js';
 import type { PushService } from '../push/service.js';
 import { DELETION_GRACE_DAYS, type AccountDeletionStore } from './deletion.js';
@@ -43,6 +44,8 @@ export type AuthRoutesOptions = {
   notices?: MemberNotices;
   /** M204: the persona-change and deletion codes go on WhatsApp first. */
   whatsapp?: WhatsappService;
+  /** M255: counts where sign-ups, sign-ins and resets stop, for the dashboard (absent in old tests: nothing is counted). */
+  refusals?: RefusalCounter;
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -181,7 +184,7 @@ const deleteSchema = z.preprocess(
 );
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -228,8 +231,10 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
    * logs says which cause is the common one. It holds the route, the refusal code, the platform and what KIND of
    * text was typed (booleans from `inputFlags`) — never the address, the number or any part of them.
    */
-  const noteRefusal = (route: 'register' | 'login' | 'reset', request: FastifyRequest, code: string, typed: unknown, error?: unknown): void => {
+  const noteRefusal = (route: 'register' | 'login' | 'reset', request: FastifyRequest, code: string, typed: unknown, error?: unknown, field = ''): void => {
     const accountState = accountStateOf(error);
+    // M255: the same refusal, counted for the dashboard (step, code, refused field, platform — nothing typed).
+    refusals?.refused(route, code, sourceOf(request), field);
     app.log.info(
       { route, code: /^[a-z_0-9]{1,40}$/.test(code) ? code : 'other', platform: sourceOf(request), ...inputFlags(typeof typed === 'string' ? typed : ''), ...(accountState ? { accountState } : {}) },
       'auth refusal',
@@ -237,7 +242,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   };
   const watched = async <T>(route: 'register' | 'login' | 'reset', request: FastifyRequest, typed: unknown, run: () => Promise<T>): Promise<T> => {
     try {
-      return await run();
+      const result = await run();
+      refusals?.passed(route, sourceOf(request));
+      return result;
     } catch (error) {
       if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) noteRefusal(route, request, error.code, typed, error);
       throw error;
@@ -306,7 +313,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const typed = typedIn(request, 'email');
       if (limited('register', 6, request, reply)) return noteRefusal('register', request, 'rate', typed);
       const body = parse(registerSchema, request.body, reply);
-      if (!body) return noteRefusal('register', request, 'invalid', typed);
+      if (!body) return noteRefusal('register', request, 'invalid', typed, undefined, refusedField(registerSchema, request.body));
       const result = await watched('register', request, typed, () => service.register(body, request.ip, langOf(request), sourceOf(request), bundleOf(request)));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
@@ -360,7 +367,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const typed = typedIn(request, 'login');
       if (limited('login', 12, request, reply)) return noteRefusal('login', request, 'rate', typed);
       const body = parse(loginSchema, request.body, reply);
-      if (!body) return noteRefusal('login', request, 'invalid', typed);
+      if (!body) return noteRefusal('login', request, 'invalid', typed, undefined, refusedField(loginSchema, request.body));
       const result = await watched('login', request, typed, () => service.login(body.login, body.password, request.ip, body.country, bundleOf(request)));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
@@ -592,7 +599,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const typed = typedIn(request, 'login');
       if (limited('reset', 6, request, reply)) return noteRefusal('reset', request, 'rate', typed);
       const body = parse(resetRequestSchema, request.body, reply);
-      if (!body) return noteRefusal('reset', request, 'invalid', typed);
+      if (!body) return noteRefusal('reset', request, 'invalid', typed, undefined, refusedField(resetRequestSchema, request.body));
       const sent = await watched('reset', request, typed, () => service.requestReset(body.login, request.ip, body.country, body.channel));
       return { ok: true, ...sent };
     }),
@@ -604,7 +611,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const typed = typedIn(request, 'login');
       if (limited('reset', 6, request, reply)) return noteRefusal('reset', request, 'rate', typed);
       const body = parse(resetConfirmSchema, request.body, reply);
-      if (!body) return noteRefusal('reset', request, 'invalid', typed);
+      if (!body) return noteRefusal('reset', request, 'invalid', typed, undefined, refusedField(resetConfirmSchema, request.body));
       await watched('reset', request, typed, () => service.confirmReset(body.login, body.code, body.password, request.ip, body.country));
       return { ok: true };
     }),
@@ -774,6 +781,20 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   // The dashboard's review: approve applies the persona at the hub first, so a failed hub call
   // leaves the request pending for a retry after the member signs in again.
   const requireDashboard = dashboardGuard(service);
+
+  // M255 «أسباب تعثّر التسجيل»: where sign-ups, sign-ins and resets stopped over the last days — counts only.
+  app.get(
+    '/api/admin/auth/refusals',
+    guard(async (request, reply) => {
+      if (!refusals) return reply.code(404).send({ error: { code: 'off', message: 'غير متاح' } });
+      const admin = await requireDashboard(request, reply);
+      if (!admin) return;
+      const query = parse(z.object({ days: z.coerce.number().int().min(1).max(90).default(7) }), request.query, reply);
+      if (!query) return;
+      void reply.header('cache-control', 'no-store');
+      return refusals.report(query.days);
+    }),
+  );
 
   app.get(
     '/api/admin/persona-requests',

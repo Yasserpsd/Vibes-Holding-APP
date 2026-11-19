@@ -1607,6 +1607,8 @@
   "form.fix.country": "الرقم يتبع {country} — تغيير الدولة",
   "form.fix.dropInvite": "المتابعة بدون رمز الدعوة",
   "form.fix.clearInvite": "حذف رمز الدعوة",
+  "form.password.show": "إظهار كلمة المرور",
+  "form.password.hide": "إخفاء كلمة المرور",
   "form.error.memberType": "اختر: فرد أم شركة",
   "form.error.heardFrom": "اختر كيف عرفت عن نادي المستثمرين",
   "form.file.hint": "PDF أو PowerPoint أو Word أو صورة (JPG أو PNG) — بحد أقصى 25 ميجابايت",

@@ -1607,6 +1607,8 @@
   "form.fix.country": "This number belongs to {country} — change the country",
   "form.fix.dropInvite": "Continue without the invite code",
   "form.fix.clearInvite": "Remove the invite code",
+  "form.password.show": "Show the password",
+  "form.password.hide": "Hide the password",
   "form.error.memberType": "Pick: individual or company",
   "form.error.heardFrom": "Pick how you heard about the Investors Club",
   "form.file.hint": "PDF, PowerPoint, Word or an image (JPG or PNG) — up to 25 MB",
