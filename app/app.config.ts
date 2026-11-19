@@ -160,6 +160,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/withAndroidR8',
     // M241: lets `android.allowBackup: false` win over the AppsFlyer SDK's own manifest (the merger refuses the build otherwise).
     './plugins/withAndroidNoBackup',
+    // Portrait stays, but as an optional hardware feature (Play's availability notice of 2026-11-19). Native: next build.
+    './plugins/withAndroidPortraitOptional',
     [
       'expo-tracking-transparency',
       { userTrackingPermission: 'This permission lets us learn which ad introduced you to Investors Club and improve our ads. We never sell your data or share it beyond this purpose.' },
