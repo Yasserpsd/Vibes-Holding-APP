@@ -92,6 +92,7 @@ export const HOME_EN: Translation<HomeContent> = {
     entrepreneur: {
       heroSubtitle: "Your venture deserves the club's stage: present it to investors through Success Partners, and publish your app with no fees.",
       ctas: {
+        projectsBank: { label: 'Browse all the projects of the bank' },
         agenda: { label: 'The “5 minutes” meetup awaits you' },
         services: { label: 'All your services' },
         podcast: { label: 'Introduce investors to your venture' },

@@ -247,11 +247,14 @@ export const HOME_SEED: HomeContent = {
       // (the app collapses the grid for this persona). His journey: present yourself (podcast,
       // شخصية ومسيرة), meet investors (الملتقيات), grow the venture (الخدمات).
       heroSubtitle: 'مشروعك يستحق منصة النادي: اعرضه على المستثمرين في شركاء النجاح، وانشر تطبيقك بدون رسوم.',
-      order: ['services', 'meetups', 'posts', 'agenda', 'podcast', 'quickActions', 'famous', 'partners', 'videos'],
-      hide: ['projectsBank', 'golden', 'opportunity', 'wallet'],
-      hideTabs: ['projects'],
+      // M254 (owner, 2026-11-19: «لازم رائد الأعمال يقدر يشوف كل مشاريع بنك المشاريع… ده ثابت في الكل»): the
+      // Projects Bank is the same for every category — its tab is back in the entrepreneur's bar (no `hideTabs`)
+      // and its block sits on his home. Only the investor's own blocks (the golden opportunity, the wallet) stay off.
+      order: ['services', 'meetups', 'projectsBank', 'posts', 'agenda', 'podcast', 'quickActions', 'famous', 'partners', 'videos'],
+      hide: ['golden', 'opportunity', 'wallet'],
       serviceKeys: ['app-publish', 'pitch-deck', 'meetup', 'studio', 'momentum', 'theater', 'famous'],
       ctas: {
+        projectsBank: { label: 'تصفّح كل مشاريع البنك', route: '/projects' },
         agenda: { label: 'ملتقى «5 دقائق» بانتظارك', route: '/agenda' },
         services: { label: 'كل خدماتك', route: '/services' },
         podcast: { label: 'عرّف المستثمرين بمشروعك', route: '/service/studio' },
@@ -280,8 +283,8 @@ export const HOME_SEED: HomeContent = {
     text: 'أهلًا بك في نادي المستثمرين. لم تحدّد وجهتك بعد؟ ابدأ بالحضور: ملتقيات النادي وندواته وورش عمله الدورية تُقام في مقر النادي بالرياض، وأينما كنت يمكنك حضورها عبر الإنترنت. تتعرّف فيها على رواد الأعمال والمستثمرين عن قرب، ثم تحدّد مسارك بثقة. حدّثني عن اهتمامك لأرشّح لك ما يناسبك.',
     quickReplies: ['ما الملتقيات وورش العمل القادمة؟', 'كيف أحضر عبر الإنترنت من خارج الرياض؟', 'لدي فكرة مشروع وأحتاج توجيهًا', 'أريد التعرّف على المنظومة أولًا'],
   },
-  version: 18,
-  updatedAt: '2026-10-25T00:00:00.000Z',
+  version: 19,
+  updatedAt: '2026-11-19T00:00:00.000Z',
 };
 
 /** Writes the seed when no home content exists yet, or when the stored seed is older than this one. */
