@@ -44,6 +44,10 @@ const envSchema = z.object({
   // M203 (owner, 2026-11-06): WhatsApp code at every new sign-in. off = nothing asked; on = bundles that can draw the step;
   // strict = older bundles are refused too (the owner decides when; a forced update cost members before, see M200).
   PHONE_CODE_MODE: z.enum(['off', 'on', 'strict']).default('off'),
+  // M260: one WhatsApp reminder to a new account that has no membership a day later (whatsapp/reminder.ts). It
+  // leaves only once Meta approved the template `club_membership_reminder`; `off` stops it at once.
+  MEMBERSHIP_REMINDER: z.enum(['off', 'on']).default('on'),
+  MEMBERSHIP_REMINDER_HOURS: z.coerce.number().int().min(1).max(168).default(24),
   // M259: sign-in with a WhatsApp code and no password. On wherever the WhatsApp code is on and the hub knows the
   // op (plugin 2.31.0); `off` hides it at once. The codes one account may ask for in a day are capped.
   CODE_LOGIN: z.enum(['off', 'on']).default('on'),

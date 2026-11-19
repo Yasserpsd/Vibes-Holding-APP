@@ -130,6 +130,11 @@ export class WhatsappService {
   }
 
   /** M205: «منحكم العضوية الشرفية», or its end when `ended`; `ref` keeps one message per grant or revoke. */
+  /** M260: the one reminder of a new account without a membership. WhatsApp only: there is no e-mail of it. */
+  sendMembershipReminder(input: Omit<SendInput, 'email'> & { name?: string | null }): Promise<WaResult> {
+    return this.deliver('membership_reminder', input, { name: firstName(input.name) });
+  }
+
   sendHonorary(input: HonoraryInput, ended = false): Promise<WaResult> {
     return this.deliver(ended ? 'honorary_ended' : 'honorary', input, { name: firstName(input.name) });
   }
@@ -572,7 +577,7 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 export function fallbackMail(kind: WaKind, lang: WaLang, vars: TemplateVars): { subject: string; text: string } | null {
   // M204: the five newer kinds have richer mails of their own, sent by their callers (`orMail`).
   if (NOTICE_KINDS.has(kind)) return null;
-  if (kind === 'membership' || kind === 'event_ticket' || kind === 'visit_update' || kind === 'request_update' || kind === 'invoice' || kind === 'code') return null;
+  if (kind === 'membership' || kind === 'membership_reminder' || kind === 'event_ticket' || kind === 'visit_update' || kind === 'request_update' || kind === 'invoice' || kind === 'code') return null;
   if (kind === 'welcome') {
     return lang === 'en'
       ? { subject: 'Welcome to Investors Club', text: `Welcome${vars.name ? `, ${vars.name}` : ''}. Your membership is active. Open the app to see what is waiting for you.` }

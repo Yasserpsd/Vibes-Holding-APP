@@ -1,6 +1,6 @@
 import type { WaTemplate } from './client.js';
 
-export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended' | NoticeKind;
+export type WaKind = 'welcome' | 'receipt' | 'code' | 'affiliate_link' | 'membership' | 'membership_reminder' | 'event_ticket' | 'visit_update' | 'request_update' | 'invoice' | 'honorary' | 'honorary_ended' | NoticeKind;
 /** M235: short notices of what the administration did; every one is filled from `TemplateVars.list`, in order. */
 export type NoticeKind = 'admin_message' | 'admin_reply' | 'pb_credit' | 'account_deleted' | 'affiliate_update' | 'payout_update' | 'affiliate_bonus' | 'affiliate_cycle';
 export const NOTICE_KINDS: ReadonlySet<string> = new Set<NoticeKind>(['admin_message', 'admin_reply', 'pb_credit', 'account_deleted', 'affiliate_update', 'payout_update', 'affiliate_bonus', 'affiliate_cycle']);
@@ -14,6 +14,8 @@ export const TEMPLATE_NAMES: Record<WaKind, string> = {
   affiliate_link: 'club_affiliate_link',
   // M204 (filed at Meta 2026-11-06, Utility, ar + en).
   membership: 'club_membership_active',
+  // M260: one reminder to a new account without a membership (Marketing; wording in scripts/m260-wa-templates.json).
+  membership_reminder: 'club_membership_reminder',
   event_ticket: 'club_event_ticket',
   visit_update: 'club_visit_update',
   request_update: 'club_request_update',
@@ -94,7 +96,7 @@ export function nameFor(name: string | null | undefined, lang: WaLang, nameEn?: 
 export function buildBodyParams(kind: WaKind, vars: TemplateVars, lang: WaLang): string[] {
   if (kind === 'code') return [cleanParam(vars.code, '-')];
   if (NOTICE_KINDS.has(kind)) return (vars.list ?? []).map((value) => cleanParam(value, '-'));
-  if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا')];
+  if (kind === 'welcome' || kind === 'honorary' || kind === 'honorary_ended' || kind === 'membership_reminder') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا')];
   if (kind === 'affiliate_link') return [cleanParam(nameFor(vars.name, lang), lang === 'en' ? 'Member' : 'عضونا'), cleanParam(vars.code, '-'), cleanParam(vars.link, '-')];
   const service = cleanParam(vars.service, lang === 'en' ? 'Service' : 'خدمة');
   // M204, in the order the templates were filed.

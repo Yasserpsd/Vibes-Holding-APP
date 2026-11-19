@@ -359,7 +359,7 @@ export function toMe(contact: HubContact): Me {
   };
 }
 
-type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null; /** M203: absent or disabled WhatsApp = no code step. */ phoneCodes?: PhoneCodeStore | null; whatsappEnabled?: () => boolean; /** M204: the accounts from before the WhatsApp sign-up. */ legacy?: LegacyAccounts };
+type Deps = { hub: HubClient; sessions: SessionStore; config: Config; log: FastifyBaseLogger; otp?: AdminOtpStore; mailer?: Mailer; invites?: InvitesService; totp?: TotpStore; nameJudge?: NameJudge | null; /** M203: absent or disabled WhatsApp = no code step. */ phoneCodes?: PhoneCodeStore | null; whatsappEnabled?: () => boolean; /** M204: the accounts from before the WhatsApp sign-up. */ legacy?: LegacyAccounts; /** M260: a new account was just created with a proven number (the day-later membership reminder hangs on it). */ onRegistered?: (contact: HubContact, lang: string) => void };
 
 export class AuthService {
   private readonly meCache = new Map<string, { me: Me; at: number }>();
@@ -443,6 +443,8 @@ export class AuthService {
         }
         throw cause;
       });
+    // M260: only a number proven on the form counts — an unproven one may belong to someone else.
+    if (proven && result.contact && !result.pending) this.deps.onRegistered?.(result.contact, lang);
     if (referral && this.deps.invites && result.contact) {
       await this.deps.invites.recordFromRegister(result.contact, Number(result.referred_by ?? 0), String(result.referred_name ?? ''), referral);
     }
@@ -645,6 +647,8 @@ export class AuthService {
         ...(referral ? { referral, ...(representative ? { referral_kind: 'representative' } : {}) } : {}),
       });
       contact = requireContact(patch);
+      // M260: a new Google/Apple account, its number proven a moment ago.
+      this.deps.onRegistered?.(contact, held.lang);
       if (referral && this.deps.invites) {
         await this.deps.invites.recordFromRegister(contact, Number(patch.referred_by ?? 0), String(patch.referred_name ?? ''), referral);
         await this.deps.invites.onVerified(contact);
@@ -1161,7 +1165,7 @@ export class AuthService {
     if (this.codeLoginHub && Date.now() - this.codeLoginHub.at < 10 * 60_000) return this.codeLoginHub.known;
     let known = true;
     try {
-      await this.deps.hub.call('phone_login', { check: 1, phone: '', country: 'sa', ip: 'probe', source: 'ios' });
+      await this.deps.hub.call('phone_login', { check: 1, phone: '', country: 'sa', ip: 'probe', source: 'app-ios' });
     } catch (error) {
       // Any refusal but «unknown op» comes from the op itself (the empty number is refused by it).
       known = !(error instanceof HubError && (error.code === 'hub_not_supported' || error.code === 'forbidden' || error.code === 'hub_unreachable' || error.code === 'hub_config'));

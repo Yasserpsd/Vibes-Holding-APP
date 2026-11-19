@@ -16,6 +16,7 @@ import { AnalyticsService, type EventKey } from './analytics/service.js';
 import { dashboardGuard, guard } from './auth/guard.js';
 import { RefusalCounter } from './auth/refusals.js';
 import { authRoutes } from './auth/routes.js';
+import { MembershipReminder } from './whatsapp/reminder.js';
 import { backupRoutes } from './backup/routes.js';
 import { BackupService } from './backup/service.js';
 import { badgesRoutes } from './badges/routes.js';
@@ -449,7 +450,36 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // M204: the accounts from before the WhatsApp sign-up (a snapshot taken once from the hub's registry).
   const legacy = new LegacyAccounts(kv);
   await legacy.load();
-  const auth: AuthService = new AuthService({ hub: hubClient, sessions, config, log: app.log, otp, mailer: mail, invites, totp, nameJudge, phoneCodes, whatsappEnabled: () => whatsapp.enabled, legacy });
+  // M260: one WhatsApp reminder to a new account that has no membership a day later. Born from sign-ups from now on
+  // only; it leaves by day, once, and only while the hub still says «no membership».
+  const membershipReminder = new MembershipReminder({
+    kv,
+    hub: hubClient,
+    log: app.log,
+    send: (input) => whatsapp.sendMembershipReminder(input),
+    enabled: () => config.MEMBERSHIP_REMINDER === 'on' && whatsapp.enabled,
+    delayMs: config.MEMBERSHIP_REMINDER_HOURS * 3_600_000,
+  });
+  if (whatsapp.enabled && config.MEMBERSHIP_REMINDER === 'on') {
+    const reminderTimer = setInterval(() => void membershipReminder.run(), 10 * 60_000);
+    reminderTimer.unref();
+    app.addHook('onClose', async () => clearInterval(reminderTimer));
+  }
+  const auth: AuthService = new AuthService({
+    hub: hubClient,
+    sessions,
+    config,
+    log: app.log,
+    otp,
+    mailer: mail,
+    invites,
+    totp,
+    nameJudge,
+    phoneCodes,
+    whatsappEnabled: () => whatsapp.enabled,
+    legacy,
+    onRegistered: (contact, lang) => void membershipReminder.note({ phone: contact.phone, name: contact.name, lang }),
+  });
   // M46: Google/Apple ID-token verification (audiences from env; empty = that button stays hidden in the app).
   const social = new SocialVerifier({ googleAudiences: parseAudiences(config.GOOGLE_CLIENT_IDS), appleAudiences: parseAudiences(config.APPLE_APP_IDS), log: app.log, fetchImpl });
   // M138: the member's receipt mail on every action and mail + push on every status change.

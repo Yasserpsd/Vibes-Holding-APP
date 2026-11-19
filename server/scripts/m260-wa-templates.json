@@ -1,0 +1,16 @@
+[
+  {
+    "name": "club_membership_reminder",
+    "language": "ar",
+    "category": "MARKETING",
+    "body": "مرحبًا {{1}}، حسابك في Investors Club جاهز. أكمل تفعيل عضويتك من داخل التطبيق لتستفيد من الملتقيات وبنك المشاريع وخدمات النادي.",
+    "bodyExamples": ["أحمد"]
+  },
+  {
+    "name": "club_membership_reminder",
+    "language": "en",
+    "category": "MARKETING",
+    "body": "Hello {{1}}, your Investors Club account is ready. Complete your membership inside the app to enjoy the meetups, the Projects Bank and the club's services.",
+    "bodyExamples": ["Ahmed"]
+  }
+]
