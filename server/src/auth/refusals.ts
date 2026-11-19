@@ -10,7 +10,7 @@ import type { KV } from '../store.js';
  */
 export type AuthStep = 'register' | 'login' | 'reset';
 export type RefusalReason = { code: string; field: string; label: string; count: number; ios: number; android: number };
-export type RefusalStep = { step: AuthStep; label: string; passed: number; refused: number; reasons: RefusalReason[] };
+export type RefusalStep = { step: AuthStep; label: string; /** M257: how many times the form was opened (apps from 1.3.5 on tell). */ opened: number; passed: number; refused: number; reasons: RefusalReason[] };
 export type RefusalReport = { days: number; from: string; to: string; steps: RefusalStep[] };
 
 type StoredDay = { counts: Record<string, number> };
@@ -18,6 +18,8 @@ type StoredDay = { counts: Record<string, number> };
 const keyOf = (day: string): string => `auth:refusals:${day}`;
 /** The count of requests that passed a step: the denominator of every refusal beside it. */
 const PASSED = 'ok';
+/** M257: the form was opened — against `ok`, it says how many leave without pressing the button at all. */
+const OPENED = 'open';
 
 const STEP_LABELS: Record<AuthStep, string> = { register: 'إنشاء حساب جديد', login: 'تسجيل الدخول', reset: 'استعادة كلمة المرور' };
 
@@ -86,6 +88,11 @@ export class RefusalCounter {
     this.add(`${step}|${PASSED}||${platformOf(platform)}`);
   }
 
+  /** M257: the form of a step was opened on a phone. */
+  opened(step: AuthStep, platform: string): void {
+    this.add(`${step}|${OPENED}||${platformOf(platform)}`);
+  }
+
   /** Resolves once every count noted so far is stored (the tests wait on it; the routes never do). */
   settled(): Promise<void> {
     return this.chain;
@@ -113,11 +120,16 @@ export class RefusalCounter {
     const steps = (Object.keys(STEP_LABELS) as AuthStep[]).map((step): RefusalStep => {
       const reasons = new Map<string, RefusalReason>();
       let passed = 0;
+      let opened = 0;
       for (const [key, count] of total) {
         const [keyStep, code = '', field = '', platform = 'other'] = key.split('|');
         if (keyStep !== step) continue;
         if (code === PASSED) {
           passed += count;
+          continue;
+        }
+        if (code === OPENED) {
+          opened += count;
           continue;
         }
         const id = `${code}|${field}`;
@@ -128,7 +140,7 @@ export class RefusalCounter {
         reasons.set(id, reason);
       }
       const list = [...reasons.values()].sort((a, b) => b.count - a.count);
-      return { step, label: STEP_LABELS[step], passed, refused: list.reduce((sum, reason) => sum + reason.count, 0), reasons: list };
+      return { step, label: STEP_LABELS[step], opened, passed, refused: list.reduce((sum, reason) => sum + reason.count, 0), reasons: list };
     });
     return { days: span.length, from: span[0] ?? '', to: span[span.length - 1] ?? '', steps };
   }

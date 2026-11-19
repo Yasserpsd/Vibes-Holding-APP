@@ -15,6 +15,7 @@ test('M255: refused sign-ups are counted by step, cause, field and platform — 
   const counter = new RefusalCounter(kv, () => now);
   counter.passed('register', 'ios');
   counter.passed('register', 'android');
+  for (let index = 0; index < 9; index += 1) counter.opened('register', index % 2 ? 'ios' : 'android');
   counter.refused('register', 'invalid', 'ios', 'email');
   counter.refused('register', 'invalid', 'android', 'email');
   counter.refused('register', 'invalid', 'ios', 'email');
@@ -31,7 +32,7 @@ test('M255: refused sign-ups are counted by step, cause, field and platform — 
   const report = await counter.report(7);
   assert.deepEqual([report.days, report.from, report.to], [7, '2026-11-13', '2026-11-19']);
   const register = report.steps.find((step) => step.step === 'register');
-  assert.deepEqual([register?.label, register?.passed, register?.refused], ['إنشاء حساب جديد', 2, 5]);
+  assert.deepEqual([register?.label, register?.opened, register?.passed, register?.refused], ['إنشاء حساب جديد', 9, 2, 5]);
   // The commonest cause first; a cause is a plain Arabic sentence, never a code.
   assert.deepEqual(
     register?.reasons.map((reason) => [reason.label, reason.count, reason.ios, reason.android]),
@@ -46,7 +47,7 @@ test('M255: refused sign-ups are counted by step, cause, field and platform — 
 
   // What is stored: counters under a day, keyed by step|code|field|platform.
   const stored = await kv.get<{ counts: Record<string, number> }>('auth:refusals:2026-11-19');
-  assert.deepEqual(Object.keys(stored?.counts ?? {}).sort(), ['login|bad_login||android', 'login|other||other', 'register|exists||ios', 'register|invalid|email|android', 'register|invalid|email|ios', 'register|ok||android', 'register|ok||ios']);
+  assert.deepEqual(Object.keys(stored?.counts ?? {}).sort(), ['login|bad_login||android', 'login|other||other', 'register|exists||ios', 'register|invalid|email|android', 'register|invalid|email|ios', 'register|ok||android', 'register|ok||ios', 'register|open||android', 'register|open||ios']);
 });
 
 test('M255: the refused field of a body is its first refused field', () => {

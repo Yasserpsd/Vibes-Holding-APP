@@ -12,6 +12,7 @@ import { CountryPicker } from '@/components/CountryPicker';
 import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
 import { ChipRow, ErrorSummary, FieldGroup, type FieldFix } from '@/components/form/FormParts';
 import { FormCard } from '@/components/form/FormTheme';
+import { SignupSteps } from '@/components/form/SignupSteps';
 import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { entranceDelay, FadeInView } from '@/components/motion';
@@ -31,7 +32,9 @@ import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Form = {
+  /** M257: the first name; the family name has its own field, and the two are sent as one name. */
   name: string;
+  lastName: string;
   country: string;
   phone: string;
   email: string;
@@ -42,12 +45,21 @@ type Form = {
   inviteCode: string;
 };
 
-const EMPTY: Form = { name: '', country: 'sa', phone: '', email: '', password: '', persona: '', jobTitle: '', inviteCode: '' };
+const EMPTY: Form = { name: '', lastName: '', country: 'sa', phone: '', email: '', password: '', persona: '', jobTitle: '', inviteCode: '' };
 
 type Field = keyof Form;
-const ORDER: Field[] = ['name', 'country', 'phone', 'email', 'password', 'persona', 'jobTitle'];
+const ORDER: Field[] = ['name', 'lastName', 'country', 'phone', 'email', 'password', 'persona', 'jobTitle'];
 /** M253: the order a refusal from the server is looked for in — the invite code can be refused too. */
 const SERVER_ORDER: Field[] = [...ORDER, 'inviteCode'];
+/** M257: the name as the club stores it — first name and family name in one line. */
+const fullName = (form: Pick<Form, 'name' | 'lastName'>): string => `${form.name.trim()} ${form.lastName.trim()}`.replace(/\s+/g, ' ').trim();
+/** A whole name into its two fields: the first word, then the rest (the member can move a word between them). */
+const splitName = (value: string): { name: string; lastName: string } => {
+  const whole = value.replace(/\s+/g, ' ').trim();
+  const at = whole.indexOf(' ');
+  return at < 0 ? { name: whole, lastName: '' } : { name: whole.slice(0, at), lastName: whole.slice(at + 1) };
+};
+
 /** M253: the field a refusal belongs under when the server (or the hub behind it) names a code and no field. */
 const CODE_FIELDS: Partial<Record<string, Field>> = {
   phone: 'phone',
@@ -94,7 +106,7 @@ export default function RegisterScreen() {
   const { data: config, isLoading, error: configError, refetch } = useAuthConfig();
   const scrollRef = useRef<ScrollView | null>(null);
   // M256: the picker opens on the country the phone is in (its time zone), Saudi Arabia when it does not tell.
-  const [form, setForm] = useState<Form>(() => ({ ...EMPTY, country: deviceCountry(), name: socialName?.trim() ?? '', email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' }));
+  const [form, setForm] = useState<Form>(() => ({ ...EMPTY, country: deviceCountry(), ...splitName(socialName ?? ''), email: socialEmail?.trim() ?? '', inviteCode: invite?.trim().slice(0, 30) ?? '' }));
   // M239 (owner, 2026-11-14: a right e-mail kept its red warning): the handlers read the newest values from here, never
   // from the render they were created in — an autofill writes a field and leaves it inside one render.
   const [newest] = useState(() => ({ form }));
@@ -111,6 +123,7 @@ export default function RegisterScreen() {
   const { signIn } = useAuth();
   const queryClient = useQueryClient();
   // M256: «التالي» on the keyboard goes to the next field instead of closing the keyboard.
+  const lastNameInput = useRef<TextInput | null>(null);
   const phoneInput = useRef<TextInput | null>(null);
   const passwordInput = useRef<TextInput | null>(null);
 
@@ -123,8 +136,11 @@ export default function RegisterScreen() {
     if (social && (key === 'email' || key === 'password')) return null;
     switch (key) {
       // M207 (owner, 2026-11-06): only an empty name stops the form; an odd one shows the warning under the field.
+      // M257 (owner, 2026-11-19): two fields, so a name of one word cannot be sent at all.
       case 'name':
-        return draft.name.trim().length < 2 ? t('form.error.name.empty') : null;
+        return draft.name.trim().length < 2 ? t('form.error.firstName') : null;
+      case 'lastName':
+        return draft.lastName.trim().length < 2 ? t('form.error.lastName') : null;
       case 'phone': {
         const land = config?.countries.find((item) => item.code === draft.country) ?? country;
         const example = land?.example ? land.example.replace(/^0+/, '') : '';
@@ -164,7 +180,11 @@ export default function RegisterScreen() {
       if (saved.country) set('country')(saved.country);
       set('phone')(saved.phone);
     }
-    if (!current.name && saved.name) set('name')(saved.name);
+    if (!current.name && !current.lastName && saved.name) {
+      const parts = splitName(saved.name);
+      set('name')(parts.name);
+      if (parts.lastName) set('lastName')(parts.lastName);
+    }
     if (!current.email && saved.email) set('email')(saved.email);
     if (!current.jobTitle && saved.jobTitle) set('jobTitle')(saved.jobTitle);
     if (!current.inviteCode && saved.inviteCode) {
@@ -183,8 +203,12 @@ export default function RegisterScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the form opens
   }, []);
+  // M257: one count for the dashboard — the form was opened (how many open it against how many finish it).
   useEffect(() => {
-    const timer = setTimeout(() => saveSignupDraft(form), 600);
+    void authApi.formOpened('register').catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => saveSignupDraft({ ...form, name: fullName(form) }), 600);
     return () => clearTimeout(timer);
   }, [form]);
   const blur = (key: Field) => () => {
@@ -212,7 +236,7 @@ export default function RegisterScreen() {
   const shown = errors.errors;
   const clearError = errors.clear;
   useEffect(() => {
-    for (const key of ['name', 'email', 'password', 'jobTitle'] as const) {
+    for (const key of ['name', 'lastName', 'email', 'password', 'jobTitle'] as const) {
       if (shown[key] && refused.values[key] !== form[key] && issueOf(key, form) === null) clearError(key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
@@ -241,7 +265,7 @@ export default function RegisterScreen() {
       if (social) {
         if (proven?.kind !== 'done') return;
         const result = await authApi.socialComplete(social.token, proven.token, {
-          name: latest.name.trim(),
+          name: fullName(latest),
           persona: latest.persona,
           jobTitle: latest.jobTitle.trim(),
           inviteCode: latest.inviteCode.trim() || undefined,
@@ -257,7 +281,7 @@ export default function RegisterScreen() {
         return;
       }
       const result = await authApi.register({
-        name: latest.name.trim(),
+        name: fullName(latest),
         country: latest.country,
         phone: latest.phone.trim(),
         email: cleanEmail(latest.email),
@@ -301,11 +325,25 @@ export default function RegisterScreen() {
   };
 
   // M253: the one-tap corrections. Each is offered only when there is ONE right answer; the label says what a tap writes.
-  const nameMeant = nameFix(form.name);
+  const typedName = fullName(form);
+  const nameComplete = form.name.trim().length >= 2 && form.lastName.trim().length >= 2;
+  const nameMeant = nameComplete ? nameFix(typedName) : null;
+  // M257: the member reads from the start that a WhatsApp code is part of signing up.
+  const stepsShown = Boolean(config?.phoneProofRequired || social);
+  const stepNow = proof?.kind === 'done' ? 2 : proof?.kind === 'code' ? 1 : 0;
   const emailMeant = social ? null : emailFix(form.email);
   const phoneLand = config && !proof && errors.errors.phone ? phoneCountryFix(form.phone, form.country, config.countries) : null;
   const fixes: Partial<Record<Field, FieldFix | null>> = {
-    name: nameMeant ? { label: t('form.fix.use', { value: nameMeant }), onPress: () => set('name')(nameMeant) } : null,
+    lastName: nameMeant
+      ? {
+          label: t('form.fix.use', { value: nameMeant }),
+          onPress: () => {
+            const parts = splitName(nameMeant);
+            set('name')(parts.name);
+            set('lastName')(parts.lastName);
+          },
+        }
+      : null,
     email:
       errors.errors.email && refused.code === 'exists' && refused.values.email === form.email
         ? { label: t('form.fix.signIn'), icon: 'log-in-outline', onPress: () => router.replace({ pathname: '/auth/login', params: { email: cleanEmail(form.email) } }) }
@@ -365,29 +403,43 @@ export default function RegisterScreen() {
       ) : null}
       {social ? null : (
         <FadeInView delay={entranceDelay(0)}>
-          <SocialButtons onError={(message) => setFailure({ message, code: 'social' })} />
+          <SocialButtons fastest onError={(message) => setFailure({ message, code: 'social' })} />
         </FadeInView>
       )}
       <FadeInView delay={entranceDelay(1)}>
         {/* Owner (2026-11-06): the white form of the profile gate is the one look for sign-up too. */}
         <FormCard tone="light">
+          {stepsShown ? <SignupSteps labels={[t('auth.register.step.details'), t('auth.register.step.code'), t('auth.register.step.done')]} current={stepNow} /> : null}
           <ErrorSummary count={errors.count} />
           <Notice text={t('auth.register.phonePolicy')} />
           <FormField
-            label={t('auth.register.name')}
+            label={t('auth.register.firstName')}
             value={form.name}
             onChangeText={set('name')}
             error={errors.errors.name}
-            fix={fixes.name}
             anchorRef={errors.anchor('name')}
             onBlur={blur('name')}
-            hint={t('auth.register.nameHint')}
-            hintOnFocus
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => lastNameInput.current?.focus()}
+            textContentType="givenName"
+            autoComplete="name-given"
+          />
+          <FormField
+            label={t('auth.register.lastName')}
+            value={form.lastName}
+            onChangeText={set('lastName')}
+            error={errors.errors.lastName}
+            fix={fixes.lastName}
+            anchorRef={errors.anchor('lastName')}
+            onBlur={blur('lastName')}
+            inputRef={lastNameInput}
             returnKeyType="next"
             submitBehavior="submit"
             onSubmitEditing={() => phoneInput.current?.focus()}
-            warning={form.name.trim().length >= 2 && nameIssue(form.name) ? t('form.nameWarning') : null}
-            textContentType="name"
+            warning={nameComplete && nameIssue(typedName) ? t('form.nameWarning') : null}
+            textContentType="familyName"
+            autoComplete="name-family"
           />
 
           <CountryPicker label={t('auth.register.country')} countries={config.countries} selected={form.country} onSelect={set('country')} anchorRef={errors.anchor('country')} />
@@ -469,7 +521,13 @@ export default function RegisterScreen() {
           />
           )}
 
-          <FieldGroup label={t('auth.register.persona')} error={errors.errors.persona} anchorRef={errors.anchor('persona')}>
+          {/* M257: one line under the three choices says what the picked category means (it changes once a year only). */}
+          <FieldGroup
+            label={t('auth.register.persona')}
+            error={errors.errors.persona}
+            hint={form.persona ? t(`persona.hint.${form.persona}`) : undefined}
+            anchorRef={errors.anchor('persona')}
+          >
             <ChipRow>
               {config.personas.map((item) => (
                 <Chip key={item.key} label={tOptional(`persona.${item.key}`) ?? item.label} selected={item.key === form.persona} onPress={() => set('persona')(item.key)} />

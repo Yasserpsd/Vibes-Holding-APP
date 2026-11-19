@@ -302,9 +302,10 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
             {need('contactEmail') ? (
               <View style={styles.group}>
                 {/* Owner (2026-10-30): the member must understand WHY — invoices and every contact go to this address only. */}
-                <Notice text={t('completeProfile.contactEmailWhy')} />
                 <FormField
                   label={t('completeProfile.contactEmail')}
+                  // M257: the «why» shows when the member taps the field, not as a block above it.
+                  hint={t('completeProfile.contactEmailWhy')}
                   value={contactEmail}
                   onChangeText={field('contactEmail', setContactEmail)}
                   error={form.errors.contactEmail}
@@ -349,7 +350,7 @@ export function CompletionForm({ missing, onLater }: { missing: Field[]; onLater
             ) : null}
 
             {need('persona') && config ? (
-              <FieldGroup label={t('completeProfile.persona')} error={form.errors.persona} anchorRef={form.anchor('persona')}>
+              <FieldGroup label={t('completeProfile.persona')} error={form.errors.persona} hint={persona ? t(`persona.hint.${persona}`) : undefined} anchorRef={form.anchor('persona')}>
                 <ChipRow>
                   {PERSONAS.map((key) => {
                     const item = config.personas.find((entry) => entry.key === key);

@@ -194,6 +194,8 @@ export type MembershipContent = {
 };
 
 export const authApi = {
+  // M257: one count for the dashboard's «أسباب تعثّر التسجيل» — a form was opened. Nothing about the member is sent.
+  formOpened: (step: 'register') => apiRequest<{ ok: true }>('POST', '/api/auth/form-open', { body: { step }, token: null, timeoutMs: 8000 }),
   register: (input: RegisterInput) => apiRequest<PendingResult | SignedInResult>('POST', '/api/auth/register', { body: input, token: null }),
   // M211: the number is proven on the form itself; nothing exists at the hub until the sign-up is sent.
   phoneProofStart: (phone: string, country: string) => apiRequest<PhoneStepResult>('POST', '/api/auth/phone-proof/start', { body: { phone, country }, token: null }),

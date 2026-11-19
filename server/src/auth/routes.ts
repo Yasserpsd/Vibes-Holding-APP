@@ -319,6 +319,18 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     }),
   );
 
+  // M257: the sign-up form was opened — one count for the dashboard, nothing about the member (no body beyond the step).
+  app.post(
+    '/api/auth/form-open',
+    guard(async (request, reply) => {
+      if (limited('form-open', 30, request, reply)) return;
+      const body = parse(z.object({ step: z.enum(['register']) }), request.body, reply);
+      if (!body) return;
+      refusals?.opened(body.step, sourceOf(request));
+      return { ok: true };
+    }),
+  );
+
   // M211: «تأكيد الرقم» on the sign-up form: a WhatsApp code before any account exists. Paid messages, so the limits are tight.
   app.post(
     '/api/auth/phone-proof/start',

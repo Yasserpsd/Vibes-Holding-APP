@@ -45,6 +45,10 @@ export function SignupIssues() {
                   <p className="muted">
                     {`المحاولات: ${formatNumber(attempts)} · نجحت: ${formatNumber(step.passed)} · توقفت: ${formatNumber(step.refused)} · نسبة التوقف: ${share(step.refused, attempts)}`}
                   </p>
+                  {/* M257: how many opened the form against how many sent it — the ones who leave without pressing the button. */}
+                  {step.opened > 0 ? (
+                    <p className="muted">{`فتحوا الصفحة: ${formatNumber(step.opened)} · أرسلوا النموذج: ${formatNumber(attempts)} · غادروا دون إرسال: ${share(Math.max(step.opened - attempts, 0), step.opened)}`}</p>
+                  ) : null}
                   {step.reasons.length === 0 ? (
                     <p className="state-card empty">لا توجد محاولات متوقفة في هذه الخطوة.</p>
                   ) : (

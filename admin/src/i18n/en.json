@@ -683,6 +683,7 @@
  "لا توجد محاولات متوقفة في هذه الخطوة.": "No stopped attempts at this step.",
  "أسباب التوقف في {0}": "Causes of stopping at {0}",
  "من المتوقفين": "Of the stopped",
+ "فتحوا الصفحة: {0} · أرسلوا النموذج: {1} · غادروا دون إرسال: {2}": "Opened the page: {0} · sent the form: {1} · left without sending: {2}",
  "السبب": "Cause",
  "العدد": "Count",
  "آيفون": "iPhone",

@@ -518,7 +518,7 @@ export type RefusalReport = {
   days: number;
   from: string;
   to: string;
-  steps: { step: 'register' | 'login' | 'reset'; label: string; passed: number; refused: number; reasons: { code: string; field: string; label: string; count: number; ios: number; android: number }[] }[];
+  steps: { step: 'register' | 'login' | 'reset'; label: string; opened: number; passed: number; refused: number; reasons: { code: string; field: string; label: string; count: number; ios: number; android: number }[] }[];
 };
 
 /** M44 «روابط الدفع» — mirrors server/src/paylinks/service.ts. */

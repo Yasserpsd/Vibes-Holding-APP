@@ -20,7 +20,7 @@ import { colors, spacing, typography } from '@/theme/tokens';
  * binary has the native module AND the server announces the provider (auth config `social`),
  * so OTA updates on older binaries and unconfigured servers both simply hide it.
  */
-export function SocialButtons({ onError }: { onError: (message: string) => void }) {
+export function SocialButtons({ onError, fastest = false }: { onError: (message: string) => void; /** M257: the sign-up form says this is the fastest way in. */ fastest?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { signIn } = useAuth();
@@ -74,6 +74,7 @@ export function SocialButtons({ onError }: { onError: (message: string) => void 
 
   return (
     <FadeInView>
+      {fastest ? <Text style={styles.fastest}>{t('auth.social.fastest', { provider: provider === 'google' ? 'Google' : 'Apple' })}</Text> : null}
       <AppButton
         label={t(provider === 'google' ? 'auth.social.google' : 'auth.social.apple')}
         icon={provider === 'google' ? 'logo-google' : 'logo-apple'}
@@ -94,4 +95,5 @@ const styles = themedStyles(() => ({
   divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   line: { flex: 1 },
   or: { ...typography.caption, color: colors.textMuted },
+  fastest: { ...typography.caption, color: colors.goldLightText, textAlign: 'center', paddingBottom: spacing.xs },
 }));

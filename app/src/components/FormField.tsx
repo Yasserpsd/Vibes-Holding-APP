@@ -14,7 +14,12 @@ import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/toke
 type Props = TextInputProps & {
   label: string;
   hint?: string;
-  /** Owner (2026-11-06): the hint is one short line that shows only while the field is focused. */
+  /**
+   * M257 (owner, 2026-11-19: «أي شرح يبقى بمجرد ما أضغط… ميبقاش شكل الفورم كبيرة»): a hint shows only while its
+   * field holds the cursor — that is the rule of every form now, with no prop needed. `true` also keeps it to one
+   * short line (owner, 2026-11-06); `false` is the rare hint that must be read before the field is touched. A
+   * field that cannot be edited never holds the cursor, so its hint always shows.
+   */
   hintOnFocus?: boolean;
   /** M207: a caution that does not block the form; it shows once the member has left the field. */
   warning?: string | null;
@@ -35,7 +40,7 @@ type Props = TextInputProps & {
  * One labelled input. M195: inside a FormCard it wears the club identity (navy ink, white field, gold
  * focus) and an error paints the border red (#D92D20) with the exact message and a warning icon under it.
  */
-export function FormField({ label, hint, hintOnFocus = false, warning, error, fix, required = false, latin = false, anchorRef, inputRef, style, multiline, secureTextEntry, onFocus, onBlur, ...inputProps }: Props) {
+export function FormField({ label, hint, hintOnFocus, warning, error, fix, required = false, latin = false, anchorRef, inputRef, style, multiline, secureTextEntry, onFocus, onBlur, ...inputProps }: Props) {
   const [focused, setFocused] = useState(false);
   // M255 (owner, 2026-11-19): a password field carries an eye button — a mistyped password nobody could see was a
   // quiet reason for «كلمة المرور غير صحيحة». The button sits BESIDE the field, never over the typed text.
@@ -126,8 +131,8 @@ export function FormField({ label, hint, hintOnFocus = false, warning, error, fi
         ) : (
           <Text style={styles.error}>{warning}</Text>
         )
-      ) : hint && (!hintOnFocus || focused) ? (
-        <Text numberOfLines={hintOnFocus ? 1 : undefined} style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
+      ) : hint && (hintOnFocus === false || focused || inputProps.editable === false) ? (
+        <Text numberOfLines={hintOnFocus === true ? 1 : undefined} style={[styles.hint, paper && styles.paperHint, form ? { color: form.muted } : null]}>{hint}</Text>
       ) : null}
       {/* Typing never paints a new caution (owner, 2026-11-07): beside an error the button is always there; beside a caution it waits until the member leaves the field. */}
       {fix && (error || !focused) ? <FixButton fix={fix} /> : null}
