@@ -50,7 +50,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'agenda', label: 'أجندة النادي', icon: 'agenda' },
   { key: 'hq', label: 'حجوزات المقر', icon: 'home' },
   { key: 'people', label: 'شخصية ومسيرة', icon: 'people' },
-  { key: 'personas', label: 'طلبات تغيير الصفة', icon: 'members' },
+  { key: 'personas', label: 'طلبات تغيير الفئة', icon: 'members' },
   { key: 'workshops', label: 'تسجيلات الورش', icon: 'workshops' },
   { key: 'forms', label: 'نماذج التسجيل', icon: 'forms' },
   { key: 'requests', label: 'طلبات الخدمات', icon: 'forms' },

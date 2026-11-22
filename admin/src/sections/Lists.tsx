@@ -156,7 +156,7 @@ export function PersonaRequests() {
   async function decide(row: PersonaChangeRequest, action: 'approve' | 'reject') {
     const to = PERSONA_WORD[row.to] ?? row.to;
     const confirmText =
-      action === 'approve' ? `اعتماد تغيير صفة «${row.name}» إلى «${to}»؟ يُطبّق التغيير فورًا ويصل للعضو إشعار.` : `رفض طلب «${row.name}»؟ يصل للعضو إشعار بالرفض.`;
+      action === 'approve' ? `اعتماد تغيير فئة «${row.name}» إلى «${to}»؟ يُطبّق التغيير فورًا ويصل للعضو إشعار.` : `رفض طلب «${row.name}»؟ يصل للعضو إشعار بالرفض.`;
     if (!window.confirm(confirmText)) return;
     const note = action === 'reject' ? (window.prompt('ملاحظة للعضو (اختياري):') ?? '') : '';
     setBusyId(row.id);
@@ -174,21 +174,21 @@ export function PersonaRequests() {
 
   return (
     <>
-      <SectionHead title="طلبات تغيير الصفة" hint={state.data ? `قيد المراجعة: ${formatNumber(pending)}` : undefined} onReload={state.reload} busy={state.loading} />
+      <SectionHead title="طلبات تغيير الفئة" hint={state.data ? `قيد المراجعة: ${formatNumber(pending)}` : undefined} onReload={state.reload} busy={state.loading} />
       <p className="muted">
-        العضو يغيّر صفته بنفسه مرة واحدة خلال سنة العضوية. ما زاد عن ذلك يصل هنا كطلب: الاعتماد يطبّق الصفة الجديدة فورًا ويُشعر العضو، والرفض يُشعره
+        العضو يغيّر فئته بنفسه مرة واحدة خلال سنة العضوية. ما زاد عن ذلك يصل هنا كطلب: الاعتماد يطبّق الفئة الجديدة فورًا ويُشعر العضو، والرفض يُشعره
         بدون تغيير. إن فشل الاعتماد لانتهاء جلسة العضو يبقى الطلب قائمًا — اطلب منه فتح التطبيق ثم أعد المحاولة.
       </p>
       <Async state={state} rows={5} empty={() => rows.length === 0} emptyText="لا توجد طلبات تغيير بعد.">
         {() => (
           <DataTable<PersonaChangeRequest>
-            caption="طلبات تغيير الصفة"
+            caption="طلبات تغيير الفئة"
             rows={rows}
             rowKey={(row) => row.id}
             columns={[
               { key: 'who', label: 'العضو', cell: (row) => <MemberLink id={row.contactId} name={row.name || row.email} /> },
-              { key: 'from', label: 'الصفة الحالية', cell: (row) => PERSONA_WORD[row.from] ?? row.from ?? '—' },
-              { key: 'to', label: 'الصفة المطلوبة', cell: (row) => PERSONA_WORD[row.to] ?? row.to },
+              { key: 'from', label: 'الفئة الحالية', cell: (row) => PERSONA_WORD[row.from] ?? row.from ?? '—' },
+              { key: 'to', label: 'الفئة المطلوبة', cell: (row) => PERSONA_WORD[row.to] ?? row.to },
               { key: 'note', label: 'ملاحظة العضو', cell: (row) => row.note || '—' },
               { key: 'at', label: 'طُلب', cell: (row) => formatDateTime(row.createdAt) },
               {
