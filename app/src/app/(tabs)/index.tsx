@@ -22,6 +22,8 @@ import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { WorkshopAdPopup } from '@/components/WorkshopAd';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
+import { HqHoursCard } from '@/components/HqHoursCard';
+import { MembershipBenefitsBlock } from '@/components/MembershipBenefitsBlock';
 import { MembershipHomeCard } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
@@ -43,7 +45,7 @@ import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
 const clubEmblem = require('../../../assets/images/club-emblem.png');
@@ -81,8 +83,6 @@ export default function HomeScreen() {
   const hq = useHq();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  // M102: the entrepreneur's collapsed services grid.
-  const [gridOpen, setGridOpen] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -183,15 +183,10 @@ export default function HomeScreen() {
   const orderedServices = leadKeys.length ? [...allServices].sort((a, b) => leadRank(a.key) - leadRank(b.key)) : allServices;
   // M102 (owner): the entrepreneur's home shows only HIS two doors — شركاء النجاح and نشر تطبيقه،
   // TWIN gold cards — and the rest of the grid waits behind a loud «اضغط للمزيد».
-  const teaser =
-    personaKey === 'entrepreneur'
-      ? gridOpen
-        ? orderedServices.filter((service) => service.key !== 'app-publish')
-        : []
-      : personaKey === 'guest'
-        ? orderedServices
-        : orderedServices.slice(0, 4);
-  const gridCollapsible = personaKey === 'entrepreneur' && orderedServices.length > 1;
+  // M261 (owner, 2026-11-22: «نبين كل الخدمات اللي مخفية»): nothing waits behind a tap any more — every persona
+  // reads the WHOLE grid on the home (the persona's lead services still open it); the entrepreneur keeps his two
+  // gold doors above it, so «نشر تطبيقك» is not repeated as a tile.
+  const teaser = personaKey === 'entrepreneur' ? orderedServices.filter((service) => service.key !== 'app-publish') : orderedServices;
 
   const sections: Partial<Record<HomeSectionKey, () => ReactElement | null>> = {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
@@ -210,17 +205,29 @@ export default function HomeScreen() {
           ))}
         </View>
       ),
-    quickActions: () =>
-      signedIn ? (
-        <FadeInView key="quickActions" delay={180}>
-          <View style={styles.quickRow}>
-            <QuickAction icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} />
-            <QuickAction icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
-            <QuickAction icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} />
-            <QuickAction icon="chatbubbles-outline" label={t('account.menu.contact')} onPress={() => router.push('/contact' as Href)} />
-          </View>
-        </FadeInView>
-      ) : null,
+    // M261 (owner: «نبين كل… المخفية»): the four quick tiles grew into the club's whole map, for everyone — the
+    // screens that only the account menu (or nothing at all, like the prices) used to reach. Twelve tiles either
+    // way, so the rows of four stay full: the member's card and invite stand where the guest reads the services
+    // and «عنّا».
+    quickActions: () => (
+      <FadeInView key="quickActions" delay={180}>
+        <SectionHeader icon="apps-outline" title={t('home.sections')} />
+        <View style={styles.quickRow}>
+          {signedIn ? <QuickAction icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} /> : <QuickAction icon="grid-outline" label={t('nav.services')} onPress={() => router.push('/services')} />}
+          <QuickAction icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
+          <QuickAction icon="stats-chart-outline" label={t('nav.markets')} onPress={() => router.push('/markets' as Href)} />
+          <QuickAction icon="ribbon-outline" label={t('nav.membership')} onPress={() => router.push('/membership')} />
+          <QuickAction icon="calendar-outline" label={t('nav.agenda')} onPress={() => router.push('/agenda' as Href)} />
+          <QuickAction icon="easel-outline" label={t('nav.workshops')} onPress={() => router.push('/workshops' as Href)} />
+          <QuickAction icon="sparkles-outline" label={t('nav.people')} onPress={() => router.push('/people' as Href)} />
+          <QuickAction icon="pricetags-outline" label={t('nav.partners')} onPress={() => router.push('/partners' as Href)} />
+          <QuickAction icon="document-text-outline" label={t('nav.decisions')} onPress={() => router.push('/news/decisions' as Href)} />
+          <QuickAction icon="play-circle-outline" label={t('account.menu.videos')} onPress={() => router.push('/videos')} />
+          {signedIn ? <QuickAction icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} /> : <QuickAction icon="information-circle-outline" label={t('nav.about')} onPress={() => router.push('/about')} />}
+          <QuickAction icon="chatbubbles-outline" label={t('account.menu.contact')} onPress={() => router.push('/contact' as Href)} />
+        </View>
+      </FadeInView>
+    ),
     // M84 (owner): the Projects Bank block with the auto-rotating images, «زي الموقع بالظبط».
     projectsBank: () =>
       content.projectsBank ? (
@@ -304,15 +311,6 @@ export default function HomeScreen() {
             </FadeInView>
           ))}
         </View>
-        {/* M102: the rest of the entrepreneur's grid, behind one tap. */}
-        {gridCollapsible ? (
-          <PressScale onPress={() => setGridOpen((open) => !open)} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={t(gridOpen ? 'home.lessServices' : 'home.moreServices')}>
-            <View style={styles.moreServices}>
-              <Text style={styles.moreServicesText}>{t(gridOpen ? 'home.lessServices' : 'home.moreServices')}</Text>
-              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.goldInk} />
-            </View>
-          </PressScale>
-        ) : null}
       </FadeInView>
     ),
     // M68 «شركاؤنا»: renders only when the server already carries the block and at least one partner is visible.
@@ -391,8 +389,14 @@ export default function HomeScreen() {
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
       <HqBanner />
 
+      {/* M261 (owner): the HQ booking and its hours wallet, loud, right under the HQ photo. */}
+      <HqHoursCard compact />
+
       {/* M120 (owner's TestFlight feedback): the subscribe door, high on every non-member's home. */}
       <MembershipHomeCard />
+
+      {/* M261 (owner): the membership's benefits, out in the open — a card per group, the page one tap away. */}
+      <MembershipBenefitsBlock />
 
       {/* M176 (owner): the news moved a little lower and became a moving carousel with the live price strip. */}
       {order.slice(0, 2).map((key) => sections[key]?.() ?? null)}
@@ -649,20 +653,6 @@ const styles = themedStyles(() => ({
     marginTop: spacing.sm,
     boxShadow: shadows.lift,
   },
-  // M102 (owner): «اضغط للمزيد» must CATCH the eye — a full gold bar, not a quiet outline.
-  moreServices: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm + 4,
-    borderRadius: radii.md,
-    backgroundColor: colors.gold,
-    experimental_backgroundImage: gradients.gold,
-    boxShadow: shadows.glowGold,
-    marginTop: spacing.sm,
-  },
-  moreServicesText: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.goldInk },
   // M74: the guest's three gateway chips, side by side and compact.
   portalsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   portalItem: { flex: 1 },
@@ -678,8 +668,9 @@ const styles = themedStyles(() => ({
   portalChipTitle: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22, color: colors.textPrimary, textAlign: 'center' },
   portalChipSubtitle: { ...typography.caption, fontSize: 10, lineHeight: 15, color: colors.textSecondary, textAlign: 'center' },
   // M84: the quick-action icon tiles.
-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  quickItem: { flex: 1 },
+  // M261: rows of four that wrap (twelve tiles); the basis leaves room for the three gaps of a row.
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  quickItem: { flexBasis: '21%', flexGrow: 1 },
   quickCard: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, paddingHorizontal: 4 },
   quickIcon: {
     width: 40,

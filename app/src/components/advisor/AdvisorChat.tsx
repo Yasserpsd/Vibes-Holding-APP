@@ -181,7 +181,8 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
       });
       const intent = await Promise.race([advisorApi.intent(text, pendingHq.current), slow]);
       if (intent?.action) {
-        pendingHq.current = intent.action.type === 'hq_book' && intent.action.missing.length ? intent.action.proposal : null;
+        // M261: a suggested (complete) booking stays pending too, so «خليها الساعة 2» changes THIS card.
+        pendingHq.current = intent.action.type === 'hq_book' ? intent.action.proposal : null;
         chat.addLocal(text, intent.reply ?? '', [intent.action]);
         return;
       }
@@ -226,7 +227,7 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
       if (request.kind === 'hq_pick') {
         const result = await advisorApi.intent('', request.proposal);
         if (result.action) {
-          pendingHq.current = result.action.type === 'hq_book' && result.action.missing.length ? result.action.proposal : null;
+          pendingHq.current = result.action.type === 'hq_book' ? result.action.proposal : null;
           chat.replaceLocal(request.messageId, result.reply ?? '', [result.action]);
         }
         return;
@@ -369,6 +370,11 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
           value={draft}
           onChange={setDraft}
           onSend={() => void submit(draft)}
+          // M261: a spoken message leaves as soon as it is transcribed; while a reply is still on its way it waits in the field, never lost.
+          onVoiceSend={(text) => {
+            if (chat.sending || submitting.current) setDraft(text);
+            else void submit(text);
+          }}
           busy={busy}
           attachment={attachment}
           onAttach={setAttachment}

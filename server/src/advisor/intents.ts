@@ -10,6 +10,8 @@ import { asciiDigits, snapOption } from './fill.js';
 
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const TIMEOUT_MS = 30_000;
+/** M261: how many bookable days ahead the advisor looks for the nearest available appointment to suggest. */
+const SUGGEST_DAYS = 7;
 
 /** Screens the app can open from a chat button (expo-router paths live in the app, keys live here). */
 export const APP_SCREENS = [
@@ -250,15 +252,41 @@ export class IntentDetector {
     modelReply: string | null,
   ): Promise<IntentResult> {
     const space: HqSpace | null = proposal.kind === 'visit' ? null : proposal.kind;
-    let times = allTimes;
-    if (proposal.date) {
+    const freeOn = async (date: string): Promise<string[]> => {
       try {
-        const { slots } = await this.deps.hq.slots(proposal.date, now, { space, hours: proposal.hours });
-        times = slots.filter((slot) => slot.available).map((slot) => slot.time);
+        const { slots } = await this.deps.hq.slots(date, now, { space, hours: proposal.hours });
+        return slots.filter((slot) => slot.available).map((slot) => slot.time);
       } catch {
-        times = [];
+        return [];
       }
-      if (proposal.time && !times.includes(proposal.time)) proposal = { ...proposal, time: null };
+    };
+    // M261 (owner, 2026-11-22: «يقترح عليا مواعيد… ناقص ادوس بس»): whatever the member left out is SUGGESTED, not
+    // asked — the nearest bookable day with a free slot (the hour he named when it is free there, the day's first
+    // free hour otherwise), so the card arrives complete and one tap confirms. Every chip still changes it.
+    let times = allTimes;
+    let suggested = false;
+    if (proposal.date) {
+      times = await freeOn(proposal.date);
+      const wanted = proposal.time;
+      if (wanted && !times.includes(wanted)) proposal = { ...proposal, time: null };
+      // A named hour that is taken stays an open question (the member sees it is gone); only a silent hour is filled.
+      if (!wanted && times[0]) {
+        proposal = { ...proposal, time: times[0] };
+        suggested = true;
+      }
+    } else {
+      const window: { date: string; free: string[] }[] = [];
+      for (const day of days.slice(0, SUGGEST_DAYS)) {
+        const free = await freeOn(day.date);
+        if (free.length) window.push({ date: day.date, free });
+      }
+      const wanted = proposal.time;
+      const match = (wanted ? window.find((day) => day.free.includes(wanted)) : undefined) ?? window[0];
+      if (match) {
+        proposal = { ...proposal, date: match.date, time: wanted && match.free.includes(wanted) ? wanted : (match.free[0] ?? null) };
+        times = match.free;
+        suggested = true;
+      }
     }
     const missing: ('date' | 'time' | 'purpose')[] = [];
     if (!proposal.date) missing.push('date');
@@ -284,6 +312,18 @@ export class IntentDetector {
       : en
         ? 'Ready — review the booking and confirm.'
         : 'جاهز، راجع الحجز واضغط تأكيد.';
+    // A suggested appointment is always named in the server's own words: the model wrote its line before the
+    // suggestion existed (it may still be asking for the day).
+    const when = proposal.date && proposal.time ? `${dayLabel(proposal.date, lang)} ${en ? 'at' : 'الساعة'} ${proposal.time}` : '';
+    const suggestion = !suggested || !when
+      ? null
+      : missing.length
+        ? en
+          ? `I suggest the nearest available appointment: ${when}. Pick ${askFor} below and the booking is ready.`
+          : `أقترح عليك أقرب موعد متاح: ${when}. اختر ${askFor} من الخيارات ليكتمل الحجز.`
+        : en
+          ? `I prepared the booking on the nearest available appointment: ${when}. Tap confirm, or change the day or the time below.`
+          : `جهّزت لك الحجز على أقرب موعد متاح: ${when}. اضغط «تأكيد الحجز»، أو غيّر اليوم أو الوقت من الخيارات.`;
     return {
       action: {
         type: 'hq_book',
@@ -298,7 +338,7 @@ export class IntentDetector {
         },
         summary,
       },
-      reply: modelReply ?? fallback,
+      reply: suggestion ?? modelReply ?? fallback,
     };
   }
 

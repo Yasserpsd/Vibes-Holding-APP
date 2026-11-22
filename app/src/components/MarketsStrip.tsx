@@ -9,12 +9,12 @@ import { getLang, t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 const LRM = '‎';
 const HOME_COUNT = 3;
 // One width for every tile (owner, 2026-11-01: «كلهم نفس المقاس»); the row stretches them to the tallest.
-const QUOTE_WIDTH = 124;
+const QUOTE_WIDTH = 138;
 
 // Owner (2026-11-02, then 2026-11-08 «عايز العلم الأصلي يظهر حقيقي»): every quote wears its real face —
 // the coin's own logo (spothq/cryptocurrency-icons, CC0), the country's real flag (flagcdn, public
@@ -74,14 +74,16 @@ export function isRiyalUnit(unit: string): boolean {
   return unit === 'ريال' || unit === 'SAR';
 }
 
-export function ChangeText({ quote }: { quote: MarketQuote }) {
+export function ChangeText({ quote, align = 'start' }: { quote: MarketQuote; align?: 'start' | 'end' }) {
   const size = Math.abs(quote.changePct);
   // A zero change is neutral: no arrow, muted colour (gold showed «0%» with a green up arrow — emulator review item 41).
   const flat = size === 0;
   const up = quote.changePct > 0;
   const color = flat ? colors.textMuted : up ? colors.success : colors.danger;
+  // M261 (owner: «نطور جدا من شكل المؤشرات»): the change wears a pill tinted with its own colour — the hex
+  // token with a two-digit alpha (~13%), so both themes follow without a new token.
   return (
-    <View style={styles.change}>
+    <View style={[styles.change, { backgroundColor: flat ? colors.surfaceElevated : `${color}22`, alignSelf: align === 'end' ? 'flex-end' : 'flex-start' }]}>
       {flat ? null : <Ionicons name={up ? 'caret-up' : 'caret-down'} size={11} color={color} />}
       <Text style={[styles.pct, { color }]} numberOfLines={1}>{`${LRM}${size}%`}</Text>
     </View>
@@ -106,7 +108,7 @@ export function MarketsStrip() {
     <View style={styles.markets}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {shown.map((quote) => (
-          <PressScale key={quote.key} onPress={open} wrapStyle={styles.tile} style={styles.quote} accessibilityRole="button" accessibilityLabel={english ? quote.labelEn : quote.label}>
+          <PressScale key={quote.key} onPress={open} wrapStyle={styles.tile} style={[styles.quote, quote.key === 'gold' && styles.quoteGold]} accessibilityRole="button" accessibilityLabel={english ? quote.labelEn : quote.label}>
             <View style={styles.labelRow}>
               {/* Owner (2026-11-02): no flag on TASI in the strip — «السوق السعودي» keeps its full name. */}
               {quote.key === 'tasi' ? null : <QuoteIcon quote={quote} />}
@@ -134,15 +136,18 @@ export function MarketsStrip() {
 const styles = themedStyles(() => ({
   // The top margin keeps the tiles off the last line of the section's description (emulator review item 25).
   markets: { gap: 4, marginTop: spacing.sm, marginBottom: spacing.sm },
-  row: { gap: spacing.sm },
+  // The vertical room keeps the gold tile's glow from being cut by the scroller's edge.
+  row: { gap: spacing.sm, paddingVertical: 6 },
   tile: { width: QUOTE_WIDTH },
-  quote: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm + 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 1 },
+  quote: { flex: 1, paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.sm + 4, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderGoldSoft, backgroundColor: colors.surface, gap: 3 },
+  // M261: gold is the strip's lead tile — a lit gold border over the gold wash.
+  quoteGold: { borderColor: colors.borderGold, experimental_backgroundImage: gradients.goldWash, boxShadow: shadows.glowGoldFaint },
   all: { alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.goldSoft },
   allText: { alignSelf: 'stretch', textAlign: 'center' },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   label: { ...typography.caption, fontFamily: fonts.semiBold, color: colors.goldLightText, textAlign: textStart, flexShrink: 1 },
-  price: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 24, color: colors.textPrimary, textAlign: textStart },
-  change: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  price: { fontFamily: fonts.bold, fontSize: 19, lineHeight: 28, color: colors.textPrimary, textAlign: textStart },
+  change: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 7, paddingVertical: 1, borderRadius: radii.pill },
   pct: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   unit: { fontSize: 10, lineHeight: 15, fontFamily: fonts.regular, color: colors.textMuted, textAlign: textStart },
   extra: { fontSize: 11, lineHeight: 16, fontFamily: fonts.medium, color: colors.goldText, textAlign: textStart },

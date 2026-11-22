@@ -84,9 +84,11 @@ test('m145: a visit needs its purpose; a card pick completes the pending booking
   assert.equal(first.action?.type, 'hq_book');
   if (first.action?.type !== 'hq_book') return;
   assert.equal(first.action.proposal.purpose, 'جولة في المقر'); // snapped to the real option
-  assert.equal(first.action.proposal.date, null); // outside the bookable days
-  assert.deepEqual(first.action.missing, ['date', 'time']);
-  assert.match(first.reply ?? '', /اليوم/);
+  // M261: a day outside the bookable days is not asked again — the nearest free appointment is suggested.
+  assert.equal(first.action.proposal.date, day);
+  assert.equal(first.action.proposal.time, '09:00');
+  assert.deepEqual(first.action.missing, []);
+  assert.match(first.reply ?? '', /أقرب موعد متاح/);
 
   const picked = await detector.detect({ text: '', lang: 'ar', me: ME, pending: { ...first.action.proposal, date: day, time: '11:00' } });
   assert.equal(calls, 1); // no model call for a bare pick

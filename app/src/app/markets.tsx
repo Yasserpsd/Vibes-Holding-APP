@@ -40,6 +40,7 @@ export default function MarketsScreen() {
   // Sections follow the server's order (each group where its first quote sits), so a reorder needs no OTA.
   const order = [...new Set<MarketGroup>(quotes.map((quote) => quote.group))];
   const groups = order.map((group) => ({ group, items: quotes.filter((quote) => quote.group === group) }));
+  const gold = quotes.find((quote) => quote.key === 'gold');
   return (
     <Screen>
       <Pressable style={styles.ask} hitSlop={6} onPress={() => ask({ type: 'screen', id: 'markets', title: t('nav.markets') })} accessibilityRole="button" accessibilityLabel={t('markets.askAdvisor')}>
@@ -47,6 +48,12 @@ export default function MarketsScreen() {
         <Text style={styles.askText}>{t('markets.askAdvisor')}</Text>
       </Pressable>
       <Text style={styles.live}>{t('markets.live', { time: data?.updatedAt ? formatRelativeTime(data.updatedAt) : '' })}</Text>
+      {/* M261 (owner: «نطور جدا من شكل المؤشرات تبع الذهب»): gold leads the screen with its gram price per karat. */}
+      {gold?.gramSar ? (
+        <FadeInView>
+          <GoldSpotlight quote={gold} gram={gold.gramSar} />
+        </FadeInView>
+      ) : null}
       {groups.map((entry, index) => (
         <FadeInView key={entry.group} delay={entranceDelay(index, 60)}>
           <Text style={styles.groupTitle}>{t(`markets.group.${entry.group}`)}</Text>
@@ -59,6 +66,41 @@ export default function MarketsScreen() {
       ))}
       <Text style={styles.note}>{t('markets.note', { source: data?.source ?? '' })}</Text>
     </Screen>
+  );
+}
+
+const KARATS = [24, 22, 21, 18];
+
+/**
+ * M261: the gold card — the world ounce price with its change, then the gram in riyals for the four
+ * karats the Saudi market trades. The 24-karat gram is the server's own figure (`gramSar`); the other
+ * karats are its plain share (karat / 24): arithmetic on a real quote, never an estimate of a shop price.
+ */
+function GoldSpotlight({ quote, gram }: { quote: MarketQuote; gram: number }) {
+  const english = getLang() === 'en';
+  return (
+    <GlassCard golden radius={radii.xl} style={styles.gold}>
+      <View style={styles.goldHead}>
+        <QuoteIcon quote={quote} size={30} />
+        <View style={styles.start}>
+          <Text style={styles.goldTitle}>{t('markets.goldTitle')}</Text>
+          <SarText style={styles.meta} numberOfLines={1}>{english ? quote.unitEn : quote.unit}</SarText>
+        </View>
+        <View style={styles.end}>
+          <SarText style={styles.goldPrice} numberOfLines={1}>{`${LRM}${priceText(quote.price)}`}</SarText>
+          <ChangeText quote={quote} align="end" />
+        </View>
+      </View>
+      <View style={styles.karats}>
+        {KARATS.map((karat) => (
+          <View key={karat} style={styles.karat}>
+            <Text style={styles.karatLabel} numberOfLines={1}>{t('markets.karat', { karat })}</Text>
+            <SarText style={styles.karatPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{`${LRM}${formatNumber((gram * karat) / 24)} ريال`}</SarText>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.goldNote}>{t('markets.goldNote')}</Text>
+    </GlassCard>
   );
 }
 
@@ -83,7 +125,7 @@ function QuoteRow({ quote, last, onAsk }: { quote: MarketQuote; last: boolean; o
       </Pressable>
       <View style={styles.end}>
         <SarText style={styles.price} numberOfLines={1}>{riyal ? `${LRM}${priceText(quote.price)} ريال` : `${LRM}${priceText(quote.price)}`}</SarText>
-        <ChangeText quote={quote} />
+        <ChangeText quote={quote} align="end" />
       </View>
     </View>
   );
@@ -105,4 +147,14 @@ const styles = themedStyles(() => ({
   gram: { fontSize: 12, lineHeight: 18, fontFamily: fonts.medium, color: colors.goldText, textAlign: textStart },
   price: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 26, color: colors.textPrimary },
   note: { ...typography.caption, color: colors.textMuted, textAlign: textStart, marginTop: spacing.lg },
+  // M261: the gold card.
+  gold: { padding: spacing.md, gap: spacing.md, marginBottom: spacing.xs },
+  goldHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  goldTitle: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 27, color: colors.goldLightText, textAlign: textStart },
+  goldPrice: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 32, color: colors.textPrimary },
+  karats: { flexDirection: 'row', gap: spacing.sm },
+  karat: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing.sm, paddingHorizontal: 4, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGoldSoft, backgroundColor: colors.goldFaint },
+  karatLabel: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, color: colors.goldText, textAlign: 'center' },
+  karatPrice: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: 'center' },
+  goldNote: { ...typography.caption, fontSize: 11, lineHeight: 17, color: colors.textMuted, textAlign: textStart },
 }));

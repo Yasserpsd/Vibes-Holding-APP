@@ -15,6 +15,8 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  /** A transcribed voice message (joined to whatever the field held): sent at once instead of filling the field. */
+  onVoiceSend?: (text: string) => void;
   /** True while a message is being sent or the conversation is not ready. */
   busy: boolean;
   /** M151: a PDF waiting to go with the next message (binaries without the picker never set it). */
@@ -27,7 +29,7 @@ type Props = {
   keyboardOpen?: boolean;
 };
 
-export function Composer({ value, onChange, onSend, busy, attachment = null, onAttach, onDetach, bottomRoom = 0, keyboardOpen = false }: Props) {
+export function Composer({ value, onChange, onSend, onVoiceSend, busy, attachment = null, onAttach, onDetach, bottomRoom = 0, keyboardOpen = false }: Props) {
   // M104: voice input (binaries without expo-audio hide the mic; see VoiceButton).
   const [listening, setListening] = useState(false);
   const hasContent = value.trim().length > 0 || attachment !== null;
@@ -101,7 +103,11 @@ export function Composer({ value, onChange, onSend, busy, attachment = null, onA
             onBusy={listen}
             onText={(text) => {
               const current = latestValue.current.trim();
-              onChange(current ? `${current} ${text}` : text);
+              const whole = current ? `${current} ${text}` : text;
+              // M261 (owner, 2026-11-22: «مجرد ما اوقف التسجيل الرسالة تتبعت مباشر»): the spoken message leaves as
+              // soon as it is transcribed — no second tap on send. Without the handler it only fills the field.
+              if (onVoiceSend) onVoiceSend(whole);
+              else onChange(whole);
             }}
           />
         ) : null}

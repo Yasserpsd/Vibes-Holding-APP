@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -39,7 +39,9 @@ export default function BookVisitScreen() {
   const queryClient = useQueryClient();
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useHq();
-  const [kind, setKind] = useState<'visit' | HqSpace>('visit');
+  // M261: the home and HQ cards open this screen on their own kind («احجز قاعة الاجتماعات» → meeting).
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const [kind, setKind] = useState<'visit' | HqSpace>(() => (params.kind === 'meeting' || params.kind === 'office' ? params.kind : 'visit'));
   const [hours, setHours] = useState(1);
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
@@ -51,6 +53,10 @@ export default function BookVisitScreen() {
   const selectedDate = date ?? data?.days[0]?.date ?? null;
   const space: HqSpace | null = kind === 'visit' ? null : kind;
   const slots = useHqSlots(selectedDate, space, hours);
+  // M261 (owner: «يقترح عليا مواعيد… ناقص ادوس بس»): until the member picks an hour, the day's first free one is
+  // already selected — derived, so a new day, kind or duration re-suggests by itself.
+  const suggestedTime = slots.data?.slots.find((slot) => slot.available)?.time ?? null;
+  const selectedTime = time ?? suggestedTime;
   // M109a: the live annual hours counter beside the space picker.
   const wallet = useHqWallet(status === 'signedIn' && data?.access === 'member');
   const walletTotal = wallet.data?.wallet.total ?? data?.content.walletHours ?? 24;
@@ -74,6 +80,7 @@ export default function BookVisitScreen() {
   }
 
   const submit = async () => {
+    const time = selectedTime;
     if (!selectedDate || !time || (!space && !purpose)) {
       setSubmitError({ message: t(space ? 'hqBook.incompleteSpace' : 'hqBook.incomplete'), code: 'local' });
       return;
@@ -186,13 +193,14 @@ export default function BookVisitScreen() {
 
       <FadeInView delay={entranceDelay(2)}>
         <Text style={styles.label}>{t('hqBook.time')}</Text>
+        {time === null && suggestedTime ? <Text style={[styles.hint, styles.suggested]}>{t('hqBook.suggested')}</Text> : null}
         {slots.data ? (
           <View style={styles.chips}>
             {slots.data.slots.map((slot) => (
               <Chip
                 key={slot.time}
                 label={slot.available ? t('hqBook.slot', { from: slot.time, to: slot.endTime }) : t('hqBook.slotFull', { time: slot.time })}
-                selected={slot.time === time}
+                selected={slot.time === selectedTime}
                 dimmed={!slot.available}
                 onPress={() => (slot.available ? setTime(slot.time) : null)}
               />
@@ -242,4 +250,5 @@ const styles = themedStyles(() => ({
   walletHint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   hintSpace: { marginTop: spacing.md },
+  suggested: { color: colors.goldText, marginBottom: spacing.sm },
 }));
