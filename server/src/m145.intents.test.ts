@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { IntentDetector } from './advisor/intents.js';
+import { IntentDetector, SCREEN_LABELS } from './advisor/intents.js';
 import type { Me } from './auth/service.js';
 import { bookableDays, type HqService } from './hq/service.js';
 import { MemoryKV } from './store.js';
@@ -127,4 +127,36 @@ test('m145: screens and services are validated; unknown ones and plain questions
 
   const failing = new IntentDetector({ apiKey: 'k', model: 'm', log, fetchImpl: async () => new Response('x', { status: 500 }), hq: fakeHq(), kv: new MemoryKV() });
   assert.deepEqual(await failing.detect({ text: 'احجز', lang: 'ar', me: ME }), { action: null, reply: null });
+});
+
+// M268 (owner, 2026-11-22): «أنشر مشروعي في بنك المشاريع» was understood as nothing because Success Partners (a form
+// service) was not in the catalog, and «افتح شركاء النجاح» opened the «شخصية ومسيرة» application because the screen
+// `people_apply` (/people/apply in the app) was labelled «التقديم في شركاء النجاح».
+test('m268: Success Partners opens as a service; the people screens no longer carry its name', async () => {
+  for (const key of ['people', 'people_apply'] as const) {
+    const label = SCREEN_LABELS[key];
+    assert.doesNotMatch(`${label.ar} ${label.en}`, /شركاء النجاح|partners/i, key);
+    assert.match(label.hint, /NOT success partners/, key);
+  }
+  assert.match(SCREEN_LABELS.people_apply.ar, /شخصية ومسيرة/);
+
+  let prompt = '';
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    prompt = String(init?.body ?? '');
+    return completion({ intent: 'service', serviceKey: 'success-partners', answers: [], reply: '' });
+  };
+  const detector = new IntentDetector({ apiKey: 'k', model: 'm', log, fetchImpl, hq: fakeHq(), kv: new MemoryKV() });
+  const result = await detector.detect({ text: 'عايز أنشر مشروعي في بنك المشاريع', lang: 'ar', me: ME });
+  assert.equal(result.action?.type, 'service');
+  if (result.action?.type !== 'service') return;
+  assert.equal(result.action.key, 'success-partners');
+  assert.deepEqual(result.action.answers, {});
+  assert.equal(result.action.label, 'افتح: شركاء النجاح');
+  // A service without request fields is announced, not «جهّزت لك الطلب».
+  assert.equal(result.reply, 'تفضل، شركاء النجاح:');
+  // The model is shown every service with what it is for, and the rule that separates the two names.
+  assert.match(prompt, /success-partners = \\"شركاء النجاح\\" \(بوابتك إلى بنك المشاريع/);
+  assert.match(prompt, /app-publish = /);
+  assert.match(prompt, /key \\"success-partners\\"/);
+  assert.match(prompt, /people_apply = التقديم في «شخصية ومسيرة»/);
 });

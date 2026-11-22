@@ -33,6 +33,7 @@ import { textStart } from '@/i18n/direction';
 import { formatNumber } from '@/lib/format';
 import { iconFor } from '@/lib/icons';
 import { openLink } from '@/lib/openLink';
+import { ServiceProgramCard } from '@/components/ServiceProgramCard';
 import { composeRequest, openWhatsApp } from '@/lib/whatsapp';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -46,6 +47,8 @@ export default function ServiceScreen() {
   const { data, isLoading, error, refetch } = useService(key);
   // A retry from the payment screen brings the previous answers back through the `answers` param.
   const [answers, setAnswers] = useState<Record<string, string>>(() => parseAnswers(answersParam));
+  // M268: the choices ticked on a programme's showcase; they arrive ticked in its form.
+  const [picked, setPicked] = useState<string[]>([]);
   const [handedOver, setHandedOver] = useState(false);
   // A second tap while WhatsApp is still opening must not report the same request to the management twice.
   const handingOver = useRef(false);
@@ -199,7 +202,17 @@ export default function ServiceScreen() {
         <ClampText style={styles.summary} text={service.summary} />
       </FadeInView>
       {/* M176 (owner: «بعض الأماكن الكلام Bulk»): the description as tidy blocks — sub-headings, fact rows, bullets. */}
-      {service.detail ? (
+      {/* M268 (owner: «وضح اوي قوة برنامج شركاء النجاح… بشكل مميز جدا»): a programme reads as its showcase — the
+          strengths, the stores line and the choices — and the plain description stays for the builds without it. */}
+      {service.program ? (
+        <FadeInView delay={entranceDelay(2)}>
+          <ServiceProgramCard
+            program={service.program}
+            picked={picked}
+            onToggle={(choice) => setPicked((current) => (current.includes(choice) ? current.filter((entry) => entry !== choice) : [...current, choice]))}
+          />
+        </FadeInView>
+      ) : service.detail ? (
         <FadeInView delay={entranceDelay(2)}>
           <StructuredText text={service.detail} />
         </FadeInView>
@@ -229,7 +242,7 @@ export default function ServiceScreen() {
             onAdvisor={askAdvisor}
             onHq={() => router.push('/hq')}
             onProjects={() => router.push('/projects')}
-            onForm={(formKey) => router.push({ pathname: '/form/[key]', params: { key: formKey } })}
+            onForm={(formKey) => router.push({ pathname: '/form/[key]', params: picked.length ? { key: formKey, ticks: picked.join(',') } : { key: formKey } })}
             onRoute={(path) => router.push(path as Href)}
           />
         </FadeInView>

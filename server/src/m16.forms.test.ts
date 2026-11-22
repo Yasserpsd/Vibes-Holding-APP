@@ -196,3 +196,36 @@ test('the notification recipients: env fallback, dashboard list, validation, res
   await send('POST', '/api/forms/success-partners', { answers: { ...PARTNER_ANSWERS, company: 'شركة الرجوع' } });
   assert.deepEqual(mailer.sent.at(-1)!.to, ['admin@vcmem.com']);
 });
+
+// M268 (owner, 2026-11-22): the two things the programme can build — optional tick boxes on the Success Partners form.
+// An optional box left empty must read «لا» in the record (it was written «نعم» whatever the member did).
+test('m268: the website and app choices are optional and recorded as the member left them', async () => {
+  const form = (await get('/api/forms/success-partners')).json().form as { fields: { key: string; type: string; required: boolean; label: string }[] };
+  const keys = form.fields.map((field) => field.key);
+  for (const key of ['wantWebsite', 'wantApp']) {
+    const field = form.fields.find((entry) => entry.key === key);
+    assert.ok(field, key);
+    assert.equal(field.type, 'agree');
+    assert.equal(field.required, false);
+    assert.match(field.label, /محل تفاوض وستزيد عن 10%/);
+    assert.ok(keys.indexOf(key) < keys.indexOf('ownership'), `${key} comes before the ownership line`);
+  }
+
+  const sent = await send('POST', '/api/forms/success-partners', { answers: { ...PARTNER_ANSWERS, company: 'شركة الاختيارات', wantWebsite: '1' } });
+  assert.equal(sent.statusCode, 201, sent.body);
+  const listed = await get('/api/admin/forms', adminToken);
+  const mine = (listed.json().submissions as { id: string; answers: { key: string; value: string }[] }[]).find((entry) => entry.id === sent.json().submission.id);
+  assert.ok(mine, 'the submission is listed');
+  const valueOf = (key: string) => mine.answers.find((answer) => answer.key === key)?.value;
+  assert.equal(valueOf('wantWebsite'), 'نعم');
+  assert.equal(valueOf('wantApp'), 'لا');
+  assert.equal(valueOf('ownership'), 'نعم');
+
+  // The service page carries the programme showcase, and its choices name those same two boxes.
+  const service = (await get('/api/services/success-partners')).json().service as { program?: { options: { key: string; note: string }[]; fullTitle: string; points: string[] } };
+  assert.deepEqual(service.program?.options.map((option) => option.key), ['wantWebsite', 'wantApp']);
+  assert.ok(service.program?.options.every((option) => /تزيد عن 10%/.test(option.note)));
+  assert.match(service.program?.fullTitle ?? '', /كامل مزايا برنامج شركاء النجاح/);
+  const english = (await app.inject({ method: 'GET', url: '/api/services/success-partners', headers: { 'x-app-lang': 'en' } })).json().service as { program?: { title: string; options: { title: string }[] } };
+  assert.doesNotMatch(JSON.stringify(english.program), /[؀-ۿ]/);
+});

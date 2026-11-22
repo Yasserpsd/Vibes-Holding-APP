@@ -13,7 +13,7 @@ import { t } from '@/i18n';
 
 /** M16: a website registration form, native — the fields come from the server, the answers go back to it. */
 export default function RegistrationFormScreen() {
-  const { key } = useLocalSearchParams<{ key: string }>();
+  const { key, ticks } = useLocalSearchParams<{ key: string; ticks?: string }>();
   const router = useRouter();
   const { data, isLoading, error, refetch } = useFormDef(key);
   // The form scrolls the screen to its first red field after a failed submit.
@@ -39,7 +39,7 @@ export default function RegistrationFormScreen() {
 
   return (
     <Screen title={data.form.title} subtitle={data.form.intro} scrollRef={scrollRef}>
-      <FormEmbed formKey={data.form.key} scrollRef={scrollRef} />
+      <FormEmbed formKey={data.form.key} scrollRef={scrollRef} ticks={ticks ? ticks.split(',').filter(Boolean) : undefined} />
     </Screen>
   );
 }

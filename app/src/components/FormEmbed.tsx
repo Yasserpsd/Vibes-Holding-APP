@@ -34,7 +34,8 @@ import { colors, radii, spacing, typography } from '@/theme/tokens';
  * show their friendly face here.
  * The hosting screen may pass its ScrollView ref: a failed submit then scrolls to the first red field.
  */
-export function FormEmbed({ formKey, scrollRef }: { formKey: string | undefined; scrollRef?: RefObject<ScrollView | null> }) {
+/** M268: `ticks` = optional tick boxes that arrive already ticked (the choices made on the programme's service page). */
+export function FormEmbed({ formKey, scrollRef, ticks }: { formKey: string | undefined; scrollRef?: RefObject<ScrollView | null>; ticks?: string[] }) {
   const router = useRouter();
   const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useFormDef(formKey);
@@ -94,7 +95,7 @@ export function FormEmbed({ formKey, scrollRef }: { formKey: string | undefined;
       {/* M170 (owner, 2026-10-31): a signed-in NON-MEMBER reads the condition before he fills the form —
           the page stays open to everyone, the project simply waits for the membership. Guests see nothing extra. */}
       {form.nonMemberNotice && me && me.membership.status !== 'active' ? <MemberNotice text={form.nonMemberNotice} /> : null}
-      <Form key={form.key} form={form} me={me} signedIn={signedIn} scrollRef={scrollRef} />
+      <Form key={form.key} form={form} me={me} signedIn={signedIn} scrollRef={scrollRef} ticks={ticks} />
     </>
   );
 }
@@ -109,9 +110,12 @@ function prefillOf(field: FormFieldDef, me: Me | null): string {
   return space < 0 ? '' : me.name.slice(space + 1);
 }
 
-function Form({ form, me, signedIn, scrollRef }: { form: FormDef; me: Me | null; signedIn: boolean; scrollRef?: RefObject<ScrollView | null> }) {
+function Form({ form, me, signedIn, scrollRef, ticks }: { form: FormDef; me: Me | null; signedIn: boolean; scrollRef?: RefObject<ScrollView | null>; ticks?: string[] }) {
   const submit = useSubmitForm(form.key);
-  const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries(form.fields.map((field) => [field.key, prefillOf(field, me)])));
+  // Only an OPTIONAL tick box may arrive ticked: a required agreement is always the member's own tap.
+  const [answers, setAnswers] = useState<Record<string, string>>(() =>
+    Object.fromEntries(form.fields.map((field) => [field.key, field.type === 'agree' && !field.required && ticks?.includes(field.key) ? '1' : prefillOf(field, me)])),
+  );
   const [problem, setProblem] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   // M193: an attachment still on its way holds the submit button.

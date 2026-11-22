@@ -100,6 +100,20 @@ export type ServiceAction =
 
 export type ServiceGroupKey = 'entrepreneur' | 'member' | 'discount';
 
+/** M268: a programme's showcase on its service page (Success Partners); the server's content, the app only draws it. */
+export type ServiceProgram = {
+  title: string;
+  tagline: string;
+  points: string[];
+  storesTitle: string;
+  storesText: string;
+  optionsTitle: string;
+  /** `key` = the optional tick box of the service's form that this choice ticks. */
+  options: { key: string; icon: string; title: string; note: string }[];
+  fullTitle: string;
+  fullText: string;
+};
+
 export type Service = {
   key: string;
   title: string;
@@ -124,6 +138,8 @@ export type Service = {
   cta?: string;
   /** M81: the owner's photo for this service, shown atop its page; an older server sends none. */
   imageUrl?: string | null;
+  /** M268: the programme showcase; an older server (or any other service) sends none. */
+  program?: ServiceProgram;
   /** M105: the service page's rotating banner photos, slot order; an older server sends none. */
   imageUrls?: string[];
   /** M130: the service's own film (YouTube watch URL); empty or absent = none. */

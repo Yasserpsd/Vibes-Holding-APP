@@ -129,6 +129,23 @@ export const FORMS_SEED: FormsContent = {
           required: false,
         },
         { key: 'website', label: 'الموقع الإلكتروني لشركتك أو مشروعك (اختياري)', type: 'text', required: false, latin: true },
+        // M268 (owner, 2026-11-22): the two things the programme can build for the venture. Optional tick boxes; each
+        // says plainly that choosing it opens a negotiation on the percentage, above the 10% of the line below.
+        {
+          key: 'wantWebsite',
+          label: 'أرغب في إنشاء موقع إلكتروني تعريفي لمشروعي ضمن البرنامج، وأعلم أن النسبة المطروحة ستكون محل تفاوض وستزيد عن 10% (اختياري).',
+          type: 'agree',
+          required: false,
+          url: null,
+        },
+        {
+          key: 'wantApp',
+          label:
+            'أرغب في تصميم تطبيق لمشروعي ونشره بالكامل على Google Play و App Store بدون أي رسوم ضمن البرنامج، وأعلم أن النسبة المطروحة ستكون محل تفاوض وستزيد عن 10% (اختياري).',
+          type: 'agree',
+          required: false,
+          url: null,
+        },
         {
           key: 'ownership',
           label:
@@ -308,7 +325,7 @@ export const FORMS_SEED: FormsContent = {
   // v7 (owner, 2026-10-26): «نشر تطبيقك على Android و iOS» replaces «على المتجرين».
   // v8 (M170, 2026-10-31): the non-member notice above the شركاء النجاح form.
   // v9 (M193, 2026-11-03): the pitch deck is an uploaded file (no link field, no yes/no question).
-  version: 9,
+  version: 10,
   updatedAt: '2026-11-03T00:00:00.000Z',
 };
 

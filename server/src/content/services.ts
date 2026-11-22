@@ -59,6 +59,25 @@ export type Service = {
   imageUrl?: string | null;
   /** M130 (owner, 2026-10-26): the service's own film, a YouTube watch URL; empty = none (edited from «القيم والأسعار»). */
   videoUrl?: string;
+  /** M268: a programme's showcase on its service page (Success Partners); absent = the plain description. */
+  program?: ServiceProgram;
+};
+
+/**
+ * M268: what a programme page shows beyond the description — its strengths, the stores line, the choices the member
+ * can add to his registration and the line he reads once he picked them all. Every word is content.
+ */
+export type ServiceProgram = {
+  title: string;
+  tagline: string;
+  points: string[];
+  storesTitle: string;
+  storesText: string;
+  optionsTitle: string;
+  /** `key` = the optional tick box of the service's form that this choice ticks. */
+  options: { key: string; icon: string; title: string; note: string }[];
+  fullTitle: string;
+  fullText: string;
 };
 
 export type ServicesContent = {
@@ -184,9 +203,33 @@ export const SERVICES_SEED: ServicesContent = {
     {
       key: 'success-partners',
       title: 'شركاء النجاح',
-      summary: 'سجّل مشروعك ليُراجع من لجنة متخصصة، ويُدرج في بنك المشاريع إن اعتُمد.',
+      summary: 'بوابتك إلى بنك المشاريع: سجّل مشروعك ليُراجع من لجنة متخصصة ويُعرض على الشركاء المحتملين.',
+      // M268: line by line — the app's StructuredText draws the sub-headings, the bullets and the «label: text» rows.
       detail:
-        'برنامج شركاء النجاح هو مصدر المشاريع المميزة في المنظومة. بعد التسجيل تراجع لجنة متخصصة مشروعك ويُقيَّم خلال 10 أيام عمل، وبعد استيفاء معايير القبول يُحال إلى بنك المشاريع ويُعرض على أعضاء النادي. الأعضاء المشتركون يحصلون على أولوية في التقديم والعرض.',
+        'بوابتك إلى بنك المشاريع:\nبرنامج شركاء النجاح هو طريق مشروعك إلى بنك المشاريع وإلى العرض على الشركاء المحتملين من أعضاء النادي.\nماذا يقدّم لك البرنامج؟\n- التسجيل بدون رسوم، ومراجعة مشروعك من لجنة متخصصة.\n- تقييم المشروع خلال 10 أيام عمل.\n- إدراج المشروع بعد اعتماده في بنك المشاريع وعرضه على الشركاء المحتملين.\n- أولوية للأعضاء المشتركين في التقديم والعرض.\n- إنشاء موقع إلكتروني تعريفي لمشروعك ضمن البرنامج.\n- تصميم تطبيقك ونشره بالكامل على Google Play و App Store بدون أي رسوم.\nكيف تُحدَّد النسبة؟\nالنسبة الأساسية: 10% ملكية لـ Vibes Ventures عند إتمام أي شراكة مع أعضاء النادي، وفق اتفاقية البرنامج.\nعند اختيار الموقع أو التطبيق: تكون النسبة المطروحة محل تفاوض وتزيد عن 10%.\nشرط النشر: عضوية سنوية سارية، أما التسجيل والمراجعة فمتاحان للجميع.',
+      // M268 (owner, 2026-11-22: «وضح اوي قوة برنامج شركاء النجاح… يظهر علامة جوجل و ابل… ولما يختار الأثنين يظهر انه
+      // بيستفيد من كامل مزايا البرنامج»): the showcase the app draws on this service's page. `options[].key` is the
+      // tick box of the same key in the «success-partners» form — a choice made here arrives ticked there.
+      program: {
+        title: 'قوة برنامج شركاء النجاح',
+        tagline: 'بوابتك إلى بنك المشاريع وإلى العرض على الشركاء المحتملين',
+        points: [
+          'تسجيل بدون رسوم ومراجعة من لجنة متخصصة',
+          'تقييم مشروعك خلال 10 أيام عمل',
+          'إدراج مشروعك في بنك المشاريع بعد اعتماده',
+          'عرض مشروعك على الشركاء المحتملين من أعضاء النادي',
+          'أولوية للأعضاء المشتركين في التقديم والعرض',
+        ],
+        storesTitle: 'تطبيقك على Google Play و App Store',
+        storesText: 'نصمّم تطبيق مشروعك وننشره على المتجرين بالكامل بدون أي رسوم ضمن البرنامج.',
+        optionsTitle: 'اختر ما تريد إضافته إلى تسجيلك',
+        options: [
+          { key: 'wantWebsite', icon: 'globe', title: 'إنشاء موقع إلكتروني تعريفي لمشروعك', note: 'عند اختياره تكون النسبة المطروحة محل تفاوض وتزيد عن 10%.' },
+          { key: 'wantApp', icon: 'rocket', title: 'تصميم تطبيقك ونشره بالكامل بدون أي رسوم', note: 'على Google Play و App Store. عند اختياره تكون النسبة المطروحة محل تفاوض وتزيد عن 10%.' },
+        ],
+        fullTitle: 'بهذا تستفيد من كامل مزايا برنامج شركاء النجاح',
+        fullText: 'موقع تعريفي، وتطبيق منشور على Google Play و App Store، وإدراج في بنك المشاريع وعرض على الشركاء المحتملين. النسبة المطروحة تُحدَّد بالتفاوض وتزيد عن 10%.',
+      },
       icon: 'ribbon',
       group: 'entrepreneur',
       priceLabel: null,
@@ -415,8 +458,8 @@ export const SERVICES_SEED: ServicesContent = {
   // v17 (owner, 2026-11-02): Momentum opens to everyone with on-request marketing packages, 50% off
   // every Momentum service for members, and requests go to Momentum's own WhatsApp.
   // v18 (owner, 2026-11-02): workshop price = plainly 290, list 990 struck with «دعم من النادي».
-  version: 18,
-  updatedAt: '2026-11-02T12:00:00.000Z',
+  version: 19,
+  updatedAt: '2026-11-22T12:00:00.000Z',
 };
 
 /** Writes the seed when no services content exists yet, or when the stored seed is older than this one. */

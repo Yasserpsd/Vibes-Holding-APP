@@ -54,6 +54,12 @@ export const FORMS_EN: Translation<FormsContent> = {
         { key: 'summary', label: 'A brief description of the company, the idea or the proposed partnership' },
         { key: 'deckFile', label: 'Pitch deck or feasibility summary (optional): PDF, PowerPoint, Word or an image' },
         { key: 'website', label: "Your company's or venture's website (optional)" },
+        { key: 'wantWebsite', label: 'I would like an introductory website built for my venture within the programme, and I understand that the offered percentage will be negotiated and will go above 10% (optional).' },
+        {
+          key: 'wantApp',
+          label:
+            'I would like an app designed for my venture and published in full on Google Play and the App Store at no charge within the programme, and I understand that the offered percentage will be negotiated and will go above 10% (optional).',
+        },
         {
           key: 'ownership',
           label:

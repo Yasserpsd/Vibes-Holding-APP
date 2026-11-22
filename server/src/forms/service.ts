@@ -136,7 +136,9 @@ export class FormsService {
     const answers: FormAnswer[] = form.fields.map((field) => ({
       key: field.key,
       label: field.label,
-      value: field.type === 'agree' ? 'نعم' : (fileLinks.get(field.key) ?? (raw[field.key] ?? '').trim()),
+      // M268: an OPTIONAL tick box left empty reads «لا» — it used to be recorded «نعم» whatever the member did
+      // (every tick box was required until now, so the value was always true).
+      value: field.type === 'agree' ? ((raw[field.key] ?? '').trim() === AGREED ? 'نعم' : 'لا') : (fileLinks.get(field.key) ?? (raw[field.key] ?? '').trim()),
     }));
     const byPrefill = (wanted: FormFieldDef['prefill']): string => {
       const field = form.fields.find((entry) => entry.prefill === wanted);

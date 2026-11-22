@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Me } from '../auth/service.js';
-import { getServicesContent, publicServices, type ServiceAction } from '../content/services.js';
+import { getServicesContent, publicServices } from '../content/services.js';
 import { HQ_SPACE_LABELS, bookableDays, slotTimes, type HqService, type HqSpace } from '../hq/service.js';
 import type { AppLang } from '../lang.js';
 import type { FetchImpl } from '../news/rss.js';
@@ -54,8 +54,10 @@ export const SCREEN_LABELS: Record<AppScreen, { ar: string; en: string; hint: st
   card: { ar: 'بطاقة العضوية', en: 'Membership card', hint: 'card, QR, print/deliver the card' },
   invite: { ar: 'دعوة عضو جديد', en: 'Invite a member', hint: 'invite code, referral' },
   agenda: { ar: 'الأجندة', en: 'Agenda', hint: 'events, tickets' },
-  people: { ar: 'شخصية ومسيرة', en: 'People', hint: 'spotlight people' },
-  people_apply: { ar: 'التقديم في شركاء النجاح', en: 'Partners application', hint: 'apply as a founder / success partners' },
+  people: { ar: 'شخصية ومسيرة', en: 'People and career', hint: 'the personal spotlight: featured members and their careers — NOT projects, NOT success partners' },
+  // M268: this key opens /people/apply — the «شخصية ومسيرة» application. It was labelled «التقديم في شركاء النجاح», so
+  // «افتح شركاء النجاح» opened the wrong screen (owner, 2026-11-22). Success Partners is a SERVICE (success-partners).
+  people_apply: { ar: 'التقديم في «شخصية ومسيرة»', en: 'Apply to People and career', hint: 'apply to be featured personally in the people spotlight — NOT a project registration, NOT success partners' },
   guide: { ar: 'دليل العضو', en: 'Member guide', hint: 'guide' },
   workshops: { ar: 'ورش العمل', en: 'Workshops', hint: 'workshops registration' },
   meetups: { ar: 'الملتقيات', en: 'Meetups', hint: 'meetups' },
@@ -96,6 +98,9 @@ export type IntentInput = {
   pending?: HqProposal | null;
   now?: number;
 };
+
+/** One service as the intent model reads it: what it is, and the request fields it can prefill (none for a form, a screen or a link). */
+type CatalogService = { key: string; title: string; summary: string; fields: { key: string; label: string; options?: string[] }[] };
 
 type Deps = { apiKey: string; model: string; log: FastifyBaseLogger; fetchImpl?: FetchImpl; hq: HqService; kv: KV };
 
@@ -169,9 +174,16 @@ export class IntentDetector {
     const content = await this.deps.hq.content();
     const days = bookableDays(content, now);
     const times = slotTimes(content);
-    const catalog = publicServices(await getServicesContent(this.deps.kv, lang), input.me)
-      .services.filter((service) => service.action !== null && (service.action.type === 'whatsapp' || service.action.type === 'paymob'))
-      .map((service) => ({ key: service.key, title: service.title, action: service.action as Extract<ServiceAction, { type: 'whatsapp' | 'paymob' }> }));
+    // M268 (owner, 2026-11-22: «طلبت منه اني عايز انشر مشروعي في بنك المشاريع مفهمش… ولا فتحلي شركاء النجاح»): the
+    // catalog used to hold only the services with a WhatsApp / payment request, so Success Partners (a form), the app
+    // publishing and every other service could not be opened at all. Every service is listed now, with its summary so
+    // the model knows what it is for; only the request ones carry fields to prefill. A locked service still opens its page.
+    const catalog: CatalogService[] = publicServices(await getServicesContent(this.deps.kv, lang), input.me).services.map((service) => ({
+      key: service.key,
+      title: service.title,
+      summary: service.summary,
+      fields: service.action && (service.action.type === 'whatsapp' || service.action.type === 'paymob') ? service.action.fields : [],
+    }));
     const text = input.text.trim();
     // The purposes as the member reads them: the card's chips and its «الغرض» line were Arabic in the English app.
     // The booking itself accepts either language (HqService.book stores the Arabic one).
@@ -210,7 +222,7 @@ export class IntentDetector {
     if (answer.intent === 'service') {
       const service = catalog.find((item) => item.key === answer.serviceKey);
       if (!service) return { action: null, reply: null };
-      const fields = service.action.fields;
+      const fields = service.fields;
       const answers: Record<string, string> = {};
       for (const { key, value } of answer.answers) {
         const field = fields.find((item) => item.key === key);
@@ -220,7 +232,15 @@ export class IntentDetector {
       const label = lang === 'en' ? `Open: ${service.title}` : `افتح: ${service.title}`;
       return {
         action: { type: 'service', key: service.key, title: service.title, answers, label },
-        reply: answer.reply.trim() || (lang === 'en' ? 'I prepared the request; review it and send.' : 'جهّزت لك الطلب، راجعه وأرسله.'),
+        reply:
+          answer.reply.trim() ||
+          (fields.length
+            ? lang === 'en'
+              ? 'I prepared the request; review it and send.'
+              : 'جهّزت لك الطلب، راجعه وأرسله.'
+            : lang === 'en'
+              ? `Here is ${service.title}.`
+              : `تفضل، ${service.title}:`),
       };
     }
 
@@ -359,7 +379,7 @@ export class IntentDetector {
     days: { date: string; weekday: number }[],
     times: string[],
     purposes: string[],
-    catalog: { key: string; title: string; action: { fields: { key: string; label: string; options?: string[] }[] } }[],
+    catalog: CatalogService[],
   ): Promise<ModelAnswer | null> {
     const lang = input.lang;
     const today = days[0]?.date ?? new Date(input.now ?? Date.now()).toISOString().slice(0, 10);
@@ -369,6 +389,8 @@ export class IntentDetector {
       'Never invent details. Unknown → "". Dates → YYYY-MM-DD from the bookable days list only (resolve "tomorrow", weekday names, "next Thursday" against today). Times → HH:MM from the slot list only (convert "10 in the morning"/"4 pm"). hours → digits (office/meeting only). purpose → copy one of the listed purposes verbatim (visits only). kind: visit | office | meeting.',
       `reply: one short, warm sentence in ${lang === 'en' ? 'English' : 'Arabic (Saudi white dialect, no diacritics)'}: confirm what you understood and, if something is missing, ask for it; for "none" leave it "".`,
       'Pending booking (if given) is what the member is completing: keep its details and fill only what this message adds.',
+      // M268: the two mix-ups the owner hit — «أنشر مشروعي في بنك المشاريع» understood as nothing, «افتح شركاء النجاح» opening the people spotlight.
+      'Pick by MEANING, never by a shared word. A service named or described by the member → "service" with its key, even when it has no fields (answers stay []). The member’s OWN project / startup / company / idea to be registered, submitted, listed, published or shown to investors or partners (including "publish my project in the Projects Bank", "شركاء النجاح", "success partners") → "service" with key "success-partners" when it is listed; the "projects" screen only BROWSES other people’s projects. The screens "people" and "people_apply" are the personal spotlight «شخصية ومسيرة» and never a project. «شركاؤنا» / partner discounts is not «شركاء النجاح».',
     ].join('\n');
     const pending = input.pending
       ? `\nPending booking: ${JSON.stringify({ kind: input.pending.kind, hours: input.pending.hours, date: input.pending.date, time: input.pending.time, purpose: input.pending.purpose, note: input.pending.note })}`
@@ -379,7 +401,7 @@ export class IntentDetector {
       `Slot times: ${times.join(', ')}`,
       `Visit purposes: ${purposes.map((purpose) => JSON.stringify(purpose)).join(' | ')}`,
       `Screens: ${APP_SCREENS.map((key) => `${key} = ${SCREEN_LABELS[key].ar} (${SCREEN_LABELS[key].hint})`).join('; ')}`,
-      `Services: ${catalog.map((service) => `${service.key} = "${service.title}" fields[${service.action.fields.map((field) => `${field.key}:"${field.label}"${field.options?.length ? `{${field.options.join('|')}}` : ''}`).join(', ')}]`).join('; ') || 'none'}`,
+      `Services: ${catalog.map((service) => `${service.key} = "${service.title}" (${service.summary.slice(0, 110)}) fields[${service.fields.map((field) => `${field.key}:"${field.label}"${field.options?.length ? `{${field.options.join('|')}}` : ''}`).join(', ')}]`).join('; ') || 'none'}`,
       pending,
       `\nMessage:\n"""${input.text.trim().slice(0, 2000)}"""`,
     ].join('\n');
