@@ -212,15 +212,22 @@ export class IntentDetector {
       return this.hqResult(proposal, lang, days, times, purposes, now, answer.reply.trim() || null);
     }
 
-    if (answer.intent === 'open_screen') {
-      const screen = APP_SCREENS.find((key) => key === answer.screen);
-      if (!screen) return { action: null, reply: null };
+    // M268, tried on the live model: «افتح شركاء النجاح» came back as "open_screen" naming the SERVICE (there is no
+    // such screen), and the action was dropped. «افتح …» is how members ask for a service too, so a key the model
+    // put in the wrong slot is still honoured: a screen answer that names a service opens the service, and the reverse.
+    const wantsScreen = answer.intent === 'open_screen';
+    const wantsService = answer.intent === 'service';
+    const namedScreen = APP_SCREENS.find((key) => key === answer.screen) ?? (wantsService ? APP_SCREENS.find((key) => key === answer.serviceKey) : undefined);
+    const namedService = catalog.find((item) => item.key === answer.serviceKey) ?? (wantsScreen ? catalog.find((item) => item.key === answer.screen) : undefined);
+
+    if ((wantsScreen && namedScreen) || (wantsService && !namedService && namedScreen)) {
+      const screen = namedScreen as AppScreen;
       const label = SCREEN_LABELS[screen][lang];
       return { action: { type: 'screen', screen, label }, reply: answer.reply.trim() || (lang === 'en' ? `Here is ${label}.` : `تفضل، ${label}:`) };
     }
 
-    if (answer.intent === 'service') {
-      const service = catalog.find((item) => item.key === answer.serviceKey);
+    if (wantsScreen || wantsService) {
+      const service = namedService;
       if (!service) return { action: null, reply: null };
       const fields = service.fields;
       const answers: Record<string, string> = {};
@@ -390,7 +397,7 @@ export class IntentDetector {
       `reply: one short, warm sentence in ${lang === 'en' ? 'English' : 'Arabic (Saudi white dialect, no diacritics)'}: confirm what you understood and, if something is missing, ask for it; for "none" leave it "".`,
       'Pending booking (if given) is what the member is completing: keep its details and fill only what this message adds.',
       // M268: the two mix-ups the owner hit — «أنشر مشروعي في بنك المشاريع» understood as nothing, «افتح شركاء النجاح» opening the people spotlight.
-      'Pick by MEANING, never by a shared word. A service named or described by the member → "service" with its key, even when it has no fields (answers stay []). The member’s OWN project / startup / company / idea to be registered, submitted, listed, published or shown to investors or partners (including "publish my project in the Projects Bank", "شركاء النجاح", "success partners") → "service" with key "success-partners" when it is listed; the "projects" screen only BROWSES other people’s projects. The screens "people" and "people_apply" are the personal spotlight «شخصية ومسيرة» and never a project. «شركاؤنا» / partner discounts is not «شركاء النجاح».',
+      'Pick by MEANING, never by a shared word. A service named or described by the member → "service" with its key, even when it has no fields (answers stay []) and even when the member only says open / show / go to it («افتح شركاء النجاح» → "service", serviceKey "success-partners"): "open_screen" is ONLY for the keys in the Screens list. The member’s OWN project / startup / company / idea to be registered, submitted, listed, published or shown to investors or partners (including "publish my project in the Projects Bank", "شركاء النجاح", "success partners") → "service" with key "success-partners" when it is listed; the "projects" screen only BROWSES other people’s projects. The screens "people" and "people_apply" are the personal spotlight «شخصية ومسيرة» and never a project. «شركاؤنا» / partner discounts is not «شركاء النجاح».',
     ].join('\n');
     const pending = input.pending
       ? `\nPending booking: ${JSON.stringify({ kind: input.pending.kind, hours: input.pending.hours, date: input.pending.date, time: input.pending.time, purpose: input.pending.purpose, note: input.pending.note })}`

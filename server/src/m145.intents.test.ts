@@ -159,4 +159,14 @@ test('m268: Success Partners opens as a service; the people screens no longer ca
   assert.match(prompt, /app-publish = /);
   assert.match(prompt, /key \\"success-partners\\"/);
   assert.match(prompt, /people_apply = التقديم في «شخصية ومسيرة»/);
+
+  // Tried on the live model the same day: «افتح شركاء النجاح» came back as a SCREEN named after the service and was
+  // dropped. A key in the wrong slot is honoured both ways; a key that is neither still opens nothing.
+  const answering = (answer: Record<string, unknown>) => new IntentDetector({ apiKey: 'k', model: 'm', log, fetchImpl: async () => completion(answer), hq: fakeHq(), kv: new MemoryKV() });
+  const asScreen = await answering({ intent: 'open_screen', screen: 'success-partners', reply: '' }).detect({ text: 'افتح شركاء النجاح', lang: 'ar', me: ME });
+  assert.equal(asScreen.action?.type === 'service' ? asScreen.action.key : asScreen.action?.type, 'success-partners');
+  const asService = await answering({ intent: 'service', serviceKey: 'card', reply: '' }).detect({ text: 'افتح بطاقتي', lang: 'ar', me: ME });
+  assert.deepEqual(asService.action, { type: 'screen', screen: 'card', label: 'بطاقة العضوية' });
+  const neither = await answering({ intent: 'open_screen', screen: 'nowhere', serviceKey: 'nothing' }).detect({ text: 'x', lang: 'ar', me: ME });
+  assert.deepEqual(neither, { action: null, reply: null });
 });
