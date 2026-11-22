@@ -75,6 +75,7 @@ const styles = themedStyles(() => ({
   badgeText: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 16 },
   date: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   meta: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  action: { flexGrow: 1 },
+  // One full-width button per line (side by side, two labels were cut on the HQ card in the emulator pass).
+  actions: { gap: spacing.sm, marginTop: spacing.sm },
+  action: { alignSelf: 'stretch' },
 }));

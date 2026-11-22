@@ -80,6 +80,8 @@ const styles = themedStyles(() => ({
   subtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
   meter: { gap: spacing.xs },
   left: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 20, color: colors.goldLightText, textAlign: textStart },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  action: { flexGrow: 1 },
+  // Emulator pass 2026-11-22: side by side the two labels were cut («Book the meeting ro…») and the wrapped row
+  // left an empty band under them — one full-width button per line reads whole in both languages.
+  actions: { gap: spacing.sm },
+  action: { alignSelf: 'stretch' },
 }));

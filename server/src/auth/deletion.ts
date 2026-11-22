@@ -17,6 +17,8 @@ const RESEND_GAP_SECONDS = 20;
 
 /** The random confirm words — plain, common club words the member types as the third step. */
 const WORDS = ['استثمار', 'شراكة', 'ازدهار', 'انطلاقة', 'ريادة', 'طموح', 'نجاح', 'مستقبل'] as const;
+/** Emulator pass 2026-11-22: the English app asked its member to type «نجاح» — an English request gets a word its keyboard can write. */
+const WORDS_EN = ['invest', 'partner', 'growth', 'launch', 'venture', 'ambition', 'success', 'future'] as const;
 
 export const SCHEDULED_KEY = 'deletion:scheduled';
 
@@ -66,7 +68,7 @@ function sameHash(left: string, right: string): boolean {
 
 /** Arabic letters compared bare: harakat, tatweel and spaces dropped so a typo-free word always passes. */
 function normalizeWord(value: string): string {
-  return value.replace(/[ً-ْـ\s]/gu, '').trim();
+  return value.replace(/[ً-ْـ\s]/gu, '').trim().toLowerCase();
 }
 
 type Doc = { byContact: Record<string, ScheduledDeletion> };
@@ -96,7 +98,7 @@ export class AccountDeletionStore {
   }
 
   /** Step 1 passed (password checked by the caller): mail the code and hand the app its confirm word. */
-  async request(contactId: number, reason: string, deliver: DeletionDeliver): Promise<DeletionRequestResult> {
+  async request(contactId: number, reason: string, deliver: DeletionDeliver, lang: 'ar' | 'en' = 'ar'): Promise<DeletionRequestResult> {
     const existing = await this.kv.get<PendingDeletion>(pendingKey(contactId));
     const now = Date.now();
     const alive = existing && Date.parse(existing.codeExpiresAt) > now;
@@ -107,7 +109,8 @@ export class AccountDeletionStore {
     }
     const code = this.fixedCode ?? String(randomInt(0, 1_000_000)).padStart(6, '0');
     await deliver(code);
-    const word = alive ? existing.word : WORDS[randomInt(0, WORDS.length)] ?? WORDS[0];
+    const pool: readonly string[] = lang === 'en' ? WORDS_EN : WORDS;
+    const word = alive ? existing.word : (pool[randomInt(0, pool.length)] ?? pool[0] ?? WORDS[0]);
     const pending: PendingDeletion = {
       codeHash: hashCode(contactId, code),
       word,

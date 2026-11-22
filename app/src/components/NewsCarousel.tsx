@@ -144,7 +144,10 @@ export function NewsCarousel() {
     );
   }, [items, position, step, dir]);
 
-  if (!items.length) return null;
+  // Emulator pass 2026-11-22 (owner: «فين اسعار الذهب؟»): the price strip lives inside this block, so a moment with
+  // no news items (a feed that has not answered yet, a server with the news off) used to hide the gold and market
+  // prices too. They stand on their own now; the strip hides itself when there are no quotes either.
+  if (!items.length) return <MarketsStrip />;
   const shown = width ? items : items.slice(0, 1);
 
   return (

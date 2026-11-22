@@ -1048,7 +1048,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
           request.log.error({ err: error instanceof Error ? error.message : 'unknown' }, 'deletion code was not mailed');
           throw new Error('mail_failed');
         }
-      }).catch((cause: unknown) => {
+      }, en ? 'en' : 'ar').catch((cause: unknown) => {
         if (cause instanceof Error && cause.message === 'mail_failed') return null;
         throw cause;
       });
