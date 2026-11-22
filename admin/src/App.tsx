@@ -39,7 +39,7 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'paylinks', label: 'روابط الدفع', icon: 'paylinks' },
   { key: 'discounts', label: 'أكواد الخصم', icon: 'discounts' },
-  { key: 'interests', label: 'الاهتمامات', icon: 'interests' },
+  { key: 'interests', label: 'اهتمامات الأعضاء', icon: 'interests' },
   { key: 'signup', label: 'أسباب تعثّر التسجيل', icon: 'stats' },
   { key: 'ratings', label: 'تقييمات المشاريع', icon: 'ratings' },
   { key: 'partners', label: 'شركاؤنا', icon: 'partners' },
