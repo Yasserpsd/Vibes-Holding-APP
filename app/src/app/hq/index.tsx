@@ -139,13 +139,9 @@ export default function HqScreen() {
       <FadeInView delay={entranceDelay(3)}>
         <SectionHeader title={t('hq.bookingTitle')} />
       </FadeInView>
-      {data.access === 'member' ? (
-        <FadeInView delay={entranceDelay(4)}>
-          <AppButton label={t('hq.book')} icon="calendar-outline" onPress={() => router.push('/hq/book')} />
-        </FadeInView>
-      ) : (
-        <LockedNotice text={data.lockedText ?? content.memberOnlyText} guest={data.access === 'guest'} />
-      )}
+      {/* M265: the member already has «احجز زيارة الآن» in the top card and the two booking buttons of the hours card —
+          a third «احجز زيارتك» here only repeated them. The section keeps the rules, and the lock for a non-member. */}
+      {data.access === 'member' ? null : <LockedNotice text={data.lockedText ?? content.memberOnlyText} guest={data.access === 'guest'} />}
       {content.rules.map((rule, index) => (
         <FadeInView key={rule} delay={entranceDelay(5 + index)} style={styles.bullet}>
           <Ionicons name="checkmark-circle-outline" size={18} color={colors.gold} />

@@ -62,7 +62,9 @@ export function HqHoursCard({ compact = false }: { compact?: boolean }) {
           <AppButton label={t('hq.bookMeeting')} icon="people-outline" onPress={() => book('meeting')} style={styles.action} />
           {compact ? null : <AppButton label={t('hq.bookOffice')} variant="outline" icon="briefcase-outline" onPress={() => book('office')} style={styles.action} />}
         </View>
-      ) : (
+      ) : compact ? null : (
+        // On the home the subscribe card and the benefits block sit right under this card: a third door to the same
+        // page only crowded it (owner: «ميبقاش زحمة»). The HQ screen keeps the button.
         <AppButton label={t('hq.seeBenefits')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
       )}
     </GlassCard>

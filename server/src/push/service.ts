@@ -457,7 +457,9 @@ export class PushService {
     });
   }
 
-  paymentResult(payment: { id: string; contactId: number; serviceTitle: string; amount: number; currency: string; status: 'paid' | 'failed' }): void {
+  paymentResult(payment: { id: string; contactId: number; serviceTitle: string; serviceTitleEn?: string | null; amount: number; currency: string; status: 'paid' | 'failed' }): void {
+    // M265: the English push names the service in English when the payment kept its English title.
+    const titleEn = payment.serviceTitleEn || payment.serviceTitle;
     const paid = payment.status === 'paid';
     const data = { type: 'payment', id: payment.id, status: payment.status, screen: `/payment/${payment.id}` };
     this.background(payment.contactId, (lang) => {
@@ -465,11 +467,11 @@ export class PushService {
         // M107: a 100% discount code settles at zero — the push confirms the order, not a transfer.
         const paidBody =
           payment.amount === 0
-            ? `Your order for "${payment.serviceTitle}" was confirmed with the discount code. We will contact you to get started.`
-            : `Your payment of ${formatAmountEn(payment.amount, payment.currency)} for "${payment.serviceTitle}" is complete. We will contact you to get started.`;
+            ? `Your order for "${titleEn}" was confirmed with the discount code. We will contact you to get started.`
+            : `Your payment of ${formatAmountEn(payment.amount, payment.currency)} for "${titleEn}" is complete. We will contact you to get started.`;
         return {
           title: paid ? (payment.amount === 0 ? 'Order confirmed' : 'Payment successful') : 'Payment incomplete',
-          body: paid ? paidBody : `The payment for "${payment.serviceTitle}" was not completed. You can try again from the app.`,
+          body: paid ? paidBody : `The payment for "${titleEn}" was not completed. You can try again from the app.`,
           data,
         };
       }

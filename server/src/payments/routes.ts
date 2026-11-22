@@ -98,7 +98,10 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsRoutesOptions> = async (
       const body = parse(startSchema, request.body, reply);
       if (!body) return;
       const me = await auth.me(current.session);
-      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv), body.discountCode, langOf(request)) };
+      // M265: an English customer's payment also keeps the service's English title (push, return page).
+      const lang = langOf(request);
+      const titleEn = lang === 'en' ? (await getServicesContent(kv, 'en')).services.find((item) => item.key === body.serviceKey)?.title : undefined;
+      return { payment: await service.start(me, body.serviceKey, body.answers, await getServicesContent(kv), body.discountCode, lang, Date.now(), titleEn) };
     }),
   );
 

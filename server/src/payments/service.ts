@@ -50,6 +50,8 @@ export type Payment = {
   phone: string;
   serviceKey: string;
   serviceTitle: string;
+  /** M265: the same title in English, kept only when the customer's app was in English — the push and the return page speak his language; the dashboard, the mails and the invoice rows keep `serviceTitle`. */
+  serviceTitleEn?: string | null;
   answers: Answer[];
   amount: number;
   amountCents: number;
@@ -84,6 +86,8 @@ export type PublicPayment = Pick<
   | 'id'
   | 'serviceKey'
   | 'serviceTitle'
+  | 'serviceTitleEn'
+  | 'lang'
   | 'answers'
   | 'amount'
   | 'currency'
@@ -173,6 +177,8 @@ export class PaymentsService {
       id: payment.id,
       serviceKey: payment.serviceKey,
       serviceTitle: payment.serviceTitle,
+      serviceTitleEn: payment.serviceTitleEn ?? null,
+      lang: payment.lang ?? null,
       answers: payment.answers,
       amount: payment.amount,
       currency: payment.currency,
@@ -234,7 +240,7 @@ export class PaymentsService {
    */
   private async createFreePayment(
     customer: { contactId: number; name: string; email: string; phone: string },
-    input: { key: string; title: string; answers: Answer[]; currency: string; memberPrice: boolean; discount: AppliedDiscount; lang?: AppLang },
+    input: { key: string; title: string; titleEn?: string; answers: Answer[]; currency: string; memberPrice: boolean; discount: AppliedDiscount; lang?: AppLang },
     now: number,
   ): Promise<Payment> {
     const id = randomUUID();
@@ -247,6 +253,7 @@ export class PaymentsService {
       phone: customer.phone,
       serviceKey: input.key,
       serviceTitle: input.title,
+      serviceTitleEn: input.titleEn ?? null,
       answers: [...input.answers, PaymentsService.discountAnswer(input.discount)],
       amount: 0,
       amountCents: 0,
@@ -303,7 +310,7 @@ export class PaymentsService {
   /** Shared core: creates the gateway intention and records the payment as created (rule 5: only the webhook pays it). */
   private async createPayment(
     customer: { contactId: number; name: string; email: string; phone: string },
-    input: { key: string; title: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount; validHours?: number; lang?: AppLang },
+    input: { key: string; title: string; titleEn?: string; answers: Answer[]; amount: number; currency: string; memberPrice: boolean; discount?: AppliedDiscount; validHours?: number; lang?: AppLang },
     now: number,
   ): Promise<Payment> {
     const id = randomUUID();
@@ -331,6 +338,7 @@ export class PaymentsService {
       phone: customer.phone,
       serviceKey: input.key,
       serviceTitle: input.title,
+      serviceTitleEn: input.titleEn ?? null,
       answers: input.discount ? [...input.answers, PaymentsService.discountAnswer(input.discount)] : input.answers,
       amount: input.amount,
       amountCents: input.amount * 100,
@@ -362,7 +370,7 @@ export class PaymentsService {
   }
 
   /** Creates the gateway intention for a paid service and records the payment as created. */
-  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, discountCode?: string, lang: AppLang = 'ar', now = Date.now()): Promise<PublicPayment> {
+  async start(me: Me, serviceKey: string, rawAnswers: Record<string, string>, content: ServicesContent, discountCode?: string, lang: AppLang = 'ar', now = Date.now(), titleEn?: string): Promise<PublicPayment> {
     const service = content.services.find((entry) => entry.key === serviceKey);
     if (!service) throw new RequestError('not_found', 'الخدمة غير موجودة', 404);
     if (toPublicService(service, me).locked || service.action.type !== 'paymob') {
@@ -377,7 +385,7 @@ export class PaymentsService {
     const customer = { contactId: me.id, name: me.name, email: me.contactEmail || me.email, phone: me.phone };
     // M107: a discount code shrinks the amount; a 100% code confirms with no gateway.
     const discount = discountCode && this.deps.discounts ? await this.deps.discounts.apply(discountCode, price.amount, now) : undefined;
-    const base = { key: service.key, title: service.title, answers, currency: price.currency, memberPrice: price.memberPrice, lang };
+    const base = { key: service.key, title: service.title, ...(lang === 'en' && titleEn ? { titleEn } : {}), answers, currency: price.currency, memberPrice: price.memberPrice, lang };
     const payment =
       discount && discount.amountAfter === 0
         ? await this.createFreePayment(customer, { ...base, discount }, now)
@@ -641,7 +649,7 @@ export class PaymentsService {
     else if (payment.status !== 'paid' && !linkSale) this.deps.notifier.paymentFailed(this.toMail(payment));
     if (payment.status === 'paid' || payment.status === 'failed') {
       const { id, contactId, serviceTitle, amount, currency, status } = payment;
-      this.deps.push.paymentResult({ id, contactId, serviceTitle, amount, currency, status });
+      this.deps.push.paymentResult({ id, contactId, serviceTitle, serviceTitleEn: payment.serviceTitleEn ?? null, amount, currency, status });
       for (const listener of this.settledListeners) {
         try {
           listener(payment);

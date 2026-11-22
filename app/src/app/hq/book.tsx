@@ -112,7 +112,8 @@ export default function BookVisitScreen() {
   };
 
   return (
-    <Screen title={t('hqBook.title')} subtitle={t('hqBook.subtitle')}>
+    // M265: the title says what is being booked (it read «حجز زيارة» over a meeting-room booking).
+    <Screen title={t(kind === 'meeting' ? 'hqBook.titleMeeting' : kind === 'office' ? 'hqBook.titleOffice' : 'hqBook.title')} subtitle={t('hqBook.subtitle')}>
       {/* M142: kind, duration, purpose and note by voice; the day and the slot stay a tap. */}
       <VoiceFill
         fields={[
