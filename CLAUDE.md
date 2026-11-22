@@ -13,7 +13,7 @@ Full scope, business facts, integrations and milestones: `docs/PROJECT_BRIEF.md`
 - The owner works on Windows. Give PowerShell-compatible commands: short, one step at a time.
 - The owner writes in Arabic (Egyptian dialect). Explain in simple Arabic. Code, comments and commit messages in English.
 - Run commands yourself when possible. Ask before anything that costs money, publishes, or touches a live system.
-- EAS builds count against a monthly quota. Do not trigger builds casually; prefer OTA updates for JS-only changes.
+- EAS builds count against a monthly quota. Do not trigger builds casually. UPDATED (owner, 2026-11-22: «عايز ديما نعتمد build الجديد… التحديث ده هنستخدمه فقط في اقل الظروف المستعجلة اوي»): changes ship in a NEW STORE BUILD by default — batch milestones into one build; an OTA update is only for a very urgent fix that cannot wait for a store review.
 - Current environment: TEST. Never switch anything to production unless the owner says so explicitly.
 
 ## Hard rules
@@ -58,6 +58,6 @@ Full scope, business facts, integrations and milestones: `docs/PROJECT_BRIEF.md`
 - Keep replies short: no long explanations, no pasting code back, no recaps.
 - If the same error survives 2 fix attempts, stop, explain in simple Arabic, and ask. Never loop.
 - No subagents, parallel agents, web browsing or MCP tools without the owner's OK.
-- Never run eas build or any paid or quota-limited action without the owner's explicit OK in the current message. Typecheck and lint must pass locally first. Prefer OTA updates.
+- Never run eas build or any paid or quota-limited action without the owner's explicit OK in the current message. Typecheck and lint must pass locally first. A store build is the default way to ship (owner, 2026-11-22); OTA only when urgent.
 - Add only the packages the task needs. Ask before adding any paid service.
 - One milestone per session. At the end, update the milestone checklist in docs/PROJECT_BRIEF.md with a short status so a new session can continue without re-exploring, then tell the owner to start a new session.
