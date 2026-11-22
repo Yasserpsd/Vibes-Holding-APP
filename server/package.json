@@ -25,6 +25,7 @@
     "@fastify/compress": "^9.3.0",
     "fast-xml-parser": "^5.11.1",
     "fastify": "^5.12.4",
+    "geoip-country": "5.0.202611210415",
     "nodemailer": "^7.0.13",
     "pg": "^8.23.0",
     "qrcode": "^1.5.4",

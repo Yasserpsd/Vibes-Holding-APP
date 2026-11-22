@@ -288,6 +288,7 @@ export default function RootLayout() {
                 <Stack.Screen name="payments/index" options={{ ...detailHeader(), title: t('nav.payments') }} />
                 <Stack.Screen name="security" options={{ ...detailHeader(), title: t('security.title') }} />
                 <Stack.Screen name="security-extra" options={{ ...detailHeader(), title: t('security.extraTitle') }} />
+                <Stack.Screen name="security-sessions" options={{ ...detailHeader(), title: t('security.sessionsTitle') }} />
                 <Stack.Screen name="delete-account" options={{ ...detailHeader(), title: t('deleteAccount.title') }} />
                 {/* M116d: club pages inside the app (terms, privacy…) — the screen sets its own title. */}
                 <Stack.Screen name="webpage" options={{ ...detailHeader(), title: '' }} />

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
@@ -90,6 +91,10 @@ test('m203: a sign-in stops at the code; the right code signs in and marks the n
   assert.ok(right.json().token);
   assert.equal(right.json().fixPhone, false);
   assert.equal(right.json().me.phoneVerified, true);
+  // M264: the phone-code step records the address the sign-in ended from.
+  const stored = await kv.get<{ ip?: string; sid?: string }>(`session:${createHash('sha256').update(right.json().token as string).digest('hex')}`);
+  assert.match(stored?.ip ?? '', /^10\.2\.0\.\d+$/);
+  assert.ok(stored?.sid);
   const again = await call('POST', '/api/auth/phone/verify', { stepToken: step.stepToken, code });
   assert.notEqual(again.statusCode, 200, 'a code works once');
 });

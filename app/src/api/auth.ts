@@ -113,6 +113,8 @@ export type AuthConfig = {
   passwordOptional?: boolean;
   /** M263: the server starts the account deletion with the code alone; an older server sends nothing and wants the password. */
   deleteByCode?: boolean;
+  /** M264: the server lists the account's signed-in devices («الجلسات المسجلة»); an older server sends nothing and the row stays hidden. */
+  deviceSessions?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };
@@ -137,6 +139,23 @@ export type RegisterInput = {
 
 export type PendingResult = { pending: true; pendingToken: string; email: string; mailSent: boolean; text: string };
 export type SignedInResult = { pending: false; token: string; me: Me; /** M157: the social sign-in just created the account. */ created?: boolean };
+/**
+ * M264: one signed-in device of the account, as the server names it. `id` is a public id (never the session itself);
+ * `ip` is the device's latest address, `place` its country in the app's language (null when the address is unknown).
+ */
+export type DeviceSession = {
+  id: string;
+  current: boolean;
+  platform: 'ios' | 'android' | 'web' | null;
+  dashboard: boolean;
+  appVersion: string | null;
+  ip: string | null;
+  country: string | null;
+  place: string | null;
+  signedInAt: string;
+  lastSeenAt: string;
+};
+
 /** M140: the account switched «حماية إضافية» on — the sign-in ends with its authenticator code. */
 export type TotpStepResult = { pending: false; totp: true; stepToken: string; seconds: number };
 /** M203: the password (or the Apple/Google identity) was right; the session starts after the WhatsApp code. */
@@ -248,6 +267,10 @@ export const authApi = {
   updateMe: (patch: ProfilePatch) => apiRequest<{ me: Me }>('PATCH', '/api/me', { body: patch }),
   // The token travels explicitly: sign-out clears the module token before this call goes out.
   logout: (token: string) => apiRequest<{ ok: true }>('POST', '/api/auth/logout', { body: {}, token }),
+  // M264 «الجلسات المسجلة»: the account's signed-in devices; one of the others, or all the others, can be signed out.
+  sessions: () => apiRequest<{ sessions: DeviceSession[] }>('GET', '/api/me/sessions'),
+  endSession: (id: string) => apiRequest<{ ok: true }>('DELETE', `/api/me/sessions/${encodeURIComponent(id)}`),
+  endOtherSessions: () => apiRequest<{ ok: true; ended: number }>('POST', '/api/me/sessions/sign-out-others', { body: {} }),
   // M101 «تغيير التوجه»: the e-mailed code applies the change at the hub, once every 30 days (admins patch directly).
   personaRequest: (persona: Persona) => apiRequest<{ ok: true; email: string; via?: 'whatsapp' | 'email'; phone?: string; seconds: number; days: number }>('POST', '/api/me/persona/request', { body: { persona } }),
   personaConfirm: (code: string) => apiRequest<{ me: Me }>('POST', '/api/me/persona/confirm', { body: { code } }),

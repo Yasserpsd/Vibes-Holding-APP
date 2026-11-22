@@ -23,6 +23,9 @@ export const SENTENCES_EN: Record<string, string> = {
   'محاولات كثيرة، حاول بعد قليل': 'Too many attempts. Try again shortly.',
   'محاولات كثيرة في وقت قصير، حاول بعد قليل': 'Too many attempts in a short time. Try again shortly.',
   'طلبات كثيرة في وقت قصير، حاول بعد قليل': 'Too many requests in a short time. Try again shortly.',
+  // M264: «الجلسات المسجلة» (auth/routes.ts).
+  'هذا هو الجهاز الحالي؛ استخدم «تسجيل الخروج» للخروج منه': 'This is the device you are using. Use "Sign out" to leave it.',
+  'هذه الجلسة انتهت بالفعل': 'This session has already ended.',
   // M259: sign-in with a WhatsApp code (auth/service.ts).
   'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور': 'Sign-in with a WhatsApp code is not available right now. Sign in with your password.',
   'لا يوجد حساب مسجل بهذا الرقم — أنشئ حسابك الجديد أولًا': 'No account is registered with this number. Create your account first.',

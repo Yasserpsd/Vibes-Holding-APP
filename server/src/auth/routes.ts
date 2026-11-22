@@ -4,13 +4,14 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { HubMode } from '../config.js';
-import { langOf, sourceOf } from '../lang.js';
+import { langOf, sourceOf, type AppLang } from '../lang.js';
 import type { Notifier } from '../mail/notify.js';
 import type { MeLocalizer } from './meEnglish.js';
 import { MOCK_CODE } from '../hub/mock.js';
 import { mobileRule } from '../hub/countries.js';
 import { cleanEmail, COUNTRIES, EMAIL_INVALID_TEXT, EMAIL_POLICY_TEXT, GENERIC_PATTERN, inputFlags, isEmailShape, PHONE_POLICY_TEXT } from '../hub/phone.js';
 import { HubError } from '../hub/types.js';
+import { deviceOf, placeOf } from './device.js';
 import { dashboardGuard, guard, parse, refusedField, RequestError, sessionGuard } from './guard.js';
 import type { RefusalCounter } from './refusals.js';
 import type { Mailer } from '../mail/mailer.js';
@@ -235,6 +236,40 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
   const requireSession = sessionGuard(service);
 
   /**
+   * M264 «الجلسات المسجلة»: EVERY sign-in is recorded with the address and device it came from, in one place — any
+   * answer of these routes that hands out a fresh session (`pending: false` with its `token`: password, WhatsApp
+   * code, Google / Apple, sign-up, the phone-code and authenticator steps, the dashboard) passes here on its way
+   * out. A route added later is covered without knowing about it. A failed note never breaks the sign-in.
+   */
+  app.addHook('preSerialization', async (request, _reply, payload) => {
+    const answer = payload as { pending?: unknown; token?: unknown } | null;
+    if (answer && typeof answer === 'object' && answer.pending === false && typeof answer.token === 'string') {
+      await service.noteSignIn(answer.token, deviceOf(request)).catch((error: unknown) => {
+        app.log.warn({ err: error instanceof Error ? error.message : 'unknown' }, 'sign-in device was not recorded');
+      });
+    }
+    return payload;
+  });
+
+  /** M264: one device as its owner sees it. The record's token hash, hub uuid and contact id never leave. */
+  const toDevice = (record: SessionRecord, current: SessionRecord, lang: AppLang) => {
+    const ip = record.lastIp ?? record.ip ?? '';
+    const isCurrent = record.sid === current.sid;
+    return {
+      id: record.sid ?? '',
+      current: isCurrent,
+      platform: record.platform ?? null,
+      // A dashboard sign-in (the e-mailed code or the authenticator step of the dashboard) is named as such.
+      dashboard: Boolean(record.adminVerifiedAt),
+      appVersion: record.appVersion ?? null,
+      ip: ip || null,
+      ...placeOf(ip, lang),
+      signedInAt: record.createdAt,
+      lastSeenAt: isCurrent ? new Date().toISOString() : record.lastSeenAt,
+    };
+  };
+
+  /**
    * M242 (complaint «إيميل صحيح ويترفض»): one line per refused sign-up, sign-in or password reset, so a week of
    * logs says which cause is the common one. It holds the route, the refusal code, the platform and what KIND of
    * text was typed (booleans from `inputFlags`) — never the address, the number or any part of them.
@@ -321,6 +356,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     passwordOptional: service.phoneProofRequired && (await service.codeLoginReady()),
     // M263: the account deletion starts with its code alone (no password first) on this server.
     deleteByCode: Boolean(deletion),
+    // M264: «الجلسات المسجلة» — this server lists the account's signed-in devices and signs them out.
+    deviceSessions: true,
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,
@@ -692,6 +729,48 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const auth = await requireSession(request, reply);
       if (!auth) return;
       await service.logout(auth.token, auth.session);
+      return { ok: true };
+    }),
+  );
+
+  // M264 «الجلسات المسجلة»: the member's own signed-in devices — address, country, device, last activity.
+  app.get(
+    '/api/me/sessions',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      void reply.header('cache-control', 'no-store');
+      const lang = langOf(request);
+      const sessions = (await service.sessionsOf(auth.session)).map((record) => toDevice(record, auth.session, lang));
+      // This device leads the list; the rest stay in their order (the latest active first).
+      return { sessions: [...sessions.filter((item) => item.current), ...sessions.filter((item) => !item.current)] };
+    }),
+  );
+
+  app.post(
+    '/api/me/sessions/sign-out-others',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      if (limited('sessions-end', 30, request, reply)) return;
+      void reply.header('cache-control', 'no-store');
+      return { ok: true, ended: await service.endOtherSessions(auth.session) };
+    }),
+  );
+
+  app.delete(
+    '/api/me/sessions/:id',
+    guard(async (request, reply) => {
+      const auth = await requireSession(request, reply);
+      if (!auth) return;
+      if (limited('sessions-end', 30, request, reply)) return;
+      void reply.header('cache-control', 'no-store');
+      const id = String((request.params as { id?: unknown }).id ?? '');
+      // This device leaves through «تسجيل الخروج» itself, which also clears what the app keeps on the phone.
+      if (id === auth.session.sid) throw new RequestError('current_session', 'هذا هو الجهاز الحالي؛ استخدم «تسجيل الخروج» للخروج منه', 400);
+      if (!/^[A-Za-z0-9_-]{16}$/.test(id) || !(await service.endSession(auth.session, id))) {
+        throw new RequestError('session_gone', 'هذه الجلسة انتهت بالفعل', 404);
+      }
       return { ok: true };
     }),
   );

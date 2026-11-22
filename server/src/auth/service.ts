@@ -16,6 +16,7 @@ import { maskEmail, OTP_RESEND_GAP_SECONDS, type AdminOtpStore } from './adminOt
 import type { LegacyAccounts } from './legacy.js';
 import { maskNumber, PHONE_CODE_RESEND_SECONDS, PHONE_CODE_SECONDS, PHONE_PROOF_SECONDS, type PhoneCodePurpose, type PhoneCodeStore, type PhoneCodeVia, type PhoneCodeWaiver } from './phoneCode.js';
 import { otpauthUri, TOTP_TOKEN_SECONDS, type TotpStatus, type TotpStore } from './totp.js';
+import type { SessionDevice } from './device.js';
 import type { SessionRecord, SessionStore } from './sessions.js';
 
 export type Persona = 'neutral' | 'entrepreneur' | 'investor';
@@ -867,8 +868,44 @@ export class AuthService {
     });
   }
 
-  async authenticate(token: string): Promise<SessionRecord | null> {
-    return this.deps.sessions.getSession(token);
+  async authenticate(token: string, device?: SessionDevice): Promise<SessionRecord | null> {
+    return this.deps.sessions.getSession(token, device);
+  }
+
+  /** M264 «الجلسات المسجلة»: the address and device a fresh sign-in came from (the routes call it for every one). */
+  async noteSignIn(token: string, device: SessionDevice): Promise<void> {
+    await this.deps.sessions.noteSignIn(token, device);
+  }
+
+  /** M264: the member's own signed-in devices, the latest active first. Records only — never a token. */
+  async sessionsOf(session: SessionRecord): Promise<SessionRecord[]> {
+    return (await this.deps.sessions.listSessions(session.contactId)).map((item) => item.record);
+  }
+
+  /** M264: signs one of the member's OTHER devices out by its public id; false when he has no such session. */
+  async endSession(session: SessionRecord, sid: string): Promise<boolean> {
+    if (sid === session.sid) return false;
+    const ended = await this.deps.sessions.endSessions(session.contactId, (id) => id === sid);
+    this.afterEnded(ended);
+    return ended.length > 0;
+  }
+
+  /** M264: signs every other device out; the one asking stays. */
+  async endOtherSessions(session: SessionRecord): Promise<number> {
+    if (!session.sid) return 0;
+    const ended = await this.deps.sessions.endOthers(session.contactId, session.sid);
+    this.afterEnded(ended);
+    return ended.length;
+  }
+
+  /** The hub forgets each ended visitor too; the app sessions are already gone, so a failed call only logs. */
+  private afterEnded(records: SessionRecord[]): void {
+    for (const record of records) {
+      this.meCache.delete(record.uuid);
+      void this.deps.hub.call('logout', { uuid: record.uuid }).catch((error: unknown) => {
+        this.deps.log.warn({ err: error instanceof Error ? error.message : 'unknown' }, 'hub logout of an ended device failed; its app session is already gone');
+      });
+    }
   }
 
   /** M216: the account was deleted by an admin: no device of his stays signed in, not even for a moment. */

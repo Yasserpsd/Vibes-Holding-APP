@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createPrivateKey, createPublicKey, generateKeyPairSync, sign as signData, type KeyObject } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as signData, type KeyObject } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp } from '../app.js';
@@ -80,6 +80,10 @@ test('google sign-in creates a verified account and signs in instantly', async (
   assert.equal(body.me.email, 'new.member@gmail.com');
   assert.equal(body.me.name, 'عضو جوجل');
   assert.equal(body.me.verified, true);
+  // M264: a Google / Apple sign-in records the address it came from (the test runner's own here).
+  const stored = await kv.get<{ ip?: string; platform?: string }>(`session:${createHash('sha256').update(body.token as string).digest('hex')}`);
+  assert.equal(stored?.ip, '127.0.0.1');
+  assert.equal(stored?.platform, 'web');
 
   // The session works like any other — fresh=1 skips the me-cache, so has_account is really checked.
   const me = await app.inject({ method: 'GET', url: '/api/me?fresh=1', headers: { authorization: `Bearer ${body.token}` } });

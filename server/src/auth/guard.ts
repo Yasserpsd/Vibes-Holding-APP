@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 
 import { HubError } from '../hub/types.js';
+import { deviceOf } from './device.js';
 import { AuthError, type AuthService, type Me } from './service.js';
 import type { SessionRecord } from './sessions.js';
 
@@ -124,7 +125,8 @@ function bearerToken(request: FastifyRequest): string {
 export function sessionGuard(service: AuthService) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<SessionAuth | null> => {
     const token = bearerToken(request);
-    const session = token ? await service.authenticate(token) : null;
+    // M264: the request names its address and device; the session keeps the latest (the member's «الجلسات المسجلة»).
+    const session = token ? await service.authenticate(token, deviceOf(request)) : null;
     if (!session) {
       void reply.code(401).send({ error: { code: 'unauthorized', message: 'سجّل الدخول أولًا' } });
       return null;
@@ -139,7 +141,7 @@ export type OptionalAuth = { session: SessionRecord; me: Me | null };
 export function optionalSession(service: AuthService) {
   return async (request: FastifyRequest): Promise<OptionalAuth | null> => {
     const token = bearerToken(request);
-    const session = token ? await service.authenticate(token) : null;
+    const session = token ? await service.authenticate(token, deviceOf(request)) : null;
     if (!session) return null;
     let me: Me | null = null;
     try {

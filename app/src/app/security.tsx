@@ -3,7 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Switch, Text, View, type ScrollView } from 'react-native';
 
-import { authApi } from '@/api/auth';
+import { authApi, useAuthConfig } from '@/api/auth';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -33,6 +33,8 @@ import { colors, radii, spacing, typography } from '@/theme/tokens';
 export default function SecurityScreen() {
   const router = useRouter();
   const { me, setMe } = useAuth();
+  // M264: the «الجلسات المسجلة» row shows only where the server says it can list devices.
+  const { data: config } = useAuthConfig();
   const scrollRef = useRef<ScrollView | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -179,8 +181,20 @@ export default function SecurityScreen() {
         </GlassCard>
       </FadeInView>
 
+      {/* M264 (owner): «الجلسات المسجلة» — every signed-in device with its address and place. Hidden on an older server. */}
+      {config?.deviceSessions ? (
+        <FadeInView delay={entranceDelay(3)}>
+          <GlassCard radius={radii.lg} style={styles.card}>
+            <CardTitle icon="phone-portrait-outline" title={t('security.sessionsTitle')} />
+            <Text style={styles.lockHint}>{t('security.sessionsCardHint')}</Text>
+            <GoldHairline />
+            <AppButton label={t('security.sessionsOpen')} variant="outline" icon="phone-portrait-outline" onPress={() => router.push('/security-sessions' as Href)} />
+          </GlassCard>
+        </FadeInView>
+      ) : null}
+
       {/* M118d (owner): the sharp things live one level deeper, out of a stray tap's reach. */}
-      <FadeInView delay={entranceDelay(3)}>
+      <FadeInView delay={entranceDelay(config?.deviceSessions ? 4 : 3)}>
         <GlassCard radius={radii.lg} style={styles.card}>
           <CardTitle icon="settings-outline" title={t('security.extraTitle')} />
           <Text style={styles.dangerText}>{t('security.extraHint')}</Text>

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import { buildApp, type BuiltApp } from './app.js';
@@ -104,6 +105,10 @@ test('m259: a proven number signs in with a four-digit WhatsApp code and no pass
   assert.equal(right.statusCode, 200, right.body);
   assert.ok(right.json().token, 'a session');
   assert.equal(right.json().me.email, account.email);
+  // M264: the code sign-in records the address and device it came from, like every other sign-in.
+  const stored = await kv.get<{ ip?: string; platform?: string }>(`session:${createHash('sha256').update(right.json().token as string).digest('hex')}`);
+  assert.match(stored?.ip ?? '', /^10\.9\.0\.\d+$/);
+  assert.equal(stored?.platform, 'ios');
   const me = await built.app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${right.json().token as string}`, 'x-app-gate': NEW_BUNDLE } });
   assert.equal(me.statusCode, 200, me.body);
   assert.equal(mailer.sent.filter((mail) => /رمز الدخول|Your Investors Club code/.test(mail.subject)).length, 0, 'the code never goes by e-mail');
