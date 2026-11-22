@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type TotpStatus } from '../api';
 import { LOCALE } from '../format';
 import { BackupCodes, cleanCode, codeReady, EnrolSteps } from '../Totp';
+import { SectionHead } from '../ui';
 
 type Mode = 'idle' | 'relink' | 'backup';
 type Setup = { token: string; secret: string; uri: string };
@@ -71,10 +72,10 @@ export function Security() {
   const enabledAt = status?.enabledAt ? new Date(status.enabledAt).toLocaleDateString(LOCALE, { year: 'numeric', month: 'long', day: 'numeric' }) : null;
 
   return (
+    <>
+    {/* The same page header as every other section (an h1), so the title has their size. */}
+    <SectionHead title="أمان الحساب" />
     <div className="stack">
-      <div className="row">
-        <h2>أمان الحساب</h2>
-      </div>
       <p className="muted">تطبيق المصادقة هو الخطوة الثانية لدخول اللوحة بعد كلمة المرور: رمز يتغيّر كل 30 ثانية على جوالك، ويعمل مع أي تطبيق مصادقة (Google Authenticator، Microsoft Authenticator، Authy…).</p>
 
       <section className="card">
@@ -135,5 +136,6 @@ export function Security() {
         </div>
       ) : null}
     </div>
+    </>
   );
 }
