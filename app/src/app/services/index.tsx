@@ -5,6 +5,7 @@ import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useServices, type ServiceGroupKey } from '@/api/content';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
+import { FeaturedProgramCard } from '@/components/FeaturedProgramCard';
 import { LockedNotice } from '@/components/LockedNotice';
 import { entranceDelay, FadeInView } from '@/components/motion';
 import { Screen } from '@/components/Screen';
@@ -27,7 +28,7 @@ const GROUP_ICONS: Record<ServiceGroupKey, IoniconName> = {
 /** Every service, grouped; member-only ones are dimmed until the annual membership is active. */
 export default function ServicesScreen() {
   const router = useRouter();
-  const { status } = useAuth();
+  const { status, me } = useAuth();
   const { data, isLoading, error, refetch } = useServices();
   const [refreshing, setRefreshing] = useState(false);
   useAdvisorScreen({ type: 'screen', id: 'services', title: data?.title ?? t('nav.services') });
@@ -49,6 +50,14 @@ export default function ServicesScreen() {
     );
   }
 
+  // Owner (2026-11-22: «في خدمات النادي اول حاجه تظهر بشكل مميز جدا شركاء النجاح… للمحايدين و رواد الأعمال فقط»):
+  // the flagship programme opens the page as its own gold card for the neutral and the entrepreneur (a signed-in
+  // account without a category reads as neutral, as on the home) and leaves their grid; the investor's and the
+  // guest's page stay as they were.
+  const persona = status === 'signedIn' ? me?.persona || 'neutral' : 'guest';
+  const flagship = persona === 'neutral' || persona === 'entrepreneur' ? (data.services.find((service) => service.key === 'success-partners') ?? null) : null;
+  const listed = flagship ? data.services.filter((service) => service.key !== flagship.key) : data.services;
+
   // V2: one running order across the whole page, so headers and cards cascade in as a single wave.
   let order = 0;
 
@@ -66,9 +75,14 @@ export default function ServicesScreen() {
           <WalletCard />
         </FadeInView>
       ) : null}
+      {flagship ? (
+        <FadeInView delay={entranceDelay(order++)}>
+          <FeaturedProgramCard service={flagship} onPress={() => router.push({ pathname: '/service/[key]', params: { key: flagship.key } })} />
+        </FadeInView>
+      ) : null}
       {data.services.length === 0 ? <StateView empty emptyText={t('common.noResults')} /> : null}
       {data.groups.map((group) => {
-        const items = data.services.filter((service) => service.group === group.key);
+        const items = listed.filter((service) => service.group === group.key);
         if (!items.length) return null;
         return (
           <View key={group.key} style={styles.section}>

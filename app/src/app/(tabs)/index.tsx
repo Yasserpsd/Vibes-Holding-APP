@@ -22,6 +22,7 @@ import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { WorkshopAdPopup } from '@/components/WorkshopAd';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
+import { FeaturedProgramCard } from '@/components/FeaturedProgramCard';
 import { MembershipBenefitsBlock } from '@/components/MembershipBenefitsBlock';
 import { MembershipHomeCard } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
@@ -57,6 +58,8 @@ const HQ_BANNER_DRAW = Math.random();
 // Card widths of the horizontal strips; the snap step is the width plus the strip gap.
 const MINI_WIDTH = 124;
 const MINI_LOGO = 72;
+/** The club's flagship programme: leads the services of the neutral and the entrepreneur as its own card. */
+const FLAGSHIP_SERVICE = 'success-partners';
 /** The club-sections tiles shown before «اضغط للمزيد»: one full row. */
 const SECTIONS_SHOWN = 4;
 const VIDEO_WIDTH = 240;
@@ -194,7 +197,11 @@ export default function HomeScreen() {
   // stays for everyone so the home is never crowded.
   // Owner's TestFlight pass (2026-11-22: «خدمات النادي كبير جدا جدا… يكون فقط 4 واضغط للمزيد»): FOUR things up
   // front, no more — four tiles, or the entrepreneur's two gold doors and two tiles — and the bar opens the rest.
-  const fullGrid = personaKey === 'entrepreneur' ? orderedServices.filter((service) => service.key !== 'app-publish') : orderedServices;
+  // Owner (2026-11-22: «اول حاجه تظهر بشكل مميز جدا شركاء النجاح ده اهم برنامج عندي… للمحايدين و رواد الأعمال فقط
+  // لكن المستثمر… يفضل زي ما هو»): the flagship programme leads the services as its own gold card for the neutral and
+  // the entrepreneur, and leaves their tiles so it is not said twice. The investor and the guest keep their grid.
+  const flagship = personaKey === 'neutral' || personaKey === 'entrepreneur' ? (allServices.find((service) => service.key === FLAGSHIP_SERVICE) ?? null) : null;
+  const fullGrid = orderedServices.filter((service) => !(flagship && service.key === FLAGSHIP_SERVICE) && !(personaKey === 'entrepreneur' && service.key === 'app-publish'));
   const shownFirst = personaKey === 'entrepreneur' ? 2 : 4;
   const teaser = gridOpen ? fullGrid : fullGrid.slice(0, shownFirst);
   const gridCollapsible = fullGrid.length > shownFirst;
@@ -318,9 +325,18 @@ export default function HomeScreen() {
           cta={ctaOf('services')?.label ?? content.services.cta}
           onPress={() => pushRoute(ctaOf('services')?.route ?? '/services')}
         />
+        {flagship && personaKey !== 'entrepreneur' ? (
+          <View style={styles.list}>
+            <FeaturedProgramCard service={flagship} onPress={() => pushRoute(`/service/${FLAGSHIP_SERVICE}`)} />
+          </View>
+        ) : null}
         {personaKey === 'entrepreneur' ? (
           <View style={styles.list}>
-            <GoldDoorCard icon="add" title={t('home.partnersPlus')} hint={t('home.partnersPlusHint')} onPress={() => pushRoute('/service/success-partners')} />
+            {flagship ? (
+              <FeaturedProgramCard service={flagship} onPress={() => pushRoute(`/service/${FLAGSHIP_SERVICE}`)} />
+            ) : (
+              <GoldDoorCard icon="add" title={t('home.partnersPlus')} hint={t('home.partnersPlusHint')} onPress={() => pushRoute('/service/success-partners')} />
+            )}
             {/* M102 (owner): the second door, gold exactly like the first — publish his app, no fees. */}
             <GoldDoorCard icon="phone-portrait-outline" title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={() => pushRoute('/service/app-publish')} />
           </View>
