@@ -201,3 +201,29 @@ test('m211: a first install on the embedded bundle is told to reopen the app, no
   assert.equal(res.json().error.code, 'phone_first_reopen');
   assert.equal((await call('/api/auth/social', { provider: 'google', token: googleToken(email) })).json().phoneFirst, true);
 });
+
+// M262 (owner, 2026-11-22: «تسهيل التسجيل»): the password is optional where the member can come back without one.
+test('m262: a sign-up without a password needs the proven number and the code sign-in; the account then opens', async () => {
+  const config = (await app.inject({ method: 'GET', url: '/api/auth/config' })).json() as { codeLogin: boolean; passwordOptional: boolean };
+  assert.equal(config.passwordOptional, config.codeLogin);
+  const phone = nextPhone();
+  const bare: Record<string, unknown> = form(phone);
+  delete bare.password;
+  // No proof: refused under the password field, before anything reaches the hub.
+  const refused = await call('/api/auth/register', bare);
+  assert.equal(refused.statusCode, 400);
+  assert.equal(refused.json().error.code, 'password_required');
+  const phoneProof = await prove(phone);
+  const res = await call('/api/auth/register', { ...bare, phoneProof });
+  if (config.passwordOptional) {
+    assert.equal(res.statusCode, 200, res.body);
+    assert.ok(res.json().token);
+    assert.equal(res.json().me.phoneVerified, true);
+  } else {
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().error.code, 'password_required');
+  }
+  // A typed password still follows its own rule.
+  const short = await call('/api/auth/register', { ...form(nextPhone()), password: '123' });
+  assert.equal(short.statusCode, 400);
+});

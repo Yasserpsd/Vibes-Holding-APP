@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -75,7 +77,8 @@ const registerSchema = z
     country: z.string().trim().toLowerCase().max(5).default('sa'),
     phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
     email: emailField('البريد الإلكتروني مطلوب'),
-    password: passwordSchema,
+    // M262: optional — see the register route (a sign-up without one needs the proven number and the code sign-in).
+    password: passwordSchema.optional(),
     persona: personaSchema,
     // M203: job, bio, interests, type and company are asked later in the profile; older bundles still send them.
     bio: z.union([z.literal(''), z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600)]).optional(),
@@ -302,6 +305,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     phoneProofRequired: service.phoneProofRequired,
     // M259: the sign-in screen offers «الدخول برمز واتساب» only where the code and the hub can carry it.
     codeLogin: await service.codeLoginReady(),
+    // M262 (owner, 2026-11-22: «تسهيل التسجيل»): the form may leave the password out only where the member can come
+    // back without one — the number is proven on the form and the hub signs in with a WhatsApp code.
+    passwordOptional: service.phoneProofRequired && (await service.codeLoginReady()),
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,
@@ -316,7 +322,19 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('register', 6, request, reply)) return noteRefusal('register', request, 'rate', typed);
       const body = parse(registerSchema, request.body, reply);
       if (!body) return noteRefusal('register', request, 'invalid', typed, undefined, refusedField(registerSchema, request.body));
-      const result = await watched('register', request, typed, () => service.register(body, request.ip, langOf(request), sourceOf(request), bundleOf(request)));
+      // M262: a sign-up without a password is taken only with a number proven on the form and a hub that signs in by
+      // WhatsApp code (the hub's code sign-in wants a stored password hash, so the account gets a random one nobody
+      // knows; «نسيت كلمة المرور» sets a real one later). Anything else is refused under the password field.
+      let password = body.password;
+      if (password === undefined) {
+        if (!body.phoneProof || !service.phoneProofRequired || !(await service.codeLoginReady())) {
+          noteRefusal('register', request, 'password_required', typed);
+          throw new RequestError('password_required', 'كلمة المرور 6 أحرف على الأقل', 400);
+        }
+        password = randomBytes(24).toString('base64url');
+      }
+      const input = { ...body, password };
+      const result = await watched('register', request, typed, () => service.register(input, request.ip, langOf(request), sourceOf(request), bundleOf(request)));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, type ScrollView, type TextInput } from 'react-native';
+import { Pressable, Text, View, type ScrollView, type TextInput } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -70,7 +70,12 @@ const CODE_FIELDS: Partial<Record<string, Field>> = {
   exists: 'email',
   invite_code: 'inviteCode',
   invite_unavailable: 'inviteCode',
+  // M262: a server that still wants a password — its field opens with the refusal under it.
+  password_required: 'password',
 };
+
+/** M262: the fields of the form's first step; everything else waits on the second. */
+const PAGE_ONE: Field[] = ['name', 'lastName', 'country', 'phone'];
 
 /**
  * The registration form. M195 (owner, 2026-11-04): the club identity (navy + gold, dark tone on the
@@ -112,6 +117,12 @@ export default function RegisterScreen() {
   // from the render they were created in — an autofill writes a field and leaves it inside one render.
   const [newest] = useState(() => ({ form }));
   const [showInvite, setShowInvite] = useState(Boolean(invite?.trim()));
+  // M262 (owner, 2026-11-22: «تسهيل التسجيل» — two short steps instead of one long form): step one is who you are and
+  // your number (proven on WhatsApp), step two the e-mail, the category and the job. Both steps stay mounted — the
+  // hidden one keeps its values, its red lines and the code field's state — and only one shows.
+  const [page, setPage] = useState<0 | 1>(0);
+  // M262: where the member can come back with a WhatsApp code, the password is a choice behind a small link.
+  const [showPassword, setShowPassword] = useState(false);
   const errors = useFormErrors<Field>(scrollRef);
   const [failure, setFailure] = useState<Failure | null>(null);
   // M253: what each field held when the server refused it — the red line stays until the member changes that value.
@@ -128,6 +139,7 @@ export default function RegisterScreen() {
   const phoneInput = useRef<TextInput | null>(null);
   const passwordInput = useRef<TextInput | null>(null);
 
+  const passwordOptional = !social && Boolean(config?.passwordOptional);
   const country = config?.countries.find((item) => item.code === form.country) ?? config?.countries[0];
   // M126 (owner): the dial code is right there, so the number never shows a leading zero.
   const phoneExample = country?.example ? country.example.replace(/^0+/, '') : '';
@@ -151,6 +163,8 @@ export default function RegisterScreen() {
       case 'email':
         return isEmail(draft.email) ? null : t('form.error.email');
       case 'password':
+        // M262: an optional password left empty is no password; one that is typed still needs its six characters.
+        if (passwordOptional && draft.password.length === 0) return null;
         return draft.password.length < 6 ? t('form.error.password') : null;
       case 'persona':
         return draft.persona ? null : t('form.error.persona');
@@ -243,6 +257,30 @@ export default function RegisterScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- issueOf is rebuilt every render; the values are what matter
   }, [form, shown, clearError, refused]);
 
+  const showPage = (next: 0 | 1) => {
+    setPage(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+  /** M262: «التالي» — the first step is checked on its own, the number is proven (M227: the code is asked for at once), then the second step opens. */
+  const goNext = (proven: PhoneProofState = proof) => {
+    setFailure(null);
+    if ((config?.phoneProofRequired || social) && proven?.kind !== 'done' && phoneReady) {
+      setAutoProof(true);
+      errors.clear('phone');
+      proofRef.current?.request();
+      setTimeout(() => errors.scrollTo('phone'), 50);
+      return;
+    }
+    const all = validate(proven);
+    const first: Partial<Record<Field, string>> = {};
+    for (const key of PAGE_ONE) {
+      const message = all[key];
+      if (message) first[key] = message;
+    }
+    if (errors.fail(first, PAGE_ONE)) return;
+    showPage(1);
+  };
+
   /** `proven` is the proof that has just arrived, before the state caught up with it. */
   const submit = async (proven: PhoneProofState = proof) => {
     if (busy) return;
@@ -253,13 +291,18 @@ export default function RegisterScreen() {
     // a right number that is not proven yet gets its code at once, the page goes up to the code field, and the
     // sign-up finishes by itself when the code is right.
     if ((config?.phoneProofRequired || social) && proven?.kind !== 'done' && phoneReady) {
+      // M262: the code field lives on the first step (a proof that outlived its half hour brings the member back to it).
+      setPage(0);
       setAutoProof(true);
       errors.clear('phone');
       proofRef.current?.request();
       setTimeout(() => errors.scrollTo('phone'), 50);
       return;
     }
-    if (errors.fail(validate(proven), ORDER) || !latest.persona) return;
+    const problems = validate(proven);
+    // M262: a red field is always on the step that shows.
+    if (PAGE_ONE.some((key) => problems[key])) setPage(0);
+    if (errors.fail(problems, ORDER) || !latest.persona) return;
     setBusy(true);
     try {
       // M212: the account of a first Google/Apple sign-in is born here, with the form's fields and the proven number.
@@ -286,7 +329,9 @@ export default function RegisterScreen() {
         country: latest.country,
         phone: latest.phone.trim(),
         email: cleanEmail(latest.email),
-        password: latest.password,
+        // M262: no password typed (where it is optional) — the server gives the account a random one and the member
+        // comes back with a WhatsApp code, Google / Apple, or «نسيت كلمة المرور».
+        password: passwordOptional && !latest.password ? undefined : latest.password,
         persona: latest.persona,
         jobTitle: latest.jobTitle.trim(),
         inviteCode: latest.inviteCode.trim() || undefined,
@@ -316,6 +361,9 @@ export default function RegisterScreen() {
       if (cause instanceof ApiError && CODE_FIELDS[cause.code] === 'inviteCode') setShowInvite(true);
       const taken = errors.fromServer(cause, SERVER_ORDER, { codes: CODE_FIELDS });
       if (taken.length) {
+        // M262: the refused field's step is the one on screen, and a refused password shows its field.
+        if (taken.some((key) => PAGE_ONE.includes(key))) setPage(0);
+        if (taken.includes('password')) setShowPassword(true);
         setRefused({ values: Object.fromEntries(taken.map((key) => [key, latest[key]])), code: cause instanceof ApiError ? cause.code : '' });
         return;
       }
@@ -331,7 +379,8 @@ export default function RegisterScreen() {
   const nameMeant = nameComplete ? nameFix(typedName) : null;
   // M257: the member reads from the start that a WhatsApp code is part of signing up.
   const stepsShown = Boolean(config?.phoneProofRequired || social);
-  const stepNow = proof?.kind === 'done' ? 2 : proof?.kind === 'code' ? 1 : 0;
+  // M262: the third mark lights when the second step opens (the number is proven by then).
+  const stepNow = page === 1 ? 2 : proof?.kind === 'code' ? 1 : 0;
   const emailMeant = social ? null : emailFix(form.email);
   const phoneLand = config && !proof && errors.errors.phone ? phoneCountryFix(form.phone, form.country, config.countries) : null;
   const fixes: Partial<Record<Field, FieldFix | null>> = {
@@ -412,6 +461,7 @@ export default function RegisterScreen() {
         <FormCard tone="light">
           {stepsShown ? <SignupSteps labels={[t('auth.register.step.details'), t('auth.register.step.code'), t('auth.register.step.done')]} current={stepNow} /> : null}
           <ErrorSummary count={errors.count} />
+          <View style={page === 0 ? styles.page : styles.hidden}>
           <FormField
             label={t('auth.register.firstName')}
             value={form.name}
@@ -473,7 +523,8 @@ export default function RegisterScreen() {
                 if (next) errors.clear('phone');
                 if (next?.kind === 'code') return;
                 setAutoProof(false);
-                if (next && autoProof) void submit(next);
+                // M262: the proof that «التالي» asked for opens the second step by itself.
+                if (next && autoProof) goNext(next);
               }}
               check={() => {
                 const issue = issueOf('phone', form);
@@ -482,6 +533,11 @@ export default function RegisterScreen() {
               }}
             />
           ) : null}
+          </View>
+          <View style={page === 1 ? styles.page : styles.hidden}>
+          <Pressable accessibilityRole="button" onPress={() => showPage(0)} style={styles.back} hitSlop={8}>
+            <Text style={styles.inviteText}>{t('auth.register.backToDetails')}</Text>
+          </Pressable>
           <FormField
             label={t('auth.register.email')}
             latin
@@ -502,9 +558,9 @@ export default function RegisterScreen() {
             anchorRef={errors.anchor('email')}
             onBlur={blur('email')}
           />
-          {social ? null : (
+          {social || (passwordOptional && !showPassword) ? null : (
           <FormField
-            label={t('common.password')}
+            label={t(passwordOptional ? 'auth.register.passwordOptional' : 'common.password')}
             latin
             secureTextEntry
             autoCapitalize="none"
@@ -513,7 +569,7 @@ export default function RegisterScreen() {
             returnKeyType="done"
             value={form.password}
             onChangeText={set('password')}
-            hint={t('auth.register.passwordHint')}
+            hint={t(passwordOptional ? 'auth.register.passwordOptionalHint' : 'auth.register.passwordHint')}
             hintOnFocus
             error={errors.errors.password}
             anchorRef={errors.anchor('password')}
@@ -567,10 +623,20 @@ export default function RegisterScreen() {
               <Text style={styles.inviteText}>{t('auth.register.haveInvite')}</Text>
             </Pressable>
           )}
+          {passwordOptional && !showPassword ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowPassword(true)} style={styles.invite} hitSlop={8}>
+              <Text style={styles.inviteText}>{t('auth.register.wantPassword')}</Text>
+            </Pressable>
+          ) : null}
+          </View>
 
           {/* The management's WhatsApp line right under the failure (owner, 2026-11-03: under every error, and in حسابي). */}
-          <FormFailure failure={failure} onRetry={() => void submit()} />
-          <AppButton label={t('auth.register.submit')} icon="person-add-outline" loading={busy} onPress={() => void submit()} />
+          <FormFailure failure={failure} onRetry={() => (page === 0 ? goNext() : void submit())} />
+          {page === 0 ? (
+            <AppButton label={t('auth.register.next')} icon="arrow-forward-circle-outline" onPress={() => goNext()} />
+          ) : (
+            <AppButton label={t('auth.register.submit')} icon="person-add-outline" loading={busy} onPress={() => void submit()} />
+          )}
         </FormCard>
       </FadeInView>
       <FadeInView delay={entranceDelay(2)}>
@@ -585,5 +651,9 @@ export default function RegisterScreen() {
 const styles = themedStyles(() => ({
   footnote: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs },
   invite: { alignSelf: 'center', paddingVertical: spacing.xs },
+  // M262: the two steps — the same spacing as the card's own, and the step that does not show takes no room.
+  page: { gap: spacing.md },
+  hidden: { display: 'none' },
+  back: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
   inviteText: { ...typography.caption, color: colors.goldText, textDecorationLine: 'underline' },
 }));

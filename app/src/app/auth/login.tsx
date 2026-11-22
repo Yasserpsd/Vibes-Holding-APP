@@ -31,6 +31,7 @@ export default function LoginScreen() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const [codeBusy, setCodeBusy] = useState(false);
+  const [usePassword, setUsePassword] = useState(Boolean(knownEmail));
 
   const submit = async () => {
     if (!identifierValid(identifier) || !password) {
@@ -98,12 +99,19 @@ export default function LoginScreen() {
       router.push(`${phoneStepPath(step)}&flow=code` as Href);
     } catch (cause) {
       setFailure(failureOf(cause));
+      // M262: an account the code cannot open (the server's sentence says to use the password) gets its password field.
+      if (cause instanceof ApiError && (cause.code === 'code_login_password' || cause.code === 'code_login_off')) setUsePassword(true);
       if (cause instanceof ApiError && cause.code === 'no_account') router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
     } finally {
       setCodeBusy(false);
     }
   };
   const codeLoginShown = Boolean(config?.codeLogin) && identifier.mode === 'phone';
+  // M262 (owner, 2026-11-22: «الدخول يكون برقم واتس اب علي طول»): where the code sign-in works, it IS the sign-in —
+  // the number and one gold button, nothing to remember. The password waits behind «الدخول بكلمة المرور» (and shows
+  // by itself for an e-mail, for an address handed over by the sign-up form, and when the server says this account
+  // must use its password).
+  const codeFirst = codeLoginShown && !usePassword;
 
   return (
     <Screen title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
@@ -124,6 +132,7 @@ export default function LoginScreen() {
       <FadeInView delay={entranceDelay(2)}>
         <LoginIdentifierField value={identifier} onChange={setIdentifier} countries={config?.countries} />
       </FadeInView>
+      {codeFirst ? null : (
       <FadeInView delay={entranceDelay(3)}>
         <FormField
           label={t('common.password')}
@@ -138,31 +147,47 @@ export default function LoginScreen() {
           returnKeyType="go"
         />
       </FadeInView>
+      )}
       {/* M253: the refusal with the button that ends it — a new password for a wrong one, another try for a lost connection. */}
       {failure ? (
         <FadeInView offset={8}>
           <FormFailure
             failure={failure}
-            onRetry={() => void submit()}
+            onRetry={() => void (codeFirst ? codeLogin() : submit())}
             actions={[failure.code === 'bad_login' || failure.code === 'bad_password' ? { label: t('auth.login.forgot'), icon: 'key-outline', onPress: () => router.push('/auth/reset') } : null]}
           />
         </FadeInView>
       ) : null}
-      <FadeInView delay={entranceDelay(4)}>
-        <AppButton label={t('auth.login.submit')} icon="log-in-outline" loading={busy} onPress={() => void submit()} />
-      </FadeInView>
-      {codeLoginShown ? (
-        <FadeInView delay={entranceDelay(4)}>
-          <AppButton label={t('auth.login.withCode')} variant="outline" icon="logo-whatsapp" loading={codeBusy} onPress={() => void codeLogin()} />
-        </FadeInView>
-      ) : null}
-      <FadeInView delay={entranceDelay(5)}>
-        <Link href="/auth/reset" asChild>
-          <PressScale>
-            <Text style={styles.link}>{t('auth.login.forgot')}</Text>
-          </PressScale>
-        </Link>
-      </FadeInView>
+      {codeFirst ? (
+        <>
+          <FadeInView delay={entranceDelay(4)}>
+            <AppButton label={t('auth.login.withCode')} icon="logo-whatsapp" loading={codeBusy} onPress={() => void codeLogin()} />
+          </FadeInView>
+          <FadeInView delay={entranceDelay(5)}>
+            <PressScale onPress={() => setUsePassword(true)} accessibilityRole="button">
+              <Text style={styles.link}>{t('auth.login.withPassword')}</Text>
+            </PressScale>
+          </FadeInView>
+        </>
+      ) : (
+        <>
+          <FadeInView delay={entranceDelay(4)}>
+            <AppButton label={t('auth.login.submit')} icon="log-in-outline" loading={busy} onPress={() => void submit()} />
+          </FadeInView>
+          {codeLoginShown ? (
+            <FadeInView delay={entranceDelay(4)}>
+              <AppButton label={t('auth.login.withCode')} variant="outline" icon="logo-whatsapp" loading={codeBusy} onPress={() => void codeLogin()} />
+            </FadeInView>
+          ) : null}
+          <FadeInView delay={entranceDelay(5)}>
+            <Link href="/auth/reset" asChild>
+              <PressScale>
+                <Text style={styles.link}>{t('auth.login.forgot')}</Text>
+              </PressScale>
+            </Link>
+          </FadeInView>
+        </>
+      )}
       {config?.registrationOpen === false ? null : (
         <FadeInView delay={entranceDelay(6)}>
           <AppButton label={t('auth.login.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />

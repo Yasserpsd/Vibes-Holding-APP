@@ -110,7 +110,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // auto-backup copied it to Google and to a new phone, which then opened signed in. Native: 1.3.4 and later.
     allowBackup: false,
     // M241 (review): in the release manifest from the template, used by no module of this app.
-    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'],
+    // M262: the calendar permissions too — expo-calendar's plugin declares them, and the app only ever opens the
+    // system's own «new event» screen (an intent), which needs neither.
+    blockedPermissions: [
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.READ_CALENDAR',
+      'android.permission.WRITE_CALENDAR',
+    ],
     ...(GOOGLE_SERVICES ? { googleServicesFile: GOOGLE_SERVICES } : {}),
   },
   // Mobile only: keeps expo export and eas update from bundling a web build.
@@ -120,6 +128,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-font',
+    // M262 «أضف إلى التقويم» (native: the first build after 1.3.5): the booking opens the SYSTEM's new-event screen,
+    // filled in — the member saves it himself, the app never reads a calendar. iOS 17+ shows that screen with no
+    // permission at all; an older iOS asks for write-only access with this sentence. Older binaries have no module
+    // and hide the button (lib/calendar.ts).
+    [
+      'expo-calendar',
+      {
+        writeOnlyAccess: true,
+        calendarPermission: 'Investors Club adds your club bookings to your calendar when you ask it to.',
+        writeOnlyCalendarPermission: 'Investors Club adds your club bookings to your calendar when you ask it to.',
+        remindersPermission: 'Investors Club adds your club bookings to your calendar when you ask it to.',
+      },
+    ],
     [
       'expo-splash-screen',
       {

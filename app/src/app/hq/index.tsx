@@ -13,6 +13,7 @@ import { LockedNotice } from '@/components/LockedNotice';
 import { HqHoursCard } from '@/components/HqHoursCard';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { visitCalendarEvent } from '@/components/NextVisitCard';
 import { Notice } from '@/components/Notice';
 import { WhatsappNote } from '@/components/WhatsappNote';
 import { Screen } from '@/components/Screen';
@@ -20,6 +21,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StateView } from '@/components/StateView';
 import { t } from '@/i18n';
 import { textStart } from '@/i18n/direction';
+import { addToCalendar, calendarAvailable } from '@/lib/calendar';
 import { formatArabicDate, weekdayName, weekdayOf } from '@/lib/format';
 import { sized } from '@/lib/imageUrl';
 import { openLink } from '@/lib/openLink';
@@ -160,7 +162,15 @@ export default function HqScreen() {
             visits.data.visits.length ? (
               visits.data.visits.map((visit, index) => (
                 <FadeInView key={visit.id} delay={entranceDelay(index)}>
-                  <VisitRow visit={visit} onPass={() => router.push({ pathname: '/hq/pass/[id]', params: { id: visit.id } })} onCancel={() => confirmCancel(visit)} />
+                  <VisitRow
+                    visit={visit}
+                    onPass={() => router.push({ pathname: '/hq/pass/[id]', params: { id: visit.id } })}
+                    onCancel={() => confirmCancel(visit)}
+                    onCalendar={() => void addToCalendar(visitCalendarEvent(visit, content.address))}
+                    onRebook={() =>
+                      router.push({ pathname: '/hq/book', params: { kind: visit.space ?? 'visit', hours: String(visit.hours ?? 1), time: visit.time, purpose: visit.space ? '' : visit.purpose } })
+                    }
+                  />
                 </FadeInView>
               ))
             ) : (
@@ -177,7 +187,7 @@ export default function HqScreen() {
   );
 }
 
-function VisitRow({ visit, onPass, onCancel }: { visit: Visit; onPass: () => void; onCancel: () => void }) {
+function VisitRow({ visit, onPass, onCancel, onCalendar, onRebook }: { visit: Visit; onPass: () => void; onCancel: () => void; onCalendar: () => void; onRebook: () => void }) {
   const weekday = weekdayOf(visit.date);
   return (
     <GlassCard golden={visit.status === 'confirmed'} style={styles.visit}>
@@ -194,6 +204,16 @@ function VisitRow({ visit, onPass, onCancel }: { visit: Visit; onPass: () => voi
       {visit.adminNote ? <Text style={styles.visitNote}>{t('hq.adminNote', { note: visit.adminNote })}</Text> : null}
       <View style={styles.actions}>
         {visit.hasPass ? <AppButton label={t('hq.pass')} icon="qr-code-outline" onPress={onPass} style={styles.action} /> : null}
+        {/* M262: a confirmed booking still ahead goes to the phone's calendar (binaries that carry the module). */}
+        {visit.status === 'confirmed' && visit.cancellable && calendarAvailable() ? (
+          <AppButton label={t('hq.addToCalendar')} variant="outline" icon="calendar-outline" onPress={onCalendar} style={styles.action} />
+        ) : null}
+        {/* M262: a booking that is over (or was not taken) is one tap from being asked for again — same kind, duration and hour. */}
+        {!visit.cancellable ? (
+          <PressScale onPress={onRebook} accessibilityRole="button" wrapStyle={styles.cancelWrap} style={styles.cancel}>
+            <Text style={styles.rebookText}>{t('hq.rebook')}</Text>
+          </PressScale>
+        ) : null}
         {visit.cancellable ? (
           <PressScale onPress={onCancel} accessibilityRole="button" wrapStyle={styles.cancelWrap} style={styles.cancel}>
             <Text style={styles.cancelText}>{t('hq.cancelBooking')}</Text>
@@ -234,4 +254,5 @@ const styles = themedStyles(() => ({
   cancelWrap: { flexShrink: 0 },
   cancel: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   cancelText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.danger },
+  rebookText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.goldText },
 }));

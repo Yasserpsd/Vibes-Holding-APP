@@ -173,13 +173,16 @@ export class IntentDetector {
       .services.filter((service) => service.action !== null && (service.action.type === 'whatsapp' || service.action.type === 'paymob'))
       .map((service) => ({ key: service.key, title: service.title, action: service.action as Extract<ServiceAction, { type: 'whatsapp' | 'paymob' }> }));
     const text = input.text.trim();
+    // The purposes as the member reads them: the card's chips and its «الغرض» line were Arabic in the English app.
+    // The booking itself accepts either language (HqService.book stores the Arabic one).
+    const purposes = lang === 'en' ? (await this.deps.hq.content('en')).purposes : content.purposes;
 
     // A bare pick from the card (no new words): complete the pending proposal without the model.
     if (!text && input.pending) {
-      return this.hqResult(input.pending, lang, days, times, content.purposes, now, null);
+      return this.hqResult(input.pending, lang, days, times, purposes, now, null);
     }
 
-    const answer = await this.ask(input, days, times, content.purposes, catalog);
+    const answer = await this.ask(input, days, times, purposes, catalog);
     if (!answer) return { action: null, reply: null };
 
     if (answer.intent === 'hq_book' || (input.pending && answer.intent === 'none' && this.hqTouched(answer))) {
@@ -191,10 +194,10 @@ export class IntentDetector {
         hours: kind === 'visit' ? 1 : Number.isInteger(hoursN) && hoursN >= 1 && hoursN <= 12 ? hoursN : base.hours,
         date: this.pickDate(answer.hq.date, days) ?? base.date,
         time: this.pickTime(answer.hq.time, times) ?? base.time,
-        purpose: kind === 'visit' ? snapOption(answer.hq.purpose, content.purposes) || base.purpose : null,
+        purpose: kind === 'visit' ? snapOption(answer.hq.purpose, purposes) || base.purpose : null,
         note: answer.hq.note.trim().slice(0, 300) || base.note,
       };
-      return this.hqResult(proposal, lang, days, times, content.purposes, now, answer.reply.trim() || null);
+      return this.hqResult(proposal, lang, days, times, purposes, now, answer.reply.trim() || null);
     }
 
     if (answer.intent === 'open_screen') {
@@ -294,9 +297,18 @@ export class IntentDetector {
     if (proposal.kind === 'visit' && !proposal.purpose) missing.push('purpose');
 
     const en = lang === 'en';
+    // The Arabic counted noun: «ساعة واحدة»، «ساعتان»، «5 ساعات»، «12 ساعة» (it read «2 ساعتان» and «12 ساعات»).
+    const hours = proposal.hours;
+    const duration = en
+      ? `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+      : hours === 1
+        ? 'ساعة واحدة'
+        : hours === 2
+          ? 'ساعتان'
+          : `${hours} ${hours <= 10 ? 'ساعات' : 'ساعة'}`;
     const summary = [
       `${en ? 'Booking' : 'الحجز'}: ${kindLabel(proposal.kind, lang)}`,
-      ...(space ? [`${en ? 'Duration' : 'المدة'}: ${proposal.hours} ${en ? (proposal.hours === 1 ? 'hour' : 'hours') : proposal.hours === 1 ? 'ساعة' : proposal.hours === 2 ? 'ساعتان' : 'ساعات'}`] : []),
+      ...(space ? [`${en ? 'Duration' : 'المدة'}: ${duration}`] : []),
       `${en ? 'Day' : 'اليوم'}: ${proposal.date ? dayLabel(proposal.date, lang) : '—'}`,
       `${en ? 'Time' : 'الوقت'}: ${proposal.time ?? '—'}`,
       ...(space ? [] : [`${en ? 'Purpose' : 'الغرض'}: ${proposal.purpose ?? '—'}`]),
@@ -308,7 +320,7 @@ export class IntentDetector {
     const fallback = missing.length
       ? en
         ? `Almost there — pick ${askFor} below.`
-        : `باقي ${askFor}، اختره من تحت وأنا أجهّز الحجز.`
+        : `بقي تحديد ${askFor}: اختر من الخيارات ليكتمل الحجز.`
       : en
         ? 'Ready — review the booking and confirm.'
         : 'جاهز، راجع الحجز واضغط تأكيد.';

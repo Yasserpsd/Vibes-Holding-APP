@@ -40,12 +40,18 @@ export default function BookVisitScreen() {
   const { status } = useAuth();
   const { data, isLoading, error, refetch } = useHq();
   // M261: the home and HQ cards open this screen on their own kind («احجز قاعة الاجتماعات» → meeting).
-  const params = useLocalSearchParams<{ kind?: string }>();
+  // M262: «احجز الموعد نفسه مرة أخرى» also hands over the duration, the hour and the purpose of the old booking.
+  const params = useLocalSearchParams<{ kind?: string; hours?: string; time?: string; purpose?: string }>();
   const [kind, setKind] = useState<'visit' | HqSpace>(() => (params.kind === 'meeting' || params.kind === 'office' ? params.kind : 'visit'));
-  const [hours, setHours] = useState(1);
+  const [hours, setHours] = useState(() => {
+    const asked = Number(params.hours);
+    return Number.isInteger(asked) && asked >= 1 && asked <= 12 ? asked : 1;
+  });
   const [date, setDate] = useState<string | null>(null);
-  const [time, setTime] = useState<string | null>(null);
-  const [purpose, setPurpose] = useState<string | null>(null);
+  const [time, setTime] = useState<string | null>(() => (typeof params.time === 'string' && /^\d{2}:\d{2}$/.test(params.time) ? params.time : null));
+  const [pickedPurpose, setPurpose] = useState<string | null>(() => (typeof params.purpose === 'string' && params.purpose ? params.purpose : null));
+  // A purpose handed over from an old booking counts only while the club still offers it (and in this language).
+  const purpose = pickedPurpose && (data?.content.purposes ?? []).includes(pickedPurpose) ? pickedPurpose : null;
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<Failure | null>(null);
@@ -55,8 +61,10 @@ export default function BookVisitScreen() {
   const slots = useHqSlots(selectedDate, space, hours);
   // M261 (owner: «يقترح عليا مواعيد… ناقص ادوس بس»): until the member picks an hour, the day's first free one is
   // already selected — derived, so a new day, kind or duration re-suggests by itself.
-  const suggestedTime = slots.data?.slots.find((slot) => slot.available)?.time ?? null;
-  const selectedTime = time ?? suggestedTime;
+  const freeTimes = (slots.data?.slots ?? []).filter((slot) => slot.available).map((slot) => slot.time);
+  const suggestedTime = freeTimes[0] ?? null;
+  // An hour that came with a rebooking stands only if it is free on the chosen day.
+  const selectedTime = time && (!slots.data || freeTimes.includes(time)) ? time : suggestedTime;
   // M109a: the live annual hours counter beside the space picker.
   const wallet = useHqWallet(status === 'signedIn' && data?.access === 'member');
   const walletTotal = wallet.data?.wallet.total ?? data?.content.walletHours ?? 24;
@@ -193,7 +201,7 @@ export default function BookVisitScreen() {
 
       <FadeInView delay={entranceDelay(2)}>
         <Text style={styles.label}>{t('hqBook.time')}</Text>
-        {time === null && suggestedTime ? <Text style={[styles.hint, styles.suggested]}>{t('hqBook.suggested')}</Text> : null}
+        {selectedTime !== time && suggestedTime ? <Text style={[styles.hint, styles.suggested]}>{t('hqBook.suggested')}</Text> : null}
         {slots.data ? (
           <View style={styles.chips}>
             {slots.data.slots.map((slot) => (

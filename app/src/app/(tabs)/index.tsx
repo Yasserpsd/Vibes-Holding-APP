@@ -31,6 +31,7 @@ import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
 import { Screen } from '@/components/Screen';
 import { NewsCarousel } from '@/components/NewsCarousel';
+import { NextVisitCard } from '@/components/NextVisitCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SlotBanner } from '@/components/SlotBanner';
 import { GoldenOpportunity } from '@/components/GoldenOpportunity';
@@ -403,6 +404,9 @@ export default function HomeScreen() {
       {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
       <HqBanner />
+
+      {/* M262 (owner): the member's next HQ booking, with its entry pass — only when one is ahead. */}
+      <NextVisitCard />
 
       {/* M261 (owner): the HQ booking and its hours wallet, loud, right under the HQ photo. */}
       <HqHoursCard compact />

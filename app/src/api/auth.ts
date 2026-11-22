@@ -109,6 +109,8 @@ export type AuthConfig = {
   phoneProofRequired?: boolean;
   /** M259: the server and the hub can sign a member in with a WhatsApp code alone; an older server sends nothing. */
   codeLogin?: boolean;
+  /** M262: the server takes a sign-up without a password (the number is proven here and the code sign-in works); an older server sends nothing. */
+  passwordOptional?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };
@@ -121,7 +123,8 @@ export type RegisterInput = {
   country: string;
   phone: string;
   email: string;
-  password: string;
+  /** M262: left out where `passwordOptional` — the server then gives the account a random one. */
+  password?: string;
   persona: Persona;
   jobTitle: string;
   /** M32: another member's membership number; the hub checks and stores it. */
