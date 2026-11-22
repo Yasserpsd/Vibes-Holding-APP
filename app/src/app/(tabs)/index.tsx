@@ -45,7 +45,7 @@ import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
 import { markSeen } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // V2: the hero carries the official emblem (mark only) — the full logo lives on the auth screens.
 const clubEmblem = require('../../../assets/images/club-emblem.png');
@@ -83,6 +83,8 @@ export default function HomeScreen() {
   const hq = useHq();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  // M102 / M261: the services grid opens in full behind «اضغط للمزيد».
+  const [gridOpen, setGridOpen] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -183,10 +185,14 @@ export default function HomeScreen() {
   const orderedServices = leadKeys.length ? [...allServices].sort((a, b) => leadRank(a.key) - leadRank(b.key)) : allServices;
   // M102 (owner): the entrepreneur's home shows only HIS two doors — شركاء النجاح and نشر تطبيقه،
   // TWIN gold cards — and the rest of the grid waits behind a loud «اضغط للمزيد».
-  // M261 (owner, 2026-11-22: «نبين كل الخدمات اللي مخفية»): nothing waits behind a tap any more — every persona
-  // reads the WHOLE grid on the home (the persona's lead services still open it); the entrepreneur keeps his two
-  // gold doors above it, so «نشر تطبيقك» is not repeated as a tile.
-  const teaser = personaKey === 'entrepreneur' ? orderedServices.filter((service) => service.key !== 'app-publish') : orderedServices;
+  // M261 (owner, 2026-11-22: «نظهر الخدمات اكتر لكن ميبقاش زحمة ويفضل اضغط للمزيد»): every persona reads MORE of
+  // the grid up front — six tiles (four under the entrepreneur's two gold doors, where «نشر تطبيقك» is not repeated
+  // as a tile; he used to see none, a member four) — and the rest waits behind the loud «اضغط للمزيد» bar, which
+  // stays for everyone so the home is never crowded.
+  const fullGrid = personaKey === 'entrepreneur' ? orderedServices.filter((service) => service.key !== 'app-publish') : orderedServices;
+  const shownFirst = personaKey === 'entrepreneur' ? 4 : 6;
+  const teaser = gridOpen ? fullGrid : fullGrid.slice(0, shownFirst);
+  const gridCollapsible = fullGrid.length > shownFirst;
 
   const sections: Partial<Record<HomeSectionKey, () => ReactElement | null>> = {
     famous: () => <PeopleBlock key="famous" block={content.famous} />,
@@ -311,6 +317,15 @@ export default function HomeScreen() {
             </FadeInView>
           ))}
         </View>
+        {/* M102 / M261 (owner: «يفضل اضغط للمزيد… ده اهم شئ»): the rest of the grid, behind one loud tap. */}
+        {gridCollapsible ? (
+          <PressScale onPress={() => setGridOpen((open) => !open)} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={t(gridOpen ? 'home.lessServices' : 'home.moreServices')}>
+            <View style={styles.moreServices}>
+              <Text style={styles.moreServicesText}>{t(gridOpen ? 'home.lessServices' : 'home.moreServices')}</Text>
+              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.goldInk} />
+            </View>
+          </PressScale>
+        ) : null}
       </FadeInView>
     ),
     // M68 «شركاؤنا»: renders only when the server already carries the block and at least one partner is visible.
@@ -653,6 +668,20 @@ const styles = themedStyles(() => ({
     marginTop: spacing.sm,
     boxShadow: shadows.lift,
   },
+  // M102 (owner): «اضغط للمزيد» must CATCH the eye — a full gold bar, not a quiet outline.
+  moreServices: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 4,
+    borderRadius: radii.md,
+    backgroundColor: colors.gold,
+    experimental_backgroundImage: gradients.gold,
+    boxShadow: shadows.glowGold,
+    marginTop: spacing.sm,
+  },
+  moreServicesText: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.goldInk },
   // M74: the guest's three gateway chips, side by side and compact.
   portalsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   portalItem: { flex: 1 },
