@@ -360,7 +360,7 @@ export function MembershipHomeCard() {
           ) : null}
         </View>
         <GoldGradient style={styles.homeCta}>
-          <Text style={styles.homeCtaText} numberOfLines={1}>
+          <Text style={styles.homeCtaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {t('store.subscribe')}
           </Text>
         </GoldGradient>
@@ -412,7 +412,9 @@ const styles = themedStyles(() => ({
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
     boxShadow: shadows.glowGoldFaint,
-    maxWidth: 110,
+    // Emulator pass 2026-11-22: at 110 the English «Subscribe now» was cut to «Subscribe n…»; the label also
+    // shrinks a little before it is ever cut.
+    maxWidth: 150,
   },
   homeCtaText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldInk },
 }));

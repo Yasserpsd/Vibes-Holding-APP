@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Keyboard } from 'react-native';
 
 import { authApi, type PhoneStepResult } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
@@ -35,6 +36,8 @@ export default function PhoneCodeScreen() {
   const submit = async (code: string) => {
     if (params.flow === 'code') {
       const signed = await authApi.codeLoginVerify(step.stepToken, code);
+      // Emulator pass 2026-11-22: the code was accepted and the keyboard stayed up over the screen that followed.
+      Keyboard.dismiss();
       // M140: an account with an authenticator app finishes on its code screen.
       if ('totp' in signed) {
         router.replace(`/auth/totp?stepToken=${encodeURIComponent(signed.stepToken)}` as Href);
@@ -46,6 +49,7 @@ export default function PhoneCodeScreen() {
       return;
     }
     const result = await authApi.phoneVerify(step.stepToken, code);
+    Keyboard.dismiss();
     await signIn(result.token, result.me);
     if (router.canDismiss()) router.dismissAll();
     else router.replace('/account');

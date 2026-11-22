@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View, type ScrollView, type TextInput } from 'react-native';
+import { Keyboard, Pressable, Text, View, type ScrollView, type TextInput } from 'react-native';
 
 import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -258,6 +258,8 @@ export default function RegisterScreen() {
   }, [form, shown, clearError, refused]);
 
   const showPage = (next: 0 | 1) => {
+    // The keyboard of the field just left (the WhatsApp code, most often) never hangs over the other step.
+    Keyboard.dismiss();
     setPage(next);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
