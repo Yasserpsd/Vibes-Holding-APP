@@ -110,7 +110,7 @@ export class MockAdmin {
       const leadScore = this.deps.state.leads.filter((lead) => lead.contactId === contact.id).reduce((sum, lead) => sum + (LEAD_WEIGHTS[lead.ltype] ?? 0), 0);
       score = Math.min(9, leadScore + (contact.passHash ? 1 : 0) + (messages >= 6 ? 1 : 0) + (messages >= 14 ? 1 : 0) + (contact.persona === 'investor' ? 1 : 0) + (contact.memo ? 1 : 0));
     }
-    return { intent: score, intent_label: score >= 6 ? 'جاد جدًا' : score >= 4 ? 'مهتم' : score >= 2 ? 'يستكشف' : 'بارد' };
+    return { intent: score, intent_label: score >= 6 ? 'جاد جدًا' : score >= 4 ? 'مهتم' : score >= 2 ? 'يستكشف' : 'صامت' };
   }
 
   private account(contact: MockContact, threads: Map<number, MockThreadRow[]>, now: number): HubAccount {
@@ -173,7 +173,7 @@ export class MockAdmin {
 
   private lead(row: MockState['leads'][number], threads: Map<number, MockThreadRow[]>, now: number): HubLead {
     const contact = this.deps.state.contacts.get(row.contactId);
-    const intent = contact ? this.intent(contact, this.stateOf(contact, now), threads.get(contact.id)?.length ?? 0) : { intent: 0, intent_label: 'بارد' };
+    const intent = contact ? this.intent(contact, this.stateOf(contact, now), threads.get(contact.id)?.length ?? 0) : { intent: 0, intent_label: 'صامت' };
     return { id: row.id, contact_id: row.contactId, name: contact?.name ?? '', phone: contact?.phone ?? '', site: row.site, ltype: row.ltype, reason: row.reason, company: row.company, notes: row.notes, status: row.status, ...intent, created_at: hubTime(row.at) };
   }
 
