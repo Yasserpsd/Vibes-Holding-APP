@@ -299,7 +299,7 @@ function Field({ field, value, onChange, error, anchorRef }: { field: FormFieldD
         </Text>
         <View style={styles.chips}>
           {(field.options ?? []).map((option) => (
-            <Chip key={option} label={option} selected={value === option} dimmed={Boolean(value)} onPress={() => onChange(value === option ? '' : option)} />
+            <Chip key={option} label={option} selected={value === option} dimmed={Boolean(value)} paper={paper} onPress={() => onChange(value === option ? '' : option)} />
           ))}
         </View>
         {error ? <FieldError text={error} /> : null}
