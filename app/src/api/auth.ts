@@ -115,6 +115,9 @@ export type AuthConfig = {
   deleteByCode?: boolean;
   /** M264: the server lists the account's signed-in devices («الجلسات المسجلة»); an older server sends nothing and the row stays hidden. */
   deviceSessions?: boolean;
+  /** M267: this server can hand the membership card to Apple Wallet / Google Wallet; an older server sends nothing and the button stays hidden. */
+  walletApple?: boolean;
+  walletGoogle?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };

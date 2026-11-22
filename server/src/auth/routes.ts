@@ -49,6 +49,8 @@ export type AuthRoutesOptions = {
   whatsapp?: WhatsappService;
   /** M255: counts where sign-ups, sign-ins and resets stop, for the dashboard (absent in old tests: nothing is counted). */
   refusals?: RefusalCounter;
+  /** M267: which «أضف إلى المحفظة» buttons this server can serve (its credentials are set); absent in old tests: both false. */
+  wallet?: { walletApple: boolean; walletGoogle: boolean };
 };
 
 const personaSchema = z.enum(['neutral', 'entrepreneur', 'investor']);
@@ -193,7 +195,7 @@ const deleteSchema = z.preprocess(
 );
 const meQuerySchema = z.object({ fresh: z.enum(['0', '1']).default('0') });
 
-export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals }) => {
+export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { service, hubMode, social, notifier, personaChange, mailer, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals, wallet }) => {
   const limiter = new RateLimiter();
   const WINDOW = 15 * 60_000;
 
@@ -358,6 +360,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     deleteByCode: Boolean(deletion),
     // M264: «الجلسات المسجلة» — this server lists the account's signed-in devices and signs them out.
     deviceSessions: true,
+    // M267: the card screen offers «أضف إلى المحفظة» only for the wallet this server holds credentials for.
+    walletApple: wallet?.walletApple ?? false,
+    walletGoogle: wallet?.walletGoogle ?? false,
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,

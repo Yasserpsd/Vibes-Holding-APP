@@ -35,6 +35,7 @@ import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
 import { cardRoutes } from './card/routes.js';
+import { walletFlags, walletRoutes } from './wallet/routes.js';
 import { CardService } from './card/service.js';
 import { contactRoutes } from './contact/routes.js';
 import { ContactService } from './contact/service.js';
@@ -770,7 +771,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     kv,
     config.OPENAI_API_KEY ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: ME_TRANSLATE_SYSTEM }) : new OffTranslator(),
   );
-  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals: new RefusalCounter(kv) });
+  await app.register(authRoutes, { service: auth, hubMode: config.HUB_MODE, social, notifier, personaChange, mailer: mail, meLocalizer, personaRequests, push, deletion, notices, whatsapp, refusals: new RefusalCounter(kv), wallet: walletFlags(config) });
   // M104: voice input for the advisor — available whenever the OpenAI key is set.
   const voice = config.OPENAI_API_KEY ? new VoiceTranscriber({ apiKey: config.OPENAI_API_KEY, log: app.log, fetchImpl }) : undefined;
   // M142: voice-filled forms — the same key; the member still submits himself.
@@ -789,6 +790,8 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(videosRoutes, { service: videos });
   await app.register(hqRoutes, { service: hq, auth, english: englishCache });
   await app.register(cardRoutes, { service: card, auth });
+  // M267: the membership card in Apple Wallet / Google Wallet (each route answers 404 until its credentials are in the environment).
+  await app.register(walletRoutes, { auth, kv, config });
   await app.register(contactRoutes, { service: contact, auth, english: englishCache });
   // M118c: the English app's spotlight people — translated once per profile change, cached in kv.
   const personLocalizer = new PersonLocalizer(

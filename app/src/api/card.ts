@@ -38,3 +38,12 @@ export function usePrintRequest(enabled: boolean) {
     staleTime: 60_000,
   });
 }
+
+/**
+ * M267: «أضف إلى المحفظة». Apple: an address Safari opens (the .pkpass, alive ten minutes); Google: the «Save to Google Wallet» link.
+ * Both open in the system browser — no native module — and both need an active membership (403 otherwise).
+ */
+export const walletApi = {
+  appleLink: () => apiGet<{ url: string }>('/api/me/wallet/apple/link'),
+  googleLink: () => apiGet<{ url: string }>('/api/me/wallet/google'),
+};

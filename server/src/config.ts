@@ -170,6 +170,19 @@ const envSchema = z.object({
   // Store review needs the terms and privacy pages next to the subscription price.
   STORE_TERMS_URL: z.string().url().optional(),
   STORE_PRIVACY_URL: z.string().url().optional(),
+  // M267 «أضف إلى المحفظة»: the membership card in Apple Wallet and Google Wallet (rule 1: environment only).
+  // Apple: the Pass Type ID certificate, its private key and Apple's WWDR G4 intermediate, each the file itself
+  // (PEM or DER) encoded to base64 into one line. Without all three the Apple route answers 404 and the app hides the button.
+  WALLET_APPLE_CERT: z.string().min(100).optional(),
+  WALLET_APPLE_KEY: z.string().min(100).optional(),
+  WALLET_APPLE_WWDR: z.string().min(100).optional(),
+  WALLET_APPLE_PASS_TYPE_ID: z.string().min(5).default('pass.com.vcmem.investorsclub.membership'),
+  WALLET_APPLE_TEAM_ID: z.string().min(5).default('2A6QQ55CX3'),
+  // Google: the Issuer ID from the Pay & Wallet Console, and the service account (its e-mail and PRIVATE KEY, base64
+  // of the PEM or of the downloaded JSON key file) that is added to that issuer as a user. Without them: no button.
+  WALLET_GOOGLE_ISSUER_ID: z.string().regex(/^\d{6,30}$/).optional(),
+  WALLET_GOOGLE_SA_EMAIL: z.string().min(5).optional(),
+  WALLET_GOOGLE_SA_KEY: z.string().min(100).optional(),
   // Expo push service: optional access token when "enhanced push security" is on for the Expo project.
   EXPO_PUSH_ACCESS_TOKEN: z.string().min(10).optional(),
   // M158: real store installs for the dashboard downloads card. All optional; unset = the card shows signed-in devices.

@@ -965,6 +965,8 @@
   "card.activate": "Activate membership",
   "card.guest": "Sign in to see your membership card.",
   "card.signIn": "Sign in",
+  "card.addToWallet": "Add to Wallet",
+  "card.walletFailed": "The wallet card could not be opened right now. Please try again in a moment.",
   "card.printTitle": "Your printed membership card",
   "card.printText": "Pick up your printed card at the club HQ with no fees at all. If you prefer it delivered to your address, shipping fees apply by region and are quoted to you before dispatch.",
   "card.printButton": "Request the printed copy",

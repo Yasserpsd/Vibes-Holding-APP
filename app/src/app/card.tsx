@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
-import { displayProfile } from '@/api/auth';
-import { cardApi, usePrintRequest, type CardDeliveryMethod } from '@/api/card';
+import { displayProfile, useAuthConfig } from '@/api/auth';
+import { cardApi, usePrintRequest, walletApi, type CardDeliveryMethod } from '@/api/card';
+import { ApiError } from '@/api/client';
 import { usePartners } from '@/api/partners';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
@@ -71,6 +72,9 @@ export default function CardScreen() {
   // M68: the member's partners promo code, printed on the card beside the membership number.
   const partners = usePartners();
   const promoCode = partners.data?.promo?.code ?? null;
+  // M267: the wallet this phone has (iPhone: Apple, Android: Google), offered only where the server holds the credentials.
+  const { data: authConfig } = useAuthConfig();
+  const walletFor = Platform.OS === 'ios' ? (authConfig?.walletApple ? 'apple' : null) : Platform.OS === 'android' ? (authConfig?.walletGoogle ? 'google' : null) : null;
 
   // The account is still being read from the device: no «sign in» prompt for a signed-in member.
   if (status === 'loading') {
@@ -224,6 +228,12 @@ export default function CardScreen() {
         {active ? <Text style={styles.hint}>{t(honorary ? 'card.honoraryHint' : 'card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
       </FadeInView>
 
+      {active && walletFor ? (
+        <FadeInView delay={entranceDelay(2)}>
+          <WalletButton wallet={walletFor} />
+        </FadeInView>
+      ) : null}
+
       {active && promoCode ? (
         <FadeInView delay={entranceDelay(2)}>
           <AppButton label={t('card.partnersLink')} variant="outline" icon="pricetags-outline" onPress={() => router.push('/partners' as Href)} />
@@ -234,6 +244,35 @@ export default function CardScreen() {
         <PrintBlock active={active} />
       </FadeInView>
     </Screen>
+  );
+}
+
+/**
+ * M267: «أضف إلى المحفظة» — asks the server for the member's pass address and hands it to the system (Safari adds an
+ * Apple Wallet pass, Chrome opens Google's «Save to Google Wallet» page). Plain Linking: no native module.
+ */
+function WalletButton({ wallet }: { wallet: 'apple' | 'google' }) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const open = async () => {
+    if (busy) return;
+    setFailure(null);
+    setBusy(true);
+    try {
+      const { url } = await (wallet === 'apple' ? walletApi.appleLink() : walletApi.googleLink());
+      await Linking.openURL(url);
+    } catch (cause) {
+      // A refusal of the server speaks for itself (403 before the membership is active); a phone that cannot open the address gets the plain sentence.
+      setFailure(cause instanceof ApiError ? failureOf(cause) : { message: t('card.walletFailed'), code: 'unexpected' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={styles.wallet}>
+      <FormFailure failure={failure} onRetry={() => void open()} />
+      <AppButton label={t('card.addToWallet')} icon="wallet-outline" variant="outline" loading={busy} onPress={() => void open()} />
+    </View>
   );
 }
 
@@ -561,6 +600,7 @@ const styles = themedStyles(() => ({
   contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.onPhotoSoft, textAlign: textStart, flexShrink: 1 },
 
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
+  wallet: { gap: spacing.sm },
   print: { gap: spacing.sm, padding: spacing.md },
   printTitle: { ...typography.body, fontFamily: fonts.semiBold, color: colors.textPrimary, textAlign: textStart },
   printText: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
