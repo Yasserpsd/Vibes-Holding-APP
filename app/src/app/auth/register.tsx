@@ -121,7 +121,7 @@ export default function RegisterScreen() {
   // your number (proven on WhatsApp), step two the e-mail, the category and the job. Both steps stay mounted — the
   // hidden one keeps its values, its red lines and the code field's state — and only one shows.
   const [page, setPage] = useState<0 | 1>(0);
-  // M262: where the member can come back with a WhatsApp code, the password is a choice behind a small link.
+  // M262: where the member can come back with a WhatsApp code there is no password field; it shows only if a server refuses the sign-up without one.
   const [showPassword, setShowPassword] = useState(false);
   const errors = useFormErrors<Field>(scrollRef);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -623,11 +623,9 @@ export default function RegisterScreen() {
               <Text style={styles.inviteText}>{t('auth.register.haveInvite')}</Text>
             </Pressable>
           )}
-          {passwordOptional && !showPassword ? (
-            <Pressable accessibilityRole="button" onPress={() => setShowPassword(true)} style={styles.invite} hitSlop={8}>
-              <Text style={styles.inviteText}>{t('auth.register.wantPassword')}</Text>
-            </Pressable>
-          ) : null}
+          {/* Owner (2026-11-22, later the same day: «ألغي اصلا باسوورد خالص كل شئ يكون من خلال واتس اب»): where the server
+              takes a sign-up without a password, the form does not offer one at all — not even behind a link. The
+              field only comes back when a server refuses the sign-up for want of it (`password_required`). */}
           </View>
 
           {/* The management's WhatsApp line right under the failure (owner, 2026-11-03: under every error, and in حسابي). */}

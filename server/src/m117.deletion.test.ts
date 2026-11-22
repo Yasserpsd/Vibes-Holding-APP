@@ -85,3 +85,21 @@ test('the legacy DELETE /api/me now schedules instead of deleting on the spot', 
   assert.equal((await get('/api/me', legacyToken)).statusCode, 200);
   assert.equal((await get('/api/me/delete/state', legacyToken)).json().scheduled.daysLeft, 30);
 });
+
+// M263 (owner, 2026-11-22: «حذف الحساب… بكود واتس اب» / «ألغي اصلا باسوورد خالص»): the three-step deletion starts with
+// its code alone; the legacy one-call route, which has no code step, still wants a real proof.
+test('m263: the deletion starts by its code alone, and the one-call route refuses that', async () => {
+  const fresh = await signUp('m263.delete@gmail.com', '0551230263');
+  const config = (await get('/api/auth/config')).json() as { deleteByCode?: boolean };
+  assert.equal(config.deleteByCode, true);
+  const started = await send('POST', '/api/me/delete/start', { byCode: true, reason: 'اختبار' }, fresh);
+  assert.equal(started.statusCode, 200, started.body);
+  assert.ok((started.json().word as string).length >= 3);
+  // A typed password beside it still decides (a wrong one is refused).
+  const other = await signUp('m263.delete2@gmail.com', '0551230264');
+  assert.equal((await send('POST', '/api/me/delete/start', { byCode: true, password: 'not-the-one' }, other)).statusCode, 403);
+  const legacy = await send('DELETE', '/api/me', { byCode: true }, other);
+  assert.equal(legacy.statusCode, 400);
+  // Nothing was scheduled for the second account.
+  assert.equal((await get('/api/me/delete/state', other)).json().scheduled, null);
+});

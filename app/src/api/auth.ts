@@ -111,6 +111,8 @@ export type AuthConfig = {
   codeLogin?: boolean;
   /** M262: the server takes a sign-up without a password (the number is proven here and the code sign-in works); an older server sends nothing. */
   passwordOptional?: boolean;
+  /** M263: the server starts the account deletion with the code alone; an older server sends nothing and wants the password. */
+  deleteByCode?: boolean;
   adminOnly: boolean;
   /** M46: which social sign-in providers the server accepts; an older server sends none. */
   social?: { google: boolean; apple: boolean };
@@ -144,7 +146,8 @@ export type LoginResult = PendingResult | SignedInResult | TotpStepResult | Phon
  * e-mail fill the sign-up form. */
 export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: string; seconds: number; name: string; email: string };
 /** M241: what proves the owner before a deletion starts; `social` is the object `POST /api/auth/social` takes. */
-export type DeleteProof = { password: string } | { social: { provider: 'google' | 'apple'; token: string } };
+/** M263: `byCode` — no first proof; the code of the next step (WhatsApp, or the mailbox) is the proof. */
+export type DeleteProof = { password: string } | { social: { provider: 'google' | 'apple'; token: string } } | { byCode: true };
 /** M212: the sign-up form's own fields, sent with the proof of a first Google/Apple sign-in. */
 export type SocialSignupProfile = { name: string; persona: Persona; jobTitle: string; inviteCode?: string };
 

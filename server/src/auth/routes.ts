@@ -167,9 +167,11 @@ const profileSchema = z
 // is dropped unread (as every extra key was before M241), and an empty or null password beside a proof counts as absent.
 const oneProof = (raw: unknown): unknown => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
-  const { password, social, ...rest } = raw as Record<string, unknown>;
+  const { password, social, byCode, ...rest } = raw as Record<string, unknown>;
   if (typeof password === 'string' && password !== '') return { ...rest, password };
   if (social !== undefined && social !== null && (password === undefined || password === null || password === '')) return { ...rest, social };
+  // M263: the code alone — only when neither of the other two proofs came.
+  if (byCode === true) return { ...rest, byCode: true };
   return raw;
 };
 const deleteSchema = z.preprocess(
@@ -178,9 +180,12 @@ const deleteSchema = z.preprocess(
     .object({
       password: z.string().min(1, 'كلمة المرور مطلوبة').max(200).optional(),
       social: socialSchema.optional(),
+      // M263 (owner, 2026-11-22: «حذف الحساب… بكود واتس اب برده»): no first proof at all — the code of the next step,
+      // sent to the member's own proven number (or mailbox), is the proof. Taken by the three-step route only.
+      byCode: z.literal(true).optional(),
       reason: z.string().trim().max(500).optional(),
     })
-    .refine((body) => body.password !== undefined || body.social !== undefined, {
+    .refine((body) => body.password !== undefined || body.social !== undefined || body.byCode === true, {
       message: 'أدخل كلمة المرور أو أكّد هويتك بحساب جوجل أو أبل',
       path: ['password'],
     }),
@@ -261,7 +266,13 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
    * Google / Apple token is verified exactly as at sign-in (signature, issuer, audience, expiry) and must belong to the
    * signed-in account itself; an identity of another account, or of no account, is refused and nothing is ever created.
    */
-  const proveOwner = async (session: SessionRecord, body: z.infer<typeof deleteSchema>): Promise<void> => {
+  const proveOwner = async (session: SessionRecord, body: z.infer<typeof deleteSchema>, codeFollows = false): Promise<void> => {
+    // M263: where a code step follows (the three-step deletion), the signed-in member may skip the first proof —
+    // the code that reaches his own number or mailbox is what a password reset already trusts.
+    if (body.byCode === true && body.password === undefined && body.social === undefined) {
+      if (codeFollows) return;
+      throw new RequestError('invalid', 'أدخل كلمة المرور أو أكّد هويتك بحساب جوجل أو أبل', 400);
+    }
     if (body.password !== undefined) {
       if (!(await service.passwordMatches(session, body.password))) throw new RequestError('bad_password', 'كلمة المرور غير صحيحة', 403);
       return;
@@ -308,6 +319,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     // M262 (owner, 2026-11-22: «تسهيل التسجيل»): the form may leave the password out only where the member can come
     // back without one — the number is proven on the form and the hub signs in with a WhatsApp code.
     passwordOptional: service.phoneProofRequired && (await service.codeLoginReady()),
+    // M263: the account deletion starts with its code alone (no password first) on this server.
+    deleteByCode: Boolean(deletion),
     adminOnly: service.adminOnly,
     // M46: which social buttons the app may show (audiences configured on the server).
     social: social.status,
@@ -939,7 +952,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (await deletion.statusOf(me.id)) {
         return reply.code(409).send({ error: { code: 'already_scheduled', message: 'حذف حسابك مجدول بالفعل' } });
       }
-      await proveOwner(auth.session, body);
+      await proveOwner(auth.session, body, true);
       // M122: the deletion code mail follows the app language the request came in.
       const en = langOf(request) === 'en';
       let via: 'whatsapp' | 'email' = 'email';

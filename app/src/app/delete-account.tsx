@@ -109,6 +109,28 @@ export default function DeleteAccountScreen() {
     }
   };
 
+  // M263 (owner, 2026-11-22: «حذف الحساب… من خلال نفس الصفحة بكود واتس اب»): no password first — the code goes to the
+  // member's WhatsApp at once and the screen moves to it. A server that refuses falls back to the password sheet,
+  // with the refusal on it.
+  const startByCode = async () => {
+    if (busy || socialBusy) return;
+    const run = ++attempt.current;
+    setBusy(true);
+    setError(null);
+    setSocialError(null);
+    try {
+      const answer = await authApi.deleteStart({ byCode: true }, reasonText());
+      if (run === attempt.current) begun(answer);
+    } catch (cause) {
+      if (run === attempt.current) {
+        setError(errorMessage(cause));
+        setConfirming(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // M241: the provider's own sheet hands a fresh identity token, and the server checks it is this account's.
   const startSocial = async () => {
     if (busy || socialBusy || !provider) return;
@@ -225,7 +247,7 @@ export default function DeleteAccountScreen() {
 
       <FadeInView delay={entranceDelay(2)}>
         <View style={styles.actions}>
-          <AppButton label={t('deleteAccount.continue')} variant="outline" icon="trash-outline" disabled={!ready} onPress={() => setConfirming(true)} />
+          <AppButton label={t('deleteAccount.continue')} variant="outline" icon="trash-outline" disabled={!ready} loading={busy && !confirming} onPress={() => (config?.deleteByCode ? void startByCode() : setConfirming(true))} />
           {!ready ? <Text style={styles.hint}>{t('deleteAccount.pickFirst')}</Text> : null}
         </View>
       </FadeInView>
