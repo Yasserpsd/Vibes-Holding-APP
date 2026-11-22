@@ -3067,7 +3067,7 @@ export const APP_STRINGS: { ar: Record<string, string>; en: Record<string, strin
     "hqBook.titleOffice": "Book a private office",
     "hq.hoursTitle": "The meeting room, at no charge",
     "hq.hoursUnit": "hours",
-    "hq.hoursMember": "{hours} of booking a year are yours in it at the club HQ, private offices included.",
+    "hq.hoursMember": "You have {hours} of booking a year in it at the club HQ, private offices included.",
     "hq.hoursGuest": "Club members get {hours} of booking a year in the meeting room and private offices at the club HQ in Riyadh.",
     "hq.bookMeeting": "Book the meeting room",
     "hq.bookOffice": "Book a private office",

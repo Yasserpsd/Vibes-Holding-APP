@@ -70,6 +70,8 @@ export type Service = {
 export type ServiceProgram = {
   title: string;
   tagline: string;
+  /** The one line the featured card says loudest (owner, 2026-11-22: the website and the full app are there from the start). */
+  highlight?: string;
   points: string[];
   storesTitle: string;
   storesText: string;
@@ -213,6 +215,7 @@ export const SERVICES_SEED: ServicesContent = {
       program: {
         title: 'قوة برنامج شركاء النجاح',
         tagline: 'بوابتك إلى بنك المشاريع وإلى العرض على الشركاء المحتملين',
+        highlight: 'موقع إلكتروني تعريفي وتطبيق كامل لمشروعك على Google Play و App Store، متاحان لك من بداية تسجيلك',
         points: [
           'تسجيل بدون رسوم ومراجعة من لجنة متخصصة',
           'تقييم مشروعك خلال 10 أيام عمل',
@@ -458,7 +461,7 @@ export const SERVICES_SEED: ServicesContent = {
   // v17 (owner, 2026-11-02): Momentum opens to everyone with on-request marketing packages, 50% off
   // every Momentum service for members, and requests go to Momentum's own WhatsApp.
   // v18 (owner, 2026-11-02): workshop price = plainly 290, list 990 struck with «دعم من النادي».
-  version: 19,
+  version: 20,
   updatedAt: '2026-11-22T12:00:00.000Z',
 };
 

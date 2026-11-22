@@ -104,6 +104,8 @@ export type ServiceGroupKey = 'entrepreneur' | 'member' | 'discount';
 export type ServiceProgram = {
   title: string;
   tagline: string;
+  /** The one line the featured card says loudest; an older server sends none. */
+  highlight?: string;
   points: string[];
   storesTitle: string;
   storesText: string;

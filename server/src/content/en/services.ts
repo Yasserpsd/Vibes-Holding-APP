@@ -70,6 +70,7 @@ export const SERVICES_EN: Translation<ServicesContent> = {
       program: {
         title: 'The strength of the Success Partners programme',
         tagline: 'Your gateway to the Projects Bank and to potential partners',
+        highlight: 'An introductory website and a complete app for your venture on Google Play and the App Store, yours from the day you register',
         points: [
           'Registration at no charge and a review by a specialised committee',
           'Your venture assessed within 10 working days',
