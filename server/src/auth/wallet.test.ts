@@ -58,6 +58,7 @@ const walletEnv = {
   WALLET_GOOGLE_ISSUER_ID: ISSUER,
   WALLET_GOOGLE_SA_EMAIL: SA_EMAIL,
   WALLET_GOOGLE_SA_KEY: b64(googlePem),
+  WALLET_GOOGLE_PUBLISHED: '1',
 };
 
 let plain: BuiltApp; // no wallet variables: both routes 404
@@ -233,4 +234,18 @@ test('the emblem Google fetches for the pass logo is public', async () => {
   const response = await wallet.app.inject({ method: 'GET', url: '/wallet/emblem.png' });
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers['content-type'], 'image/png');
+});
+
+// 2026-11-22: Google has not granted the issuer «publishing access» yet — until then only the issuer's own users can
+// save a pass, so the Android button must stay hidden even though the credentials are set.
+test('the Google button waits for the publishing switch; the Apple one does not', async () => {
+  const { WALLET_GOOGLE_PUBLISHED: _published, ...unpublished } = walletEnv;
+  const built = await buildApp({ config: loadConfig({ ...baseEnv, ...unpublished }), kv: new MemoryKV(), hub: new MockHubClient(), mailer: new LogMailer() });
+  try {
+    const config = (await built.app.inject({ method: 'GET', url: '/api/auth/config' })).json();
+    assert.equal(config.walletApple, true);
+    assert.equal(config.walletGoogle, false);
+  } finally {
+    await built.app.close();
+  }
 });

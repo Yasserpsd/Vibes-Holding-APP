@@ -183,6 +183,10 @@ const envSchema = z.object({
   WALLET_GOOGLE_ISSUER_ID: z.string().regex(/^\d{6,30}$/).optional(),
   WALLET_GOOGLE_SA_EMAIL: z.string().min(5).optional(),
   WALLET_GOOGLE_SA_KEY: z.string().min(100).optional(),
+  // Until Google grants the issuer «publishing access» only the issuer's own users and test accounts can save a pass:
+  // every other member would hit Google's error page. The button therefore stays hidden until this is '1' (requested
+  // 2026-11-22, Google answers by e-mail in 2–3 days); the route itself keeps working for a direct test.
+  WALLET_GOOGLE_PUBLISHED: z.enum(['0', '1']).default('0'),
   // Expo push service: optional access token when "enhanced push security" is on for the Expo project.
   EXPO_PUSH_ACCESS_TOKEN: z.string().min(10).optional(),
   // M158: real store installs for the dashboard downloads card. All optional; unset = the card shows signed-in devices.

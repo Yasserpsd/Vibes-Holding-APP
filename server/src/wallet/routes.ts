@@ -16,7 +16,8 @@ export type WalletRoutesOptions = { auth: AuthService; kv: KV; config: Config };
 
 /** What `/api/auth/config` tells the app: a button shows only where the server holds the credentials behind it. */
 export function walletFlags(config: Config): { walletApple: boolean; walletGoogle: boolean } {
-  return { walletApple: appleCredentialsOf(config) !== null, walletGoogle: googleCredentialsOf(config) !== null };
+  // Google: the credentials AND the issuer's publishing access (WALLET_GOOGLE_PUBLISHED) — see config.ts.
+  return { walletApple: appleCredentialsOf(config) !== null, walletGoogle: googleCredentialsOf(config) !== null && config.WALLET_GOOGLE_PUBLISHED === '1' };
 }
 
 const LINK_MINUTES = 10;
