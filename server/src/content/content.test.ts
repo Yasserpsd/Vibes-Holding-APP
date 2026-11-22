@@ -77,7 +77,11 @@ test('the app reads every block in its language; the logic keeps the Arabic stru
   assert.equal(services.lockedText, 'This feature is exclusive to Investors Club members. Join now to enjoy all membership benefits.');
   assert.equal((await get('/api/services/credit', 'en')).json().service.title, 'Projects Bank balance');
 
-  assert.equal((await get('/api/membership', 'en')).json().groups[0].title, 'Why it is worth it even before you set your direction');
+  // Owner, 2026-11-22: the relationships group leads the membership benefits, and the meeting room is never «half price».
+  const membershipEn = (await get('/api/membership', 'en')).json();
+  assert.equal(membershipEn.groups[0].title, 'Relationships are your real capital');
+  assert.doesNotMatch(JSON.stringify(membershipEn), /meeting room at half price|and the meeting room — at a 50% discount/i);
+  assert.match(JSON.stringify((await get('/api/membership', 'ar')).json()), /قاعة الاجتماعات بدون أي رسوم: لك فيها 24 ساعة حجز سنويًا/);
   assert.equal((await get('/api/golden', 'en')).json().companies[0].name, 'Wdeny');
   assert.equal((await get('/api/about', 'en')).json().sections[1].bullets[0], 'Success Partners: a venture starts by registering, and a specialised committee reviews it before it is approved.');
   const hq = (await get('/api/hq', 'en')).json();

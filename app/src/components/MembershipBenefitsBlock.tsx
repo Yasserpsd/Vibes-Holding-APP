@@ -15,6 +15,8 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 
 const CARD_WIDTH = 232;
 const LINES_SHOWN = 3;
+const TITLE_SLOT = 46;
+const LINE_SLOT = 40;
 
 /**
  * M261 (owner, 2026-11-22: «كل شئ يخص العضوية مخفي… نبين كل المميزات المخفية»): the membership's benefit
@@ -46,6 +48,10 @@ export function MembershipBenefitsBlock() {
 
 function BenefitCard({ group, onPress }: { group: MembershipGroup; onPress: () => void }) {
   const rest = group.items.length - LINES_SHOWN;
+  // Owner's TestFlight pass (2026-11-22: «لازم شكل الكروت دي يتوحد كله يكون نفس المقاس»): every card is the same
+  // size whatever its words — the title, each of the three lines and the footer hold a fixed slot (two lines of
+  // text each), and a group with fewer lines keeps its empty slots.
+  const slots = Array.from({ length: LINES_SHOWN }, (_, index) => group.items[index] ?? null);
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={group.title}>
       <GlassCard golden radius={radii.lg} style={styles.card}>
@@ -57,15 +63,21 @@ function BenefitCard({ group, onPress }: { group: MembershipGroup; onPress: () =
             {group.title}
           </Text>
         </View>
-        {group.items.slice(0, LINES_SHOWN).map((item) => (
-          <View key={item.text} style={styles.line}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.goldText} style={styles.tick} />
-            <Text style={styles.lineText} numberOfLines={2}>
-              {item.text}
-            </Text>
+        {slots.map((item, index) => (
+          <View key={item?.text ?? `empty-${index}`} style={styles.line}>
+            {item ? (
+              <>
+                <Ionicons name="checkmark-circle" size={14} color={colors.goldText} style={styles.tick} />
+                <Text style={styles.lineText} numberOfLines={2}>
+                  {item.text}
+                </Text>
+              </>
+            ) : null}
           </View>
         ))}
-        {rest > 0 ? <Text style={styles.more}>{t('home.benefitsMore', { count: rest })}</Text> : null}
+        <Text style={styles.more} numberOfLines={1}>
+          {rest > 0 ? t('home.benefitsMore', { count: rest }) : t('home.benefitsAll')}
+        </Text>
       </GlassCard>
     </PressScale>
   );
@@ -74,10 +86,11 @@ function BenefitCard({ group, onPress }: { group: MembershipGroup; onPress: () =
 const styles = themedStyles(() => ({
   row: { gap: spacing.sm, paddingVertical: spacing.xs },
   card: { width: CARD_WIDTH, padding: spacing.md, gap: spacing.xs },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
   icon: { width: 36, height: 36, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldSoft },
+  // Slot heights = two lines of each text style (title 23 × 2, caption 20 × 2), so one-line and two-line cards match.
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs, minHeight: TITLE_SLOT },
   title: { flex: 1, fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.goldLightText, textAlign: textStart },
-  line: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  line: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, minHeight: LINE_SLOT },
   tick: { marginTop: 4 },
   lineText: { ...typography.caption, flex: 1, color: colors.textPrimary, textAlign: textStart },
   more: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 18, color: colors.goldText, textAlign: textStart, marginTop: spacing.xs },

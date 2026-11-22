@@ -4,6 +4,18 @@ import type { MembershipContent, MembershipGroup } from '../membership.js';
 /** The membership page in English, group by group; links, icons and keys are the Arabic block's. */
 const GROUPS_EN: Translation<MembershipGroup>[] = [
   {
+    key: 'network',
+    title: 'Relationships are your real capital',
+    items: [
+      { text: 'A full year to build lasting relationships: meetups, evenings and workshops all year round, giving you enough time to get to know people, build trust and grow your professional network' },
+      { text: 'Fresh chances to meet and learn all year: attend the club’s meetups, workshops and private evenings at no charge' },
+      { text: 'A community of neutral members, entrepreneurs and investors: widen your network and see varied experiences and paths from inside the Kingdom and beyond' },
+      { text: 'Your gateway to the Saudi market, wherever you are: whether you are in Riyadh, Tokyo, Geneva, New York, Dubai or Cairo, your membership places you inside an established Saudi business community, before you arrive and after' },
+      { text: 'Missed a session? Full recordings of the lectures and workshops are yours, no conditions, for your whole membership year — watch them whenever you like' },
+      { text: 'A stage for your venture before people interested in partnership opportunities: days dedicated to entrepreneurs, and priority booking of your slot at the “5 minutes” meetup to present your venture live' },
+    ],
+  },
+  {
     key: 'why',
     title: 'Why it is worth it even before you set your direction',
     items: [
@@ -14,15 +26,14 @@ const GROUPS_EN: Translation<MembershipGroup>[] = [
     ],
   },
   {
-    key: 'network',
-    title: 'Relationships are your real capital',
+    key: 'neutral',
+    title: 'Neutral and not sure of your direction yet? This is your place',
     items: [
-      { text: 'Your gateway to the Saudi market, wherever you are: whether you are in Riyadh, Tokyo, Geneva, New York, Dubai or Cairo, your membership places you inside an established Saudi business community, before you arrive and after' },
-      { text: 'A full year to build lasting relationships: meetups, evenings and workshops all year round, giving you enough time to get to know people, build trust and grow your professional network' },
-      { text: 'A community of neutral members, entrepreneurs and investors: widen your network and see varied experiences and paths from inside the Kingdom and beyond' },
-      { text: 'Fresh chances to meet and learn all year: attend the club’s meetups, workshops and private evenings at no charge' },
-      { text: 'Missed a session? Full recordings of the lectures and workshops are yours, no conditions, for your whole membership year — watch them whenever you like' },
-      { text: 'A stage for your venture before people interested in partnership opportunities: days dedicated to entrepreneurs, and priority booking of your slot at the “5 minutes” meetup to present your venture live' },
+      { text: 'Explore entrepreneurship and partnership opportunities, and discover your interests before you choose your path' },
+      { text: 'An online consultation at no extra fees: with a smart AI-powered advisor who helps you understand your idea and set your next steps' },
+      { text: 'A smart assistant around the clock: with a daily renewing usage balance, for questions, drafting, analysis and getting to know the group’s services' },
+      { text: 'Every benefit of the app is included in your membership: follow the ventures, the events and the notifications with one account' },
+      { text: 'Present yourself and your experience to the members through the “Profile and Journey” initiative at no charge, among the figures the club’s committee picks periodically' },
     ],
   },
   {
@@ -45,22 +56,11 @@ const GROUPS_EN: Translation<MembershipGroup>[] = [
     ],
   },
   {
-    key: 'neutral',
-    title: 'Neutral and not sure of your direction yet? This is your place',
-    items: [
-      { text: 'Explore entrepreneurship and partnership opportunities, and discover your interests before you choose your path' },
-      { text: 'An online consultation at no extra fees: with a smart AI-powered advisor who helps you understand your idea and set your next steps' },
-      { text: 'A smart assistant around the clock: with a daily renewing usage balance, for questions, drafting, analysis and getting to know the group’s services' },
-      { text: 'Every benefit of the app is included in your membership: follow the ventures, the events and the notifications with one account' },
-      { text: 'Present yourself and your experience to the members through the “Profile and Journey” initiative at no charge, among the figures the club’s committee picks periodically' },
-    ],
-  },
-  {
     key: 'discounts',
     title: 'Privileges you start with at member prices',
     items: [
       { text: 'Hold your own meetup at a 50% discount: through the “Make your meetup” service and the club theatre rental, with media coverage and a live stream of your event' },
-      { text: 'A meeting room at half price: seats 8 people and comes with a Zoom subscription, for your meetings and your partners’ gatherings' },
+      { text: 'The meeting room at no charge: 24 booking hours a year are yours in it; it seats 8 people and comes with a Zoom subscription, for your meetings and your partners’ gatherings' },
       { text: 'Design your website or app at a 50% discount: websites and mobile apps on Android and iOS' },
       { text: 'Prepare your pitch at a 50% discount: the “Pitch Deck” presentation built by the PV company' },
       { text: 'Marketing services at a 50% discount through Momentum: visual identity, content management, digital campaigns and influencer-ads packages' },
@@ -134,7 +134,7 @@ export const MEMBERSHIP_EN: Translation<MembershipContent> = {
       },
       {
         title: 'Your services with priority and at half the value',
-        text: 'And when your idea becomes a venture: the design of any website or mobile app of yours on Android or iOS, the pitch deck, marketing by Momentum, Al-Moltaqa podcast production and the meeting room — at a 50% discount, alongside up to 50% off outdoor filming and conference coverage.',
+        text: 'And when your idea becomes a venture: the design of any website or mobile app of yours on Android or iOS, the pitch deck, marketing by Momentum, and Al-Moltaqa podcast production — at a 50% discount, alongside up to 50% off outdoor filming and conference coverage; and the meeting room at no charge, with 24 booking hours a year in it.',
       },
     ],
   },

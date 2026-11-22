@@ -22,7 +22,6 @@ import { MeetupsBlock } from '@/components/MeetupsBlock';
 import { ClubTourStrip } from '@/components/ClubTourStrip';
 import { WorkshopAdPopup } from '@/components/WorkshopAd';
 import { GlassCard, GoldGradient, GoldHairline } from '@/components/lux';
-import { HqHoursCard } from '@/components/HqHoursCard';
 import { MembershipBenefitsBlock } from '@/components/MembershipBenefitsBlock';
 import { MembershipHomeCard } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
@@ -58,6 +57,8 @@ const HQ_BANNER_DRAW = Math.random();
 // Card widths of the horizontal strips; the snap step is the width plus the strip gap.
 const MINI_WIDTH = 124;
 const MINI_LOGO = 72;
+/** The club-sections tiles shown before «اضغط للمزيد»: one full row. */
+const SECTIONS_SHOWN = 4;
 const VIDEO_WIDTH = 240;
 
 // M74: the default block order (an older server sends no personas map). New blocks render only when the server carries them.
@@ -86,6 +87,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // M102 / M261: the services grid opens in full behind «اضغط للمزيد».
   const [gridOpen, setGridOpen] = useState(false);
+  const [sectionsOpen, setSectionsOpen] = useState(false);
   // Tab screens keep the floating «اسأل المستشار» button above the tab bar.
   useAdvisorScreen({ type: 'screen', id: 'home', title: t('tabs.home') }, true);
   // M75: opening the home clears its +N badge.
@@ -190,8 +192,10 @@ export default function HomeScreen() {
   // the grid up front — six tiles (four under the entrepreneur's two gold doors, where «نشر تطبيقك» is not repeated
   // as a tile; he used to see none, a member four) — and the rest waits behind the loud «اضغط للمزيد» bar, which
   // stays for everyone so the home is never crowded.
+  // Owner's TestFlight pass (2026-11-22: «خدمات النادي كبير جدا جدا… يكون فقط 4 واضغط للمزيد»): FOUR things up
+  // front, no more — four tiles, or the entrepreneur's two gold doors and two tiles — and the bar opens the rest.
   const fullGrid = personaKey === 'entrepreneur' ? orderedServices.filter((service) => service.key !== 'app-publish') : orderedServices;
-  const shownFirst = personaKey === 'entrepreneur' ? 4 : 6;
+  const shownFirst = personaKey === 'entrepreneur' ? 2 : 4;
   const teaser = gridOpen ? fullGrid : fullGrid.slice(0, shownFirst);
   const gridCollapsible = fullGrid.length > shownFirst;
 
@@ -216,25 +220,36 @@ export default function HomeScreen() {
     // screens that only the account menu (or nothing at all, like the prices) used to reach. Twelve tiles either
     // way, so the rows of four stay full: the member's card and invite stand where the guest reads the services
     // and «عنّا».
-    quickActions: () => (
-      <FadeInView key="quickActions" delay={180}>
-        <SectionHeader icon="apps-outline" title={t('home.sections')} />
-        <View style={styles.quickRow}>
-          {signedIn ? <QuickAction icon="card-outline" label={t('nav.card')} onPress={() => router.push('/card' as Href)} /> : <QuickAction icon="grid-outline" label={t('nav.services')} onPress={() => router.push('/services')} />}
-          <QuickAction icon="business-outline" label={t('account.menu.hq')} onPress={() => router.push('/hq')} />
-          <QuickAction icon="stats-chart-outline" label={t('nav.markets')} onPress={() => router.push('/markets' as Href)} />
-          <QuickAction icon="ribbon-outline" label={t('nav.membership')} onPress={() => router.push('/membership')} />
-          <QuickAction icon="calendar-outline" label={t('nav.agenda')} onPress={() => router.push('/agenda' as Href)} />
-          <QuickAction icon="easel-outline" label={t('nav.workshops')} onPress={() => router.push('/workshops' as Href)} />
-          <QuickAction icon="sparkles-outline" label={t('nav.people')} onPress={() => router.push('/people' as Href)} />
-          <QuickAction icon="pricetags-outline" label={t('nav.partners')} onPress={() => router.push('/partners' as Href)} />
-          <QuickAction icon="document-text-outline" label={t('nav.decisions')} onPress={() => router.push('/news/decisions' as Href)} />
-          <QuickAction icon="play-circle-outline" label={t('account.menu.videos')} onPress={() => router.push('/videos')} />
-          {signedIn ? <QuickAction icon="gift-outline" label={t('account.menu.invite')} onPress={() => router.push('/invite' as Href)} /> : <QuickAction icon="information-circle-outline" label={t('nav.about')} onPress={() => router.push('/about')} />}
-          <QuickAction icon="chatbubbles-outline" label={t('account.menu.contact')} onPress={() => router.push('/contact' as Href)} />
-        </View>
-      </FadeInView>
-    ),
+    // Owner's TestFlight pass (2026-11-22: «واقسام النادي نفس الفكرة… يكون بس 4 واضغط للمزيد»): one row of four —
+    // the HQ, the meetups and workshops calendar, the workshops and the membership — and the same gold bar opens
+    // the other eight.
+    quickActions: () => {
+      const tiles: { icon: IoniconName; label: string; route: string }[] = [
+        { icon: 'business-outline', label: t('account.menu.hq'), route: '/hq' },
+        { icon: 'calendar-outline', label: t('nav.agenda'), route: '/agenda' },
+        { icon: 'easel-outline', label: t('nav.workshops'), route: '/workshops' },
+        { icon: 'ribbon-outline', label: t('nav.membership'), route: '/membership' },
+        signedIn ? { icon: 'card-outline', label: t('nav.card'), route: '/card' } : { icon: 'grid-outline', label: t('nav.services'), route: '/services' },
+        { icon: 'stats-chart-outline', label: t('nav.markets'), route: '/markets' },
+        { icon: 'sparkles-outline', label: t('nav.people'), route: '/people' },
+        { icon: 'pricetags-outline', label: t('nav.partners'), route: '/partners' },
+        { icon: 'document-text-outline', label: t('nav.decisions'), route: '/news/decisions' },
+        { icon: 'play-circle-outline', label: t('account.menu.videos'), route: '/videos' },
+        signedIn ? { icon: 'gift-outline', label: t('account.menu.invite'), route: '/invite' } : { icon: 'information-circle-outline', label: t('nav.about'), route: '/about' },
+        { icon: 'chatbubbles-outline', label: t('account.menu.contact'), route: '/contact' },
+      ];
+      return (
+        <FadeInView key="quickActions" delay={180}>
+          <SectionHeader icon="apps-outline" title={t('home.sections')} />
+          <View style={styles.quickRow}>
+            {(sectionsOpen ? tiles : tiles.slice(0, SECTIONS_SHOWN)).map((tile) => (
+              <QuickAction key={tile.route} icon={tile.icon} label={tile.label} onPress={() => pushRoute(tile.route)} />
+            ))}
+          </View>
+          <MoreBar open={sectionsOpen} onPress={() => setSectionsOpen((open) => !open)} moreLabel={t('home.moreSections')} lessLabel={t('home.lessSections')} />
+        </FadeInView>
+      );
+    },
     // M84 (owner): the Projects Bank block with the auto-rotating images, «زي الموقع بالظبط».
     projectsBank: () =>
       content.projectsBank ? (
@@ -319,14 +334,7 @@ export default function HomeScreen() {
           ))}
         </View>
         {/* M102 / M261 (owner: «يفضل اضغط للمزيد… ده اهم شئ»): the rest of the grid, behind one loud tap. */}
-        {gridCollapsible ? (
-          <PressScale onPress={() => setGridOpen((open) => !open)} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={t(gridOpen ? 'home.lessServices' : 'home.moreServices')}>
-            <View style={styles.moreServices}>
-              <Text style={styles.moreServicesText}>{t(gridOpen ? 'home.lessServices' : 'home.moreServices')}</Text>
-              <Ionicons name={gridOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.goldInk} />
-            </View>
-          </PressScale>
-        ) : null}
+        {gridCollapsible ? <MoreBar open={gridOpen} onPress={() => setGridOpen((open) => !open)} moreLabel={t('home.moreServices')} lessLabel={t('home.lessServices')} /> : null}
       </FadeInView>
     ),
     // M68 «شركاؤنا»: renders only when the server already carries the block and at least one partner is visible.
@@ -408,8 +416,8 @@ export default function HomeScreen() {
       {/* M262 (owner): the member's next HQ booking, with its entry pass — only when one is ahead. */}
       <NextVisitCard />
 
-      {/* M261 (owner): the HQ booking and its hours wallet, loud, right under the HQ photo. */}
-      <HqHoursCard compact />
+      {/* The HQ booking-hours card left this spot (owner's TestFlight pass, 2026-11-22: «مش اول حاجه كده خالص…
+          تحت حتي شخصية ومسيرة»): it lives under the office photos of «جولة في النادي», below the people block. */}
 
       {/* M120 (owner's TestFlight feedback): the subscribe door, high on every non-member's home. */}
       <MembershipHomeCard />
@@ -467,6 +475,19 @@ function PortalChip({ portal, onPress }: { portal: HomePortal; onPress: () => vo
           {portal.subtitle}
         </Text>
       </GlassCard>
+    </PressScale>
+  );
+}
+
+/** M102 / M261: the loud gold «اضغط للمزيد» bar (owner: «ده اهم شئ… حلوة جدا»), shared by the services grid and the club sections. */
+function MoreBar({ open, onPress, moreLabel, lessLabel }: { open: boolean; onPress: () => void; moreLabel: string; lessLabel: string }) {
+  const label = open ? lessLabel : moreLabel;
+  return (
+    <PressScale onPress={onPress} glow glowRadius={radii.md} accessibilityRole="button" accessibilityLabel={label}>
+      <View style={styles.moreServices}>
+        <Text style={styles.moreServicesText}>{label}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.goldInk} />
+      </View>
     </PressScale>
   );
 }

@@ -18,6 +18,9 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
  * member's live remainder as a bar, and one-tap doors into the booking screen on the right kind.
  * The number is the server's (`walletHours`, the member's own wallet once it loads); a non-member
  * reads the same benefit with a door to the membership page (never a payment link — rule 3).
+ * Owner's TestFlight pass (2026-11-22): the title says it plainly — the meeting room, no fees, and the hours that
+ * are his in it. `compact` is the home's copy, under the HQ photos of «جولة في النادي»: no remainder bar and
+ * one button, so it stays a light line under the pictures; the HQ screen keeps the full card.
  */
 export function HqHoursCard({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -48,10 +51,10 @@ export function HqHoursCard({ compact = false }: { compact?: boolean }) {
         </GoldGradient>
         <View style={styles.texts}>
           <Text style={styles.title}>{t('hq.hoursTitle')}</Text>
-          <Text style={styles.subtitle}>{member ? t('hq.hoursMember') : t('hq.hoursGuest', { hours: formatHours(total) })}</Text>
+          <Text style={styles.subtitle}>{t(member ? 'hq.hoursMember' : 'hq.hoursGuest', { hours: formatHours(total) })}</Text>
         </View>
       </View>
-      {member && wallet.data ? (
+      {member && wallet.data && !compact ? (
         <View style={styles.meter}>
           <GrowBar percent={(remaining / total) * 100} height={8} />
           <Text style={styles.left}>{t('hq.walletLine', { left: formatNumber(remaining), total: formatNumber(total) })}</Text>
