@@ -26,4 +26,7 @@ export const SCREEN_ROUTES: Record<AppScreen, Href> = {
   profile: '/profile-edit',
   security: '/security',
   about: '/about',
+  // M268 (EXTRA_SCREENS): «شركاؤنا» — the partner discounts, not «شركاء النجاح» — and the market indicators.
+  partners: '/partners' as Href,
+  markets: '/markets' as Href,
 };

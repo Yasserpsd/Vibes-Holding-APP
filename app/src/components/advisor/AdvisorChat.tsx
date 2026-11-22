@@ -214,7 +214,9 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
   /** M145: a card's request — navigation, a re-check after a pick, or the booking itself. */
   const act = async (request: ChatAct) => {
     if (request.kind === 'screen') {
-      router.push(SCREEN_ROUTES[request.screen]);
+      // A key this build has no route for (a newer server) opens nothing rather than a broken page.
+      const route = SCREEN_ROUTES[request.screen] as (typeof SCREEN_ROUTES)[keyof typeof SCREEN_ROUTES] | undefined;
+      if (route) router.push(route);
       return;
     }
     if (request.kind === 'service') {

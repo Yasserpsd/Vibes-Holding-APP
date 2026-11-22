@@ -8,7 +8,7 @@ import type { EnglishCache } from '../englishCache.js';
 import { riyadhNow } from '../hq/service.js';
 import { langOf, type AppLang } from '../lang.js';
 import { FILL_FIELD_TYPES, type FormFiller } from './fill.js';
-import { SCREEN_LABELS, type HqProposal, type IntentDetector } from './intents.js';
+import { EXTRA_SCREENS, SCREEN_LABELS, type HqProposal, type IntentDetector } from './intents.js';
 import type { AdvisorMessage } from './sanitize.js';
 import type { AdvisorService } from './service.js';
 import { speakable, type SpeechSynthesizer } from './speech.js';
@@ -95,7 +95,8 @@ const pendingSchema = z.object({
   purpose: z.string().trim().max(120).nullable(),
   note: z.string().trim().max(300),
 });
-const intentSchema = z.object({ text: z.string().trim().max(4000).default(''), pending: pendingSchema.nullish() });
+// M268: `screens` = the extra screen keys this app build can open (see EXTRA_SCREENS); an older build sends none.
+const intentSchema = z.object({ text: z.string().trim().max(4000).default(''), pending: pendingSchema.nullish(), screens: z.array(z.string().max(40)).max(20).default([]) });
 
 /** Chat with the hub advisor. Every route needs a session; the hub adds its own per-account limits. */
 // A one-minute m4a clip is ~1 MB; base64 adds a third. The cap keeps the route harmless.
@@ -254,7 +255,8 @@ export const advisorRoutes: FastifyPluginAsync<AdvisorRoutesOptions> = async (ap
       if (!body.text && !body.pending) return { action: null, reply: null };
       const me = await auth.me(current.session);
       try {
-        return await intents.detect({ text: body.text, lang: langOf(request), me, pending: (body.pending ?? null) as HqProposal | null });
+        const extraScreens = EXTRA_SCREENS.filter((key) => body.screens.includes(key));
+        return await intents.detect({ text: body.text, lang: langOf(request), me, pending: (body.pending ?? null) as HqProposal | null, extraScreens });
       } catch (error) {
         request.log.warn({ err: error }, 'intent detection failed');
         return { action: null, reply: null };

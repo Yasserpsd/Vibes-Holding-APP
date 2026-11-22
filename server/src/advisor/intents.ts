@@ -38,7 +38,14 @@ export const APP_SCREENS = [
   'security',
   'about',
 ] as const;
-export type AppScreen = (typeof APP_SCREENS)[number];
+/**
+ * M268: screens added AFTER builds were in the stores. An installed build pushes whatever route its own table gives
+ * for a key, so a key it does not know must never reach it: the app names the extra keys it knows in the request
+ * (`screens`), and only those are offered to the model.
+ */
+export const EXTRA_SCREENS = ['partners', 'markets'] as const;
+export type ExtraScreen = (typeof EXTRA_SCREENS)[number];
+export type AppScreen = (typeof APP_SCREENS)[number] | ExtraScreen;
 
 export const SCREEN_LABELS: Record<AppScreen, { ar: string; en: string; hint: string }> = {
   home: { ar: 'الرئيسية', en: 'Home', hint: 'home / start' },
@@ -65,6 +72,8 @@ export const SCREEN_LABELS: Record<AppScreen, { ar: string; en: string; hint: st
   profile: { ar: 'تعديل الملف الشخصي', en: 'Edit profile', hint: 'change name, company, bio' },
   security: { ar: 'الأمان', en: 'Security', hint: 'password, app lock, two-factor' },
   about: { ar: 'عن النادي', en: 'About the club', hint: 'about, contact management' },
+  partners: { ar: 'شركاؤنا', en: 'Our partners', hint: 'partner discounts, offers and the member promo code — NOT success partners' },
+  markets: { ar: 'مؤشرات السوق', en: 'Markets', hint: 'gold price, currencies, market indicators' },
 };
 
 export type HqKind = 'visit' | HqSpace;
@@ -96,6 +105,8 @@ export type IntentInput = {
   me: Me;
   /** The hq_book proposal the member is still completing (the app sends it back). */
   pending?: HqProposal | null;
+  /** M268: the EXTRA_SCREENS keys this app build can open; an older build sends none. */
+  extraScreens?: ExtraScreen[];
   now?: number;
 };
 
@@ -184,6 +195,7 @@ export class IntentDetector {
       summary: service.summary,
       fields: service.action && (service.action.type === 'whatsapp' || service.action.type === 'paymob') ? service.action.fields : [],
     }));
+    const screens: AppScreen[] = [...APP_SCREENS, ...EXTRA_SCREENS.filter((key) => input.extraScreens?.includes(key))];
     const text = input.text.trim();
     // The purposes as the member reads them: the card's chips and its «الغرض» line were Arabic in the English app.
     // The booking itself accepts either language (HqService.book stores the Arabic one).
@@ -194,7 +206,7 @@ export class IntentDetector {
       return this.hqResult(input.pending, lang, days, times, purposes, now, null);
     }
 
-    const answer = await this.ask(input, days, times, purposes, catalog);
+    const answer = await this.ask(input, days, times, purposes, catalog, screens);
     if (!answer) return { action: null, reply: null };
 
     if (answer.intent === 'hq_book' || (input.pending && answer.intent === 'none' && this.hqTouched(answer))) {
@@ -217,11 +229,11 @@ export class IntentDetector {
     // put in the wrong slot is still honoured: a screen answer that names a service opens the service, and the reverse.
     const wantsScreen = answer.intent === 'open_screen';
     const wantsService = answer.intent === 'service';
-    const namedScreen = APP_SCREENS.find((key) => key === answer.screen) ?? (wantsService ? APP_SCREENS.find((key) => key === answer.serviceKey) : undefined);
+    const namedScreen = screens.find((key) => key === answer.screen) ?? (wantsService ? screens.find((key) => key === answer.serviceKey) : undefined);
     const namedService = catalog.find((item) => item.key === answer.serviceKey) ?? (wantsScreen ? catalog.find((item) => item.key === answer.screen) : undefined);
 
     if ((wantsScreen && namedScreen) || (wantsService && !namedService && namedScreen)) {
-      const screen = namedScreen as AppScreen;
+      const screen = namedScreen;
       const label = SCREEN_LABELS[screen][lang];
       return { action: { type: 'screen', screen, label }, reply: answer.reply.trim() || (lang === 'en' ? `Here is ${label}.` : `تفضل، ${label}:`) };
     }
@@ -387,6 +399,7 @@ export class IntentDetector {
     times: string[],
     purposes: string[],
     catalog: CatalogService[],
+    screens: AppScreen[],
   ): Promise<ModelAnswer | null> {
     const lang = input.lang;
     const today = days[0]?.date ?? new Date(input.now ?? Date.now()).toISOString().slice(0, 10);
@@ -407,7 +420,7 @@ export class IntentDetector {
       `Bookable days: ${days.map((day) => `${day.date} (${dayLabel(day.date, 'en')})`).join(', ')}`,
       `Slot times: ${times.join(', ')}`,
       `Visit purposes: ${purposes.map((purpose) => JSON.stringify(purpose)).join(' | ')}`,
-      `Screens: ${APP_SCREENS.map((key) => `${key} = ${SCREEN_LABELS[key].ar} (${SCREEN_LABELS[key].hint})`).join('; ')}`,
+      `Screens: ${screens.map((key) => `${key} = ${SCREEN_LABELS[key].ar} (${SCREEN_LABELS[key].hint})`).join('; ')}`,
       `Services: ${catalog.map((service) => `${service.key} = "${service.title}" (${service.summary.slice(0, 110)}) fields[${service.fields.map((field) => `${field.key}:"${field.label}"${field.options?.length ? `{${field.options.join('|')}}` : ''}`).join(', ')}]`).join('; ') || 'none'}`,
       pending,
       `\nMessage:\n"""${input.text.trim().slice(0, 2000)}"""`,

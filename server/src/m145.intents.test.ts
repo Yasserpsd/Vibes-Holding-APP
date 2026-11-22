@@ -169,4 +169,20 @@ test('m268: Success Partners opens as a service; the people screens no longer ca
   assert.deepEqual(asService.action, { type: 'screen', screen: 'card', label: 'بطاقة العضوية' });
   const neither = await answering({ intent: 'open_screen', screen: 'nowhere', serviceKey: 'nothing' }).detect({ text: 'x', lang: 'ar', me: ME });
   assert.deepEqual(neither, { action: null, reply: null });
+
+  // «شركاؤنا» and the markets are screens only a newer build can open: offered to the model, and honoured, only
+  // when the app names them — an installed build must never hear a key its route table lacks.
+  let seen = '';
+  const partnersModel: typeof fetch = async (_input, init) => {
+    seen = String(init?.body ?? '');
+    return completion({ intent: 'open_screen', screen: 'partners', reply: '' });
+  };
+  const newer = new IntentDetector({ apiKey: 'k', model: 'm', log, fetchImpl: partnersModel, hq: fakeHq(), kv: new MemoryKV() });
+  const opened = await newer.detect({ text: 'وريني خصومات شركاؤنا', lang: 'ar', me: ME, extraScreens: ['partners', 'markets'] });
+  assert.deepEqual(opened.action, { type: 'screen', screen: 'partners', label: 'شركاؤنا' });
+  assert.match(seen, /partners = شركاؤنا/);
+  assert.match(seen, /markets = مؤشرات السوق/);
+  const older = await newer.detect({ text: 'وريني خصومات شركاؤنا', lang: 'ar', me: ME });
+  assert.deepEqual(older, { action: null, reply: null });
+  assert.doesNotMatch(seen, /partners = شركاؤنا/);
 });

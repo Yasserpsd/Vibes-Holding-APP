@@ -37,7 +37,15 @@ export type AppScreen =
   | 'payments'
   | 'profile'
   | 'security'
-  | 'about';
+  | 'about'
+  | ExtraScreen;
+
+/**
+ * M268: screens the advisor learned after builds were in the stores. This build names them in every intent request,
+ * so the server offers them only to an app whose route table has them (an older build never hears these keys).
+ */
+export const EXTRA_SCREENS = ['partners', 'markets'] as const;
+export type ExtraScreen = (typeof EXTRA_SCREENS)[number];
 export type HqKind = 'visit' | 'office' | 'meeting';
 export type HqProposal = { kind: HqKind; hours: number; date: string | null; time: string | null; purpose: string | null; note: string };
 export type HqProposalOptions = { kinds: { key: HqKind; label: string }[]; days: { date: string; label: string }[]; times: string[]; purposes: string[]; hours: number[] };
@@ -127,7 +135,7 @@ export const advisorApi = {
   // M145: is this line an app action? An older server answers 404 → treated as «no».
   intent: async (text: string, pending: HqProposal | null): Promise<IntentResult> => {
     try {
-      return await apiRequest<IntentResult>('POST', '/api/advisor/intent', { body: { text, pending }, timeoutMs: 60_000 });
+      return await apiRequest<IntentResult>('POST', '/api/advisor/intent', { body: { text, pending, screens: EXTRA_SCREENS }, timeoutMs: 60_000 });
     } catch (error) {
       if (error instanceof ApiError && (error.status === 404 || error.status === 429)) return { action: null, reply: null };
       throw error;
