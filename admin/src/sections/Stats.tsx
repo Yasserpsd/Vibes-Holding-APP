@@ -90,11 +90,11 @@ type ClubMetric = 'signups' | 'activations' | 'renewals' | 'hubPayments' | 'appP
 
 function PersonasCard({ personas, error, onRetry }: { personas: Personas | null; error?: { code: string; message: string }; onRetry: () => void }) {
   if (!personas) return error ? <ErrorCard error={error} onRetry={onRetry} /> : null;
-  // The club's order: محايد ثم رائد الأعمال ثم المستثمر.
+  // The club's order: محايد ثم رائد أعمال ثم مستثمر — the same names as the home cards and the members list's chips.
   const slices: DonutSlice[] = [
     { label: 'محايد', value: personas.neutral, tone: 'a' },
-    { label: 'رائد الأعمال', value: personas.entrepreneur, tone: 'b' },
-    { label: 'المستثمر', value: personas.investor, tone: 'c' },
+    { label: 'رائد أعمال', value: personas.entrepreneur, tone: 'b' },
+    { label: 'مستثمر', value: personas.investor, tone: 'c' },
     ...(personas.none > 0 ? [{ label: 'بدون فئة', value: personas.none, tone: 'd' as const }] : []),
   ];
   return (

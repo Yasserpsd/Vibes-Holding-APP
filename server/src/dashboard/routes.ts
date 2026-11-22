@@ -15,9 +15,13 @@ const idSchema = z.object({ id: z.coerce.number().int().positive() });
 const homeSchema = z.object({ days: z.coerce.number().int().min(7).max(180).default(30) });
 const accountsSchema = z.object({
   q,
-  state: z.enum(['all', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
+  // `registered` = the home's «الحسابات المسجّلة»: every confirmed account (`all` also holds those still waiting for their e-mail code).
+  state: z.enum(['all', 'registered', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
   // M86 (owner): one tap filters the members by their category.
-  persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor']).default('all'),
+  // `none` = «بدون فئة»: registered accounts that have not chosen a category.
+  persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor', 'none']).default('all'),
+  // Memberships ending within 7 / 30 days — the home cards «تنتهي خلال 7 أيام / 30 يومًا» open exactly these.
+  ends: z.enum(['all', '7', '30']).default('all'),
   // M210 (owner): WhatsApp-proven number or not (hub 2.28.4+; an older hub ignores it).
   wa: z.enum(['all', 'yes', 'no']).default('all'),
   // M229: the hub lists by activity; `newest` makes the server sweep it and order by sign-up time.
@@ -71,7 +75,7 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!admin) return;
       const query = parse(accountsSchema, request.query, reply);
       if (!query) return;
-      const answer = await service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona, wa: query.wa, sort: query.sort });
+      const answer = await service.accounts(admin, { q: query.q, state: query.state, page: query.page, perPage: query.per_page, persona: query.persona, ends: query.ends, wa: query.wa, sort: query.sort });
       // M116 (owner): the members list shows each account's interests beside the persona filter.
       if (!interests) return answer;
       const labels = await interests.labelsFor(answer.items.map((item) => item.id));

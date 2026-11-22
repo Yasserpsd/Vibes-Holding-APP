@@ -77,7 +77,26 @@ function atLeast(version: string | null, wanted: number[]): boolean {
   return true;
 }
 
-export function toPbMember(account: Pick<HubAccount, 'id' | 'member_end' | 'member_days' | 'honorary' | 'honorary_since' | 'name' | 'email' | 'phone'>): PbMember {
+/**
+ * The two narrowing filters of the members list, applied by the server because the hub has neither:
+ * the category (`none` = a registered account that has not chosen one — pending and lead rows are not «accounts» yet,
+ * the same rule as the home card) and the memberships ending within 7 / 30 days (dated paid ones, like the hub's expiring count).
+ */
+export function accountMatches(account: HubAccount, persona = 'all', ends = 'all'): boolean {
+  if (persona !== 'all') {
+    // A category belongs to a registered account: one still waiting for its e-mail (or a lead) is in no category row, as in no home card.
+    if (account.state === 'pending' || account.state === 'lead') return false;
+    const chosen = ['neutral', 'entrepreneur', 'investor'].includes(account.persona);
+    if (persona === 'none' ? chosen : account.persona !== persona) return false;
+  }
+  if (ends !== 'all') {
+    const days = Number(ends);
+    if (account.state !== 'member' || account.honorary === 1 || account.never_expires === 1 || account.member_left === null || account.member_left > days) return false;
+  }
+  return true;
+}
+
+export function toPbMember(account:Pick<HubAccount, 'id' | 'member_end' | 'member_days' | 'honorary' | 'honorary_since' | 'name' | 'email' | 'phone'>): PbMember {
   // M205: the honorary member's Projects Bank year (membership/honorary.ts).
   return { contact_id: account.id, ...pbPeriodOf(account), name: account.name, email: account.email, phone: account.phone };
 }
@@ -219,9 +238,14 @@ export class DashboardService {
   /** The hub's list with the Projects Bank «رصيد» beside every active member, through one `balances` call. */
   async accounts(
     admin: AdminActor,
-    query: { q: string; state: string; page: number; perPage: number; persona?: string; wa?: string; sort?: 'activity' | 'newest' },
+    query: { q: string; state: string; page: number; perPage: number; persona?: string; ends?: string; wa?: string; sort?: 'activity' | 'newest' },
   ): Promise<Omit<HubResults['admin_accounts'], 'items'> & { items: (HubAccount & { pb: PbBeside | null })[]; pbError: SectionError | null }> {
     let result: HubResults['admin_accounts'];
+    // `registered` is a view of the hub's `all` without the accounts still waiting for their e-mail code.
+    const registered = query.state === 'registered';
+    const hubState = registered ? 'all' : query.state;
+    const kept = (account: HubAccount) => (!registered || account.state !== 'pending') && accountMatches(account, query.persona, query.ends);
+    const narrowed = registered || (query.persona && query.persona !== 'all') || (query.ends && query.ends !== 'all');
     // M210 (hub 2.28.4): the WhatsApp filter is the hub's own; an older hub ignores the key and sends no wa counts.
     const wa = query.wa && query.wa !== 'all' ? { wa: query.wa } : {};
     if (query.sort === 'newest') {
@@ -229,9 +253,9 @@ export class DashboardService {
       const all: HubAccount[] = [];
       let counts: Record<string, number> = {};
       for (let page = 1; page <= 200; page += 1) {
-        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100, ...wa });
+        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: hubState, page, per_page: 100, ...wa });
         counts = slice.counts;
-        all.push(...slice.items.filter((account) => !query.persona || query.persona === 'all' || account.persona === query.persona));
+        all.push(...slice.items.filter(kept));
         if (!slice.items.length || page * 100 >= slice.total) break;
       }
       // M230: the hub pages by offset over a list it orders by activity, so an account that becomes active while the pages
@@ -240,15 +264,15 @@ export class DashboardService {
       unique.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id);
       const start = (query.page - 1) * query.perPage;
       result = { ok: true, total: unique.length, page: query.page, per_page: query.perPage, items: unique.slice(start, start + query.perPage), counts };
-    } else if (query.persona && query.persona !== 'all') {
+    } else if (narrowed) {
       // M86 (owner): the hub list has no persona filter yet, so the server sweeps it (pages of 100,
-      // capped at 1000 like `personas()`), keeps the chosen category and pages the match locally.
+      // capped at 1000 like `personas()`), keeps the chosen category (and the memberships ending soon) and pages the match locally.
       const matched: HubAccount[] = [];
       let counts: Record<string, number> = {};
       for (let page = 1; page <= 10; page += 1) {
-        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page, per_page: 100, ...wa });
+        const slice = await this.hub(admin, 'admin_accounts', { q: query.q, state: hubState, page, per_page: 100, ...wa });
         counts = slice.counts;
-        matched.push(...slice.items.filter((account) => account.persona === query.persona));
+        matched.push(...slice.items.filter(kept));
         if (page * 100 >= slice.total) break;
       }
       const start = (query.page - 1) * query.perPage;
@@ -338,6 +362,8 @@ export class DashboardService {
       const result = await this.hub(admin, 'admin_accounts', { q: '', state, page, per_page: 100 });
       for (const account of result.items) {
         counts.total += 1;
+        // Same rule as the list's category filters (accountMatches): only registered accounts are counted in a category or in «none».
+        if (account.state === 'pending' || account.state === 'lead') continue;
         if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;
         else counts.none += 1;
       }

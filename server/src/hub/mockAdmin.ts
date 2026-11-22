@@ -32,6 +32,11 @@ const int = (body: HubBody, key: string, fallback: number, min: number, max: num
 };
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+function personaTotals(personas: string[]): { persona_neutral: number; persona_entrepreneur: number; persona_investor: number } {
+  const of = (name: string) => personas.filter((persona) => persona === name).length;
+  return { persona_neutral: of('neutral'), persona_entrepreneur: of('entrepreneur'), persona_investor: of('investor') };
+}
+
 function paged<T>(rows: T[], body: HubBody): { total: number; page: number; per_page: number; items: T[] } {
   const perPage = int(body, 'per_page', 25, 1, 100);
   const page = int(body, 'page', 1, 1, 100_000);
@@ -249,6 +254,8 @@ export class MockAdmin {
         members_expired: count('expired'),
         members_no_expiry: contacts.filter((contact) => typeof contact.honoraryAt === 'number' || (contact.isMember && contact.memberStartedAt === null)).length,
         members_honorary: contacts.filter((contact) => typeof contact.honoraryAt === 'number').length,
+        // Hub 2.19.0+: the registered accounts split by the category they chose (the three add up to `accounts` minus those with none yet).
+        ...personaTotals(contacts.filter((contact) => contact.verified || contact.isMember).map((contact) => this.deps.publicContact(contact).persona)),
         admins: contacts.filter((contact) => contact.verified && contact.role === 'admin').length,
         publishers: contacts.filter((contact) => contact.verified && contact.role === 'publisher').length,
       },

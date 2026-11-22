@@ -297,9 +297,9 @@ export function DownloadsCard({ days, hub, stamp, onRefresh }: { days: number; h
         <Step label="التحميلات" value={formatNumber(data?.installs.allTime)} extra={<TotalMarks />} notes={downloadsNotes()} tone="gold" />
         <Arrow />
         {/* The hub counts an account once it is confirmed (or has paid): the ones still waiting for their code are the tile below, and «اليوم» counts today's confirmations, so it is a part of this number. */}
-        <Step label="الحسابات المسجّلة" value={formatNumber(hub?.totals.accounts)} notes={hub ? ['حسابات اكتمل تسجيلها وتأكيدها', `منها اليوم: ${formatNumber(hub.today.verified)}`] : []} onOpen={() => openMembers('all')} />
+        <Step label="الحسابات المسجّلة" value={formatNumber(hub?.totals.accounts)} notes={hub ? ['حسابات اكتمل تسجيلها وتأكيدها', `منها اليوم: ${formatNumber(hub.today.verified)}`] : []} onOpen={() => openMembers({ state: 'registered' })} />
         <Arrow />
-        <Step label="الأعضاء المشتركون" value={formatNumber(hub?.totals.members_active)} notes={hub ? ['عضوية سارية في النادي', ...memberNotes(hub)] : []} tone="outline" onOpen={() => openMembers('member')} />
+        <Step label="الأعضاء المشتركون" value={formatNumber(hub?.totals.members_active)} notes={hub ? ['عضوية سارية في النادي', ...memberNotes(hub)] : []} tone="outline" onOpen={() => openMembers({ state: 'member' })} />
       </div>
 
       {data ? (

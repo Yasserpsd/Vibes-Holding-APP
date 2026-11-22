@@ -188,6 +188,27 @@ test('accounts: states, search, counts, and the Projects Bank balance beside eve
   assert.equal(proven.total + unproven.total, body.total);
   assert.equal((await get('/api/admin/accounts?wa=maybe', adminToken)).statusCode, 400);
 
+  // The home cards open exactly what they say: the list under each filter has as many rows as the card's number.
+  const homeTotals = (await get('/api/admin/home', adminToken)).json().hub as { totals: { accounts: number; persona_neutral: number; persona_entrepreneur: number; persona_investor: number }; expiring: { d7: number; d30: number } };
+  for (const [persona, card] of [['neutral', homeTotals.totals.persona_neutral], ['entrepreneur', homeTotals.totals.persona_entrepreneur], ['investor', homeTotals.totals.persona_investor]] as const) {
+    const rows = (await get(`/api/admin/accounts?persona=${persona}&per_page=100`, adminToken)).json();
+    assert.equal(rows.total, card, persona);
+    assert.ok(rows.items.every((item: { persona: string }) => item.persona === persona));
+  }
+  const noCategory = (await get('/api/admin/accounts?persona=none&per_page=100', adminToken)).json();
+  assert.equal(noCategory.total, homeTotals.totals.accounts - homeTotals.totals.persona_neutral - homeTotals.totals.persona_entrepreneur - homeTotals.totals.persona_investor);
+  assert.ok(noCategory.items.every((item: { persona: string; state: string }) => !['neutral', 'entrepreneur', 'investor'].includes(item.persona) && item.state !== 'pending' && item.state !== 'lead'));
+  for (const [ends, card] of [['7', homeTotals.expiring.d7], ['30', homeTotals.expiring.d30]] as const) {
+    const rows = (await get(`/api/admin/accounts?ends=${ends}&per_page=100`, adminToken)).json();
+    assert.equal(rows.total, card, `ends ${ends}`);
+    assert.ok(rows.items.every((item: { state: string; member_left: number | null }) => item.state === 'member' && item.member_left !== null && item.member_left <= Number(ends)));
+  }
+  assert.equal((await get('/api/admin/accounts?ends=90', adminToken)).statusCode, 400);
+  // «الحسابات المسجّلة» of the downloads card: the confirmed accounts, without those still waiting for their e-mail code.
+  const registeredRows = (await get('/api/admin/accounts?state=registered&per_page=100', adminToken)).json();
+  assert.equal(registeredRows.total, homeTotals.totals.accounts);
+  assert.ok(registeredRows.items.every((item: { state: string }) => item.state !== 'pending' && item.state !== 'lead'));
+
   const member = await someMember();
   const detail = (await get(`/api/admin/accounts/${member.id}`, adminToken)).json();
   assert.equal(detail.account.id, member.id);

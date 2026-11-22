@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { BarChart, type ChartPoint } from '../Chart';
 import { daysText, formatCents, formatDateTime, formatDay, formatMoney, formatNumber, formatRelative } from '../format';
-import type { AccountFilter, BridgeSide, Home as HomeData, HubStats, StatsDay } from '../types';
+import type { BridgeSide, MembersView, Home as HomeData, HubStats, StatsDay } from '../types';
 import { Async, Boundary, Chips, ErrorCard, Pill, SectionHead, useLoad, useShell } from '../ui';
 import { DownloadsCard } from './Downloads';
 import { personaLabel } from './Members';
@@ -39,7 +39,8 @@ function Tile({ label, value, note, tone, onOpen }: { label: string; value: numb
 
 function Tiles({ hub }: { hub: HubStats }) {
   const { openMembers } = useShell();
-  const open = (state: AccountFilter) => () => openMembers(state);
+  // Every card opens the members list already filtered to what its label says (the same chips, the same address).
+  const open = (view: Partial<MembersView>) => () => openMembers(view);
   const { totals, expiring } = hub;
   const withoutCategory = Math.max(0, totals.accounts - (totals.persona_neutral ?? 0) - (totals.persona_entrepreneur ?? 0) - (totals.persona_investor ?? 0));
   return (
@@ -50,17 +51,17 @@ function Tiles({ hub }: { hub: HubStats }) {
           محايد ثم رائد أعمال ثم مستثمر ثم بدون فئة; «لم يدفعوا بعد» closes the row. */}
       {totals.persona_investor !== undefined ? (
         <>
-          <Tile label="محايد" value={totals.persona_neutral ?? 0} onOpen={open('all')} />
-          <Tile label="رائد أعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open('all')} />
-          <Tile label="مستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open('all')} />
+          <Tile label="محايد" value={totals.persona_neutral ?? 0} onOpen={open({ persona: 'neutral' })} />
+          <Tile label="رائد أعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open({ persona: 'entrepreneur' })} />
+          <Tile label="مستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open({ persona: 'investor' })} />
           {/* M230: the three above add up to the accounts that chose a category; this is the rest, so the sum is the registered number. */}
-          {withoutCategory > 0 ? <Tile label="بدون فئة" value={withoutCategory} onOpen={open('all')} /> : null}
+          {withoutCategory > 0 ? <Tile label="بدون فئة" value={withoutCategory} onOpen={open({ persona: 'none' })} /> : null}
         </>
       ) : null}
-      <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open('pending')} />
-      <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} />
-      <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} />
-      <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open('unpaid')} />
+      <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open({ state: 'pending' })} />
+      <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} onOpen={open({ ends: '7' })} />
+      <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} onOpen={open({ ends: '30' })} />
+      <Tile label="لم يدفعوا بعد" value={totals.unpaid} onOpen={open({ state: 'unpaid' })} />
     </div>
   );
 }
@@ -169,12 +170,13 @@ function AppPayments({ data, days }: { data: HomeData; days: string }) {
 }
 
 function Expiring({ hub }: { hub: HubStats }) {
-  const { openMember } = useShell();
+  const { openMember, openMembers } = useShell();
   return (
     <section className="card" aria-labelledby="expiring-title">
       <div className="row">
         <h2 id="expiring-title">عضويات تنتهي قريبًا</h2>
-        <span className="muted num">{formatNumber(hub.expiring.d30)} خلال 30 يومًا</span>
+        {/* The hub sends the soonest 20 only; the count beside it is the whole list, which this opens. */}
+        <button type="button" className="chip" onClick={() => openMembers({ ends: '30' })}>{formatNumber(hub.expiring.d30)} خلال 30 يومًا · عرض الكل</button>
       </div>
       {hub.expiring.items.length === 0 ? <p className="muted">لا توجد عضويات تنتهي خلال 30 يومًا.</p> : null}
       <ul className="list">
@@ -211,7 +213,7 @@ function LatestMembers({ token }: { token: string }) {
     <section className="card" aria-labelledby="latest-title">
       <div className="row">
         <h2 id="latest-title">آخر الأعضاء المسجّلين</h2>
-        <button type="button" className="chip" onClick={() => openMembers('all')}>عرض الكل</button>
+        <button type="button" className="chip" onClick={() => openMembers()}>عرض الكل</button>
       </div>
       {state.error && !state.loading ? <ErrorCard error={state.error} onRetry={state.reload} /> : null}
       {!state.data && !state.error ? <p className="muted">جارٍ التحميل…</p> : null}

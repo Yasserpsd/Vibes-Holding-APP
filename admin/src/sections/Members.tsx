@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api';
 import { daysText, formatDay, formatNumber, formatRelative } from '../format';
-import type { Account, AccountFilter, AccountRow, PersonaFilter, WaFilter } from '../types';
+import type { Account, AccountFilter, AccountRow, EndsFilter, MembersView, PersonaFilter, WaFilter } from '../types';
 import { AsyncPage, Chips, ErrorCard, Pill, SearchBox, SectionHead, useDebounced, useLoad, useShell, type Tone } from '../ui';
 
 // M86 (owner): «اعرف كام مستثمر وكام رائد أعمال وكام محايد — بوتون أدوس عليها ويتفلتر لوحده».
@@ -11,6 +11,14 @@ const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
   { value: 'neutral', label: 'محايد' },
   { value: 'entrepreneur', label: 'رائد أعمال' },
   { value: 'investor', label: 'مستثمر' },
+  { value: 'none', label: 'بدون فئة' },
+];
+
+// The home cards «تنتهي خلال 7 أيام / 30 يومًا» open these (same words).
+const ENDS_FILTERS: { value: EndsFilter; label: string }[] = [
+  { value: 'all', label: 'الكل' },
+  { value: '7', label: 'تنتهي خلال 7 أيام' },
+  { value: '30', label: 'تنتهي خلال 30 يومًا' },
 ];
 
 // M210 (owner, 2026-11-07: «يظهر عندي الأعضاء الموثقين عبر واتس اب والغير موثقين» — and in the dashboard for the admin).
@@ -23,6 +31,7 @@ const WA_FILTERS: { value: WaFilter; label: string }[] = [
 const PER_PAGE = 25;
 const FILTERS: { value: AccountFilter; label: string }[] = [
   { value: 'all', label: 'الكل' },
+  { value: 'registered', label: 'الحسابات المسجّلة' },
   { value: 'member', label: 'أعضاء مشتركون' },
   { value: 'unpaid', label: 'لم يدفعوا بعد' },
   { value: 'pending', label: 'بانتظار تأكيد البريد' },
@@ -73,7 +82,7 @@ export function dailyLeft(account: Pick<Account, 'daily_left' | 'daily_limit'>):
 
 /** M116 (owner): the member's category, readable at a glance on the row and the sheet. */
 export function personaLabel(persona: string | null | undefined): string | null {
-  return PERSONA_FILTERS.find((entry) => entry.value === persona && entry.value !== 'all')?.label ?? null;
+  return PERSONA_FILTERS.find((entry) => entry.value === persona && entry.value !== 'all' && entry.value !== 'none')?.label ?? null;
 }
 
 function Row({ account }: { account: AccountRow }) {
@@ -128,18 +137,22 @@ function Row({ account }: { account: AccountRow }) {
 }
 
 /** Every account of the hub: search, the states with their counts, and beside each annual member what he has left. The shell remounts it to open on another state. */
-export function Members({ initial, stamp }: { initial: AccountFilter; stamp: number }) {
-  const [filter, setFilter] = useState<AccountFilter>(initial);
-  const [persona, setPersona] = useState<PersonaFilter>('all');
-  const [wa, setWa] = useState<WaFilter>('all');
+export function Members({ initial, stamp }: { initial: MembersView; stamp: number }) {
+  const { setMembersView } = useShell();
+  const [filter, setFilter] = useState<AccountFilter>(initial.state);
+  const [persona, setPersona] = useState<PersonaFilter>(initial.persona);
+  const [wa, setWa] = useState<WaFilter>(initial.wa);
+  const [ends, setEnds] = useState<EndsFilter>(initial.ends);
   const [text, setText] = useState('');
   const [page, setPage] = useState(1);
   const q = useDebounced(text.trim());
-  const state = useLoad(() => api.accounts({ q, state: filter, persona, wa, page, perPage: PER_PAGE }), [q, filter, persona, wa, page, stamp]);
+  const state = useLoad(() => api.accounts({ q, state: filter, persona, wa, ends, page, perPage: PER_PAGE }), [q, filter, persona, wa, ends, page, stamp]);
   // M86: the category counts over ALL accounts — the buttons show them and a tap filters the list.
   const personas = useLoad(() => api.personas('all'), [stamp]);
 
-  useEffect(() => setPage(1), [q, filter, persona, wa]);
+  useEffect(() => setPage(1), [q, filter, persona, wa, ends]);
+  // The address follows the chips (a reload or Back lands on the same list); a card of the home arrives through the same address.
+  useEffect(() => setMembersView({ state: filter, persona, wa, ends }), [filter, persona, wa, ends, setMembersView]);
 
   const counts = state.data?.counts;
   const personaCount = (value: PersonaFilter): number | null =>
@@ -149,8 +162,9 @@ export function Members({ initial, stamp }: { initial: AccountFilter; stamp: num
       <SectionHead title="الأعضاء" hint={state.data ? `الحسابات في هذا العرض: ${formatNumber(state.data.total)}` : undefined} onReload={state.reload} busy={state.loading} />
       <div className="filters">
         <SearchBox value={text} onChange={setText} placeholder="ابحث بالاسم أو البريد أو الجوال" />
-        <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: counts?.[entry.value] ?? null }))} value={filter} onChange={setFilter} />
+        <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: entry.value === 'registered' ? (counts?.all !== undefined ? counts.all - (counts.pending ?? 0) : null) : (counts?.[entry.value] ?? null) }))} value={filter} onChange={setFilter} />
         <Chips label="الفئة" options={PERSONA_FILTERS.map((entry) => ({ ...entry, count: personaCount(entry.value) }))} value={persona} onChange={setPersona} />
+        <Chips label="انتهاء العضوية" options={ENDS_FILTERS} value={ends} onChange={setEnds} />
         {/* M210: shown only when the hub answers the WhatsApp counts (2.28.4+). */}
         {counts && counts.wa_yes !== undefined ? (
           <Chips label="توثيق WhatsApp" options={WA_FILTERS.map((entry) => ({ ...entry, count: entry.value === 'all' ? null : (counts[entry.value === 'yes' ? 'wa_yes' : 'wa_no'] ?? null) }))} value={wa} onChange={setWa} />

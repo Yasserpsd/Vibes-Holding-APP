@@ -7,8 +7,13 @@ export type Listed<T> = { ok: true; total: number; page: number; per_page: numbe
 
 export type AccountState = 'pending' | 'unpaid' | 'member' | 'expired' | 'lead';
 /** The filters of the members list: the states plus the two roles and «all» (which leaves the leads out). */
-export type AccountFilter = 'all' | 'pending' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
-export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor';
+export type AccountFilter = 'all' | 'registered' | 'pending' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
+/** `none` = «بدون فئة»: a registered account that has not chosen a category. */
+export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor' | 'none';
+/** Memberships ending within 7 / 30 days (paid, dated ones only — the same count as the home cards). */
+export type EndsFilter = 'all' | '7' | '30';
+/** Everything the members list is filtered by; it lives in the address (`#members?persona=investor`) so a reload and Back keep it. */
+export type MembersView = { state: AccountFilter; persona: PersonaFilter; wa: WaFilter; ends: EndsFilter };
 /** M210: WhatsApp-proven number or not (hub 2.28.4+). */
 export type WaFilter = 'all' | 'yes' | 'no';
 

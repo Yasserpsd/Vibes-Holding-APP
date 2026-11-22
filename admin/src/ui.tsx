@@ -2,7 +2,7 @@ import { Component, createContext, useCallback, useContext, useEffect, useId, us
 
 import { ApiError } from './api';
 import { formatNumber } from './format';
-import type { AccountFilter } from './types';
+import type { MembersView } from './types';
 
 export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'signup' | 'ratings' | 'partners' | 'cards' | 'invites' | 'affiliates' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'requests' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion' | 'security';
 
@@ -11,11 +11,14 @@ export type Shell = {
   signOut: () => void;
   notify: (kind: 'ok' | 'error', text: string) => void;
   openMember: (contactId: number) => void;
-  openMembers: (state: AccountFilter) => void;
+  /** Opens the members list already filtered (`{ persona: 'investor' }`); no key means «all». */
+  openMembers: (view?: Partial<MembersView>) => void;
+  /** The members list tells the address which filters its chips show now. */
+  setMembersView: (view: MembersView) => void;
   openSection: (section: SectionKey) => void;
   openThread: (contactId: number) => void;
 };
-export const ShellContext = createContext<Shell>({ signOut: () => undefined, notify: () => undefined, openMember: () => undefined, openMembers: () => undefined, openSection: () => undefined, openThread: () => undefined });
+export const ShellContext = createContext<Shell>({ signOut: () => undefined, notify: () => undefined, openMember: () => undefined, openMembers: () => undefined, setMembersView: () => undefined, openSection: () => undefined, openThread: () => undefined });
 export const useShell = () => useContext(ShellContext);
 
 /**

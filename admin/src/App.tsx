@@ -27,7 +27,7 @@ import { Content } from './sections/Content';
 import { News } from './sections/News';
 import { Stats } from './sections/Stats';
 import { Wording } from './sections/Wording';
-import type { AccountFilter } from './types';
+import { parseView, viewQuery } from './membersView';
 import { Boundary, Broken, Icon, ShellContext, Sheet, type IconName, type SectionKey, type Shell } from './ui';
 
 const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
@@ -72,15 +72,15 @@ const LEAVE_EDITOR = 'لم تحفظ ما كتبته بعد. هل تترك الص
 const NOTICE_MS = 6000;
 
 /** `#threads/45@12`: the section, the open conversation, and the member whose sheet is up. The phone's back button walks them. */
-type Route = { section: SectionKey; thread: number | null; member: number | null };
+type Route = { section: SectionKey; thread: number | null; member: number | null; /** The members list's filters (`persona=investor`), kept in the address so a reload and Back keep them. */ filter: string };
 
 function readRoute(): Route {
-  const match = /^#?([a-z]+)(?:\/(\d+))?(?:@(\d+))?$/.exec(window.location.hash);
+  const match = /^#?([a-z]+)(?:\/(\d+))?(?:@(\d+))?(?:\?([a-z0-9=&]*))?$/.exec(window.location.hash);
   const section = SECTIONS.find((entry) => entry.key === match?.[1])?.key ?? 'home';
-  return { section, thread: section === 'threads' && match?.[2] ? Number(match[2]) : null, member: match?.[3] ? Number(match[3]) : null };
+  return { section, thread: section === 'threads' && match?.[2] ? Number(match[2]) : null, member: match?.[3] ? Number(match[3]) : null, filter: section === 'members' && match?.[4] ? match[4] : '' };
 }
 
-const toHash = (route: Route) => `#${route.section}${route.thread ? `/${route.thread}` : ''}${route.member ? `@${route.member}` : ''}`;
+const toHash = (route: Route) => `#${route.section}${route.thread ? `/${route.thread}` : ''}${route.member ? `@${route.member}` : ''}${route.filter ? `?${route.filter}` : ''}`;
 
 export function App() {
   const [me, setMe] = useState<Me | null>(null);
@@ -88,7 +88,8 @@ export function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [more, setMore] = useState(false);
-  const [memberFilter, setMemberFilter] = useState<{ state: AccountFilter; turn: number }>({ state: 'all', turn: 0 });
+  // Bumped whenever the address (not a chip) changes the members list's filters, so the list opens again on them.
+  const [membersTurn, setMembersTurn] = useState(0);
   const [stamp, setStamp] = useState(0);
   const editing = useRef(false);
   // The route on screen. After the phone's back button the address has already moved on; this has not.
@@ -131,6 +132,7 @@ export function App() {
       }
       if (!next.member) pushedMember.current = false;
       if (!next.thread) pushedThread.current = false;
+      if (next.filter !== shown.current.filter) setMembersTurn((value) => value + 1);
       shown.current = next;
       setRoute(next);
     };
@@ -173,12 +175,12 @@ export function App() {
     setRoute(to);
   }, []);
   const closeMember = useCallback(() => stepBack(pushedMember, { ...readRoute(), member: null }), [stepBack]);
-  const closeThread = useCallback(() => stepBack(pushedThread, { section: 'threads', thread: null, member: null }), [stepBack]);
+  const closeThread = useCallback(() => stepBack(pushedThread, { section: 'threads', thread: null, member: null, filter: '' }), [stepBack]);
 
   /** A conversation picked from the list. Beside an open one (a desk shows both) it takes that one's place, so back always leads to the list. */
   const pickThread = useCallback(
     (contactId: number) => {
-      const next: Route = { section: 'threads', thread: contactId, member: null };
+      const next: Route = { section: 'threads', thread: contactId, member: null, filter: '' };
       if (shown.current.section !== 'threads' || !shown.current.thread) {
         if (go(next)) pushedThread.current = true;
         return;
@@ -198,15 +200,23 @@ export function App() {
       openMember: (contactId) => {
         if (go({ ...readRoute(), member: contactId })) pushedMember.current = true;
       },
-      openMembers: (state) => {
-        setMemberFilter((current) => ({ state, turn: current.turn + 1 }));
-        go({ section: 'members', thread: null, member: null });
+      openMembers: (view) => {
+        setMembersTurn((value) => value + 1);
+        go({ section: 'members', thread: null, member: null, filter: viewQuery(view ?? {}) });
       },
-      openSection: (section) => go({ section, thread: null, member: null }),
+      // A chip on the members list: the address follows in place (no new history entry), the list itself already shows it.
+      setMembersView: (view) => {
+        const next: Route = { ...readRoute(), filter: viewQuery(view) };
+        if (toHash(next) === toHash(readRoute())) return;
+        window.history.replaceState(null, '', toHash(next));
+        shown.current = next;
+        setRoute(next);
+      },
+      openSection: (section) => go({ section, thread: null, member: null, filter: '' }),
       openThread: (contactId) => {
         // The sheet was opened from this very conversation: closing it is the whole way back.
         if (shown.current.section === 'threads' && shown.current.thread === contactId && shown.current.member) return closeMember();
-        if (!go({ section: 'threads', thread: contactId, member: null })) return;
+        if (!go({ section: 'threads', thread: contactId, member: null, filter: '' })) return;
         // Reached from a member's sheet, not from the list: the arrow in the conversation then rewrites the address instead of stepping back into the sheet.
         pushedMember.current = false;
         pushedThread.current = false;
@@ -276,7 +286,7 @@ export function App() {
           <Boundary key={section} watch={route.thread}>
             {section === 'home' ? <Home stamp={stamp} /> : null}
             {section === 'stats' ? <Stats /> : null}
-            {section === 'members' ? <Members key={memberFilter.turn} initial={memberFilter.state} stamp={stamp} /> : null}
+            {section === 'members' ? <Members key={membersTurn} initial={parseView(route.filter)} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
             {section === 'paylinks' ? <Paylinks /> : null}
             {section === 'discounts' ? <Discounts /> : null}
