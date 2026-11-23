@@ -85,7 +85,8 @@ test('a management message opens with the reader’s name, in the feed and in it
   pushed = [];
   assert.equal((await send('POST', `/api/admin/posts/${id}/notify`, {}, adminToken)).statusCode, 200);
   assert.equal(pushed.find((message) => message.to === MEMBER_DEVICE)?.body, 'الأستاذ/ عبد الله، تفاصيل الفرصة.');
-  assert.equal(pushed.find((message) => message.to === PARTNER_DEVICE)?.body, 'الأستاذ/ سلطان، تفاصيل الفرصة.');
+  // M269: the button is a reminder — the partner opened the message above, so his device hears nothing more.
+  assert.equal(pushed.find((message) => message.to === PARTNER_DEVICE), undefined);
 });
 
 test('an honorary member is kept apart from everything the management sends, whatever his category', async () => {

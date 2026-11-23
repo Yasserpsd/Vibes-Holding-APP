@@ -1,5 +1,7 @@
 import { hubCall, type HubClient } from '../hub/types.js';
 import type { PushService } from '../push/service.js';
+import { riyadhDay, riyadhHour } from '../riyadh.js';
+import { normalizePhone } from './phone.js';
 import type { WhatsappService } from './service.js';
 import { nameFor, toLang, type NoticeKind } from './templates.js';
 
@@ -72,6 +74,72 @@ export async function tellAudience(deps: TellDeps & { log?: { info: (data: objec
     deps.log?.info({ ref: input.ref, ...out }, 'management message announced on whatsapp');
   } catch (error) {
     deps.log?.warn({ ref: input.ref, ...out, err: error instanceof Error ? error.message : 'error' }, 'whatsapp announcement stopped early');
+  }
+  return out;
+}
+
+/** M269: a WhatsApp reminder stays inside the day — nothing between 22:00 and 08:00 Riyadh. */
+export function quietHour(ms: number): boolean {
+  const hour = riyadhHour(ms);
+  return hour >= 22 || hour < 8;
+}
+
+export type RemindDeps = Omit<TellDeps, 'whatsapp'> & {
+  whatsapp?: Pick<WhatsappService, 'sendNotice' | 'enabled' | 'toldToday'>;
+  log?: { info: (data: object, text: string) => void; warn: (data: object, text: string) => void };
+};
+export type RemindInput = { uuid: string; persona: string | null; members: number[]; done: ReadonlySet<number>; ref: string; now?: number };
+
+/**
+ * M269 (owner, 2026-11-23): the dashboard's «إرسال تذكير» — WhatsApp says again that a management message waits, only
+ * to the accounts of its audience that did not open it (a poll: did not vote). The number is protected («حد ارسال يومي
+ * مرة واحدة بس»): an account, or a number, that already heard a management notice today — the first announcement or
+ * another reminder — hears nothing more until tomorrow; one reminder never passes BROADCAST_CAP, never goes out at
+ * night, and the same reminder is never sent twice in a day (`ref`). Runs in the background and never throws.
+ */
+export async function remindAudience(deps: RemindDeps, input: RemindInput): Promise<{ sent: number; skipped: number }> {
+  const out = { sent: 0, skipped: 0 };
+  try {
+    const whatsapp = deps.whatsapp;
+    const now = input.now ?? Date.now();
+    if (!whatsapp?.enabled || quietHour(now)) return out;
+    const told = await whatsapp.toldToday('admin_message', now);
+    const day = riyadhDay(now);
+    const tell = async (account: { id: number; phone?: unknown; name?: string | null; lang?: unknown }) => {
+      const raw = String(account.phone ?? '').trim();
+      const phone = normalizePhone(raw);
+      if (!phone || input.done.has(account.id) || told.accounts.has(account.id) || told.phones.has(phone) || out.sent >= BROADCAST_CAP) {
+        out.skipped += 1;
+        return;
+      }
+      told.accounts.add(account.id);
+      told.phones.add(phone);
+      const stored = account.lang;
+      const lang = (await deps.push.langOf(account.id).catch(() => null)) ?? (stored === 'en' || stored === 'ar' ? stored : null);
+      const result = await whatsapp.sendNotice('admin_message', { phone: raw, lang, name: await nameIn(deps, account.id, account.name, lang), ref: `${input.ref}:${account.id}:r${day}` });
+      if (result.channel === 'whatsapp' && result.error !== 'already_sent') out.sent += 1;
+      else out.skipped += 1;
+    };
+    if (input.members.length) {
+      for (const contactId of input.members) {
+        const contact = await deps.hub.call('member_status', { contact_id: contactId }).then((found) => found.contact, () => null);
+        if (contact && contact.id === contactId) await tell(contact);
+        else out.skipped += 1;
+      }
+    } else {
+      for (let page = 1; page <= 50 && out.sent < BROADCAST_CAP; page += 1) {
+        const slice = await hubCall(deps.hub, 'admin_accounts', { uuid: input.uuid, q: '', state: 'all', page, per_page: 100 });
+        for (const account of slice.items) {
+          const fits = (account.state === 'member' || account.state === 'unpaid' || account.state === 'expired') && account.honorary !== 1 && (!input.persona || account.persona === input.persona);
+          if (fits) await tell(account);
+          else out.skipped += 1;
+        }
+        if (slice.items.length === 0 || page * slice.per_page >= slice.total) break;
+      }
+    }
+    deps.log?.info({ ref: input.ref, ...out }, 'management message reminder on whatsapp');
+  } catch (error) {
+    deps.log?.warn({ ref: input.ref, ...out, err: error instanceof Error ? error.message : 'error' }, 'whatsapp reminder stopped early');
   }
   return out;
 }

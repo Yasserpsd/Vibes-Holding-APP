@@ -88,3 +88,30 @@ test('a signed-in open is recorded once per visit; guests are not; the dashboard
   assert.equal((await send('DELETE', `/api/admin/posts/${id}`, undefined, adminToken)).statusCode, 200);
   assert.equal((await get(`/api/admin/posts/${id}/opens`, adminToken)).statusCode, 404);
 });
+
+// M269: the dashboard's button is a reminder — it leaves alone whoever already opened the message.
+test('m269: the reminder skips whoever opened the message and says it is a reminder', async () => {
+  const mine = 'ExponentPushToken[m269-admin-device-01]';
+  const theirs = 'ExponentPushToken[m269-other-device-02]';
+  assert.equal((await send('POST', '/api/push/tokens', { token: mine, platform: 'android' }, adminToken)).statusCode, 200);
+  assert.equal((await send('POST', '/api/push/tokens', { token: theirs, platform: 'android' }, otherToken)).statusCode, 200);
+  const made = await send('POST', '/api/admin/posts', { title: 'رسالة تحتاج تذكيرًا', body: 'نص الرسالة', status: 'published' }, adminToken);
+  assert.equal(made.statusCode, 201, made.body);
+  const id = made.json().post.id as string;
+  assert.equal((await get(`/api/posts/${id}`, otherToken)).statusCode, 200);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  pushBatches.length = 0;
+  const first = await send('POST', `/api/admin/posts/${id}/notify`, undefined, adminToken);
+  assert.equal(first.statusCode, 200, first.body);
+  assert.equal(first.json().opened, 1);
+  assert.equal(first.json().whatsapp, 'off'); // WhatsApp is not configured in this test
+  const reached = pushBatches.flat();
+  assert.equal(reached.some((message) => message.to === theirs), false);
+  const own = reached.find((message) => message.to === mine);
+  assert.equal(own?.title, 'رسالة تحتاج تذكيرًا'); // never notified before: the plain title
+
+  pushBatches.length = 0;
+  assert.equal((await send('POST', `/api/admin/posts/${id}/notify`, undefined, adminToken)).statusCode, 200);
+  assert.equal(pushBatches.flat().find((message) => message.to === mine)?.title, 'تذكير: رسالة تحتاج تذكيرًا');
+});

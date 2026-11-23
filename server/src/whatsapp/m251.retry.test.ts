@@ -57,7 +57,7 @@ test('m251: a notice Meta held back (131049) is sent again after 1 h, 6 h and 24
   const first = await service.sendNotice('admin_message', { phone: '0503844438', lang: 'ar', name: 'ماجد العمري', ref: 'post:p1:7' });
   assert.equal(first.channel, 'whatsapp');
   await service.ingestWebhook(status('wamid.1', 'failed', 131049));
-  assert.deepEqual({ ...(await service.deliveryOf('admin_message', 'post:p1')), rows: undefined }, { delivered: 0, sent: 0, retrying: 1, failed: 0, rows: undefined });
+  assert.deepEqual({ ...(await service.deliveryOf('admin_message', 'post:p1')), rows: undefined }, { delivered: 0, sent: 0, retrying: 1, failed: 0, rows: undefined, reached: [] });
 
   // Too early: nothing leaves before the first wait is over.
   clock.now += HOUR - 60_000;

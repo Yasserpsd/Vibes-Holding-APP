@@ -47,6 +47,11 @@ export class PollsService {
     await run;
   }
 
+  /** M269: the accounts that already voted — a reminder of the poll leaves them alone. */
+  async voters(postId: string): Promise<number[]> {
+    return Object.keys(await this.load(postId)).map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  }
+
   /** Counts per option (removed options' votes count nowhere) and the total of counted voters. */
   async results(postId: string, poll: PostPoll): Promise<{ counts: Record<string, number>; total: number }> {
     const votes = await this.load(postId);

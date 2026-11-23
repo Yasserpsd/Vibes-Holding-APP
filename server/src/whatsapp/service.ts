@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Mailer } from '../mail/mailer.js';
+import { riyadhDay } from '../riyadh.js';
 import type { KV } from '../store.js';
 import type { NewTemplate, WaTemplate, WhatsappClient } from './client.js';
 import { maskPhone, normalizePhone } from './phone.js';
@@ -58,7 +59,8 @@ const accountOfRef = (ref: string | null): number | null => {
 };
 
 export type WaDeliveryRow = { to: string; contactId: number | null; state: 'delivered' | 'sent' | 'retrying' | 'failed'; error: string | null; attempt: number; mailed: boolean; at: string };
-export type WaDelivery = { delivered: number; sent: number; retrying: number; failed: number; rows: WaDeliveryRow[] };
+/** M269: `reached` lists the numbers the notice was delivered to (the owner: «اعرف مين وصله علي واتس اب»); `rows` stays the ones it did not reach yet. */
+export type WaDelivery = { delivered: number; sent: number; retrying: number; failed: number; rows: WaDeliveryRow[]; reached: { to: string; contactId: number | null; at: string }[] };
 
 export const WHATSAPP_LOG_KEY = 'whatsapp:messages';
 /** M236: a broadcast to every account writes hundreds of records at once; the newest ones must not push the day's codes and receipts out. */
@@ -490,16 +492,35 @@ export class WhatsappService {
   async deliveryOf(kind: string, ref: string): Promise<WaDelivery> {
     const latest = new Map<string, WaRecord>();
     for (const record of await this.records()) {
-      if (record.kind === kind && record.ref && (record.ref === ref || record.ref.startsWith(`${ref}:`))) latest.set(`${record.ref}|${record.to}`, record);
+      // M269: a reminder is a later ref of the same message (`post:<id>:<account>:r<day>`) — the number keeps ONE row, its newest try.
+      if (record.kind === kind && record.ref && (record.ref === ref || record.ref.startsWith(`${ref}:`))) latest.set(record.to, record);
     }
-    const out: WaDelivery = { delivered: 0, sent: 0, retrying: 0, failed: 0, rows: [] };
+    const out: WaDelivery = { delivered: 0, sent: 0, retrying: 0, failed: 0, rows: [], reached: [] };
     for (const record of latest.values()) {
       const attempt = record.attempt ?? 0;
       const state = record.status === 'delivered' || record.status === 'read' ? 'delivered'
         : record.status !== 'failed' ? 'sent'
           : RETRY_KINDS.has(kind) && refusedByMeta(record) && !record.closed && attempt < RETRY_DELAYS_MS.length ? 'retrying' : 'failed';
       out[state] += 1;
-      if (state !== 'delivered') out.rows.push({ to: record.to, contactId: accountOfRef(record.ref), state, error: record.error, attempt, mailed: record.mailed === true, at: record.updatedAt });
+      if (state === 'delivered') out.reached.push({ to: record.to, contactId: accountOfRef(record.ref), at: record.updatedAt });
+      else out.rows.push({ to: record.to, contactId: accountOfRef(record.ref), state, error: record.error, attempt, mailed: record.mailed === true, at: record.updatedAt });
+    }
+    return out;
+  }
+
+  /**
+   * M269 (owner, 2026-11-23: «حد ارسال يومي مرة واحدة بس علي واتس اب… حماية لرقم واتس اب»): the numbers and the
+   * accounts this kind was already sent to in the Riyadh day of `now`. Every try counts, a refused one too — the
+   * limit protects the number, so it errs on the side of silence.
+   */
+  async toldToday(kind: string, now = (this.deps.now ?? Date.now)()): Promise<{ phones: Set<string>; accounts: Set<number> }> {
+    const today = riyadhDay(now);
+    const out = { phones: new Set<string>(), accounts: new Set<number>() };
+    for (const record of await this.records()) {
+      if (record.kind !== kind || riyadhDay(Date.parse(record.createdAt)) !== today) continue;
+      out.phones.add(record.to);
+      const account = accountOfRef(record.ref);
+      if (account) out.accounts.add(account);
     }
     return out;
   }

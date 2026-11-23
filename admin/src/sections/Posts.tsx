@@ -124,6 +124,7 @@ function WhatsappDelivery({ post }: { post: Post }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<PostWhatsapp | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [showReached, setShowReached] = useState(false);
   if (post.status !== 'published' || post.kind === 'popup') return null;
   const names = new Map<number, string>();
   if (post.audience?.type === 'members') for (const member of post.audience.members) names.set(member.contactId, member.name);
@@ -139,6 +140,10 @@ function WhatsappDelivery({ post }: { post: Post }) {
       setError(messageOf(cause));
     }
   };
+  /** M269: the member's name (the hub's), else the name the audience carries, else the account number. */
+  const labelOf = (row: { to: string; contactId: number | null; name?: string | null }) =>
+    row.name || (row.contactId !== null && names.get(row.contactId)) || (row.contactId !== null ? `حساب رقم ${row.contactId}` : `+${row.to}`);
+  const reached = data?.reached ?? [];
   const total = data ? data.delivered + data.sent + data.retrying + data.failed : 0;
   const stateText = (row: PostWhatsappRow) =>
     row.state === 'sent'
@@ -173,7 +178,7 @@ function WhatsappDelivery({ post }: { post: Post }) {
               <li key={`${row.to}-${row.at}`}>
                 <button type="button" className="list-row" disabled={row.contactId === null} onClick={() => (row.contactId === null ? undefined : openMember(row.contactId))}>
                   <span className="list-main">
-                    <strong dir="auto">{(row.contactId !== null && names.get(row.contactId)) || (row.contactId !== null ? `حساب رقم ${row.contactId}` : `+${row.to}`)}</strong>
+                    <strong dir="auto">{labelOf(row)}</strong>
                     <span className="muted">
                       {`${stateText(row)} · ${formatDateTime(row.at)}`}
                     </span>
@@ -182,6 +187,27 @@ function WhatsappDelivery({ post }: { post: Post }) {
               </li>
             ))}
           </ul>
+          {reached.length > 0 ? (
+            <>
+              <button type="button" className="link" onClick={() => setShowReached(!showReached)} aria-expanded={showReached}>
+                ✅ {showReached ? 'إخفاء من وصلتهم الرسالة' : `عرض من وصلتهم الرسالة (${formatNumber(reached.length)})`}
+              </button>
+              {showReached ? (
+                <ul className="list">
+                  {reached.map((row) => (
+                    <li key={`${row.to}-${row.at}`}>
+                      <button type="button" className="list-row" disabled={row.contactId === null} onClick={() => (row.contactId === null ? undefined : openMember(row.contactId))}>
+                        <span className="list-main">
+                          <strong dir="auto">{labelOf(row)}</strong>
+                          <span className="muted">{`وصلت على واتساب · ${formatDateTime(row.at)}`}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -247,16 +273,23 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
     }
   }
 
+  /** M269: «إرسال تذكير» — the app's notification and a WhatsApp notice, only to whoever did not open the message yet. */
   async function push(post: Post) {
-    const again = post.notifiedAt ? ' سبق إرسال إشعار لهذا المنشور.' : '';
     const audience = audienceOf(post);
-    const target = audience.type === 'all' ? `إلى ${devices} جهاز` : audience.type === 'persona' ? `إلى أجهزة فئة ${personaLabel(audience.persona)}` : audience.type === 'member' ? `إلى أجهزة العضو ${audience.name || `#${audience.contactId}`}` : `إلى أجهزة الأعضاء المحددين (${audience.members.length})`;
-    if (!window.confirm(`إرسال إشعار بهذا المنشور ${target}؟${again}`)) return;
+    const target = audience.type === 'all' ? 'جميع الأعضاء' : audience.type === 'persona' ? `فئة ${personaLabel(audience.persona)}` : audience.type === 'member' ? `العضو ${audience.name || `#${audience.contactId}`}` : `الأعضاء المحددين (${audience.members.length})`;
+    const who = post.kind === 'poll' ? 'لمن لم يصوّت بعد' : 'لمن لم يفتح الرسالة بعد';
+    const lines = [
+      `إرسال تذكير بهذا المنشور إلى ${target}؟`,
+      `يذهب التذكير ${who} فقط: إشعار على التطبيق، ورسالة واتساب.`,
+      'واتساب: رسالة واحدة في اليوم لكل رقم، ولا يُرسل ليلًا (من 10 مساءً إلى 8 صباحًا).',
+    ];
+    if (!window.confirm(lines.join('\n'))) return;
     setBusyId(post.id);
     try {
       const result = await api.notifyPost(post.id);
-      if (result.sent > 0) notify(result.failed ? 'error' : 'ok', `أُرسل الإشعار إلى ${result.sent} جهاز، وفشل ${result.failed}.`);
-      else notify('error', `لم يصل الإشعار إلى أي جهاز (فشل ${result.failed}). لم يُسجَّل كإشعار مُرسل.`);
+      const app = result.sent > 0 ? `إشعار التطبيق: وصل إلى ${formatNumber(result.sent)} جهاز${result.failed ? `، وفشل ${formatNumber(result.failed)}` : ''}.` : result.failed ? `إشعار التطبيق: لم يصل إلى أي جهاز (فشل ${formatNumber(result.failed)}).` : 'إشعار التطبيق: لا يوجد جهاز يحتاج تذكيرًا.';
+      const whatsapp = result.whatsapp === 'started' ? 'واتساب: بدأ الإرسال، وتظهر الأسماء في «عرض حالة واتساب».' : result.whatsapp === 'night' ? 'واتساب: لم يُرسل لأن الوقت ليل، أعد التذكير بعد 8 صباحًا.' : 'واتساب: غير مفعّل على هذا الخادم.';
+      notify(result.ok ? 'ok' : 'error', `${app} ${whatsapp}`);
       state.reload();
     } catch (failure) {
       fail(failure);
@@ -286,7 +319,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
       <SectionHead title="أدوات التواصل" hint={state.data ? `الأجهزة المسجلة للإشعارات: ${formatNumber(devices)}` : undefined} onReload={state.reload} busy={state.loading}>
         <button className="primary" type="button" onClick={() => setEditing('new')}>أداة جديدة</button>
       </SectionHead>
-      {state.data && devices === 0 ? <p className="muted">زر «إرسال إشعار» متوقف الآن لأن أي جهاز لم يسجّل بعد. يبدأ التسجيل بعد تثبيت نسخة التطبيق التي تدعم الإشعارات وتسجيل الدخول منها.</p> : null}
+      {state.data && devices === 0 ? <p className="muted">لم يسجّل أي جهاز للإشعارات بعد، فيذهب التذكير على واتساب فقط. يبدأ التسجيل بعد تثبيت نسخة التطبيق التي تدعم الإشعارات وتسجيل الدخول منها.</p> : null}
       <Async state={state} rows={5} empty={() => posts.length === 0} emptyText="لا توجد أدوات تواصل بعد.">
         {() => (
           <ul className="posts">
@@ -317,7 +350,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 {isAdmin ? <WhatsappDelivery post={post} /> : null}
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
-                  {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published' || devices === 0}>إرسال إشعار</button>}
+                  {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published'}>إرسال تذكير</button>}
                   <button className="danger" type="button" onClick={() => void remove(post)} disabled={busyId === post.id}>حذف</button>
                 </div>
               </li>

@@ -14,9 +14,9 @@ import type { WaDelivery } from '../whatsapp/service.js';
 import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
 import type { PostOpens } from './opens.js';
-import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
+import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, pollClosed, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void; /** M251: the WhatsApp delivery of one message's notice, for the dashboard. */ delivery?: (postId: string) => Promise<WaDelivery> };
+export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void; /** M251: the WhatsApp delivery of one message's notice, for the dashboard. */ delivery?: (postId: string) => Promise<WaDelivery>; /** M269: the reminder's WhatsApp half — starts in the background and says at once whether it started, is held for the night, or WhatsApp is off. */ remind?: (input: { uuid: string; persona: string | null; members: number[]; done: ReadonlySet<number>; ref: string }) => 'started' | 'night' | 'off' };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -86,7 +86,7 @@ const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
 
 /** «رسائل الإدارة»: the member's inbox feed (M29) and the dashboard's admin endpoints. */
-export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { opens, service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience, delivery }) => {
+export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, { opens, service, auth, hub, polls, push, media, hubSync, sync, autoPush = true, english, tellMember, tellAudience, delivery, remind }) => {
   const requireAdmin = dashboardGuard(auth, true); // M28: moderators publish posts
   const maybeSession = optionalSession(auth);
 
@@ -139,8 +139,35 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     else tellAudience?.(uuid, audience.type === 'persona' ? audience.persona : null, `post:${post.id}`);
   };
 
+  /**
+   * M269: the name of every account, by id, for the WhatsApp status list. The names are the hub's (rule 2) and are
+   * kept five minutes; a hub that cannot answer leaves the list with account numbers, as before.
+   */
+  let namesCache: { at: number; names: Map<number, string> } | null = null;
+  const accountNames = async (uuid: string): Promise<Map<number, string>> => {
+    if (namesCache && Date.now() - namesCache.at < 5 * 60_000) return namesCache.names;
+    const names = new Map<number, string>();
+    try {
+      for (let page = 1; page <= 50; page += 1) {
+        const slice = await hubCall(hub, 'admin_accounts', { uuid, q: '', state: 'all', page, per_page: 100 });
+        for (const account of slice.items) if ((account.name ?? '').trim()) names.set(account.id, String(account.name).trim());
+        if (slice.items.length === 0 || page * slice.per_page >= slice.total) break;
+      }
+      namesCache = { at: Date.now(), names };
+    } catch {
+      // The list still opens: rows without a name show the account number.
+    }
+    return names;
+  };
+
+  /** M269: who needs no reminder — whoever opened the message; for a poll that still takes votes, whoever voted. */
+  const doneWith = async (post: Post): Promise<Set<number>> => {
+    if (post.kind === 'poll' && post.poll && !pollClosed(post.poll)) return new Set(await polls.voters(post.id));
+    return new Set((opens ? await opens.list(post.id) : []).map((open) => open.contactId));
+  };
+
   /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
-  const pushPost = async (post: Post) => {
+  const pushPost = async (post: Post, reminder: { done: ReadonlySet<number>; titled: boolean } | null = null) => {
     // M180: an English app hears the message in English (the stored English; the Arabic only until it exists).
     const messageIn = (lang: AppLang, name: string | null, nameEn: string | null) => {
       const en = lang === 'en' ? post.en : null;
@@ -149,8 +176,10 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       // M232: the notification of a management message carries the member's name too.
       const hello = (post.kind ?? 'post') === 'post' ? greeting(lang, name, nameEn) : '';
       const line = text.length > 140 ? `${text.slice(0, 139)}…` : text || fallback;
+      const title = en?.title || post.title;
       return {
-        title: en?.title || post.title,
+        // M269: a reminder says it is one.
+        title: reminder?.titled ? (lang === 'en' ? `Reminder: ${title}` : `تذكير: ${title}`) : title,
         body: hello ? `${hello} ${line}` : line,
         data: { type: 'post', postId: post.id, screen: `/posts/${post.id}` },
       };
@@ -161,6 +190,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     const outcome = await push.broadcastPersonal((device) => {
       if (audience.type === 'persona' && device.persona !== audience.persona) return null;
       if (named.length && !named.includes(device.contactId)) return null;
+      // M269: a reminder leaves alone whoever already opened the message (a poll: already voted).
+      if (reminder?.done.has(device.contactId)) return null;
       return messageIn(device.lang === 'en' ? 'en' : 'ar', device.name, device.nameEn);
     });
     if (outcome.sent > 0) await service.markNotified(post.id);
@@ -276,7 +307,11 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       const post = await service.get(params.id);
       if (!post) return reply.code(404).send(NOT_FOUND);
       // M251: next to who opened it, where its WhatsApp notice stands (delivered, waiting, being tried again, refused).
-      return { opens: opens ? await opens.list(post.id) : [], whatsapp: delivery ? await delivery(post.id) : null };
+      const whatsapp = delivery ? await delivery(post.id) : null;
+      // M269 (owner: «يظهر اسم الشخص اعرف مين وصله علي واتس اب»): every row carries the account's name, the delivered ones too.
+      const names = whatsapp && whatsapp.rows.length + whatsapp.reached.length > 0 ? await accountNames(admin.session.uuid) : new Map<number, string>();
+      const named = <T extends { contactId: number | null }>(row: T) => ({ ...row, name: (row.contactId !== null && names.get(row.contactId)) || null });
+      return { opens: opens ? await opens.list(post.id) : [], whatsapp: whatsapp ? { ...whatsapp, rows: whatsapp.rows.map(named), reached: whatsapp.reached.map(named) } : null };
     }),
   );
 
@@ -374,15 +409,20 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       if (post.status !== 'published') {
         return reply.code(409).send({ error: { code: 'not_published', message: 'انشر المنشور أولًا ثم أرسل الإشعار' } });
       }
+      // M269 (owner, 2026-11-23): the button is a reminder — the app's notification AND a WhatsApp notice, only to
+      // whoever did not open the message yet (a poll still open: did not vote yet). WhatsApp runs in the background.
+      const done = await doneWith(post);
+      const audience = audienceOf(post);
+      const devices = await audienceDevices(post);
+      const whatsapp = remind ? remind({ uuid: admin.session.uuid, persona: audience.type === 'persona' ? audience.persona : null, members: audienceMemberIds(audience), done, ref: `post:${post.id}` }) : 'off';
       // M29: the notification goes exactly where the message goes. No registered device in the
       // audience means nobody would receive it: say so instead of reporting a sent notification.
-      if ((await audienceDevices(post)) === 0) {
-        const audience = audienceOf(post);
+      if (devices === 0 && whatsapp !== 'started') {
         const who = audience.type === 'all' ? 'للإشعارات بعد' : audience.type === 'persona' ? 'لهذه الفئة بعد' : audience.type === 'members' ? 'لهؤلاء الأعضاء بعد' : 'لهذا العضو بعد';
         return reply.code(409).send({ error: { code: 'no_devices', message: `لا توجد أجهزة مسجلة ${who}، فلن يصل الإشعار إلى أحد` } });
       }
-      const outcome = await pushPost(post);
-      return { ok: outcome.sent > 0, ...outcome };
+      const outcome = devices > 0 ? await pushPost(post, { done, titled: Boolean(post.notifiedAt) }) : { sent: 0, failed: 0, dropped: 0 };
+      return { ok: outcome.sent > 0 || whatsapp === 'started', ...outcome, whatsapp, opened: done.size };
     }),
   );
 

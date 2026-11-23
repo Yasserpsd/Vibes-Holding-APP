@@ -25,8 +25,9 @@ export type PostVideo = { url: string; poster: string | null };
 export type PostOpen = { contactId: number; name: string; persona: string; first: string; last: string; count: number };
 
 /** M251: where a message's WhatsApp notice stands; `rows` lists only the numbers it has not reached yet. */
-export type PostWhatsappRow = { to: string; contactId: number | null; state: 'sent' | 'retrying' | 'failed'; error: string | null; attempt: number; mailed: boolean; at: string };
-export type PostWhatsapp = { delivered: number; sent: number; retrying: number; failed: number; rows: PostWhatsappRow[] };
+export type PostWhatsappRow = { to: string; contactId: number | null; state: 'sent' | 'retrying' | 'failed'; error: string | null; attempt: number; mailed: boolean; at: string; name?: string | null };
+/** M269: `reached` = who the WhatsApp notice was delivered to, by name. */
+export type PostWhatsapp = { delivered: number; sent: number; retrying: number; failed: number; rows: PostWhatsappRow[]; reached?: { to: string; contactId: number | null; at: string; name?: string | null }[] };
 
 export type Post = {
   id: string;
@@ -692,7 +693,7 @@ export const api = {
   createPost: (input: PostInput) => call<{ post: Post }>('POST', '/api/admin/posts', input),
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),
-  notifyPost: (id: string) => call<{ ok: true; sent: number; failed: number; dropped: number }>('POST', `/api/admin/posts/${id}/notify`),
+  notifyPost: (id: string) => call<{ ok: boolean; sent: number; failed: number; dropped: number; whatsapp?: 'started' | 'night' | 'off'; opened?: number }>('POST', `/api/admin/posts/${id}/notify`),
   // M158: the downloads card and its «حدّث الآن».
   downloads: (days: number) => call<Downloads>('GET', `/api/admin/downloads?days=${days}`),
   downloadsSnapshot: (days: number) => call<Downloads>('POST', `/api/admin/downloads/snapshot?days=${days}`),

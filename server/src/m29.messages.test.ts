@@ -161,16 +161,25 @@ test('the notification goes exactly where the message goes', async () => {
   assert.equal((await register(users.investor.token, 'inv00001')).statusCode, 200);
   assert.equal((await register(users.neutral.token, 'neu00001')).statusCode, 200);
 
+  // M269: the button is a reminder — the investor already opened `investorsId`, so this one is a message he has not opened.
+  const unreadId = await publish({ title: 'للمستثمرين مرة أخرى', body: 'رسالة لم تُفتح بعد.', audience: { type: 'persona', persona: 'investor' } });
   pushBatches.length = 0;
-  const investorsPush = await send('POST', `/api/admin/posts/${investorsId}/notify`, undefined, adminToken);
+  const investorsPush = await send('POST', `/api/admin/posts/${unreadId}/notify`, undefined, adminToken);
   assert.equal(investorsPush.statusCode, 200, investorsPush.body);
   assert.equal(investorsPush.json().sent, 1);
   assert.deepEqual(pushBatches.flat().map((message) => message.to), ['ExponentPushToken[inv00001]']);
 
+  const unreadOneId = await publish({ title: 'رسالة خاصة أخرى', body: 'لك وحدك، ولم تُفتح بعد.', audience: { type: 'member', contactId: users.investor.id, name: 'عضو inv' } });
   pushBatches.length = 0;
-  const memberPush = await send('POST', `/api/admin/posts/${oneMemberId}/notify`, undefined, adminToken);
+  const memberPush = await send('POST', `/api/admin/posts/${unreadOneId}/notify`, undefined, adminToken);
+  assert.equal(memberPush.json().opened, 0);
   assert.equal(memberPush.statusCode, 200, memberPush.body);
   assert.deepEqual(pushBatches.flat().map((message) => message.to), ['ExponentPushToken[inv00001]']);
+
+  // M269: the message its one member already opened reminds nobody.
+  pushBatches.length = 0;
+  const openedPush = await send('POST', `/api/admin/posts/${oneMemberId}/notify`, undefined, adminToken);
+  assert.deepEqual([openedPush.statusCode, openedPush.json().ok, openedPush.json().sent, openedPush.json().opened, pushBatches.flat().length], [200, false, 0, 1, 0]);
 
   // Nobody of the audience registered a device: said plainly, nothing recorded.
   const entId = await publish({ title: 'لرواد الأعمال', body: 'رسالة فئة رواد الأعمال.', audience: { type: 'persona', persona: 'entrepreneur' } });
