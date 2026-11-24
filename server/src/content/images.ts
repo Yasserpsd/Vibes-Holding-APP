@@ -28,11 +28,17 @@ export type ImageSlot = {
 
 export const IMAGES_KEY = 'content:images';
 
-/** The HQ gallery: up to this many photos, shown in slot order on the HQ screen. */
-const HQ_SLOTS = 6;
+/**
+ * The HQ gallery: up to this many photos, shown in slot order on the HQ screen.
+ * M270 (owner, 2026-11-25: «استخدم كله… استخدم اكبر كمية ممكنة»): twelve, so the new hall photographs join his own six.
+ */
+const HQ_SLOTS = 12;
 
-/** M105 (owner, 2026-10-19): every service page carries an auto-rotating banner — up to this many photos. */
-const SERVICE_SLOTS = 6;
+/**
+ * M105 (owner, 2026-10-19): every service page carries an auto-rotating banner — up to this many photos.
+ * M270: twelve (it was six), so new posters are ADDED to a service whose six were already his.
+ */
+const SERVICE_SLOTS = 12;
 
 /** One document: `<slot>` → the picture, `en:<slot>` → the English app's picture of the same slot. */
 type StoredImages = Record<string, string>;
