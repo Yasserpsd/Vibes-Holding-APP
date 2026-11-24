@@ -17,17 +17,25 @@ const dryRun = args.includes('--dry-run');
 const dirAt = args.indexOf('--dir');
 const dir = dirAt >= 0 ? args[dirAt + 1] : 'C:/Users/LENOVO/OneDrive/Desktop/صور التطبيق الجديد/جاهزة للتطبيق';
 
-const call = async (pathname, options) => {
-  const { response, body } = await adminCall(pathname, options, api);
-  if (!response.ok) throw new Error(`${pathname}: ${response.status} ${body?.error?.message ?? ''}`);
-  return body;
-};
+// `adminCall` answers the parsed body and throws on any refusal (it signs in again once on a 401).
+const call = (pathname, options) => adminCall(pathname, options, api);
 
 /** Uploads one file and returns its public address. */
 async function upload(file) {
   const bytes = await readFile(path.join(dir, file));
   const ticket = await call('/api/admin/uploads', { method: 'POST', body: JSON.stringify({ filename: file, contentType: 'image/webp', size: bytes.length }) });
-  const put = await fetch(ticket.upload.url, { method: ticket.upload.method ?? 'PUT', headers: ticket.upload.headers ?? { 'content-type': 'image/webp' }, body: bytes, signal: AbortSignal.timeout(60000) });
+  // Two kinds of ticket, as in the dashboard (admin/src/api.ts `transfer`): a bucket takes a form whose policy
+  // fields come first and the file last; the disk store takes the bytes in a PUT.
+  let request;
+  if (ticket.upload.method === 'POST') {
+    const form = new FormData();
+    for (const [name, value] of Object.entries(ticket.upload.fields)) form.append(name, value);
+    form.append('file', new Blob([bytes], { type: 'image/webp' }), file);
+    request = { method: 'POST', body: form };
+  } else {
+    request = { method: 'PUT', headers: ticket.upload.headers, body: bytes };
+  }
+  const put = await fetch(ticket.upload.url, { ...request, signal: AbortSignal.timeout(60000) });
   if (!put.ok) throw new Error(`upload of ${file}: ${put.status}`);
   return ticket.url;
 }
@@ -57,6 +65,9 @@ for (const row of manifest) {
   for (const wanted of row.slots) {
     const slot = target(wanted);
     if (!slot) { console.log(`skip  ${wanted}: no empty slot`); continue; }
+    // A slot that already holds the owner's own picture keeps it, and takes no English twin of OURS either:
+    // the English app would otherwise show a different picture from the Arabic one.
+    if (slot.url) { console.log(`keep  ${slot.key}: already filled`); continue; }
     for (const [lang, file, current] of [['ar', row.file, slot.url], ['en', row.fileEn, slot.urlEn]]) {
       if (!file) continue;
       if (current) { console.log(`keep  ${slot.key} (${lang}): already filled`); continue; }
