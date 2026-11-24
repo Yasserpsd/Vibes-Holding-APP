@@ -602,6 +602,21 @@ export class PushService {
     });
   }
 
+  /** M271: the administration gave this member «عضوية شركاء النجاح» (360 days) or took it back. */
+  partnerChanged(contactId: number, on: boolean, until: string | null): void {
+    const data = { type: 'membership', status: on ? 'active' : 'changed', kind: 'partner', screen: '/membership' };
+    this.background(contactId, (lang) => {
+      if (lang === 'en') {
+        return on
+          ? { title: 'You have been granted Success Partners Membership', body: `Your Success Partners Membership of Investors Club is active${until ? ` until ${until}` : ''}.`, data }
+          : { title: 'Your Success Partners Membership has ended', body: 'Any active annual membership you hold is not affected.', data };
+      }
+      return on
+        ? { title: 'مُنحتم عضوية شركاء النجاح', body: `يسرّنا إبلاغكم بمنحكم عضوية شركاء النجاح في نادي المستثمرين${until ? `، وهي سارية حتى ${until}` : ''}.`, data }
+        : { title: 'انتهت عضوية شركاء النجاح', body: 'لا يؤثر انتهاؤها في أي عضوية سنوية سارية لديكم.', data };
+    });
+  }
+
   membershipActivated(contactId: number, activation: { expiresAt: string | null; pending: boolean }): void {
     const data = { type: 'membership', status: activation.pending ? 'pending' : 'active', screen: '/membership' };
     this.background(contactId, (lang) =>

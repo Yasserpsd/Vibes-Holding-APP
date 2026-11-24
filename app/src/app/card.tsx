@@ -16,6 +16,7 @@ import { useFormErrors } from '@/components/form/useFormErrors';
 import { FormField } from '@/components/FormField';
 import { GlassCard, NeonPulse } from '@/components/lux';
 import { entranceDelay, FadeInView, Sheen, useCountUp } from '@/components/motion';
+import { cardGlow, cardKindOf, cardLook, PARTNERS_LOGO, type CardKind } from '@/components/membershipLook';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { StateView } from '@/components/StateView';
@@ -24,7 +25,7 @@ import { t, type StringKey } from '@/i18n';
 import { textStart } from '@/i18n/direction';
 import { formatArabicDate } from '@/lib/format';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 type PrintField = 'city' | 'address' | 'phone' | 'note';
 const PRINT_ORDER: PrintField[] = ['city', 'address', 'phone', 'note'];
@@ -37,29 +38,15 @@ function categoryOf(persona: string): string {
   return key ? (t(key).split('—')[0] ?? '').trim() : '';
 }
 
+// The line under the card, per kind (an unactivated card shows the activation button instead).
+const HINT: Record<CardKind, StringKey> = { annual: 'card.daysCountdown', partner: 'card.partnerHint', honorary: 'card.honoraryHint', inactive: 'card.daysCountdown' };
+
 // Left-to-right mark: keeps a Latin or numeric value readable inside the Arabic line (Android RTL).
 const LRM = '‎';
 
-// M103 (owner): the ACTIVE member's card is a VIP gold piece; the unactivated (or expired) card
-// turns to a faded silver with «عضو غير مفعل» on it — same layout, two metals.
-const SILVER = {
-  bright: '#E9EAEF',
-  body: '#B6BAC4',
-  dark: '#787D88',
-  soft: 'rgba(182, 186, 196, 0.16)',
-  glow: '0 0 24px rgba(182, 186, 196, 0.18)',
-} as const;
-// The card is black in both themes, so its gold is fixed too (the logo's champagne scale): the light theme's
-// deeper golds are tuned for white paper and made the slab look dull.
-const GOLD = {
-  bright: '#F2CE74',
-  body: '#D9A83C',
-  dark: '#A67C22',
-} as const;
-
 /**
- * M30: «كارت العضوية» — a gold business card on black: club name, the member's name with an
- * engraved-gold effect, his title, company and city, the membership number, the expiry date and
+ * M30: «كارت العضوية» — a business card in the colour of the membership (M271, components/membershipLook.ts): club
+ * name, the member's name with an engraved effect, his title, company and city, the membership number, the expiry date and
  * the daily countdown. Under it: the member's own request for a printed copy, at no charge.
  * Pure views and shadows (no gradient package: a new native module would break OTA updates).
  */
@@ -104,45 +91,56 @@ export default function CardScreen() {
   const holder = displayProfile(me);
   const roleLine = [holder.jobTitle, holder.company].filter(Boolean).join(' · ');
   const contacts = [holder.city, me.phone && `${LRM}${me.phone}`, me.email && `${LRM}${me.email}`].filter(Boolean) as string[];
-  // M103: one layout, two metals — VIP gold for the active member, faded silver for the rest.
-  const metal = {
-    frame: active ? GOLD.body : SILVER.dark,
-    inner: active ? GOLD.dark : SILVER.dark,
-    bright: active ? GOLD.bright : SILVER.bright,
-    body: active ? GOLD.body : SILVER.body,
-    glow: active ? shadows.glowGoldStrong : SILVER.glow,
-  };
+  // M103 + M271: one layout, a colour per membership; faded silver without an active one.
+  const kind = cardKindOf(me.membership);
+  const look = cardLook(kind);
+  const partner = kind === 'partner';
+  const gold = kind === 'annual';
+  const glow = cardGlow(kind);
+  const ink = { textShadowColor: look.textShadow };
+  // On the pearl card the lettering is pressed, not lifted: a soft white edge instead of a dark drop.
+  const press = kind === 'honorary' ? { textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 } : null;
 
   return (
     <Screen title={t('nav.card')} subtitle={t('card.subtitle')}>
       <Stack.Screen options={{ title: t('nav.card') }} />
 
-      <FadeInView offset={18}>
-      <View style={[styles.card, { borderColor: metal.frame, boxShadow: metal.glow }, !active && styles.cardFaded]}>
-        {/* V2: the card frame breathes a neon halo — golden only while the membership is. */}
-        {active ? <NeonPulse radius={radii.lg} intensity="strong" /> : null}
-        <View style={[styles.cardInner, { borderColor: metal.inner }]} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
-          {/* The metal of the card: soft rings and a diagonal sheen, behind everything. */}
-          <View pointerEvents="none" style={[styles.ring, styles.ringLarge, { borderColor: metal.body }]} />
-          <View pointerEvents="none" style={[styles.ring, styles.ringSmall, { borderColor: metal.body }]} />
-          <View pointerEvents="none" style={[styles.sheen, { backgroundColor: metal.bright }]} />
-          <View pointerEvents="none" style={[styles.corner, styles.cornerTopStart, { borderColor: metal.frame }]} />
-          <View pointerEvents="none" style={[styles.corner, styles.cornerBottomEnd, { borderColor: metal.frame }]} />
+      {/* Keyed by the kind: the cards differ in structure, and a view must never change shape in place (Android). */}
+      <FadeInView key={kind} offset={18}>
+      <View style={[styles.card, { backgroundColor: look.shell, borderColor: look.frame, boxShadow: glow }, !active && styles.cardFaded]}>
+        {/* V2: the card frame breathes a neon halo, in the card's own colour, only while the membership is active. */}
+        {active ? <NeonPulse radius={radii.lg} intensity="strong" color={gold ? undefined : look.frame} halo={gold ? undefined : glow} /> : null}
+        <View style={[styles.cardInner, { borderColor: look.edge, backgroundColor: look.face, experimental_backgroundImage: look.image }]} onLayout={(event) => setCardSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+          {/* The material of the card: soft rings and a diagonal sheen, behind everything. */}
+          <View pointerEvents="none" style={[styles.ring, styles.ringLarge, { borderColor: look.body, opacity: look.ringOpacity }]} />
+          <View pointerEvents="none" style={[styles.ring, styles.ringSmall, { borderColor: look.body, opacity: look.ringOpacity }]} />
+          <View pointerEvents="none" style={[styles.sheen, { backgroundColor: look.sheen }]} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerTopStart, { borderColor: partner ? look.accent : look.frame }]} />
+          <View pointerEvents="none" style={[styles.corner, styles.cornerBottomEnd, { borderColor: partner ? look.accent : look.frame }]} />
 
           <View style={styles.head}>
-            <View style={[styles.logoBadge, { borderColor: metal.frame }]}>
+            <View style={[styles.logoBadge, { borderColor: look.frame, backgroundColor: look.disc }]}>
               <Image source={require('../../assets/images/club-logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
             </View>
-            {/* The club's name once: since it became Latin «Investors Club» in both languages (2026-10-21), the
-                spaced-capitals line under it repeated the same two words. */}
-            <View style={styles.headText}>
-              <Text style={[styles.club, { color: metal.body }]} numberOfLines={1}>{t('common.clubName')}</Text>
-            </View>
-            {/* M103: the member's standing, loud and unmistakable — VIP in gold, or the quiet silver tag. */}
+            {partner ? (
+              // M271 (owner): the Success Partners logo beside the club emblem, on white so its own colours stay.
+              <View style={styles.headText}>
+                <View style={styles.partnerPlate}>
+                  <Image source={PARTNERS_LOGO} style={styles.partnerLogo} resizeMode="contain" accessibilityLabel={t('card.partnerLogo')} />
+                </View>
+              </View>
+            ) : (
+              /* The club's name once: since it became Latin «Investors Club» in both languages (2026-10-21), the
+                 spaced-capitals line under it repeated the same two words. */
+              <View style={styles.headText}>
+                <Text style={[styles.club, { color: look.body }]} numberOfLines={1}>{t('common.clubName')}</Text>
+              </View>
+            )}
+            {/* M103: the member's standing, loud and unmistakable — VIP in the card's metal, or the quiet silver tag. */}
             {active ? (
-              <View style={styles.vipBadge}>
-                <Ionicons name="diamond" size={11} color={colors.goldInk} />
-                <Text style={styles.vipText} numberOfLines={1}>VIP</Text>
+              <View style={[styles.vipBadge, { backgroundColor: look.pill, experimental_backgroundImage: look.pillImage, boxShadow: partner ? '0 0 16px rgba(247, 143, 52, 0.45)' : shadows.glowGold }]}>
+                <Ionicons name="diamond" size={11} color={look.pillInk} />
+                <Text style={[styles.vipText, { color: look.pillInk }]} numberOfLines={1}>VIP</Text>
               </View>
             ) : (
               <View style={styles.inactiveBadge}>
@@ -151,19 +149,27 @@ export default function CardScreen() {
             )}
           </View>
 
-          <GoldRule active={active} />
+          {partner ? (
+            <View style={styles.typeRow}>
+              <Text style={[styles.typeClub, { color: look.strong }]} numberOfLines={1}>{t('common.clubName')}</Text>
+              <View style={[styles.typeDot, { backgroundColor: look.accent }]} />
+              <Text style={[styles.typeName, { color: look.accent }]} numberOfLines={1}>{t('membership.partner')}</Text>
+            </View>
+          ) : null}
+
+          <MetalRule tones={look.rule} />
 
           <View style={styles.holder}>
-            <Text style={[styles.holderName, { color: metal.bright }]} numberOfLines={2}>
+            <Text style={[styles.holderName, { color: look.strong }, ink, press]} numberOfLines={2}>
               {holder.name}
             </Text>
             <View style={styles.holderMetaRow}>
               {category ? (
-                <View style={[styles.categoryPill, { backgroundColor: active ? GOLD.body : SILVER.body }]}>
-                  <Text style={styles.categoryText} numberOfLines={1}>{category}</Text>
+                <View style={[styles.categoryPill, { backgroundColor: look.pill }]}>
+                  <Text style={[styles.categoryText, { color: look.pillInk }]} numberOfLines={1}>{category}</Text>
                 </View>
               ) : null}
-              {roleLine ? <Text style={styles.holderRole} numberOfLines={1}>{roleLine}</Text> : null}
+              {roleLine ? <Text style={[styles.holderRole, { color: look.soft }]} numberOfLines={1}>{roleLine}</Text> : null}
             </View>
           </View>
 
@@ -171,61 +177,61 @@ export default function CardScreen() {
             <View style={styles.numberRow}>
               {me.cardNumber ? (
                 <View style={[styles.numberBlock, styles.numberCell]}>
-                  <Text style={styles.numberLabel}>{t('card.numberLabel')}</Text>
-                  <Text style={[styles.number, { color: metal.body }]}>{me.cardNumber}</Text>
+                  <Text style={[styles.numberLabel, { color: look.label }]}>{t('card.numberLabel')}</Text>
+                  <Text style={[styles.number, { color: look.body }, ink, press]}>{me.cardNumber}</Text>
                 </View>
               ) : null}
               {active && promoCode ? (
                 <View style={styles.numberBlock}>
-                  <Text style={styles.numberLabel}>{t('card.promoLabel')}</Text>
-                  <Text style={[styles.number, { color: metal.body }]} selectable>{promoCode}</Text>
+                  <Text style={[styles.numberLabel, { color: look.label }]}>{t('card.promoLabel')}</Text>
+                  <Text style={[styles.number, { color: look.body }, ink, press]} selectable>{promoCode}</Text>
                 </View>
               ) : null}
             </View>
           ) : null}
 
-          <View style={[styles.footer, { borderTopColor: metal.inner }]}>
+          <View style={[styles.footer, { borderTopColor: look.edge }]}>
             {honorary ? (
               <View style={styles.cell}>
-                <Text style={styles.cellLabel}>{t('card.typeLabel')}</Text>
-                <Text style={[styles.cellValue, { color: metal.bright }]}>{t('membership.honorary')}</Text>
+                <Text style={[styles.cellLabel, { color: look.label }]}>{t('card.typeLabel')}</Text>
+                <Text style={[styles.cellValue, { color: look.strong }]}>{t('membership.honorary')}</Text>
               </View>
             ) : null}
             {active && endDate && !honorary ? (
               <View style={styles.cell}>
-                <Text style={styles.cellLabel}>{t('card.validThru')}</Text>
-                <Text style={[styles.cellValue, { color: metal.bright }]}>{endDate}</Text>
+                <Text style={[styles.cellLabel, { color: look.label }]}>{t('card.validThru')}</Text>
+                <Text style={[styles.cellValue, { color: look.strong }]}>{endDate}</Text>
               </View>
             ) : null}
             {active && me.membership.daysLeft !== null && !honorary ? (
               <View style={styles.cell}>
-                <Text style={styles.cellLabel}>{t('card.daysLabel')}</Text>
+                <Text style={[styles.cellLabel, { color: look.label }]}>{t('card.daysLabel')}</Text>
                 <View style={styles.daysRow}>
-                  <Ionicons name="hourglass-outline" size={13} color={GOLD.body} />
-                  <Text style={[styles.cellValue, { color: metal.bright }]}>{t('card.daysValue', { days: daysShown })}</Text>
+                  <Ionicons name="hourglass-outline" size={13} color={look.accent} />
+                  <Text style={[styles.cellValue, { color: look.strong }]}>{t('card.daysValue', { days: daysShown })}</Text>
                 </View>
               </View>
             ) : null}
-            {!active ? <Text style={styles.inactive}>{me.membership.status === 'expired' ? t('card.expired') : t('card.notActive')}</Text> : null}
+            {!active ? <Text style={[styles.inactive, { color: look.strong }]}>{me.membership.status === 'expired' ? t('card.expired') : t('card.notActive')}</Text> : null}
           </View>
 
           {contacts.length ? (
             <View style={styles.contacts}>
               {contacts.map((entry) => (
-                <Text key={entry} style={styles.contact} numberOfLines={1}>
+                <Text key={entry} style={[styles.contact, { color: look.soft }]} numberOfLines={1}>
                   {entry}
                 </Text>
               ))}
             </View>
           ) : null}
 
-          {cardSize ? <Sheen width={cardSize.width} height={cardSize.height} /> : null}
+          {cardSize ? <Sheen width={cardSize.width} height={cardSize.height} color={look.sweep} /> : null}
         </View>
       </View>
       </FadeInView>
 
       <FadeInView delay={entranceDelay(1)}>
-        {active ? <Text style={styles.hint}>{t(honorary ? 'card.honoraryHint' : 'card.daysCountdown')}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
+        {active ? <Text style={styles.hint}>{t(HINT[kind])}</Text> : <AppButton label={t('card.activate')} icon="ribbon-outline" onPress={() => router.push('/membership')} />}
       </FadeInView>
 
       {active && walletFor ? (
@@ -276,12 +282,11 @@ function WalletButton({ wallet }: { wallet: 'apple' | 'google' }) {
   );
 }
 
-/** A thin metallic divider: dark metal melting into bright and back — gold or silver with the membership. */
-function GoldRule({ active }: { active: boolean }) {
-  const steps = active ? [GOLD.dark, GOLD.body, GOLD.bright, GOLD.body, GOLD.dark] : [SILVER.dark, SILVER.body, SILVER.bright, SILVER.body, SILVER.dark];
+/** A thin metallic divider: the dark tone melting into the bright one and back, in the card's colour. */
+function MetalRule({ tones }: { tones: readonly string[] }) {
   return (
     <View style={styles.rule}>
-      {steps.map((tone, index) => (
+      {tones.map((tone, index) => (
         <View key={index} style={[styles.ruleStep, { backgroundColor: tone, flex: index % 2 ? 3 : 2 }]} />
       ))}
     </View>
@@ -483,52 +488,49 @@ function PrintBlock({ active }: { active: boolean }) {
   );
 }
 
-const CARD_BLACK = '#0B0A08';
-// The card is black in BOTH themes: its frame and logo disc must not follow `colors.black` (near-white in
-// the light theme), and the text on it uses the onPhoto* tokens (light on dark in both themes).
-const CARD_FRAME_BLACK = '#070708';
-
 const styles = themedStyles(() => ({
-  // The card: a gold slab on black — double gold frame, deep warm black, a gold glow around it.
+  // The card: a double frame and a halo; its colours come from components/membershipLook.ts (fixed in both themes).
   card: {
     borderRadius: radii.lg,
     borderWidth: 2,
-    borderColor: GOLD.body,
-    backgroundColor: CARD_FRAME_BLACK,
     padding: 5,
-    boxShadow: shadows.glowGoldStrong,
   },
   cardInner: {
     borderRadius: radii.lg - 5,
     borderWidth: 1,
-    borderColor: GOLD.dark,
-    backgroundColor: CARD_BLACK,
     paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.md + 2,
     gap: spacing.md,
     overflow: 'hidden',
   },
-  // Engraved gold circles, barely there, like guilloché on a bank card.
-  ring: { position: 'absolute', borderColor: GOLD.body, opacity: 0.09 },
+  // Engraved circles, barely there, like guilloché on a bank card.
+  ring: { position: 'absolute' },
   ringLarge: { width: 230, height: 230, borderRadius: 115, borderWidth: 22, top: -95, start: -85 },
   ringSmall: { width: 130, height: 130, borderRadius: 65, borderWidth: 12, bottom: -55, end: -45 },
-  // A diagonal sheen band across the metal.
-  sheen: { position: 'absolute', width: 520, height: 74, backgroundColor: GOLD.bright, opacity: 0.05, top: 26, start: -120, transform: [{ rotate: '-16deg' }] },
+  // A diagonal sheen band across the face.
+  sheen: { position: 'absolute', width: 520, height: 74, opacity: 0.05, top: 26, start: -120, transform: [{ rotate: '-16deg' }] },
   // Thin corner accents.
-  corner: { position: 'absolute', width: 26, height: 26, borderColor: GOLD.body, opacity: 0.75 },
+  corner: { position: 'absolute', width: 26, height: 26, opacity: 0.75 },
   cornerTopStart: { top: 10, start: 10, borderTopWidth: 1.5, borderStartWidth: 1.5, borderTopStartRadius: 8 },
   cornerBottomEnd: { bottom: 10, end: 10, borderBottomWidth: 1.5, borderEndWidth: 1.5, borderBottomEndRadius: 8 },
 
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
-  logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: GOLD.body, backgroundColor: CARD_FRAME_BLACK, alignItems: 'center', justifyContent: 'center' },
+  logoBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 32, height: 32 },
   headText: { flex: 1 },
-  club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: GOLD.body, textAlign: textStart },
-  categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill, backgroundColor: GOLD.body },
-  categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17, color: colors.goldInk },
+  club: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, textAlign: textStart },
+  // M271: the white plate of the Success Partners logo (900×250); it shrinks with a narrow phone.
+  partnerPlate: { alignSelf: 'flex-start', width: '100%', maxWidth: 176, height: 46, borderRadius: radii.md, backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm, paddingVertical: 6, boxShadow: '0 4px 14px rgba(3, 12, 46, 0.35)' },
+  partnerLogo: { width: '100%', height: '100%' },
+  typeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+  typeClub: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 22 },
+  typeDot: { width: 5, height: 5, borderRadius: 3 },
+  typeName: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, flexShrink: 1 },
+  categoryPill: { paddingVertical: 3, paddingHorizontal: spacing.sm + 2, borderRadius: radii.pill },
+  categoryText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 17 },
   // M103: the silvered, faded shell of the unactivated card.
   cardFaded: { opacity: 0.88 },
-  // M103: the VIP mark — gold on gold-ink, impossible to miss.
+  // M103: the VIP mark — impossible to miss.
   vipBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,68 +538,61 @@ const styles = themedStyles(() => ({
     paddingVertical: 4,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
-    backgroundColor: GOLD.body,
-    experimental_backgroundImage: gradients.gold,
-    boxShadow: shadows.glowGold,
   },
-  vipText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, color: colors.goldInk, letterSpacing: 2, writingDirection: 'ltr' },
+  vipText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, letterSpacing: 2, writingDirection: 'ltr' },
   inactiveBadge: {
     paddingVertical: 3,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: SILVER.dark,
-    backgroundColor: SILVER.soft,
+    borderColor: '#787D88',
+    backgroundColor: 'rgba(182, 186, 196, 0.16)',
   },
-  inactiveBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: SILVER.bright },
+  inactiveBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 16, color: '#E9EAEF' },
   holderMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
 
   rule: { flexDirection: 'row', alignItems: 'center', height: 2, borderRadius: 1, overflow: 'hidden' },
   ruleStep: { height: 2 },
 
   holder: { gap: 2, paddingVertical: 2 },
-  // The name in raised gold: bright gold letters lifted off the black by a soft dark drop.
+  // The name in raised letters, lifted off the face by a soft drop.
   holderName: {
     fontFamily: fonts.bold,
     fontSize: 26,
     lineHeight: 38,
-    color: GOLD.bright,
     letterSpacing: 0.4,
     textAlign: textStart,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 4,
   },
-  holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.onPhotoSoft, textAlign: textStart },
+  holderRole: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, textAlign: textStart },
 
   numberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   numberCell: { flex: 1 },
   // flexShrink: a long promo code must not squeeze the membership number out of the row on a narrow phone.
   numberBlock: { gap: 1, flexShrink: 1 },
-  numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, color: colors.onPhotoMuted, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
+  numberLabel: { fontFamily: fonts.medium, fontSize: 10, lineHeight: 15, textAlign: textStart, writingDirection: 'ltr', letterSpacing: 1.5 },
   number: {
     fontFamily: fonts.semiBold,
     fontSize: 22,
     lineHeight: 30,
-    color: GOLD.body,
     textAlign: textStart,
     writingDirection: 'ltr',
     letterSpacing: 3,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
   },
 
-  footer: { flexDirection: 'row', gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: GOLD.dark, paddingTop: spacing.sm + 2 },
+  footer: { flexDirection: 'row', gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm + 2 },
   cell: { flex: 1, gap: 2 },
-  cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.onPhotoMuted, textAlign: textStart },
-  cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, color: GOLD.bright, textAlign: textStart },
+  cellLabel: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, textAlign: textStart },
+  cellValue: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 21, textAlign: textStart },
   daysRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // M103: the unactivated line reads clearly on the silver card.
-  inactive: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, color: SILVER.bright, textAlign: textStart },
+  inactive: { fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 22, textAlign: textStart },
 
   contacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 },
-  contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: colors.onPhotoSoft, textAlign: textStart, flexShrink: 1 },
+  contact: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, textAlign: textStart, flexShrink: 1 },
 
   hint: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   wallet: { gap: spacing.sm },

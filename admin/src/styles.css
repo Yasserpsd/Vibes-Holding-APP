@@ -118,6 +118,7 @@ button.tile:hover { border-color: var(--gold-line); }
 .search input:focus { outline: none; }
 .pill { display: inline-flex; align-items: center; font-size: 0.75rem; line-height: 1.5; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .pill.gold { border-color: var(--gold-line); color: var(--gold-bright); background: var(--gold-wash); }
+.pill.blue { border-color: rgba(88, 142, 255, 0.55); color: #9dbcff; background: rgba(47, 99, 214, 0.18); }
 .pill.ok { border-color: rgba(63, 185, 80, 0.4); color: var(--ok); background: var(--ok-wash); }
 .pill.danger { border-color: rgba(229, 72, 77, 0.45); color: #ff8589; background: var(--danger-wash); }
 .intent { display: inline-flex; gap: 6px; align-items: center; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }

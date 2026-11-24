@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
+import sharp from 'sharp';
 
 import { guard, RequestError, sessionGuard } from '../auth/guard.js';
 import { PERSONAS, type AuthService, type Me } from '../auth/service.js';
@@ -23,6 +24,7 @@ export function walletFlags(config: Config): { walletApple: boolean; walletGoogl
 const LINK_MINUTES = 10;
 const PKPASS_TYPE = 'application/vnd.apple.pkpass';
 const EMBLEM_FILE = 'wallet-emblem.png';
+const PARTNER_FILE = 'success-partners-logo.png';
 
 /** The first word of the category (the line before its explainer), in both languages. */
 function categoryWords(persona: string): { categoryAr: string; categoryEn: string } {
@@ -33,7 +35,7 @@ function categoryWords(persona: string): { categoryAr: string; categoryEn: strin
 
 /** The pass says what the in-app card says: the name, the membership number (also the QR value) and the end date. */
 function passMemberOf(me: Me): PassMember {
-  return { name: me.name, cardNumber: me.cardNumber, endDate: me.membership.endDate, ...categoryWords(me.persona) };
+  return { name: me.name, cardNumber: me.cardNumber, kind: me.membership.kind, endDate: me.membership.endDate, ...categoryWords(me.persona) };
 }
 
 type StoredLink = { hash: string; expiresAt: string; pass: string };
@@ -52,6 +54,7 @@ export const walletRoutes: FastifyPluginAsync<WalletRoutesOptions> = async (app,
   const apple = appleCredentialsOf(config);
   const google = googleCredentialsOf(config);
   const readEmblem = () => readFileSync(join(process.cwd(), 'assets', EMBLEM_FILE));
+  const readPartnerLogo = () => readFileSync(join(process.cwd(), 'assets', PARTNER_FILE));
   const noStore = (reply: FastifyReply) => reply.header('Cache-Control', 'no-store');
   const notFound = (reply: FastifyReply) => noStore(reply).code(404).send({ error: { code: 'not_found', message: 'هذه الخدمة غير متاحة حاليًا' } });
 
@@ -71,7 +74,7 @@ export const walletRoutes: FastifyPluginAsync<WalletRoutesOptions> = async (app,
       if (!apple) return notFound(reply);
       const me = await activeMember(request, reply);
       if (!me) return;
-      const pass = await buildPkpass(apple, passMemberOf(me), readEmblem);
+      const pass = await buildPkpass(apple, passMemberOf(me), readEmblem, readPartnerLogo);
       return reply.header('Content-Type', PKPASS_TYPE).header('Content-Disposition', 'inline; filename="investors-club.pkpass"').send(pass);
     }),
   );
@@ -84,7 +87,7 @@ export const walletRoutes: FastifyPluginAsync<WalletRoutesOptions> = async (app,
       const me = await activeMember(request, reply);
       if (!me) return;
       const secret = randomBytes(24).toString('base64url');
-      const pass = await buildPkpass(apple, passMemberOf(me), readEmblem);
+      const pass = await buildPkpass(apple, passMemberOf(me), readEmblem, readPartnerLogo);
       // One entry per member, replaced by the next request: nothing piles up and an old link dies with the new one.
       const stored: StoredLink = { hash: hashOf(secret), expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000).toISOString(), pass: pass.toString('base64') };
       await kv.set(linkKey(me.id), stored);
@@ -116,12 +119,25 @@ export const walletRoutes: FastifyPluginAsync<WalletRoutesOptions> = async (app,
       if (!google) return notFound(reply);
       const me = await activeMember(request, reply);
       if (!me) return;
-      return { url: googleSaveUrl(google, passMemberOf(me), `${config.PUBLIC_URL}/wallet/emblem.png`, langOf(request) === 'en' ? 'en' : 'ar') };
+      return { url: googleSaveUrl(google, passMemberOf(me), `${config.PUBLIC_URL}/wallet/emblem.png`, langOf(request) === 'en' ? 'en' : 'ar', new Date(), `${config.PUBLIC_URL}/wallet/success-partners.png`) };
     }),
   );
 
   // The club's emblem, public: Google fetches the pass logo from here.
   app.get('/wallet/emblem.png', async (_request, reply) => {
     return reply.header('Content-Type', 'image/png').header('Cache-Control', 'public, max-age=86400').send(readEmblem());
+  });
+
+  // M271: the Success Partners logo on white in Google's banner shape (1032×336), public for the same reason.
+  let banner: Promise<Buffer> | null = null;
+  app.get('/wallet/success-partners.png', async (_request, reply) => {
+    banner ??= (async () => {
+      const logo = await sharp(readPartnerLogo()).resize({ width: 760 }).png().toBuffer();
+      return sharp({ create: { width: 1032, height: 336, channels: 4, background: '#ffffff' } }).composite([{ input: logo, gravity: 'centre' }]).png().toBuffer();
+    })();
+    banner.catch(() => {
+      banner = null;
+    });
+    return reply.header('Content-Type', 'image/png').header('Cache-Control', 'public, max-age=86400').send(await banner);
   });
 };

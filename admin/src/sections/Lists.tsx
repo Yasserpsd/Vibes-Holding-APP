@@ -575,6 +575,7 @@ function auditText(entry: AuditEntry): string {
   }
   if (entry.action === 'delete') return typeof params.name === 'string' && params.name ? `حذف الحساب: ${params.name}` : 'حذف الحساب';
   if (entry.action === 'honorary') return params.on === false ? 'سحب العضوية الشرفية' : 'منح العضوية الشرفية';
+  if (entry.action === 'partner') return params.on === false ? 'سحب عضوية شركاء النجاح' : 'منح عضوية شركاء النجاح';
   if (entry.action === 'role') return params.role === 'publisher' ? 'منح صلاحية النشر' : 'سحب صلاحية النشر';
   if (entry.action === 'pb_grant') {
     const amount = typeof params.amount === 'number' ? params.amount : 0;

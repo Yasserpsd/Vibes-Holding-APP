@@ -6,6 +6,7 @@ import type { Config } from '../config.js';
 import { COUNTRIES, hubNumber, nationalDigits, normLogin } from '../hub/phone.js';
 import { HubError, type HubClient, type HubContact, type HubResponse } from '../hub/types.js';
 import { isHonorary } from '../membership/honorary.js';
+import { isPartner } from '../membership/partner.js';
 import { interestLabel, isInterestKey } from '../interests/types.js';
 import type { AppLang, AppSource } from '../lang.js';
 import type { SocialIdentity } from './social.js';
@@ -47,8 +48,10 @@ export type Membership = {
   /**
    * M205: 'honorary' = «عضوية شرفية» for the Vibes Ventures board, given by an admin in the dashboard and stored by the
    * hub (rule 2). Always active, no days left and no end date; nothing the app sends can set it.
+   * M271: 'partner' = «عضوية شركاء النجاح», given the same way for 360 days; its days and end date are its own.
+   * An app that does not know the word draws the annual card, with the right dates.
    */
-  kind: 'annual' | 'honorary';
+  kind: 'annual' | 'honorary' | 'partner';
   daysLeft: number | null;
   endDate: string | null;
   aiDailyLimit: number;
@@ -319,12 +322,16 @@ const ME_HUB_TIMEOUT_MS = 10_000;
 function membershipOf(contact: HubContact): Membership {
   // M205: the honorary membership never lapses — whatever the paid clock under it says.
   const honorary = isHonorary(contact);
-  const status: MembershipStatus = honorary || contact.is_member ? 'active' : contact.member_expired ? 'expired' : 'unactivated';
+  const partner = !honorary && isPartner(contact);
+  const status: MembershipStatus = honorary || partner || contact.is_member ? 'active' : contact.member_expired ? 'expired' : 'unactivated';
+  // M271: a Success Partners member reads the dates of that year, even when a paid period under it ends later.
+  const left = partner ? (contact.partner_left ?? null) : contact.member_left;
+  const end = partner ? (contact.partner_end ?? '') : contact.member_end;
   return {
     status,
-    kind: honorary ? 'honorary' : 'annual',
-    daysLeft: status === 'active' && !honorary ? contact.member_left : null,
-    endDate: contact.member_end && !honorary ? contact.member_end : null,
+    kind: honorary ? 'honorary' : partner ? 'partner' : 'annual',
+    daysLeft: status === 'active' && !honorary ? left : null,
+    endDate: end && !honorary ? end : null,
     aiDailyLimit: contact.daily_limit,
     aiDailyLeft: contact.daily_left,
   };

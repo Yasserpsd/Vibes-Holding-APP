@@ -4,7 +4,7 @@ import { maskEmail } from '../auth/adminOtp.js';
 import { EMAIL_POLICY_TEXT, normEmail, normPhone, phoneIntl, phoneLocal } from './phone.js';
 import { MOCK_HUB_VERSION, MockAdmin } from './mockAdmin.js';
 import { MockChat } from './mockChat.js';
-import { blankContact, newMockState, nextId, seedDemo, type MockContact } from './mockData.js';
+import { blankContact, MOCK_PARTNER_DAYS, mockPartnerEnd, newMockState, nextId, seedDemo, type MockContact } from './mockData.js';
 import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, type HubResponse } from './types.js';
 
 /**
@@ -431,9 +431,21 @@ export class MockHubClient implements HubClient {
   }
 
   private publicContact(contact: MockContact): HubContact {
-    const endMs = contact.memberStartedAt !== null ? contact.memberStartedAt + contact.memberDays * 86_400_000 : null;
-    const daysLeft = contact.isMember && endMs !== null ? Math.ceil((endMs - Date.now()) / 86_400_000) : null;
-    const paid = contact.isMember && (daysLeft === null || daysLeft > 0);
+    // M271 (hub 2.33.0): the live period is whichever of the paid clock and the Success Partners clock ends later; a
+    // lapsed partner year with nothing paid behind it reads as an expired membership.
+    let held = contact.isMember;
+    let days = contact.memberDays;
+    let endMs = contact.memberStartedAt !== null ? contact.memberStartedAt + contact.memberDays * 86_400_000 : null;
+    const partnerStart = typeof contact.honoraryAt === 'number' ? null : (contact.partnerAt ?? null);
+    const partnerEndMs = partnerStart !== null ? partnerStart + MOCK_PARTNER_DAYS * 86_400_000 : null;
+    if (partnerEndMs !== null && !(held && (endMs === null || endMs > partnerEndMs))) {
+      held = true;
+      days = MOCK_PARTNER_DAYS;
+      endMs = partnerEndMs;
+    }
+    const daysLeft = held && endMs !== null ? Math.ceil((endMs - Date.now()) / 86_400_000) : null;
+    const paid = held && (daysLeft === null || daysLeft > 0);
+    const partnerRunning = mockPartnerEnd(contact);
     // M205 (hub 2.28.0): the honorary membership overrides the paid clock — a member with no days and no end date.
     const honorary = typeof contact.honoraryAt === 'number';
     const active = honorary || paid;
@@ -441,6 +453,10 @@ export class MockHubClient implements HubClient {
       referred_by: contact.referredBy ?? 0,
       honorary: honorary ? 1 : 0,
       honorary_since: honorary ? isoDate(contact.honoraryAt as number) : '',
+      partner: partnerRunning !== null ? 1 : 0,
+      partner_since: partnerRunning !== null ? isoDate(contact.partnerAt as number) : '',
+      partner_end: partnerRunning !== null ? isoDate(partnerRunning) : '',
+      partner_left: partnerRunning !== null ? Math.ceil((partnerRunning - Date.now()) / 86_400_000) : null,
       id: contact.id,
       name: contact.name,
       email: contact.email,
@@ -449,9 +465,9 @@ export class MockHubClient implements HubClient {
       stage: contact.verified ? (active ? 2 : 1) : 0,
       is_member: active ? 1 : 0,
       member_left: honorary ? null : daysLeft,
-      member_days: contact.memberDays,
+      member_days: days,
       member_end: honorary ? '' : endMs !== null ? isoDate(endMs) : '',
-      member_expired: contact.isMember && !active ? 1 : 0,
+      member_expired: held && !active ? 1 : 0,
       daily_limit: MOCK_DAILY_LIMIT,
       daily_left: active ? MOCK_DAILY_LIMIT : null,
       has_account: contact.passHash ? 1 : 0,
@@ -471,7 +487,7 @@ export class MockHubClient implements HubClient {
       contact_email: contact.contactEmail ?? '',
       city: contact.city,
       bio: contact.bio,
-      pending_pay: contact.passHash && contact.verified && !contact.isMember && !honorary ? 1 : 0,
+      pending_pay: contact.passHash && contact.verified && !held && !honorary ? 1 : 0,
     };
   }
 }

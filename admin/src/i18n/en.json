@@ -1600,5 +1600,16 @@
  "وصلت إلى {0} من {1}": "Delivered to {0} of {1}",
  "في الطريق: {0}": "On the way: {0}",
  "تُعاد المحاولة: {0}": "Retrying: {0}",
- "لم تصل: {0}": "Not delivered: {0}"
+ "لم تصل: {0}": "Not delivered: {0}",
+ "{0} بعضوية شركاء النجاح": "{0} with Success Partners Membership",
+ "منح عضوية شركاء النجاح": "Success Partners Membership granted",
+ "سحب عضوية شركاء النجاح": "Success Partners Membership withdrawn",
+ "شركاء النجاح": "Success Partners",
+ "عضوية شركاء النجاح": "Success Partners Membership",
+ "منح عضوية شركاء النجاح لمدة 360 يومًا": "Success Partners Membership granted for 360 days",
+ "تُمنح «{0}» عضوية شركاء النجاح لمدة 360 يومًا تبدأ من الآن، بمزايا العضوية السارية، ويصله إشعار داخل التطبيق وعلى واتساب، ويصل الإدارة بريد بالإجراء. إن كان له اشتراك مدفوع تبقى أيامه محفوظة.": "“{0}” is granted the Success Partners Membership for 360 days from now, with the benefits of an active membership. The member is told in the app and on WhatsApp, and the management gets an e-mail. Days of any paid subscription are kept.",
+ "تُسحب عضوية شركاء النجاح من «{0}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار داخل التطبيق وبالبريد، ويصل الإدارة بريد بالإجراء.": "The Success Partners Membership is withdrawn from “{0}” now. With an active paid subscription the account stays a member until it ends; otherwise it loses the member benefits. The member is told in the app and by e-mail, and the management gets an e-mail.",
+ "اشتراك مدفوع بعدها حتى": "Paid subscription continues until",
+ "عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.": "Success Partners Membership: 360 days, and it ends by itself. Days of any store subscription are kept.",
+ "عضوية شركاء النجاح تحتاج تحديث إضافة الهب إلى 2.33.0 أو أحدث": "The Success Partners Membership needs the hub plugin 2.33.0 or newer"
 }

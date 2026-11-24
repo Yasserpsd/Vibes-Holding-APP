@@ -65,6 +65,9 @@ type NeonPulseProps = {
   radius?: number;
   /** Peak halo; the ring breathes between a whisper and this. */
   intensity?: 'soft' | 'strong';
+  /** M271: the ring and halo of a card that is not gold. */
+  color?: string;
+  halo?: string;
   duration?: number;
 };
 
@@ -72,7 +75,7 @@ type NeonPulseProps = {
  * A breathing golden neon ring. Absolutely fills its parent (which needs position
  * relative — any RN View is), ignores touches, animates opacity on the native driver.
  */
-export function NeonPulse({ radius = radii.lg, intensity = 'soft', duration = 2200 }: NeonPulseProps) {
+export function NeonPulse({ radius = radii.lg, intensity = 'soft', duration = 2200, color, halo }: NeonPulseProps) {
   const [glow] = useState(() => new Animated.Value(0.35));
   // Review 2026-11-15: the endless breathing holds still at a mid glow under «reduce motion».
   const reduced = useReducedMotion();
@@ -99,8 +102,8 @@ export function NeonPulse({ radius = radii.lg, intensity = 'soft', duration = 22
           opacity: glow,
           borderRadius: radius,
           borderWidth: 1,
-          borderColor: colors.borderGold,
-          boxShadow: intensity === 'strong' ? shadows.glowGoldStrong : shadows.glowGold,
+          borderColor: color ?? colors.borderGold,
+          boxShadow: halo ?? (intensity === 'strong' ? shadows.glowGoldStrong : shadows.glowGold),
         },
       ]}
     />

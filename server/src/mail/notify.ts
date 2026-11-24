@@ -527,6 +527,47 @@ export class Notifier {
     ]);
   }
 
+  /** M271: the management hears of every Success Partners membership given or taken back. */
+  partnerChanged(record: { on: boolean; name: string; phone: string; email: string; contactId: number; by: string; note: string }): void {
+    const action = record.on ? 'منح عضوية شركاء النجاح' : 'سحب عضوية شركاء النجاح';
+    this.dispatch(`${action}: ${record.name || record.email}`, [
+      record.on ? 'مُنح هذا العضو عضوية شركاء النجاح (360 يومًا) من لوحة التحكم.' : 'سُحبت عضوية شركاء النجاح من هذا العضو من لوحة التحكم.',
+      '',
+      ...personLines(record),
+      `رقم الحساب: ${record.contactId}`,
+      `نفّذ الإجراء: ${record.by || '—'}`,
+      `الملاحظة: ${record.note}`,
+    ]);
+  }
+
+  /** M271: the member's own notice of a Success Partners grant (when WhatsApp cannot carry it) or of its end. */
+  tellPartner(record: { on: boolean; to: string; lang: 'ar' | 'en'; name: string; until: string | null }): void {
+    const { on, lang } = record;
+    const name = record.name.trim();
+    const appUrl = `${this.deps.publicUrl ?? 'https://vcmem.com'}/app`;
+    const mail: RoyalMail =
+      lang === 'en'
+        ? {
+            lang,
+            title: on ? 'Success Partners Membership' : 'Your Success Partners Membership has ended',
+            subtitle: 'Investors Club',
+            greeting: name ? `Welcome, ${name}.` : 'Welcome.',
+            lead: [on ? 'The administration has granted you the Success Partners Membership of Investors Club. The privileges of an active membership are open to you inside the app.' : 'Your Success Partners Membership has ended. Any active annual membership you hold is not affected.'],
+            rows: on && record.until ? [{ label: 'Valid until', value: record.until }] : [],
+            cta: { label: 'Open your membership card', url: appUrl },
+          }
+        : {
+            lang,
+            title: on ? 'عضوية شركاء النجاح' : 'انتهت عضوية شركاء النجاح',
+            subtitle: 'Investors Club · نادي المستثمرين',
+            greeting: name ? `أهلًا بك يا ${name}.` : 'أهلًا بك.',
+            lead: [on ? 'منحتك الإدارة عضوية شركاء النجاح في نادي المستثمرين، ومزايا العضوية السارية متاحة لك من داخل التطبيق.' : 'انتهت عضوية شركاء النجاح الممنوحة لك، ولا يؤثر انتهاؤها في أي عضوية سنوية سارية لديك.'],
+            rows: on && record.until ? [{ label: 'سارية حتى', value: record.until }] : [],
+            cta: { label: 'افتح بطاقة عضويتك', url: appUrl },
+          };
+    this.sendRoyal(record.to, lang === 'en' ? (on ? 'Your Success Partners Membership' : 'Your Success Partners Membership has ended') : on ? 'عضوية شركاء النجاح' : 'انتهت عضوية شركاء النجاح', mail, 'success partners');
+  }
+
   /** M216: the management's copy of a deletion from the dashboard. */
   accountDeletedByAdmin(record: { name: string; phone: string; email: string; contactId: number; by: string; note: string; told: boolean }): void {
     this.dispatch(`حذف حساب من لوحة التحكم: ${record.name || record.email}`, [

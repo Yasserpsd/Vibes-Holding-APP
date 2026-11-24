@@ -1,6 +1,6 @@
 import { DAY_MS, hubTime, lastRiyadhDays, riyadhDay } from '../riyadh.js';
 import type { MockChat, MockThreadRow } from './mockChat.js';
-import { MOCK_SITES, nextId, type MockContact, type MockEvent, type MockState } from './mockData.js';
+import { MOCK_SITES, mockPartnerEnd, nextId, type MockContact, type MockEvent, type MockState } from './mockData.js';
 import {
   HubError,
   type HubAccount,
@@ -100,8 +100,10 @@ export class MockAdmin {
   private stateOf(contact: MockContact, now: number): HubAccountState {
     if (!contact.verified) return contact.passHash ? 'pending' : 'lead';
     if (typeof contact.honoraryAt === 'number') return 'member';
-    if (!contact.isMember) return 'unpaid';
-    return contact.memberStartedAt === null || contact.memberStartedAt + contact.memberDays * DAY_MS > now ? 'member' : 'expired';
+    if (mockPartnerEnd(contact, now) !== null) return 'member';
+    if (contact.isMember && (contact.memberStartedAt === null || contact.memberStartedAt + contact.memberDays * DAY_MS > now)) return 'member';
+    // A lapsed Success Partners year with nothing paid behind it is an expired membership.
+    return contact.isMember || typeof contact.partnerAt === 'number' ? 'expired' : 'unpaid';
   }
 
   private intent(contact: MockContact, state: HubAccountState, messages: number): { intent: number; intent_label: string } {
@@ -137,11 +139,15 @@ export class MockAdmin {
       msg_count: rows.filter((row) => row.role === 'user').length,
       is_member: state === 'member' ? 1 : 0,
       member_left: view.member_left,
-      member_days: contact.isMember ? contact.memberDays : 0,
+      member_days: contact.isMember || typeof contact.partnerAt === 'number' ? view.member_days : 0,
       member_end: view.member_end,
       never_expires: view.honorary === 1 || (contact.isMember && contact.memberStartedAt === null) ? 1 : 0,
       honorary: view.honorary ?? 0,
       honorary_since: view.honorary_since ?? '',
+      partner: view.partner ?? 0,
+      partner_since: view.partner_since ?? '',
+      partner_end: view.partner_end ?? '',
+      partner_left: view.partner_left ?? null,
       daily_limit: MOCK_DAILY_LIMIT,
       daily_left: view.daily_left,
       ...this.intent(contact, state, rows.length),
@@ -254,6 +260,7 @@ export class MockAdmin {
         members_expired: count('expired'),
         members_no_expiry: contacts.filter((contact) => typeof contact.honoraryAt === 'number' || (contact.isMember && contact.memberStartedAt === null)).length,
         members_honorary: contacts.filter((contact) => typeof contact.honoraryAt === 'number').length,
+        members_partner: contacts.filter((contact) => mockPartnerEnd(contact) !== null).length,
         // Hub 2.19.0+: the registered accounts split by the category they chose (the three add up to `accounts` minus those with none yet).
         ...personaTotals(contacts.filter((contact) => contact.verified || contact.isMember).map((contact) => this.deps.publicContact(contact).persona)),
         admins: contacts.filter((contact) => contact.verified && contact.role === 'admin').length,
@@ -437,20 +444,36 @@ export class MockAdmin {
     const admin = this.requireRole(body, ['admin']);
     const contact = this.target(body);
     const action = str(body, 'action', 20);
-    if (action !== 'activate' && action !== 'extend' && action !== 'revoke' && action !== 'honorary' && action !== 'honorary_revoke') throw new HubError('invalid', 'إجراء غير معروف', 400);
+    if (action !== 'activate' && action !== 'extend' && action !== 'revoke' && action !== 'honorary' && action !== 'honorary_revoke' && action !== 'partner' && action !== 'partner_revoke') throw new HubError('invalid', 'إجراء غير معروف', 400);
     if (!contact.verified) throw new HubError('invalid', 'الحساب غير مفعّل بالبريد بعد', 400);
     // M205 (hub 2.28.0): the honorary membership is a flag over the paid clock — given and taken back here only.
     const honorary = typeof contact.honoraryAt === 'number';
+    // M271 (hub 2.33.0): «عضوية شركاء النجاح», 360 days beside the paid clock; one given membership at a time.
+    const partner = mockPartnerEnd(contact) !== null;
+    if (action === 'partner' || action === 'partner_revoke') {
+      const on = action === 'partner';
+      if (on && honorary) throw new HubError('honorary', 'هذا الحساب يحمل العضوية الشرفية: اسحبها أولًا لمنح عضوية شركاء النجاح', 409);
+      if (on === partner) throw new HubError('invalid', on ? 'عضوية شركاء النجاح ممنوحة لهذا الحساب من قبل' : 'هذا الحساب لا يحمل عضوية شركاء النجاح', 409);
+      contact.partnerAt = on ? Date.now() : null;
+      const { state } = this.deps;
+      const event: MockEvent = { id: nextId(state, 'event'), contactId: contact.id, kind: on ? 'partner' : 'partner_revoked', days: on ? 360 : 0, source: 'admin', ref: '', actorId: admin.id, note: str(body, 'note', 300), at: Date.now() };
+      state.events.push(event);
+      return { ok: true, contact: this.deps.publicContact(contact), event: this.eventRow(event) };
+    }
+    if (action === 'honorary' && partner) throw new HubError('partner', 'هذا الحساب يحمل عضوية شركاء النجاح: اسحبها أولًا لمنح العضوية الشرفية', 409);
     if (action === 'honorary' || action === 'honorary_revoke') {
       const on = action === 'honorary';
       if (on === honorary) throw new HubError('invalid', on ? 'العضوية الشرفية ممنوحة لهذا الحساب من قبل' : 'هذا الحساب لا يحمل عضوية شرفية', 409);
       contact.honoraryAt = on ? Date.now() : null;
+      // As the plugin: a Success Partners year that already ran out is over for good.
+      if (on) contact.partnerAt = null;
       const { state } = this.deps;
       const event: MockEvent = { id: nextId(state, 'event'), contactId: contact.id, kind: on ? 'honorary' : 'honorary_revoked', days: 0, source: 'admin', ref: '', actorId: admin.id, note: str(body, 'note', 300), at: Date.now() };
       state.events.push(event);
       return { ok: true, contact: this.deps.publicContact(contact), event: this.eventRow(event) };
     }
     if (honorary) throw new HubError('honorary', 'هذا الحساب يحمل العضوية الشرفية وهي بلا مدة: اسحبها أولًا لتعديل الاشتراك', 409);
+    if (partner) throw new HubError('partner', 'هذا الحساب يحمل عضوية شركاء النجاح: اسحبها أولًا لتعديل الاشتراك', 409);
     const days = Number(body.days);
     if (action !== 'revoke' && (!Number.isInteger(days) || days < 1 || days > 3650)) throw new HubError('invalid', 'عدد الأيام غير صحيح', 400);
     const { event } = this.memberChange(contact, action, days, 'admin', '', admin.id, str(body, 'note', 300));
@@ -478,7 +501,7 @@ export class MockAdmin {
     if (contact.id === admin.id) throw new HubError('self_delete', 'لا يمكن حذف حسابك من لوحة التحكم', 403);
     if (contact.role === 'admin') throw new HubError('admin_account', 'لا يمكن حذف حساب مدير', 403);
     const email = contact.contactEmail || contact.email;
-    Object.assign(contact, { name: 'حساب محذوف', email: '', phone: '', passHash: '', contactEmail: '', isMember: false, memberDays: 0, memberStartedAt: null, honoraryAt: null, verified: false, role: 'member', persona: '' });
+    Object.assign(contact, { name: 'حساب محذوف', email: '', phone: '', passHash: '', contactEmail: '', isMember: false, memberDays: 0, memberStartedAt: null, honoraryAt: null, partnerAt: null, verified: false, role: 'member', persona: '' });
     this.event(contact.id, 'deleted', { source: 'admin', actorId: admin.id, note: str(body, 'note', 300) });
     return { ok: true, already: false, email, lang: 'ar' };
   }

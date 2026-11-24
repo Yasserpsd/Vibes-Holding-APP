@@ -243,8 +243,8 @@ function Trend({ data }: { data: DownloadsData }) {
 /** «منهم 2 بعضوية شرفية» — honorary members never expire, so «بلا تاريخ انتهاء» only adds the others. */
 function memberNotes(hub: HubStats | null): string[] {
   if (!hub) return [];
-  const { members_honorary: honorary = 0, members_no_expiry: noExpiry = 0 } = hub.totals;
-  const parts = [honorary > 0 ? `${formatNumber(honorary)} بعضوية شرفية` : '', noExpiry > honorary ? `${formatNumber(noExpiry - honorary)} بلا تاريخ انتهاء` : ''].filter(Boolean);
+  const { members_honorary: honorary = 0, members_no_expiry: noExpiry = 0, members_partner: partner = 0 } = hub.totals;
+  const parts = [partner > 0 ? `${formatNumber(partner)} بعضوية شركاء النجاح` : '', honorary > 0 ? `${formatNumber(honorary)} بعضوية شرفية` : '', noExpiry > honorary ? `${formatNumber(noExpiry - honorary)} بلا تاريخ انتهاء` : ''].filter(Boolean);
   return parts.length ? [`منهم ${parts.join(' و')}`] : [];
 }
 

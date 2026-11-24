@@ -1,0 +1,408 @@
+diff -ruN orig-2320/vibes-ai-assistant/includes/class-vai-admin.php hub/vibes-ai-assistant/includes/class-vai-admin.php
+--- orig-2320/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-25 01:27:30.760747200 +0300
++++ hub/vibes-ai-assistant/includes/class-vai-admin.php	2026-11-25 01:29:07.505845900 +0300
+@@ -244,11 +244,18 @@
+ 					if ( VAI_Hub::is_honorary( $c ) ) {
+ 						self::back( sanitize_key( $_POST['back'] ?? 'vibes-ai-accounts' ), '', 'هذا الحساب يحمل العضوية الشرفية (بلا مدة) — تُمنح وتُسحب من لوحة التطبيق فقط.' );
+ 					}
++					// 2.33.0 (M271): nor does this button touch a Success Partners membership.
++					if ( VAI_Hub::is_partner( $c ) ) {
++						self::back( sanitize_key( $_POST['back'] ?? 'vibes-ai-accounts' ), '', 'هذا الحساب يحمل عضوية شركاء النجاح — تُمنح وتُسحب من لوحة التطبيق فقط.' );
++					}
+ 					if ( $c ) {
+ 						VAI_Hub::set_member( $id, ! (int) $c->is_member );
+ 					}
+ 					self::back( sanitize_key( $_POST['back'] ?? 'vibes-ai-accounts' ), (int) $c->is_member ? 'أُلغيت العضوية المدفوعة.' : 'تم التحويل إلى عضوية مدفوعة ⭐ وبدأ عدّاد ' . (int) vai_cfg( 'member_days' ) . ' يومًا.' );
+ 				} elseif ( $act === 'renew' ) {
++					if ( VAI_Hub::is_partner( VAI_Hub::contact( $id ) ) ) {
++						self::back( sanitize_key( $_POST['back'] ?? 'vibes-ai-members' ), '', 'هذا الحساب يحمل عضوية شركاء النجاح — اسحبها من لوحة التطبيق أولًا ثم جدّد.' );
++					}
+ 					VAI_Hub::set_member( $id, true );
+ 					self::back( sanitize_key( $_POST['back'] ?? 'vibes-ai-members' ), 'تم تجديد العضوية — عدّاد جديد من اليوم.' );
+ 				}
+diff -ruN orig-2320/vibes-ai-assistant/includes/class-vai-hub.php hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- orig-2320/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-25 01:27:30.760747200 +0300
++++ hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-25 01:29:07.505845900 +0300
+@@ -13,7 +13,9 @@
+  */
+ class VAI_Hub {
+ 
+-	const DB_VERSION = '2.28.1';
++	const DB_VERSION = '2.33.0';
++	/** 2.33.0 (M271): the length of the Success Partners membership, in days (owner, 2026-11-25). */
++	const PARTNER_DAYS = 360;
+ 
+ 	/** Source / reference of the next set_member() call (see member_context()). */
+ 	private static $member_ctx = null;
+@@ -162,6 +164,8 @@
+ 			paid_is_member TINYINT NOT NULL DEFAULT 0,
+ 			paid_started_at DATETIME NULL,
+ 			paid_days INT NOT NULL DEFAULT 0,
++			partner_at DATETIME NULL,
++			partner_days INT NOT NULL DEFAULT 0,
+ 			persona VARCHAR(40) NOT NULL DEFAULT '',
+ 			pass_token VARCHAR(64) NOT NULL DEFAULT '',
+ 			pass_token_expires DATETIME NULL,
+@@ -1507,8 +1511,8 @@
+ 		if ( $hit ) {
+ 			return self::ref_hit( $hit, $c );
+ 		}
+-		// 2.28.0: under an honorary membership the paid clock is the kept one (paid_*), and it names the event.
+-		$was  = self::is_honorary( $c ) ? (int) $c->paid_is_member : (int) $c->is_member;
++		// 2.28.0 / 2.33.0: under an honorary or a Success Partners membership the paid clock is the kept one (paid_*), and it names the event.
++		$was  = ( self::is_honorary( $c ) || self::is_partner( $c ) ) ? (int) $c->paid_is_member : (int) $c->is_member;
+ 		$kind = $a['action'] === 'revoke' ? 'revoked' : ( $was === 1 ? 'renewed' : 'activated' );
+ 		// The history row goes first: its unique ref_key is what stops a parallel duplicate of the same reference.
+ 		$eid = self::insert_event( $c->id, $kind, $a['action'] === 'revoke' ? 0 : $a['days'], $a['source'], $a['ref'], $a['actor_id'], $a['note'] );
+@@ -1552,7 +1556,12 @@
+ 		global $wpdb;
+ 		$ct     = self::t( 'contacts' );
+ 		if ( self::is_honorary( $c ) ) {
+-			return self::member_apply_under_honorary( $c, $a );
++			return self::member_apply_kept( $c, $a );
++		}
++		if ( self::is_partner( $c ) ) {
++			// The same kept paid clock; then the live columns are set again to whichever of the two clocks ends later.
++			$branch = self::member_apply_kept( $c, $a );
++			return ( $branch !== '' && self::partner_sync( $c->id ) ) ? $branch : '';
+ 		}
+ 		$active = self::member_active( $c );
+ 		if ( $a['action'] === 'revoke' ) {
+@@ -1591,8 +1600,8 @@
+ 		return ( self::is_honorary( $c ) && ! empty( $c->honorary_at ) ) ? vai_riyadh( $c->honorary_at, 'Y-m-d' ) : '';
+ 	}
+ 
+-	/** member_apply() for an honorary member: the same four branches, written to the kept paid clock. */
+-	private static function member_apply_under_honorary( $c, array $a ) {
++	/** member_apply() under an honorary or a Success Partners membership: the same four branches, written to the kept paid clock. */
++	private static function member_apply_kept( $c, array $a ) {
+ 		global $wpdb;
+ 		$ct = self::t( 'contacts' );
+ 		if ( $a['action'] === 'revoke' ) {
+@@ -1630,6 +1639,11 @@
+ 			$wpdb->query( 'ROLLBACK' );
+ 			return vai_error( 'invalid', $on ? 'العضوية الشرفية ممنوحة لهذا الحساب من قبل' : 'هذا الحساب لا يحمل عضوية شرفية', 409 );
+ 		}
++		// 2.33.0: one given membership at a time — the kept paid clock (paid_*) has room for one only.
++		if ( $on && self::is_partner( $c ) ) {
++			$wpdb->query( 'ROLLBACK' );
++			return vai_error( 'partner', 'هذا الحساب يحمل عضوية شركاء النجاح: اسحبها أولًا لمنح العضوية الشرفية', 409 );
++		}
+ 		$eid = self::insert_event( $c->id, $on ? 'honorary' : 'honorary_revoked', 0, 'admin', '', (int) $actor_id, (string) $note );
+ 		if ( $on ) {
+ 			$row = array(
+@@ -1642,20 +1656,12 @@
+ 				'stage'             => 2,
+ 				'member_started_at' => null,
+ 				'member_days'       => 0,
++				// 2.33.0: a Success Partners period that already ran out is over for good.
++				'partner_at'        => null,
++				'partner_days'      => 0,
+ 			);
+ 		} else {
+-			$paid = (int) $c->paid_is_member === 1;
+-			$row  = array(
+-				'honorary'          => 0,
+-				'honorary_at'       => null,
+-				'is_member'         => $paid ? 1 : 0,
+-				'stage'             => $paid ? 2 : max( 1, (int) $c->stage === 2 ? 1 : (int) $c->stage ),
+-				'member_started_at' => $paid && ! empty( $c->paid_started_at ) ? $c->paid_started_at : null,
+-				'member_days'       => $paid ? (int) $c->paid_days : 0,
+-				'paid_is_member'    => 0,
+-				'paid_started_at'   => null,
+-				'paid_days'         => 0,
+-			);
++			$row = array_merge( array( 'honorary' => 0, 'honorary_at' => null ), self::kept_clock_back( $c ) );
+ 		}
+ 		$ok = $wpdb->update( $ct, $row, array( 'id' => $c->id ) );
+ 		if ( $ok === false ) {
+@@ -1672,6 +1678,138 @@
+ 		return array( 'ok' => true, 'event_id' => (int) $eid );
+ 	}
+ 
++	/** Taking a given membership back: the kept paid clock (paid_*) is in charge of the live columns again. */
++	private static function kept_clock_back( $c ) {
++		$paid = (int) $c->paid_is_member === 1;
++		return array(
++			'is_member'         => $paid ? 1 : 0,
++			'stage'             => $paid ? 2 : max( 1, (int) $c->stage === 2 ? 1 : (int) $c->stage ),
++			'member_started_at' => $paid && ! empty( $c->paid_started_at ) ? $c->paid_started_at : null,
++			'member_days'       => $paid ? (int) $c->paid_days : 0,
++			'paid_is_member'    => 0,
++			'paid_started_at'   => null,
++			'paid_days'         => 0,
++		);
++	}
++
++	/* ───────────── Success Partners membership (2.33.0, app milestone M271) ─────────────
++	 * «عضوية شركاء النجاح»: given by the administration for 360 days, from the app dashboard only
++	 * (admin_grant: partner | partner_revoke). Nothing is sold and no client op reads a `partner` field.
++	 *
++	 * How it is stored: partner_at + partner_days are its own clock, and it runs while that clock does (is_partner()
++	 * reads the time, so nothing has to run on the day it ends). The paid clock he had (or buys later) is kept aside in
++	 * paid_*, like under the honorary membership. The live columns (member_started_at, member_days) always hold
++	 * WHICHEVER OF THE TWO ENDS LATER, so every gate, list, count and reminder needs no change, and a paid period that
++	 * outlasts the Success Partners year simply carries on when the year is over.
++	 */
++
++	/** UTC timestamp the Success Partners period ends, 0 when there is none. */
++	private static function partner_end_ts( $c ) {
++		if ( ! $c || empty( $c->partner_at ) || (int) $c->partner_days <= 0 ) {
++			return 0;
++		}
++		return strtotime( $c->partner_at . ' UTC' ) + (int) $c->partner_days * 86400;
++	}
++
++	/** Holds a Success Partners membership that is running now. */
++	public static function is_partner( $c ) {
++		return self::partner_end_ts( $c ) > time() && ! self::is_honorary( $c );
++	}
++
++	/** The four partner fields of the contact shapes: zeroes and empty strings when it is not running. */
++	public static function partner_fields( $c ) {
++		$on  = self::is_partner( $c );
++		$end = $on ? self::partner_end_ts( $c ) : 0;
++		return array(
++			'partner'       => $on ? 1 : 0,
++			'partner_since' => $on ? vai_riyadh( $c->partner_at, 'Y-m-d' ) : '',
++			'partner_end'   => $on ? vai_riyadh( gmdate( 'Y-m-d H:i:s', $end ), 'Y-m-d' ) : '',
++			'partner_left'  => $on ? (int) ceil( ( $end - time() ) / 86400 ) : null,
++		);
++	}
++
++	/** The live membership columns under a Success Partners period: the clock that ends later wins. */
++	private static function partner_main_clock( $partner_at, $partner_days, $paid_on, $paid_at, $paid_days ) {
++		$row = array( 'is_member' => 1, 'stage' => 2, 'member_started_at' => $partner_at, 'member_days' => (int) $partner_days );
++		if ( (int) $paid_on !== 1 ) {
++			return $row;
++		}
++		if ( empty( $paid_at ) ) { // a paid membership with no end date outlasts everything
++			$row['member_started_at'] = null;
++			$row['member_days']       = (int) $paid_days;
++			return $row;
++		}
++		$days = (int) $paid_days > 0 ? (int) $paid_days : (int) vai_cfg( 'member_days' );
++		if ( strtotime( $paid_at . ' UTC' ) + $days * 86400 > strtotime( $partner_at . ' UTC' ) + (int) $partner_days * 86400 ) {
++			$row['member_started_at'] = $paid_at;
++			$row['member_days']       = $days;
++		}
++		return $row;
++	}
++
++	/** After the kept paid clock changed under a Success Partners period: set the live columns again. */
++	private static function partner_sync( $contact_id ) {
++		global $wpdb;
++		$c = self::contact( $contact_id );
++		if ( ! $c || empty( $c->partner_at ) ) {
++			return false;
++		}
++		$row = self::partner_main_clock( $c->partner_at, (int) $c->partner_days, (int) $c->paid_is_member, $c->paid_started_at, (int) $c->paid_days );
++		return $wpdb->update( self::t( 'contacts' ), $row, array( 'id' => $c->id ) ) !== false;
++	}
++
++	/**
++	 * Give ($on) or take back the Success Partners membership. One transaction with the history row, like member_write().
++	 * Returns array( ok, event_id ) or a WP_Error (honorary / invalid 409, db_error 500).
++	 */
++	public static function partner_change( $contact_id, $on, $actor_id = 0, $note = '' ) {
++		global $wpdb;
++		$ct = self::t( 'contacts' );
++		$on = (bool) $on;
++		$wpdb->query( 'START TRANSACTION' );
++		$c = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE id=%d FOR UPDATE", (int) $contact_id ) );
++		if ( ! $c ) {
++			$wpdb->query( 'ROLLBACK' );
++			return vai_error( 'no_contact', 'الحساب غير موجود', 404 );
++		}
++		if ( $on && self::is_honorary( $c ) ) {
++			$wpdb->query( 'ROLLBACK' );
++			return vai_error( 'honorary', 'هذا الحساب يحمل العضوية الشرفية: اسحبها أولًا لمنح عضوية شركاء النجاح', 409 );
++		}
++		if ( self::is_partner( $c ) === $on ) {
++			$wpdb->query( 'ROLLBACK' );
++			return vai_error( 'invalid', $on ? 'عضوية شركاء النجاح ممنوحة لهذا الحساب من قبل' : 'هذا الحساب لا يحمل عضوية شركاء النجاح', 409 );
++		}
++		$eid = self::insert_event( $c->id, $on ? 'partner' : 'partner_revoked', $on ? self::PARTNER_DAYS : 0, 'admin', '', (int) $actor_id, (string) $note );
++		if ( $on ) {
++			$now = vai_now();
++			$row = array_merge(
++				self::partner_main_clock( $now, self::PARTNER_DAYS, (int) $c->is_member, $c->member_started_at, (int) $c->member_days ),
++				array(
++					'partner_at'      => $now,
++					'partner_days'    => self::PARTNER_DAYS,
++					'paid_is_member'  => (int) $c->is_member,
++					'paid_started_at' => ! empty( $c->member_started_at ) ? $c->member_started_at : null,
++					'paid_days'       => (int) $c->member_days,
++				)
++			);
++		} else {
++			$row = array_merge( array( 'partner_at' => null, 'partner_days' => 0 ), self::kept_clock_back( $c ) );
++		}
++		$ok = $wpdb->update( $ct, $row, array( 'id' => $c->id ) );
++		if ( $ok === false ) {
++			$wpdb->query( 'ROLLBACK' );
++			if ( $eid ) {
++				$wpdb->delete( self::t( 'events' ), array( 'id' => (int) $eid ) ); // MyISAM has no rollback
++			}
++			return vai_error( 'db_error', 'تعذّر حفظ العضوية الآن — أعد المحاولة', 500 );
++		}
++		$wpdb->query( 'COMMIT' );
++		self::webhook( 'member.changed', array( 'contact_id' => (int) $c->id, 'kind' => $on ? 'partner' : 'partner_revoked' ) );
++		self::insert_message( $c->id, (int) $c->last_site_id, 'system', $on ? 'مُنحت عضوية شركاء النجاح ⭐ (' . self::PARTNER_DAYS . ' يومًا)' : 'سُحبت عضوية شركاء النجاح' );
++		return array( 'ok' => true, 'event_id' => (int) $eid );
++	}
++
+ 	/** After the commit: member.changed for the app server, the system line in the thread, the welcome mail. */
+ 	private static function member_after( array $res, array $a ) {
+ 		$c    = $res['contact'];
+@@ -1688,7 +1826,8 @@
+ 			self::insert_message( $c->id, $site, 'system', 'تحوّل إلى عضوية مدفوعة (' . $days . ' يومًا) ⭐' );
+ 			// activate = the 2.6 behaviour (always mails); extend mails only on a first activation.
+ 			// 2.28.0: an honorary member is not told «تم تفعيل عضويتك» for a paid period that runs under his honorary membership.
+-			if ( ! self::is_honorary( $c ) && ( $a['action'] === 'activate' || (int) $c->is_member !== 1 ) && class_exists( 'VAI_Payments' ) ) {
++			// 2.33.0: nor a Success Partners member, for the same reason.
++			if ( ! self::is_honorary( $c ) && ! self::is_partner( $c ) && ( $a['action'] === 'activate' || (int) $c->is_member !== 1 ) && class_exists( 'VAI_Payments' ) ) {
+ 				VAI_Payments::send_member_welcome( self::contact( $c->id ) );
+ 			}
+ 		}
+@@ -1927,8 +2066,9 @@
+ 		if ( ! $c ) {
+ 			return null;
+ 		}
+-		$left  = null;
+-		$daily = (int) vai_cfg( 'member_daily' );
++		$left    = null;
++		$daily   = (int) vai_cfg( 'member_daily' );
++		$partner = self::partner_fields( $c );
+ 		return array(
+ 			'referred_by' => isset( $c->referred_by ) ? (int) $c->referred_by : 0, // 2.28.2 (M206)
+ 			'id'          => (int) $c->id,
+@@ -1944,6 +2084,12 @@
+ 			// 2.28.0 (M205): «عضوية شرفية» — a member with no days left and no end date; given by the administration only.
+ 			'honorary'       => self::is_honorary( $c ) ? 1 : 0,
+ 			'honorary_since' => self::honorary_since( $c ),
++			// 2.33.0 (M271): «عضوية شركاء النجاح», 360 days, given by the administration only. is_member / member_end above
++			// stay the effective ones (the later of the two clocks); these four describe the partner period itself.
++			'partner'        => $partner['partner'],
++			'partner_since'  => $partner['partner_since'],
++			'partner_end'    => $partner['partner_end'],
++			'partner_left'   => $partner['partner_left'],
+ 			'daily_limit' => $daily,
+ 			'daily_left'  => (int) $c->is_member ? max( 0, $daily - self::count_replies_today( $c->id ) ) : null,
+ 			'has_account' => ! empty( $c->pass_hash ) ? 1 : 0,
+@@ -6270,7 +6416,8 @@
+ 		$std   = (int) vai_cfg( 'member_days' );
+ 		$daily = (int) vai_cfg( 'member_daily' );
+ 		$days  = (int) $c->member_days > 0 ? (int) $c->member_days : $std;
+-		$score = self::intent_calc( $c, $types );
++		$score   = self::intent_calc( $c, $types );
++		$partner = self::partner_fields( $c );
+ 		return array(
+ 			'id'            => (int) $c->id,
+ 			'name'          => (string) $c->name,
+@@ -6296,6 +6443,10 @@
+ 			'never_expires' => ( (int) $c->is_member && empty( $c->member_started_at ) ) ? 1 : 0,
+ 			'honorary'      => self::is_honorary( $c ) ? 1 : 0,
+ 			'honorary_since' => self::honorary_since( $c ),
++			'partner'        => $partner['partner'], // 2.33.0 (M271)
++			'partner_since'  => $partner['partner_since'],
++			'partner_end'    => $partner['partner_end'],
++			'partner_left'   => $partner['partner_left'],
+ 			'daily_limit'   => $daily,
+ 			'daily_left'    => (int) $c->is_member ? max( 0, $daily - (int) $used_today ) : null,
+ 			'intent'        => $score,
+@@ -6445,6 +6596,8 @@
+ 			'paid_is_member'     => 0,
+ 			'paid_started_at'    => null,
+ 			'paid_days'          => 0,
++			'partner_at'         => null,
++			'partner_days'       => 0,
+ 			'persona'            => '',
+ 			'pass_token'         => '',
+ 			'pass_token_expires' => null,
+@@ -6571,6 +6724,8 @@
+ 			. ', SUM(CASE WHEN ' . self::sql_state( 'expired' ) . ' THEN 1 ELSE 0 END) AS members_expired'
+ 			. ', SUM(CASE WHEN c.is_member=1 AND c.member_started_at IS NULL THEN 1 ELSE 0 END) AS members_no_expiry'
+ 			. ', SUM(CASE WHEN c.honorary=1 THEN 1 ELSE 0 END) AS members_honorary'
++			// 2.33.0 (M271): Success Partners periods that are running now.
++			. ', SUM(CASE WHEN c.honorary=0 AND c.partner_at IS NOT NULL AND DATE_ADD(c.partner_at, INTERVAL c.partner_days DAY)>UTC_TIMESTAMP() THEN 1 ELSE 0 END) AS members_partner'
+ 			. ", SUM(CASE WHEN c.role='admin' AND c.admin_verified=1 THEN 1 ELSE 0 END) AS admins"
+ 			. ", SUM(CASE WHEN c.role='publisher' THEN 1 ELSE 0 END) AS publishers"
+ 			// 2.19.0 (owner): how many investors / entrepreneurs / neutrals among the accounts.
+@@ -6580,7 +6735,7 @@
+ 			. " FROM $ct c";
+ 		$row = (array) $wpdb->get_row( $sql, ARRAY_A );
+ 		$out = array();
+-		foreach ( array( 'contacts', 'leads', 'accounts', 'pending_email', 'unpaid', 'members_active', 'members_expired', 'members_no_expiry', 'members_honorary', 'admins', 'publishers', 'persona_investor', 'persona_entrepreneur', 'persona_neutral' ) as $k ) {
++		foreach ( array( 'contacts', 'leads', 'accounts', 'pending_email', 'unpaid', 'members_active', 'members_expired', 'members_no_expiry', 'members_honorary', 'members_partner', 'admins', 'publishers', 'persona_investor', 'persona_entrepreneur', 'persona_neutral' ) as $k ) {
+ 			$out[ $k ] = isset( $row[ $k ] ) ? (int) $row[ $k ] : 0;
+ 		}
+ 		return $out;
+@@ -7069,15 +7224,18 @@
+ 		}
+ 		$c      = self::contact( isset( $d['contact_id'] ) ? (int) $d['contact_id'] : 0 );
+ 		$action = vai_str( $d, 'action', 20 );
+-		if ( ! $c || self::is_wiped( $c ) || ! in_array( $action, array( 'activate', 'extend', 'revoke', 'honorary', 'honorary_revoke' ), true ) ) {
++		if ( ! $c || self::is_wiped( $c ) || ! in_array( $action, array( 'activate', 'extend', 'revoke', 'honorary', 'honorary_revoke', 'partner', 'partner_revoke' ), true ) ) {
+ 			return vai_error( 'invalid', 'بيانات ناقصة' );
+ 		}
+ 		// 2.28.0 (M205): «عضوية شرفية» is given and taken back here only; it takes no days.
+-		if ( $action === 'honorary' || $action === 'honorary_revoke' ) {
++		// 2.33.0 (M271): «عضوية شركاء النجاح» the same way; its length is fixed (PARTNER_DAYS).
++		if ( in_array( $action, array( 'honorary', 'honorary_revoke', 'partner', 'partner_revoke' ), true ) ) {
+ 			if ( ! (int) $c->verified ) {
+ 				return vai_error( 'invalid', 'الحساب غير مفعّل بالبريد بعد' );
+ 			}
+-			$res = self::honorary_change( $c->id, $action === 'honorary', (int) $actor->id, vai_str( $d, 'note', 250 ) );
++			$res = ( $action === 'partner' || $action === 'partner_revoke' )
++				? self::partner_change( $c->id, $action === 'partner', (int) $actor->id, vai_str( $d, 'note', 250 ) )
++				: self::honorary_change( $c->id, $action === 'honorary', (int) $actor->id, vai_str( $d, 'note', 250 ) );
+ 			if ( is_wp_error( $res ) ) {
+ 				return $res;
+ 			}
+@@ -7089,6 +7247,9 @@
+ 		if ( self::is_honorary( $c ) ) {
+ 			return vai_error( 'honorary', 'هذا الحساب يحمل العضوية الشرفية وهي بلا مدة: اسحبها أولًا لتعديل الاشتراك', 409 );
+ 		}
++		if ( self::is_partner( $c ) ) {
++			return vai_error( 'partner', 'هذا الحساب يحمل عضوية شركاء النجاح: اسحبها أولًا لتعديل الاشتراك', 409 );
++		}
+ 		$days = vai_int_in( $d, 'days', 1, 3660, (int) vai_cfg( 'member_days' ) );
+ 		$res  = self::member_change( $c->id, $action, $days, 'admin', '', (int) $actor->id, vai_str( $d, 'note', 250 ) );
+ 		if ( ! $res ) {
+diff -ruN orig-2320/vibes-ai-assistant/readme.txt hub/vibes-ai-assistant/readme.txt
+--- orig-2320/vibes-ai-assistant/readme.txt	2026-11-25 01:27:30.760747200 +0300
++++ hub/vibes-ai-assistant/readme.txt	2026-11-25 01:29:07.505845900 +0300
+@@ -14,6 +14,11 @@
+ 
+ == سجل التغييرات ==
+ 
++= 2.33.0 =
++* M271 for the app (owner, 2026-11-25: «عضوية شركاء النجاح بتكون لمدة 360 يوم»): a third membership kind, given and taken back from the app dashboard only (`admin_grant` actions `partner` / `partner_revoke`; nothing is sold and no client op can set it). Two new columns, `partner_at` and `partner_days` (360). It ends by itself after its 360 days. A paid membership the account had, or buys meanwhile, keeps counting underneath (`paid_*`), and the live columns always hold whichever of the two ends later, so no gate, list or reminder changed.
++* The contact shapes (`account`, `admin_grant`, `member_status`, `admin_accounts`…) gain `partner`, `partner_since`, `partner_end`, `partner_left`; `admin_stats.totals` gains `members_partner`. New event kinds `partner`, `partner_revoked`.
++* While it runs, `activate` / `extend` / `revoke` from the app dashboard and the hub page's convert / renew buttons are refused. One given membership at a time: it and the honorary one refuse each other (code `partner` / `honorary`).
++
+ = 2.32.0 =
+ * Price-card member check by MOBILE NUMBER (owner, 2026-11-24: «رقم جوالك المسجّل في التطبيق… مفيش ايميل اصلا»): `POST /vibes-ai/v1/member-check` takes `phone` (optional `country`, default `sa`; optional `lang` = `en` for English texts). The number is normalised exactly like registration and `phone_login` (05…, 5…, 9665…, +9665…, 009665…, Arabic-Indic digits, spaces and dashes; another country in full international form) and the 4-digit code goes to that number on WhatsApp through the app server (`whatsapp.send`, kind `code`). No mail fallback: a send that fails answers 503 `send_failed`. A member with a phone and no e-mail works end to end.
+ * The code of this road lives in its own transient (10 minutes, burnt after 5 wrong tries), so it never replaces an account's sign-up / sign-in code. `verify` → `active` answers `name`, the masked `phone` (last three digits), `member_end`, `member_left` (an open-ended membership: `member_end` '' and `member_left` null) — never the full number or an e-mail.
+diff -ruN orig-2320/vibes-ai-assistant/vibes-ai-assistant.php hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- orig-2320/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-25 01:27:30.760747200 +0300
++++ hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-25 01:29:07.505845900 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
+- * Version:     2.32.0
++ * Version:     2.33.0
+  * Author:      Vibes Ventures
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.32.0' );
++define( 'VAI_VERSION', '2.33.0' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

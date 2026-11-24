@@ -194,7 +194,9 @@ export type PassMember = {
   name: string;
   /** The membership number — also the QR value, the same code the club uses for the member everywhere. */
   cardNumber: string;
-  /** `YYYY-MM-DD`, or null for the honorary membership (no expiry). */
+  /** M271: which membership the pass is for — it decides the colour, as on the in-app card. */
+  kind: 'annual' | 'partner' | 'honorary';
+  /** `YYYY-MM-DD`, or null for a membership with no expiry (the honorary one). */
   endDate: string | null;
   /** The category's first word in Arabic, English, or '' when the account has none. */
   categoryAr: string;
@@ -217,9 +219,12 @@ export function appleCredentialsOf(env: { WALLET_APPLE_CERT?: string; WALLET_APP
   };
 }
 
-const CLUB_BLACK = 'rgb(11, 10, 8)';
-const CLUB_GOLD = 'rgb(242, 206, 116)';
-const CLUB_GOLD_LABEL = 'rgb(217, 168, 60)';
+/** The face, text and label colours per membership — the same three cards as app/src/components/membershipLook.ts. */
+export const PASS_COLORS: Record<PassMember['kind'], { background: string; foreground: string; label: string }> = {
+  annual: { background: 'rgb(11, 10, 8)', foreground: 'rgb(242, 206, 116)', label: 'rgb(217, 168, 60)' },
+  partner: { background: 'rgb(13, 46, 134)', foreground: 'rgb(255, 255, 255)', label: 'rgb(255, 154, 60)' },
+  honorary: { background: 'rgb(251, 248, 240)', foreground: 'rgb(74, 54, 10)', label: 'rgb(138, 101, 16)' },
+};
 
 /** The fields' labels are keys; each language's pass.strings gives the reading. */
 const STRINGS = {
@@ -229,6 +234,8 @@ const STRINGS = {
     'VALID UNTIL': 'سارية حتى',
     MEMBERSHIP: 'العضوية',
     'Honorary membership': 'عضوية شرفية',
+    'Success Partners': 'شركاء النجاح',
+    'Active membership': 'عضوية سارية',
     CATEGORY: 'الفئة',
     'Investors Club membership card': 'بطاقة عضوية Investors Club',
   },
@@ -238,6 +245,8 @@ const STRINGS = {
     'VALID UNTIL': 'VALID UNTIL',
     MEMBERSHIP: 'MEMBERSHIP',
     'Honorary membership': 'Honorary membership',
+    'Success Partners': 'Success Partners',
+    'Active membership': 'Active membership',
     CATEGORY: 'CATEGORY',
     'Investors Club membership card': 'Investors Club membership card',
   },
@@ -270,15 +279,40 @@ function artworkFiles(readEmblem: () => Buffer): Promise<Array<{ name: string; d
   return artwork;
 }
 
-/** pass.json: a generic pass, black and gold like the in-app card, with the membership number as a QR code. */
+/**
+ * M271: the Success Partners logo as a generic pass's thumbnail (Wallet takes 2:3 to 3:2): the approved logo, whole and
+ * in its own colours, on a white tile. Drawn once per process.
+ */
+let partnerArtwork: Promise<Array<{ name: string; data: Buffer }>> | null = null;
+function partnerThumbnails(readPartnerLogo: () => Buffer): Promise<Array<{ name: string; data: Buffer }>> {
+  partnerArtwork ??= (async () => {
+    const logo = readPartnerLogo();
+    const tile = async (name: string, scale: number) => {
+      const inner = await sharp(logo).resize({ width: 84 * scale }).png().toBuffer();
+      const data = await sharp({ create: { width: 90 * scale, height: 60 * scale, channels: 4, background: '#ffffff' } }).composite([{ input: inner, gravity: 'centre' }]).png().toBuffer();
+      return { name, data };
+    };
+    return Promise.all([tile('thumbnail.png', 1), tile('thumbnail@2x.png', 2), tile('thumbnail@3x.png', 3)]);
+  })();
+  partnerArtwork.catch(() => {
+    partnerArtwork = null;
+  });
+  return partnerArtwork;
+}
+
+/** pass.json: a generic pass in the colour of the in-app card, with the membership number as a QR code. */
 export function passJson(credentials: Pick<AppleWalletCredentials, 'passTypeId' | 'teamId'>, member: PassMember): Record<string, unknown> {
   const secondary: Array<Record<string, unknown>> = [{ key: 'number', label: 'MEMBERSHIP NO.', value: member.cardNumber }];
   secondary.push(
     member.endDate
       ? { key: 'valid', label: 'VALID UNTIL', value: `${member.endDate}T00:00:00Z`, dateStyle: 'PKDateStyleMedium', ignoresTimeZone: true }
-      : { key: 'valid', label: 'MEMBERSHIP', value: 'Honorary membership' },
+      : { key: 'valid', label: 'MEMBERSHIP', value: member.kind === 'honorary' ? 'Honorary membership' : 'Active membership' },
   );
-  const auxiliary = member.categoryEn ? [{ key: 'category', label: 'CATEGORY', value: member.categoryEn }] : [];
+  const auxiliary = [
+    ...(member.kind === 'partner' ? [{ key: 'type', label: 'MEMBERSHIP', value: 'Success Partners' }] : []),
+    ...(member.categoryEn ? [{ key: 'category', label: 'CATEGORY', value: member.categoryEn }] : []),
+  ];
+  const colors = PASS_COLORS[member.kind];
   return {
     formatVersion: 1,
     passTypeIdentifier: credentials.passTypeId,
@@ -287,9 +321,9 @@ export function passJson(credentials: Pick<AppleWalletCredentials, 'passTypeId' 
     organizationName: 'Investors Club',
     description: 'Investors Club membership card',
     logoText: 'Investors Club',
-    backgroundColor: CLUB_BLACK,
-    foregroundColor: CLUB_GOLD,
-    labelColor: CLUB_GOLD_LABEL,
+    backgroundColor: colors.background,
+    foregroundColor: colors.foreground,
+    labelColor: colors.label,
     ...(member.endDate ? { expirationDate: `${member.endDate}T23:59:59Z` } : {}),
     barcodes: [{ format: 'PKBarcodeFormatQR', message: member.cardNumber, messageEncoding: 'iso-8859-1', altText: member.cardNumber }],
     generic: {
@@ -300,7 +334,7 @@ export function passJson(credentials: Pick<AppleWalletCredentials, 'passTypeId' 
   };
 }
 
-export async function buildPkpass(credentials: AppleWalletCredentials, member: PassMember, readEmblem: () => Buffer, now = new Date()): Promise<Buffer> {
+export async function buildPkpass(credentials: AppleWalletCredentials, member: PassMember, readEmblem: () => Buffer, readPartnerLogo: () => Buffer, now = new Date()): Promise<Buffer> {
   const arabic: Record<string, string> = { ...STRINGS.ar };
   const english: Record<string, string> = { ...STRINGS.en };
   if (member.categoryEn) {
@@ -310,6 +344,7 @@ export async function buildPkpass(credentials: AppleWalletCredentials, member: P
   const files: ZipEntry[] = [
     { name: 'pass.json', data: Buffer.from(JSON.stringify(passJson(credentials, member)), 'utf8') },
     ...(await artworkFiles(readEmblem)),
+    ...(member.kind === 'partner' ? await partnerThumbnails(readPartnerLogo) : []),
     { name: 'ar.lproj/pass.strings', data: stringsFile(arabic) },
     { name: 'en.lproj/pass.strings', data: stringsFile(english) },
   ];

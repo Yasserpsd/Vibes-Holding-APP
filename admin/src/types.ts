@@ -46,6 +46,11 @@ export type Account = {
   phone_verified?: 0 | 1;
   honorary?: 0 | 1;
   honorary_since?: string;
+  /** M271 (hub 2.33.0+): «عضوية شركاء النجاح» is running; `member_end` stays the effective end, `partner_end` its own. */
+  partner?: 0 | 1;
+  partner_since?: string;
+  partner_end?: string;
+  partner_left?: number | null;
   daily_limit: number;
   daily_left: number | null;
   intent: number;
@@ -166,6 +171,8 @@ export type HubStats = {
     members_expired: number;
     members_no_expiry: number;
     members_honorary?: number;
+    /** M271: Success Partners memberships running now. */
+    members_partner?: number;
     admins: number;
     publishers: number;
     /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */
@@ -317,7 +324,7 @@ export type NewsSourceRow = {
 };
 export type NewsSourcesResult = { sources: NewsSourceRow[]; updatedAt: string | null; lastError: string | null; running: boolean; visibleByLang: { ar: number; en: number }; classifier: string };
 
-export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'delete';
+export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'delete';
 export type AuditEntry = {
   id: string;
   at: string;

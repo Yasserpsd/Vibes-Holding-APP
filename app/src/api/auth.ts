@@ -15,7 +15,7 @@ export type Membership = {
    * M205: 'honorary' = «عضوية شرفية», given by the administration only (the hub stores it). Always active, with no days
    * left and no end date; absent from a server before M205.
    */
-  kind?: 'annual' | 'honorary';
+  kind?: 'annual' | 'honorary' | 'partner';
   daysLeft: number | null;
   endDate: string | null;
   aiDailyLimit: number;

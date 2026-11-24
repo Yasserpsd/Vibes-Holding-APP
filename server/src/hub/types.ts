@@ -46,6 +46,11 @@ export type HubContact = {
   honorary?: 0 | 1;
   /** M205: the Riyadh day the honorary membership was given ('' when none). */
   honorary_since?: string;
+  /** M271 (hub 2.33.0+): «عضوية شركاء النجاح» is running. is_member / member_end stay the effective ones; these four are its own period. */
+  partner?: 0 | 1;
+  partner_since?: string;
+  partner_end?: string;
+  partner_left?: number | null;
   city: string;
   bio: string;
   pending_pay: 0 | 1;
@@ -210,6 +215,11 @@ export type HubAccount = {
   phone_verified?: 0 | 1;
   honorary?: 0 | 1;
   honorary_since?: string;
+  /** M271 (hub 2.33.0+): «عضوية شركاء النجاح» is running. is_member / member_end stay the effective ones; these four are its own period. */
+  partner?: 0 | 1;
+  partner_since?: string;
+  partner_end?: string;
+  partner_left?: number | null;
   daily_limit: number;
   daily_left: number | null;
   intent: number;
@@ -266,10 +276,10 @@ export type HubLead = {
   created_at: string;
 };
 
-export type HubEventKind = 'registered' | 'verified' | 'activated' | 'renewed' | 'revoked' | 'role' | 'deleted' | 'honorary' | 'honorary_revoked';
+export type HubEventKind = 'registered' | 'verified' | 'activated' | 'renewed' | 'revoked' | 'role' | 'deleted' | 'honorary' | 'honorary_revoked' | 'partner' | 'partner_revoked';
 
-/** `admin_grant` actions; the two honorary ones exist since hub 2.28.0 (M205) and take no days. */
-export type HubGrantAction = 'activate' | 'extend' | 'revoke' | 'honorary' | 'honorary_revoke';
+/** `admin_grant` actions; the honorary pair exists since hub 2.28.0 (M205), the partner pair since 2.33.0 (M271); neither takes days. */
+export type HubGrantAction = 'activate' | 'extend' | 'revoke' | 'honorary' | 'honorary_revoke' | 'partner' | 'partner_revoke';
 
 export type HubEvent = {
   id: number;
@@ -334,6 +344,8 @@ export type HubStats = {
     members_no_expiry: number;
     /** M205 (hub 2.28.0+): honorary members, counted inside members_active and members_no_expiry too. */
     members_honorary?: number;
+    /** M271 (hub 2.33.0+): Success Partners memberships running now, counted inside members_active too. */
+    members_partner?: number;
     admins: number;
     publishers: number;
     /** M112 (hub 2.19.0): persona counts among the accounts; an older hub sends none. */

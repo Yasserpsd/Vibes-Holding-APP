@@ -2,6 +2,9 @@ import { createPrivateKey, sign } from 'node:crypto';
 
 import { decodeEnvFile, type PassMember } from './pkpass.js';
 
+/** M271: the face of the pass per membership; Google picks a readable text colour by itself. */
+const GOOGLE_COLORS: Record<PassMember['kind'], string> = { annual: '#0B0A08', partner: '#0D2E86', honorary: '#FBF8F0' };
+
 /**
  * M267 «أضف إلى المحفظة» (Google): the «Save to Google Wallet» link is a JWT, signed with the service account's key,
  * that carries the pass itself (a Generic class and a Generic object). Google reads it at
@@ -37,30 +40,36 @@ export function googleClassId(issuerId: string): string {
   return `${issuerId}.investors_club_membership`;
 }
 
-export function googleObjectId(issuerId: string, cardNumber: string): string {
+export function googleObjectId(issuerId: string, cardNumber: string, kind: PassMember['kind'] = 'annual'): string {
   // Object ids allow letters, digits, dots, dashes and underscores only; the membership number already fits.
-  return `${issuerId}.member_${cardNumber.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+  // M271: Google keeps a saved object as it first saw it, so each other kind of membership is its own object (the
+  // annual one keeps the id the saved passes already have).
+  return `${issuerId}.member_${cardNumber.replace(/[^A-Za-z0-9_-]/g, '_')}${kind === 'annual' ? '' : `_${kind}`}`;
 }
 
 export type GoogleLang = 'ar' | 'en';
 
-export function googleClaims(credentials: GoogleWalletCredentials, member: PassMember, emblemUrl: string, lang: GoogleLang, now: Date): Record<string, unknown> {
+export function googleClaims(credentials: GoogleWalletCredentials, member: PassMember, emblemUrl: string, lang: GoogleLang, now: Date, partnerBannerUrl?: string): Record<string, unknown> {
   const text = (value: string) => ({ defaultValue: { language: lang, value } });
   const labels = lang === 'ar' ? { number: 'رقم العضوية', valid: 'سارية حتى', honorary: 'عضوية شرفية', category: 'الفئة', member: 'عضو', type: 'العضوية' } : { number: 'Membership no.', valid: 'Valid until', honorary: 'Honorary membership', category: 'Category', member: 'Member', type: 'Membership' };
+  const partnerName = lang === 'ar' ? 'عضوية شركاء النجاح' : 'Success Partners Membership';
+  const openName = member.kind === 'honorary' ? labels.honorary : lang === 'ar' ? 'عضوية سارية' : 'Active membership';
   const modules: Array<{ id: string; header: string; body: string }> = [
     { id: 'number', header: labels.number, body: member.cardNumber },
-    member.endDate ? { id: 'valid', header: labels.valid, body: member.endDate } : { id: 'valid', header: labels.type, body: labels.honorary },
+    member.endDate ? { id: 'valid', header: labels.valid, body: member.endDate } : { id: 'valid', header: labels.type, body: openName },
   ];
   const category = lang === 'ar' ? member.categoryAr : member.categoryEn;
   if (category) modules.push({ id: 'category', header: labels.category, body: category });
   const object = {
-    id: googleObjectId(credentials.issuerId, member.cardNumber),
+    id: googleObjectId(credentials.issuerId, member.cardNumber, member.kind),
     classId: googleClassId(credentials.issuerId),
     state: 'ACTIVE',
     cardTitle: text('Investors Club'),
     header: text(member.name),
-    subheader: text(labels.member),
-    hexBackgroundColor: '#0B0A08',
+    subheader: text(member.kind === 'partner' ? partnerName : member.kind === 'honorary' ? labels.honorary : labels.member),
+    hexBackgroundColor: GOOGLE_COLORS[member.kind],
+    // M271: the Success Partners logo across the pass, beside the club's emblem at its top.
+    ...(member.kind === 'partner' && partnerBannerUrl ? { heroImage: { sourceUri: { uri: partnerBannerUrl }, contentDescription: text(partnerName) } } : {}),
     logo: { sourceUri: { uri: emblemUrl }, contentDescription: text('Investors Club') },
     barcode: { type: 'QR_CODE', value: member.cardNumber, alternateText: member.cardNumber },
     textModulesData: modules,
@@ -77,9 +86,9 @@ export function googleClaims(credentials: GoogleWalletCredentials, member: PassM
 }
 
 /** The signed link for one member. */
-export function googleSaveUrl(credentials: GoogleWalletCredentials, member: PassMember, emblemUrl: string, lang: GoogleLang, now = new Date()): string {
+export function googleSaveUrl(credentials: GoogleWalletCredentials, member: PassMember, emblemUrl: string, lang: GoogleLang, now = new Date(), partnerBannerUrl?: string): string {
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const body = base64url(JSON.stringify(googleClaims(credentials, member, emblemUrl, lang, now)));
+  const body = base64url(JSON.stringify(googleClaims(credentials, member, emblemUrl, lang, now, partnerBannerUrl)));
   const signature = sign('sha256', Buffer.from(`${header}.${body}`), createPrivateKey(credentials.privateKeyPem)).toString('base64url');
   return `https://pay.google.com/gp/v/save/${header}.${body}.${signature}`;
 }

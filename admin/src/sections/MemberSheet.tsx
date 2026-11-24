@@ -6,7 +6,7 @@ import type { Account, GrantAction, MemberDetail, MemberEvent } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
 import { dailyLeft, memberLeft, personaLabel, StatePill, WaPill } from './Members';
 
-type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'delete';
+type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'partner' | 'unpartner' | 'delete';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
 type Draft = { kind: ActionKind; amount: number; note: string; requestId: string; tellMember: boolean };
 
@@ -18,12 +18,15 @@ const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: bool
   // M205: only for official partners in the founding contract of a Vibes Ventures company — the administration gives it and takes it back, nobody else.
   honorary: { button: 'منح العضوية الشرفية', title: 'منح العضوية الشرفية' },
   unhonorary: { button: 'سحب العضوية الشرفية', title: 'سحب العضوية الشرفية', danger: true },
+  // M271: given by the administration for 360 days, never sold.
+  partner: { button: 'منح عضوية شركاء النجاح', title: 'منح عضوية شركاء النجاح' },
+  unpartner: { button: 'سحب عضوية شركاء النجاح', title: 'سحب عضوية شركاء النجاح', danger: true },
   delete: { button: 'حذف الحساب', title: 'حذف الحساب نهائيًا', danger: true },
   publisher: { button: 'ترقية إلى موديريتور', title: 'صلاحية النشر (موديريتور)' },
   unpublisher: { button: 'سحب صلاحية الموديريتور', title: 'سحب صلاحية الموديريتور', danger: true },
 };
 
-const EVENT_KINDS: Record<string, string> = { registered: 'تسجيل', verified: 'تأكيد البريد', activated: 'تفعيل عضوية', renewed: 'تجديد عضوية', revoked: 'إلغاء عضوية', honorary: 'منح العضوية الشرفية', honorary_revoked: 'سحب العضوية الشرفية', role: 'تغيير صلاحية', deleted: 'حذف الحساب' };
+const EVENT_KINDS: Record<string, string> = { registered: 'تسجيل', verified: 'تأكيد البريد', activated: 'تفعيل عضوية', renewed: 'تجديد عضوية', revoked: 'إلغاء عضوية', honorary: 'منح العضوية الشرفية', honorary_revoked: 'سحب العضوية الشرفية', partner: 'منح عضوية شركاء النجاح', partner_revoked: 'سحب عضوية شركاء النجاح', role: 'تغيير صلاحية', deleted: 'حذف الحساب' };
 const EVENT_SOURCES: Record<string, string> = { paymob: 'بيموب', store: 'المتجر', admin: 'الإدارة', list: 'قائمة', manual: 'يدوي', app: 'التطبيق' };
 
 /** A membership the hub gives no end for: its flag says so, and so does a member with no days-left figure. */
@@ -47,11 +50,27 @@ function membershipActions(account: Account): ActionKind[] {
   if (account.state === 'lead' || account.state === 'pending') return [];
   // A membership with no end date has nothing to extend: the hub would start a dated period from today and so put an end to it.
   // M205: an honorary member has no days to add or cancel — only the honorary membership itself can be taken back.
-  const list: ActionKind[] = account.honorary ? ['pb', 'unhonorary'] : account.state !== 'member' ? ['activate', 'honorary'] : openEnded(account) ? ['pb', 'honorary', 'revoke'] : ['extend', 'pb', 'honorary', 'revoke'];
+  // M271: nor are there days to change under a Success Partners membership; one given membership at a time.
+  const list: ActionKind[] = account.honorary
+    ? ['pb', 'unhonorary']
+    : account.partner
+      ? ['pb', 'unpartner']
+      : account.state !== 'member'
+        ? ['activate', 'partner', 'honorary']
+        : openEnded(account)
+          ? ['pb', 'partner', 'honorary', 'revoke']
+          : ['extend', 'pb', 'partner', 'honorary', 'revoke'];
   if (account.role === 'publisher') list.push('unpublisher');
   else if (account.role !== 'admin') list.push('publisher');
   return list;
 }
+
+const PREFILLED_NOTES: Partial<Record<ActionKind, string>> = {
+  honorary: 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures',
+  unhonorary: 'سحب العضوية الشرفية',
+  partner: 'منح عضوية شركاء النجاح لمدة 360 يومًا',
+  unpartner: 'سحب عضوية شركاء النجاح',
+};
 
 /** One sentence that says exactly what the confirm button will do. */
 function summary(draft: Draft, name: string): string {
@@ -68,6 +87,10 @@ function summary(draft: Draft, name: string): string {
       return `تُمنح «${name}» العضوية الشرفية: عضوية كاملة مفتوحة بلا تجديد، ويصله إشعار بذلك على واتساب وداخل التطبيق، ويصل الإدارة بريد بالإجراء. تُمنح فقط لمن هو شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures.`;
     case 'unhonorary':
       return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ويصل الإدارة بريد بالإجراء.`;
+    case 'partner':
+      return `تُمنح «${name}» عضوية شركاء النجاح لمدة 360 يومًا تبدأ من الآن، بمزايا العضوية السارية، ويصله إشعار داخل التطبيق وعلى واتساب، ويصل الإدارة بريد بالإجراء. إن كان له اشتراك مدفوع تبقى أيامه محفوظة.`;
+    case 'unpartner':
+      return `تُسحب عضوية شركاء النجاح من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار داخل التطبيق وبالبريد، ويصل الإدارة بريد بالإجراء.`;
     case 'delete':
       return `سيُحذف حساب «${name}» نهائيًا الآن: تُمسح بياناته ومحادثاته وعضويته، وتُغلق جلساته على جميع الأجهزة، ويفقد ما فتحه في بنك المشاريع. لا يمكن التراجع عن ذلك، وتبقى الفواتير وسجلات الدفع محفوظة.`;
     case 'publisher':
@@ -82,6 +105,7 @@ function run(contactId: number, draft: Draft) {
   if (draft.kind === 'delete') return api.deleteAccount(contactId, { tellMember: draft.tellMember, ...meta });
   if (draft.kind === 'pb') return api.pbGrant(contactId, { amount: draft.amount, ...meta });
   if (draft.kind === 'honorary' || draft.kind === 'unhonorary') return api.honorary(contactId, { on: draft.kind === 'honorary', ...meta });
+  if (draft.kind === 'partner' || draft.kind === 'unpartner') return api.partner(contactId, { on: draft.kind === 'partner', ...meta });
   if (draft.kind === 'publisher' || draft.kind === 'unpublisher') return api.setRole(contactId, { role: draft.kind === 'publisher' ? 'publisher' : 'member', ...meta });
   return api.grant(contactId, { action: draft.kind, days: draft.kind === 'revoke' ? null : draft.amount, ...meta });
 }
@@ -93,8 +117,9 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
   const [amount, setAmount] = useState(days ? '365' : kind === 'pb' ? '1' : '');
   // A phone's numeric keypad has no minus key: taking «رصيد» away is a choice, not a typed sign.
   const [direction, setDirection] = useState<'add' | 'cut'>('add');
-  // M215: the honorary actions come with their note written; it stays editable. The same sentences live in server dashboard/service.ts.
-  const [note, setNote] = useState(kind === 'honorary' ? 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures' : kind === 'unhonorary' ? 'سحب العضوية الشرفية' : '');
+  // M215 + M271: the honorary and Success Partners actions come with their note written; it stays editable. The same
+  // sentences live in server dashboard/service.ts.
+  const [note, setNote] = useState(PREFILLED_NOTES[kind] ?? '');
   const [draft, setDraft] = useState<Draft | null>(null);
   // M216: an active member is told by default; a spam or test account is not.
   const [tellMember, setTellMember] = useState(account.state === 'member');
@@ -372,11 +397,13 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
 
       {everMember ? (
         <section className="sheet-block">
-          <h3>{account.honorary ? 'العضوية الشرفية' : 'العضوية السنوية'}</h3>
+          <h3>{account.honorary ? 'العضوية الشرفية' : account.partner ? 'عضوية شركاء النجاح' : 'العضوية السنوية'}</h3>
           <dl className="fields">
             {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
+            {account.partner ? <Field label="مُنحت في">{account.partner_since ? formatDay(account.partner_since) : '—'}</Field> : null}
             <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
-            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
+            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.partner ? formatDay(account.partner_end ?? '') : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
+            {account.partner && (account.never_expires || (account.member_end && account.member_end > (account.partner_end ?? ''))) ? <Field label="اشتراك مدفوع بعدها حتى">{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field> : null}
             {account.state === 'member' ? <Field label="رصيد المستشار اليوم">{dailyLeft(account)}</Field> : null}
             <Field label="رصيد بنك المشاريع">{pb ? `المتبقي ${formatProjects(pb.left)}` : '—'}</Field>
             {pb ? <Field label="تفاصيل الرصيد">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
@@ -423,7 +450,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             ))}
           </div>
         ) : null}
-        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
+        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : account.partner ? <p className="muted hint">عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
         {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
         {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
         {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}

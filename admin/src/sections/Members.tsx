@@ -49,9 +49,14 @@ const STATES: Record<Account['state'], { label: string; tone: Tone }> = {
   lead: { label: 'عميل محتمل', tone: 'muted' },
 };
 
-export function StatePill({ account }: { account: Pick<Account, 'state' | 'role' | 'honorary'> }) {
+export function StatePill({ account }: { account: Pick<Account, 'state' | 'role' | 'honorary' | 'partner'> }) {
   // M205: the honorary membership reads as its own state, never as a paid subscription.
-  const state = account.honorary ? { label: 'عضوية شرفية', tone: 'gold' as Tone } : (STATES[account.state] ?? { label: account.state, tone: 'muted' as Tone });
+  // M271: and so does the Success Partners membership, in its own blue.
+  const state = account.honorary
+    ? { label: 'عضوية شرفية', tone: 'gold' as Tone }
+    : account.partner
+      ? { label: 'شركاء النجاح', tone: 'blue' as Tone }
+      : (STATES[account.state] ?? { label: account.state, tone: 'muted' as Tone });
   return (
     <>
       <Pill tone={state.tone}>{state.label}</Pill>
@@ -68,8 +73,9 @@ export function WaPill({ account }: { account: Pick<Account, 'phone_verified' | 
   return <Pill tone="danger">{account.phone ? 'غير موثّق' : 'غير موثّق — بدون جوال'}</Pill>;
 }
 
-export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end' | 'honorary'>): string {
+export function memberLeft(account: Pick<Account, 'never_expires' | 'member_left' | 'member_end' | 'honorary' | 'partner' | 'partner_left'>): string {
   if (account.honorary) return 'شرفية مفتوحة';
+  if (account.partner && account.partner_left != null) return `باقي ${daysText(account.partner_left)}`;
   if (account.never_expires) return 'بلا تاريخ انتهاء';
   if (account.member_left === null) return '—';
   return `باقي ${daysText(account.member_left)}`;

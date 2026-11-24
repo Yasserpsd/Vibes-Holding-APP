@@ -38,6 +38,8 @@ export type MockContact = {
   memberDays: number;
   /** M205: when the honorary membership was given (hub 2.28.0 `honorary_at`); it overrides the paid clock above. */
   honoraryAt?: number | null;
+  /** M271: when «عضوية شركاء النجاح» was given (hub 2.33.0 `partner_at`); it runs 360 days beside the paid clock above. */
+  partnerAt?: number | null;
   memberStartedAt: number | null;
   resetPending: boolean;
   role: MockRole;
@@ -304,4 +306,14 @@ export function seedDemo(state: MockState, chat: MockChat, now: number): void {
   pages.forEach(([host, url, title, kind, excerpt], index) => {
     state.knowledge.push({ id: nextId(state, 'knowledge'), host, site: MOCK_SITES[host] ?? host, url, title, kind, excerpt, at: now - (pages.length - index) * 5 * DAY_MS });
   });
+}
+
+/** M271: the hub gives the Success Partners membership for 360 days. */
+export const MOCK_PARTNER_DAYS = 360;
+
+/** The end of a running Success Partners period, else null (as the plugin: honorary wins, a lapsed one is gone). */
+export function mockPartnerEnd(contact: MockContact, now = Date.now()): number | null {
+  if (typeof contact.partnerAt !== 'number' || typeof contact.honoraryAt === 'number') return null;
+  const end = contact.partnerAt + MOCK_PARTNER_DAYS * DAY_MS;
+  return end > now ? end : null;
 }

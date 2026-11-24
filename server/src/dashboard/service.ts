@@ -10,6 +10,7 @@ import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
 import type { Notifier } from '../mail/notify.js';
 import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
+import { HUB_PARTNER_VERSION, isPartner } from '../membership/partner.js';
 import type { MembershipService } from '../membership/service.js';
 import type { PaymentStats, PaymentsService } from '../payments/service.js';
 import type { PbBalance, PbBalanceLite, PbBridge, PbMember } from '../projectsBank/bridge.js';
@@ -40,6 +41,10 @@ const UPGRADE_HUB_HONORARY = 'العضوية الشرفية تحتاج تحدي�
 // M215: the same two sentences prefill the note in admin/src/sections/MemberSheet.tsx.
 const HONORARY_NOTE_GRANT = 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures';
 const HONORARY_NOTE_REVOKE = 'سحب العضوية الشرفية';
+const UPGRADE_HUB_PARTNER = 'عضوية شركاء النجاح تحتاج تحديث إضافة الهب إلى 2.33.0 أو أحدث';
+// M271: the same two sentences prefill the note in admin/src/sections/MemberSheet.tsx.
+const PARTNER_NOTE_GRANT = 'منح عضوية شركاء النجاح لمدة 360 يومًا';
+const PARTNER_NOTE_REVOKE = 'سحب عضوية شركاء النجاح';
 
 export type SectionError = { code: string; message: string };
 export type BridgeInfo = { hub: { version: string | null; ok: boolean }; pb: { version: string | null; ok: boolean } };
@@ -49,7 +54,7 @@ export type AuditEntry = {
   id: string;
   at: string;
   actor: { id: number; name: string; email: string };
-  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'delete';
+  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'delete';
   contactId: number;
   params: Record<string, unknown>;
   note: string;
@@ -514,6 +519,42 @@ export class DashboardService {
       await this.deps.push.setHonorary(contactId, input.on).catch(() => undefined);
       this.deps.push.honoraryChanged(contactId, input.on);
       this.deps.notifier?.honoraryChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
+      return { ok: true as const, contact: result.contact, event: result.event };
+    });
+  }
+
+  /**
+   * M271 «عضوية شركاء النجاح»: given and taken back here only, like the honorary one — an admin session, `confirm: true`,
+   * one audit entry. The hub holds it (`admin_grant` partner / partner_revoke, 2.33.0) and ends it by itself after 360
+   * days; a paid period under it keeps counting. Nothing about it is sold (rule 3). A grant is told on WhatsApp with the
+   * approved «سارية حتى» template (M234), by e-mail when WhatsApp cannot carry it; a revoke by e-mail; both by push.
+   */
+  partner(admin: AdminActor, contactId: number, input: { on: boolean; note: string; requestId: string | null }) {
+    const note = input.note.trim() || (input.on ? PARTNER_NOTE_GRANT : PARTNER_NOTE_REVOKE);
+    return this.write(admin, 'partner', contactId, { params: { on: input.on }, note, requestId: input.requestId }, async () => {
+      let result: HubResults['admin_grant'];
+      try {
+        result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: input.on ? 'partner' : 'partner_revoke', days: 0, note }, false);
+      } catch (error) {
+        if (error instanceof HubError && error.code === 'invalid' && (await this.hubBefore(HUB_PARTNER_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
+        throw error;
+      }
+      // A hub that answered without the flag did not understand the action: nothing changed and nobody is told.
+      if (isPartner(result.contact) !== input.on) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
+      this.deps.auth.forget(contactId);
+      this.bust('hub', 'pb');
+      const { contact, event } = result;
+      const email = String(contact.contact_email ?? '').trim() || contact.email;
+      const lang = await this.memberLang(contactId, contact.lang);
+      const until = input.on ? (contact.partner_end ?? null) : null;
+      const mail = () => this.deps.notifier?.tellPartner({ on: input.on, to: email, lang: lang === 'en' ? 'en' : 'ar', name: contact.name, until });
+      if (input.on && until && this.deps.whatsapp) {
+        this.deps.whatsapp.announceMembership({ phone: contact.phone, lang, name: contact.name, expiresAt: `${until}T00:00:00+03:00`, ref: `partner:${contactId}:${event.id}` }, mail);
+      } else {
+        mail();
+      }
+      this.deps.push.partnerChanged(contactId, input.on, until);
+      this.deps.notifier?.partnerChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
       return { ok: true as const, contact: result.contact, event: result.event };
     });
   }

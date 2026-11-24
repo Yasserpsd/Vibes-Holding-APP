@@ -282,7 +282,7 @@ export function AsyncPage<T extends PageOf>({ state, onPage, emptyText, rows, ch
   );
 }
 
-export type Tone = 'gold' | 'ok' | 'danger' | 'muted';
+export type Tone = 'gold' | 'blue' | 'ok' | 'danger' | 'muted';
 export function Pill({ tone = 'muted', children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`pill ${tone}`}>{children}</span>;
 }

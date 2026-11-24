@@ -319,7 +319,7 @@ export function useCountUp(target: number, duration = 800): number {
 }
 
 /** A light band sweeping across gold surfaces (the membership card's metal sheen). */
-export function Sheen({ width, height, band = 90, duration = 2600, delay = 1200 }: { width: number; height: number; band?: number; duration?: number; delay?: number }) {
+export function Sheen({ width, height, band = 90, duration = 2600, delay = 1200, color = 'rgba(255, 244, 204, 0.14)' }: { width: number; height: number; band?: number; duration?: number; delay?: number; /** M271: a card of another colour sweeps its own light. */ color?: string }) {
   const [progress] = useState(() => new Animated.Value(0));
   const reduced = useReducedMotion();
   useEffect(() => {
@@ -344,7 +344,7 @@ export function Sheen({ width, height, band = 90, duration = 2600, delay = 1200 
           left: -band * 2,
           width: band,
           height: height * 1.8,
-          backgroundColor: 'rgba(255, 244, 204, 0.14)',
+          backgroundColor: color,
           transform: [
             { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, travel] }) },
             { rotate: '18deg' },
