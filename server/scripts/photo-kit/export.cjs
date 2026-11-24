@@ -44,13 +44,17 @@ const ITEMS = [
   { name: 'card-partners-gate', from: 'm10', width: 1280, crop: { ratio: 16 / 9, y0: 27 }, slots: ['home.card.success-partners.3'] },
   { name: 'card-app-screens', from: 'm6', width: 1280, crop: { ratio: 16 / 9, y0: 36 }, slots: ['home.card.app-publish.1'] },
   // The HQ: the membership benefit cards, the HQ gallery, two home banners and the services held in the hall.
-  { name: 'hq-hall-evening', from: 'hallWide', width: 1280, crop: { ratio: 16 / 9, y0: 10 }, slots: ['membership.photo.1', 'hq', 'service.theater', 'service.meetup'] },
-  { name: 'hq-investor-seat', from: 'chair', width: 1280, crop: { ratio: 16 / 9, y0: 1 }, slots: ['membership.photo.2', 'hq', 'service.hq-visit', 'home.slide.hq.2'] },
-  { name: 'hq-hall-symmetry', from: 'hallSym', width: 1280, crop: { ratio: 16 / 9, y0: 0 }, slots: ['membership.photo.3', 'hq', 'service.theater', 'service.hq-visit', 'home.slide.hq.1'] },
-  { name: 'hq-meetup-audience', from: 'crowd', width: 1280, crop: { ratio: 16 / 9, y0: 36 }, slots: ['membership.photo.4', 'hq', 'service.meetup', 'service.workshop'] },
-  { name: 'hq-seat-embroidery', from: 'macro', width: 1280, crop: { ratio: 16 / 9, y0: 22 }, slots: ['membership.photo.5', 'hq', 'service.hq-visit'] },
-  { name: 'hq-hall-aisle', from: 'aisle', width: 1280, crop: { ratio: 16 / 9, y0: 50 }, slots: ['membership.photo.6', 'hq', 'service.theater'] },
-  { name: 'hq-hall-rows', from: 'hallTall', width: 1280, crop: { ratio: 16 / 9, y0: 52 }, slots: ['membership.photo.7', 'hq', 'service.workshop'] },
+  { name: 'hq-hall-evening', from: 'hallWide', width: 1280, crop: { ratio: 16 / 9, y0: 10 }, slots: ['membership.photo.1', 'hq', 'service.theater', 'service.meetup', 'auth.photo.5', 'page.photo.1'] },
+  { name: 'hq-investor-seat', from: 'chair', width: 1280, crop: { ratio: 16 / 9, y0: 1 }, slots: ['membership.photo.2', 'hq', 'service.hq-visit', 'home.slide.hq.2', 'page.photo.2'] },
+  { name: 'hq-hall-symmetry', from: 'hallSym', width: 1280, crop: { ratio: 16 / 9, y0: 0 }, slots: ['membership.photo.3', 'hq', 'service.theater', 'service.hq-visit', 'home.slide.hq.1', 'auth.photo.4', 'page.photo.3'] },
+  { name: 'hq-meetup-audience', from: 'crowd', width: 1280, crop: { ratio: 16 / 9, y0: 36 }, slots: ['membership.photo.4', 'hq', 'service.meetup', 'service.workshop', 'page.photo.4'] },
+  { name: 'hq-seat-embroidery', from: 'macro', width: 1280, crop: { ratio: 16 / 9, y0: 22 }, slots: ['membership.photo.5', 'hq', 'service.hq-visit', 'page.photo.5'] },
+  { name: 'hq-hall-aisle', from: 'aisle', width: 1280, crop: { ratio: 16 / 9, y0: 50 }, slots: ['membership.photo.6', 'hq', 'service.theater', 'page.photo.6'] },
+  // Upright cuts for the entry screens (the gate shows them tall, edge to edge).
+  { name: 'auth-investor-seat', from: 'chair', width: 1080, crop: { ratio: 4 / 5, y0: 0 }, slots: ['auth.photo.1'] },
+  { name: 'auth-hall-rows', from: 'hallTall', width: 1080, crop: { ratio: 4 / 5, y0: 30 }, slots: ['auth.photo.2'] },
+  { name: 'auth-hall-aisle', from: 'aisle', width: 1080, crop: { ratio: 4 / 5, y0: 30 }, slots: ['auth.photo.3'] },
+  { name: 'hq-hall-rows', from: 'hallTall', width: 1280, crop: { ratio: 16 / 9, y0: 52 }, slots: ['membership.photo.7', 'hq', 'service.workshop', 'page.photo.7'] },
 ];
 
 async function render(file, item, target) {

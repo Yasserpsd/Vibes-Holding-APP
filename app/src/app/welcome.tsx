@@ -3,16 +3,15 @@ import { Image, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthConfig } from '@/api/auth';
-import { useHq } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
 import { useGuestGate } from '@/auth/GuestGate';
 import { AppButton } from '@/components/AppButton';
+import { AuthHero, useAuthPhotos } from '@/components/AuthPhotos';
 import { GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { languageChoiceOffered, t } from '@/i18n';
 import { chooseLanguage } from '@/i18n/chooseLanguage';
-import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -24,22 +23,25 @@ const clubLogo = require('../../assets/images/club-logo.png');
  * guest mode is permanent, so the guest choice is always offered and never runs out.
  * M106b: the club theatre breathes FAINT behind the whole gate («اعمل من ورا شكل المسرح بشياكة
  * ويكون خفيف في الخلفية») — the first HQ photo at low opacity under a dark wash.
+ * M270 (owner, 2026-11-25: «وعايزين صور في صفحة الدخول برده كل شئ يكون في صور»): the faint wash became a real
+ * photograph — it fills the top of the gate edge to edge, changes on its own (the dashboard set `auth.photo`,
+ * the HQ gallery until it is filled) and melts into the background above the buttons; the gate's content then
+ * sits at the foot of the screen with the logo over the fading picture. With no picture the gate is plain.
  */
 export default function WelcomeScreen() {
   const router = useRouter();
   const { locked, startGuest } = useGuestGate();
   const { sessionExpired, dismissSessionExpired } = useAuth();
   const { data: config } = useAuthConfig();
-  const theatre = useHq().data?.photos?.[0] ?? null;
+  const photos = useAuthPhotos();
 
   if (!locked) return <Redirect href="/" />;
 
   return (
     <GoldGradient variant="screen" style={styles.backdrop}>
-      {theatre ? <Image source={{ uri: sized(theatre, 480) }} style={styles.theatre} resizeMode="cover" blurRadius={2} /> : null}
-      <View style={styles.theatreWash} pointerEvents="none" />
+      {photos.length ? <AuthHero photos={photos} /> : null}
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, photos.length ? styles.contentLow : null]} showsVerticalScrollIndicator={false}>
           <FadeInView delay={entranceDelay(0)} style={styles.hero}>
             <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
           </FadeInView>
@@ -91,11 +93,10 @@ export default function WelcomeScreen() {
 
 const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.black },
-  // M106b: the theatre, faint and classy, under a dark wash that keeps every word readable.
-  theatre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.35 },
-  theatreWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.wash },
   safeArea: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+  // Under a photograph the content rests at the foot of the screen, so the picture's clear top stays in view.
+  contentLow: { justifyContent: 'flex-end' },
   hero: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   logo: { width: 230, height: 190 },
   title: { ...typography.title, color: colors.gold, textAlign: 'center' },

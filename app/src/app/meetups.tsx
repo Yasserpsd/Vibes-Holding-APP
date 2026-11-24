@@ -33,7 +33,7 @@ export default function MeetupsScreen() {
   const { intro, meetups } = meetupsFor(data, personaKey);
 
   return (
-    <Screen title={data.title} subtitle={data.subtitle}>
+    <Screen title={data.title} subtitle={data.subtitle} photo={false}>
       {/* M270: the meetups open on their own picture — shows only when the owner fills the slot. */}
       <SlotBanner slot="meetups.banner" />
       {intro ? (

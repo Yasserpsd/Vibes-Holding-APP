@@ -66,6 +66,7 @@ export default function MembershipScreen() {
       title={data.title}
       subtitle={data.subtitle}
       watermark
+      photo={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
     >
       {/* M81 extension: the owner's membership banner — shows only when he fills the slot.

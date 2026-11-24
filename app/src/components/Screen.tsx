@@ -1,6 +1,7 @@
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactElement, type ReactNode, type RefObject } from 'react';
 import {
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   ScrollView,
@@ -14,12 +15,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { pagePhotoOf, usePagePhotos } from '@/api/images';
 import { useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { EmblemWatermark, GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
 import { textStart } from '@/i18n/direction';
+import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   title?: string;
@@ -35,6 +38,11 @@ type Props = {
   watermark?: boolean;
   /** M176: lets a screen scroll itself (the top «اشترك الآن» button jumps to the booking card). */
   scrollRef?: RefObject<ScrollView | null>;
+  /**
+   * M270: a titled page opens on a photograph with its title written on it. `false` keeps the plain heading —
+   * for the few pages that already lead with their own banner right under the title.
+   */
+  photo?: boolean;
 };
 
 /**
@@ -142,7 +150,11 @@ export function useFieldScroller(scrollRef: RefObject<ScrollView | null>) {
 }
 
 /** Scrollable screen with keyboard handling, used by forms and detail pages. */
-export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef }: Props) {
+export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef, photo = true }: Props) {
+  // M270 (owner, on the gate's photograph: «عايز كله يكون كده… نفس الفكرة دي كل الصفحات»): the heading of every
+  // titled page is a photograph of the club that melts into the page, each page its own picture.
+  const pagePhotos = usePagePhotos();
+  const heroPhoto = title && photo ? pagePhotoOf(pagePhotos, title) : null;
   // The bottom padding keeps the last element clear of the floating «اسأل المستشار» button. Without a tab bar or
   // a bottom safe-area edge under it, the scroll view runs to the physical bottom edge and the inset counts too.
   const clearance = useAskAdvisorClearance(aboveTabBar || edges.includes('bottom'));
@@ -161,7 +173,7 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
   const keeper = useFieldScroller(scroll);
   return (
     <SafeAreaView style={styles.safeArea} edges={safeEdges}>
-      {watermark ? <EmblemWatermark /> : null}
+      {watermark && !heroPhoto ? <EmblemWatermark /> : null}
       {/* Review 2026-11-16: `padding` on Android too. Edge-to-edge means the window is not resized for the keyboard,
           so `undefined` (a plain View) left every form behind the keys. The offset is the header above this view on
           both platforms; if a device ever did resize the window, the padding works out to zero by itself. */}
@@ -175,8 +187,20 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
           showsVerticalScrollIndicator={false}
           {...keeper.scrollProps}
         >
-          {title ? (
-            <FadeInView offset={10} duration={360}>
+          {title && heroPhoto ? (
+            <FadeInView key="photo-heading" offset={10} duration={360}>
+              <View style={styles.hero}>
+                <Image source={{ uri: sized(heroPhoto, 400) }} style={styles.heroFill} resizeMode="cover" resizeMethod="resize" accessibilityIgnoresInvertColors />
+                <View style={[styles.heroFill, styles.heroScrim]} />
+                <View style={styles.heroTexts}>
+                  <Text style={styles.heroTitle}>{title}</Text>
+                  {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
+                  <GoldHairline style={styles.hairline} />
+                </View>
+              </View>
+            </FadeInView>
+          ) : title ? (
+            <FadeInView key="plain-heading" offset={10} duration={360}>
               <View style={styles.heading}>
                 <Text style={styles.title}>{title}</Text>
                 {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -201,4 +225,22 @@ const styles = themedStyles(() => ({
   title: { ...typography.title, color: colors.gold, textAlign: textStart },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   hairline: { marginTop: spacing.sm, width: 72, alignSelf: 'flex-start' },
+  // M270: the photograph runs to the screen's edges (it undoes the content's own padding) and darkens downward
+  // into the dark theme's background, so the page seems to grow out of it; the light theme reads it as a
+  // rounded picture header. The words on it use the on-photo colours in both themes.
+  hero: {
+    marginHorizontal: -spacing.md,
+    marginTop: -spacing.md,
+    minHeight: 206,
+    justifyContent: 'flex-end',
+    backgroundColor: '#070708',
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
+    overflow: 'hidden',
+  },
+  heroFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  heroScrim: { experimental_backgroundImage: 'linear-gradient(0deg, rgba(7, 7, 8, 1) 0%, rgba(7, 7, 8, 0.82) 30%, rgba(7, 7, 8, 0.28) 64%, rgba(7, 7, 8, 0.22) 100%)' },
+  heroTexts: { paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm, gap: spacing.xs },
+  heroTitle: { ...typography.title, color: colors.onPhotoGold, textAlign: textStart },
+  heroSubtitle: { ...typography.body, color: colors.onPhoto, textAlign: textStart },
 }));

@@ -33,7 +33,7 @@ export default function AgendaScreen() {
   const targetMs = nearest ? Date.parse(`${nearest.date}T${nearest.time || '00:00'}:00+03:00`) : NaN;
 
   return (
-    <Screen title={t('agenda.title')} subtitle={t('agenda.subtitle')}>
+    <Screen title={t('agenda.title')} subtitle={t('agenda.subtitle')} photo={false}>
       <Stack.Screen options={{ title: t('nav.agenda') }} />
       {/* M270: the agenda opens on its own picture — shows only when the owner fills the slot. */}
       <SlotBanner slot="agenda.banner" />
