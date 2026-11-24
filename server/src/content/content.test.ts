@@ -153,3 +153,46 @@ test('the image slots fill from the dashboard and ride into the hq gallery and t
   assert.equal((await putImage({ key: 'hq.2', url: null })).statusCode, 200);
   assert.deepEqual((await get('/api/hq')).json().photos, []);
 });
+
+// M270: the home's moving banners, the photo sets and the English picture beside a slot that carries words.
+test('the moving banners, the photo sets and the English pictures reach each app in its own language', async () => {
+  const putImage = (payload: Record<string, unknown>) =>
+    app.inject({ method: 'PUT', url: '/api/admin/content/image', payload, headers: { authorization: `Bearer ${token}` } });
+  const media = (name: string) => `https://cdn.example.test/media/${name}.webp`;
+
+  for (const [key, name] of [['home.slide.membership.1', 'seat'], ['home.slide.partners.1', 'start'], ['home.slide.membership.2', 'anywhere'], ['membership.photo.2', 'hall'], ['meetups.banner', 'five']] as const) {
+    assert.equal((await putImage({ key, url: media(name) })).statusCode, 200, key);
+  }
+  assert.equal((await putImage({ key: 'home.slide.membership.1', url: media('seat-en'), lang: 'en' })).statusCode, 200);
+  assert.equal((await putImage({ key: 'home.slide.nowhere.1', url: media('x') })).statusCode, 404, 'a door outside the catalog has no slot');
+
+  // Round-robin: the first banner of each door, then the second ones; every banner opens its door's screen.
+  const arabic = (await get('/api/images')).json();
+  assert.deepEqual(arabic.slides, [
+    { url: media('seat'), route: '/membership' },
+    { url: media('start'), route: '/service/success-partners' },
+    { url: media('anywhere'), route: '/membership' },
+  ]);
+  assert.deepEqual(arabic.sets, { 'membership.photo': [media('hall')] });
+  assert.equal(arabic.images['meetups.banner'], media('five'));
+
+  // The English app gets the English picture where one exists and the slot's own picture otherwise.
+  const english = (await get('/api/images', 'en')).json();
+  assert.deepEqual(english.slides.map((slide: { url: string }) => slide.url), [media('seat-en'), media('start'), media('anywhere')]);
+
+  const listed = (await app.inject({ method: 'GET', url: '/api/admin/content/images', headers: { authorization: `Bearer ${token}` } })).json().slots as { key: string; url: string | null; urlEn: string | null; bilingual: boolean }[];
+  const seat = listed.find((slot) => slot.key === 'home.slide.membership.1');
+  assert.deepEqual([seat?.url, seat?.urlEn, seat?.bilingual], [media('seat'), media('seat-en'), true]);
+  assert.equal(listed.find((slot) => slot.key === 'membership.photo.2')?.bilingual, false, 'a photo with no words is uploaded once');
+
+  // A service banner: the Arabic app keeps its picture, the English app reads the English one.
+  const serviceKey = (listed.find((slot) => slot.key.startsWith('service.') && slot.url) as { key: string }).key.slice('service.'.length);
+  assert.equal((await putImage({ key: `service.${serviceKey}`, url: media('studio-en'), lang: 'en' })).statusCode, 200);
+  const imageOf = async (lang?: 'en') => ((await get('/api/services', lang)).json().services as { key: string; imageUrl: string | null }[]).find((service) => service.key === serviceKey)?.imageUrl;
+  assert.equal(await imageOf(), 'https://cdn.example.test/media/studio.webp');
+  assert.equal(await imageOf('en'), media('studio-en'));
+
+  // Clearing the English picture falls back to the slot's own.
+  assert.equal((await putImage({ key: 'home.slide.membership.1', url: null, lang: 'en' })).statusCode, 200);
+  assert.equal((await get('/api/images', 'en')).json().slides[0].url, media('seat'));
+});

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { PressScale } from '@/components/motion';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii } from '@/theme/tokens';
@@ -15,9 +16,24 @@ const MAX_HEIGHT = 320;
 /**
  * M105 (owner): «بانر بيتحرك لوحده» — an auto-rotating fade banner for the owner's photo sets
  * (service pages first). One interval, native-driver fades only; a single photo renders still.
+ *
+ * M270: the same banner carries the home's moving advertisements — `onPress` makes the showing picture a
+ * button, `startAt` opens on another picture each launch, `maxHeight` lets a tall poster show whole, and
+ * `steady` holds one height for the whole set (the tallest picture's) so the page under it never jumps.
  */
-export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }: { urls: string[]; height?: number; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
-  const [index, setIndex] = useState(0);
+type Props = {
+  urls: string[];
+  height?: number;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  onPress?: (url: string) => void;
+  startAt?: number;
+  maxHeight?: number;
+  steady?: boolean;
+};
+
+export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, onPress, startAt = 0, maxHeight = MAX_HEIGHT, steady = false }: Props) {
+  const [index, setIndex] = useState(startAt);
   const [opacity] = useState(() => new Animated.Value(1));
   // M109h: a photo that fails to load (a stale upload, a network hiccup) leaves the rotation
   // instead of cycling an empty gray frame; with none left the banner steps aside entirely.
@@ -72,10 +88,13 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
   if (!url) return null;
 
   // The whole-photo height for the current slide; clamped, and the prop height until measured.
-  const fitted = boxWidth > 0 && ratios[url] ? boxWidth / ratios[url] : null;
-  const boxHeight = fitted ? Math.round(Math.min(Math.max(fitted, MIN_HEIGHT), MAX_HEIGHT)) : height;
+  // `steady`: the narrowest measured shape (the tallest picture) sizes the box for every slide.
+  const measured = usable.map((entry) => ratios[entry]).filter((ratio): ratio is number => Boolean(ratio));
+  const ratio = steady && measured.length ? Math.min(...measured) : ratios[url];
+  const fitted = boxWidth > 0 && ratio ? boxWidth / ratio : null;
+  const boxHeight = fitted ? Math.round(Math.min(Math.max(fitted, MIN_HEIGHT), maxHeight)) : height;
 
-  return (
+  const box = (
     <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
         <Image
@@ -95,6 +114,12 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel }
         </View>
       ) : null}
     </View>
+  );
+  if (!onPress) return box;
+  return (
+    <PressScale onPress={() => onPress(url)} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
+      {box}
+    </PressScale>
   );
 }
 

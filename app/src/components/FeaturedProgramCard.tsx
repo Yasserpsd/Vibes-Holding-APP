@@ -2,72 +2,65 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
-import { GoldGradient, GoldHairline } from '@/components/lux';
+import { usePhotoSet } from '@/api/images';
+import { FadingPhotos } from '@/components/FadingPhotos';
+import { GoldGradient } from '@/components/lux';
 import { PressScale } from '@/components/motion';
 import { chevronForward, textStart } from '@/i18n/direction';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, shadows, spacing } from '@/theme/tokens';
-
-/** How many of the programme's strengths the card lists; the rest wait on the service page. */
-const POINTS_SHOWN = 3;
+import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/tokens';
 
 /**
  * Owner (2026-11-22: «في خدمات النادي اول حاجه تظهر بشكل مميز جدا شركاء النجاح ده اهم برنامج عندي… للمحايدين و
- * رواد الأعمال فقط»): the club's flagship programme leads the services as one card — its name, the line that
- * says what it is, three of its strengths and its own call to action. The words are the service's content
- * (title, `program`, `cta`); a server without the programme block still gets the card, on the summary alone.
- * Who sees it is the caller's rule (the investor's services stay as they are).
+ * رواد الأعمال فقط»): the club's flagship programme leads the services as one card. The words are the
+ * service's content (title, `program`, `cta`). Who sees it is the caller's rule (the investor's services
+ * stay as they are).
  *
- * Second pass the same evening, on TestFlight («خلي واضح ان خدمة التطبيق و الويب سايت كاملة متوفرة من البداية
- * وتكون الخلفية بيضاء مميزة جدا والكلام مكتوب بطريقة شيك»): the card is a WHITE sheet with a gold edge — the one
- * white surface on the dark home, so it cannot be missed — with ink text, and a gold band right under the name
- * that says the website and the full app are his from the start, beside the web and the two store marks.
+ * M270 (owner, 2026-11-25, on the white sheet with its tick list: «شكله مش عاجبني خالص نهائي… عايزك تزود اوي
+ * الصور… لازم نعيد التفكير في الشكل»): the card is now a PHOTOGRAPH. The programme's own pictures (the
+ * dashboard set `home.card.<service>`) fill the top and change on their own; the name and its line are
+ * written on the picture, and under it sit only the one promise the owner insisted on («موقع إلكتروني وتطبيق
+ * كامل… من بداية تسجيلك», with the web and the two store marks) and the call to action. The tick list left
+ * for the service page, where the whole programme is told. Until the set is filled (or on an older server)
+ * the same card stands without the picture, the name under a gold ribbon.
  */
 export function FeaturedProgramCard({ service, onPress }: { service: Service; onPress: () => void }) {
   const program = service.program;
+  const photos = usePhotoSet(`home.card.${service.key}`);
+  const tagline = program?.tagline ?? service.summary;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={service.title}>
       <View style={styles.card}>
-        <View style={styles.head}>
-          <GoldGradient style={styles.badge}>
-            <Ionicons name="ribbon" size={26} color={colors.goldInk} />
-          </GoldGradient>
-          <View style={styles.headTexts}>
-            <Text style={styles.title}>{service.title}</Text>
-            <Text style={styles.tagline}>{program?.tagline ?? service.summary}</Text>
-          </View>
-        </View>
-
-        {program?.highlight ? (
-          <GoldGradient style={styles.highlight}>
-            <View style={styles.marks}>
-              <Mark icon="globe-outline" />
-              <Mark icon="logo-google-playstore" />
-              <Mark icon="logo-apple" />
+        {photos.length ? (
+          <View style={styles.photo}>
+            <FadingPhotos urls={photos} points={360} />
+            <View style={styles.scrim} />
+            <View style={styles.onPhoto}>
+              <Text style={styles.photoTitle}>{service.title}</Text>
+              <Text style={styles.photoTagline}>{tagline}</Text>
             </View>
-            <Text style={styles.highlightText}>{program.highlight}</Text>
-          </GoldGradient>
-        ) : null}
-
-        {program ? (
-          <View style={styles.points}>
-            {program.points.slice(0, POINTS_SHOWN).map((point) => (
-              <View key={point} style={styles.point}>
-                <Ionicons name="checkmark-circle" size={17} color={colors.paperGold} style={styles.pointTick} />
-                <Text style={styles.pointText}>{point}</Text>
-              </View>
-            ))}
           </View>
-        ) : null}
+        ) : (
+          <View style={styles.head}>
+            <GoldGradient style={styles.badge}>
+              <Ionicons name="ribbon" size={24} color={colors.goldInk} />
+            </GoldGradient>
+            <View style={styles.headTexts}>
+              <Text style={styles.title}>{service.title}</Text>
+              <Text style={styles.tagline}>{tagline}</Text>
+            </View>
+          </View>
+        )}
 
-        <GoldHairline />
-
-        <View style={styles.foot}>
-          {/* Without the highlight band (an older server) the two stores keep their place beside the button. */}
-          {program && !program.highlight ? (
-            <View style={styles.marks}>
-              <Mark icon="logo-google-playstore" />
-              <Mark icon="logo-apple" />
+        <View style={styles.body}>
+          {program?.highlight ? (
+            <View style={styles.promise}>
+              <View style={styles.marks}>
+                <Mark icon="globe-outline" />
+                <Mark icon="logo-google-playstore" />
+                <Mark icon="logo-apple" />
+              </View>
+              <Text style={styles.promiseText}>{program.highlight}</Text>
             </View>
           ) : null}
           <GoldGradient style={styles.cta}>
@@ -85,38 +78,46 @@ export function FeaturedProgramCard({ service, onPress }: { service: Service; on
 function Mark({ icon }: { icon: 'globe-outline' | 'logo-google-playstore' | 'logo-apple' }) {
   return (
     <View style={styles.mark}>
-      <Ionicons name={icon} size={16} color={colors.gold} />
+      <Ionicons name={icon} size={15} color={colors.gold} />
     </View>
   );
 }
 
 const styles = themedStyles(() => ({
-  // The paper tokens are the same white and ink in the dark and the light theme, so the card reads alike in both.
   card: {
-    padding: spacing.md,
-    gap: spacing.md,
     borderRadius: radii.xl,
     borderWidth: 1.5,
     borderColor: colors.gold,
-    backgroundColor: colors.paperCard,
+    backgroundColor: colors.surfaceElevated,
     boxShadow: shadows.glowGold,
+    overflow: 'hidden',
   },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  badge: { width: 56, height: 56, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
+  // The picture is dark in both themes, so the words on it use the on-photo tokens.
+  photo: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#0B0B0E', justifyContent: 'flex-end' },
+  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
+  onPhoto: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm + 2, gap: 2 },
+  photoTitle: { fontFamily: fonts.bold, fontSize: 25, lineHeight: 38, color: colors.onPhoto, textAlign: textStart },
+  photoTagline: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 21, color: colors.onPhotoGold, textAlign: textStart },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, paddingBottom: 0 },
+  badge: { width: 52, height: 52, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
   headTexts: { flex: 1, gap: 2 },
-  title: { fontFamily: fonts.bold, fontSize: 23, lineHeight: 35, color: colors.paperInk, textAlign: textStart },
-  tagline: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 21, color: colors.paperGold, textAlign: textStart },
-  highlight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radii.lg },
-  highlightText: { flex: 1, fontFamily: fonts.bold, fontSize: 14, lineHeight: 23, color: colors.goldInk, textAlign: textStart },
+  title: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 34, color: colors.textPrimary, textAlign: textStart },
+  tagline: { fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 21, color: colors.goldText, textAlign: textStart },
+  body: { padding: spacing.md, gap: spacing.md },
+  promise: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  promiseText: { flex: 1, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 21, color: colors.textPrimary, textAlign: textStart },
   marks: { flexDirection: 'row', gap: 4 },
-  mark: { width: 30, height: 30, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldInk },
-  points: { gap: spacing.xs },
-  point: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  pointTick: { marginTop: 3 },
-  pointText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 23, color: colors.paperInk, textAlign: textStart },
-  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  mark: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.goldSoft,
+  },
   cta: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

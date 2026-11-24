@@ -12,7 +12,7 @@ import { MembershipStatusCard } from '@/components/MembershipStatusCard';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { PaperCard } from '@/components/paper';
 import { Screen } from '@/components/Screen';
-import { SlotBanner } from '@/components/SlotBanner';
+import { SetBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { StorePurchaseCard } from '@/components/StorePurchaseCard';
 import { t } from '@/i18n';
@@ -68,8 +68,9 @@ export default function MembershipScreen() {
       watermark
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}
     >
-      {/* M81 extension: the owner's membership banner — shows only when he fills the slot. */}
-      <SlotBanner slot="membership.banner" />
+      {/* M81 extension: the owner's membership banner — shows only when he fills the slot.
+          M270: the membership's moving banners lead when their set is filled. */}
+      <SetBanner set="membership.slide" slot="membership.banner" />
       <FadeInView delay={entranceDelay(0)}>
         <PaperCard>
           <ClampText text={data.intro} />

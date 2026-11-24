@@ -7,6 +7,7 @@ import { cardImageOf, useAgenda, type AgendaEvent } from '@/api/agenda';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { SarText } from '@/components/SarText';
 import { Screen } from '@/components/Screen';
+import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { isWatchable, WatchRibbon } from '@/components/WatchRibbon';
 import { FlipCountdown } from '@/components/wow';
@@ -34,6 +35,8 @@ export default function AgendaScreen() {
   return (
     <Screen title={t('agenda.title')} subtitle={t('agenda.subtitle')}>
       <Stack.Screen options={{ title: t('nav.agenda') }} />
+      {/* M270: the agenda opens on its own picture — shows only when the owner fills the slot. */}
+      <SlotBanner slot="agenda.banner" />
       {!agenda.data ? (
         <StateView loading={agenda.isLoading} error={agenda.error} onRetry={() => void agenda.refetch()} />
       ) : events.length === 0 ? (

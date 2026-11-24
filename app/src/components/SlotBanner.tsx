@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Image } from 'react-native';
 
-import { useAppImages } from '@/api/images';
+import { launchStart, useAppImages, usePhotoSet } from '@/api/images';
 import { FadeInView } from '@/components/motion';
+import { RotatingBanner } from '@/components/RotatingBanner';
 import { sized } from '@/lib/imageUrl';
 import { themedStyles } from '@/theme/styles';
 import { colors, radii, shadows } from '@/theme/tokens';
@@ -54,7 +55,22 @@ export function SlotBanner({ slot }: { slot: string }) {
   );
 }
 
+/**
+ * M270: a screen's own moving banner — the dashboard photo set `set`, opening on a different picture every
+ * launch. While the set is empty (or on an older server) the screen's single banner slot stands in.
+ */
+export function SetBanner({ set, slot }: { set: string; slot: string }) {
+  const urls = usePhotoSet(set);
+  if (!urls.length) return <SlotBanner slot={slot} />;
+  return (
+    <FadeInView offset={8}>
+      <RotatingBanner urls={urls} steady startAt={launchStart(urls.length)} style={styles.set} />
+    </FadeInView>
+  );
+}
+
 const styles = themedStyles(() => ({
+  set: { boxShadow: shadows.lift },
   banner: {
     width: '100%',
     borderRadius: radii.xl,

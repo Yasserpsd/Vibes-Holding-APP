@@ -160,7 +160,8 @@ export default function ServiceScreen() {
         </FadeInView>
       ) : service.imageUrls?.length || service.imageUrl ? (
         <FadeInView delay={entranceDelay(0)}>
-          <RotatingBanner urls={service.imageUrls?.length ? service.imageUrls : [service.imageUrl as string]} accessibilityLabel={service.title} />
+          {/* M270: a 4:5 poster shows whole, and the set keeps one height so the page under it does not jump. */}
+          <RotatingBanner urls={service.imageUrls?.length ? service.imageUrls : [service.imageUrl as string]} accessibilityLabel={service.title} steady maxHeight={470} />
         </FadeInView>
       ) : null}
       <FadeInView delay={entranceDelay(0)}>

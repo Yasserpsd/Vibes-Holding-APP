@@ -8,6 +8,7 @@ import { useAgenda } from '@/api/agenda';
 import { displayProfile } from '@/api/auth';
 import { useHomeContent, useMeetupsContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { useHq } from '@/api/hq';
+import { launchStart, useAppImages, usePhotoSet } from '@/api/images';
 import { usePartners, type Partner } from '@/api/partners';
 import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
@@ -27,8 +28,10 @@ import { MembershipBenefitsBlock } from '@/components/MembershipBenefitsBlock';
 import { MembershipHomeCard } from '@/components/MembershipGate';
 import { entranceDelay, FadeInView, Floating, PressScale, SkeletonCards } from '@/components/motion';
 import { PeopleBlock } from '@/components/PeopleBlock';
+import { PhotoDoorCard } from '@/components/PhotoDoorCard';
 import { ProjectsBankCarousel } from '@/components/ProjectsBankCarousel';
 import { HOME_POSTS_LIMIT, PostsBlock } from '@/components/PostsBlock';
+import { RotatingBanner } from '@/components/RotatingBanner';
 import { Screen } from '@/components/Screen';
 import { NewsCarousel } from '@/components/NewsCarousel';
 import { NextVisitCard } from '@/components/NextVisitCard';
@@ -338,7 +341,7 @@ export default function HomeScreen() {
               <GoldDoorCard icon="add" title={t('home.partnersPlus')} hint={t('home.partnersPlusHint')} onPress={() => pushRoute('/service/success-partners')} />
             )}
             {/* M102 (owner): the second door, gold exactly like the first — publish his app, no fees. */}
-            <GoldDoorCard icon="phone-portrait-outline" title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={() => pushRoute('/service/app-publish')} />
+            <AppPublishDoor onPress={() => pushRoute('/service/app-publish')} />
           </View>
         ) : null}
         {/* M85: the light 2-column tiles, on the home too. */}
@@ -426,8 +429,10 @@ export default function HomeScreen() {
       <AffiliateHomeCard />
 
       {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
-          banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery. */}
-      <HqBanner />
+          banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery.
+          M270 (owner: «في فولدر اسمه Banner كله بنرات ممتازة… وزعها»): the club's moving banners take this
+          spot when the owner filled them — each one opens its own screen; the HQ photo stays the fallback. */}
+      <HomeSlides />
 
       {/* M262 (owner): the member's next HQ booking, with its entry pass — only when one is ahead. */}
       <NextVisitCard />
@@ -456,6 +461,26 @@ export default function HomeScreen() {
         </View>
       </FadeInView>
     </Screen>
+  );
+}
+
+/**
+ * M270: the home's moving banners — finished advertisements from the dashboard, changing on their own, each a
+ * button to its own screen (the server names it), opening on a different one every launch. With none filled
+ * (or on an older server) the HQ photo stands here as before.
+ */
+function HomeSlides() {
+  const router = useRouter();
+  const slides = useAppImages().data?.slides ?? [];
+  if (!slides.length) return <HqBanner />;
+  const open = (url: string) => {
+    const slide = slides.find((entry) => entry.url === url);
+    if (slide) router.push(slide.route as Href);
+  };
+  return (
+    <FadeInView delay={140}>
+      <RotatingBanner urls={slides.map((slide) => slide.url)} height={200} steady startAt={launchStart(slides.length)} onPress={open} accessibilityLabel={t('common.clubName')} style={styles.slides} />
+    </FadeInView>
   );
 }
 
@@ -630,6 +655,13 @@ function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membersh
   );
 }
 
+/** M270: the entrepreneur's second door wears its own photographs once the owner filled the set; the gold bar until then. */
+function AppPublishDoor({ onPress }: { onPress: () => void }) {
+  const photos = usePhotoSet('home.card.app-publish');
+  if (photos.length) return <PhotoDoorCard photos={photos} title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={onPress} />;
+  return <GoldDoorCard icon="phone-portrait-outline" title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={onPress} />;
+}
+
 /** M74 + M102 (owner): the entrepreneur's gold doors — شركاء النجاح and نشر تطبيقه, twins by design. */
 function GoldDoorCard({ icon, title, hint, onPress }: { icon: IoniconName; title: string; hint: string; onPress: () => void }) {
   return (
@@ -709,6 +741,8 @@ const styles = themedStyles(() => ({
     marginTop: spacing.sm,
     boxShadow: shadows.lift,
   },
+  // M270: the moving banners sit a little apart from the hero and lift off the page.
+  slides: { marginTop: spacing.sm, boxShadow: shadows.lift },
   // M102 (owner): «اضغط للمزيد» must CATCH the eye — a full gold bar, not a quiet outline.
   moreServices: {
     flexDirection: 'row',

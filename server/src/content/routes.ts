@@ -19,7 +19,7 @@ import { getGuideContent } from './guide.js';
 import { getHomeContent } from './home.js';
 import { getMeetupsContent } from './meetups.js';
 import { getMembershipContent } from './membership.js';
-import { bannerImages, imageSlots, opportunityImage, saveImage, serviceGalleries, serviceImages } from './images.js';
+import { appImages, imageSlots, opportunityImage, saveImage, serviceGalleries, serviceImages } from './images.js';
 import { getServicesContent, publicServices } from './services.js';
 
 export type ContentRoutesOptions = { kv: KV; auth: AuthService; notifier: Notifier; sync: SyncService; offers: GoldenOffersService; englishSweep?: EnglishSweep; requests?: RequestsService };
@@ -53,6 +53,8 @@ const imageSchema = z.object({
   key: z.string().trim().min(1).max(80),
   /** `null` (or absent) = clear the slot (M81 «صور التطبيق»). */
   url: z.string().trim().max(500).nullish(),
+  /** M270: `en` fills the slot's English picture (the English app's version of a banner that carries words). */
+  lang: z.enum(['ar', 'en']).optional(),
 });
 
 /**
@@ -123,7 +125,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
     }),
   );
   // M81 extension: the owner-filled screen banners (home/golden/membership/about), empty keys left out.
-  app.get('/api/images', async () => ({ images: await bannerImages(kv) }));
+  // M270: plus the home's moving banners and the photo sets, each in the asking app's language.
+  app.get('/api/images', async (request) => appImages(kv, langOf(request)));
   app.get('/api/membership', async (request) => getMembershipContent(kv, langOf(request)));
   app.get('/api/home', async (request) => getHomeContent(kv, langOf(request)));
   // M119: the five club meetups — content only; registration goes through the forms module.
@@ -138,8 +141,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       const list = publicServices(await getServicesContent(kv, langOf(request)), who?.me ?? null);
       // M81 + M105: the owner's uploaded service photos ride on the services the app already reads —
       // `imageUrl` stays the first photo (older apps), `imageUrls` carries the whole rotating banner.
-      const images = await serviceImages(kv);
-      const galleries = await serviceGalleries(kv);
+      const images = await serviceImages(kv, langOf(request));
+      const galleries = await serviceGalleries(kv, langOf(request));
       return { ...list, services: list.services.map((service) => ({ ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] })) };
     }),
   );
@@ -153,8 +156,8 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       const list = publicServices(content, who?.me ?? null);
       const service = list.services.find((entry) => entry.key === key);
       if (!service) return reply.code(404).send({ error: { code: 'not_found', message: 'الخدمة غير موجودة' } });
-      const images = await serviceImages(kv);
-      const galleries = await serviceGalleries(kv);
+      const images = await serviceImages(kv, langOf(request));
+      const galleries = await serviceGalleries(kv, langOf(request));
       return { service: { ...service, imageUrl: images[service.key] ?? null, imageUrls: galleries[service.key] ?? [] }, lockedText: list.lockedText, isMember: list.isMember, upsell: list.upsell };
     }),
   );
@@ -267,7 +270,7 @@ export const contentRoutes: FastifyPluginAsync<ContentRoutesOptions> = async (ap
       if (!admin) return;
       const body = parse(imageSchema, request.body, reply);
       if (!body) return;
-      const slot = await saveImage(kv, body.key, body.url ?? null);
+      const slot = await saveImage(kv, body.key, body.url ?? null, body.lang ?? 'ar');
       if (!slot) return reply.code(404).send({ error: { code: 'not_found', message: 'خانة الصورة غير موجودة' } });
       await sync.bump('content').catch(() => undefined);
       return { ok: true, slot };

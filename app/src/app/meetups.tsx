@@ -7,6 +7,7 @@ import { ClampText } from '@/components/ClampText';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { Screen } from '@/components/Screen';
+import { SlotBanner } from '@/components/SlotBanner';
 import { StateView } from '@/components/StateView';
 import { youtubeIdOf } from '@/lib/player';
 import { textStart } from '@/i18n/direction';
@@ -33,6 +34,8 @@ export default function MeetupsScreen() {
 
   return (
     <Screen title={data.title} subtitle={data.subtitle}>
+      {/* M270: the meetups open on their own picture — shows only when the owner fills the slot. */}
+      <SlotBanner slot="meetups.banner" />
       {intro ? (
         <FadeInView>
           <ClampText style={styles.intro} text={intro} />

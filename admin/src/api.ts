@@ -797,7 +797,7 @@ export const api = {
   testMarketAlert: () => call<{ ok: true; sent: number; message: { title: string; body: string } }>('POST', '/api/admin/market-alerts/test'),
   // M81 «صور التطبيق»: code-defined image slots the owner fills with uploads.
   contentImages: () => call<{ slots: ImageSlot[] }>('GET', '/api/admin/content/images'),
-  saveContentImage: (key: string, url: string | null) => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url }),
+  saveContentImage: (key: string, url: string | null, lang: 'ar' | 'en' = 'ar') => call<{ ok: true; slot: ImageSlot }>('PUT', '/api/admin/content/image', { key, url, lang }),
   partners: () => call<{ settings: PartnersSettings; partners: Partner[] }>('GET', '/api/admin/partners'),
   createPartner: (input: PartnerInput) => call<{ partner: Partner }>('POST', '/api/admin/partners', input),
   updatePartner: (id: string, input: Partial<PartnerInput>) => call<{ partner: Partner }>('PUT', `/api/admin/partners/${id}`, input),
@@ -807,7 +807,8 @@ export const api = {
 };
 
 /** M81 «صور التطبيق» — mirrors server/src/content/images.ts. */
-export type ImageSlot = { key: string; label: string; group: string; url: string | null };
+/** M270: `urlEn` is the same slot's picture for the English app; `bilingual` slots carry words, so the English upload shows beside them. */
+export type ImageSlot = { key: string; label: string; group: string; url: string | null; urlEn?: string | null; bilingual?: boolean };
 
 /** M87b «المستشار اليومي» — mirrors server/src/companion/service.ts. */
 export type CompanionPersona = 'investor' | 'entrepreneur' | 'neutral';
