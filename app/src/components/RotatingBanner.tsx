@@ -11,6 +11,8 @@ const FADE_OUT_MS = 240;
 const FADE_IN_MS = 340;
 /** A sideways drag longer than this (in points) turns the banner by hand. */
 const SWIPE_POINTS = 36;
+/** In a steady box, a picture whose shape is further than this from the box's is shown whole instead of cropped. */
+const SHAPE_TOLERANCE = 0.12;
 /** M130b (owner: «متبقاش مقصوصة»): the box follows the photo's own shape within these bounds. */
 const MIN_HEIGHT = 150;
 const MAX_HEIGHT = 320;
@@ -118,14 +120,22 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
   const ratio = steady && measured.length ? Math.min(...measured) : ratios[url];
   const fitted = boxWidth > 0 && ratio ? boxWidth / ratio : null;
   const boxHeight = fitted ? Math.round(Math.min(Math.max(fitted, MIN_HEIGHT), maxHeight)) : height;
+  // Owner (2026-11-25: «استخدم كله… اكبر كمية ممكنة»): a service page now mixes his wide photos with the taller
+  // posters. The steady box takes the tallest shape, so a wider picture is drawn WHOLE over a blurred, dimmed copy
+  // of itself instead of losing its sides to a cover crop.
+  const own = ratios[url];
+  const whole = steady && boxWidth > 0 && own !== undefined && Math.abs(own / (boxWidth / boxHeight) - 1) > SHAPE_TOLERANCE;
 
   const box = (
     <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)} {...(usable.length > 1 ? swipe.panHandlers : null)}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
+        {whole ? <Image key="backdrop" source={{ uri: sized(url, 360) }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={24} accessibilityIgnoresInvertColors /> : null}
+        {whole ? <View key="dim" style={[StyleSheet.absoluteFill, styles.dim]} /> : null}
         <Image
+          key="photo"
           source={{ uri: sized(url, 360) }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode={whole ? 'contain' : 'cover'}
           resizeMethod="resize"
           accessibilityLabel={accessibilityLabel}
           onError={() => setFailed((current) => (current.includes(url) ? current : [...current, url]))}
@@ -159,4 +169,5 @@ const styles = themedStyles(() => ({
   dots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 4 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.45)' },
   dotOn: { backgroundColor: colors.gold },
+  dim: { backgroundColor: 'rgba(0,0,0,0.45)' },
 }));
