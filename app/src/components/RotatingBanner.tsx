@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, I18nManager, Image, PanResponder, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { PressScale } from '@/components/motion';
 import { sized } from '@/lib/imageUrl';
@@ -9,6 +9,8 @@ import { colors, radii } from '@/theme/tokens';
 const ROTATE_MS = 5000;
 const FADE_OUT_MS = 240;
 const FADE_IN_MS = 340;
+/** A sideways drag longer than this (in points) turns the banner by hand. */
+const SWIPE_POINTS = 36;
 /** M130b (owner: «متبقاش مقصوصة»): the box follows the photo's own shape within these bounds. */
 const MIN_HEIGHT = 150;
 const MAX_HEIGHT = 320;
@@ -20,6 +22,9 @@ const MAX_HEIGHT = 320;
  * M270: the same banner carries the home's moving advertisements — `onPress` makes the showing picture a
  * button, `startAt` opens on another picture each launch, `maxHeight` lets a tall poster show whole, and
  * `steady` holds one height for the whole set (the tallest picture's) so the page under it never jumps.
+ * The owner's «وحسن تجربة المستخدم قدر الإمكان» (same day): a set of several pictures also turns by hand —
+ * a sideways swipe shows the next or the previous one (mirrored under RTL), and the clock starts again from
+ * that picture so it is not taken away a second later. An up-and-down drag still scrolls the page.
  */
 type Props = {
   urls: string[];
@@ -48,6 +53,8 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
   }
   const usable = urls.filter((entry) => !failed.includes(entry));
 
+  // A hand swipe bumps `turns`, which restarts the clock below from the picture the member chose.
+  const [turns, setTurns] = useState(0);
   useEffect(() => {
     if (usable.length < 2) return;
     const timer = setInterval(() => {
@@ -57,7 +64,24 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
       });
     }, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [opacity, usable.length]);
+  }, [opacity, usable.length, turns]);
+
+  // Only a clearly sideways drag is taken, so the page keeps its vertical scroll and a tap stays a tap.
+  const [swipe] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 14 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      onPanResponderRelease: (_event, gesture) => {
+        if (Math.abs(gesture.dx) < SWIPE_POINTS) return;
+        // The next picture comes from the end side: a swipe towards the start asks for it (mirrored under RTL).
+        const forward = I18nManager.isRTL ? gesture.dx > 0 : gesture.dx < 0;
+        Animated.timing(opacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+          setIndex((current) => current + (forward ? 1 : -1));
+          setTurns((current) => current + 1);
+          Animated.timing(opacity, { toValue: 1, duration: FADE_IN_MS, useNativeDriver: true }).start();
+        });
+      },
+    }),
+  );
 
   // M130b (owner: «تقليب الصور تقيل»): the set's other photos download behind the first one,
   // so every swap shows an already-cached image instead of a loading hitch. Never fatal.
@@ -84,7 +108,8 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
     }
   }, [key]);
 
-  const url = usable[usable.length ? index % usable.length : 0];
+  const at = usable.length ? ((index % usable.length) + usable.length) % usable.length : 0;
+  const url = usable[at];
   if (!url) return null;
 
   // The whole-photo height for the current slide; clamped, and the prop height until measured.
@@ -95,7 +120,7 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
   const boxHeight = fitted ? Math.round(Math.min(Math.max(fitted, MIN_HEIGHT), maxHeight)) : height;
 
   const box = (
-    <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}>
+    <View style={[styles.box, { height: boxHeight }, style]} onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)} {...(usable.length > 1 ? swipe.panHandlers : null)}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
         <Image
           source={{ uri: sized(url, 360) }}
@@ -109,7 +134,7 @@ export function RotatingBanner({ urls, height = 190, style, accessibilityLabel, 
       {usable.length > 1 ? (
         <View style={styles.dots}>
           {usable.map((entry, dot) => (
-            <View key={`${dot}-${entry.slice(-12)}`} style={[styles.dot, dot === index % usable.length && styles.dotOn]} />
+            <View key={`${dot}-${entry.slice(-12)}`} style={[styles.dot, dot === at && styles.dotOn]} />
           ))}
         </View>
       ) : null}

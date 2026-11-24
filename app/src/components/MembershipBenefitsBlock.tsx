@@ -68,8 +68,10 @@ function BenefitCard({ group, photo, onPress }: { group: MembershipGroup; photo?
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.lg} accessibilityRole="button" accessibilityLabel={group.title}>
       <GlassCard golden radius={radii.lg} style={[styles.card, photo ? styles.photoCard : null]}>
+        {/* Keyed apart: the photo can arrive after the first draw, and morphing the plain head into the photo box
+            in place breaks Android's view mounting (addViewAt, seen on the emulator). */}
         {photo ? (
-          <View style={styles.photo}>
+          <View key="photo" style={styles.photo}>
             <Image source={{ uri: sized(photo, CARD_WIDTH) }} style={styles.fill} resizeMode="cover" resizeMethod="resize" accessibilityIgnoresInvertColors />
             <View style={[styles.fill, styles.scrim]} />
             <View style={styles.photoHead}>
@@ -82,7 +84,7 @@ function BenefitCard({ group, photo, onPress }: { group: MembershipGroup; photo?
             </View>
           </View>
         ) : (
-          <View style={styles.head}>
+          <View key="head" style={styles.head}>
             <View style={styles.icon}>
               <Ionicons name={iconFor(group.icon, 'checkmark-circle-outline')} size={20} color={colors.gold} />
             </View>
@@ -91,7 +93,7 @@ function BenefitCard({ group, photo, onPress }: { group: MembershipGroup; photo?
             </Text>
           </View>
         )}
-        <View style={photo ? styles.body : styles.plain}>
+        <View key={photo ? "body" : "plain"} style={photo ? styles.body : styles.plain}>
           {slots.map((item, index) => (
             <View key={item?.text ?? `empty-${index}`} style={styles.line}>
               {item ? (

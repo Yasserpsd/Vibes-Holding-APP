@@ -31,8 +31,10 @@ export function FeaturedProgramCard({ service, onPress }: { service: Service; on
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={service.title}>
       <View style={styles.card}>
+        {/* Two different views, each with its own key: the set can arrive after the first draw, and turning the
+            plain head INTO the photo box in place breaks Android's view mounting (addViewAt, seen on the emulator). */}
         {photos.length ? (
-          <View style={styles.photo}>
+          <View key="photo" style={styles.photo}>
             <FadingPhotos urls={photos} points={360} />
             <View style={styles.scrim} />
             <View style={styles.onPhoto}>
@@ -41,7 +43,7 @@ export function FeaturedProgramCard({ service, onPress }: { service: Service; on
             </View>
           </View>
         ) : (
-          <View style={styles.head}>
+          <View key="head" style={styles.head}>
             <GoldGradient style={styles.badge}>
               <Ionicons name="ribbon" size={24} color={colors.goldInk} />
             </GoldGradient>
