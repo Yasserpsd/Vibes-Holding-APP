@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'react-native';
 
 import { apiGet } from './client';
 import { useHq } from './hq';
@@ -27,6 +28,20 @@ export function useAppImages() {
 
 const NONE: string[] = [];
 
+/**
+ * Owner (2026-11-25, on a sign-in screen that showed no picture: «مش عايز مكان اقرع كده بدون صور لازم كله يكون في
+ * صور»): two photographs ship inside the app as stand-ins, so a page is never bare while the server's sets are
+ * still loading, are empty, or the phone is offline. The dashboard's pictures replace them as soon as they arrive.
+ */
+const bundled = (source: number): string[] => {
+  const uri = Image.resolveAssetSource(source)?.uri;
+  return uri ? [uri] : NONE;
+};
+/** The hall, wide — behind a page heading. */
+export const PAGE_STANDIN = bundled(require('../../assets/images/photo-page.webp'));
+/** The investor's seat, upright — behind the gate. */
+export const GATE_STANDIN = bundled(require('../../assets/images/photo-gate.webp'));
+
 /** M270: the pictures of one photo set in slot order; empty until the owner fills it (or on an older server). */
 export function usePhotoSet(key: string): string[] {
   return useAppImages().data?.sets?.[key] ?? NONE;
@@ -35,13 +50,14 @@ export function usePhotoSet(key: string): string[] {
 /**
  * M270 (owner, 2026-11-25, on the gate's photograph: «عايز كله يكون كده… كل الصفحات تكون بنفس الأفكار»): the
  * pictures a page may open on — the dashboard set `page.photo`, then the membership photographs, then the HQ
- * gallery. Empty on a server with none, and the pages keep their plain heading.
+ * gallery, and the bundled stand-in when the server has none of them (or has not answered yet).
  */
 export function usePagePhotos(): string[] {
   const sets = useAppImages().data?.sets;
   const hq = useHq().data?.photos;
   const own = sets?.['page.photo'] ?? sets?.['membership.photo'];
-  return own?.length ? own : (hq ?? NONE);
+  if (own?.length) return own;
+  return hq?.length ? hq : PAGE_STANDIN;
 }
 
 /** The picture of ONE page: a different one per page (by its title), moved on at every launch. */
