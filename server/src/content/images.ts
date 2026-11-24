@@ -91,6 +91,8 @@ const PHOTO_SETS: { key: string; label: string; group: string; slots: number; bi
   { key: 'membership.photo', label: 'صورة مزايا العضوية', group: 'مزايا العضوية (صورة أعلى كل كارت في الرئيسية)', slots: 8, bilingual: false },
   { key: 'home.card.success-partners', label: 'كارت شركاء النجاح', group: 'كروت الرئيسية (صورة الكارت)', slots: 4, bilingual: false },
   { key: 'home.card.app-publish', label: 'كارت انشر تطبيقك', group: 'كروت الرئيسية (صورة الكارت)', slots: 2, bilingual: false },
+  // Owner (2026-11-25: «وعايزين صور في صفحة الدخول برده»): the gate's photograph and the strip over the sign-in form.
+  { key: 'auth.photo', label: 'صورة شاشات الدخول', group: 'شاشات الدخول (أعلى شاشة البداية وتسجيل الدخول)', slots: 6, bilingual: false },
 ];
 
 export type HomeSlide = { url: string; route: string };

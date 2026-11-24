@@ -160,7 +160,7 @@ test('the moving banners, the photo sets and the English pictures reach each app
     app.inject({ method: 'PUT', url: '/api/admin/content/image', payload, headers: { authorization: `Bearer ${token}` } });
   const media = (name: string) => `https://cdn.example.test/media/${name}.webp`;
 
-  for (const [key, name] of [['home.slide.membership.1', 'seat'], ['home.slide.partners.1', 'start'], ['home.slide.membership.2', 'anywhere'], ['membership.photo.2', 'hall'], ['meetups.banner', 'five']] as const) {
+  for (const [key, name] of [['home.slide.membership.1', 'seat'], ['home.slide.partners.1', 'start'], ['home.slide.membership.2', 'anywhere'], ['membership.photo.2', 'hall'], ['auth.photo.1', 'gate'], ['meetups.banner', 'five']] as const) {
     assert.equal((await putImage({ key, url: media(name) })).statusCode, 200, key);
   }
   assert.equal((await putImage({ key: 'home.slide.membership.1', url: media('seat-en'), lang: 'en' })).statusCode, 200);
@@ -173,7 +173,7 @@ test('the moving banners, the photo sets and the English pictures reach each app
     { url: media('start'), route: '/service/success-partners' },
     { url: media('anywhere'), route: '/membership' },
   ]);
-  assert.deepEqual(arabic.sets, { 'membership.photo': [media('hall')] });
+  assert.deepEqual(arabic.sets, { 'membership.photo': [media('hall')], 'auth.photo': [media('gate')] });
   assert.equal(arabic.images['meetups.banner'], media('five'));
 
   // The English app gets the English picture where one exists and the slot's own picture otherwise.
