@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api, type Post, type PostAudience, type PostKind, type PostFollow, type PostFollowRow, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
@@ -268,7 +268,28 @@ function WhatsappDelivery({ post }: { post: Post }) {
   const [data, setData] = useState<PostWhatsapp | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [showReached, setShowReached] = useState(false);
-  if (post.status !== 'published' || post.kind === 'popup') return null;
+  // M278c (owner: «حالة واتس اب مش ظاهرة… لازم اضغط عليها»): the numbers load by themselves once the tile is on screen.
+  const tile = useRef<HTMLButtonElement>(null);
+  const tracked = post.status === 'published' && post.kind !== 'popup';
+  useEffect(() => {
+    const node = tile.current;
+    if (!tracked || !node || data !== undefined) return;
+    let alive = true;
+    const seen = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      seen.disconnect();
+      api
+        .postOpens(post.id)
+        .then((loaded) => (alive ? setData(loaded.whatsapp ?? null) : undefined))
+        .catch((cause: unknown) => (alive ? setError(messageOf(cause)) : undefined));
+    }, { rootMargin: '200px' });
+    seen.observe(node);
+    return () => {
+      alive = false;
+      seen.disconnect();
+    };
+  }, [tracked, post.id, data]);
+  if (!tracked) return null;
   const names = new Map<number, string>();
   if (post.audience?.type === 'members') for (const member of post.audience.members) names.set(member.contactId, member.name);
   if (post.audience?.type === 'member') names.set(post.audience.contactId, post.audience.name);
@@ -299,10 +320,10 @@ function WhatsappDelivery({ post }: { post: Post }) {
   // M278: a number tile next to «فتحوا»; its list unfolds under the tiles.
   return (
     <>
-    <button type="button" className={open ? 'stat-tile on' : 'stat-tile'} aria-expanded={open} onClick={() => void toggle()}>
+    <button ref={tile} type="button" className={open ? 'stat-tile on' : 'stat-tile'} aria-expanded={open} onClick={() => void toggle()}>
       <span className="tile-label">💬 واتساب</span>
       <b>{data && total > 0 ? formatNumber(data.delivered) : '—'}</b>
-      <span className="tile-note">{data === undefined ? 'عرض الحالة' : data && total > 0 ? `وصلت من ${formatNumber(total)}` : 'لا رسائل'}</span>
+      <span className="tile-note">{data === undefined ? (error ? 'تعذّر التحميل، اضغط للمحاولة' : 'جارٍ التحميل…') : data && total > 0 ? `وصلت من ${formatNumber(total)}` : 'لا رسائل'}</span>
       {data && total > 0 ? <span className="mini wa"><i style={{ width: `${(data.delivered / total) * 100}%` }} /></span> : null}
     </button>
     {open ? (
@@ -453,7 +474,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
     try {
       const result = await api.notifyPost(post.id);
       const app = result.sent > 0 ? `إشعار التطبيق: وصل إلى ${formatNumber(result.sent)} جهاز${result.failed ? `، وفشل ${formatNumber(result.failed)}` : ''}.` : result.failed ? `إشعار التطبيق: لم يصل إلى أي جهاز (فشل ${formatNumber(result.failed)}).` : 'إشعار التطبيق: لا يوجد جهاز يحتاج تذكيرًا.';
-      const whatsapp = result.whatsapp === 'started' ? 'واتساب: بدأ الإرسال، وتظهر الأسماء في «عرض حالة واتساب».' : result.whatsapp === 'night' ? 'واتساب: لم يُرسل لأن الوقت ليل، أعد التذكير بعد 8 صباحًا.' : 'واتساب: غير مفعّل على هذا الخادم.';
+      const whatsapp = result.whatsapp === 'started' ? 'واتساب: بدأ الإرسال، وتظهر الأسماء تحت مربع «واتساب».' : result.whatsapp === 'night' ? 'واتساب: لم يُرسل لأن الوقت ليل، أعد التذكير بعد 8 صباحًا.' : 'واتساب: غير مفعّل على هذا الخادم.';
       notify(result.ok ? 'ok' : 'error', `${app} ${whatsapp}`);
       state.reload();
     } catch (failure) {

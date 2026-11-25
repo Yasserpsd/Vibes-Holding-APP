@@ -259,7 +259,7 @@ function History({ detail }: { detail: MemberDetail }) {
       <Chips label="سجل الحساب" options={tabs} value={tab} onChange={setTab} />
       {tab === 'events' ? (
         detail.events.length === 0 ? none : (
-          <ul className="list">
+          <ul className="list timeline">
             {detail.events.map((event) => (
               <li key={event.id} className="entry">
                 <strong>{eventText(event)}</strong>
@@ -379,8 +379,7 @@ function PhoneWaiver({ contactId, phone, waiver, onStart, onChanged }: { contact
  * it opens with his name in his inbox, his devices hear the notification, and WhatsApp tells him by name that a
  * message waits for him (M235). Its follow-up (opened or not) sits with the other messages in «أدوات التواصل».
  */
-function PrivateMessage({ account }: { account: Account }) {
-  const [open, setOpen] = useState(false);
+function PrivateMessage({ account, open, setOpen }: { account: Account; open: boolean; setOpen: (open: boolean) => void }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -440,27 +439,171 @@ function PrivateMessage({ account }: { account: Account }) {
   );
 }
 
+/** M279: the sensitive actions wait closed at the bottom of the sheet; the rest sit in the membership card. */
+const SENSITIVE: ActionKind[] = ['publisher', 'unpublisher', 'delete'];
+const PERSONA_ICON: Record<string, string> = { entrepreneur: '🚀', investor: '💼', neutral: '✦' };
+
+/** Whole days since a moment, never below zero. */
+const daysSince = (iso: string | null | undefined): number | null => (iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)) : null);
+const agoText = (days: number | null): string => (days === null ? '—' : days === 0 ? 'اليوم' : days === 1 ? 'أمس' : `منذ ${formatDays(days, 'يومين')}`);
+
+/** Digits for wa.me: «05…» (Saudi) gains 966, «00…» loses its zeros; anything else is taken as international already. */
+function waDigits(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (/^05\d{8}$/.test(digits)) return `966${digits.slice(1)}`;
+  return digits;
+}
+
 function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done: string | null; onStart: () => void; onChanged: (text: string) => void }) {
   const { openThread } = useShell();
   const [action, setAction] = useState<ActionKind | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const messageBlock = useRef<HTMLDivElement>(null);
   const { account, pb } = detail;
   const everMember = account.state === 'member' || account.state === 'expired';
   const allowed = actionsFor(account);
   // A reload can change what the account allows: a panel left open for an action that no longer applies closes.
   const open = action !== null && allowed.includes(action) ? action : null;
+  const inbox = account.state === 'member' || account.state === 'unpaid' || account.state === 'expired';
+  const lastSeen = daysSince(account.last_login_at);
+  const since = daysSince(account.created_at);
+  const persona = personaLabel(account.persona);
+
+  const buttons = (kinds: ActionKind[]) =>
+    open && kinds.includes(open) ? (
+      <ActionPanel
+        key={open}
+        kind={open}
+        account={account}
+        current={detail.partnerProject ?? null}
+        onCancel={() => setAction(null)}
+        onDone={(text) => {
+          setAction(null);
+          onChanged(text);
+        }}
+      />
+    ) : kinds.length > 0 ? (
+      <div className="actions">
+        {kinds.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className={ACTIONS[kind].danger ? 'danger' : kind === 'activate' || kind === 'extend' ? 'primary' : undefined}
+            onClick={() => {
+              onStart();
+              setAction(kind);
+            }}
+          >
+            {kind === 'partnerProject' && detail.partnerProject ? 'تغيير المشروع' : ACTIONS[kind].button}
+          </button>
+        ))}
+      </div>
+    ) : null;
+  const mainActions = allowed.filter((kind) => !SENSITIVE.includes(kind));
+  const sensitiveActions = allowed.filter((kind) => SENSITIVE.includes(kind));
+  const showWaiver = Boolean(account.phone) && detail.phoneWaiver !== undefined;
+
+  const copyPhone = async () => {
+    try {
+      await navigator.clipboard.writeText(account.phone);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      window.prompt('انسخ الرقم:', account.phone);
+    }
+  };
+
   return (
-    <div className="stack">
-      <section className="sheet-block">
+    <div className="stack member-sheet">
+      {/* M279 (owner: «الشكل بتاع لما بفتح اي عضو ده محتاج تعديل كبير»): who this is at a glance, and how to reach him in one tap. */}
+      <section className="member-hero">
+        <div className="hero-top">
+          <span className="persona-badge" aria-hidden="true">{PERSONA_ICON[account.persona] ?? '✦'}</span>
+          <div className="hero-name">
+            <strong dir="auto">{account.name || account.email || `حساب رقم ${account.id}`}</strong>
+            <span className="muted">
+              {[account.job_title, account.company, account.city].filter(Boolean).join(' · ') || (persona ?? 'بدون فئة')}
+              {since !== null ? ` · ${since === 0 ? 'انضم اليوم' : `عضو منذ ${formatDays(since, 'يومين')}`}` : ''}
+            </span>
+          </div>
+        </div>
         <div className="pills">
-          {personaLabel(account.persona) ? <Pill tone="muted">{personaLabel(account.persona)}</Pill> : null}
+          {persona ? <Pill tone="gold">{persona}</Pill> : null}
           <StatePill account={account} />
           <WaPill account={account} />
           <Intent score={account.intent} label={account.intent_label} />
         </div>
         {/* M116 (owner): the member's interests, right where he reads who this is. */}
-        {detail.interests?.length ? (
-          <div className="pills">{detail.interests.map((label) => <Pill key={label} tone="gold">{label}</Pill>)}</div>
+        {detail.interests?.length ? <div className="pills">{detail.interests.map((label) => <Pill key={label} tone="muted">{label}</Pill>)}</div> : null}
+        <div className="quick-actions">
+          {account.phone ? <a className="quick" href={`https://wa.me/${waDigits(account.phone)}`} target="_blank" rel="noreferrer"><span aria-hidden="true">💬</span>واتساب</a> : null}
+          {account.phone ? <a className="quick" href={`tel:${account.phone}`}><span aria-hidden="true">📞</span>اتصال</a> : null}
+          {account.email ? <a className="quick" href={`mailto:${account.email}`}><span aria-hidden="true">✉️</span>بريد</a> : null}
+          {inbox && !account.honorary ? (
+            <button type="button" className="quick" onClick={() => { setWriting(true); window.setTimeout(() => messageBlock.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }}>
+              <span aria-hidden="true">📨</span>رسالة خاصة
+            </button>
+          ) : null}
+          {account.msg_count > 0 ? <button type="button" className="quick" onClick={() => openThread(account.id)}><span aria-hidden="true">🤖</span>المستشار</button> : null}
+          {account.phone ? <button type="button" className="quick" onClick={() => void copyPhone()}><span aria-hidden="true">{copied ? '✓' : '⧉'}</span>{copied ? 'نُسخ' : 'نسخ الرقم'}</button> : null}
+        </div>
+      </section>
+
+      <div className="member-tiles">
+        <div className="member-tile"><span className="muted">آخر دخول</span><b>{agoText(lastSeen)}</b></div>
+        <div className="member-tile"><span className="muted">رصيد بنك المشاريع</span><b>{pb ? formatNumber(pb.left) : '—'}</b></div>
+        <div className="member-tile"><span className="muted">رسائل المستشار</span><b>{formatNumber(account.msg_count)}</b></div>
+        <div className="member-tile"><span className="muted">مشاريع فتحها</span><b>{pb ? formatNumber(pb.unlocked.length) : '—'}</b></div>
+      </div>
+
+      {done ? <Done text={done} /> : null}
+
+      <section className={everMember ? 'sheet-block member-card on' : 'sheet-block member-card'}>
+        <div className="card-head">
+          <h3>{account.honorary ? 'العضوية الشرفية' : account.partner ? 'عضوية شركاء النجاح' : 'العضوية السنوية'}</h3>
+          <StatePill account={account} />
+        </div>
+        {account.partner ? <LinkedProject project={detail.partnerProject ?? null} /> : null}
+        {everMember ? (
+          <dl className="fields">
+            {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
+            {account.partner ? <Field label="مُنحت في">{account.partner_since ? formatDay(account.partner_since) : '—'}</Field> : null}
+            <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
+            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.partner ? formatDay(account.partner_end ?? '') : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
+            {account.partner && (account.never_expires || (account.member_end && account.member_end > (account.partner_end ?? ''))) ? <Field label="اشتراك مدفوع بعدها حتى">{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field> : null}
+            {account.state === 'member' ? <Field label="رصيد المستشار اليوم">{dailyLeft(account)}</Field> : null}
+            {pb ? <Field label="تفاصيل رصيد بنك المشاريع">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
+          </dl>
+        ) : (
+          <p className="muted">{account.state === 'lead' ? 'عميل محتمل بلا حساب مؤكد بعد.' : account.state === 'pending' ? 'لم يؤكد بريده بعد.' : 'لم يشترك في العضوية بعد.'}</p>
+        )}
+        {detail.pbError ? <ErrorCard error={{ code: detail.pbError.code, message: `رصيد بنك المشاريع غير متاح الآن: ${detail.pbError.message}` }} /> : null}
+        {account.partner && !detail.partnerProject ? <p className="warn">شريك النجاح هذا غير مرتبط بمشروع: اربطه من «ربط بمشروع».</p> : null}
+        {detail.deletionRequest ? (
+          <p className="warn">
+            طلب العضو حذف حسابه في {formatDay(detail.deletionRequest.requestedAt.slice(0, 10))}، وموعد الحذف {formatDay(detail.deletionRequest.dueAt.slice(0, 10))}.
+            {detail.deletionRequest.reason ? ` السبب: ${detail.deletionRequest.reason}` : ''}
+          </p>
         ) : null}
+        {buttons(mainActions)}
+        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : account.partner ? <p className="muted hint">عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
+        {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
+        {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}
+      </section>
+
+      {/* M274: only a verified account has an inbox to read it in. */}
+      {inbox ? (
+        <div ref={messageBlock}>
+          <PrivateMessage account={account} open={writing} setOpen={setWriting} />
+        </div>
+      ) : null}
+
+      <History detail={detail} />
+
+      <section className="sheet-block">
+        <h3>البيانات</h3>
         <dl className="fields">
           <Field label="البريد الإلكتروني" ltr>{account.email || '—'}</Field>
           <Field label="الجوال" ltr>{account.phone || '—'}</Field>
@@ -470,79 +613,8 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
           <Field label="سجّل في">{formatDateTime(account.created_at)}</Field>
           <Field label="أكّد بريده">{account.verified_at ? formatDateTime(account.verified_at) : 'لم يؤكد بعد'}</Field>
           <Field label="آخر دخول">{account.last_login_at ? formatDateTime(account.last_login_at) : '—'}</Field>
-          <Field label="رسائله مع المستشار">{formatNumber(account.msg_count)}</Field>
           {detail.sites.length > 0 ? <Field label="المواقع">{detail.sites.join(' · ')}</Field> : null}
         </dl>
-        {account.msg_count > 0 ? <button type="button" onClick={() => openThread(account.id)}>فتح المحادثة</button> : null}
-      </section>
-
-      {/* M274: only a verified account has an inbox to read it in. */}
-      {account.state === 'member' || account.state === 'unpaid' || account.state === 'expired' ? <PrivateMessage account={account} /> : null}
-
-      {account.phone && detail.phoneWaiver !== undefined ? <PhoneWaiver contactId={account.id} phone={account.phone} waiver={detail.phoneWaiver} onStart={onStart} onChanged={onChanged} /> : null}
-
-      {everMember ? (
-        <section className="sheet-block">
-          <h3>{account.honorary ? 'العضوية الشرفية' : account.partner ? 'عضوية شركاء النجاح' : 'العضوية السنوية'}</h3>
-          {account.partner ? <LinkedProject project={detail.partnerProject ?? null} /> : null}
-          <dl className="fields">
-            {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
-            {account.partner ? <Field label="مُنحت في">{account.partner_since ? formatDay(account.partner_since) : '—'}</Field> : null}
-            <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
-            <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.partner ? formatDay(account.partner_end ?? '') : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
-            {account.partner && (account.never_expires || (account.member_end && account.member_end > (account.partner_end ?? ''))) ? <Field label="اشتراك مدفوع بعدها حتى">{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field> : null}
-            {account.state === 'member' ? <Field label="رصيد المستشار اليوم">{dailyLeft(account)}</Field> : null}
-            <Field label="رصيد بنك المشاريع">{pb ? `المتبقي ${formatProjects(pb.left)}` : '—'}</Field>
-            {pb ? <Field label="تفاصيل الرصيد">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
-            {pb ? <Field label="مشاريع فتحها">{formatNumber(pb.unlocked.length)}</Field> : null}
-          </dl>
-          {detail.pbError ? <ErrorCard error={{ code: detail.pbError.code, message: `رصيد بنك المشاريع غير متاح الآن: ${detail.pbError.message}` }} /> : null}
-        </section>
-      ) : null}
-
-      <section className="sheet-block">
-        <h3>الإجراءات</h3>
-        {done ? <Done text={done} /> : null}
-        {account.partner && !detail.partnerProject ? <p className="warn">شريك النجاح هذا غير مرتبط بمشروع: اربطه من «ربط بمشروع».</p> : null}
-        {detail.deletionRequest ? (
-          <p className="warn">
-            طلب العضو حذف حسابه في {formatDay(detail.deletionRequest.requestedAt.slice(0, 10))}، وموعد الحذف {formatDay(detail.deletionRequest.dueAt.slice(0, 10))}.
-            {detail.deletionRequest.reason ? ` السبب: ${detail.deletionRequest.reason}` : ''}
-          </p>
-        ) : null}
-        {open ? (
-          <ActionPanel
-            key={open}
-            kind={open}
-            account={account}
-            current={detail.partnerProject ?? null}
-            onCancel={() => setAction(null)}
-            onDone={(text) => {
-              setAction(null);
-              onChanged(text);
-            }}
-          />
-        ) : allowed.length > 0 ? (
-          <div className="actions">
-            {allowed.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                className={ACTIONS[kind].danger ? 'danger' : kind === 'activate' || kind === 'extend' ? 'primary' : undefined}
-                onClick={() => {
-                  onStart();
-                  setAction(kind);
-                }}
-              >
-                {kind === 'partnerProject' && detail.partnerProject ? 'تغيير المشروع' : ACTIONS[kind].button}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : account.partner ? <p className="muted hint">عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
-        {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
-        {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
-        {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}
       </section>
 
       {detail.memo || detail.notes ? (
@@ -553,7 +625,16 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         </section>
       ) : null}
 
-      <History detail={detail} />
+      {showWaiver || sensitiveActions.length > 0 || account.role === 'admin' ? (
+        <details className="danger-zone" open={open !== null && SENSITIVE.includes(open) ? true : undefined}>
+          <summary>🔒 إجراءات حساسة{sensitiveActions.includes('delete') ? ' — منها حذف الحساب' : ''}</summary>
+          <div className="stack">
+            {account.phone && detail.phoneWaiver !== undefined ? <PhoneWaiver contactId={account.id} phone={account.phone} waiver={detail.phoneWaiver} onStart={onStart} onChanged={onChanged} /> : null}
+            {sensitiveActions.length > 0 ? <section className="sheet-block"><h3>الصلاحيات والحساب</h3>{buttons(sensitiveActions)}</section> : null}
+            {account.role === 'admin' ? <p className="muted hint">صلاحية الإدارة تُمنح وتُسحب من صفحة الهب فقط.</p> : null}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

@@ -391,6 +391,24 @@ progress::-moz-progress-bar { background: var(--gold); }
 .stat-tile { flex: 1 1 130px; min-width: 0; display: grid; gap: 2px; justify-items: start; text-align: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--black); color: var(--text); font: inherit; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
 .stat-tile:hover:not(:disabled), .stat-tile.on { border-color: var(--gold-line); background: var(--gold-wash); }
 .stat-tile:disabled { cursor: default; opacity: 1; }
+/* M278c (owner: «اقرب منها تنور»): a tile lifts, glows gold and shows its arrow under the pointer. */
+.stat-tile { position: relative; transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.25s; }
+.stat-tile b { transition: color 0.2s; }
+.stat-tile:not(:disabled):hover { transform: translateY(-3px); border-color: var(--gold); box-shadow: 0 12px 28px rgba(201, 162, 39, 0.16), inset 0 0 0 1px rgba(201, 162, 39, 0.22); }
+.stat-tile:not(:disabled):hover b, .stat-tile.on b { color: var(--gold-bright); }
+.stat-tile:not(:disabled):active { transform: translateY(-1px) scale(0.98); }
+.stat-tile:not(:disabled)::after { content: '←'; position: absolute; top: 10px; inset-inline-end: 12px; color: var(--gold-bright); opacity: 0; transform: translateX(6px); transition: opacity 0.2s, transform 0.2s; }
+.stat-tile:not(:disabled):hover::after { opacity: 1; transform: none; }
+.stat-tile.on::after { content: '↓'; opacity: 1; transform: none; }
+.stat-tile .mini i { animation: bar-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: right; }
+.poll-option { transition: transform 0.2s, border-color 0.2s, box-shadow 0.25s; }
+.poll-option:hover { transform: translateY(-2px); border-color: var(--gold-line); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+.poll-option.top:hover { border-color: var(--gold-bright); box-shadow: 0 10px 30px rgba(201, 162, 39, 0.18); }
+.poll-option.none:hover { opacity: 0.75; }
+.names-pill, .card-actions button, .more-menu summary { transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
+.names-pill:hover, .card-actions button:not(:disabled):hover, .more-menu summary:hover { transform: translateY(-2px); border-color: var(--gold); box-shadow: 0 8px 20px rgba(201, 162, 39, 0.14); }
+.card-actions .remind:not(:disabled):hover { background: rgba(201, 162, 39, 0.18); }
+@media (prefers-reduced-motion: reduce) { .stat-tile, .poll-option, .names-pill, .card-actions button { transition: none; transform: none !important; } .stat-tile .mini i { animation: none; } }
 .stat-tile .tile-label { color: var(--muted); font-size: 0.8rem; }
 .stat-tile b { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
 .stat-tile .tile-note { color: var(--muted); font-size: 0.75rem; }
@@ -619,3 +637,35 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
 
 /* M232: a hidden field stays hidden even where a rule gives it a display (label.check). */
 [hidden] { display: none !important; }
+
+/* M279: the member sheet — a gold hero card, one-tap contact, number tiles, the membership card, a closed danger zone. */
+.member-hero { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--gold-line); border-radius: 16px; background: radial-gradient(120% 140% at 100% 0%, rgba(201, 162, 39, 0.16), transparent 55%), #141209; }
+.hero-top { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.persona-badge { flex: none; display: grid; place-items: center; inline-size: 58px; block-size: 58px; border-radius: 50%; border: 2px solid var(--gold); background: #1d1a10; font-size: 1.6rem; box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.08), 0 8px 24px rgba(201, 162, 39, 0.14); }
+.hero-name { display: grid; gap: 2px; min-width: 0; }
+.hero-name strong { font-size: 1.35rem; color: var(--gold-bright); overflow-wrap: anywhere; }
+.hero-name .muted { margin: 0; font-size: 0.85rem; }
+.quick-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.quick { display: grid; justify-items: center; gap: 4px; padding: 10px 4px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.35); color: var(--text); font: inherit; font-size: 0.8rem; text-decoration: none; cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+.quick > span { font-size: 1.2rem; line-height: 1; }
+.quick:hover { transform: translateY(-3px); border-color: var(--gold); background: var(--gold-wash); box-shadow: 0 10px 24px rgba(201, 162, 39, 0.16); }
+.member-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.member-tile { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; transition: border-color 0.2s, transform 0.2s; }
+.member-tile:hover { border-color: var(--gold-line); transform: translateY(-2px); }
+.member-tile .muted { margin: 0; font-size: 0.75rem; }
+.member-tile b { font-size: 1.15rem; font-weight: 600; }
+.member-card .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.member-card .card-head h3 { margin: 0; }
+.member-card.on { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-wash), transparent 70%), var(--panel); }
+.timeline { position: relative; padding-inline-start: 18px; }
+.timeline::before { content: ''; position: absolute; inset-block: 14px; inset-inline-start: 4px; inline-size: 2px; background: var(--line); }
+.timeline > .entry { position: relative; }
+.timeline > .entry::before { content: ''; position: absolute; inset-block-start: 16px; inset-inline-start: -18px; inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px #161616; }
+.danger-zone { border: 1px solid rgba(229, 72, 77, 0.3); border-radius: var(--radius); background: rgba(229, 72, 77, 0.04); }
+.danger-zone > summary { list-style: none; cursor: pointer; padding: 12px 14px; color: var(--muted); font-size: 0.9rem; user-select: none; }
+.danger-zone > summary::-webkit-details-marker { display: none; }
+.danger-zone > summary::after { content: '⌄'; float: inline-end; transition: transform 0.2s; }
+.danger-zone[open] > summary::after { transform: rotate(180deg); }
+.danger-zone[open] > summary { color: #ff8589; border-bottom: 1px solid rgba(229, 72, 77, 0.2); }
+.danger-zone > .stack { padding: 12px; }
+@media (prefers-reduced-motion: reduce) { .quick, .member-tile { transition: none; transform: none !important; } }
