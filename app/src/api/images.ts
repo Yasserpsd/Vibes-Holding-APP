@@ -38,9 +38,9 @@ const bundled = (source: number): string[] => {
   return uri ? [uri] : NONE;
 };
 /** The hall, wide — behind a page heading. */
-export const PAGE_STANDIN = bundled(require('../../assets/images/photo-page.webp'));
+export const PAGE_STANDIN = bundled(require('../../assets/images/photo-page.jpg'));
 /** The investor's seat, upright — behind the gate. */
-export const GATE_STANDIN = bundled(require('../../assets/images/photo-gate.webp'));
+export const GATE_STANDIN = bundled(require('../../assets/images/photo-gate.jpg'));
 
 /**
  * The same set, never empty: the bundled hall photograph stands in until the server's pictures arrive (owner, on a

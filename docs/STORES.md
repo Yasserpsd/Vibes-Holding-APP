@@ -251,7 +251,7 @@ In-app content presents partnership opportunities and services; it is not a cont
 ```
 Investors Club is an Arabic-first (RTL) business-club app for a private members club in Riyadh, Saudi Arabia. Content language is Arabic (an English UI is included).
 
-Sign in with the provided demo account (email + password; no SMS/2FA). The account already holds an ACTIVE annual membership, so all member features are unlocked: projects bank with full project details, smart advisor chat, events, services and the membership card.
+Sign in with the provided demo account: on the first screen tap "Sign in with e-mail or password" (Arabic: «الدخول بالبريد أو كلمة المرور») under the phone field, then enter the e-mail and password (no SMS/2FA). The phone field on the first screen sends a WhatsApp code to real members and is not needed for the demo account. The account already holds an ACTIVE annual membership, so all member features are unlocked: projects bank with full project details, smart advisor chat, events, services and the membership card.
 
 The annual membership is an auto-renewing subscription sold via in-app purchase (product: club_membership_annual). Other in-app payments (club services) are real-world services for club members fulfilled at the Riyadh HQ, paid via the Paymob payment gateway, per guideline 3.1.3(e) — they are not digital content.
 
@@ -260,7 +260,7 @@ Account deletion: in-app under Account (حسابي) → delete account, and via 
 
 ### Google Play → App access → instructions
 ```
-All member functionality requires signing in. Use the provided demo credentials (email + password, no 2FA). The demo account holds an active annual membership, so every member screen is reachable: projects bank (full details), advisor chat, events, services, membership card. The app is Arabic-first (RTL); an English UI is included.
+All member functionality requires signing in. Use the provided demo credentials: on the first screen tap "Sign in with e-mail or password" (Arabic: «الدخول بالبريد أو كلمة المرور») under the phone field, then enter the e-mail and password (no 2FA). The phone field on the first screen sends a WhatsApp code to real members and is not needed for the demo account. The demo account holds an active annual membership, so every member screen is reachable: projects bank (full details), advisor chat, events, services, membership card. The app is Arabic-first (RTL); an English UI is included.
 ```
 
 (Credentials themselves: `ceo@vibesholding.com` + the password the owner holds — he types it

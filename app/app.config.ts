@@ -8,7 +8,7 @@ const IS_PRODUCTION = APP_ENV === 'production';
 
 const EAS_PROJECT_ID = '41f3ea2d-5f89-4e33-87c1-ccb795d9166a';
 // The version of the binary this tree builds. Bump it with every store build (ASC never attaches a lower one).
-const APP_VERSION = '1.3.6';
+const APP_VERSION = '1.3.7';
 // OTA_RUNTIME_VERSION=1.2.0 publishes an update for the phones still on an older binary (M162, owner 2026-10-30).
 // M239: the server's forced-update floor relies on two facts, so they are enforced here — a store build never
 // takes the override (its runtime is always its own version), and a bundle is never published to a runtime NEWER
