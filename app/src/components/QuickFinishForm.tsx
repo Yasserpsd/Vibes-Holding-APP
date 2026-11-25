@@ -3,16 +3,18 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, View, type TextInput } from 'react-native';
 
-import { authApi } from '@/api/auth';
+import { authApi, useAuthConfig, type Persona } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { Chip } from '@/components/Chip';
 import { FormFailure, failureOf, type Failure } from '@/components/form/FormFailure';
+import { ChipRow, FieldGroup } from '@/components/form/FormParts';
 import { FormCard } from '@/components/form/FormTheme';
 import { FormField } from '@/components/FormField';
 import { Notice } from '@/components/Notice';
 import { SupportLink } from '@/components/SupportLink';
-import { t } from '@/i18n';
+import { t, tOptional } from '@/i18n';
 import { trackRegistration } from '@/lib/adsAttribution';
 import { markIntroDue } from '@/lib/introGate';
 import { clearSignupDraft } from '@/lib/signupDraft';
@@ -21,6 +23,9 @@ import { themedStyles } from '@/theme/styles';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 type Field = 'first' | 'last' | 'job' | 'email' | 'invite';
+
+// Drawn before the config answers (and by a server that names none): the three categories the club has.
+const PERSONAS: Persona[] = ['investor', 'entrepreneur', 'neutral'];
 
 type Props = {
   /** The proof of the number, good for half an hour. */
@@ -32,14 +37,20 @@ type Props = {
 };
 
 /**
- * M272: what is left of the sign-up once the number is proven — the name (two fields, M257) and the job (M203, «مهمة
- * جدا»). No password and no category: the account signs in by WhatsApp code and starts as «محايد», free to choose
- * later. The invite code waits behind one line, so a representative's invitation is still counted.
+ * M272: what is left of the sign-up once the number is proven — the category, the name (two fields, M257) and the job
+ * (M203, «مهمة جدا»). No password: the account signs in by WhatsApp code. The invite code waits behind one line, so a
+ * representative's invitation is still counted.
+ * M277 (owner, 2026-11-25: «الفئة دي اهم شئ عندي… لازم تكون اجبارية… يختارها في ثواني»): the first build of this form
+ * wrote «محايد» for everyone; the category is asked again, first on the form, one tap, and nothing is sent without it.
  */
 export function QuickFinishForm({ proof, number, country, needsEmail }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { signIn } = useAuth();
+  const { data: config } = useAuthConfig();
+  const personas = config?.personas?.length ? config.personas.map((item) => item.key) : PERSONAS;
+  const [persona, setPersona] = useState<Persona | ''>('');
+  const [personaError, setPersonaError] = useState<string | undefined>(undefined);
   const [values, setValues] = useState<Record<Field, string>>({ first: '', last: '', job: '', email: '', invite: '' });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -80,8 +91,9 @@ export function QuickFinishForm({ proof, number, country, needsEmail }: Props) {
       email: askEmail && !isEmail(values.email) ? t('form.error.email') : undefined,
     };
     setErrors(problems);
+    setPersonaError(persona ? undefined : t('form.error.persona'));
     setFailure(null);
-    if (Object.values(problems).some(Boolean)) return;
+    if (!persona || Object.values(problems).some(Boolean)) return;
     Keyboard.dismiss();
     setBusy(true);
     try {
@@ -90,8 +102,7 @@ export function QuickFinishForm({ proof, number, country, needsEmail }: Props) {
         country,
         phone: number,
         ...(askEmail ? { email: cleanEmail(values.email) } : {}),
-        persona: 'neutral',
-        personaDefaulted: true,
+        persona,
         jobTitle: values.job.trim(),
         inviteCode: values.invite.trim() || undefined,
         phoneProof: proof,
@@ -143,6 +154,21 @@ export function QuickFinishForm({ proof, number, country, needsEmail }: Props) {
     <View style={styles.wrap}>
       <Notice tone="success" text={t('phoneProof.done')} />
       <FormCard tone="light">
+        <FieldGroup label={t('auth.register.persona')} error={personaError} hint={persona ? t(`persona.hint.${persona}`) : undefined}>
+          <ChipRow>
+            {personas.map((key) => (
+              <Chip
+                key={key}
+                label={tOptional(`persona.${key}`) ?? config?.personas.find((item) => item.key === key)?.label ?? key}
+                selected={key === persona}
+                onPress={() => {
+                  setPersona(key);
+                  setPersonaError(undefined);
+                }}
+              />
+            ))}
+          </ChipRow>
+        </FieldGroup>
         <FormField
           label={t('auth.register.firstName')}
           value={values.first}

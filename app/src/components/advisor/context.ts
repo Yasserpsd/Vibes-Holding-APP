@@ -14,10 +14,11 @@ export type ChatContext =
   | { type: 'screen'; id: ScreenKey; title: string };
 
 /** The advisor opens the conversation itself: shown until the member answers. */
-export type ChatOpening = { title: string; text: string; quickReplies: string[] };
+/** `send` (M277): a first message the app sends by itself the moment the chat is ready — the member asked by his tap. */
+export type ChatOpening = { title: string; text: string; quickReplies: string[]; send?: string };
 
 /** Route params of the advisor tab; the nonce makes every tap a new request. `prompt` is a suggested first message. */
-export type ContextParams = { ctxType?: string; ctxId?: string; ctxTitle?: string; ctxEvent?: string; ctxNonce?: string; prompt?: string };
+export type ContextParams = { ctxType?: string; ctxId?: string; ctxTitle?: string; ctxEvent?: string; ctxNonce?: string; prompt?: string; send?: string };
 
 export const CONTEXT_ICONS: Record<ChatContext['type'], IoniconName> = {
   project: 'briefcase-outline',
@@ -53,7 +54,7 @@ export function toApiContext(context: ChatContext | null): AdvisorContext | null
   }
 }
 
-export function contextParams(context: ChatContext, prompt?: string): ContextParams {
+export function contextParams(context: ChatContext, prompt?: string, send = false): ContextParams {
   return {
     ctxType: context.type,
     ctxId: String(context.id),
@@ -61,11 +62,12 @@ export function contextParams(context: ChatContext, prompt?: string): ContextPar
     ctxNonce: String(Date.now()),
     ...(context.type === 'post' && context.event ? { ctxEvent: '1' } : {}),
     ...(prompt ? { prompt } : {}),
+    ...(prompt && send ? { send: '1' } : {}),
   };
 }
 
 /** Reads the params back; ids are checked against what the server accepts, anything else is ignored. */
-export function parseContextParams(params: ContextParams): { key: string; context: ChatContext; prompt: string | null } | null {
+export function parseContextParams(params: ContextParams): { key: string; context: ChatContext; prompt: string | null; send?: boolean } | null {
   const key = `${params.ctxType ?? ''}:${params.ctxId ?? ''}:${params.ctxNonce ?? ''}`;
   const title = params.ctxTitle?.trim() ?? '';
   const prompt = params.prompt?.trim() || null;
@@ -94,7 +96,7 @@ export function parseContextParams(params: ContextParams): { key: string; contex
     case 'screen': {
       const screen = SCREEN_KEYS.find((candidate) => candidate === id);
       if (!screen) return null;
-      return { key, context: { type: 'screen', id: screen, title: title || t('advisor.ctx.screen') }, prompt };
+      return { key, context: { type: 'screen', id: screen, title: title || t('advisor.ctx.screen') }, prompt, send: params.send === '1' };
     }
     default:
       return null;
@@ -181,8 +183,9 @@ const OPENING_KEYS: Record<ChatContext['type'], StringKey> = {
 };
 
 /** The advisor's first move for a context: a short line and the starter questions (the suggested prompt first). */
-export function openingFor(context: ChatContext, prompt: string | null): ChatOpening {
+export function openingFor(context: ChatContext, prompt: string | null, send = false): ChatOpening {
   const starterList = startersFor(context);
+  if (prompt && send) return { title: context.title, text: t(OPENING_KEYS[context.type]), quickReplies: starterList.filter((starter) => starter !== prompt).slice(0, 4), send: prompt };
   const quickReplies = prompt ? [prompt, ...starterList.filter((starter) => starter !== prompt)] : starterList;
   return { title: context.title, text: t(OPENING_KEYS[context.type]), quickReplies: quickReplies.slice(0, 4) };
 }

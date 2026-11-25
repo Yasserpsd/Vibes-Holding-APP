@@ -47,6 +47,7 @@ import { chevronForward, textStart } from '@/i18n/direction';
 import { iconFor, type IoniconName } from '@/lib/icons';
 import { sized } from '@/lib/imageUrl';
 import { playVideo } from '@/lib/player';
+import { takeInterestsDue } from '@/lib/introGate';
 import { markSeen } from '@/lib/seen';
 import { themedStyles } from '@/theme/styles';
 import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -102,6 +103,15 @@ export default function HomeScreen() {
       markSeen('home');
     }, []),
   );
+  // M277: a new account picks its interests right after the sign-up — «اهتماماتي» opens once over the home (the intro
+  // film, when one is owed, plays above it). The pause lets the sign-up screens finish closing first.
+  useFocusEffect(
+    useCallback(() => {
+      if (status !== 'signedIn' || !takeInterestsDue()) return undefined;
+      const timer = setTimeout(() => router.push('/news/interests'), 400);
+      return () => clearTimeout(timer);
+    }, [status, router]),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -131,7 +141,7 @@ export default function HomeScreen() {
   const content = home.data;
   if (!content) {
     return (
-      <Screen aboveTabBar>
+      <Screen aboveTabBar backdrop={false}>
         {home.isLoading ? (
           <SkeletonCards count={4} />
         ) : (
@@ -398,7 +408,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
+    <Screen aboveTabBar backdrop={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
       {/* M177 (owner): the next workshop, once a day, in the day's AI-written words — the first thing every open shows. */}
       <WorkshopAdPopup />
       {/* The hero leads for everyone; after it the blocks follow the persona's order (M74). */}

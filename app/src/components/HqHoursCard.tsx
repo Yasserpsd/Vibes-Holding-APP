@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 
 import { useHq, useHqWallet } from '@/api/hq';
 import { useAuth } from '@/auth/AuthProvider';
+import { contextParams } from '@/components/advisor/context';
 import { AppButton } from '@/components/AppButton';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { GrowBar } from '@/components/motion';
@@ -36,7 +37,12 @@ export function HqHoursCard({ compact = false }: { compact?: boolean }) {
   const words = formatHours(total).split(' ');
   const big = words.length > 1 ? (words[0] ?? '') : formatNumber(total);
   const unit = words.length > 1 ? words.slice(1).join(' ') : t('hq.hoursUnit');
-  const book = (kind: 'meeting' | 'office') => router.push({ pathname: '/hq/book', params: { kind } } as Href);
+  // M277 (owner, 2026-11-25): the meeting room is booked by the advisor — the tap opens the chat with the request
+  // already sent, and the advisor answers with the nearest free appointment and a confirm card. The office keeps its form.
+  const book = (kind: 'meeting' | 'office') =>
+    kind === 'meeting'
+      ? router.navigate({ pathname: '/(tabs)/advisor', params: contextParams({ type: 'screen', id: 'hq', title: t('hqBook.kindMeeting') }, t('hq.askMeeting'), true) } as Href)
+      : router.push({ pathname: '/hq/book', params: { kind } } as Href);
 
   return (
     <GlassCard golden radius={radii.xl} style={styles.card}>

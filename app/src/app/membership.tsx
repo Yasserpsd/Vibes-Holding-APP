@@ -3,7 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { useMembershipContent, type MembershipGroup, type MembershipItem, type NeutralReason } from '@/api/auth';
+import { useAuthConfig, useMembershipContent, type MembershipGroup, type MembershipItem, type NeutralReason } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
 import { useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { AppButton } from '@/components/AppButton';
@@ -25,6 +25,8 @@ import { colors, fonts, radii, spacing, typography } from '@/theme/tokens';
 /** Membership benefits as the owner wrote them (server content), grouped; lines can open a screen or WhatsApp. */
 export default function MembershipScreen() {
   const router = useRouter();
+  // M277: with the quick entry one button is enough — the number field signs in and opens an account alike.
+  const quickEntry = Boolean(useAuthConfig().data?.quickEntry);
   const { status, me, refresh, syncMembership, membershipPending } = useAuth();
   const { data, isLoading, error, refetch } = useMembershipContent();
   useAdvisorScreen({ type: 'screen', id: 'membership', title: data?.title ?? t('nav.membership') });
@@ -90,8 +92,8 @@ export default function MembershipScreen() {
       {status === 'guest' ? (
         <FadeInView delay={entranceDelay(2)} style={styles.guestActions}>
           {/* M78 (owner): «اختيار مباشر انه يدخل يسجل ويدفع» — registration flows straight back here, where the payment lives. */}
-          <AppButton label={t('membership.registerAndPay')} icon="person-add-outline" onPress={() => router.push('/auth/register')} />
-          <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+          <AppButton label={t('membership.registerAndPay')} icon="person-add-outline" onPress={() => router.push(quickEntry ? '/auth/login' : '/auth/register')} />
+          {quickEntry ? null : <AppButton label={t('auth.login.title')} variant="outline" icon="log-in-outline" onPress={() => router.push('/auth/login')} />}
         </FadeInView>
       ) : null}
 

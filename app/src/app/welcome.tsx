@@ -170,8 +170,13 @@ export default function WelcomeScreen() {
                   )}
                 </>
               )}
-              {/* While the number is being typed only the field and its button stay, so both sit above the keyboard. */}
-              {typing ? null : (
+              {/* While the number is being typed only the field, its button and the small guest line stay above the
+                  keyboard (owner, 2026-11-25: «يقدر يكمل بدون تسجيل بزرار صغير خالص تحت: متابعة كضيف»). */}
+              {typing ? (
+                <PressScale onPress={guest} accessibilityRole="button" hitSlop={8}>
+                  <Text style={styles.guestSmall}>{t('welcome.guest')}</Text>
+                </PressScale>
+              ) : (
                 <>
                   {quick ? (
                     <>
@@ -188,7 +193,7 @@ export default function WelcomeScreen() {
                     </>
                   ) : null}
                   <PressScale onPress={guest} accessibilityRole="button" hitSlop={8}>
-                    <Text style={styles.link}>{t('welcome.guest')}</Text>
+                    <Text style={quick ? styles.guestSmall : styles.link}>{t('welcome.guest')}</Text>
                   </PressScale>
                   <Text style={styles.hint}>{t('welcome.guestHint')}</Text>
                 </>
@@ -223,6 +228,7 @@ const styles = themedStyles(() => ({
   line: { flex: 1 },
   or: { ...typography.caption, color: colors.textMuted },
   link: { ...typography.body, color: colors.goldLightText, textAlign: 'center', paddingVertical: spacing.xs },
+  guestSmall: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', textDecorationLine: 'underline', paddingVertical: spacing.xs },
   hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   language: { ...typography.body, color: colors.goldLightText, textAlign: 'center', paddingVertical: spacing.sm },
 }));

@@ -9,6 +9,7 @@ import type { ProjectsSort, PublicProject } from '@/api/types';
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen, useAskAdvisor } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
+import { QuietBackdrop } from '@/components/QuietBackdrop';
 import { entranceDelay, FadeInView, PressScale, useCountUp } from '@/components/motion';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ProjectFiltersSheet } from '@/components/ProjectFiltersSheet';
@@ -221,6 +222,7 @@ export default function ProjectsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <QuietBackdrop />
       <FlatList
         data={rows}
         keyExtractor={(item) => String(item.id)}

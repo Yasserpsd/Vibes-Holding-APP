@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, View, type ScrollView, type TextInput } from 'react-native';
 
@@ -445,6 +445,11 @@ export default function RegisterScreen() {
       </Screen>
     );
   }
+
+  // M277 (owner, 2026-11-25: «خلي دي طريقة تسجيل الدخول… تأكيد واتس اب بيتم قبل ما العميل يسجل اصلا»): every «إنشاء
+  // حساب» door ends on the one number field. This long form stays for a first Apple/Google sign-in, an invite link and
+  // an e-mail that has no account.
+  if (config.quickEntry && !social && !fromLogin && !invite) return <Redirect href="/auth/login" />;
 
   return (
     <Screen title={t('auth.register.title')} subtitle={social ? t('auth.register.socialSubtitle') : t('auth.register.subtitle')} scrollRef={scrollRef}>

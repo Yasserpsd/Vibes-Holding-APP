@@ -8,6 +8,7 @@ import { useDecisions, useNewsFeed, useNewsPrefs, useNewsTopics, type NewsItem }
 import { useAuth } from '@/auth/AuthProvider';
 import { ASK_ADVISOR_CLEARANCE, useAdvisorScreen } from '@/components/advisor/AskAdvisor';
 import { Chip } from '@/components/Chip';
+import { QuietBackdrop } from '@/components/QuietBackdrop';
 import { GlassCard } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
 import { NewsCard, PageFooter } from '@/components/news/NewsCard';
@@ -147,6 +148,7 @@ export default function NewsListScreen() {
     // The top inset is the page's own: with no native header above it, the title sat under the status bar.
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Screen options={{ title: t('news.title') }} />
+      <QuietBackdrop />
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}

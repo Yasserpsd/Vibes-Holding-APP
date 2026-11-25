@@ -24,6 +24,7 @@ export default function AdvisorScreen() {
   const [handledKey, setHandledKey] = useState<string | null>(null);
   const [context, setContext] = useState<ChatContext | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
+  const [send, setSend] = useState(false);
 
   // Set by the floating «اسأل المستشار» button, the inline «ناقش … مع المستشار» buttons, the home portals and services.
   const incoming = parseContextParams(params);
@@ -31,6 +32,7 @@ export default function AdvisorScreen() {
     setHandledKey(incoming.key);
     setContext(incoming.context);
     setPrompt(incoming.prompt);
+    setSend(Boolean(incoming.send));
   }
 
   // The neutral portal lets the advisor open the conversation (server copy); every other context opens with
@@ -38,8 +40,8 @@ export default function AdvisorScreen() {
   const opening = useMemo<ChatOpening | null>(() => {
     if (!context) return null;
     if (context.type === 'portal' && context.id === 'neutral' && home.data) return home.data.neutralOpening;
-    return openingFor(context, prompt);
-  }, [context, prompt, home.data]);
+    return openingFor(context, prompt, send);
+  }, [context, prompt, send, home.data]);
 
   if (status === 'loading') {
     return (
@@ -57,7 +59,7 @@ export default function AdvisorScreen() {
       >
         <FadeInView delay={entranceDelay(2)} style={styles.actions}>
           <AppButton label={t('auth.login.title')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
-          {config?.registrationOpen === false ? null : (
+          {config?.registrationOpen === false || config?.quickEntry ? null : (
             <AppButton label={t('auth.register.title')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
           )}
         </FadeInView>
@@ -73,6 +75,7 @@ export default function AdvisorScreen() {
       onClearContext={() => {
         setContext(null);
         setPrompt(null);
+        setSend(false);
       }}
     />
   );

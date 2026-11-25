@@ -19,7 +19,7 @@ export function useAuthPhotos(): string[] {
 }
 
 /** `#RRGGBB` with an alpha, for a fade that ends exactly on a theme colour. */
-function withAlpha(hex: string, alpha: number): string {
+export function withAlpha(hex: string, alpha: number): string {
   const value = hex.replace('#', '');
   const part = (at: number) => parseInt(value.slice(at, at + 2), 16);
   return `rgba(${part(0)}, ${part(2)}, ${part(4)}, ${alpha})`;

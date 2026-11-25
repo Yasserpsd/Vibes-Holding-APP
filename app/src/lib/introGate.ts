@@ -11,12 +11,24 @@ const DUE_KEY = 'investorsclub.introDue';
 export const INTRO_DEVICE_SEEN_KEY = 'investorsclub.introSeen.v2';
 export const introAccountSeenKey = (accountId: string): string => `investorsclub.introSeen.v3.${accountId}`;
 
+// M277 (owner, 2026-11-25: «خلي اهتماماتي تطلع بعد ما يسجل ويدخل يختارها كده بسرعة»): no sign-up form asks the
+// interests any more, so a new account owes them once — the home opens «اهتماماتي» the first time it is shown.
+let interestsDue = false;
+
+/** True once after a registration; the caller opens the interests screen. */
+export function takeInterestsDue(): boolean {
+  const due = interestsDue;
+  interestsDue = false;
+  return due;
+}
+
 // Read synchronously by the host the moment the new session is announced (the storage write is asynchronous).
 let dueNow = false;
 
 /** A brand-new account just registered: it owes the film once. Call BEFORE announcing the session. */
 export function markIntroDue(): void {
   dueNow = true;
+  interestsDue = true;
   void saveSetting(DUE_KEY, '1');
 }
 

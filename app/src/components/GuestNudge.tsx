@@ -2,6 +2,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
+import { useAuthConfig } from '@/api/auth';
 import { useAuth } from '@/auth/AuthProvider';
 import { useGuestGate } from '@/auth/GuestGate';
 import { AppButton } from '@/components/AppButton';
@@ -22,6 +23,8 @@ const NUDGE_AFTER_MS = 90_000;
  */
 export function GuestNudge() {
   const router = useRouter();
+  // M277: with the quick entry one button is enough — the number field signs in and opens an account alike.
+  const quickEntry = Boolean(useAuthConfig().data?.quickEntry);
   const segments = useSegments();
   const { status } = useAuth();
   const { locked, ready } = useGuestGate();
@@ -66,8 +69,8 @@ export function GuestNudge() {
               <Text style={styles.title}>{t('guestNudge.title')}</Text>
               <Text style={styles.text}>{t('guestNudge.text')}</Text>
             </ScrollView>
-            <AppButton label={t('guestNudge.register')} icon="person-add-outline" onPress={() => go('/auth/register')} />
-            <AppButton label={t('guestNudge.signIn')} variant="outline" icon="log-in-outline" onPress={() => go('/auth/login')} />
+            <AppButton label={t('guestNudge.register')} icon="person-add-outline" onPress={() => go(quickEntry ? '/auth/login' : '/auth/register')} />
+            {quickEntry ? null : <AppButton label={t('guestNudge.signIn')} variant="outline" icon="log-in-outline" onPress={() => go('/auth/login')} />}
             <PressScale onPress={dismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('guestNudge.later')}>
               <Text style={styles.later}>{t('guestNudge.later')}</Text>
             </PressScale>

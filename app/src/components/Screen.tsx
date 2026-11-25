@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { pagePhotoOf, usePagePhotos } from '@/api/images';
+import { QuietBackdrop } from '@/components/QuietBackdrop';
 import { useAskAdvisorClearance } from '@/components/advisor/AskAdvisor';
 import { EmblemWatermark, GoldHairline } from '@/components/lux';
 import { FadeInView } from '@/components/motion';
@@ -43,6 +44,11 @@ type Props = {
    * for the few pages that already lead with their own banner right under the title.
    */
   photo?: boolean;
+  /**
+   * M277: a page that opens without a photo heading (no title, or `photo={false}`) gets the quiet photograph behind
+   * its top (see QuietBackdrop). `false` keeps the plain background.
+   */
+  backdrop?: boolean;
 };
 
 /**
@@ -153,7 +159,7 @@ export function useFieldScroller(scrollRef: RefObject<ScrollView | null>) {
 const SUBTITLE_ON_PHOTO = 96;
 
 /** Scrollable screen with keyboard handling, used by forms and detail pages. */
-export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef, photo = true }: Props) {
+export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef, photo = true, backdrop = true }: Props) {
   // M270 (owner, on the gate's photograph: «عايز كله يكون كده… نفس الفكرة دي كل الصفحات»): the heading of every
   // titled page is a photograph of the club that melts into the page, each page its own picture.
   const pagePhotos = usePagePhotos();
@@ -179,7 +185,8 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
   const keeper = useFieldScroller(scroll);
   return (
     <SafeAreaView style={styles.safeArea} edges={safeEdges}>
-      {watermark && !heroPhoto ? <EmblemWatermark /> : null}
+      {backdrop && !heroPhoto ? <QuietBackdrop /> : null}
+      {watermark && !heroPhoto && !backdrop ? <EmblemWatermark /> : null}
       {/* Review 2026-11-16: `padding` on Android too. Edge-to-edge means the window is not resized for the keyboard,
           so `undefined` (a plain View) left every form behind the keys. The offset is the header above this view on
           both platforms; if a device ever did resize the window, the padding works out to zero by itself. */}

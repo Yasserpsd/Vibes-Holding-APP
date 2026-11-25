@@ -89,7 +89,7 @@ export default function PhoneCodeScreen() {
 
   if (proof) {
     return (
-      <Screen title={t('quick.finish.title')} subtitle={t('quick.finish.subtitle')}>
+      <Screen title={t('quick.finish.title')} subtitle={t('quick.finish.subtitleCategory')}>
         <Stack.Screen options={{ title: t('quick.finish.title') }} />
         <FadeInView delay={entranceDelay(0)}>
           <QuickFinishForm proof={proof} number={params.number ?? ''} country={params.country ?? 'sa'} needsEmail={params.needsEmail === '1'} />

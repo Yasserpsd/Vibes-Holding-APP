@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FadeInView, Floating } from '@/components/motion';
 import { env } from '@/config/env';
+import { QuietBackdrop } from '@/components/QuietBackdrop';
 import { t } from '@/i18n';
 import { themedStyles } from '@/theme/styles';
 import { colors, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
@@ -19,6 +20,7 @@ type Props = {
 export function PlaceholderScreen({ title, description, children }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
+      <QuietBackdrop />
       {/* Scrollable: the guest's account carries up to seven buttons, more than a small phone (or a large font) can show at once. */}
       {/* The guest's account now carries a number field: the keyboard pads the bottom (Android runs edge to edge, so
           `padding` there too) and a tap on the button under the field counts while the keyboard is up. */}

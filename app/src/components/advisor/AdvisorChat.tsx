@@ -211,6 +211,17 @@ export function AdvisorChat({ context, opening = null, onClearContext }: Props) 
     }
   };
 
+  // M277 (owner, 2026-11-25: «لما ادوس عليها اتحول علي المستشار يحجزلي… في ثواني ويقترح اقرب ميعاد»): an opening
+  // that carries its own first message sends it once the conversation is loaded — no second tap.
+  const sentOpening = useRef<ChatOpening | null>(null);
+  const autoSend = opening?.send && chat.status === 'ready' ? opening : null;
+  useEffect(() => {
+    if (!autoSend?.send || sentOpening.current === autoSend) return;
+    sentOpening.current = autoSend;
+    void submit(autoSend.send);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one send per opening; `submit` is redrawn every render
+  }, [autoSend]);
+
   /** M145: a card's request — navigation, a re-check after a pick, or the booking itself. */
   const act = async (request: ChatAct) => {
     if (request.kind === 'screen') {

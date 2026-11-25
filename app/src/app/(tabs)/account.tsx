@@ -118,7 +118,7 @@ export default function AccountScreen() {
     });
 
   return (
-    <Screen aboveTabBar watermark refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
+    <Screen aboveTabBar refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.gold} colors={[colors.gold]} progressBackgroundColor={colors.surfaceElevated} />}>
       {me ? (
         <FadeInView offset={12}>
           {/* M103: the gentle «كمّل بياناتك» popup — at most once a week while the profile is incomplete. */}

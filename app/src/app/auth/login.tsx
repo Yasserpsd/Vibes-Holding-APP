@@ -213,7 +213,8 @@ export default function LoginScreen() {
           </FadeInView>
         </>
       )}
-      {config?.registrationOpen === false ? null : (
+      {/* M277: with the quick entry the number field opens an account too, so the long form's button goes. */}
+      {config?.registrationOpen === false || config?.quickEntry ? null : (
         <FadeInView delay={entranceDelay(6)}>
           <AppButton label={t('auth.login.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
         </FadeInView>
