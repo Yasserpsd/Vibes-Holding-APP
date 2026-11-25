@@ -519,6 +519,16 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
 .pp-row.on { border-color: var(--gold); background: var(--gold-wash); }
 .pp-row .warn { font-size: 0.8rem; }
 .pp-chosen { margin: 0; font-weight: 600; color: var(--gold-bright); overflow-wrap: anywhere; }
+.pp-card { display: grid; gap: 6px; justify-items: start; padding: 14px 16px; border-radius: 12px; border: 2px solid #4f86f7; background: linear-gradient(160deg, #1740ad, #0d2e86); color: #fff; min-width: 0; overflow-wrap: anywhere; }
+.pp-card .pp-label { font-size: 0.78rem; color: #c4d6ff; }
+.pp-card .pp-title { font-size: 1.3rem; font-weight: 700; line-height: 1.5; color: #fff; }
+.pp-card .pp-number { font-size: 0.85rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); }
+.pp-card.missing { border-color: var(--danger); background: var(--danger-wash); }
+.pp-card.missing .pp-label { color: #ff8589; }
+.pp-partner { flex: 1; gap: 6px; }
+.pp-partner .pp-card { padding: 10px 12px; }
+.pp-partner .pp-card .pp-title { font-size: 1.1rem; }
+.list-row:hover .pp-card .pp-title { color: #fff; }
 
 /* M232: a hidden field stays hidden even where a rule gives it a display (label.check). */
 [hidden] { display: none !important; }

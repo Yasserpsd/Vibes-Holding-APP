@@ -23,6 +23,20 @@ const plain = (text: string): string =>
 
 export const projectName = (project: ProjectRef): string => (project.number ? `${project.title} (رقم المشروع: ${project.number})` : project.title);
 
+/**
+ * The partner's project, made to stand out (owner, 2026-11-25: «اسم المشروع المرتبط بيه ده مهم جدا لازم يبان») in the
+ * membership's royal blue, or as a warning while there is none. Spans only: it also sits inside a list row's button.
+ */
+export function LinkedProject({ project }: { project: ProjectRef | null }) {
+  return (
+    <span className={project ? 'pp-card' : 'pp-card missing'}>
+      <span className="pp-label">المشروع المرتبط</span>
+      <strong className="pp-title">{project ? project.title : 'لم يُربط بمشروع بعد'}</strong>
+      {project?.number ? <span className="pp-number">{`رقم المشروع: ${project.number}`}</span> : null}
+    </span>
+  );
+}
+
 /** The required choice of a grant or a change: search by name or number; a project another partner holds is locked. */
 export function ProjectPicker({ value, current, onPick }: { value: ProjectRef | null; current: ProjectRef | null; onPick: (project: ProjectRef) => void }) {
   const state = useLoad(() => api.successPartners(), []);
@@ -87,9 +101,9 @@ function PartnerList({ stamp }: { stamp: number }) {
           {partners.map((partner) => (
             <li key={partner.contactId}>
               <button type="button" className="list-row" onClick={() => openMember(partner.contactId)}>
-                <span className="list-main">
+                <span className="list-main pp-partner">
                   <strong>{partner.name || `حساب رقم ${partner.contactId}`}</strong>
-                  <span>{partner.project ? projectName(partner.project) : 'بلا مشروع مرتبط'}</span>
+                  <LinkedProject project={partner.project} />
                   <span className="muted">
                     {partner.phone ? <bdi dir="ltr">{partner.phone}</bdi> : null}
                     {partner.end ? <span>{` · تنتهي في ${formatDay(partner.end)}`}</span> : null}

@@ -5,7 +5,7 @@ import { formatCents, formatDateTime, formatDay, formatDays, formatLooseDate, fo
 import type { Account, GrantAction, MemberDetail, MemberEvent, ProjectRef } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
 import { dailyLeft, memberLeft, personaLabel, StatePill, WaPill } from './Members';
-import { ProjectPicker, projectName } from './SuccessPartners';
+import { LinkedProject, ProjectPicker, projectName } from './SuccessPartners';
 
 type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'partner' | 'partnerProject' | 'unpartner' | 'delete';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
@@ -484,10 +484,10 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
       {everMember ? (
         <section className="sheet-block">
           <h3>{account.honorary ? 'العضوية الشرفية' : account.partner ? 'عضوية شركاء النجاح' : 'العضوية السنوية'}</h3>
+          {account.partner ? <LinkedProject project={detail.partnerProject ?? null} /> : null}
           <dl className="fields">
             {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
             {account.partner ? <Field label="مُنحت في">{account.partner_since ? formatDay(account.partner_since) : '—'}</Field> : null}
-            {account.partner ? <Field label="المشروع المرتبط">{detail.partnerProject ? projectName(detail.partnerProject) : 'لم يُربط بمشروع بعد'}</Field> : null}
             <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
             <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.partner ? formatDay(account.partner_end ?? '') : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
             {account.partner && (account.never_expires || (account.member_end && account.member_end > (account.partner_end ?? ''))) ? <Field label="اشتراك مدفوع بعدها حتى">{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field> : null}
