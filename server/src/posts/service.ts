@@ -67,6 +67,8 @@ export const postInputSchema = z
     title: z.string().trim().min(1).max(140),
     body: z.string().trim().max(6000).default(''),
     links: z.array(z.object({ label: z.string().trim().min(1).max(80), url: httpUrl })).max(8).default([]),
+    /** M278: the cover members see on the card, at the top of the page and in the notification; `images` = the pictures inside the content. */
+    cover: httpUrl.nullish(),
     images: z.array(httpUrl).max(10).default([]),
     video: z.string().trim().max(300).nullish(),
     videoFile: z.object({ url: httpUrl, poster: httpUrl.nullish() }).nullish(),
@@ -90,6 +92,8 @@ export type Post = {
   title: string;
   body: string;
   links: { label: string; url: string }[];
+  /** M278: absent on older posts — their first image stood in as the cover (and still does). */
+  cover?: string | null;
   images: string[];
   youtubeId: string | null;
   /** An uploaded video; posts stored before M15 have no such key. */
@@ -195,9 +199,14 @@ export function canSee(post: Pick<Post, 'audience'>, viewer: PostViewer): boolea
   return audienceMemberIds(audience).includes(viewer.contactId);
 }
 
+/** M278: the picture that stands for the post — its cover, else (older posts) its first image. */
+export function coverOf(post: Pick<Post, 'cover' | 'images'>): string | null {
+  return post.cover || post.images[0] || null;
+}
+
 /** Every media URL a post points at (images, uploaded video, poster), ours or not. */
-export function postMediaUrls(post: Pick<Post, 'images' | 'video'>): string[] {
-  return [...post.images, ...(post.video ? [post.video.url, ...(post.video.poster ? [post.video.poster] : [])] : [])];
+export function postMediaUrls(post: Pick<Post, 'cover' | 'images' | 'video'>): string[] {
+  return [...(post.cover ? [post.cover] : []), ...post.images, ...(post.video ? [post.video.url, ...(post.video.poster ? [post.video.poster] : [])] : [])];
 }
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -311,6 +320,7 @@ export class PostsService {
       title: input.title,
       body: input.body,
       links: input.links,
+      cover: input.cover ?? null,
       images: input.images,
       youtubeId,
       video: PostsService.videoFile(input),
@@ -337,7 +347,7 @@ export class PostsService {
       const post = posts.find((entry) => entry.id === id);
       if (!post) return null;
       const stamp = now.toISOString();
-      Object.assign(post, { title: input.title, body: input.body, links: input.links, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), poll: PostsService.poll(input, post), popup: PostsService.popup(input), audience: input.audience, updatedAt: stamp });
+      Object.assign(post, { title: input.title, body: input.body, links: input.links, cover: input.cover ?? null, images: input.images, youtubeId, video: PostsService.videoFile(input), pinned: input.pinned, kind: input.kind, event: PostsService.event(input), poll: PostsService.poll(input, post), popup: PostsService.popup(input), audience: input.audience, updatedAt: stamp });
       if (input.status === 'published' && !post.publishedAt) post.publishedAt = stamp;
       post.status = input.status;
       return post;

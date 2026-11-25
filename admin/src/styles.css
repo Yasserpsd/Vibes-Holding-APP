@@ -272,6 +272,52 @@ button.tile:hover { border-color: var(--gold-line); }
 .top strong { color: var(--gold-bright); font-size: 1.4rem; font-weight: 600; margin-inline-end: auto; }
 .page { max-width: 860px; }
 
+/* M278: the tools page — a toolbar, cover cards, and the editor with its live phone preview. */
+.posts-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.posts-toolbar .posts-search { flex: 1 1 220px; width: auto; min-width: 0; }
+.chip .count { display: inline-block; min-width: 20px; margin-inline-start: 4px; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 0.75rem; line-height: 18px; text-align: center; }
+.chip.on .count { background: rgba(0, 0, 0, 0.18); }
+.posts.grid { grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); align-items: start; }
+.post-card { padding-top: 0; overflow: hidden; transition: border-color 0.2s, transform 0.2s; }
+.post-card:hover { border-color: var(--gold-line); transform: translateY(-2px); }
+.post-cover { position: relative; margin: 0 -16px; aspect-ratio: 16 / 9; max-height: 240px; width: calc(100% + 32px); background: var(--black); border-bottom: 1px solid var(--line); overflow: hidden; display: grid; place-items: center; }
+.posts:not(.grid) .post-cover { aspect-ratio: auto; height: 120px; }
+.post-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.post-cover.empty { aspect-ratio: auto; height: 96px; background: radial-gradient(120% 120% at 100% 0%, var(--gold-wash), transparent 60%), var(--black); }
+.post-cover::after { content: ''; position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(transparent, rgba(0, 0, 0, 0.55)); pointer-events: none; }
+.kind-tag { position: absolute; z-index: 1; bottom: 10px; inset-inline-start: 12px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--gold-line); background: rgba(11, 11, 11, 0.75); color: var(--gold-bright); font-size: 0.78rem; backdrop-filter: blur(6px); }
+.date-chip { position: absolute; z-index: 1; top: 12px; inset-inline-start: 12px; display: grid; justify-items: center; min-width: 54px; padding: 6px 10px; border-radius: 12px; background: var(--gold); color: #111; line-height: 1.15; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.date-chip b { font-size: 1.35rem; }
+.date-chip small { font-size: 0.72rem; font-weight: 600; }
+/* The editor: the form, and beside it on a desk the phone preview that follows while scrolling. */
+.page.editor-layout { max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.cover-zone { border-color: var(--gold-line); background: var(--gold-wash); }
+.cover-zone legend { color: var(--gold-bright); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.cover-tag { padding: 1px 10px; border-radius: 999px; border: 1px solid var(--gold-line); font-size: 0.75rem; font-weight: 500; }
+.cover-drop { position: relative; aspect-ratio: 16 / 9; max-height: 280px; border: 1.5px dashed var(--gold-line); border-radius: 12px; overflow: hidden; background: var(--black); display: grid; }
+.cover-drop.over { border-color: var(--gold-bright); background: var(--gold-wash); }
+.cover-drop img { width: 100%; height: 100%; object-fit: cover; }
+.cover-empty { display: grid; place-content: center; gap: 6px; border: 0; background: transparent; width: 100%; height: 100%; color: var(--gold-bright); }
+.phone-preview { position: sticky; top: 16px; display: grid; gap: 8px; }
+.phone-preview > .muted { margin: 0; text-align: center; font-size: 0.85rem; }
+.phone { border: 1px solid var(--line); border-radius: 32px; padding: 10px; background: #050505; box-shadow: 0 0 0 4px #121212, 0 20px 50px rgba(0, 0, 0, 0.5); }
+.phone-cover { position: relative; aspect-ratio: 16 / 9; border-radius: 22px 22px 12px 12px; overflow: hidden; background: var(--panel); display: grid; place-items: center; }
+.phone-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.phone-cover .date-chip { top: 8px; min-width: 42px; padding: 4px 8px; }
+.phone-cover .date-chip b { font-size: 1.05rem; }
+.phone-cover .kind-tag { bottom: 8px; font-size: 0.7rem; }
+.phone-body { display: grid; gap: 6px; padding: 12px 6px 8px; }
+.phone-body strong { font-size: 1rem; }
+.phone-body p { margin: 0; font-size: 0.85rem; color: var(--muted); white-space: pre-line; }
+.phone-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.phone-options li { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.85rem; }
+.phone-images { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.phone-images img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+@media (max-width: 1000px) {
+  .page.editor-layout { grid-template-columns: minmax(0, 1fr); }
+  .phone-preview { position: static; max-width: 320px; justify-self: center; width: 100%; }
+}
+
 /* Forms. */
 label { display: grid; gap: 6px; font-weight: 500; }
 label.check { display: flex; align-items: center; gap: 8px; }

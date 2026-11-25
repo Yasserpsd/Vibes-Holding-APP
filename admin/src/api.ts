@@ -37,6 +37,8 @@ export type Post = {
   title: string;
   body: string;
   links: PostLink[];
+  /** M278: the cover members see; absent on older posts, whose first image stood in for it. */
+  cover?: string | null;
   images: string[];
   youtubeId: string | null;
   /** Posts older than uploads have no `video` key at all: read a missing key as null. */
@@ -84,7 +86,7 @@ export type PostMember = { contactId: number; name: string };
 export const MAX_AUDIENCE_MEMBERS = 50;
 export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; error: string | null; published: boolean };
 /** `video` is the YouTube link or id, `videoFile` the uploaded video; a post may carry both. */
-export type PostInput = { title: string; body: string; english?: { title: string; body: string } | null; links: PostLink[]; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; popup?: { until: string | null } | null; audience: PostAudience };
+export type PostInput = { title: string; body: string; english?: { title: string; body: string } | null; links: PostLink[]; cover: string | null; images: string[]; video: string | null; videoFile: PostVideo | null; status: 'draft' | 'published'; pinned: boolean; kind: PostKind; event: PostEvent | null; poll: PostPollInput | null; popup?: { until: string | null } | null; audience: PostAudience };
 
 /** M30: a member's request for his printed membership card, delivered to his door at no charge. */
 /** M7/M109a: an HQ visit or office/meeting-room booking as the dashboard reviews it. */

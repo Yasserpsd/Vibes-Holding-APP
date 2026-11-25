@@ -12,6 +12,8 @@ export type Post = {
   body: string;
   links: { label: string; url: string }[];
   images: string[];
+  /** M278: the cover chosen in the dashboard. When set, it is also `images[0]` (older binaries read it there), so the content skips it. */
+  cover?: string | null;
   youtubeId: string | null;
   /** A video uploaded from the dashboard. Older servers and posts send no `video` key: treat it as null. */
   video?: { url: string; poster: string | null } | null;

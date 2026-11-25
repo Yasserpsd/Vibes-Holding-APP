@@ -59,7 +59,10 @@ function publicPost(post: Post, lang: AppLang = 'ar') {
     title: en?.title || post.title,
     body: en?.body || post.body,
     links: en?.links ? links.map((link, index) => ({ ...link, label: en.links?.[index] || link.label })) : links,
-    images,
+    // M278: binaries before the cover read it as the first image, exactly as before; newer ones show `cover` on top
+    // and skip it inside the content (`images` still starts with it).
+    images: post.cover ? [post.cover, ...images] : images,
+    cover: post.cover ?? null,
     youtubeId,
     video: post.video ?? null,
     pinned,
@@ -232,7 +235,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
 
   /** Uploaded media must exist with the right kind; pasted image links pass as before. */
   const checkMedia = async (input: PostInput): Promise<void> => {
-    for (const url of input.images) if (media.keyOf(url)) await media.check(url, 'image');
+    for (const url of [...(input.cover ? [input.cover] : []), ...input.images]) if (media.keyOf(url)) await media.check(url, 'image');
     if (!input.videoFile) return;
     await media.check(input.videoFile.url, 'video');
     if (input.videoFile.poster) await media.check(input.videoFile.poster, 'image');

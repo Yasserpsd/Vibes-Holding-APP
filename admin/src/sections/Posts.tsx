@@ -1,11 +1,40 @@
 import { useEffect, useState } from 'react';
 
-import { api, type Post, type PostAudience, type PostFollow, type PostFollowRow, type PostWhatsapp, type PostWhatsappRow } from '../api';
+import { api, type Post, type PostAudience, type PostKind, type PostFollow, type PostFollowRow, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
 import { paidLabel, personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
 
 const audienceOf = (post: Post): PostAudience => post.audience ?? { type: 'all' };
+
+const KIND_TABS: { key: PostKind | 'all'; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'post', label: 'رسائل الإدارة' },
+  { key: 'event', label: 'فعاليات' },
+  { key: 'poll', label: 'استفتاءات' },
+  { key: 'popup', label: 'بوب أب' },
+];
+const KIND_NAME: Record<PostKind, string> = { post: 'رسالة الإدارة', event: 'فعالية', poll: 'استفتاء', popup: 'بوب أب' };
+const dayMonth = new Intl.DateTimeFormat('ar-u-nu-latn-ca-gregory', { day: 'numeric', month: 'long', timeZone: 'Asia/Riyadh' });
+
+/** M278: the card's banner — the cover (an older post's first image), the kind, and an event's day on top. */
+function PostCover({ post }: { post: Post }) {
+  const cover = post.cover ?? (post.cover === undefined ? post.images[0] : null) ?? null;
+  const kind = post.kind ?? 'post';
+  const day = kind === 'event' && post.event ? dayMonth.formatToParts(new Date(post.event.date.length === 10 ? `${post.event.date}T12:00:00+03:00` : post.event.date)) : null;
+  return (
+    <div className={cover ? 'post-cover' : 'post-cover empty'}>
+      {cover ? <img src={cover} alt="" referrerPolicy="no-referrer" loading="lazy" /> : <span className="muted">بدون غلاف</span>}
+      <span className="kind-tag">{KIND_NAME[kind]}</span>
+      {day ? (
+        <span className="date-chip">
+          <b>{day.find((part) => part.type === 'day')?.value}</b>
+          <small>{day.find((part) => part.type === 'month')?.value}</small>
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 /** M29: who the message is for, named on its row. Nothing shows for a public post. */
 function AudiencePill({ post }: { post: Post }) {
@@ -293,6 +322,16 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
   // because saving that copy would make the server remove the files uploaded in between.
   const [saved, setSaved] = useState<Post[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // M278: tabs by kind, a search, and cards or rows — the last view stays for the next visit.
+  const [filter, setFilter] = useState<PostKind | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    try { return localStorage.getItem('posts.view') === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
+  });
+  const pickView = (next: 'grid' | 'list') => {
+    setView(next);
+    try { localStorage.setItem('posts.view', next); } catch { /* private window: the choice lasts this visit only */ }
+  };
 
   useEffect(() => {
     onEditing(editing !== null);
@@ -322,6 +361,10 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
   });
   // What is left was saved a moment ago and the list has not brought it yet.
   const posts = [...mine.values(), ...rows];
+  const counts = new Map<PostKind | 'all', number>([['all', posts.length]]);
+  for (const post of posts) counts.set(post.kind ?? 'post', (counts.get(post.kind ?? 'post') ?? 0) + 1);
+  const needle = query.trim();
+  const shown = posts.filter((post) => (filter === 'all' || (post.kind ?? 'post') === filter) && (!needle || post.title.includes(needle) || post.body.includes(needle)));
 
   function fail(failure: unknown) {
     if (sessionOver(failure)) signOut();
@@ -390,11 +433,27 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
         <button className="primary" type="button" onClick={() => setEditing('new')}>أداة جديدة</button>
       </SectionHead>
       {state.data && devices === 0 ? <p className="muted">لم يسجّل أي جهاز للإشعارات بعد، فيذهب التذكير على واتساب فقط. يبدأ التسجيل بعد تثبيت نسخة التطبيق التي تدعم الإشعارات وتسجيل الدخول منها.</p> : null}
+      <div className="posts-toolbar">
+        <div className="chips" role="group" aria-label="نوع الأداة">
+          {KIND_TABS.map((tab) => (
+            <button key={tab.key} type="button" className={filter === tab.key ? 'chip on' : 'chip'} aria-pressed={filter === tab.key} onClick={() => setFilter(tab.key)}>
+              {tab.label} <span className="count">{formatNumber(counts.get(tab.key) ?? 0)}</span>
+            </button>
+          ))}
+        </div>
+        <input className="posts-search" type="search" placeholder="بحث في العناوين والنصوص" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="chips" role="group" aria-label="طريقة العرض">
+          <button type="button" className={view === 'grid' ? 'chip on' : 'chip'} aria-pressed={view === 'grid'} onClick={() => pickView('grid')}>كروت</button>
+          <button type="button" className={view === 'list' ? 'chip on' : 'chip'} aria-pressed={view === 'list'} onClick={() => pickView('list')}>قائمة</button>
+        </div>
+      </div>
       <Async state={state} rows={5} empty={() => posts.length === 0} emptyText="لا توجد أدوات تواصل بعد.">
         {() => (
-          <ul className="posts">
-            {posts.map((post) => (
-              <li key={post.id} className="card">
+          shown.length === 0 ? <p className="muted">لا توجد نتائج لهذا البحث.</p> : (
+          <ul className={view === 'grid' ? 'posts grid' : 'posts'}>
+            {shown.map((post) => (
+              <li key={post.id} className="card post-card">
+                <PostCover post={post} />
                 <div className="row">
                   <h2>{post.pinned ? '📌 ' : ''}{post.title}</h2>
                   <span className="pills">
@@ -426,6 +485,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
               </li>
             ))}
           </ul>
+          )
         )}
       </Async>
     </>

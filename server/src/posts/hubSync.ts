@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import { HubError, hubCall, type HubClient } from '../hub/types.js';
 import type { KV } from '../store.js';
-import { audienceOf, type Post, type PostsService } from './service.js';
+import { audienceOf, coverOf, type Post, type PostsService } from './service.js';
 
 /**
  * «عقل واحد»: a post or an event published from the dashboard is handed to the hub's `publish` op (docs/BRIDGE_V2.md
@@ -42,7 +42,7 @@ export class PostsHubSync {
         title: post.title,
         content: post.body,
         url: post.links[0]?.url ?? '',
-        image: post.images[0] ?? post.video?.poster ?? '',
+        image: coverOf(post) ?? post.video?.poster ?? '',
         ...(post.kind === 'event' && post.event ? { event: { date: post.event.date, place: post.event.place, online_url: post.event.onlineUrl ?? '' } } : {}),
       });
       await this.mark(post, error, error ? onHub : true);

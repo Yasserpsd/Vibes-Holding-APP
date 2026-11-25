@@ -50,6 +50,11 @@ export default function PostScreen() {
         <StateView loading={query.isPending} error={query.error} onRetry={() => query.refetch()} />
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: clearance }]}>
+          {post.cover ? (
+            <FadeInView delay={entranceDelay(0)}>
+              <Image source={{ uri: sized(post.cover, 720) }} style={styles.cover} resizeMode="cover" accessibilityLabel={post.title} />
+            </FadeInView>
+          ) : null}
           <View style={styles.meta}>
             <PopIn style={styles.badge}>
               <Ionicons name={event ? 'calendar' : isPoll ? 'stats-chart' : 'megaphone-outline'} size={14} color={colors.goldInk} />
@@ -94,7 +99,7 @@ export default function PostScreen() {
               <VideoTile url={post.video.url} poster={post.video.poster || null} posterFit="contain" label={t('posts.playVideo')} title={post.title} />
             </FadeInView>
           ) : null}
-          {post.images.map((uri, index) => (
+          {(post.cover ? post.images.slice(1) : post.images).map((uri, index) => (
             <FadeInView key={`${index}:${uri}`} delay={entranceDelay(6 + index)}>
               <Image source={{ uri: sized(uri, 400) }} style={styles.image} resizeMode="contain" accessibilityLabel={post.title} />
             </FadeInView>
@@ -297,6 +302,7 @@ const styles = themedStyles(() => ({
   eventLabel: { ...typography.caption, color: colors.textMuted, textAlign: textStart },
   eventValue: { ...typography.body, fontFamily: fonts.medium, color: colors.textPrimary, textAlign: textStart },
   // `contain`: a flyer or a logo keeps its text; the box colour fills the sides.
+  cover: { width: '100%', aspectRatio: 16 / 9, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   image: { width: '100%', height: 240, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated },
   video: { borderRadius: radii.lg, overflow: 'hidden', backgroundColor: colors.surfaceElevated },
   videoImage: { width: '100%', height: 200 },

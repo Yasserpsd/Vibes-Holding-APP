@@ -64,7 +64,7 @@ function AudienceReach({ audience }: { audience: PostAudience }) {
   return <p className="reach" aria-live="polite">{reach.members === null ? devices : `الحسابات التي تصلها الرسالة: ${formatNumber(reach.members)} · ${devices}`}</p>;
 }
 /** One row of the progress list. A failed row stays, with the reason, until the owner hides it. */
-type Pending = { id: number; name: string; kind: UploadKind; progress: number; error: string | null };
+type Pending = { id: number; name: string; kind: UploadKind | 'cover'; progress: number; error: string | null };
 
 const MAX_IMAGES = 10;
 const POSTER_UPLOAD_TIMEOUT_MS = 30_000;
@@ -214,7 +214,13 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
   const [enBody, setEnBody] = useState(post?.en?.body ?? '');
   const [links, setLinks] = useState<PostLink[]>(post?.links ?? []);
   // Uploaded images and pasted links live side by side: both are just URLs, in display order.
-  const [images, setImages] = useState<string[]>(post?.images ?? []);
+  // M278: the cover is its own field. An older post (no `cover` key) showed its first image as the cover, so it opens that way.
+  const legacy = post !== null && post !== undefined && post.cover === undefined;
+  const [cover, setCover] = useState<string | null>(legacy ? (post.images[0] ?? null) : (post?.cover ?? null));
+  const [coverNote, setCoverNote] = useState<string | null>(null);
+  const [coverDrag, setCoverDrag] = useState(false);
+  const coverInput = useRef<HTMLInputElement>(null);
+  const [images, setImages] = useState<string[]>(legacy ? post.images.slice(1) : (post?.images ?? []));
   const [videoFile, setVideoFile] = useState<PostVideo | null>(post?.video ?? null);
   // The server stores the YouTube id and accepts a bare id back, so an edit starts from it.
   const [video, setVideo] = useState(post?.youtubeId ?? '');
@@ -274,7 +280,8 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
 
   const pendingImages = uploads.filter((item) => item.kind === 'image' && !item.error).length;
   const pendingVideo = uploads.some((item) => item.kind === 'video' && !item.error);
-  const uploading = pendingImages > 0 || pendingVideo;
+  const pendingCover = uploads.some((item) => item.kind === 'cover' && !item.error);
+  const uploading = pendingImages > 0 || pendingVideo || pendingCover;
   const room = MAX_IMAGES - images.length - pendingImages;
 
   const patchUpload = (id: number, patch: Partial<Pending>) => setUploads((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -287,7 +294,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     dropUpload(id);
   };
 
-  function enqueue(file: File, kind: UploadKind) {
+  function enqueue(file: File, kind: Pending['kind']) {
     const id = nextId.current++;
     const controller = new AbortController();
     controllers.current.set(id, controller);
@@ -328,6 +335,26 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
       }
     });
     await imageChain.current;
+  }
+
+  /** M278: one cover; a new pick replaces it. */
+  async function addCover(picked: File) {
+    const file = typedFile(picked);
+    const problem = fileProblem(file, config.images);
+    setCoverNote(problem);
+    if (problem) return;
+    const { id, signal } = enqueue(file, 'cover');
+    const done = await send(id, file, signal);
+    if (!done) return;
+    dropUpload(id);
+    setCover(done.url);
+  }
+
+  /** A content picture becomes the cover; the old cover takes its place among the pictures. */
+  function makeCover(index: number) {
+    const picked = images[index];
+    setImages(cover ? images.map((url, at) => (at === index ? cover : url)) : images.filter((_, at) => at !== index));
+    setCover(picked ?? null);
   }
 
   async function addVideo(picked: File) {
@@ -422,7 +449,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     // The hour is Riyadh time, where the club's events happen; a day alone stays a day.
     const eventInput: PostEvent | null = kind === 'event' ? { date: eventTime ? `${eventDay}T${eventTime}:00+03:00` : eventDay, place: place.trim(), onlineUrl: onlineUrl.trim() || null } : null;
     const pollInput: PostPollInput | null = kind === 'poll' ? { options: cleanOptions, closesAt: pollDay ? (pollTime ? `${pollDay}T${pollTime}:00+03:00` : pollDay) : null, resultsVisible } : null;
-    const input: PostInput = { title: title.trim(), body: body.trim(), english: enTitle.trim() || enBody.trim() ? { title: enTitle.trim(), body: enBody.trim() } : null, links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), images: allImages, video: video.trim() || null, videoFile, status, pinned: kind === 'popup' ? false : pinned, kind, event: eventInput, poll: pollInput, popup: kind === 'popup' ? { until: popupDay || null } : null, audience };
+    const input: PostInput = { title: title.trim(), body: body.trim(), english: enTitle.trim() || enBody.trim() ? { title: enTitle.trim(), body: enBody.trim() } : null, links: cleanLinks.map((link) => ({ label: link.label.trim(), url: link.url.trim() })), cover, images: allImages, video: video.trim() || null, videoFile, status, pinned: kind === 'popup' ? false : pinned, kind, event: eventInput, poll: pollInput, popup: kind === 'popup' ? { until: popupDay || null } : null, audience };
     setBusy(true);
     setError(null);
     try {
@@ -436,7 +463,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
 
   const setLink = (index: number, patch: Partial<PostLink>) => setLinks(links.map((link, at) => (at === index ? { ...link, ...patch } : link)));
 
-  const progressRows = (kind: UploadKind) => {
+  const progressRows = (kind: Pending['kind']) => {
     const rows = uploads.filter((item) => item.kind === kind);
     if (rows.length === 0) return null;
     return (
@@ -470,7 +497,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
         <strong>{post ? 'تعديل أداة تواصل' : 'أداة تواصل جديدة'}</strong>
         <button className="link" type="button" onClick={() => onClose(null)}>رجوع بدون حفظ</button>
       </header>
-      <div className="page">
+      <div className="page editor-layout">
         <form className="card editor" onSubmit={(event) => void save(event, post?.status ?? 'draft')}>
           <fieldset>
             <legend>نوع الأداة</legend>
@@ -489,7 +516,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                   يظهر حتى يوم (اختياري)
                   <input type="date" dir="ltr" value={popupDay} onChange={(e) => setPopupDay(e.target.value)} />
                 </label>
-                <p className="muted hint">يظهر البوب أب مرة واحدة لكل عضو عند فتح التطبيق: العنوان والنص، وأول صورة، وأول رابط كزر. لا يُرسل معه إشعار ولا يظهر في المواقع. بدون تاريخ يبقى حتى تلغي نشره.</p>
+                <p className="muted hint">يظهر البوب أب مرة واحدة لكل عضو عند فتح التطبيق: العنوان والنص، وصورة الغلاف، وأول رابط كزر. لا يُرسل معه إشعار ولا يظهر في المواقع. بدون تاريخ يبقى حتى تلغي نشره.</p>
               </>
             ) : null}
             {kind === 'poll' ? (
@@ -599,6 +626,36 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             </fieldset>
           ) : null}
 
+          {/* M278: the cover is what members see first — on the card, at the top of the page and in the notification. */}
+          <fieldset className="cover-zone">
+            <legend>صورة الغلاف <span className="cover-tag">تظهر للأعضاء</span></legend>
+            <div
+              className={coverDrag ? 'cover-drop over' : 'cover-drop'}
+              onDragOver={(e) => { e.preventDefault(); setCoverDrag(true); }}
+              onDragLeave={() => setCoverDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setCoverDrag(false); const dropped = e.dataTransfer.files?.[0]; if (dropped) void addCover(dropped); }}
+            >
+              {cover ? (
+                <img src={cover} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                <button type="button" className="cover-empty" onClick={() => coverInput.current?.click()}>
+                  <strong>اختر صورة الغلاف أو اسحبها هنا</strong>
+                  <span className="muted">صورة عريضة بمقاس 16:9 تبدو أجمل</span>
+                </button>
+              )}
+            </div>
+            <input ref={coverInput} type="file" accept="image/*" hidden onChange={(e) => { const picked = e.target.files?.[0]; e.target.value = ''; if (picked) void addCover(picked); }} />
+            {progressRows('cover')}
+            {coverNote ? <p className="error" role="alert">{coverNote}</p> : null}
+            {cover ? (
+              <div className="actions">
+                <button type="button" onClick={() => coverInput.current?.click()}>تغيير الغلاف</button>
+                <button className="link" type="button" onClick={() => setCover(null)}>إزالة الغلاف</button>
+              </div>
+            ) : null}
+            <p className="muted hint">يظهر في قائمة التطبيق، وأعلى صفحة الأداة، وفي الإشعار. صور المحتوى تُضاف في قسم «صور داخل المحتوى».</p>
+          </fieldset>
+
           <label>
             العنوان
             <input value={title} maxLength={140} onChange={(e) => setTitle(e.target.value)} required />
@@ -642,7 +699,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
           {!config.durable ? <p className="warn">تنبيه: الملفات المرفوعة في هذه البيئة مؤقتة، وتختفي مع أول تحديث للخادم.</p> : null}
 
           <fieldset>
-            <legend>الصور ({images.length} من {MAX_IMAGES})</legend>
+            <legend>صور داخل المحتوى ({images.length} من {MAX_IMAGES})</legend>
             {images.length > 0 ? (
               <ul className="thumbs">
                 {images.map((url, index) => (
@@ -652,6 +709,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                     {/* Arrows are not mirrored by the browser: under RTL the earlier slot is to the right. */}
                     <div className="thumb-actions">
                       <button type="button" aria-label="تقديم الصورة" title="تقديم" disabled={index === 0} onClick={() => moveImage(index, -1)}>→</button>
+                      <button type="button" aria-label="اجعلها الغلاف" title="اجعلها الغلاف" onClick={() => makeCover(index)}>★</button>
                       <button type="button" aria-label="إزالة الصورة" title="إزالة" onClick={() => setImages(images.filter((_, at) => at !== index))}>✕</button>
                       <button type="button" aria-label="تأخير الصورة" title="تأخير" disabled={index === images.length - 1} onClick={() => moveImage(index, 1)}>←</button>
                     </div>
@@ -698,7 +756,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                 <button className="link" type="button" onClick={() => setLinkDraft(null)}>إلغاء</button>
               </div>
             ) : null}
-            <p className="muted hint">حتى {MAX_IMAGES} صور، وحجم الصورة حتى {megabytes(config.images.maxBytes)} ميجابايت ({typeNames(config.images.types)}).</p>
+            <p className="muted hint">تظهر تحت النص بالترتيب، و★ تجعل الصورة غلافًا. حتى {MAX_IMAGES} صور، وحجم الصورة حتى {megabytes(config.images.maxBytes)} ميجابايت ({typeNames(config.images.types)}).</p>
           </fieldset>
 
           <fieldset hidden={kind === 'popup'}>
@@ -764,7 +822,45 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             )}
           </div>
         </form>
+        <PhonePreview kind={kind} title={title} body={body} cover={cover} images={images} eventDay={eventDay} place={place} options={pollOptions.map((option) => option.label)} />
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL: Record<PostKind, string> = { post: 'رسالة الإدارة', event: 'فعالية', poll: 'استفتاء', popup: 'بوب أب' };
+const dayMonth = new Intl.DateTimeFormat('ar-u-nu-latn-ca-gregory', { day: 'numeric', month: 'long' });
+
+/** M278: a live sketch of how the member sees the tool in the app, while it is being written. */
+function PhonePreview({ kind, title, body, cover, images, eventDay, place, options }: { kind: PostKind; title: string; body: string; cover: string | null; images: string[]; eventDay: string; place: string; options: string[] }) {
+  const day = kind === 'event' && /^\d{4}-\d{2}-\d{2}$/.test(eventDay) ? dayMonth.formatToParts(new Date(`${eventDay}T12:00:00`)) : null;
+  const choices = options.map((label) => label.trim()).filter(Boolean);
+  return (
+    <aside className="phone-preview" aria-label="معاينة في التطبيق">
+      <p className="muted">معاينة حيّة كما يراها العضو</p>
+      <div className="phone">
+        <div className="phone-cover">
+          {cover ? <img src={cover} alt="" referrerPolicy="no-referrer" /> : <span className="muted">بدون غلاف</span>}
+          <span className="kind-tag">{KIND_LABEL[kind]}</span>
+          {day ? (
+            <span className="date-chip">
+              <b>{day.find((part) => part.type === 'day')?.value}</b>
+              <small>{day.find((part) => part.type === 'month')?.value}</small>
+            </span>
+          ) : null}
+        </div>
+        <div className="phone-body">
+          <strong dir="auto">{title.trim() || 'عنوان الأداة'}</strong>
+          {kind === 'event' && place.trim() ? <span className="muted">{place.trim()}</span> : null}
+          <p dir="auto">{body.trim() ? body.trim().slice(0, 160) + (body.trim().length > 160 ? '…' : '') : 'نص الرسالة يظهر هنا'}</p>
+          {kind === 'poll' && choices.length > 0 ? (
+            <ul className="phone-options">{choices.map((label, index) => <li key={index} dir="auto">{label}</li>)}</ul>
+          ) : null}
+          {images.length > 0 ? (
+            <div className="phone-images">{images.slice(0, 3).map((url, index) => <img key={`${index}:${url}`} src={url} alt="" referrerPolicy="no-referrer" />)}</div>
+          ) : null}
+        </div>
+      </div>
+    </aside>
   );
 }

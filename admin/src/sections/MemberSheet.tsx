@@ -397,7 +397,7 @@ function PrivateMessage({ account }: { account: Account }) {
     setError(null);
     setSent(null);
     try {
-      await api.createPost({ title: title.trim(), body: body.trim(), links: [], images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, poll: null, audience: { type: 'member', contactId: account.id, name: account.name } });
+      await api.createPost({ title: title.trim(), body: body.trim(), links: [], cover: null, images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, poll: null, audience: { type: 'member', contactId: account.id, name: account.name } });
       setOpen(false);
       setTitle('');
       setBody('');
