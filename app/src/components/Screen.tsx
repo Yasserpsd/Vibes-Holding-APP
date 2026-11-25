@@ -149,12 +149,18 @@ export function useFieldScroller(scrollRef: RefObject<ScrollView | null>) {
   return { field, scrollProps: { onScroll, onLayout, scrollEventThrottle: 32, scrollsChildToFocus: false } };
 }
 
+/** The longest subtitle (in characters) still written on the page photograph: about two lines. */
+const SUBTITLE_ON_PHOTO = 96;
+
 /** Scrollable screen with keyboard handling, used by forms and detail pages. */
 export function Screen({ title, subtitle, children, refreshControl, edges = ['top'], aboveTabBar = false, watermark = false, scrollRef, photo = true }: Props) {
   // M270 (owner, on the gate's photograph: «عايز كله يكون كده… نفس الفكرة دي كل الصفحات»): the heading of every
   // titled page is a photograph of the club that melts into the page, each page its own picture.
   const pagePhotos = usePagePhotos();
   const heroPhoto = title && photo ? pagePhotoOf(pagePhotos, title) : null;
+  // A subtitle that is a whole paragraph (the HQ page) cannot be read over a picture: only a short line is written
+  // on the photograph, a longer one follows under it in the page's own colours (seen on the emulator).
+  const subtitleOnPhoto = Boolean(subtitle) && (subtitle?.length ?? 0) <= SUBTITLE_ON_PHOTO;
   // The bottom padding keeps the last element clear of the floating «اسأل المستشار» button. Without a tab bar or
   // a bottom safe-area edge under it, the scroll view runs to the physical bottom edge and the inset counts too.
   const clearance = useAskAdvisorClearance(aboveTabBar || edges.includes('bottom'));
@@ -194,10 +200,11 @@ export function Screen({ title, subtitle, children, refreshControl, edges = ['to
                 <View style={[styles.heroFill, styles.heroScrim]} />
                 <View style={styles.heroTexts}>
                   <Text style={styles.heroTitle}>{title}</Text>
-                  {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
+                  {subtitleOnPhoto ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
                   <GoldHairline style={styles.hairline} />
                 </View>
               </View>
+              {subtitle && !subtitleOnPhoto ? <Text style={[styles.subtitle, styles.subtitleUnder]}>{subtitle}</Text> : null}
             </FadeInView>
           ) : title ? (
             <FadeInView key="plain-heading" offset={10} duration={360}>
@@ -243,4 +250,5 @@ const styles = themedStyles(() => ({
   heroTexts: { paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm, gap: spacing.xs },
   heroTitle: { ...typography.title, color: colors.onPhotoGold, textAlign: textStart },
   heroSubtitle: { ...typography.body, color: colors.onPhoto, textAlign: textStart },
+  subtitleUnder: { marginTop: spacing.md },
 }));
