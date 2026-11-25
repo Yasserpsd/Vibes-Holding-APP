@@ -36,7 +36,7 @@ const FILTERS: { value: AccountFilter; label: string }[] = [
   { value: 'all', label: 'الكل' },
   { value: 'registered', label: 'الحسابات المسجّلة' },
   { value: 'member', label: 'أعضاء مشتركون' },
-  { value: 'unpaid', label: 'لم يدفعوا بعد' },
+  { value: 'unpaid', label: 'لم يدفع' },
   { value: 'pending', label: 'بانتظار تأكيد البريد' },
   { value: 'expired', label: 'انتهت عضويتهم' },
   { value: 'publisher', label: 'موديريتور' },
@@ -46,7 +46,7 @@ const FILTERS: { value: AccountFilter; label: string }[] = [
 
 const STATES: Record<Account['state'], { label: string; tone: Tone }> = {
   member: { label: 'عضو مشترك', tone: 'gold' },
-  unpaid: { label: 'لم يدفع بعد', tone: 'muted' },
+  unpaid: { label: 'لم يدفع', tone: 'muted' },
   pending: { label: 'بانتظار تأكيد البريد', tone: 'muted' },
   expired: { label: 'انتهت العضوية', tone: 'danger' },
   lead: { label: 'عميل محتمل', tone: 'muted' },
