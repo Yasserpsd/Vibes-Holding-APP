@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Animated, Platform, StyleSheet, Text, View, type ColorValue } from 'react-native';
 
+import { useAuth } from '@/auth/AuthProvider';
 import { AdvisorDockButton, useAskAdvisor, useCurrentAdvisorContext } from '@/components/advisor/AskAdvisor';
 import { NeonPulse } from '@/components/lux';
 import { PopIn } from '@/components/motion';
@@ -84,10 +85,25 @@ export default function TabsLayout() {
   const advisorContext = useCurrentAdvisorContext();
   // M99: the persona decides the bar — a hidden tab leaves it (its screen stays reachable by path).
   const hiddenTabs = useHiddenTabs();
+  // 2026-11-25 (Android «addViewAt… The specified child already has a parent»): a sign-out or a sign-in REBUILDS the
+  // tabs instead of re-sorting them. The persona orders the home blocks, the service grid, the meetups strip and
+  // this bar, so the account change moved views that were already on screen; when the session was refused while
+  // the app was paused (in the background, or under the system's notification prompt) the move was mounted together
+  // with the removal of this screen for the gate, and Android refused it — a crash on the way back to the app. New
+  // views are never moved. The number changes in the same render as the status (no commit in between), and never
+  // for the first answer of a launch («loading» → …), so an ordinary start draws once.
+  const { status } = useAuth();
+  const [seenStatus, setSeenStatus] = useState(status);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  if (seenStatus !== status) {
+    setSeenStatus(status);
+    if (seenStatus !== 'loading' && status !== 'loading') setSessionEpoch((epoch) => epoch + 1);
+  }
   const badgeOf = (name: string): number =>
     name === 'news' ? badges.inbox : name === 'projects' ? badges.projects : name === 'index' ? badges.home : name === 'account' ? badges.account : 0;
   return (
     <Tabs
+      key={sessionEpoch}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.black },
