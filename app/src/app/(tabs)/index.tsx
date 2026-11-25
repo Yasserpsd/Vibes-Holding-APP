@@ -8,7 +8,7 @@ import { useAgenda } from '@/api/agenda';
 import { displayProfile } from '@/api/auth';
 import { useHomeContent, useMeetupsContent, useServices, type HomeContent, type HomePortal, type HomeCta, type HomeSectionKey, type PortalKey } from '@/api/content';
 import { useHq } from '@/api/hq';
-import { launchStart, useAppImages, usePhotoSet } from '@/api/images';
+import { launchStart, useAppImages, usePhotoSetOrStandin } from '@/api/images';
 import { usePartners, type Partner } from '@/api/partners';
 import { usePeople } from '@/api/people';
 import { useLatestPosts } from '@/api/posts';
@@ -431,8 +431,11 @@ export default function HomeScreen() {
       {/* M102 (owner, third ask): the image at the very top is the CLUB HQ photo, never the podcast
           banner — the first HQ-gallery photo leads; the home.banner slot only fills an empty gallery.
           M270 (owner: «في فولدر اسمه Banner كله بنرات ممتازة… وزعها»): the club's moving banners take this
-          spot when the owner filled them — each one opens its own screen; the HQ photo stays the fallback. */}
-      <HomeSlides />
+          spot when the owner filled them — each one opens its own screen; the HQ photo stays the fallback.
+          Owner, the same night, on a banner standing right above the membership photo card (2026-11-25: «شيل دي يا
+          غالي كفاية اللي تحتها ممتازة جدا»): a signed-in visitor who has not subscribed opens on that card alone, so
+          the two pictures never stack; a guest and a subscribed member, who have no such card, keep the banners. */}
+      {signedIn && me && me.membership.status !== 'active' ? null : <HomeSlides />}
 
       {/* M262 (owner): the member's next HQ booking, with its entry pass — only when one is ahead. */}
       <NextVisitCard />
@@ -489,6 +492,9 @@ function HqBanner() {
   const router = useRouter();
   const photos = useHq().data?.photos ?? [];
   // M127: a different HQ photo each app open (same one for the whole session).
+  // Owner, on a wordless hall photograph standing alone above the membership card (2026-11-25: «الصورة دي ملهاش
+  // داعي خالص شيلها»): no stand-in here — this spot shows a picture only when it has something to say (a lettered
+  // banner) or the owner's own HQ gallery.
   const photo = photos.length > 0 ? photos[Math.floor(HQ_BANNER_DRAW * photos.length) % photos.length] : null;
   if (!photo) return <SlotBanner slot="home.banner" />;
   return (
@@ -657,7 +663,7 @@ function MembershipTeaserCard({ block, onPress }: { block: HomeContent['membersh
 
 /** M270: the entrepreneur's second door wears its own photographs once the owner filled the set; the gold bar until then. */
 function AppPublishDoor({ onPress }: { onPress: () => void }) {
-  const photos = usePhotoSet('home.card.app-publish');
+  const photos = usePhotoSetOrStandin('home.card.app-publish');
   if (photos.length) return <PhotoDoorCard photos={photos} title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={onPress} />;
   return <GoldDoorCard icon="phone-portrait-outline" title={t('home.appPublish')} hint={t('home.appPublishHint')} onPress={onPress} />;
 }

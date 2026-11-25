@@ -11,7 +11,11 @@ fs.mkdirSync(out, { recursive: true });
 fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true });
 const pick = (dir, prefix) => path.join(dir, fs.readdirSync(dir).find((f) => f.startsWith(prefix)));
 
+const fresh = path.join(root, 'صور جديدة مميزة');
 const SRC = {
+  n1: pick(fresh, 'Artistic_architectural_and_human'), n2: pick(fresh, 'Cinematic_luxury'), n3: pick(fresh, 'Dramatic_evening'), n4: pick(fresh, 'Exquisite_luxury_detail'),
+  n5: pick(fresh, 'Extraordinary_editorial'), n6: pick(fresh, 'Highly_artistic'), n7: pick(fresh, 'Iconic_frame'), n8: pick(fresh, 'Immersive_first-person'),
+  n9: pick(fresh, 'Intimate_candid'), n10: pick(fresh, 'The_ultimate_signature'),
   b1: pick(banner, 'Authentic'), b2: pick(banner, 'Definitive'), b3: pick(banner, 'International'), b4: pick(banner, 'Luxury'),
   b5: pick(banner, 'Premium_business-travel'), b6: pick(banner, 'Premium_technology'), b7: pick(banner, 'Ultra'),
   m3: pick(root, 'Breathtaking'), m6: pick(root, 'Extraordinary_vertical'), m10: pick(root, 'The_most'), m11: pick(root, 'Visually'),
@@ -45,15 +49,25 @@ const ITEMS = [
   { name: 'card-app-screens', from: 'm6', width: 1280, crop: { ratio: 16 / 9, y0: 36 }, slots: ['home.card.app-publish.1'] },
   // The HQ: the membership benefit cards, the HQ gallery, two home banners and the services held in the hall.
   { name: 'hq-hall-evening', from: 'hallWide', width: 1280, crop: { ratio: 16 / 9, y0: 10 }, slots: ['membership.photo.1', 'hq', 'service.theater', 'service.meetup', 'auth.photo.5', 'page.photo.1'] },
-  { name: 'hq-investor-seat', from: 'chair', width: 1280, crop: { ratio: 16 / 9, y0: 1 }, slots: ['membership.photo.2', 'hq', 'service.hq-visit', 'home.slide.hq.2', 'page.photo.2'] },
-  { name: 'hq-hall-symmetry', from: 'hallSym', width: 1280, crop: { ratio: 16 / 9, y0: 0 }, slots: ['membership.photo.3', 'hq', 'service.theater', 'service.hq-visit', 'home.slide.hq.1', 'auth.photo.4', 'page.photo.3'] },
+  { name: 'hq-investor-seat', from: 'chair', width: 1280, crop: { ratio: 16 / 9, y0: 1 }, slots: ['membership.photo.2', 'hq', 'service.hq-visit', 'page.photo.2'] },
+  { name: 'hq-hall-symmetry', from: 'hallSym', width: 1280, crop: { ratio: 16 / 9, y0: 0 }, slots: ['membership.photo.3', 'hq', 'service.theater', 'service.hq-visit', 'auth.photo.4', 'page.photo.3'] },
   { name: 'hq-meetup-audience', from: 'crowd', width: 1280, crop: { ratio: 16 / 9, y0: 36 }, slots: ['membership.photo.4', 'hq', 'service.meetup', 'service.workshop', 'page.photo.4'] },
   { name: 'hq-seat-embroidery', from: 'macro', width: 1280, crop: { ratio: 16 / 9, y0: 22 }, slots: ['membership.photo.5', 'hq', 'service.hq-visit', 'page.photo.5'] },
   { name: 'hq-hall-aisle', from: 'aisle', width: 1280, crop: { ratio: 16 / 9, y0: 50 }, slots: ['membership.photo.6', 'hq', 'service.theater', 'page.photo.6'] },
   // Upright cuts for the entry screens (the gate shows them tall, edge to edge).
-  { name: 'auth-investor-seat', from: 'chair', width: 1080, crop: { ratio: 4 / 5, y0: 0 }, slots: ['auth.photo.1'] },
   { name: 'auth-hall-rows', from: 'hallTall', width: 1080, crop: { ratio: 4 / 5, y0: 30 }, slots: ['auth.photo.2'] },
   { name: 'auth-hall-aisle', from: 'aisle', width: 1080, crop: { ratio: 4 / 5, y0: 30 }, slots: ['auth.photo.3'] },
+  // The second batch (owner, 2026-11-25: «صورة جديدة استخدمها برده… كلها مقاس واحد بحيث تقدر توزعها»): people in the hall.
+  { name: 'life-two-members-talking', from: 'n1', width: 1280, slots: ['page.photo.8', 'membership.photo.8', 'hq', 'service.meetup'] },
+  { name: 'life-entering-the-hall', from: 'n2', width: 1280, slots: ['page.photo.9', 'service.hq-visit'] },
+  { name: 'life-hall-evening-wide', from: 'n3', width: 1280, slots: ['auth.photo.1', 'service.theater'] },
+  { name: 'life-seat-detail', from: 'n4', width: 1280, slots: ['hq'] },
+  { name: 'life-behind-the-glass', from: 'n5', width: 1280, slots: ['page.photo.10', 'service.hq-visit'] },
+  { name: 'life-hall-architecture', from: 'n6', width: 1280, slots: ['service.theater'] },
+  { name: 'life-facing-the-hall', from: 'n7', width: 1280, slots: ['auth.photo.6'] },
+  { name: 'life-coffee-and-notes', from: 'n8', width: 1280, slots: ['service.consultation', 'service.workshop'] },
+  { name: 'life-three-in-conversation', from: 'n9', width: 1280, slots: ['page.photo.11', 'home.card.success-partners.4', 'service.meetup', 'service.workshop'] },
+  { name: 'life-member-portrait', from: 'n10', width: 1280, slots: ['page.photo.12'] },
   { name: 'hq-hall-rows', from: 'hallTall', width: 1280, crop: { ratio: 16 / 9, y0: 52 }, slots: ['membership.photo.7', 'hq', 'service.workshop', 'page.photo.7'] },
 ];
 

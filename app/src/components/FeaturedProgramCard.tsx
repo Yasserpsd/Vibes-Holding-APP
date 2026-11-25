@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Text, View } from 'react-native';
 
 import type { Service } from '@/api/content';
-import { usePhotoSet } from '@/api/images';
+import { usePhotoSetOrStandin } from '@/api/images';
 import { FadingPhotos } from '@/components/FadingPhotos';
 import { GoldGradient } from '@/components/lux';
 import { PressScale } from '@/components/motion';
@@ -26,7 +26,7 @@ import { colors, fonts, gradients, radii, shadows, spacing } from '@/theme/token
  */
 export function FeaturedProgramCard({ service, onPress }: { service: Service; onPress: () => void }) {
   const program = service.program;
-  const photos = usePhotoSet(`home.card.${service.key}`);
+  const photos = usePhotoSetOrStandin(`home.card.${service.key}`);
   const tagline = program?.tagline ?? service.summary;
   return (
     <PressScale onPress={onPress} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={service.title}>

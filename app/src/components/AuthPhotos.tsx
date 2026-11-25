@@ -32,13 +32,24 @@ const HERO_SHARE = 0.56;
  * The gate's photograph: it fills the top of the screen edge to edge, changes on its own, and melts into the
  * screen's own background before the buttons start — so the words under it stay on the theme's colours and read
  * the same in the dark and the light theme. Absolutely placed: the gate lays its content over it.
+ *
+ * `logoTop` / `logoHeight` (window points) say where the gate's logo sits. The quick-entry gate (M272) is taller than
+ * the one the first fade was drawn for, so its logo climbed onto the clear part of the picture. The rule now, seen
+ * right on the emulator: the picture fills whatever room is ABOVE the logo and melts behind the logo's upper half,
+ * however tall the content is; until the gate has measured itself the first gate's share stands in.
  */
-export function AuthHero({ photos }: { photos: string[] }) {
+export function AuthHero({ photos, logoTop, logoHeight = 0 }: { photos: string[]; logoTop?: number; logoHeight?: number }) {
   const { height, width } = useWindowDimensions();
+  // Measured: the picture ends behind the lower half of the logo. Not yet measured: the share the first gate used.
+  const heroHeight = logoTop === undefined ? Math.round(height * HERO_SHARE) : Math.max(Math.round(height * 0.2), Math.round(logoTop + logoHeight * 0.62));
+  const clearUntil = logoTop === undefined ? 0.42 : Math.min(0.9, Math.max(0.3, (logoTop - 16) / heroHeight));
+  const percent = (value: number) => `${Math.round(value * 100)}%`;
+  // A light shade at the very top for the status bar, the picture clear down to the logo, then it melts into the screen.
+  const fade = `linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.06) ${percent(clearUntil * 0.6)}, ${withAlpha(colors.black, 0.1)} ${percent(clearUntil)}, ${withAlpha(colors.black, 0.86)} ${percent(clearUntil + (1 - clearUntil) * 0.66)}, ${colors.black} 100%)`;
   return (
-    <View style={[styles.hero, { height: Math.round(height * HERO_SHARE) }]} pointerEvents="none">
+    <View style={[styles.hero, { height: heroHeight }]} pointerEvents="none">
       <FadingPhotos urls={photos} points={width} />
-      <View style={[styles.fill, { experimental_backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.06) 26%, ${withAlpha(colors.black, 0)} 42%, ${withAlpha(colors.black, 0.86)} 80%, ${colors.black} 100%)` }]} />
+      <View style={[styles.fill, { experimental_backgroundImage: fade }]} />
     </View>
   );
 }

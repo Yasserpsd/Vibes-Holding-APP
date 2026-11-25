@@ -1,7 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authApi, useAuthConfig } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -64,6 +64,9 @@ export default function WelcomeScreen() {
   const [busy, setBusy] = useState(false);
   const typing = useKeyboardOpen();
   const scroll = useRef<ScrollView>(null);
+  // Where the logo starts on the screen: the photograph behind stays clear above it and darkens from there.
+  const insets = useSafeAreaInsets();
+  const [logoY, setLogoY] = useState<number | undefined>(undefined);
 
   if (!locked) return <Redirect href="/" />;
 
@@ -103,7 +106,7 @@ export default function WelcomeScreen() {
 
   return (
     <GoldGradient variant="screen" style={styles.backdrop}>
-      {photos.length ? <AuthHero photos={photos} /> : null}
+      {photos.length ? <AuthHero photos={photos} logoTop={logoY === undefined ? undefined : logoY + insets.top} logoHeight={quick ? 150 : 190} /> : null}
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView style={styles.safeArea} behavior="padding">
           <ScrollView
@@ -116,9 +119,12 @@ export default function WelcomeScreen() {
             onContentSizeChange={() => (typing ? scroll.current?.scrollToEnd({ animated: false }) : undefined)}
             onLayout={() => (typing ? scroll.current?.scrollToEnd({ animated: false }) : undefined)}
           >
-            <FadeInView delay={entranceDelay(0)} style={styles.hero}>
-              <Image source={clubLogo} style={styles.logo} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
-            </FadeInView>
+            <View onLayout={(event) => setLogoY(Math.round(event.nativeEvent.layout.y))}>
+              <FadeInView delay={entranceDelay(0)} style={styles.hero}>
+                {/* The field and its button need the room: the logo is a size smaller on the quick-entry gate. */}
+                <Image source={clubLogo} style={[styles.logo, quick ? styles.logoCompact : null]} resizeMode="contain" accessibilityLabel={t('common.clubName')} />
+              </FadeInView>
+            </View>
             <FadeInView delay={entranceDelay(2)}>
               <Text style={styles.subtitle}>{t(quick ? 'quick.subtitle' : 'welcome.subtitle')}</Text>
             </FadeInView>
@@ -210,6 +216,7 @@ const styles = themedStyles(() => ({
   contentLow: { justifyContent: 'flex-end' },
   hero: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   logo: { width: 230, height: 190 },
+  logoCompact: { width: 182, height: 150 },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   actions: { gap: spacing.sm + 4, marginTop: spacing.md },
   divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

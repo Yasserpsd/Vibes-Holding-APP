@@ -4,7 +4,7 @@ import { Image, ScrollView, Text, View } from 'react-native';
 
 import { useMembershipContent, type MembershipGroup } from '@/api/auth';
 import { useHq } from '@/api/hq';
-import { launchStart, usePhotoSet } from '@/api/images';
+import { launchStart, PAGE_STANDIN, usePhotoSet } from '@/api/images';
 import { useAuth } from '@/auth/AuthProvider';
 import { GlassCard, GoldGradient } from '@/components/lux';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
@@ -39,7 +39,7 @@ export function MembershipBenefitsBlock() {
   const { data } = useMembershipContent();
   const own = usePhotoSet('membership.photo');
   const hq = useHq().data?.photos;
-  const photos = own.length ? own : (hq ?? []);
+  const photos = own.length ? own : hq?.length ? hq : PAGE_STANDIN;
   const groups = (data?.groups ?? []).filter((group) => !group.comingSoon && group.items.length > 0);
   if (!groups.length) return null;
   const first = launchStart(photos.length);

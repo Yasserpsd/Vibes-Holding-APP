@@ -42,6 +42,15 @@ export const PAGE_STANDIN = bundled(require('../../assets/images/photo-page.webp
 /** The investor's seat, upright — behind the gate. */
 export const GATE_STANDIN = bundled(require('../../assets/images/photo-gate.webp'));
 
+/**
+ * The same set, never empty: the bundled hall photograph stands in until the server's pictures arrive (owner, on a
+ * home that drew its cards without pictures against an empty server: «فين الشكل اللي اتفقنا عليه»).
+ */
+export function usePhotoSetOrStandin(key: string): string[] {
+  const own = usePhotoSet(key);
+  return own.length ? own : PAGE_STANDIN;
+}
+
 /** M270: the pictures of one photo set in slot order; empty until the owner fills it (or on an older server). */
 export function usePhotoSet(key: string): string[] {
   return useAppImages().data?.sets?.[key] ?? NONE;

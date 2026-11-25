@@ -3,11 +3,13 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, Text, View } from 'react-native';
 
+import { usePhotoSetOrStandin } from '@/api/images';
 import { useStoreConfig } from '@/api/membership';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppButton } from '@/components/AppButton';
+import { FadingPhotos } from '@/components/FadingPhotos';
 import { GlassCard, GoldGradient } from '@/components/lux';
-import { Floating, PopIn, PressScale } from '@/components/motion';
+import { PopIn, PressScale } from '@/components/motion';
 import { Notice } from '@/components/Notice';
 import { SarText } from '@/components/SarText';
 import { StoreLegalLinks, storePriceLabel } from '@/components/StorePurchaseCard';
@@ -26,7 +28,7 @@ import {
   type StoreOffer,
 } from '@/lib/purchases';
 import { themedStyles } from '@/theme/styles';
-import { colors, fonts, radii, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, fonts, gradients, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 /**
  * M120 (owner's TestFlight feedback, 2026-10-23): the subscribe path. One popup, opened the moment
@@ -325,6 +327,9 @@ export function MembershipHomeCard() {
   const nonMember = signedIn && me.membership.status !== 'active';
   const { data: config } = useStoreConfig(nonMember);
   const [loaded, setLoaded] = useState<LoadedOffer | null>(null);
+  // The club's own photographs, in the reverse order of the benefit cards right under this card, so the two never
+  // open on the same picture.
+  const photos = [...usePhotoSetOrStandin('membership.photo')].reverse();
   // This account's offer only (see MembershipGateHost): the price of an account that signed out is never shown.
   const offer = nonMember ? (loaded && loaded.contactId === me.id ? loaded.offer : config ? cachedMembershipOffer(config, me.id) : null) : null;
 
@@ -343,14 +348,13 @@ export function MembershipHomeCard() {
   if (!nonMember) return null;
   return (
     <PressScale onPress={showMembershipGate} glow glowRadius={radii.xl} accessibilityRole="button" accessibilityLabel={t('gate.activateNow')}>
-      <GlassCard golden radius={radii.xl} style={styles.homeCard}>
-        <Floating amplitude={2} duration={2600}>
-          <GoldGradient style={styles.homeIcon}>
-            <Ionicons name="ribbon" size={24} color={colors.goldInk} />
-          </GoldGradient>
-        </Floating>
-        <View style={styles.homeTexts}>
+      <View style={styles.homeCard}>
+        <View style={styles.homePhoto}>
+          <FadingPhotos urls={photos} points={360} />
+          <View style={styles.homeScrim} />
           <Text style={styles.homeTitle}>{t('gate.homeTitle')}</Text>
+        </View>
+        <View style={styles.homeBody}>
           <Text style={styles.homeSubtitle}>{t('gate.homeText')}</Text>
           {offer ? (
             <Text style={styles.homePrice}>
@@ -358,13 +362,14 @@ export function MembershipHomeCard() {
               <Text style={styles.homePeriod}>{` ${t('store.period', { store: storeName() })}`}</Text>
             </Text>
           ) : null}
+          <GoldGradient style={styles.homeCta}>
+            <Ionicons name="ribbon" size={18} color={colors.goldInk} />
+            <Text style={styles.homeCtaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {t('store.subscribe')}
+            </Text>
+          </GoldGradient>
         </View>
-        <GoldGradient style={styles.homeCta}>
-          <Text style={styles.homeCtaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-            {t('store.subscribe')}
-          </Text>
-        </GoldGradient>
-      </GlassCard>
+      </View>
     </PressScale>
   );
 }
@@ -393,28 +398,31 @@ const styles = themedStyles(() => ({
   error: { ...typography.caption, color: colors.danger, textAlign: 'center' },
   later: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xs },
   // The home card.
-  homeCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm },
-  homeIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: shadows.glowGold,
+  homeCard: {
+    marginTop: spacing.sm,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.surfaceElevated,
+    boxShadow: shadows.glowGoldFaint,
+    overflow: 'hidden',
   },
-  homeTexts: { flex: 1, gap: 2 },
-  homeTitle: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 23, color: colors.textPrimary, textAlign: textStart },
-  homeSubtitle: { ...typography.caption, color: colors.textSecondary, textAlign: textStart },
+  // The picture is dark in both themes, so the title on it uses the on-photo colour.
+  homePhoto: { width: '100%', aspectRatio: 2, backgroundColor: '#0B0B0E', justifyContent: 'flex-end' },
+  homeScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, experimental_backgroundImage: gradients.scrim },
+  homeBody: { padding: spacing.md, gap: spacing.sm },
+  homeTitle: { fontFamily: fonts.bold, fontSize: 21, lineHeight: 32, color: colors.onPhoto, textAlign: textStart, paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  homeSubtitle: { ...typography.body, color: colors.textSecondary, textAlign: textStart },
   homePrice: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: colors.goldText, textAlign: textStart, marginTop: 2 },
   homePeriod: { ...typography.caption, fontFamily: fonts.regular, color: colors.textSecondary },
   homeCta: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    boxShadow: shadows.glowGoldFaint,
-    // Emulator pass 2026-11-22: at 110 the English «Subscribe now» was cut to «Subscribe n…»; the label also
-    // shrinks a little before it is ever cut.
-    maxWidth: 150,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
   },
-  homeCtaText: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 20, color: colors.goldInk },
+  homeCtaText: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 25, color: colors.goldInk },
 }));
