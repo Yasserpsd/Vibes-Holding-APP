@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { adminGuard, dashboardGuard, guard, optionalSession, parse } from '../auth/guard.js';
 import { PERSONAS, type AuthService } from '../auth/service.js';
 import { firstName } from '../companion/tips.js';
+import { isActiveMember } from '../content/services.js';
 import { hubCall, type HubClient } from '../hub/types.js';
 import { langOf, type AppLang } from '../lang.js';
 import { MediaService } from '../media/service.js';
@@ -11,12 +12,13 @@ import type { PollsService, PollView } from '../polls/service.js';
 import type { PushService } from '../push/service.js';
 import type { SyncService } from '../sync/service.js';
 import type { WaDelivery } from '../whatsapp/service.js';
+import { accountInAudience } from '../whatsapp/tell.js';
 import type { PostsEnglish } from './english.js';
 import type { PostsHubSync } from './hubSync.js';
 import type { PostOpens } from './opens.js';
-import { audienceMemberIds, audienceOf, audienceSchema, canSee, InvalidVideoError, pollClosed, postInputSchema, postMediaUrls, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
+import { audienceFilter, audienceMemberIds, audienceOf, audienceSchema, canSee, fitsFilter, InvalidVideoError, pollClosed, postInputSchema, postMediaUrls, type AudienceFilter, type PaidState, type Post, type PostAudience, type PostInput, type PostsService, type PostViewer } from './service.js';
 
-export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string) => void; /** M251: the WhatsApp delivery of one message's notice, for the dashboard. */ delivery?: (postId: string) => Promise<WaDelivery>; /** M269: the reminder's WhatsApp half — starts in the background and says at once whether it started, is held for the night, or WhatsApp is off. */ remind?: (input: { uuid: string; persona: string | null; members: number[]; done: ReadonlySet<number>; ref: string }) => 'started' | 'night' | 'off' };
+export type PostsRoutesOptions = { /** M243: who opened each message (the dashboard's read stats). */ opens?: PostOpens; service: PostsService; auth: AuthService; hub: HubClient; polls: PollsService; push: PushService; media: MediaService; hubSync: PostsHubSync; sync: SyncService; autoPush?: boolean; english?: PostsEnglish; /** M235: a message addressed to ONE member is also announced on his WhatsApp. */ tellMember?: (contactId: number, ref: string) => void; /** M236: a message for everyone (persona null) or one category is announced to every account that fits. */ tellAudience?: (uuid: string, persona: string | null, ref: string, /** M273: only whoever paid / did not pay. */ paid?: PaidState | null) => void; /** M251: the WhatsApp delivery of one message's notice, for the dashboard. */ delivery?: (postId: string) => Promise<WaDelivery>; /** M269: the reminder's WhatsApp half — starts in the background and says at once whether it started, is held for the night, or WhatsApp is off. */ remind?: (input: { uuid: string; persona: string | null; paid?: PaidState | null; members: number[]; done: ReadonlySet<number>; ref: string }) => 'started' | 'night' | 'off' };
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -65,7 +67,8 @@ function publicPost(post: Post, lang: AppLang = 'ar') {
     kind: post.kind ?? 'post',
     event,
     // M238: a chosen list reads in the app exactly like a message for one member («لك خصيصًا»).
-    audience: audienceOf(post).type === 'members' ? 'member' : audienceOf(post).type,
+    // M273: a message for whoever paid / did not pay reads in the app like one for a category («لفئتك»).
+    audience: audienceOf(post).type === 'members' ? 'member' : audienceOf(post).type === 'paid' ? 'persona' : audienceOf(post).type,
   };
 }
 
@@ -81,6 +84,7 @@ const composeSchema = z.object({
   body: z.string().trim().min(1).max(6000),
   audience: audienceSchema,
 });
+const reachSchema = z.object({ audience: audienceSchema });
 const memberSearchSchema = z.object({ q: z.string().trim().min(2).max(120) });
 
 const voteSchema = z.object({ optionId: z.string().trim().min(1).max(40) });
@@ -95,7 +99,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   const viewerFrom = (current: Awaited<ReturnType<typeof maybeSession>>): PostViewer => {
     if (!current?.me) return null;
     const me = current.me;
-    return { contactId: me.id, persona: me.persona, honorary: me.membership.kind === 'honorary', name: firstName(me.name), nameEn: firstName(me.en?.name) };
+    return { contactId: me.id, persona: me.persona, honorary: me.membership.kind === 'honorary', paid: isActiveMember(me), name: firstName(me.name), nameEn: firstName(me.en?.name) };
   };
 
   /** M31: the post as the app reads it, with the poll block as THIS viewer may see it. */
@@ -120,10 +124,14 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   };
 
   /** How many registered devices the post's audience holds right now (M232: honorary members' devices never count). */
-  const audienceDevices = async (post: Post): Promise<number> => {
+  const audienceDevices = async (post: Pick<Post, 'audience'>, uuid: string, fresh = false): Promise<number> => {
     const audience = audienceOf(post);
     if (audience.type === 'all') return push.reachable();
-    if (audience.type === 'persona') return (await push.tokensForPersona(audience.persona)).length;
+    // M273: a category, a payment state, or both — as each device's account stood at its last registration.
+    const filter = audienceFilter(audience);
+    const fitting = await paidAccounts(uuid, filter, fresh);
+    if (fitting) return (await push.tokensForAccounts(fitting)).length;
+    if (filter) return (await push.tokensForSegment(filter.persona, filter.paid ? filter.paid === 'paid' : null)).length;
     let devices = 0;
     for (const contactId of audienceMemberIds(audience)) devices += (await push.tokensFor(contactId)).length;
     return devices;
@@ -136,27 +144,45 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     const named = audienceMemberIds(audience);
     // M251: each member has his own ref — one shared ref let the first send answer «already sent» for the rest of the list.
     if (named.length) for (const contactId of named) tellMember?.(contactId, `post:${post.id}:${contactId}`);
-    else tellAudience?.(uuid, audience.type === 'persona' ? audience.persona : null, `post:${post.id}`);
+    else tellAudience?.(uuid, audienceFilter(audience)?.persona ?? null, `post:${post.id}`, audienceFilter(audience)?.paid ?? null);
   };
 
   /**
    * M269: the name of every account, by id, for the WhatsApp status list. The names are the hub's (rule 2) and are
    * kept five minutes; a hub that cannot answer leaves the list with account numbers, as before.
    */
-  let namesCache: { at: number; names: Map<number, string> } | null = null;
-  const accountNames = async (uuid: string): Promise<Map<number, string>> => {
-    if (namesCache && Date.now() - namesCache.at < 5 * 60_000) return namesCache.names;
-    const names = new Map<number, string>();
+  type AccountRow = { id: number; name: string; persona: unknown; state: unknown; honorary: unknown };
+  let accountsCache: { at: number; rows: AccountRow[] } | null = null;
+  /** M273: every account of the hub's registry (kept five minutes); `complete` is false when the hub stopped answering midway. */
+  const accountRows = async (uuid: string, fresh = false): Promise<{ rows: AccountRow[]; complete: boolean }> => {
+    if (!fresh && accountsCache && Date.now() - accountsCache.at < 5 * 60_000) return { rows: accountsCache.rows, complete: true };
+    const rows: AccountRow[] = [];
     try {
       for (let page = 1; page <= 50; page += 1) {
         const slice = await hubCall(hub, 'admin_accounts', { uuid, q: '', state: 'all', page, per_page: 100 });
-        for (const account of slice.items) if ((account.name ?? '').trim()) names.set(account.id, String(account.name).trim());
+        for (const account of slice.items) rows.push({ id: account.id, name: String(account.name ?? '').trim(), persona: account.persona, state: account.state, honorary: account.honorary });
         if (slice.items.length === 0 || page * slice.per_page >= slice.total) break;
       }
-      namesCache = { at: Date.now(), names };
+      accountsCache = { at: Date.now(), rows };
+      return { rows, complete: true };
     } catch {
       // The list still opens: rows without a name show the account number.
+      return { rows, complete: false };
     }
+  };
+  /**
+   * M273: the accounts a payment filter names, by the hub's registry (rule 2). A device only knows the membership as it
+   * stood at its last launch, so a member who paid an hour ago must not hear «لم يدفع» from it. Null when the audience
+   * has no payment filter, or the hub cannot answer now — the devices' own note decides then.
+   */
+  const paidAccounts = async (uuid: string, filter: AudienceFilter | null, fresh = false): Promise<Set<number> | null> => {
+    if (!filter?.paid) return null;
+    const { rows, complete } = await accountRows(uuid, fresh);
+    return complete ? new Set(rows.filter((row) => accountInAudience(row, filter.persona, filter.paid)).map((row) => row.id)) : null;
+  };
+  const accountNames = async (uuid: string): Promise<Map<number, string>> => {
+    const names = new Map<number, string>();
+    for (const row of (await accountRows(uuid)).rows) if (row.name) names.set(row.id, row.name);
     return names;
   };
 
@@ -167,7 +193,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
   };
 
   /** One notification to exactly the post's audience. Only a delivered one is recorded on the post. */
-  const pushPost = async (post: Post, reminder: { done: ReadonlySet<number>; titled: boolean } | null = null) => {
+  const pushPost = async (post: Post, uuid: string, reminder: { done: ReadonlySet<number>; titled: boolean } | null = null) => {
     // M180: an English app hears the message in English (the stored English; the Arabic only until it exists).
     const messageIn = (lang: AppLang, name: string | null, nameEn: string | null) => {
       const en = lang === 'en' ? post.en : null;
@@ -186,9 +212,12 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     };
     const audience = audienceOf(post);
     const named = audienceMemberIds(audience);
+    const filter = audienceFilter(audience);
+    // M273: a payment filter is judged by the hub's registry as it is this minute, not by the device's older note.
+    const fitting = await paidAccounts(uuid, filter, true);
     // M232: every device hears its own wording; honorary members' devices are left out by the push service itself.
     const outcome = await push.broadcastPersonal((device) => {
-      if (audience.type === 'persona' && device.persona !== audience.persona) return null;
+      if (filter && (fitting ? !fitting.has(device.contactId) : !fitsFilter(filter, { persona: device.persona, paid: device.member }))) return null;
       if (named.length && !named.includes(device.contactId)) return null;
       // M269: a reminder leaves alone whoever already opened the message (a poll: already voted).
       if (reminder?.done.has(device.contactId)) return null;
@@ -361,7 +390,7 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
         // M232: a popup opens inside the app by itself and sends no notification.
         if (post.kind !== 'popup' && post.status === 'published' && previous?.status !== 'published') announce(post, admin.session.uuid);
         if (autoPush && post.kind !== 'popup' && post.status === 'published' && previous?.status !== 'published' && !post.notifiedAt) {
-          void pushPost((await service.get(post.id)) ?? post).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
+          void pushPost((await service.get(post.id)) ?? post, admin.session.uuid).catch((error: unknown) => request.log.error({ err: error, post: post.id }, 'auto post notification failed'));
         }
         return await reply.code(mode === 'create' ? 201 : 200).send({ post: (await service.get(post.id)) ?? post });
       } catch (error) {
@@ -413,16 +442,37 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       // whoever did not open the message yet (a poll still open: did not vote yet). WhatsApp runs in the background.
       const done = await doneWith(post);
       const audience = audienceOf(post);
-      const devices = await audienceDevices(post);
-      const whatsapp = remind ? remind({ uuid: admin.session.uuid, persona: audience.type === 'persona' ? audience.persona : null, members: audienceMemberIds(audience), done, ref: `post:${post.id}` }) : 'off';
+      const devices = await audienceDevices(post, admin.session.uuid, true);
+      const whatsapp = remind ? remind({ uuid: admin.session.uuid, persona: audienceFilter(audience)?.persona ?? null, paid: audienceFilter(audience)?.paid ?? null, members: audienceMemberIds(audience), done, ref: `post:${post.id}` }) : 'off';
       // M29: the notification goes exactly where the message goes. No registered device in the
       // audience means nobody would receive it: say so instead of reporting a sent notification.
       if (devices === 0 && whatsapp !== 'started') {
-        const who = audience.type === 'all' ? 'للإشعارات بعد' : audience.type === 'persona' ? 'لهذه الفئة بعد' : audience.type === 'members' ? 'لهؤلاء الأعضاء بعد' : 'لهذا العضو بعد';
+        const who = audience.type === 'all' ? 'للإشعارات بعد' : audienceFilter(audience) ? 'لهذه الفئة بعد' : audience.type === 'members' ? 'لهؤلاء الأعضاء بعد' : 'لهذا العضو بعد';
         return reply.code(409).send({ error: { code: 'no_devices', message: `لا توجد أجهزة مسجلة ${who}، فلن يصل الإشعار إلى أحد` } });
       }
-      const outcome = devices > 0 ? await pushPost(post, { done, titled: Boolean(post.notifiedAt) }) : { sent: 0, failed: 0, dropped: 0 };
+      const outcome = devices > 0 ? await pushPost(post, admin.session.uuid, { done, titled: Boolean(post.notifiedAt) }) : { sent: 0, failed: 0, dropped: 0 };
       return { ok: outcome.sent > 0 || whatsapp === 'started', ...outcome, whatsapp, opened: done.size };
+    }),
+  );
+
+  /**
+   * M273: before sending, the dashboard shows whom an audience reaches — how many accounts read it in the app (the hub's
+   * registry, rule 2; null when the hub cannot answer now) and how many registered devices hear its notification.
+   */
+  app.post(
+    '/api/admin/posts/reach',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const input = parse(reachSchema, request.body, reply);
+      if (!input) return;
+      const audience = input.audience;
+      if (admin.level !== 'admin' && audience.type !== 'all') return reply.code(403).send(MODERATOR_TARGETED);
+      const devices = await audienceDevices({ audience }, admin.session.uuid);
+      if (audience.type === 'member' || audience.type === 'members') return { members: audienceMemberIds(audience).length, devices };
+      const filter = audienceFilter(audience);
+      const { rows, complete } = await accountRows(admin.session.uuid);
+      return { members: complete ? rows.filter((row) => accountInAudience(row, filter?.persona ?? null, filter?.paid ?? null)).length : null, devices };
     }),
   );
 
@@ -465,8 +515,8 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
       await english?.ensure(post.id);
       await sync.bump('posts');
       announce(post, admin.session.uuid);
-      const devices = await audienceDevices(post);
-      const outcome = devices > 0 ? await pushPost((await service.get(post.id)) ?? post) : null;
+      const devices = await audienceDevices(post, admin.session.uuid, true);
+      const outcome = devices > 0 ? await pushPost((await service.get(post.id)) ?? post, admin.session.uuid) : null;
       return reply.code(201).send({ post: (await service.get(post.id)) ?? post, devices, push: outcome });
     }),
   );

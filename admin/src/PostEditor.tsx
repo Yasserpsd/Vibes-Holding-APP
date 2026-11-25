@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, MAX_AUDIENCE_MEMBERS, type PostLink, type PostMember, type PostPersona, type PostPollInput, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { api, ApiError, uploadFile, type Post, type PostAudience, type PostEvent, type PostInput, type PostKind, MAX_AUDIENCE_MEMBERS, type PostLink, type PostMember, type PostPaid, type PostPersona, type PostPollInput, type PostReach, type PostVideo, type UploadConfig, type Uploaded, type UploadKind } from './api';
+import { formatNumber } from './format';
 import { capturePoster, DEFAULT_UPLOAD_CONFIG, fileProblem, megabytes, typedFile, typeNames } from './media';
 
 type Props = { post: Post | null; isAdmin: boolean; onClose: (saved: Post | null) => void };
@@ -13,6 +14,54 @@ export const PERSONA_LABELS: { key: PostPersona; label: string }[] = [
 ];
 
 export const personaLabel = (key: string): string => PERSONA_LABELS.find((entry) => entry.key === key)?.label ?? key;
+
+/** M273: the two payment states a message may be addressed to, in the owner's wording. */
+export const PAID_LABELS: { key: PostPaid; label: string }[] = [
+  { key: 'paid', label: 'مدفوع' },
+  { key: 'unpaid', label: 'لم يدفع' },
+];
+export const paidLabel = (key: PostPaid): string => PAID_LABELS.find((entry) => entry.key === key)?.label ?? key;
+
+/** M273: an audience as its two filters — payment and category (null = all of them); null for a list of named members. */
+export function audienceSegment(audience: PostAudience): { paid: PostPaid | null; persona: PostPersona | null } | null {
+  if (audience.type === 'all') return { paid: null, persona: null };
+  if (audience.type === 'persona') return { paid: audience.paid ?? null, persona: audience.persona };
+  if (audience.type === 'paid') return { paid: audience.paid, persona: null };
+  return null;
+}
+const segmentAudience = (paid: PostPaid | null, persona: PostPersona | null): PostAudience =>
+  persona ? { type: 'persona', persona, ...(paid ? { paid } : {}) } : paid ? { type: 'paid', paid } : { type: 'all' };
+
+/**
+ * M273: before sending, who this audience reaches right now — accounts that read it in the app and devices that hear
+ * its notification. Asked again a moment after every change; an answer is shown only for the choice it belongs to.
+ */
+function AudienceReach({ audience }: { audience: PostAudience }) {
+  const key = JSON.stringify(audience);
+  const empty = audience.type === 'members' && audience.members.length === 0;
+  const [answer, setAnswer] = useState<{ key: string; reach: PostReach | null } | null>(null);
+  useEffect(() => {
+    if (empty) return undefined;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      api.postReach(JSON.parse(key) as PostAudience).then(
+        (reach) => live && setAnswer({ key, reach }),
+        () => live && setAnswer({ key, reach: null }),
+      );
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [key, empty]);
+  if (empty) return null;
+  if (answer?.key !== key) return <p className="reach muted" aria-live="polite">جارٍ حساب من تصلهم الرسالة…</p>;
+  const reach = answer.reach;
+  if (!reach) return null;
+  const devices = `الأجهزة التي يصلها الإشعار: ${formatNumber(reach.devices)}`;
+  if (reach.members === 0) return <p className="reach warn" aria-live="polite">لا يوجد أحد في هذا الاختيار الآن.</p>;
+  return <p className="reach" aria-live="polite">{reach.members === null ? devices : `الحسابات التي تصلها الرسالة: ${formatNumber(reach.members)} · ${devices}`}</p>;
+}
 /** One row of the progress list. A failed row stays, with the reason, until the owner hides it. */
 type Pending = { id: number; name: string; kind: UploadKind; progress: number; error: string | null };
 
@@ -115,7 +164,7 @@ function MemberPicker({ chosen, onChange }: { chosen: PostMember[]; onChange: (m
         </div>
       ) : null}
       {full ? (
-        <p className="muted hint">اكتمل الحد الأقصى ({MAX_AUDIENCE_MEMBERS} عضوًا). لعدد أكبر استخدم «فئة واحدة» أو «للجميع».</p>
+        <p className="muted hint">اكتمل الحد الأقصى ({MAX_AUDIENCE_MEMBERS} عضوًا). لعدد أكبر استخدم «حسب الفئة».</p>
       ) : (
         <div className="link-add">
           <input
@@ -175,6 +224,10 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
     // M238: a message saved for one member opens as a list of one, so more members can be added.
     return saved.type === 'member' ? { type: 'members', members: [{ contactId: saved.contactId, name: saved.name }] } : saved;
   });
+  const segment = audienceSegment(audience);
+  // Each row changes its own filter over the latest choice, so two quick taps never undo each other.
+  const pickPaid = (paid: PostPaid | null) => setAudience((now) => segmentAudience(paid, audienceSegment(now)?.persona ?? null));
+  const pickPersona = (persona: PostPersona | null) => setAudience((now) => segmentAudience(audienceSegment(now)?.paid ?? null, persona));
   // An event is a post with a date and a place: the websites' feed and the assistant hear it like any other post.
   const [kind, setKind] = useState<PostKind>(post?.kind ?? 'post');
   const [eventDay, setEventDay] = useState(() => eventFields(post?.event).day);
@@ -500,15 +553,30 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
             <fieldset>
               <legend>الجمهور</legend>
               <div className="chips" role="group" aria-label="جمهور الرسالة">
-                <button type="button" className={audience.type === 'all' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'all'} onClick={() => setAudience({ type: 'all' })}>للجميع</button>
-                <button type="button" className={audience.type === 'persona' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'persona'} onClick={() => setAudience({ type: 'persona', persona: audience.type === 'persona' ? audience.persona : 'neutral' })}>فئة واحدة</button>
+                <button type="button" className={segment ? 'chip on' : 'chip'} aria-pressed={Boolean(segment)} onClick={() => setAudience(segment ? audience : { type: 'all' })}>حسب الفئة</button>
                 <button type="button" className={audience.type === 'members' ? 'chip on' : 'chip'} aria-pressed={audience.type === 'members'} onClick={() => setAudience({ type: 'members', members: audience.type === 'members' ? audience.members : [] })}>أعضاء محددون</button>
               </div>
-              {audience.type === 'persona' ? (
-                <div className="chips" role="group" aria-label="الفئة">
-                  {PERSONA_LABELS.map((entry) => (
-                    <button key={entry.key} type="button" className={audience.persona === entry.key ? 'chip on' : 'chip'} aria-pressed={audience.persona === entry.key} onClick={() => setAudience({ type: 'persona', persona: entry.key })}>{entry.label}</button>
-                  ))}
+              {segment ? (
+                <div className="audience-rows">
+                  {/* M273: two filters over each other — payment, then category; «الكل» in both is everyone. */}
+                  <div className="audience-row">
+                    <span className="muted">حالة الدفع</span>
+                    <div className="chips" role="group" aria-label="حالة الدفع">
+                      <button type="button" className={segment.paid === null ? 'chip on' : 'chip'} aria-pressed={segment.paid === null} onClick={() => pickPaid(null)}>الكل</button>
+                      {PAID_LABELS.map((entry) => (
+                        <button key={entry.key} type="button" className={segment.paid === entry.key ? 'chip on' : 'chip'} aria-pressed={segment.paid === entry.key} onClick={() => pickPaid(entry.key)}>{entry.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="audience-row">
+                    <span className="muted">الفئة</span>
+                    <div className="chips" role="group" aria-label="الفئة">
+                      <button type="button" className={segment.persona === null ? 'chip on' : 'chip'} aria-pressed={segment.persona === null} onClick={() => pickPersona(null)}>الكل</button>
+                      {PERSONA_LABELS.map((entry) => (
+                        <button key={entry.key} type="button" className={segment.persona === entry.key ? 'chip on' : 'chip'} aria-pressed={segment.persona === entry.key} onClick={() => pickPersona(entry.key)}>{entry.label}</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : null}
               {audience.type === 'members' ? (
@@ -517,6 +585,9 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                   onChange={(members) => setAudience({ type: 'members', members })}
                 />
               ) : null}
+              <AudienceReach audience={audience} />
+              {audience.type === 'all' ? <p className="muted hint">«الكل» في الصفّين = للجميع: تظهر الرسالة لكل الأعضاء والزوار.</p> : null}
+              {segment?.paid ? <p className="muted hint">«مدفوع» = عضويته السنوية سارية الآن. «لم يدفع» = لم يشترك بعد أو انتهت عضويته.</p> : null}
               <p className="muted hint">أصحاب العضوية الشرفية معزولون تمامًا: لا تصلهم رسائل الإدارة ولا البوب أب ولا إشعاراتها، أيًّا كانت فئتهم.</p>
               {audience.type !== 'all' ? <p className="muted hint">الرسالة الموجّهة تصل داخل التطبيق فقط إلى من وُجّهت إليهم، ولا تظهر في المواقع ولا يعرفها المستشار.</p> : null}
             </fieldset>

@@ -215,6 +215,21 @@ export class PushService {
       .map((entry) => entry.token);
   }
 
+  /**
+   * M273: devices of one category and/or one payment state, as the account stood at the last registration (null = any).
+   * A device whose payment state is not known yet fits neither «دفع» nor «لم يدفع».
+   */
+  async tokensForSegment(persona: string | null, member: boolean | null): Promise<string[]> {
+    return (await this.reach())
+      .filter((entry) => (persona === null || entry.persona === persona) && (member === null || (entry.member ?? null) === member))
+      .map((entry) => entry.token);
+  }
+
+  /** M273: the devices of the given accounts (an honorary member's devices stay out, as everywhere). */
+  async tokensForAccounts(accounts: ReadonlySet<number>): Promise<string[]> {
+    return (await this.reach()).filter((entry) => accounts.has(entry.contactId)).map((entry) => entry.token);
+  }
+
   /** M158: signed-in devices and distinct accounts per platform — the downloads card before the store keys exist. */
   async platforms(): Promise<{ devices: { android: number; ios: number }; accounts: { android: number; ios: number; total: number } }> {
     const tokens = await this.load();
@@ -308,11 +323,11 @@ export class PushService {
    * a hundred members with a hundred names are still one request. Honorary members' devices stay out.
    */
   async broadcastPersonal(
-    choose: (device: { contactId: number; persona: string | null; lang: AppLang | null; name: string | null; nameEn: string | null }) => PushMessage | null,
+    choose: (device: { contactId: number; persona: string | null; lang: AppLang | null; name: string | null; nameEn: string | null; member: boolean | null }) => PushMessage | null,
   ): Promise<PushOutcome> {
     const items: { to: string; message: PushMessage }[] = [];
     for (const entry of await this.reach()) {
-      const message = choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null, name: entry.name ?? null, nameEn: entry.nameEn ?? null });
+      const message = choose({ contactId: entry.contactId, persona: entry.persona ?? null, lang: entry.lang ?? null, name: entry.name ?? null, nameEn: entry.nameEn ?? null, member: entry.member ?? null });
       if (message) items.push({ to: entry.token, message });
     }
     return this.deliverItems(items, { personal: true, devices: items.length });

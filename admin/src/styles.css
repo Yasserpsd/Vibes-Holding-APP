@@ -112,6 +112,14 @@ button.tile:hover { border-color: var(--gold-line); }
 .chip { flex: none; display: inline-flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
 .chip .num { font-size: 0.75rem; padding: 0 6px; border-radius: 999px; background: var(--line); color: var(--text); }
 .chip.on { border-color: var(--gold); color: var(--gold-bright); background: var(--gold-wash); }
+/* M273: the audience picker — payment over category, and the live «who gets it» line under them. */
+.audience-rows { display: grid; gap: 6px; }
+.audience-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 8px; align-items: center; }
+.audience-row > span { font-size: 0.85rem; }
+.reach { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold-wash); color: var(--gold-bright); font-size: 0.9rem; }
+.reach.muted { border-color: var(--line); background: transparent; color: var(--muted); }
+.reach.warn { border-color: var(--line); background: transparent; color: var(--text); }
+@media (max-width: 520px) { .audience-row { grid-template-columns: 1fr; gap: 2px; } }
 .search { display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--muted); font-weight: 400; }
 .search:focus-within { border-color: var(--gold); }
 .search input { border: 0; background: transparent; padding-inline: 0; }

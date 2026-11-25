@@ -72,7 +72,10 @@ export type PostPollInput = { options: { id?: string; label: string }[]; closesA
 export type PollResults = { options: { id: string; label: string; votes: number | null }[]; closesAt: string | null; closed: boolean; resultsVisible: boolean; totalVotes: number | null; myVote: string | null };
 /** M29: everyone, one persona, or one member («رسالة Admin»). `name` is only the shown label. */
 export type PostPersona = 'neutral' | 'entrepreneur' | 'investor';
-export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona } | { type: 'member'; contactId: number; name: string } | { type: 'members'; members: PostMember[] };
+/** M273: «مدفوع» = the annual membership is active now; «لم يدفع» = never paid or expired. Alone, or narrowing one category. */
+export type PostPaid = 'paid' | 'unpaid';
+export type PostReach = { members: number | null; devices: number };
+export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona; paid?: PostPaid } | { type: 'paid'; paid: PostPaid } | { type: 'member'; contactId: number; name: string } | { type: 'members'; members: PostMember[] };
 /** M238: one chosen member of a message's list. */
 export type PostMember = { contactId: number; name: string };
 export const MAX_AUDIENCE_MEMBERS = 50;
@@ -690,6 +693,8 @@ export const api = {
   invites: () => call<{ invites: InviteRecord[]; config: InvitesConfig }>('GET', '/api/admin/invites'),
   inviteGift: (id: string, note: string) => call<{ invite: InviteRecord }>('POST', `/api/admin/invites/${id}/gift`, { note }),
   invitesConfig: (input: Partial<InvitesConfig>) => call<{ config: InvitesConfig }>('POST', '/api/admin/invites/config', input),
+  /** M273: whom an audience reaches right now — accounts in the app (null: the hub did not answer) and devices with notifications. */
+  postReach: (audience: PostAudience) => call<PostReach>('POST', '/api/admin/posts/reach', { audience }),
   createPost: (input: PostInput) => call<{ post: Post }>('POST', '/api/admin/posts', input),
   updatePost: (id: string, input: PostInput) => call<{ post: Post }>('PUT', `/api/admin/posts/${id}`, input),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/api/admin/posts/${id}`),

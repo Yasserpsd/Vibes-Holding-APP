@@ -1611,5 +1611,17 @@
  "تُسحب عضوية شركاء النجاح من «{0}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار داخل التطبيق وبالبريد، ويصل الإدارة بريد بالإجراء.": "The Success Partners Membership is withdrawn from “{0}” now. With an active paid subscription the account stays a member until it ends; otherwise it loses the member benefits. The member is told in the app and by e-mail, and the management gets an e-mail.",
  "اشتراك مدفوع بعدها حتى": "Paid subscription continues until",
  "عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.": "Success Partners Membership: 360 days, and it ends by itself. Days of any store subscription are kept.",
- "عضوية شركاء النجاح تحتاج تحديث إضافة الهب إلى 2.33.0 أو أحدث": "The Success Partners Membership needs the hub plugin 2.33.0 or newer"
+ "عضوية شركاء النجاح تحتاج تحديث إضافة الهب إلى 2.33.0 أو أحدث": "The Success Partners Membership needs the hub plugin 2.33.0 or newer",
+ "حسب الفئة": "By category",
+ "مدفوع": "Paid",
+ "لم يدفع": "Not Paid",
+ "جارٍ حساب من تصلهم الرسالة…": "Working out who the message reaches…",
+ "لا يوجد أحد في هذا الاختيار الآن.": "Nobody is in this selection right now.",
+ "الحسابات التي تصلها الرسالة: {0} · {1}": "Accounts that get the message: {0} · {1}",
+ "الأجهزة التي يصلها الإشعار: {0}": "Devices that get the notification: {0}",
+ "«الكل» في الصفّين = للجميع: تظهر الرسالة لكل الأعضاء والزوار.": "“All” in both rows = everyone: the message shows to every member and visitor.",
+ "«مدفوع» = عضويته السنوية سارية الآن. «لم يدفع» = لم يشترك بعد أو انتهت عضويته.": "“Paid” = the annual membership is active now. “Not Paid” = not subscribed yet, or the membership has expired.",
+ "عضوًا). لعدد أكبر استخدم «حسب الفئة».": "members). For a larger number use “By category”.",
+ "كل من حالته «{0}»": "everyone whose status is “{0}”",
+ "فئة {0} ({1})": "the {0} category ({1})"
 }

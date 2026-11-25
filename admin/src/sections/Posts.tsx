@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { api, type Post, type PostAudience, type PostOpen, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
-import { personaLabel, PostEditor } from '../PostEditor';
+import { paidLabel, personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
 
 const audienceOf = (post: Post): PostAudience => post.audience ?? { type: 'all' };
@@ -11,7 +11,9 @@ const audienceOf = (post: Post): PostAudience => post.audience ?? { type: 'all' 
 function AudiencePill({ post }: { post: Post }) {
   const audience = audienceOf(post);
   if (audience.type === 'all') return null;
-  if (audience.type === 'persona') return <Pill tone="gold">لفئة {personaLabel(audience.persona)}</Pill>;
+  // M273: «لم يدفع · رائد الأعمال» — the payment state first, then the category when one is chosen.
+  if (audience.type === 'persona') return audience.paid ? <Pill tone="gold">{paidLabel(audience.paid)} · {personaLabel(audience.persona)}</Pill> : <Pill tone="gold">لفئة {personaLabel(audience.persona)}</Pill>;
+  if (audience.type === 'paid') return <Pill tone="gold">{paidLabel(audience.paid)}</Pill>;
   if (audience.type === 'member') return <Pill tone="gold">لعضو: {audience.name || `#${audience.contactId}`}</Pill>;
   const [first] = audience.members;
   if (audience.members.length === 1 && first) return <Pill tone="gold">لعضو: {first.name || `#${first.contactId}`}</Pill>;
@@ -276,7 +278,7 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
   /** M269: «إرسال تذكير» — the app's notification and a WhatsApp notice, only to whoever did not open the message yet. */
   async function push(post: Post) {
     const audience = audienceOf(post);
-    const target = audience.type === 'all' ? 'جميع الأعضاء' : audience.type === 'persona' ? `فئة ${personaLabel(audience.persona)}` : audience.type === 'member' ? `العضو ${audience.name || `#${audience.contactId}`}` : `الأعضاء المحددين (${audience.members.length})`;
+    const target = audience.type === 'all' ? 'جميع الأعضاء' : audience.type === 'persona' ? `فئة ${personaLabel(audience.persona)}${audience.paid ? ` (${paidLabel(audience.paid)})` : ''}` : audience.type === 'paid' ? `كل من حالته «${paidLabel(audience.paid)}»` : audience.type === 'member' ? `العضو ${audience.name || `#${audience.contactId}`}` : `الأعضاء المحددين (${audience.members.length})`;
     const who = post.kind === 'poll' ? 'لمن لم يصوّت بعد' : 'لمن لم يفتح الرسالة بعد';
     const lines = [
       `إرسال تذكير بهذا المنشور إلى ${target}؟`,
