@@ -51,8 +51,10 @@ const PARTNER_NOTE_REVOKE = 'سحب عضوية شركاء النجاح';
 const PARTNER_NOTE_PROJECT = 'ربط شريك النجاح بمشروع';
 export const PICK_PROJECT = 'اختر المشروع المرتبط بشريك النجاح أولًا: لا تُمنح العضوية بدون مشروع';
 
-export type SuccessPartnerRow = { contactId: number; name: string; phone: string; since: string; end: string; left: number | null; project: PartnerProject | null };
-export type PartnerProjectChoice = PartnerProject & { holder: { contactId: number; name: string } | null };
+/** A project as the dashboard shows it: `url` is its public page in the Projects Bank, to open and read it. */
+export type ShownProject = PartnerProject & { url: string | null };
+export type SuccessPartnerRow = { contactId: number; name: string; phone: string; since: string; end: string; left: number | null; project: ShownProject | null };
+export type PartnerProjectChoice = ShownProject & { holder: { contactId: number; name: string } | null };
 
 export type SectionError = { code: string; message: string };
 export type BridgeInfo = { hub: { version: string | null; ok: boolean }; pb: { version: string | null; ok: boolean } };
@@ -92,11 +94,13 @@ function atLeast(version: string | null, wanted: number[]): boolean {
 
 /**
  * The two narrowing filters of the members list, applied by the server because the hub has neither:
- * the category (`none` = a registered account that has not chosen one — pending and lead rows are not «accounts» yet,
+ * the category (`partners` = M275, a running Success Partners membership; `none` = a registered account that has not chosen one — pending and lead rows are not «accounts» yet,
  * the same rule as the home card) and the memberships ending within 7 / 30 days (dated paid ones, like the hub's expiring count).
  */
 export function accountMatches(account: HubAccount, persona = 'all', ends = 'all'): boolean {
-  if (persona !== 'all') {
+  if (persona === 'partners') {
+    if (!isPartner(account)) return false;
+  } else if (persona !== 'all') {
     // A category belongs to a registered account: one still waiting for its e-mail (or a lead) is in no category row, as in no home card.
     if (account.state === 'pending' || account.state === 'lead') return false;
     const chosen = ['neutral', 'entrepreneur', 'investor'].includes(account.persona);
@@ -136,7 +140,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore; /** M243: a deleted account leaves the messages' read lists. */ postOpens?: { forgetContact(contactId: number): Promise<void> }; /** M275: the bank a Success Partner is tied to. */ projects: Pick<ProjectsService, 'all' | 'get'> };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore; /** M243: a deleted account leaves the messages' read lists. */ postOpens?: { forgetContact(contactId: number): Promise<void> }; /** M275: the bank a Success Partner is tied to. */ projects: Pick<ProjectsService, 'all' | 'get' | 'pageUrl'> };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -260,7 +264,9 @@ export class DashboardService {
     let result: HubResults['admin_accounts'];
     // `registered` is a view of the hub's `all` without the accounts still waiting for their e-mail code.
     const registered = query.state === 'registered';
-    const hubState = registered ? 'all' : query.state;
+    // M275: every partner is a member to the hub, so the search for them never walks the whole registry.
+    const wholeList = registered || query.state === 'all';
+    const hubState = wholeList ? (query.persona === 'partners' ? 'member' : 'all') : query.state;
     const kept = (account: HubAccount) => (!registered || account.state !== 'pending') && accountMatches(account, query.persona, query.ends);
     const narrowed = registered || (query.persona && query.persona !== 'all') || (query.ends && query.ends !== 'all');
     // M210 (hub 2.28.4): the WhatsApp filter is the hub's own; an older hub ignores the key and sends no wa counts.
@@ -314,7 +320,7 @@ export class DashboardService {
     return { ...result, items: result.items.map((account) => ({ ...account, pb: beside(account) })), pbError };
   }
 
-  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null; deletionRequest: { requestedAt: string; dueAt: string; reason: string } | null; partnerProject: PartnerProject | null }> {
+  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null; deletionRequest: { requestedAt: string; dueAt: string; reason: string } | null; partnerProject: ShownProject | null }> {
     const result = await this.hub(admin, 'admin_member', { contact_id: contactId });
     let pb: PbBalance | null = null;
     let pbError: SectionError | null = null;
@@ -375,12 +381,14 @@ export class DashboardService {
   }
 
   /** M33/M86: accounts by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
-  async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number }> {
-    const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0 };
+  async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number; partners: number }> {
+    const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0, partners: 0 };
     for (let page = 1; page <= 10; page += 1) {
       const result = await this.hub(admin, 'admin_accounts', { q: '', state, page, per_page: 100 });
       for (const account of result.items) {
         counts.total += 1;
+        // M275: beside his category, not instead of it.
+        if (isPartner(account)) counts.partners += 1;
         // Same rule as the list's category filters (accountMatches): only registered accounts are counted in a category or in «none».
         if (account.state === 'pending' || account.state === 'lead') continue;
         if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;
@@ -658,15 +666,15 @@ export class DashboardService {
     const holders = new Map(links.map((link) => [link.project.id, { contactId: link.contactId, name: found.get(link.contactId)?.name || found.get(link.contactId)?.email || '' }]));
     const projects = this.deps.projects
       .all()
-      .map((project) => ({ id: project.id, number: project.number, title: project.title, holder: holders.get(project.id) ?? null }))
+      .map((project) => ({ id: project.id, number: project.number, title: project.title, url: this.deps.projects.pageUrl(project.id), holder: holders.get(project.id) ?? null }))
       .sort((a, b) => b.id - a.id);
     return { partners, projects };
   }
 
-  /** Name and number only (rule 4), as the bank has them today; the stored ones once a project has left the feed. */
-  private currentProject(stored: PartnerProject): PartnerProject {
+  /** Name, number and public page only (rule 4), as the bank has them today; the stored ones once a project has left the feed. */
+  private currentProject(stored: PartnerProject): ShownProject {
     const live = this.deps.projects.get(stored.id);
-    return live ? { id: live.id, number: live.number, title: live.title } : stored;
+    return live ? { id: live.id, number: live.number, title: live.title, url: this.deps.projects.pageUrl(live.id) } : { ...stored, url: null };
   }
 
   private bankProject(projectId: number | null): PartnerProject {

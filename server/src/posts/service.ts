@@ -48,6 +48,8 @@ export const audienceSchema = z.discriminatedUnion('type', [
   // M273: a category may be narrowed to whoever paid / did not pay; `paid` alone is every category of that payment state.
   z.object({ type: z.literal('persona'), persona: z.enum(['neutral', 'entrepreneur', 'investor']), paid: z.enum(['paid', 'unpaid']).optional() }),
   z.object({ type: z.literal('paid'), paid: z.enum(['paid', 'unpaid']) }),
+  // M275: whoever holds the Success Partners membership now; it follows the membership, nobody chooses it.
+  z.object({ type: z.literal('partners') }),
   z.object({ type: z.literal('member'), contactId: z.coerce.number().int().positive(), name: z.string().trim().max(120).default('') }),
   // M238: a chosen list of members (1 to 50), each once.
   z.object({
@@ -140,22 +142,25 @@ export type PostAudience =
   | { type: 'all' }
   | { type: 'persona'; persona: Persona; paid?: PaidState }
   | { type: 'paid'; paid: PaidState }
+  | { type: 'partners' }
   | { type: 'member'; contactId: number; name: string }
   | { type: 'members'; members: { contactId: number; name: string }[] };
 
 /** M273 (owner, 2026-11-25: «ابعت لكل اللي دفعو او لكل اللي مدفعوش»): `paid` = the annual membership is active now; `unpaid` = never paid or expired. */
 export type PaidState = 'paid' | 'unpaid';
-export type AudienceFilter = { persona: Persona | null; paid: PaidState | null };
+export type AudienceFilter = { persona: Persona | null; paid: PaidState | null; /** M275 */ partners: boolean };
 
-/** M273: the category filter of an audience (a persona, a payment state, or both); null when it is for everyone or for named members. */
+/** M273: the category filter of an audience (a persona, a payment state, both, or the Success Partners); null when it is for everyone or for named members. */
 export function audienceFilter(audience: PostAudience): AudienceFilter | null {
-  if (audience.type === 'persona') return { persona: audience.persona, paid: audience.paid ?? null };
-  if (audience.type === 'paid') return { persona: null, paid: audience.paid };
+  if (audience.type === 'persona') return { persona: audience.persona, paid: audience.paid ?? null, partners: false };
+  if (audience.type === 'paid') return { persona: null, paid: audience.paid, partners: false };
+  if (audience.type === 'partners') return { persona: null, paid: null, partners: true };
   return null;
 }
 
-/** M273: does this account fit the filter? An unknown payment state (`paid: null`) fits neither «دفع» nor «لم يدفع». */
-export function fitsFilter(filter: AudienceFilter, who: { persona: string | null; paid: boolean | null }): boolean {
+/** M273: does this account fit the filter? An unknown payment state (`paid: null`) fits neither «دفع» nor «لم يدفع»; M275: an unknown membership kind is no partner. */
+export function fitsFilter(filter: AudienceFilter, who: { persona: string | null; paid: boolean | null; partner?: boolean }): boolean {
+  if (filter.partners && who.partner !== true) return false;
   if (filter.persona && who.persona !== filter.persona) return false;
   if (filter.paid && who.paid !== (filter.paid === 'paid')) return false;
   return true;
@@ -172,7 +177,7 @@ export type PostHubSync = { state: 'ok' | 'failed' | 'unsupported'; at: string; 
  * Who is reading the feed; null is a guest. M232: `honorary` = «عضوية شرفية» — such a member is kept apart from
  * everything the management sends, whatever his category; `name` / `nameEn` greet the reader of a message by name.
  */
-export type PostViewer = { contactId: number; persona: string; honorary?: boolean; /** M273: the annual membership is active now. */ paid?: boolean; name?: string; nameEn?: string } | null;
+export type PostViewer = { contactId: number; persona: string; honorary?: boolean; /** M273: the annual membership is active now. */ paid?: boolean; /** M275 */ partner?: boolean; name?: string; nameEn?: string } | null;
 
 export function audienceOf(post: Pick<Post, 'audience'>): PostAudience {
   return post.audience ?? { type: 'all' };
@@ -186,7 +191,7 @@ export function canSee(post: Pick<Post, 'audience'>, viewer: PostViewer): boolea
   if (audience.type === 'all') return true;
   if (!viewer) return false;
   const filter = audienceFilter(audience);
-  if (filter) return fitsFilter(filter, { persona: viewer.persona, paid: viewer.paid ?? null });
+  if (filter) return fitsFilter(filter, { persona: viewer.persona, paid: viewer.paid ?? null, partner: viewer.partner });
   return audienceMemberIds(audience).includes(viewer.contactId);
 }
 

@@ -13,6 +13,8 @@ const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
   { value: 'entrepreneur', label: 'رائد أعمال' },
   { value: 'investor', label: 'مستثمر' },
   { value: 'none', label: 'بدون فئة' },
+  // M275 (owner, 2026-11-25): read from the membership, beside the category the member chose.
+  { value: 'partners', label: 'شركاء النجاح' },
 ];
 
 // The home cards «تنتهي خلال 7 أيام / 30 يومًا» open these (same words).
@@ -89,7 +91,7 @@ export function dailyLeft(account: Pick<Account, 'daily_left' | 'daily_limit'>):
 
 /** M116 (owner): the member's category, readable at a glance on the row and the sheet. */
 export function personaLabel(persona: string | null | undefined): string | null {
-  return PERSONA_FILTERS.find((entry) => entry.value === persona && entry.value !== 'all' && entry.value !== 'none')?.label ?? null;
+  return PERSONA_FILTERS.find((entry) => entry.value === persona && !['all', 'none', 'partners'].includes(entry.value))?.label ?? null;
 }
 
 function Row({ account }: { account: AccountRow }) {
@@ -163,7 +165,7 @@ export function Members({ initial, stamp }: { initial: MembersView; stamp: numbe
 
   const counts = state.data?.counts;
   const personaCount = (value: PersonaFilter): number | null =>
-    personas.data ? (value === 'all' ? personas.data.total : personas.data[value]) : null;
+    personas.data ? (value === 'all' ? personas.data.total : (personas.data[value] ?? null)) : null;
   return (
     <>
       <SectionHead title="الأعضاء" hint={state.data ? `الحسابات في هذا العرض: ${formatNumber(state.data.total)}` : undefined} onReload={state.reload} busy={state.loading} />

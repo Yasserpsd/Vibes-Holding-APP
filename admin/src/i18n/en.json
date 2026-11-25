@@ -1684,5 +1684,7 @@
  "المشروع المختار غير موجود في بنك المشاريع: حدّث الصفحة واختر من القائمة": "The chosen project is not in the Projects Bank: reload the page and choose from the list",
  "هذا الحساب يحمل عضوية شركاء النجاح من قبل: غيّر مشروعه من «تغيير المشروع»": "This account already holds the Success Partners membership: use “Change the project”",
  "هذا الحساب لا يحمل عضوية شركاء النجاح، فلا يرتبط بمشروع": "This account does not hold the Success Partners membership, so no project can be linked to it",
- "هذا المشروع مرتبط بالفعل بشريك النجاح «{0}» (حساب رقم {1}). المشروع الواحد لا يرتبط إلا بشريك واحد": "This project is already linked to the Success Partner “{0}” (account no. {1}). A project can be linked to one partner only"
+ "هذا المشروع مرتبط بالفعل بشريك النجاح «{0}» (حساب رقم {1}). المشروع الواحد لا يرتبط إلا بشريك واحد": "This project is already linked to the Success Partner “{0}” (account no. {1}). A project can be linked to one partner only",
+ "«شركاء النجاح» = كل من يحمل عضوية شركاء النجاح الآن، أيًّا كانت فئته.": "“Success Partners” = everyone holding the Success Partners membership now, whatever their category.",
+ "استعرض المشروع في بنك المشاريع": "View the project in the Projects Bank"
 }

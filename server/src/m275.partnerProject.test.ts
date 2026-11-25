@@ -117,8 +117,8 @@ test('a grant links the project: the sheet, the audit log and the management mai
   const member = await signUp('m275.grant@gmail.com', 'فهد الدوسري');
   const given = await partner(member.id, 1);
   assert.equal(given.statusCode, 200, given.body);
-  // Name and number only: nothing else of the project goes anywhere (rule 4).
-  assert.deepEqual((await sheet(member.id)).partnerProject, { id: 1, number: 'P-1', title: 'مشروع رقم 1' });
+  // Name, number and public page only: nothing else of the project goes anywhere (rule 4).
+  assert.deepEqual((await sheet(member.id)).partnerProject, { id: 1, number: 'P-1', title: 'مشروع رقم 1', url: null });
   const audit = ((await kv.get<{ entries: AuditEntry[] }>(AUDIT_KEY))?.entries ?? []).find((entry) => entry.contactId === member.id && entry.result === 'ok');
   assert.equal(audit?.params.project, 'مشروع رقم 1 (رقم المشروع: P-1)');
   await new Promise((resolve) => setImmediate(resolve));
@@ -223,7 +223,7 @@ test('the list pairs every partner with his project and marks the taken projects
   const eleven = projects.find((entry) => entry.id === 11);
   assert.deepEqual(eleven?.holder, { contactId: member.id, name: 'نواف السبيعي' });
   assert.equal(projects.find((entry) => entry.id === 12)?.holder, null);
-  assert.deepEqual(Object.keys(eleven ?? {}).sort(), ['holder', 'id', 'number', 'title']);
+  assert.deepEqual(Object.keys(eleven ?? {}).sort(), ['holder', 'id', 'number', 'title', 'url']);
 
   assert.equal((await call('GET', '/api/admin/success-partners')).statusCode, 401);
   assert.equal((await call('GET', '/api/admin/success-partners', undefined, member.token)).statusCode, 403);

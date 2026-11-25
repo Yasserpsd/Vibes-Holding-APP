@@ -22,11 +22,12 @@ export const PAID_LABELS: { key: PostPaid; label: string }[] = [
 ];
 export const paidLabel = (key: PostPaid): string => PAID_LABELS.find((entry) => entry.key === key)?.label ?? key;
 
-/** M273: an audience as its two filters — payment and category (null = all of them); null for a list of named members. */
-export function audienceSegment(audience: PostAudience): { paid: PostPaid | null; persona: PostPersona | null } | null {
-  if (audience.type === 'all') return { paid: null, persona: null };
-  if (audience.type === 'persona') return { paid: audience.paid ?? null, persona: audience.persona };
-  if (audience.type === 'paid') return { paid: audience.paid, persona: null };
+/** M273: an audience as its two filters — payment and category (null = all of them); null for a list of named members. M275: or the Success Partners alone. */
+export function audienceSegment(audience: PostAudience): { paid: PostPaid | null; persona: PostPersona | null; partners: boolean } | null {
+  if (audience.type === 'all') return { paid: null, persona: null, partners: false };
+  if (audience.type === 'persona') return { paid: audience.paid ?? null, persona: audience.persona, partners: false };
+  if (audience.type === 'paid') return { paid: audience.paid, persona: null, partners: false };
+  if (audience.type === 'partners') return { paid: null, persona: null, partners: true };
   return null;
 }
 const segmentAudience = (paid: PostPaid | null, persona: PostPersona | null): PostAudience =>
@@ -559,22 +560,26 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
               {segment ? (
                 <div className="audience-rows">
                   {/* M273: two filters over each other — payment, then category; «الكل» in both is everyone. */}
-                  <div className="audience-row">
-                    <span className="muted">حالة الدفع</span>
-                    <div className="chips" role="group" aria-label="حالة الدفع">
-                      <button type="button" className={segment.paid === null ? 'chip on' : 'chip'} aria-pressed={segment.paid === null} onClick={() => pickPaid(null)}>الكل</button>
-                      {PAID_LABELS.map((entry) => (
-                        <button key={entry.key} type="button" className={segment.paid === entry.key ? 'chip on' : 'chip'} aria-pressed={segment.paid === entry.key} onClick={() => pickPaid(entry.key)}>{entry.label}</button>
-                      ))}
+                  {/* M275: a Success Partner's membership is given, never paid, so the payment row does not apply. */}
+                  {segment.partners ? null : (
+                    <div className="audience-row">
+                      <span className="muted">حالة الدفع</span>
+                      <div className="chips" role="group" aria-label="حالة الدفع">
+                        <button type="button" className={segment.paid === null ? 'chip on' : 'chip'} aria-pressed={segment.paid === null} onClick={() => pickPaid(null)}>الكل</button>
+                        {PAID_LABELS.map((entry) => (
+                          <button key={entry.key} type="button" className={segment.paid === entry.key ? 'chip on' : 'chip'} aria-pressed={segment.paid === entry.key} onClick={() => pickPaid(entry.key)}>{entry.label}</button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="audience-row">
                     <span className="muted">الفئة</span>
                     <div className="chips" role="group" aria-label="الفئة">
-                      <button type="button" className={segment.persona === null ? 'chip on' : 'chip'} aria-pressed={segment.persona === null} onClick={() => pickPersona(null)}>الكل</button>
+                      <button type="button" className={segment.persona === null && !segment.partners ? 'chip on' : 'chip'} aria-pressed={segment.persona === null && !segment.partners} onClick={() => pickPersona(null)}>الكل</button>
                       {PERSONA_LABELS.map((entry) => (
                         <button key={entry.key} type="button" className={segment.persona === entry.key ? 'chip on' : 'chip'} aria-pressed={segment.persona === entry.key} onClick={() => pickPersona(entry.key)}>{entry.label}</button>
                       ))}
+                      <button type="button" className={segment.partners ? 'chip on' : 'chip'} aria-pressed={segment.partners} onClick={() => setAudience({ type: 'partners' })}>شركاء النجاح</button>
                     </div>
                   </div>
                 </div>
@@ -586,6 +591,7 @@ export function PostEditor({ post, isAdmin, onClose }: Props) {
                 />
               ) : null}
               <AudienceReach audience={audience} />
+              {audience.type === 'partners' ? <p className="muted hint">«شركاء النجاح» = كل من يحمل عضوية شركاء النجاح الآن، أيًّا كانت فئته.</p> : null}
               {audience.type === 'all' ? <p className="muted hint">«الكل» في الصفّين = للجميع: تظهر الرسالة لكل الأعضاء والزوار.</p> : null}
               {segment?.paid ? <p className="muted hint">«مدفوع» = عضويته السنوية سارية الآن. «لم يدفع» = لم يشترك بعد أو انتهت عضويته.</p> : null}
               <p className="muted hint">أصحاب العضوية الشرفية معزولون تمامًا: لا تصلهم رسائل الإدارة ولا البوب أب ولا إشعاراتها، أيًّا كانت فئتهم.</p>

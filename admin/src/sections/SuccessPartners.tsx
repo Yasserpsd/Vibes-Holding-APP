@@ -23,9 +23,18 @@ const plain = (text: string): string =>
 
 export const projectName = (project: ProjectRef): string => (project.number ? `${project.title} (رقم المشروع: ${project.number})` : project.title);
 
+/** The project's own page in the Projects Bank, in a new tab (owner, 2026-11-25: «يفتح مباشر في بنك المشاريع اقدر استعرض المشروع»). */
+function ProjectPage({ url }: { url: string }) {
+  return (
+    <a className="pp-open" href={url} target="_blank" rel="noopener noreferrer">
+      استعرض المشروع في بنك المشاريع
+    </a>
+  );
+}
+
 /**
  * The partner's project, made to stand out (owner, 2026-11-25: «اسم المشروع المرتبط بيه ده مهم جدا لازم يبان») in the
- * membership's royal blue, or as a warning while there is none. Spans only: it also sits inside a list row's button.
+ * membership's royal blue, or as a warning while there is none. It carries a link, so it never sits inside a button.
  */
 export function LinkedProject({ project }: { project: ProjectRef | null }) {
   return (
@@ -33,6 +42,7 @@ export function LinkedProject({ project }: { project: ProjectRef | null }) {
       <span className="pp-label">المشروع المرتبط</span>
       <strong className="pp-title">{project ? project.title : 'لم يُربط بمشروع بعد'}</strong>
       {project?.number ? <span className="pp-number">{`رقم المشروع: ${project.number}`}</span> : null}
+      {project?.url ? <ProjectPage url={project.url} /> : null}
     </span>
   );
 }
@@ -45,6 +55,7 @@ export function ProjectPicker({ value, current, onPick }: { value: ProjectRef | 
   return (
     <div className="pp-picker">
       <strong>المشروع المرتبط (إلزامي)</strong>
+      {value?.url ? <ProjectPage url={value.url} /> : null}
       {value ? <p className="pp-chosen">{`المشروع المختار: ${projectName(value)}`}</p> : <p className="muted hint">اختر مشروعًا من بنك المشاريع. المشروع الواحد لا يرتبط إلا بشريك واحد.</p>}
       {/* Enter in the search box must not send the form behind it. */}
       <div onKeyDown={(event) => event.key === 'Enter' && event.preventDefault()}>
@@ -71,7 +82,7 @@ export function ProjectPicker({ value, current, onPick }: { value: ProjectRef | 
                         className={value?.id === project.id ? 'pp-row on' : 'pp-row'}
                         aria-pressed={value?.id === project.id}
                         disabled={taken || mine}
-                        onClick={() => onPick({ id: project.id, number: project.number, title: project.title })}
+                        onClick={() => onPick({ id: project.id, number: project.number, title: project.title, url: project.url })}
                       >
                         <span>{project.title}</span>
                         {project.number ? <small className="muted">{`رقم المشروع: ${project.number}`}</small> : null}
@@ -99,11 +110,10 @@ function PartnerList({ stamp }: { stamp: number }) {
       {({ partners }: SuccessPartners) => (
         <ul className="list">
           {partners.map((partner) => (
-            <li key={partner.contactId}>
+            <li key={partner.contactId} className="pp-item">
               <button type="button" className="list-row" onClick={() => openMember(partner.contactId)}>
-                <span className="list-main pp-partner">
+                <span className="list-main">
                   <strong>{partner.name || `حساب رقم ${partner.contactId}`}</strong>
-                  <LinkedProject project={partner.project} />
                   <span className="muted">
                     {partner.phone ? <bdi dir="ltr">{partner.phone}</bdi> : null}
                     {partner.end ? <span>{` · تنتهي في ${formatDay(partner.end)}`}</span> : null}
@@ -111,6 +121,7 @@ function PartnerList({ stamp }: { stamp: number }) {
                 </span>
                 <Pill tone={partner.project ? 'ok' : 'danger'}>{partner.project ? 'مرتبط' : 'يحتاج ربطًا'}</Pill>
               </button>
+              <LinkedProject project={partner.project} />
             </li>
           ))}
         </ul>

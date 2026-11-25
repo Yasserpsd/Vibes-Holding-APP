@@ -78,7 +78,7 @@ export type PostPersona = 'neutral' | 'entrepreneur' | 'investor';
 /** M273: «مدفوع» = the annual membership is active now; «لم يدفع» = never paid or expired. Alone, or narrowing one category. */
 export type PostPaid = 'paid' | 'unpaid';
 export type PostReach = { members: number | null; devices: number };
-export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona; paid?: PostPaid } | { type: 'paid'; paid: PostPaid } | { type: 'member'; contactId: number; name: string } | { type: 'members'; members: PostMember[] };
+export type PostAudience = { type: 'all' } | { type: 'persona'; persona: PostPersona; paid?: PostPaid } | { type: 'paid'; paid: PostPaid } | { type: 'partners' } | { type: 'member'; contactId: number; name: string } | { type: 'members'; members: PostMember[] };
 /** M238: one chosen member of a message's list. */
 export type PostMember = { contactId: number; name: string };
 export const MAX_AUDIENCE_MEMBERS = 50;

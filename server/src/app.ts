@@ -836,7 +836,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
     const found = await hubClient.call('member_status', { contact_id: contactId });
     return found.contact?.id === contactId && isHonorary(found.contact);
   });
-  await app.register(postsRoutes, { opens: postOpens, service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, persona, ref, paid) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, persona, paid: paid ?? null, ref }), delivery: (postId) => whatsapp.deliveryOf('admin_message', `post:${postId}`), remind: (input) => {
+  await app.register(postsRoutes, { opens: postOpens, service: posts, auth, hub: hubClient, polls, push, media, hubSync: postsHub, sync, autoPush, english: postsEnglish, tellMember: (contactId, ref) => void tellMember({ hub: hubClient, push, whatsapp }, contactId, 'admin_message', [], ref), tellAudience: (uuid, partners, persona, ref, paid) => void tellAudience({ hub: hubClient, push, whatsapp, log: app.log }, { uuid, partners, persona, paid: paid ?? null, ref }), delivery: (postId) => whatsapp.deliveryOf('admin_message', `post:${postId}`), remind: (input) => {
     // M269: the reminder's WhatsApp half — never at night, never twice a day to one number (remindAudience).
     if (!whatsapp.enabled) return 'off';
     if (quietHour(Date.now())) return 'night';

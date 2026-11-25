@@ -42,9 +42,11 @@ export async function tellMember(deps: TellDeps, contactId: number, kind: Notice
  * expired), never an honorary one (M232); `persona` narrows to one category, `paid` to whoever holds an active
  * membership («دفع») or does not («لم يدفع»: never paid, or expired). One rule for WhatsApp and for the dashboard's count.
  */
-export function accountInAudience(account: { state?: unknown; honorary?: unknown; persona?: unknown }, persona: string | null, paid: 'paid' | 'unpaid' | null = null): boolean {
+export function accountInAudience(account: { state?: unknown; honorary?: unknown; persona?: unknown; partner?: unknown }, persona: string | null, paid: 'paid' | 'unpaid' | null = null, partners = false): boolean {
   if (account.state !== 'member' && account.state !== 'unpaid' && account.state !== 'expired') return false;
   if (account.honorary === 1) return false;
+  // M275: «شركاء النجاح» — only an account whose Success Partners membership is running.
+  if (partners && account.partner !== 1) return false;
   if (persona && account.persona !== persona) return false;
   return !paid || (account.state === 'member') === (paid === 'paid');
 }
@@ -58,7 +60,7 @@ export const BROADCAST_CAP = 1500;
  * unverified sign-up or a lead. Each account hears it once (`ref`), in the language its app runs in (Arabic when it has
  * no device here). Meta bills every one of these messages. Runs in the background and never throws.
  */
-export async function tellAudience(deps: TellDeps & { log?: { info: (data: object, text: string) => void; warn: (data: object, text: string) => void } }, input: { uuid: string; persona: string | null; /** M273 */ paid?: 'paid' | 'unpaid' | null; ref: string }): Promise<{ sent: number; skipped: number }> {
+export async function tellAudience(deps: TellDeps & { log?: { info: (data: object, text: string) => void; warn: (data: object, text: string) => void } }, input: { uuid: string; persona: string | null; /** M273 */ paid?: 'paid' | 'unpaid' | null; /** M275 */ partners?: boolean; ref: string }): Promise<{ sent: number; skipped: number }> {
   const out = { sent: 0, skipped: 0 };
   try {
     if (!deps.whatsapp?.enabled) return out;
@@ -67,7 +69,7 @@ export async function tellAudience(deps: TellDeps & { log?: { info: (data: objec
       const slice = await hubCall(deps.hub, 'admin_accounts', { uuid: input.uuid, q: '', state: 'all', page, per_page: 100 });
       for (const account of slice.items) {
         const phone = String(account.phone ?? '').trim();
-        const fits = accountInAudience(account, input.persona, input.paid ?? null);
+        const fits = accountInAudience(account, input.persona, input.paid ?? null, input.partners ?? false);
         if (!fits || !phone || seen.has(phone) || out.sent >= BROADCAST_CAP) {
           out.skipped += 1;
           continue;
@@ -100,7 +102,7 @@ export type RemindDeps = Omit<TellDeps, 'whatsapp'> & {
   whatsapp?: Pick<WhatsappService, 'sendNotice' | 'enabled' | 'toldToday'>;
   log?: { info: (data: object, text: string) => void; warn: (data: object, text: string) => void };
 };
-export type RemindInput = { uuid: string; persona: string | null; /** M273 */ paid?: 'paid' | 'unpaid' | null; members: number[]; done: ReadonlySet<number>; ref: string; now?: number };
+export type RemindInput = { uuid: string; persona: string | null; /** M273 */ paid?: 'paid' | 'unpaid' | null; /** M275 */ partners?: boolean; members: number[]; done: ReadonlySet<number>; ref: string; now?: number };
 
 /**
  * M269 (owner, 2026-11-23): the dashboard's «إرسال تذكير» — WhatsApp says again that a management message waits, only
@@ -142,7 +144,7 @@ export async function remindAudience(deps: RemindDeps, input: RemindInput): Prom
       for (let page = 1; page <= 50 && out.sent < BROADCAST_CAP; page += 1) {
         const slice = await hubCall(deps.hub, 'admin_accounts', { uuid: input.uuid, q: '', state: 'all', page, per_page: 100 });
         for (const account of slice.items) {
-          const fits = accountInAudience(account, input.persona, input.paid ?? null);
+          const fits = accountInAudience(account, input.persona, input.paid ?? null, input.partners ?? false);
           if (fits) await tell(account);
           else out.skipped += 1;
         }
