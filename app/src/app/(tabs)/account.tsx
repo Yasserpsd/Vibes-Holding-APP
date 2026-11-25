@@ -6,6 +6,7 @@ import { Image, RefreshControl, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { displayProfile, useAuthConfig, useMembershipContent, type Me } from '@/api/auth';
+import { QuickEntryForm } from '@/components/QuickEntryForm';
 import { useStoreConfig } from '@/api/membership';
 import { companionApi } from '@/api/push';
 import { useAuth } from '@/auth/AuthProvider';
@@ -41,7 +42,7 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 export default function AccountScreen() {
   const router = useRouter();
   const { status, me, signOut, refresh } = useAuth();
-  const { data: config } = useAuthConfig();
+  const { data: config, refetch: refetchConfig } = useAuthConfig();
   const { data: content } = useMembershipContent();
   // M109c: the legal rows of «المزيد» open the server's own pages (or the owner's override URLs).
   const { data: store } = useStoreConfig();
@@ -66,12 +67,21 @@ export default function AccountScreen() {
     return (
       <PlaceholderScreen
         title={t('account.title')}
-        description={t('account.guestDescription')}
+        description={t(config?.quickEntry ? 'quick.subtitle' : 'account.guestDescription')}
       >
         <FadeInView delay={120} style={styles.actions}>
-          <AppButton label={t('account.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
-          {config?.registrationOpen === false ? null : (
-            <AppButton label={t('account.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+          {/* M272 (owner: «هو الدخول السريع اللي اتفقنا عليه فين؟»): a phone that once chose «المتابعة كضيف» never
+              meets the gate again, so its one number field stands here too; the two old buttons return only where
+              the server cannot answer it. */}
+          {config?.quickEntry ? (
+            <QuickEntryForm config={config} onRefused={() => void refetchConfig()} />
+          ) : (
+            <>
+              <AppButton label={t('account.signIn')} icon="log-in-outline" onPress={() => router.push('/auth/login')} />
+              {config?.registrationOpen === false ? null : (
+                <AppButton label={t('account.register')} variant="outline" icon="person-add-outline" onPress={() => router.push('/auth/register')} />
+              )}
+            </>
           )}
           <AppButton label={t('account.benefits')} variant="outline" icon="ribbon-outline" onPress={() => router.push('/membership')} />
           <AppButton label={t('account.about')} variant="outline" icon="information-circle-outline" onPress={() => router.push('/about')} />

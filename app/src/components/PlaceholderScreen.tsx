@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Image, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FadeInView, Floating } from '@/components/motion';
@@ -20,7 +20,10 @@ export function PlaceholderScreen({ title, description, children }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Scrollable: the guest's account carries up to seven buttons, more than a small phone (or a large font) can show at once. */}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* The guest's account now carries a number field: the keyboard pads the bottom (Android runs edge to edge, so
+          `padding` there too) and a tap on the button under the field counts while the keyboard is up. */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Floating>
           <View style={styles.emblemWrap}>
             <View style={styles.halo} />
@@ -43,6 +46,7 @@ export function PlaceholderScreen({ title, description, children }: Props) {
           </FadeInView>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
       <Text style={styles.footer}>
         {t(env.isProduction ? 'account.version' : 'account.versionPreview', { version: env.appVersion })}
       </Text>
@@ -56,6 +60,7 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.black,
     experimental_backgroundImage: gradients.screen,
   },
+  flex: { flex: 1 },
   content: {
     flexGrow: 1,
     alignItems: 'center',
