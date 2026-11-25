@@ -112,6 +112,14 @@ button.tile:hover { border-color: var(--gold-line); }
 .chip { flex: none; display: inline-flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
 .chip .num { font-size: 0.75rem; padding: 0 6px; border-radius: 999px; background: var(--line); color: var(--text); }
 .chip.on { border-color: var(--gold); color: var(--gold-bright); background: var(--gold-wash); }
+/* M274: the follow-up list of a message — long poll options as chips, and the message's own words on its card. */
+.chip.long { max-inline-size: 18em; }
+.chip.long > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.post-opens { display: grid; gap: 8px; justify-items: start; }
+.post-opens > .list, .post-opens > .chips { inline-size: 100%; }
+.post-body { display: grid; gap: 4px; justify-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.post-body p { margin: 0; font-size: 0.92rem; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 /* M273: the audience picker — payment over category, and the live «who gets it» line under them. */
 .audience-rows { display: grid; gap: 6px; }
 .audience-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 8px; align-items: center; }

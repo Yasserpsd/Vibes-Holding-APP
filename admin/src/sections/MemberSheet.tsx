@@ -357,6 +357,73 @@ function PhoneWaiver({ contactId, phone, waiver, onStart, onChanged }: { contact
   );
 }
 
+/**
+ * M274 (owner, 2026-11-25: «اقدر اي عضو لما افتح ارسله رسالة علي الخاص فورا هنا ووصله تذكير علي واتس اب… ويكون فيها
+ * اسمه»): a private message to this member, from his own sheet. It is a management message addressed to him alone —
+ * it opens with his name in his inbox, his devices hear the notification, and WhatsApp tells him by name that a
+ * message waits for him (M235). Its follow-up (opened or not) sits with the other messages in «أدوات التواصل».
+ */
+function PrivateMessage({ account }: { account: Account }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const name = account.name || `حساب رقم ${account.id}`;
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    if (!title.trim() || !body.trim()) return setError('اكتب عنوان الرسالة ونصها.');
+    const channels = account.phone ? 'مع إشعار التطبيق، وتنبيه على واتساب باسمه بأن له إشعارًا جديدًا في بريد الوارد.' : 'مع إشعار التطبيق. لا يوجد رقم جوال، فلن يصله تنبيه واتساب.';
+    if (!window.confirm(`إرسال هذه الرسالة إلى ${name} وحده؟ تصله في «بريد وارد» باسمه ${channels}`)) return;
+    setBusy(true);
+    setError(null);
+    setSent(null);
+    try {
+      await api.createPost({ title: title.trim(), body: body.trim(), links: [], images: [], video: null, videoFile: null, status: 'published', pinned: false, kind: 'post', event: null, poll: null, audience: { type: 'member', contactId: account.id, name: account.name } });
+      setOpen(false);
+      setTitle('');
+      setBody('');
+      setSent(`أُرسلت الرسالة الخاصة إلى ${name}. متابعتها (فتحها أم لا) في «أدوات التواصل».`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الإرسال الآن');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="sheet-block">
+      <h3>رسالة خاصة</h3>
+      {sent ? <Done text={sent} /> : null}
+      {account.honorary ? (
+        <p className="muted hint">صاحب العضوية الشرفية لا تصله رسائل الإدارة ولا إشعاراتها.</p>
+      ) : open ? (
+        <form className="stack" onSubmit={(event) => void send(event)}>
+          <label>
+            العنوان
+            <input value={title} maxLength={140} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label>
+            نص الرسالة
+            <textarea value={body} rows={5} maxLength={6000} onChange={(event) => setBody(event.target.value)} />
+          </label>
+          <p className="muted hint">تبدأ الرسالة باسمه تلقائيًا («الأستاذ/ …»)، فلا تكتب الاسم بنفسك.</p>
+          {error ? <p className="muted hint" role="alert">{error}</p> : null}
+          <div className="actions">
+            <button type="submit" className="primary" disabled={busy}>{busy ? 'جارٍ الإرسال…' : 'إرسال الآن'}</button>
+            <button type="button" disabled={busy} onClick={() => setOpen(false)}>إلغاء</button>
+          </div>
+        </form>
+      ) : (
+        <div className="actions">
+          <button type="button" onClick={() => { setOpen(true); setSent(null); }}>كتابة رسالة خاصة</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done: string | null; onStart: () => void; onChanged: (text: string) => void }) {
   const { openThread } = useShell();
   const [action, setAction] = useState<ActionKind | null>(null);
@@ -392,6 +459,9 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         </dl>
         {account.msg_count > 0 ? <button type="button" onClick={() => openThread(account.id)}>فتح المحادثة</button> : null}
       </section>
+
+      {/* M274: only a verified account has an inbox to read it in. */}
+      {account.state === 'member' || account.state === 'unpaid' || account.state === 'expired' ? <PrivateMessage account={account} /> : null}
 
       {account.phone && detail.phoneWaiver !== undefined ? <PhoneWaiver contactId={account.id} phone={account.phone} waiver={detail.phoneWaiver} onStart={onStart} onChanged={onChanged} /> : null}
 

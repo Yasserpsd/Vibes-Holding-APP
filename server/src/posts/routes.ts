@@ -344,6 +344,50 @@ export const postsRoutes: FastifyPluginAsync<PostsRoutesOptions> = async (app, {
     }),
   );
 
+  /**
+   * M274 (owner, 2026-11-25: «مش عارف مين فتح ومين ما فتح… ومين سجل وسجل وين»): one row per account of the message's
+   * audience — did he open it (and when), and for a poll what he chose. The audience is read from the hub's registry as
+   * it is now (rule 2); whoever opened or voted stays on the list even if he left the category since. `complete` is
+   * false when the registry could not be read, so «لم يفتح» may be short. Names are the admin's only.
+   */
+  app.get(
+    '/api/admin/posts/:id/follow',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      if (admin.level !== 'admin') return reply.code(403).send({ error: { code: 'admins_only', message: 'متابعة الأعضاء بالأسماء متاحة للمدير فقط' } });
+      const post = await service.get(params.id);
+      if (!post) return reply.code(404).send(NOT_FOUND);
+      const audience = audienceOf(post);
+      const opened = new Map((opens ? await opens.list(post.id) : []).map((row) => [row.contactId, row]));
+      const options = post.kind === 'poll' && post.poll ? post.poll.options.map((option) => ({ id: option.id, label: option.label })) : [];
+      // A vote for an option that was removed counts nowhere, here as in the totals.
+      const ballots = new Map([...(options.length ? await polls.ballots(post.id) : new Map<number, string>())].filter(([, optionId]) => options.some((option) => option.id === optionId)));
+      const { rows: accounts, complete } = await accountRows(admin.session.uuid);
+      const byId = new Map(accounts.map((row) => [row.id, row]));
+      const filter = audienceFilter(audience);
+      const named = audience.type === 'member' || audience.type === 'members';
+      const ids = new Set<number>(named ? audienceMemberIds(audience) : accounts.filter((row) => accountInAudience(row, filter?.persona ?? null, filter?.paid ?? null)).map((row) => row.id));
+      for (const id of opened.keys()) ids.add(id);
+      for (const id of ballots.keys()) ids.add(id);
+      const labels = new Map<number, string>(audience.type === 'members' ? audience.members.map((member) => [member.contactId, member.name]) : audience.type === 'member' ? [[audience.contactId, audience.name]] : []);
+      const rows = [...ids].map((id) => {
+        const account = byId.get(id);
+        const open = opened.get(id);
+        return {
+          contactId: id,
+          name: account?.name || open?.name || labels.get(id) || '',
+          persona: typeof account?.persona === 'string' && account.persona ? account.persona : (open?.persona ?? ''),
+          opened: open ? { first: open.first, last: open.last, count: open.count } : null,
+          vote: ballots.get(id) ?? null,
+        };
+      });
+      return { rows, options, complete: named || complete };
+    }),
+  );
+
   /** M28/M29/M31: a moderator publishes plain posts to everyone; targeted messages and polls are the admin's alone. */
   const MODERATOR_TARGETED = { error: { code: 'forbidden', message: 'الرسائل الموجّهة لحسابات الأدمن فقط' } };
   const MODERATOR_POLL = { error: { code: 'forbidden', message: 'الاستفتاءات لحسابات الأدمن فقط' } };

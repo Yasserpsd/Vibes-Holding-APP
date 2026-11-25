@@ -52,6 +52,16 @@ export class PollsService {
     return Object.keys(await this.load(postId)).map(Number).filter((id) => Number.isInteger(id) && id > 0);
   }
 
+  /** M274: who chose what, by account — the dashboard's follow-up list names every voter's choice (admins only). */
+  async ballots(postId: string): Promise<Map<number, string>> {
+    const out = new Map<number, string>();
+    for (const [contactId, optionId] of Object.entries(await this.load(postId))) {
+      const id = Number(contactId);
+      if (Number.isInteger(id) && id > 0) out.set(id, optionId);
+    }
+    return out;
+  }
+
   /** Counts per option (removed options' votes count nowhere) and the total of counted voters. */
   async results(postId: string, poll: PostPoll): Promise<{ counts: Record<string, number>; total: number }> {
     const votes = await this.load(postId);

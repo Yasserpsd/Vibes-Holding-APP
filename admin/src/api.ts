@@ -22,6 +22,9 @@ export type PostLink = { label: string; url: string };
 /** An uploaded video: both values are `url`s the uploads endpoint returned. */
 export type PostVideo = { url: string; poster: string | null };
 /** M243: one member who opened a management message. */
+/** M274: one account of a message's audience — did he open it, and what he chose in its poll. */
+export type PostFollowRow = { contactId: number; name: string; persona: string; opened: { first: string; last: string; count: number } | null; vote: string | null };
+export type PostFollow = { rows: PostFollowRow[]; options: { id: string; label: string }[]; complete: boolean };
 export type PostOpen = { contactId: number; name: string; persona: string; first: string; last: string; count: number };
 
 /** M251: where a message's WhatsApp notice stands; `rows` lists only the numbers it has not reached yet. */
@@ -668,6 +671,7 @@ export const api = {
   logout: (token?: string) => call<unknown>('POST', '/api/auth/logout', {}, token),
   posts: () => call<{ posts: Post[]; devices: number }>('GET', '/api/admin/posts'),
   /** M243: the members who opened one message, latest first (admins only). */
+  postFollow: (id: string) => call<PostFollow>('GET', `/api/admin/posts/${encodeURIComponent(id)}/follow`),
   postOpens: (id: string) => call<{ opens: PostOpen[]; whatsapp?: PostWhatsapp | null }>('GET', `/api/admin/posts/${encodeURIComponent(id)}/opens`),
   cardRequests: () => call<{ requests: CardRequest[] }>('GET', '/api/admin/card-requests'),
   cardRequestDone: (id: string) => call<{ request: CardRequest }>('POST', `/api/admin/card-requests/${id}/done`),

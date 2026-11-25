@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, type Post, type PostAudience, type PostOpen, type PostWhatsapp, type PostWhatsappRow } from '../api';
+import { api, type Post, type PostAudience, type PostFollow, type PostFollowRow, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
 import { paidLabel, personaLabel, PostEditor } from '../PostEditor';
 import { Async, messageOf, Pill, SectionHead, sessionOver, useLoad, useShell } from '../ui';
@@ -33,7 +33,7 @@ function HubSync({ post }: { post: Post }) {
 }
 
 /** M31: the poll's live numbers on its row — a bar per option, the leader filled fullest. */
-function PollResults({ post }: { post: Post }) {
+function PollResults({ post, picked = null, onPick }: { post: Post; picked?: string | null; onPick?: (optionId: string) => void }) {
   const results = post.pollResults;
   if (post.kind !== 'poll' || !results) return null;
   const total = results.totalVotes ?? 0;
@@ -44,7 +44,11 @@ function PollResults({ post }: { post: Post }) {
         return (
           <div className="row-line" key={option.id}>
             <span>{option.label}</span>
-            <span className="muted">{formatNumber(votes)}{total > 0 ? ` · ${Math.round((votes / total) * 100)}%` : ''}</span>
+            <span className="muted">
+              {formatNumber(votes)}{total > 0 ? ` · ${Math.round((votes / total) * 100)}%` : ''}
+              {/* M274: the names behind an option, one tap away (admins). */}
+              {onPick && votes > 0 ? <> · <button type="button" className="link" aria-pressed={picked === option.id} onClick={() => onPick(option.id)}>{picked === option.id ? 'إخفاء الأسماء' : 'عرض الأسماء'}</button></> : null}
+            </span>
             <div className="bar"><span style={{ width: total > 0 ? `${(votes / total) * 100}%` : 0 }} /></div>
           </div>
         );
@@ -65,54 +69,117 @@ function counted(count: number, [one, two, few, many]: [string, string, string, 
   return `${formatNumber(count)} ${count % 100 >= 3 && count % 100 <= 10 ? few : many}`;
 }
 
+/** M274: which rows of the follow-up list show — everyone, one state, or one poll option (`option:<id>`). */
+type FollowView = 'all' | 'voted' | 'opened' | 'unopened' | `option:${string}`;
+const FOLLOW_PAGE = 100;
+const followState = (row: PostFollowRow): 'voted' | 'opened' | 'unopened' => (row.vote !== null ? 'voted' : row.opened ? 'opened' : 'unopened');
+
 /**
- * M243 (owner: «اعرف مين فتح المقال ... واقدر اضغط علي العضو اشوف مين ده»): how many members opened the message; the
- * admin unfolds the names (latest first) and a name opens the member's sheet. A moderator sees the number only.
+ * M243 (owner: «اعرف مين فتح المقال ... واقدر اضغط علي العضو اشوف مين ده») + M274 (owner, 2026-11-25: «مش عارف مين فتح
+ * ومين ما فتح… ومين سجل وسجل وين»): the message followed member by member. The admin unfolds every account of its
+ * audience — who voted and for what, who only opened, who has not opened — filters it, and a name opens the member's
+ * sheet; an option of the poll opens the names behind it. A moderator sees the numbers only.
  */
-function Opens({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
+function Tracking({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
   const { openMember } = useShell();
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<PostOpen[] | null>(null);
+  const [view, setView] = useState<FollowView | null>(null);
+  const [data, setData] = useState<PostFollow | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (post.status !== 'published' || post.kind === 'popup') return null;
+  const [limit, setLimit] = useState(FOLLOW_PAGE);
+  const isPoll = post.kind === 'poll';
+  const tracked = post.status === 'published' && post.kind !== 'popup';
+  const canFollow = isAdmin && tracked;
   const count = post.opened ?? 0;
   const label = count === 0 ? 'لم يفتحها أي عضو بعد' : `فتحها ${counted(count, ['عضو واحد', 'عضوان', 'أعضاء', 'عضوًا'])}`;
-  if (!isAdmin || count === 0) return <p className="muted">👁 {label}</p>;
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (!next) return;
+  const show = async (next: FollowView | null) => {
+    const wasClosed = view === null;
+    setView(next);
+    setLimit(FOLLOW_PAGE);
+    if (next === null || !wasClosed) return;
     setError(null);
+    setData(null);
     try {
-      setRows((await api.postOpens(post.id)).opens);
+      setData(await api.postFollow(post.id));
     } catch (cause) {
       setError(messageOf(cause));
     }
   };
+  const rank = { voted: 0, opened: 1, unopened: 2 };
+  const rows = [...(data?.rows ?? [])].sort(
+    (a, b) => rank[followState(a)] - rank[followState(b)] || (b.opened?.last ?? '').localeCompare(a.opened?.last ?? '') || a.name.localeCompare(b.name, 'ar'),
+  );
+  const total = (state: 'voted' | 'opened' | 'unopened') => rows.filter((row) => followState(row) === state).length;
+  const optionLabel = (id: string) => data?.options.find((option) => option.id === id)?.label ?? '';
+  const shown = rows.filter((row) => (view === null || view === 'all' ? true : view.startsWith('option:') ? row.vote === view.slice(7) : followState(row) === view));
+  const stateLabel = { voted: 'صوّت', opened: isPoll ? 'فتح ولم يصوّت' : 'فتح', unopened: 'لم يفتح' };
+  const chip = (key: FollowView, text: string, number: number, long = false) => (
+    <button key={key} type="button" className={`${view === key ? 'chip on' : 'chip'}${long ? ' long' : ''}`} aria-pressed={view === key} title={long ? text : undefined} onClick={() => void show(key)}>
+      <span lang={long ? 'ar' : undefined}>{text}</span>
+      <span className="num">{formatNumber(number)}</span>
+    </button>
+  );
   return (
-    <div className="post-opens">
-      <button type="button" className="link" onClick={() => void toggle()} aria-expanded={open}>
-        👁 {label} · {open ? 'إخفاء الأسماء' : 'عرض الأسماء'}
-      </button>
-      {open && error ? <p className="muted">{error}</p> : null}
-      {open && !error && rows === null ? <p className="muted">جارٍ التحميل…</p> : null}
-      {open && rows ? (
-        <ul className="list">
-          {rows.map((row) => (
-            <li key={row.contactId}>
-              <button type="button" className="list-row" onClick={() => openMember(row.contactId)}>
-                <span className="list-main">
-                  <strong>{row.name || `حساب رقم ${row.contactId}`}</strong>
-                  <span className="muted">
-                    {personaLabel(row.persona) || 'بدون فئة'} · فتحها {formatDateTime(row.last)}
-                    {row.count > 1 ? ` · ${counted(row.count, ['مرة واحدة', 'مرتان', 'مرات', 'مرة'])} (أول مرة ${formatDateTime(row.first)})` : ''}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+    <>
+      <PollResults post={post} picked={view?.startsWith('option:') ? view.slice(7) : null} onPick={canFollow ? (optionId) => void show(view === `option:${optionId}` ? 'all' : `option:${optionId}`) : undefined} />
+      {!tracked ? null : !isAdmin ? <p className="muted">👁 {label}</p> : (
+        <div className="post-opens">
+          <button type="button" className="link" onClick={() => void show(view === null ? 'all' : null)} aria-expanded={view !== null}>
+            👁 {label} · {view !== null ? 'إخفاء المتابعة' : 'متابعة الأعضاء بالأسماء'}
+          </button>
+          {view !== null && error ? <p className="muted">{error}</p> : null}
+          {view !== null && !error && data === null ? <p className="muted">جارٍ التحميل…</p> : null}
+          {view !== null && data ? (
+            <>
+              <div className="chips" role="group" aria-label="تصفية المتابعة">
+                {chip('all', 'الكل', rows.length)}
+                {isPoll ? chip('voted', stateLabel.voted, total('voted')) : null}
+                {chip('opened', stateLabel.opened, total('opened'))}
+                {chip('unopened', stateLabel.unopened, total('unopened'))}
+              </div>
+              {isPoll ? (
+                <div className="chips" role="group" aria-label="حسب الاختيار">
+                  {data.options.map((option) => chip(`option:${option.id}`, option.label, rows.filter((row) => row.vote === option.id).length, true))}
+                </div>
+              ) : null}
+              {data.complete ? null : <p className="muted hint">تعذّرت قراءة سجل الأعضاء الآن، فقائمة «لم يفتح» قد تكون ناقصة. أعد المحاولة بعد قليل.</p>}
+              {shown.length === 0 ? <p className="muted">لا يوجد أحد في هذه القائمة.</p> : null}
+              <ul className="list">
+                {shown.slice(0, limit).map((row) => (
+                  <li key={row.contactId}>
+                    <button type="button" className="list-row" onClick={() => openMember(row.contactId)}>
+                      <span className="list-main">
+                        <strong>{row.name || `حساب رقم ${row.contactId}`}</strong>
+                        <span className="muted">
+                          {personaLabel(row.persona) || 'بدون فئة'}
+                          {row.vote !== null ? <> · اختار: <span lang="ar">{optionLabel(row.vote)}</span></> : null}
+                          {row.opened ? <> · فتحها {formatDateTime(row.opened.last)}</> : null}
+                          {row.opened && row.opened.count > 1 ? ` · ${counted(row.opened.count, ['مرة واحدة', 'مرتان', 'مرات', 'مرة'])} (أول مرة ${formatDateTime(row.opened.first)})` : ''}
+                        </span>
+                      </span>
+                      <Pill tone={followState(row) === 'voted' ? 'ok' : followState(row) === 'opened' ? 'gold' : 'muted'}>{stateLabel[followState(row)]}</Pill>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {shown.length > limit ? <button type="button" className="link" onClick={() => setLimit(limit + FOLLOW_PAGE)}>عرض المزيد ({formatNumber(shown.length - limit)})</button> : null}
+            </>
+          ) : null}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** M274 (owner: «في رسالة توصل مع الاستفتاء مش ظاهرة»): the words the member reads, on the card — three lines, the rest on a tap. */
+function BodyText({ post }: { post: Post }) {
+  const [full, setFull] = useState(false);
+  const text = post.body.trim();
+  if (!text) return null;
+  const long = text.length > 200 || text.split('\n').length > 3;
+  return (
+    <div className="post-body">
+      <p className={full || !long ? 'prose' : 'prose clamp'} lang="ar" dir="auto">{text}</p>
+      {long ? <button type="button" className="link" onClick={() => setFull(!full)}>{full ? 'إخفاء النص' : 'عرض النص كاملًا'}</button> : null}
     </div>
   );
 }
@@ -346,9 +413,9 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                   {post.images.length > 0 ? ` · صور: ${post.images.length}` : ''}
                   {post.video ? ' · فيديو مرفوع' : ''}
                 </p>
+                <BodyText post={post} />
                 <HubSync post={post} />
-                <PollResults post={post} />
-                <Opens post={post} isAdmin={isAdmin} />
+                <Tracking post={post} isAdmin={isAdmin} />
                 {isAdmin ? <WhatsappDelivery post={post} /> : null}
                 <div className="actions">
                   <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
