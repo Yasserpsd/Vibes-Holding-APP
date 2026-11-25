@@ -11,6 +11,8 @@ import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type 
 import type { Notifier } from '../mail/notify.js';
 import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
 import { HUB_PARTNER_VERSION, isPartner } from '../membership/partner.js';
+import { PartnerProjectStore, projectLabel, type PartnerLink, type PartnerProject } from '../membership/partnerProjects.js';
+import type { ProjectsService } from '../projectsBank/service.js';
 import type { MembershipService } from '../membership/service.js';
 import type { PaymentStats, PaymentsService } from '../payments/service.js';
 import type { PbBalance, PbBalanceLite, PbBridge, PbMember } from '../projectsBank/bridge.js';
@@ -45,6 +47,12 @@ const UPGRADE_HUB_PARTNER = 'عضوية شركاء النجاح تحتاج تح�
 // M271: the same two sentences prefill the note in admin/src/sections/MemberSheet.tsx.
 const PARTNER_NOTE_GRANT = 'منح عضوية شركاء النجاح لمدة 360 يومًا';
 const PARTNER_NOTE_REVOKE = 'سحب عضوية شركاء النجاح';
+// M275: what the link itself writes and refuses with.
+const PARTNER_NOTE_PROJECT = 'ربط شريك النجاح بمشروع';
+export const PICK_PROJECT = 'اختر المشروع المرتبط بشريك النجاح أولًا: لا تُمنح العضوية بدون مشروع';
+
+export type SuccessPartnerRow = { contactId: number; name: string; phone: string; since: string; end: string; left: number | null; project: PartnerProject | null };
+export type PartnerProjectChoice = PartnerProject & { holder: { contactId: number; name: string } | null };
 
 export type SectionError = { code: string; message: string };
 export type BridgeInfo = { hub: { version: string | null; ok: boolean }; pb: { version: string | null; ok: boolean } };
@@ -54,7 +62,7 @@ export type AuditEntry = {
   id: string;
   at: string;
   actor: { id: number; name: string; email: string };
-  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'delete';
+  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete';
   contactId: number;
   params: Record<string, unknown>;
   note: string;
@@ -128,7 +136,7 @@ class ShortCache {
   }
 }
 
-type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore; /** M243: a deleted account leaves the messages' read lists. */ postOpens?: { forgetContact(contactId: number): Promise<void> } };
+type Deps = { hub: HubClient; pb: PbBridge; kv: KV; auth: AuthService; payments: PaymentsService; membership: MembershipService; push: PushService; log: FastifyBaseLogger; /** M205: the honorary membership notice goes on WhatsApp. */ whatsapp?: WhatsappService; /** M215: the management's mail for an honorary grant or revoke. */ notifier?: Notifier; /** M216: a dashboard deletion ends the member's own 30-day request. */ deletion?: AccountDeletionStore; /** M243: a deleted account leaves the messages' read lists. */ postOpens?: { forgetContact(contactId: number): Promise<void> }; /** M275: the bank a Success Partner is tied to. */ projects: Pick<ProjectsService, 'all' | 'get'> };
 
 export class DashboardService {
   private readonly cache = new ShortCache();
@@ -138,7 +146,11 @@ export class DashboardService {
   private readonly running = new Map<string, Promise<Record<string, unknown>>>();
   private readonly answered = new Map<string, Record<string, unknown>>();
 
-  constructor(private readonly deps: Deps) {}
+  private readonly links: PartnerProjectStore;
+
+  constructor(private readonly deps: Deps) {
+    this.links = new PartnerProjectStore(deps.kv);
+  }
 
   /** Webhooks and writes drop what they made stale: `hub`, `threads`, `pb` or everything. */
   bust(...groups: ('hub' | 'threads' | 'pb')[]): void {
@@ -302,7 +314,7 @@ export class DashboardService {
     return { ...result, items: result.items.map((account) => ({ ...account, pb: beside(account) })), pbError };
   }
 
-  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null; deletionRequest: { requestedAt: string; dueAt: string; reason: string } | null }> {
+  async account(admin: AdminActor, contactId: number): Promise<HubResults['admin_member'] & { pb: PbBalance | null; pbError: SectionError | null; deletionRequest: { requestedAt: string; dueAt: string; reason: string } | null; partnerProject: PartnerProject | null }> {
     const result = await this.hub(admin, 'admin_member', { contact_id: contactId });
     let pb: PbBalance | null = null;
     let pbError: SectionError | null = null;
@@ -316,7 +328,9 @@ export class DashboardService {
     }
     // M216: the member's own 30-day request shows on the sheet, where the deletion is executed.
     const scheduled = await this.deps.deletion?.scheduledOf(contactId);
-    return { ...result, pb, pbError, deletionRequest: scheduled ? { requestedAt: scheduled.requestedAt, dueAt: scheduled.dueAt, reason: scheduled.reason } : null };
+    // M275: only a running Success Partners membership shows its project.
+    const link = isPartner(result.account) ? await this.links.of(contactId) : null;
+    return { ...result, pb, pbError, deletionRequest: scheduled ? { requestedAt: scheduled.requestedAt, dueAt: scheduled.dueAt, reason: scheduled.reason } : null, partnerProject: link ? this.currentProject(link.project) : null };
   }
 
   /**
@@ -528,19 +542,24 @@ export class DashboardService {
    * one audit entry. The hub holds it (`admin_grant` partner / partner_revoke, 2.33.0) and ends it by itself after 360
    * days; a paid period under it keeps counting. Nothing about it is sold (rule 3). A grant is told on WhatsApp with the
    * approved «سارية حتى» template (M234), by e-mail when WhatsApp cannot carry it; a revoke by e-mail; both by push.
+   * M275: no grant without a project of the bank that no other partner holds; a revoke frees it.
    */
-  partner(admin: AdminActor, contactId: number, input: { on: boolean; note: string; requestId: string | null }) {
+  async partner(admin: AdminActor, contactId: number, input: { on: boolean; projectId: number | null; note: string; requestId: string | null }) {
     const note = input.note.trim() || (input.on ? PARTNER_NOTE_GRANT : PARTNER_NOTE_REVOKE);
-    return this.write(admin, 'partner', contactId, { params: { on: input.on }, note, requestId: input.requestId }, async () => {
+    // The audit line names the project taken, or the one a revoke frees.
+    const named = input.on ? this.deps.projects.get(input.projectId ?? 0) : ((await this.links.of(contactId))?.project ?? null);
+    const params = { on: input.on, ...(input.on ? { projectId: input.projectId } : {}), ...(named ? { project: projectLabel(named) } : {}) };
+    return this.write(admin, 'partner', contactId, { params, note, requestId: input.requestId }, async () => {
+      let project: PartnerProject | null = null;
       let result: HubResults['admin_grant'];
-      try {
-        result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: input.on ? 'partner' : 'partner_revoke', days: 0, note }, false);
-      } catch (error) {
-        if (error instanceof HubError && error.code === 'invalid' && (await this.hubBefore(HUB_PARTNER_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
-        throw error;
+      if (input.on) {
+        const chosen = this.bankProject(input.projectId);
+        project = chosen;
+        result = await this.links.exclusive(() => this.grantWithProject(admin, contactId, chosen, note));
+      } else {
+        result = await this.setPartner(admin, contactId, false, note);
+        await this.freeProject(contactId);
       }
-      // A hub that answered without the flag did not understand the action: nothing changed and nobody is told.
-      if (isPartner(result.contact) !== input.on) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
       this.deps.auth.forget(contactId);
       this.bust('hub', 'pb');
       const { contact, event } = result;
@@ -554,9 +573,136 @@ export class DashboardService {
         mail();
       }
       this.deps.push.partnerChanged(contactId, input.on, until);
-      this.deps.notifier?.partnerChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note });
+      this.deps.notifier?.partnerChanged({ on: input.on, name: contact.name, phone: contact.phone, email, contactId, by: admin.me.name || admin.me.email, note, project: project ? projectLabel(project) : null });
       return { ok: true as const, contact: result.contact, event: result.event };
     });
+  }
+
+  /** The hub's half of a grant or a revoke. */
+  private async setPartner(admin: AdminActor, contactId: number, on: boolean, note: string): Promise<HubResults['admin_grant']> {
+    let result: HubResults['admin_grant'];
+    try {
+      result = await this.hub(admin, 'admin_grant', { contact_id: contactId, action: on ? 'partner' : 'partner_revoke', days: 0, note }, false);
+    } catch (error) {
+      if (error instanceof HubError && error.code === 'invalid' && (await this.hubBefore(HUB_PARTNER_VERSION))) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
+      throw error;
+    }
+    // A hub that answered without the flag did not understand the action: nothing changed and nobody is told.
+    if (isPartner(result.contact) !== on) throw new HubError('hub_not_supported', UPGRADE_HUB_PARTNER, 501);
+    return result;
+  }
+
+  /**
+   * M275, inside `links.exclusive`: the project is taken before the hub is asked, so a membership never starts without
+   * one, and it is given back when the hub refuses. A hub that applied the grant and lost its answer keeps the link.
+   */
+  private async grantWithProject(admin: AdminActor, contactId: number, project: PartnerProject, note: string): Promise<HubResults['admin_grant']> {
+    const account = await this.accountNow(admin, contactId);
+    if (account && isPartner(account)) throw new RequestError('partner', 'هذا الحساب يحمل عضوية شركاء النجاح من قبل: غيّر مشروعه من «تغيير المشروع»', 409);
+    await this.assertFree(admin, project, contactId);
+    const previous = await this.links.of(contactId);
+    await this.links.put(this.newLink(admin, contactId, project));
+    try {
+      return await this.setPartner(admin, contactId, true, note);
+    } catch (error) {
+      // No answer to this question either: the link stays, and its next reader frees it if the membership never started.
+      const now = await this.accountNow(admin, contactId).catch(() => undefined);
+      if (now !== undefined && !(now && isPartner(now))) await (previous ? this.links.put(previous) : this.links.remove(contactId));
+      throw error;
+    }
+  }
+
+  /** M275: links a partner given before the rule, or moves him to another project. The membership is untouched. */
+  setPartnerProject(admin: AdminActor, contactId: number, input: { projectId: number; note: string; requestId: string | null }) {
+    const note = input.note.trim() || PARTNER_NOTE_PROJECT;
+    const named = this.deps.projects.get(input.projectId);
+    const params = { projectId: input.projectId, ...(named ? { project: projectLabel(named) } : {}) };
+    return this.write(admin, 'partner_project', contactId, { params, note, requestId: input.requestId }, async () => {
+      const project = this.bankProject(input.projectId);
+      await this.links.exclusive(async () => {
+        const account = await this.accountNow(admin, contactId);
+        if (!account || !isPartner(account)) throw new RequestError('not_partner', 'هذا الحساب لا يحمل عضوية شركاء النجاح، فلا يرتبط بمشروع', 409);
+        await this.assertFree(admin, project, contactId);
+        await this.links.put(this.newLink(admin, contactId, project));
+      });
+      return { ok: true as const, project };
+    });
+  }
+
+  /** M275: the running Success Partners with their projects, and the bank as the picker offers it (name and number only). */
+  async successPartners(admin: AdminActor): Promise<{ partners: SuccessPartnerRow[]; projects: PartnerProjectChoice[] }> {
+    const found = new Map<number, HubAccount>();
+    for (let page = 1; page <= 200; page += 1) {
+      const slice = await this.hub(admin, 'admin_accounts', { q: '', state: 'member', page, per_page: 100 });
+      for (const account of slice.items) if (isPartner(account)) found.set(account.id, account);
+      if (!slice.items.length || page * 100 >= slice.total) break;
+    }
+    // A year that ran out by itself says nothing to this server: its link is dropped here, once the hub confirms it.
+    const links = await this.links.exclusive(async () => {
+      for (const link of await this.links.all()) {
+        if (found.has(link.contactId)) continue;
+        const account = await this.accountNow(admin, link.contactId);
+        if (account && isPartner(account)) found.set(account.id, account);
+        else await this.links.remove(link.contactId);
+      }
+      return this.links.all();
+    });
+    const byContact = new Map(links.map((link) => [link.contactId, link]));
+    // Those still waiting for a project lead the list.
+    const partners = [...found.values()]
+      .map((account) => {
+        const link = byContact.get(account.id);
+        return { contactId: account.id, name: account.name || account.email, phone: account.phone, since: account.partner_since ?? '', end: account.partner_end ?? '', left: account.partner_left ?? null, project: link ? this.currentProject(link.project) : null };
+      })
+      .sort((a, b) => Number(Boolean(a.project)) - Number(Boolean(b.project)) || b.since.localeCompare(a.since) || b.contactId - a.contactId);
+    const holders = new Map(links.map((link) => [link.project.id, { contactId: link.contactId, name: found.get(link.contactId)?.name || found.get(link.contactId)?.email || '' }]));
+    const projects = this.deps.projects
+      .all()
+      .map((project) => ({ id: project.id, number: project.number, title: project.title, holder: holders.get(project.id) ?? null }))
+      .sort((a, b) => b.id - a.id);
+    return { partners, projects };
+  }
+
+  /** Name and number only (rule 4), as the bank has them today; the stored ones once a project has left the feed. */
+  private currentProject(stored: PartnerProject): PartnerProject {
+    const live = this.deps.projects.get(stored.id);
+    return live ? { id: live.id, number: live.number, title: live.title } : stored;
+  }
+
+  private bankProject(projectId: number | null): PartnerProject {
+    if (!projectId) throw new RequestError('project_required', PICK_PROJECT, 400);
+    const project = this.deps.projects.get(projectId);
+    if (!project) throw new RequestError('project_unknown', 'المشروع المختار غير موجود في بنك المشاريع: حدّث الصفحة واختر من القائمة', 400);
+    return { id: project.id, number: project.number, title: project.title };
+  }
+
+  private newLink(admin: AdminActor, contactId: number, project: PartnerProject): PartnerLink {
+    return { contactId, project, linkedAt: new Date().toISOString(), by: admin.me.name || admin.me.email };
+  }
+
+  /** The account as the hub has it this moment; null when the hub no longer knows it. */
+  private async accountNow(admin: AdminActor, contactId: number): Promise<HubAccount | null> {
+    try {
+      return (await this.hub(admin, 'admin_member', { contact_id: contactId }, false)).account;
+    } catch (error) {
+      if (error instanceof HubError && error.code === 'not_found') return null;
+      throw error;
+    }
+  }
+
+  /** Inside `links.exclusive`: refuses a project a running partner holds, and frees one whose holder no longer is one. */
+  private async assertFree(admin: AdminActor, project: PartnerProject, contactId: number): Promise<void> {
+    for (const link of await this.links.all()) {
+      if (link.project.id !== project.id || link.contactId === contactId) continue;
+      const holder = await this.accountNow(admin, link.contactId);
+      if (holder && isPartner(holder)) throw new RequestError('project_taken', `هذا المشروع مرتبط بالفعل بشريك النجاح «${holder.name || holder.email}» (حساب رقم ${holder.id}). المشروع الواحد لا يرتبط إلا بشريك واحد`, 409);
+      await this.links.remove(link.contactId);
+    }
+  }
+
+  /** After a revoke or a deletion, which are already done: a link that cannot be removed now is dropped by its next reader. */
+  private async freeProject(contactId: number): Promise<void> {
+    await this.links.exclusive(() => this.links.remove(contactId)).catch((error: unknown) => this.deps.log.error({ err: error, contactId }, 'partner project not freed'));
   }
 
   /**
@@ -582,6 +728,7 @@ export class DashboardService {
       await this.deps.push.forgetContact(contactId);
       await this.deps.deletion?.cancel(contactId);
       await this.deps.postOpens?.forgetContact(contactId);
+      await this.freeProject(contactId);
       this.bust('hub', 'pb');
       if (!result.already) {
         const email = result.email || account.email;

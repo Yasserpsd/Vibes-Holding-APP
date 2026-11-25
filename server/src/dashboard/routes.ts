@@ -5,7 +5,7 @@ import { dashboardGuard, guard, parse } from '../auth/guard.js';
 import { LEGACY_BEFORE_UTC, type LegacyAccounts } from '../auth/legacy.js';
 import type { AuthService } from '../auth/service.js';
 import type { InterestsService } from '../interests/service.js';
-import type { DashboardService } from './service.js';
+import { PICK_PROJECT, type DashboardService } from './service.js';
 
 export type DashboardRoutesOptions = { service: DashboardService; auth: AuthService; interests?: InterestsService; legacy?: LegacyAccounts };
 
@@ -46,8 +46,12 @@ const grantSchema = z
 const roleSchema = z.object({ role: z.enum(['member', 'publisher']), note, confirm, requestId });
 // M205 «عضوية شرفية»: on = give, off = take back. No days: it has no duration.
 const honorarySchema = z.strictObject({ on: z.boolean(), note, confirm, requestId });
-// M271: the same body for «عضوية شركاء النجاح» (the 360 days are the hub's, never sent).
-const partnerSchema = honorarySchema;
+// M271: «عضوية شركاء النجاح» (the 360 days are the hub's, never sent). M275: a grant names its Projects Bank project.
+const projectId = z.number('اختر المشروع من القائمة').int().positive('اختر المشروع من القائمة');
+const partnerSchema = z
+  .strictObject({ on: z.boolean(), projectId: projectId.nullish(), note, confirm, requestId })
+  .refine((body) => !body.on || typeof body.projectId === 'number', { message: PICK_PROJECT, path: ['projectId'] });
+const partnerProjectSchema = z.strictObject({ projectId, note, confirm, requestId });
 // M216 «حذف فوري للحساب»: the reason is required; it stays in the audit log and reaches the management.
 const deleteSchema = z.strictObject({ note: z.string().trim().min(3, 'اكتب سبب الحذف').max(300), tellMember: z.boolean().default(false), confirm, requestId });
 const pbGrantSchema = z.object({ amount: z.number().int().min(-50).max(50).refine((value) => value !== 0, 'اكتب عدد المشاريع المضافة أو المخصومة'), note, confirm, requestId });
@@ -265,7 +269,30 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       if (!params) return;
       const body = parse(partnerSchema, request.body, reply);
       if (!body) return;
-      return service.partner(admin, params.id, { on: body.on, note: body.note, requestId: body.requestId ?? null });
+      return service.partner(admin, params.id, { on: body.on, projectId: body.on ? (body.projectId ?? null) : null, note: body.note, requestId: body.requestId ?? null });
+    }),
+  );
+
+  // M275: link or move a running partner's project, and the partners beside the bank's taken and free projects.
+  app.post(
+    '/api/admin/accounts/:id/partner-project',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(partnerProjectSchema, request.body, reply);
+      if (!body) return;
+      return service.setPartnerProject(admin, params.id, { projectId: body.projectId, note: body.note, requestId: body.requestId ?? null });
+    }),
+  );
+
+  app.get(
+    '/api/admin/success-partners',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return service.successPartners(admin);
     }),
   );
 

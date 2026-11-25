@@ -8,6 +8,8 @@ import { AUDIT_KEY, type AuditEntry } from './dashboard/service.js';
 import { MOCK_CODE, MockHubClient } from './hub/mock.js';
 import { HubError, type HubBody, type HubClient, type HubContact, type HubOp, type HubResponse } from './hub/types.js';
 import { DAY_MS } from './riyadh.js';
+import { SNAPSHOT_KEY } from './projectsBank/service.js';
+import type { PublicProject } from './projectsBank/types.js';
 import { MemoryKV } from './store.js';
 import { googleClaims, googleObjectId } from './wallet/google.js';
 import { passJson } from './wallet/pkpass.js';
@@ -47,7 +49,17 @@ const call = (input: Inject) => {
 };
 const post = (url: string, payload: Record<string, unknown>, token?: string, headers?: Record<string, string>) => call({ method: 'POST', url, payload, token, headers });
 const get = (url: string, token?: string) => call({ method: 'GET', url, token });
-const partner = (id: number, on: boolean, token = adminToken, extra: Record<string, unknown> = {}) => post(`/api/admin/accounts/${id}/partner`, { on, note: '', confirm: true, ...extra }, token);
+// M275: a grant names a project of the bank; each member of these tests has his own.
+const bank = { projects: Array.from({ length: 30 }, (_, index) => ({ id: index + 1, number: `P-${index + 1}`, title: `مشروع ${index + 1}`, sector: null, stage: null, gallery: [] }) as unknown as PublicProject), fetchedAt: '2026-11-25T00:00:00.000Z' };
+const projectOf = new Map<number, number>();
+const projectFor = (id: number): number => projectOf.get(id) ?? projectOf.set(id, projectOf.size + 1).get(id)!;
+async function startApp(store: MemoryKV, hubClient: HubClient): Promise<Awaited<ReturnType<typeof buildApp>>['app']> {
+  await store.set(SNAPSHOT_KEY, bank);
+  const built = await buildApp({ config, kv: store, hub: hubClient });
+  await built.projects.start();
+  return built.app;
+}
+const partner = (id: number, on: boolean, token = adminToken, extra: Record<string, unknown> = {}) => post(`/api/admin/accounts/${id}/partner`, { on, ...(on ? { projectId: projectFor(id) } : {}), note: '', confirm: true, ...extra }, token);
 const honorary = (id: number, on: boolean) => post(`/api/admin/accounts/${id}/honorary`, { on, note: '', confirm: true }, adminToken);
 const grant = (id: number, action: 'activate' | 'extend' | 'revoke', days = 30) => post(`/api/admin/accounts/${id}/grant`, { action, days, note: 'اختبار', confirm: true }, adminToken);
 type MembershipView = { status: string; kind: string; daysLeft: number | null; endDate: string | null };
@@ -72,7 +84,7 @@ const purchase = (id: string, contactId: number, now = Date.now()) =>
   );
 
 before(async () => {
-  app = (await buildApp({ config, kv, hub })).app;
+  app = await startApp(kv, hub);
   adminToken = (await signUp('m271.admin@gmail.com')).token;
 });
 
@@ -202,7 +214,7 @@ test('a hub before 2.33.0 changes nothing and the admin is told to update it', a
   const oldHub = new StagedHub();
   oldHub.oldVersion = '2.32.0';
   const main = app;
-  app = (await buildApp({ config, kv: new MemoryKV(), hub: oldHub })).app;
+  app = await startApp(new MemoryKV(), oldHub);
   try {
     const admin = await signUp('m271.oldadmin@gmail.com');
     const member = await signUp('m271.oldhub@gmail.com');

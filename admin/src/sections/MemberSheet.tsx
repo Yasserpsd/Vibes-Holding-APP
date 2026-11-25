@@ -2,13 +2,17 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { api, newRequestId } from '../api';
 import { formatCents, formatDateTime, formatDay, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
-import type { Account, GrantAction, MemberDetail, MemberEvent } from '../types';
+import type { Account, GrantAction, MemberDetail, MemberEvent, ProjectRef } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
 import { dailyLeft, memberLeft, personaLabel, StatePill, WaPill } from './Members';
+import { ProjectPicker, projectName } from './SuccessPartners';
 
-type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'partner' | 'unpartner' | 'delete';
+type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'partner' | 'partnerProject' | 'unpartner' | 'delete';
 /** What the owner filled in, frozen for the confirm step together with the id that makes the write idempotent. */
-type Draft = { kind: ActionKind; amount: number; note: string; requestId: string; tellMember: boolean };
+type Draft = { kind: ActionKind; amount: number; note: string; requestId: string; tellMember: boolean; project: ProjectRef | null };
+
+/** M275: the two actions that name a Projects Bank project. */
+const picksProject = (kind: ActionKind): boolean => kind === 'partner' || kind === 'partnerProject';
 
 const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: boolean }> = {
   activate: { button: 'تفعيل العضوية', title: 'تفعيل العضوية' },
@@ -20,6 +24,8 @@ const ACTIONS: Record<ActionKind, { button: string; title: string; danger?: bool
   unhonorary: { button: 'سحب العضوية الشرفية', title: 'سحب العضوية الشرفية', danger: true },
   // M271: given by the administration for 360 days, never sold.
   partner: { button: 'منح عضوية شركاء النجاح', title: 'منح عضوية شركاء النجاح' },
+  // M275: the button reads «تغيير المشروع» once there is one.
+  partnerProject: { button: 'ربط بمشروع', title: 'مشروع شريك النجاح' },
   unpartner: { button: 'سحب عضوية شركاء النجاح', title: 'سحب عضوية شركاء النجاح', danger: true },
   delete: { button: 'حذف الحساب', title: 'حذف الحساب نهائيًا', danger: true },
   publisher: { button: 'ترقية إلى موديريتور', title: 'صلاحية النشر (موديريتور)' },
@@ -54,7 +60,7 @@ function membershipActions(account: Account): ActionKind[] {
   const list: ActionKind[] = account.honorary
     ? ['pb', 'unhonorary']
     : account.partner
-      ? ['pb', 'unpartner']
+      ? ['pb', 'partnerProject', 'unpartner']
       : account.state !== 'member'
         ? ['activate', 'partner', 'honorary']
         : openEnded(account)
@@ -69,6 +75,7 @@ const PREFILLED_NOTES: Partial<Record<ActionKind, string>> = {
   honorary: 'منح العضوية الشرفية: شريك رسمي في عقد تأسيس إحدى شركات Vibes Ventures',
   unhonorary: 'سحب العضوية الشرفية',
   partner: 'منح عضوية شركاء النجاح لمدة 360 يومًا',
+  partnerProject: 'ربط شريك النجاح بمشروع',
   unpartner: 'سحب عضوية شركاء النجاح',
 };
 
@@ -89,6 +96,8 @@ function summary(draft: Draft, name: string): string {
       return `تُسحب العضوية الشرفية من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار على واتساب بأن العضوية الشرفية مخصّصة للشركاء الرسميين في عقود تأسيس شركات Vibes Ventures، ويصل الإدارة بريد بالإجراء.`;
     case 'partner':
       return `تُمنح «${name}» عضوية شركاء النجاح لمدة 360 يومًا تبدأ من الآن، بمزايا العضوية السارية، ويصله إشعار داخل التطبيق وعلى واتساب، ويصل الإدارة بريد بالإجراء. إن كان له اشتراك مدفوع تبقى أيامه محفوظة.`;
+    case 'partnerProject':
+      return `يُربط شريك النجاح «${name}» بالمشروع المختار، ولا يتغير شيء في عضويته ولا يصله إشعار.`;
     case 'unpartner':
       return `تُسحب عضوية شركاء النجاح من «${name}» الآن. إن كان له اشتراك مدفوع سارٍ يبقى عضوًا حتى نهايته، وإلا يفقد مزايا الأعضاء. يصله إشعار داخل التطبيق وبالبريد، ويصل الإدارة بريد بالإجراء.`;
     case 'delete':
@@ -105,13 +114,14 @@ function run(contactId: number, draft: Draft) {
   if (draft.kind === 'delete') return api.deleteAccount(contactId, { tellMember: draft.tellMember, ...meta });
   if (draft.kind === 'pb') return api.pbGrant(contactId, { amount: draft.amount, ...meta });
   if (draft.kind === 'honorary' || draft.kind === 'unhonorary') return api.honorary(contactId, { on: draft.kind === 'honorary', ...meta });
-  if (draft.kind === 'partner' || draft.kind === 'unpartner') return api.partner(contactId, { on: draft.kind === 'partner', ...meta });
+  if (draft.kind === 'partnerProject') return api.setPartnerProject(contactId, { projectId: draft.project?.id ?? 0, ...meta });
+  if (draft.kind === 'partner' || draft.kind === 'unpartner') return api.partner(contactId, { on: draft.kind === 'partner', ...(draft.project ? { projectId: draft.project.id } : {}), ...meta });
   if (draft.kind === 'publisher' || draft.kind === 'unpublisher') return api.setRole(contactId, { role: draft.kind === 'publisher' ? 'publisher' : 'member', ...meta });
   return api.grant(contactId, { action: draft.kind, days: draft.kind === 'revoke' ? null : draft.amount, ...meta });
 }
 
 /** Step one: the numbers and the required note. Step two: the sentence and «تأكيد». Nothing is sent before the second tap. */
-function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; account: Account; onDone: (text: string) => void; onCancel: () => void }) {
+function ActionPanel({ kind, account, current, onDone, onCancel }: { kind: ActionKind; account: Account; current: ProjectRef | null; onDone: (text: string) => void; onCancel: () => void }) {
   const { signOut } = useShell();
   const days = kind === 'activate' || kind === 'extend';
   const [amount, setAmount] = useState(days ? '365' : kind === 'pb' ? '1' : '');
@@ -124,6 +134,7 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
   // M216: an active member is told by default; a spam or test account is not.
   const [tellMember, setTellMember] = useState(account.state === 'member');
   const [word, setWord] = useState('');
+  const [project, setProject] = useState<ProjectRef | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = account.name || account.email || `حساب رقم ${account.id}`;
@@ -134,10 +145,11 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
     const value = kind === 'pb' && direction === 'cut' ? -typed : typed;
     if (days && (!Number.isInteger(typed) || typed < 1 || typed > 3650)) return setError('اكتب عدد الأيام من 1 إلى 3650.');
     if (kind === 'pb' && (!Number.isInteger(typed) || typed < 1 || typed > 50)) return setError('اكتب عدد المشاريع من 1 إلى 50.');
+    if (picksProject(kind) && !project) return setError('اختر المشروع المرتبط بشريك النجاح أولًا: لا تُمنح العضوية بدون مشروع.');
     if (note.trim().length < 3) return setError('اكتب ملاحظة توضّح سبب الإجراء: تُحفظ في سجل الإجراءات.');
     setError(null);
     setWord('');
-    setDraft({ kind, amount: value, note: note.trim(), requestId: newRequestId(), tellMember: kind === 'delete' && tellMember });
+    setDraft({ kind, amount: value, note: note.trim(), requestId: newRequestId(), tellMember: kind === 'delete' && tellMember, project: picksProject(kind) ? project : null });
   }
 
   async function confirm() {
@@ -159,6 +171,9 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
       <div className={ACTIONS[kind].danger ? 'confirm danger' : 'confirm'} role="group" aria-label="تأكيد الإجراء">
         <h3>تأكيد: {ACTIONS[kind].title}</h3>
         <p>{summary(draft, name)}</p>
+        {draft.project ? <p className="pp-chosen">{`المشروع المختار: ${projectName(draft.project)}`}</p> : null}
+        {draft.project && current ? <p className="muted">{`يصبح المشروع السابق متاحًا لشريك آخر: ${projectName(current)}`}</p> : null}
+        {draft.kind === 'unpartner' && current ? <p className="muted">{`يصبح مشروعه متاحًا لشريك آخر: ${projectName(current)}`}</p> : null}
         <p className="muted">الملاحظة: {draft.note}</p>
         {kind === 'delete' ? (
           <>
@@ -201,6 +216,7 @@ function ActionPanel({ kind, account, onDone, onCancel }: { kind: ActionKind; ac
           </label>
         </>
       ) : null}
+      {picksProject(kind) ? <ProjectPicker value={project} current={current} onPick={(next) => { setProject(next); setError(null); }} /> : null}
       <label>
         ملاحظة (مطلوبة)
         <textarea rows={2} maxLength={300} value={note} onChange={(event) => setNote(event.target.value)} placeholder={kind === 'delete' ? 'سبب الحذف، مثال: مخالفة شروط الاستخدام' : 'سبب الإجراء، مثال: دفع بتحويل بنكي'} required />
@@ -471,6 +487,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
           <dl className="fields">
             {account.honorary ? <Field label="مُنحت في">{account.honorary_since ? formatDay(account.honorary_since) : '—'}</Field> : null}
             {account.partner ? <Field label="مُنحت في">{account.partner_since ? formatDay(account.partner_since) : '—'}</Field> : null}
+            {account.partner ? <Field label="المشروع المرتبط">{detail.partnerProject ? projectName(detail.partnerProject) : 'لم يُربط بمشروع بعد'}</Field> : null}
             <Field label="المتبقي">{account.state === 'expired' ? 'انتهت' : memberLeft(account)}</Field>
             <Field label={account.state === 'expired' ? 'انتهت في' : 'تنتهي في'}>{account.honorary ? 'مفتوحة' : account.partner ? formatDay(account.partner_end ?? '') : account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field>
             {account.partner && (account.never_expires || (account.member_end && account.member_end > (account.partner_end ?? ''))) ? <Field label="اشتراك مدفوع بعدها حتى">{account.never_expires ? 'بلا تاريخ انتهاء' : formatDay(account.member_end)}</Field> : null}
@@ -486,6 +503,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
       <section className="sheet-block">
         <h3>الإجراءات</h3>
         {done ? <Done text={done} /> : null}
+        {account.partner && !detail.partnerProject ? <p className="warn">شريك النجاح هذا غير مرتبط بمشروع: اربطه من «ربط بمشروع».</p> : null}
         {detail.deletionRequest ? (
           <p className="warn">
             طلب العضو حذف حسابه في {formatDay(detail.deletionRequest.requestedAt.slice(0, 10))}، وموعد الحذف {formatDay(detail.deletionRequest.dueAt.slice(0, 10))}.
@@ -497,6 +515,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             key={open}
             kind={open}
             account={account}
+            current={detail.partnerProject ?? null}
             onCancel={() => setAction(null)}
             onDone={(text) => {
               setAction(null);
@@ -515,7 +534,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
                   setAction(kind);
                 }}
               >
-                {ACTIONS[kind].button}
+                {kind === 'partnerProject' && detail.partnerProject ? 'تغيير المشروع' : ACTIONS[kind].button}
               </button>
             ))}
           </div>

@@ -527,13 +527,14 @@ export class Notifier {
     ]);
   }
 
-  /** M271: the management hears of every Success Partners membership given or taken back. */
-  partnerChanged(record: { on: boolean; name: string; phone: string; email: string; contactId: number; by: string; note: string }): void {
+  /** M271: the management hears of every Success Partners membership given or taken back; M275: a grant names its project. */
+  partnerChanged(record: { on: boolean; name: string; phone: string; email: string; contactId: number; by: string; note: string; project?: string | null }): void {
     const action = record.on ? 'منح عضوية شركاء النجاح' : 'سحب عضوية شركاء النجاح';
     this.dispatch(`${action}: ${record.name || record.email}`, [
       record.on ? 'مُنح هذا العضو عضوية شركاء النجاح (360 يومًا) من لوحة التحكم.' : 'سُحبت عضوية شركاء النجاح من هذا العضو من لوحة التحكم.',
       '',
       ...personLines(record),
+      ...(record.project ? [`المشروع المرتبط: ${record.project}`] : []),
       `رقم الحساب: ${record.contactId}`,
       `نفّذ الإجراء: ${record.by || '—'}`,
       `الملاحظة: ${record.note}`,

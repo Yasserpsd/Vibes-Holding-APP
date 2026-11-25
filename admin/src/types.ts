@@ -239,6 +239,8 @@ export type MemberDetail = {
   interests?: string[];
   /** M204: an admin vouched for this account's number (it signs in without the WhatsApp code). Absent on an older server. */
   phoneWaiver?: { by: string; at: string } | null;
+  /** M275: the Projects Bank project a running Success Partner is tied to; null while he has none. */
+  partnerProject?: ProjectRef | null;
 };
 export type ThreadDetail = { ok: true; account: Account; messages: ThreadMessage[]; has_more: boolean };
 
@@ -324,7 +326,15 @@ export type NewsSourceRow = {
 };
 export type NewsSourcesResult = { sources: NewsSourceRow[]; updatedAt: string | null; lastError: string | null; running: boolean; visibleByLang: { ar: number; en: number }; classifier: string };
 
-export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'delete';
+/** M275: a Projects Bank project as the dashboard names it: number and title only. */
+export type ProjectRef = { id: number; number: string | null; title: string };
+export type ProjectChoice = ProjectRef & { holder: { contactId: number; name: string } | null };
+export type SuccessPartners = {
+  partners: { contactId: number; name: string; phone: string; since: string; end: string; left: number | null; project: ProjectRef | null }[];
+  projects: ProjectChoice[];
+};
+
+export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete';
 export type AuditEntry = {
   id: string;
   at: string;

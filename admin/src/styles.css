@@ -512,5 +512,13 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
   .store-id { grid-column: 1 / -1; }
 }
 
+/* M275: the required Projects Bank choice of a Success Partner, and the line that says what was chosen. */
+.pp-picker { display: grid; gap: 8px; min-width: 0; }
+.pp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-block-size: 260px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.pp-row { display: grid; gap: 2px; inline-size: 100%; text-align: start; overflow-wrap: anywhere; }
+.pp-row.on { border-color: var(--gold); background: var(--gold-wash); }
+.pp-row .warn { font-size: 0.8rem; }
+.pp-chosen { margin: 0; font-weight: 600; color: var(--gold-bright); overflow-wrap: anywhere; }
+
 /* M232: a hidden field stays hidden even where a rule gives it a display (label.check). */
 [hidden] { display: none !important; }

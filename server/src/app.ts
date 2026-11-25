@@ -638,7 +638,7 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   // the project brief, the websites' feed and the hub hand-over of published posts.
   // M117: the three-step, 30-day account deletion; the due-day sweep (below) mails the management to execute.
   const deletion = new AccountDeletionStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
-  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier, deletion, postOpens });
+  const dashboard = new DashboardService({ hub: hubClient, pb: pbBridge, kv, auth, payments, membership, push, log: app.log, whatsapp, notifier, deletion, postOpens, projects });
   const access = new ProjectAccessService({ pb: pbBridge, projects, auth, log: app.log, onUnlock: () => dashboard.bust('pb') });
   const brief = new BriefService({ kv, log: app.log, apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, fetchImpl });
   // M170 «مشروع اليوم»: one AI-chosen project a day to every device, at/after 12:00 Riyadh; the tick retries until it goes out.

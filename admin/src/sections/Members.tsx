@@ -4,6 +4,7 @@ import { api } from '../api';
 import { daysText, formatDay, formatNumber, formatRelative } from '../format';
 import type { Account, AccountFilter, AccountRow, EndsFilter, MembersView, PersonaFilter, WaFilter } from '../types';
 import { AsyncPage, Chips, ErrorCard, Pill, SearchBox, SectionHead, useDebounced, useLoad, useShell, type Tone } from '../ui';
+import { SuccessPartnersBlock } from './SuccessPartners';
 
 // M86 (owner): «اعرف كام مستثمر وكام رائد أعمال وكام محايد — بوتون أدوس عليها ويتفلتر لوحده».
 const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
@@ -166,6 +167,8 @@ export function Members({ initial, stamp }: { initial: MembersView; stamp: numbe
   return (
     <>
       <SectionHead title="الأعضاء" hint={state.data ? `الحسابات في هذا العرض: ${formatNumber(state.data.total)}` : undefined} onReload={state.reload} busy={state.loading} />
+      {/* M275: who holds which project. */}
+      <SuccessPartnersBlock stamp={stamp} />
       <div className="filters">
         <SearchBox value={text} onChange={setText} placeholder="ابحث بالاسم أو البريد أو الجوال" />
         <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: entry.value === 'registered' ? (counts?.all !== undefined ? counts.all - (counts.pending ?? 0) : null) : (counts?.[entry.value] ?? null) }))} value={filter} onChange={setFilter} />

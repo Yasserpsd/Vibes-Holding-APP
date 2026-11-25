@@ -1,4 +1,4 @@
-import type { AccountFilter, AccountsResult, EndsFilter, Personas, PersonaFilter, WaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
+import type { AccountFilter, AccountsResult, EndsFilter, Personas, PersonaFilter, WaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, SuccessPartners, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api-test.vibesholdingsa.com';
@@ -727,8 +727,10 @@ export const api = {
   // M205 «عضوية شرفية»: given and taken back by the administration only; no days.
   deleteAccount: (id: number, input: { tellMember: boolean } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/delete`, { ...input, confirm: true }),
   honorary: (id: number, input: { on: boolean } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/honorary`, { ...input, confirm: true }),
-  // M271 «عضوية شركاء النجاح»: the same shape; the hub gives it for 360 days.
-  partner: (id: number, input: { on: boolean } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/partner`, { ...input, confirm: true }),
+  // M271 «عضوية شركاء النجاح»: the hub gives it for 360 days. M275: a grant names its Projects Bank project.
+  partner: (id: number, input: { on: boolean; projectId?: number } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/partner`, { ...input, confirm: true }),
+  setPartnerProject: (id: number, input: { projectId: number } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/partner-project`, { ...input, confirm: true }),
+  successPartners: () => call<SuccessPartners>('GET', '/api/admin/success-partners'),
   setRole: (id: number, input: { role: 'member' | 'publisher' } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/role`, { ...input, confirm: true }),
   pbGrant: (id: number, input: { amount: number } & WriteMeta) => call<{ ok: true; already: boolean; granted: number; left: number }>('POST', `/api/admin/accounts/${id}/pb-grant`, { ...input, confirm: true }),
   phoneWaiver: (id: number, on: boolean) => call<{ phoneWaiver: { by: string; at: string } | null }>('POST', `/api/admin/accounts/${id}/phone-waiver`, { on, confirm: true }),
