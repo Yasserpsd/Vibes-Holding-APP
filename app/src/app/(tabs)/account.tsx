@@ -255,9 +255,11 @@ function ProfileHeader({ me }: { me: Me }) {
         {me.personaLabel ? <Text style={styles.meta}>{tOptional(`persona.${me.persona}`) ?? me.personaLabel}</Text> : null}
         {shown.jobTitle ? <Text style={styles.meta}>{shown.jobTitle}</Text> : null}
         {/* One line each, whatever the system font size: the address shrinks to fit, and only a very long one is cut — in the middle, never as «…@gmail» / «.com». */}
+        {me.email ? (
         <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} ellipsizeMode="middle">
           {me.email}
         </Text>
+        ) : null}
         <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {me.phone}
         </Text>

@@ -1,0 +1,126 @@
+diff -ru --strip-trailing-cr orig-2330/vibes-ai-assistant/includes/class-vai-hub.php hub/vibes-ai-assistant/includes/class-vai-hub.php
+--- orig-2330/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-25 02:31:01.780227600 +0300
++++ hub/vibes-ai-assistant/includes/class-vai-hub.php	2026-11-25 02:31:42.987400700 +0300
+@@ -3247,7 +3247,8 @@
+ 			return vai_error( 'phone', 'رقم الجوال غير صحيح أو ناقص — تأكد من اختيار دولتك من القائمة ثم اكتب الرقم بدون صفر البداية' );
+ 		}
+ 		$taken = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::t( 'contacts' ) . ' WHERE phone_norm=%s AND verified=1', $pn ) );
+-		return array( 'ok' => true, 'taken' => $taken > 0 ? 1 : 0, 'phone_norm' => $pn, 'phone_local' => vai_phone_local( $pn ) );
++		// 2.34.0 (app M272): email_optional = a sign-up with a proven number may leave the e-mail out.
++		return array( 'ok' => true, 'taken' => $taken > 0 ? 1 : 0, 'email_optional' => 1, 'phone_norm' => $pn, 'phone_local' => vai_phone_local( $pn ) );
+ 	}
+ 
+ 	/**
+@@ -3285,7 +3286,9 @@
+ 		if ( in_array( $acc->role, array( 'admin', 'publisher' ), true ) ) {
+ 			return vai_error( 'password_only', 'هذا الحساب يسجّل الدخول بكلمة المرور', 403 );
+ 		}
+-		if ( ! self::phone_is_verified( $acc ) ) {
++		// 2.34.0 (app M272): the app server's own switch (off by default) lets the right code be the number's first proof,
++		// as the WhatsApp password reset already does. One active account and never staff, as above.
++		if ( ! self::phone_is_verified( $acc ) && ( empty( $d['unproven_ok'] ) || empty( $site->trusted ) ) ) {
+ 			return vai_error( 'phone_unproven', 'سجّل الدخول بكلمة المرور مرة واحدة لتأكيد رقمك على واتساب، وبعدها يتاح لك الدخول بالرمز', 403 );
+ 		}
+ 		if ( ! empty( $d['check'] ) ) {
+@@ -3538,10 +3541,13 @@
+ 		if ( trim( $bio ) !== '' && mb_strlen( trim( $bio ), 'UTF-8' ) < 10 ) {
+ 			return vai_error( 'invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل' );
+ 		}
+-		if ( $email === '' ) {
++		// 2.34.0 (app M272, owner 2026-11-25: «تدخل التطبيق مياخدش منك 3 ثواني»): a number the app server proved a moment
++		// ago may open an account with no e-mail. A typed address is still checked.
++		$no_mail = '' === trim( vai_str( $d, 'email', 190 ) ) && ! empty( $d['phone_proven'] ) && ! empty( $site->trusted );
++		if ( $email === '' && ! $no_mail ) {
+ 			return vai_error( 'invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل' );
+ 		}
+-		if ( ! is_email( $email ) || ! vai_email_allowed( $email ) ) {
++		if ( ! $no_mail && ( ! is_email( $email ) || ! vai_email_allowed( $email ) ) ) {
+ 			return vai_error( 'email_domain', 'البريد الإلكتروني غير صحيح — سيصلك كود التفعيل عليه، فتأكد من كتابته صحيحًا (أي بريد شخصي أو بريد شركة مقبول)' );
+ 		}
+ 		if ( strlen( $pass ) < 6 ) {
+@@ -3569,7 +3575,9 @@
+ 			return vai_error( 'rate', 'محاولات كثيرة — حاول بعد قليل', 429 );
+ 		}
+ 		$ct = self::t( 'contacts' );
+-		$ex = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE (email_norm=%s OR phone_norm=%s) AND pass_hash<>'' ORDER BY verified DESC, id ASC LIMIT 1", $email, $pn ) );
++		// 2.34.0: an empty address matches nobody — every other number-only account has an empty one too.
++		$same = $no_mail ? $wpdb->prepare( 'phone_norm=%s', $pn ) : $wpdb->prepare( '(email_norm=%s OR phone_norm=%s)', $email, $pn );
++		$ex   = $wpdb->get_row( "SELECT * FROM $ct WHERE $same AND pass_hash<>'' ORDER BY verified DESC, id ASC LIMIT 1" );
+ 		if ( $ex && (int) $ex->verified ) {
+ 			return vai_error( 'exists', 'عندك حساب بهذا البريد أو الجوال — سجّل الدخول، أو استخدم «نسيت كلمة المرور»', 409 );
+ 		}
+@@ -3585,7 +3593,7 @@
+ 				self::attach_visitor( $site, isset( $d['uuid'] ) ? $d['uuid'] : '', $c );
+ 			}
+ 		} else {
+-			$ex2 = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE id<>%d AND stage>=1 AND pass_hash='' AND (phone_norm=%s OR email_norm=%s) ORDER BY last_at DESC LIMIT 1", $c->id, $pn, $email ) );
++			$ex2 = $wpdb->get_row( "SELECT * FROM $ct WHERE id<>" . (int) $c->id . " AND stage>=1 AND pass_hash='' AND $same ORDER BY last_at DESC LIMIT 1" );
+ 			if ( $ex2 ) {
+ 				self::merge_contacts( $c, $ex2 );
+ 				$c = self::contact( $ex2->id );
+@@ -3616,6 +3624,10 @@
+ 		if ( $cname !== '' ) {
+ 			$fields['company'] = $cname;
+ 		}
++		// 2.34.0: an earlier contact adopted by its number keeps the address it already had.
++		if ( $no_mail ) {
++			unset( $fields['email'], $fields['email_norm'] );
++		}
+ 		if ( $ref_id ) {
+ 			$fields['referred_by'] = $ref_id;
+ 			// 2.28.1 (M206): the representative list lives on the app server, so it tells the hub which code was his.
+@@ -4601,7 +4613,8 @@
+ 			return $acc ? $acc : $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE LOWER(TRIM(contact_email))=%s AND $real $order", $em ) );
+ 		}
+ 		$pn = vai_norm_phone( $login );
+-		return strlen( $pn ) >= 9 ? $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE phone_norm=%s AND $real $order", $pn ) ) : null;
++		// 2.34.0: a number finds its account even with no e-mail on it (its code goes on WhatsApp).
++		return strlen( $pn ) >= 9 ? $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $ct WHERE phone_norm=%s AND (pass_hash<>'' OR verified=1) AND (email<>'' OR pass_hash<>'') ORDER BY (pass_hash<>'') DESC, (email<>'') DESC, id ASC LIMIT 1", $pn ) ) : null;
+ 	}
+ 
+ 	/** 2.26.3 (M197): «ya***@gmail.com» — tells the member which inbox to open without revealing the address. */
+@@ -4622,7 +4635,8 @@
+ 		}
+ 		$acc = self::find_reset_account( $login );
+ 		// 2.26.3: an unknown login is said out loud — before, the member waited for a mail that was never sent.
+-		if ( ! $acc || vai_junk_email( vai_norm_email( $acc->email ) ) ) {
++		$no_mail = $acc && '' === (string) $acc->email; // 2.34.0: a number-only account
++		if ( ! $acc || ( ! $no_mail && vai_junk_email( vai_norm_email( $acc->email ) ) ) ) {
+ 			return vai_error( 'not_found', 'لا يوجد حساب بهذا البريد أو الجوال — تأكد منه، أو سجّل حسابًا جديدًا', 404 );
+ 		}
+ 		$to       = self::mail_to( $acc );
+@@ -4632,9 +4646,12 @@
+ 		// 2.27.0 (owner, 2026-11-06): 'whatsapp' = WhatsApp only, the mail when Meta refused; 'mail' = the member asked for it.
+ 		// No channel = an older app, whose screen names the inbox: it keeps both.
+ 		$channel = vai_str( $d, 'channel', 10 );
+-		if ( 'whatsapp' === $channel && self::send_code_whatsapp_now( $acc, $code ) ) {
++		if ( ( 'whatsapp' === $channel || $no_mail ) && self::send_code_whatsapp_now( $acc, $code ) ) {
+ 			return array( 'ok' => true, 'sent' => true, 'sent_to' => self::mask_phone( $acc->phone ), 'sent_via' => 'whatsapp', 'provider' => $provider );
+ 		}
++		if ( $no_mail ) {
++			return vai_error( 'mail_failed', 'تعذّر إرسال الرمز على واتساب الآن — حاول بعد لحظات أو تواصل مع الإدارة', 503 );
++		}
+ 		if ( '' === $channel ) {
+ 			self::send_code_whatsapp( $acc, $code );
+ 		}
+diff -ru --strip-trailing-cr orig-2330/vibes-ai-assistant/vibes-ai-assistant.php hub/vibes-ai-assistant/vibes-ai-assistant.php
+--- orig-2330/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-25 02:31:01.781738300 +0300
++++ hub/vibes-ai-assistant/vibes-ai-assistant.php	2026-11-25 02:31:42.983401600 +0300
+@@ -3,7 +3,7 @@
+  * Plugin Name: Vibes AI Assistant
+  * Plugin URI:  https://vcmem.com/
+  * Description: Ù…Ø³Ø§Ø¹Ø¯ Ù…Ù†Ø¸ÙˆÙ…Ø© Ú¤Ø§ÙŠØ¨Ø² Ø§Ù„Ø°ÙƒÙŠ â€” ÙˆÙŠØ¯Ø¬Øª Ù…Ø­Ø§Ø¯Ø«Ø© ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ù†Ø¸ÙˆÙ…Ø© (ÙˆØ¶Ø¹ Â«Ù…ÙˆÙ‚Ø¹ ØªØ§Ø¨Ø¹Â») + Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ¯Ø§Ø´Ø¨ÙˆØ±Ø¯ Ù…Ø±ÙƒØ²ÙŠØ© (ÙˆØ¶Ø¹ Â«Ø§Ù„Ù‡Ø¨Â») + Ø±Ø¨Ø· Ø¨Ø¹Ù‚Ù„ n8n.
+- * Version:     2.33.0
++ * Version:     2.34.0
+  * Author:      Vibes Ventures
+  * Text Domain: vibes-ai
+  * Requires PHP: 7.4
+@@ -13,7 +13,7 @@
+ 	exit;
+ }
+ 
+-define( 'VAI_VERSION', '2.33.0' );
++define( 'VAI_VERSION', '2.34.0' );
+ define( 'VAI_FILE', __FILE__ );
+ define( 'VAI_DIR', plugin_dir_path( __FILE__ ) );
+ define( 'VAI_URL', plugin_dir_url( __FILE__ ) );

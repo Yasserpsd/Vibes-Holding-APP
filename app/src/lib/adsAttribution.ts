@@ -286,7 +286,7 @@ function logEvent(eventName: string, eventValues: Record<string, unknown>): void
 
 /** A new account finished its e-mail code (the server created the member). */
 export function trackRegistration(
-  method: 'email' | 'google' | 'apple',
+  method: 'email' | 'google' | 'apple' | 'phone',
   me?: { id: number; email?: string; phone?: string; contactEmail?: string },
 ): void {
   // 2026-11-10 audit: name the member (and the hashed contact) BEFORE the sign-up event, so the event

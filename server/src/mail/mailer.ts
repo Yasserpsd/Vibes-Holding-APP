@@ -56,6 +56,7 @@ export class SmtpMailer implements Mailer {
   }
 
   async send(mail: Mail): Promise<boolean> {
+    if (!mail.to.some(Boolean)) return false;
     await this.transport.sendMail({ from: this.options.from, to: mail.to.join(', '), subject: mail.subject, text: mail.text, ...(mail.html ? { html: mail.html } : {}) });
     return true;
   }
@@ -69,6 +70,7 @@ export class HubMailer implements Mailer {
   constructor(private readonly hub: HubClient) {}
 
   async send(mail: Mail): Promise<boolean> {
+    if (!mail.to.some(Boolean)) return false;
     const answer = await hubCall(this.hub, 'send_mail', { to: mail.to, subject: mail.subject, text: mail.text, ...(mail.html ? { html: mail.html } : {}) });
     return answer.sent === true;
   }

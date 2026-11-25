@@ -194,9 +194,17 @@ function codeLoginRefusal(error: unknown): unknown {
   if (error.code === 'hub_not_supported') return new AuthError('code_login_off', 'الدخول برمز واتساب غير متاح حاليًا، سجّل الدخول بكلمة المرور', 503);
   if (error.code === 'no_account' || error.code === 'not_found') return new AuthError('no_account', 'لا يوجد حساب مسجل بهذا الرقم — أنشئ حسابك الجديد أولًا', 404);
   if (error.code === 'phone_shared' || error.code === 'password_only' || error.code === 'phone_unproven') {
-    return new AuthError('code_login_password', 'الدخول بالرمز غير متاح لهذا الحساب بعد. سجّل الدخول بكلمة المرور مرة واحدة، وبعدها يتاح لك الدخول بالرمز', 403);
+    const refusal = new AuthError('code_login_password', 'الدخول بالرمز غير متاح لهذا الحساب بعد. سجّل الدخول بكلمة المرور مرة واحدة، وبعدها يتاح لك الدخول بالرمز', 403);
+    // M272: which of the three it was stays on the server, for the dashboard's count; the member reads one sentence.
+    refusalDetails.set(refusal, error.code);
+    return refusal;
   }
   return error;
+}
+
+const refusalDetails = new WeakMap<object, string>();
+export function refusalDetailOf(error: unknown): string {
+  return typeof error === 'object' && error !== null ? (refusalDetails.get(error) ?? '') : '';
 }
 
 /** M197: the hub's «no account» answer on a reset becomes `no_account`, the code the app already translates (M128). */
@@ -297,7 +305,13 @@ export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: 
 export type SocialSignupProfile = { name?: string; persona?: Persona; jobTitle?: string; inviteCode?: string };
 export type MemberLoginResult = LoginResult | TotpStepResult | PhoneStepResult;
 /** What one bundle can do at sign-in (the `x-app-gate` words). */
-export type SignInBundle = { canPhoneCode: boolean; canPhoneFirst?: boolean };
+export type SignInBundle = { canPhoneCode: boolean; canPhoneFirst?: boolean; /** M272: this sign-in must also prove the number (a code sign-in was refused it a moment ago). */ confirmNumber?: boolean };
+/**
+ * M272: what the gate's one number field got. `signin`: the account exists and its code is on the way
+ * (`code-login/verify` ends it). `signup`: no account; the code proves the number (`phone-proof/confirm`), then a
+ * short form creates the account. `needsEmail`: the hub still wants an address on that form (older than 2.34.0).
+ */
+export type QuickStartResult = PhoneStepResult & ({ kind: 'signin' } | { kind: 'signup'; needsEmail: boolean });
 export type AdminLoginResult = LoginResult | OtpResult | TotpStepResult | TotpSetupResult;
 /** The first dashboard sign-in after enrolment: the session plus the backup codes, shown once. */
 export type EnrolledResult = SignedInResult & { backupCodes: string[] };
@@ -404,6 +418,10 @@ export class AuthService {
     const proven = Boolean(proof && proof.country === input.country && proof.phone === plainNumber(input.phone, input.country));
     if (this.phoneProofRequired && bundle.canPhoneFirst && !proven) {
       throw new AuthError('phone_proof_required', 'أكّد رقمك عبر واتساب لإكمال التسجيل', 400);
+    }
+    // M272: no e-mail only for a number proven a moment ago, at a hub that stores such an account (2.34.0).
+    if (!input.email && !(proven && (await this.hubTakesNoEmail(input.phone, input.country)))) {
+      throw new AuthError('email_required', 'اكتب بريدك الإلكتروني', 400);
     }
     // M207 (owner, 2026-11-06): an odd name no longer stops the sign-up; the app shows a warning and lets him through.
     // M32: the invite code is shaped-checked here, then the hub itself resolves and stores it (rule 5's spirit: never the client's word).
@@ -518,6 +536,31 @@ export class AuthService {
   }
 
   /**
+   * M272 (owner, 2026-11-25: «يدخل الرقم ولو مفيش عليه حساب يجيله كود واتس اب وبعدين يكمل تسجيل، ولو في حساب بالفعل
+   * يجيله كود ويدخل»): one number, one tap. The hub says whether a code can sign this number in; a number with no
+   * account gets the sign-up proof instead, so «لا يوجد حساب» is never an answer here.
+   */
+  async quickStart(phone: string, country: string, ip: string, lang: AppLang = 'ar', source: AppSource = 'app'): Promise<QuickStartResult> {
+    try {
+      return { kind: 'signin', ...(await this.startCodeLogin(phone, country, ip, source)) };
+    } catch (error) {
+      // With the sign-up closed there is nothing to prove a number for: the refusal stands.
+      if (!(error instanceof AuthError && error.code === 'no_account') || !this.phoneProofRequired) throw error;
+    }
+    const { step, emailOptional } = await this.signupProof(phone, country, lang);
+    return { kind: 'signup', needsEmail: !emailOptional, ...step };
+  }
+
+  /** M272: asked again at the sign-up itself, so a form cannot decide it. */
+  private async hubTakesNoEmail(phone: string, country: string): Promise<boolean> {
+    try {
+      return (await this.deps.hub.call('phone_check', { phone: plainNumber(phone, country), country })).email_optional === 1;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * M128 + M242: what the hub knows of this e-mail or phone (member_status looks it up without a session).
    * `none`: nobody. `passwordless`: a person the club knows who has no app account yet — a contact row without
    * a password, or a name on the members list only. `account`: an app account. Any doubt — odd input, a hub
@@ -550,7 +593,7 @@ export class AuthService {
       return result.found === true && result.contact?.has_account === 1;
     };
     try {
-      const [byEmail, byPhone] = await Promise.all([taken({ email }), /^\d{8,15}$/.test(digits) ? taken({ phone: digits }) : Promise.resolve(false)]);
+      const [byEmail, byPhone] = await Promise.all([email ? taken({ email }) : Promise.resolve(false), /^\d{8,15}$/.test(digits) ? taken({ phone: digits }) : Promise.resolve(false)]);
       return byEmail === byPhone ? null : byEmail ? 'email' : 'phone';
     } catch {
       return null;
@@ -1108,7 +1151,7 @@ export class AuthService {
   async passwordMatches(session: SessionRecord, password: string): Promise<boolean> {
     const me = await this.me(session);
     try {
-      const result = await this.deps.hub.call('login', { uuid: newUuid(), ip: 'delete-check', login: me.email, password, page_url: 'app://delete-account' });
+      const result = await this.deps.hub.call('login', { uuid: newUuid(), ip: 'delete-check', login: me.email || me.phone /* M272: a number-only account */, password, page_url: 'app://delete-account' });
       return Boolean(result.contact);
     } catch {
       return false;
@@ -1228,7 +1271,7 @@ export class AuthService {
     const digits = plainNumber(phone, country);
     let known: HubResponse;
     try {
-      known = await this.deps.hub.call('phone_login', { check: 1, ip, source, phone: digits, country });
+      known = await this.deps.hub.call('phone_login', { check: 1, ip, source, phone: digits, country, ...this.unprovenOk() });
     } catch (error) {
       throw codeLoginRefusal(error);
     }
@@ -1251,13 +1294,21 @@ export class AuthService {
     const step = await this.checkPhoneCode(stepToken, code, 'codelogin');
     let result: HubResponse;
     try {
-      result = await this.deps.hub.call('phone_login', { uuid: step.uuid, ip, source, phone: step.newPhone ?? '', country: step.country ?? 'sa', page_url: 'app://code-login' });
+      result = await this.deps.hub.call('phone_login', { uuid: step.uuid, ip, source, phone: step.newPhone ?? '', country: step.country ?? 'sa', page_url: 'app://code-login', ...this.unprovenOk() });
     } catch (error) {
       throw codeLoginRefusal(error);
     }
-    const contact = requireContact(result);
+    let contact = requireContact(result);
     await this.gate(step.uuid, contact);
+    // M272: with CODE_LOGIN_UNPROVEN the right code on WhatsApp is the number's proof from here on.
+    if (contact.phone_verified === 0 && step.via === 'whatsapp') {
+      contact = requireContact(await this.deps.hub.call('profile', { uuid: step.uuid, phone_verified: 1 }));
+    }
     return this.signIn(step.uuid, contact);
+  }
+
+  private unprovenOk(): { unproven_ok?: 1 } {
+    return this.deps.config.CODE_LOGIN_UNPROVEN === 'on' ? { unproven_ok: 1 } : {};
   }
 
   /** M211: the sign-up confirms the number before the account exists. */
@@ -1267,6 +1318,10 @@ export class AuthService {
 
   /** M211: «تأكيد الرقم» on the sign-up form. WhatsApp only: a mailed code proves nothing about a number. */
   async startPhoneProof(phone: string, country: string, lang: AppLang): Promise<PhoneStepResult> {
+    return (await this.signupProof(phone, country, lang)).step;
+  }
+
+  private async signupProof(phone: string, country: string, lang: AppLang): Promise<{ step: PhoneStepResult; emailOptional: boolean }> {
     if (!this.phoneProofRequired) throw new AuthError('phone_code_off', 'رمز واتساب غير مفعّل', 404);
     const store = this.requirePhoneCodes();
     const digits = plainNumber(phone, country);
@@ -1284,7 +1339,8 @@ export class AuthService {
     // No account yet: the store's hourly budget hangs on the number itself, as a negative id no contact can have.
     const begun = await store.begin({ purpose: 'signup', uuid: newUuid(), contactId: -Number(`${dial}${digits}`.slice(-15)), phone: target, newPhone: digits, country, email: '', lang });
     if (!begun.ok) throw phoneCodeProblem(begun);
-    return { pending: false, phoneStep: true, stepToken: begun.token, via: 'whatsapp', phone: maskNumber(target), email: '', seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
+    const step: PhoneStepResult = { pending: false, phoneStep: true, stepToken: begun.token, via: 'whatsapp', phone: maskNumber(target), email: '', seconds: PHONE_CODE_SECONDS, resendAfter: PHONE_CODE_RESEND_SECONDS };
+    return { step, emailOptional: known?.email_optional === 1 };
   }
 
   async confirmPhoneProof(stepToken: string, code: string): Promise<{ proof: string; seconds: number }> {
@@ -1315,7 +1371,8 @@ export class AuthService {
     if (contact.phone_verified === undefined || !String(contact.phone ?? '').trim()) return false;
     if (this.phoneCodeExempt(contact)) return false;
     // M204: an older account keeps signing in as it always did until its number is proven.
-    if (this.legacyUnproven(contact.id, contact.phone_verified === 1)) return false;
+    // M272: unless it just asked to sign in by code and was sent to its password — this step proves the number.
+    if (!bundle.confirmNumber && this.legacyUnproven(contact.id, contact.phone_verified === 1)) return false;
     return (await this.deps.phoneCodes?.waiver(contact.id)) == null;
   }
 

@@ -41,6 +41,7 @@ export type PersonaDeliver = (code: string) => Promise<void>;
 
 const requestKey = (contactId: number): string => `persona-change:${contactId}`;
 const stampKey = (contactId: number): string => `persona-changed:${contactId}`;
+const defaultedKey = (contactId: number): string => `persona-defaulted:${contactId}`;
 
 function hashCode(contactId: number, code: string): string {
   return createHash('sha256').update(`${contactId}:${code}`).digest('hex');
@@ -111,6 +112,18 @@ export class PersonaChangeStore {
     }
     await this.kv.set(requestKey(contactId), { ...request, attempts });
     return { ok: false, reason: 'bad_code', attemptsLeft: MAX_ATTEMPTS - attempts };
+  }
+
+  /** M272: the quick sign-up asks no category and writes «محايد»; that account's first choice is not a «change». */
+  async markDefaulted(contactId: number): Promise<void> {
+    await this.kv.set(defaultedKey(contactId), true);
+  }
+
+  /** True once, for an account whose category was never chosen by its owner. */
+  async takeDefaulted(contactId: number): Promise<boolean> {
+    if (!(await this.kv.get<boolean>(defaultedKey(contactId)))) return false;
+    await this.kv.delete(defaultedKey(contactId));
+    return true;
   }
 
   /** The change landed at the hub: the membership-year window starts now. */

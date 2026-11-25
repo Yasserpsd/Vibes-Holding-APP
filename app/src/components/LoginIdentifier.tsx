@@ -53,9 +53,13 @@ type Props = {
   onChange: (value: Identifier) => void;
   countries: Country[] | undefined;
   editable?: boolean;
+  /** M272: the gate's one field — a mobile number only, with no switch to e-mail. */
+  phoneOnly?: boolean;
+  /** The keyboard's «go» on the number field (Android; the iPhone's number pad has none). */
+  onSubmit?: () => void;
 };
 
-export function LoginIdentifierField({ value, onChange, countries, editable = true }: Props) {
+export function LoginIdentifierField({ value, onChange, countries, editable = true, phoneOnly = false, onSubmit }: Props) {
   // Keep each mode's draft so flipping the switch never loses what was typed.
   const [drafts, setDrafts] = useState<Record<IdentifierMode, string>>({ phone: '', email: '' });
   const country = countries?.find((item) => item.code === value.country);
@@ -74,6 +78,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
 
   return (
     <View style={styles.block}>
+      {phoneOnly ? null : (
       <View style={styles.switch} accessibilityRole="tablist">
         {(['phone', 'email'] as const).map((mode) => {
           const selected = mode === value.mode;
@@ -93,6 +98,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
           );
         })}
       </View>
+      )}
       {value.mode === 'phone' ? (
         <View style={styles.phoneRow}>
           {countries?.length ? (
@@ -113,7 +119,7 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               onChangeText={(text) => {
                 // A saved login or a pasted address can land in this field: an «@» or a letter means an e-mail, so the
                 // e-mail tab takes the text whole instead of this field stripping it down to its digits.
-                if (/[@A-Za-z]/.test(text)) {
+                if (!phoneOnly && /[@A-Za-z]/.test(text)) {
                   setDrafts((current) => ({ ...current, phone: value.value }));
                   onChange({ ...value, mode: 'email', value: text });
                   return;
@@ -122,6 +128,8 @@ export function LoginIdentifierField({ value, onChange, countries, editable = tr
               }}
               placeholder={placeholder}
               hint={t('auth.login.phoneHint')}
+              onSubmitEditing={onSubmit}
+              returnKeyType={onSubmit ? 'go' : undefined}
               error={phoneBad ? t('auth.phone.check', { format: placeholder }) : undefined}
               fix={
                 phoneLand

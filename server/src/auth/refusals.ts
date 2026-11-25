@@ -45,6 +45,20 @@ const REASON_LABELS: Record<string, string> = {
   hub_unreachable: 'تعذّر الوصول إلى خدمة النادي',
   hub_error: 'خدمة النادي أجابت بخطأ',
   hub_not_supported: 'الخدمة غير متاحة مؤقتًا',
+  // M272: these read «سبب آخر» until the owner asked what they were.
+  code_login_password: 'الحساب لا يدخل بالرمز بعد (يحتاج كلمة المرور مرة واحدة)',
+  code_login_off: 'الدخول بالرمز غير متاح مؤقتًا',
+  code_login_spent: 'استنفد رموز الدخول المتاحة لليوم',
+  otp_cooldown: 'محاولات دخول كثيرة لهذا الحساب',
+  phone_code_send_failed: 'تعذّر إرسال رمز واتساب',
+  phone_code_update: 'نسخة التطبيق قديمة وتحتاج تحديثًا',
+  email_required: 'البريد الإلكتروني مطلوب',
+};
+/** M272: why a code sign-in was refused, when the server knows (kept in the same slot as a refused field). */
+const DETAIL_LABELS: Record<string, string> = {
+  phone_unproven: 'رقم الحساب لم يُؤكَّد على واتساب بعد',
+  phone_shared: 'الرقم مسجّل على أكثر من حساب',
+  password_only: 'حساب إدارة يدخل بكلمة المرور',
 };
 const FIELD_LABELS: Record<string, string> = {
   name: 'الاسم',
@@ -63,11 +77,17 @@ const FIELD_LABELS: Record<string, string> = {
 
 export function reasonLabel(code: string, field: string): string {
   if (code === 'invalid') return field ? `خانة غير صحيحة: ${FIELD_LABELS[field] ?? 'خانة أخرى'}` : 'بيانات غير مكتملة';
+  if (code === 'code_login_password' && DETAIL_LABELS[field]) return `الدخول بالرمز مرفوض: ${DETAIL_LABELS[field]}`;
   return REASON_LABELS[code] ?? 'سبب آخر';
 }
 
 const clean = (value: string, fallback: string): string => (/^[A-Za-z_0-9]{1,40}$/.test(value) ? value : fallback);
-const platformOf = (value: string): 'ios' | 'android' | 'other' => (value === 'ios' || value === 'android' ? value : 'other');
+// M272: the routes hand over `sourceOf` («app-ios» / «app-android»), which this used to file under «other» — the
+// dashboard's iPhone and Android columns stayed at zero. Counts stored under either spelling are read.
+const platformOf = (value: string): 'ios' | 'android' | 'other' => {
+  const bare = value.replace(/^app-/, '');
+  return bare === 'ios' || bare === 'android' ? bare : 'other';
+};
 
 export class RefusalCounter {
   /** Writes follow one another, so two refusals in the same instant never lose a count. */
@@ -122,7 +142,8 @@ export class RefusalCounter {
       let passed = 0;
       let opened = 0;
       for (const [key, count] of total) {
-        const [keyStep, code = '', field = '', platform = 'other'] = key.split('|');
+        const [keyStep, code = '', field = '', stored = 'other'] = key.split('|');
+        const platform = platformOf(stored);
         if (keyStep !== step) continue;
         if (code === PASSED) {
           passed += count;

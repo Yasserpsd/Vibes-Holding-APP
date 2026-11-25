@@ -24,7 +24,7 @@ import type { MemberNotices } from '../requests/notices.js';
 import { RateLimiter } from './rateLimit.js';
 import type { WhatsappService } from '../whatsapp/service.js';
 import { maskNumber } from './phoneCode.js';
-import { ACTION_CODE_CAPABILITY, accountStateOf, AuthError, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
+import { ACTION_CODE_CAPABILITY, accountStateOf, refusalDetailOf, AuthError, bundleKnows, canPhoneCode, canPhoneFirst, forBundle, gateFieldsOf, PERSONAS, type AuthService } from './service.js';
 import type { SessionRecord } from './sessions.js';
 import type { SocialIdentity, SocialVerifier } from './social.js';
 
@@ -79,10 +79,13 @@ const registerSchema = z
     companyName: z.string().trim().max(190).optional(),
     country: z.string().trim().toLowerCase().max(5).default('sa'),
     phone: z.string().trim().min(7, 'رقم الجوال مطلوب').max(40),
-    email: emailField('البريد الإلكتروني مطلوب'),
+    // M272: absent = a quick sign-up on a proven number; the service takes it only where the hub can store it.
+    email: emailField('البريد الإلكتروني مطلوب').optional(),
     // M262: optional — see the register route (a sign-up without one needs the proven number and the code sign-in).
     password: passwordSchema.optional(),
     persona: personaSchema,
+    // M272: the quick sign-up asks no category; it sends «neutral» and says nobody chose it.
+    personaDefaulted: z.boolean().optional(),
     // M203: job, bio, interests, type and company are asked later in the profile; older bundles still send them.
     bio: z.union([z.literal(''), z.string().trim().min(10, 'اكتب نبذة مختصرة عنك (سطر على الأقل)').max(600)]).optional(),
     // M156: the app's form requires the job and the interests; the server stays lenient here because the
@@ -103,7 +106,7 @@ const pendingSchema = z.object({ pendingToken: pendingTokenSchema });
 const verifySchema = pendingSchema.extend({ code: codeSchema });
 // `country` rides along when the member typed a phone number (world-wide dial codes, M126).
 const countrySchema = z.string().trim().toLowerCase().max(5).optional();
-const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), country: countrySchema });
+const loginSchema = z.object({ login: loginFieldSchema, password: z.string().min(1, 'كلمة المرور مطلوبة').max(200), country: countrySchema, confirmNumber: z.boolean().optional() });
 // M46: the provider's ID token (a JWT the server verifies itself); Apple sends the name separately on first sign-in.
 const socialSchema = z.object({
   provider: z.enum(['google', 'apple']),
@@ -291,7 +294,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       refusals?.passed(route, sourceOf(request));
       return result;
     } catch (error) {
-      if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) noteRefusal(route, request, error.code, typed, error);
+      if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) noteRefusal(route, request, error.code, typed, error, refusalDetailOf(error));
       throw error;
     }
   };
@@ -353,6 +356,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
     phoneProofRequired: service.phoneProofRequired,
     // M259: the sign-in screen offers «الدخول برمز واتساب» only where the code and the hub can carry it.
     codeLogin: await service.codeLoginReady(),
+    // M272: the gate draws its one number field only where this server has the route behind it.
+    quickEntry: await service.codeLoginReady(),
     // M262 (owner, 2026-11-22: «تسهيل التسجيل»): the form may leave the password out only where the member can come
     // back without one — the number is proven on the form and the hub signs in with a WhatsApp code.
     passwordOptional: service.phoneProofRequired && (await service.codeLoginReady()),
@@ -388,8 +393,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         }
         password = randomBytes(24).toString('base64url');
       }
-      const input = { ...body, password };
+      const input = { ...body, email: body.email ?? '', password };
       const result = await watched('register', request, typed, () => service.register(input, request.ip, langOf(request), sourceOf(request), bundleOf(request)));
+      if (body.personaDefaulted && body.persona === 'neutral' && !result.pending && 'me' in result) await personaChange?.markDefaulted(result.me.id);
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -455,7 +461,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       if (limited('login', 12, request, reply)) return noteRefusal('login', request, 'rate', typed);
       const body = parse(loginSchema, request.body, reply);
       if (!body) return noteRefusal('login', request, 'invalid', typed, undefined, refusedField(loginSchema, request.body));
-      const result = await watched('login', request, typed, () => service.login(body.login, body.password, request.ip, body.country, bundleOf(request)));
+      const bundle = { ...bundleOf(request), confirmNumber: body.confirmNumber === true };
+      const result = await watched('login', request, typed, () => service.login(body.login, body.password, request.ip, body.country, bundle));
       return result.pending || 'totp' in result || 'phoneStep' in result ? result : { ...result, me: await withEnglish(request, result.me) };
     }),
   );
@@ -496,6 +503,26 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
       const body = parse(phoneStartSchema, request.body, reply);
       if (!body) return noteRefusal('login', request, 'invalid', typed, undefined, refusedField(phoneStartSchema, request.body));
       return watched('login', request, typed, () => service.startCodeLogin(body.phone, body.country, request.ip, sourceOf(request)));
+    }),
+  );
+
+  // M272: the gate's one number field. An account gets its sign-in code; a new number gets the sign-up proof. Only a
+  // refusal is counted as a sign-in that stopped, and a new number is not one.
+  app.post(
+    '/api/auth/quick/start',
+    guard(async (request, reply) => {
+      const typed = typedIn(request, 'phone');
+      if (limited('quick', 12, request, reply)) return noteRefusal('login', request, 'rate', typed);
+      const body = parse(phoneStartSchema, request.body, reply);
+      if (!body) return noteRefusal('login', request, 'invalid', typed, undefined, refusedField(phoneStartSchema, request.body));
+      try {
+        const result = await service.quickStart(body.phone, body.country, request.ip, langOf(request), sourceOf(request));
+        if (result.kind === 'signin') refusals?.passed('login', sourceOf(request));
+        return result;
+      } catch (error) {
+        if (error instanceof AuthError || error instanceof HubError || error instanceof RequestError) noteRefusal('login', request, error.code, typed, error, refusalDetailOf(error));
+        throw error;
+      }
     }),
   );
 
@@ -889,7 +916,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, { s
         return reply.code(400).send({ error: { code: `persona_${result.reason}`, message } });
       }
       const updated = await service.updateProfile(auth.session, { persona: result.persona }, sourceOf(request));
-      if (!updated.isAdmin) await personaChange.stamp(me.id);
+      if (!updated.isAdmin && !(await personaChange.takeDefaulted(me.id))) await personaChange.stamp(me.id);
       return { me: await withEnglish(request, updated) };
     }),
   );

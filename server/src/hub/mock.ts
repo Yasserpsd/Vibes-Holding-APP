@@ -39,6 +39,9 @@ export class MockHubClient implements HubClient {
   private readonly chat: MockChat;
   private readonly admin: MockAdmin;
 
+  /** M272: false = a hub older than 2.34.0, which wants an e-mail from every sign-up. */
+  emailOptional = true;
+
   /** options.replyDelayMs: how long a canned chat reply stays hidden (the real workflow takes a few seconds). */
   constructor(options: { replyDelayMs?: number; seed?: boolean } = {}) {
     this.chat = new MockChat(options.replyDelayMs ?? 1500);
@@ -63,7 +66,7 @@ export class MockHubClient implements HubClient {
         const norm = phoneIntl(str(body, 'country', 5).toLowerCase() || 'sa', str(body, 'phone', 40));
         if (!norm) throw new HubError('phone', 'رقم الجوال غير صحيح أو ناقص', 400);
         const taken = [...this.contacts.values()].some((contact) => contact.verified && contact.phoneNorm === norm);
-        return { ok: true, taken: taken ? 1 : 0, phone_norm: norm, phone_local: phoneLocal(norm) };
+        return { ok: true, taken: taken ? 1 : 0, phone_norm: norm, phone_local: phoneLocal(norm), ...(this.emailOptional ? { email_optional: 1 as const } : {}) };
       }
       case 'phone_login': {
         // Plugin 2.31.0 (M259): one active account, its number proven, not staff; `check` only asks.
@@ -75,7 +78,8 @@ export class MockHubClient implements HubClient {
         const owner = owners[0] as MockContact;
         // The live hub refuses admins too; here every verified account is an admin (the mock's rule), so only a publisher shows the refusal.
         if (owner.role === 'publisher') throw new HubError('password_only', 'هذا الحساب يسجّل الدخول بكلمة المرور', 403);
-        if (owner.phone === '' || owner.phoneVerified !== owner.phone) throw new HubError('phone_unproven', 'سجّل الدخول بكلمة المرور مرة واحدة لتأكيد رقمك', 403);
+        // Plugin 2.34.0 (M272): the app server may say the code itself is to prove the number (its switch).
+        if (owner.phone === '' || (owner.phoneVerified !== owner.phone && !body.unproven_ok)) throw new HubError('phone_unproven', 'سجّل الدخول بكلمة المرور مرة واحدة لتأكيد رقمك', 403);
         if (body.check === 1 || body.check === '1') return { ok: true, eligible: 1, contact_id: owner.id, phone_norm: norm, phone_local: phoneLocal(norm), lang: 'ar' } as HubResponse;
         owner.lastLoginAt = Date.now();
         this.visitors.set(this.uuid(body), owner.id);
@@ -234,13 +238,14 @@ export class MockHubClient implements HubClient {
     if (!PERSONAS.includes(persona)) throw new HubError('invalid', 'اختر فئتك: محايد، رائد أعمال، أو مستثمر', 400);
     // Plugin 2.27.0 (M203): the bio is asked later; a given one still has to say something.
     if (bio && bio.length < 10) throw new HubError('invalid', 'اكتب نبذة مختصرة عنك (سطر على الأقل) لنكمل التسجيل', 400);
-    if (!email) throw new HubError('invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل', 400);
-    if (!emailAllowed(email)) throw new HubError('email_domain', `${EMAIL_POLICY_TEXT} — هذا البريد غير مقبول`, 400);
+    // Plugin 2.34.0 (M272): a number the app server proved may open an account with no e-mail.
+    if (!email && !(this.emailOptional && body.phone_proven)) throw new HubError('invalid', 'البريد الإلكتروني مطلوب — يصلك عليه رمز التفعيل', 400);
+    if (email && !emailAllowed(email)) throw new HubError('email_domain', `${EMAIL_POLICY_TEXT} — هذا البريد غير مقبول`, 400);
     if (password.length < 6) throw new HubError('invalid', 'كلمة المرور 6 أحرف على الأقل', 400);
     const referrer = this.resolveReferral(body);
     const uuid = this.uuid(body);
     const existing = [...this.contacts.values()].find(
-      (contact) => contact.passHash && (contact.email === email || contact.phoneNorm === phoneNorm),
+      (contact) => contact.passHash && ((email !== '' && contact.email === email) || contact.phoneNorm === phoneNorm),
     );
     if (existing?.verified) {
       throw new HubError('exists', 'عندك حساب بهذا البريد أو الجوال — سجّل الدخول، أو استخدم «نسيت كلمة المرور»', 409);

@@ -20,7 +20,7 @@ import { colors, spacing, typography } from '@/theme/tokens';
  * binary has the native module AND the server announces the provider (auth config `social`),
  * so OTA updates on older binaries and unconfigured servers both simply hide it.
  */
-export function SocialButtons({ onError, fastest = false }: { onError: (message: string) => void; /** M257: the sign-up form says this is the fastest way in. */ fastest?: boolean }) {
+export function SocialButtons({ onError, fastest = false, bare = false }: { onError: (message: string) => void; /** M257: the sign-up form says this is the fastest way in. */ fastest?: boolean; /** M272: the button alone — the gate draws its own divider above it. */ bare?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { signIn } = useAuth();
@@ -82,11 +82,13 @@ export function SocialButtons({ onError, fastest = false }: { onError: (message:
         loading={busy}
         onPress={() => void press()}
       />
+      {bare ? null : (
       <View style={styles.divider}>
         <GoldHairline style={styles.line} />
         <Text style={styles.or}>{t('auth.social.or')}</Text>
         <GoldHairline style={styles.line} />
       </View>
+      )}
     </FadeInView>
   );
 }

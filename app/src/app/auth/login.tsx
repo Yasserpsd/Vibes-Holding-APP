@@ -10,6 +10,7 @@ import { FormFailure, failureOf, type Failure } from '@/components/form/FormFail
 import { FormField } from '@/components/FormField';
 import { EMPTY_IDENTIFIER, identifierPayload, identifierPhoneProblem, identifierValid, LoginIdentifierField, type Identifier } from '@/components/LoginIdentifier';
 import { entranceDelay, FadeInView, PressScale } from '@/components/motion';
+import { passwordRoad, quickStepPath } from '@/lib/quickEntry';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { SocialButtons } from '@/components/SocialButtons';
@@ -25,13 +26,21 @@ export default function LoginScreen() {
   useEffect(() => dismissSessionExpired, [dismissSessionExpired]);
   // M126: the phone is the first-class identifier — a number from any country or an e-mail.
   // M253: the sign-up form sends a member who already has an account here, with the address filled in.
-  const { email: knownEmail } = useLocalSearchParams<{ email?: string }>();
-  const [identifier, setIdentifier] = useState<Identifier>(knownEmail ? { mode: 'email', country: 'sa', value: knownEmail } : EMPTY_IDENTIFIER);
+  // M272: the gate sends `password=1` (its «e-mail or password» line), or a number the code could not open, with the
+  // server's sentence in `why`; `confirm=1` = this password sign-in must prove that number too.
+  const params = useLocalSearchParams<{ email?: string; number?: string; country?: string; why?: string; confirm?: string; password?: string }>();
+  const knownEmail = params.email;
+  const [identifier, setIdentifier] = useState<Identifier>(() => {
+    if (knownEmail) return { mode: 'email', country: 'sa', value: knownEmail };
+    return params.number ? { mode: 'phone', country: params.country ?? EMPTY_IDENTIFIER.country, value: params.number } : EMPTY_IDENTIFIER;
+  });
   const [password, setPassword] = useState('');
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const [codeBusy, setCodeBusy] = useState(false);
-  const [usePassword, setUsePassword] = useState(Boolean(knownEmail));
+  // M272: the number a code sign-in was just refused (here or at the gate): its password sign-in proves it too.
+  const [mustProve, setMustProve] = useState(params.confirm === '1' ? params.number : undefined);
+  const [usePassword, setUsePassword] = useState(Boolean(knownEmail || params.why || params.password));
 
   const submit = async () => {
     if (!identifierValid(identifier) || !password) {
@@ -48,7 +57,7 @@ export default function LoginScreen() {
     setFailure(null);
     try {
       const { login, country } = identifierPayload(identifier);
-      const result = await authApi.login(login, password, country);
+      const result = await authApi.login(login, password, country, identifier.mode === 'phone' && identifier.value.trim() === mustProve);
       if (result.pending) {
         router.push({ pathname: '/auth/verify', params: { pendingToken: result.pendingToken, email: result.email, text: result.text } });
         return;
@@ -69,7 +78,8 @@ export default function LoginScreen() {
     } catch (cause) {
       setFailure(failureOf(cause));
       // M128 (owner): no account behind these details → straight to registration, with a notice there.
-      if (cause instanceof ApiError && cause.code === 'no_account') {
+      // M272: a number is not sent to the long form — the button under the sentence starts the quick sign-up.
+      if (cause instanceof ApiError && cause.code === 'no_account' && !(config?.quickEntry && identifier.mode === 'phone')) {
         router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
       }
     } finally {
@@ -93,20 +103,27 @@ export default function LoginScreen() {
     }
     setCodeBusy(true);
     setFailure(null);
+    const { login, country } = identifierPayload(identifier);
     try {
-      const { login, country } = identifierPayload(identifier);
+      // M272: one road for both — an account gets its sign-in code, a new number goes on to the short sign-up.
+      if (config?.quickEntry) {
+        router.push(quickStepPath(await authApi.quickStart(login, country ?? identifier.country), login, country ?? identifier.country));
+        return;
+      }
       const step = await authApi.codeLoginStart(login, country ?? identifier.country);
       router.push(`${phoneStepPath(step)}&flow=code` as Href);
     } catch (cause) {
+      // A number that belongs to an account already: the password field opens, with the sentence that says why.
+      if (passwordRoad(cause, login, country ?? identifier.country)) setUsePassword(true);
+      if (cause instanceof ApiError && cause.code === 'code_login_password') setMustProve(login);
       setFailure(failureOf(cause));
-      // M262: an account the code cannot open (the server's sentence says to use the password) gets its password field.
-      if (cause instanceof ApiError && (cause.code === 'code_login_password' || cause.code === 'code_login_off')) setUsePassword(true);
       if (cause instanceof ApiError && cause.code === 'no_account') router.push({ pathname: '/auth/register', params: { fromLogin: '1' } });
     } finally {
       setCodeBusy(false);
     }
   };
   const codeLoginShown = Boolean(config?.codeLogin) && identifier.mode === 'phone';
+  const newNumber = Boolean(config?.quickEntry) && identifier.mode === 'phone' && failure?.code === 'no_account';
   // M262 (owner, 2026-11-22: «الدخول يكون برقم واتس اب علي طول»): where the code sign-in works, it IS the sign-in —
   // the number and one gold button, nothing to remember. The password waits behind «الدخول بكلمة المرور» (and shows
   // by itself for an e-mail, for an address handed over by the sign-up form, and when the server says this account
@@ -119,6 +136,11 @@ export default function LoginScreen() {
       {sessionExpired ? (
         <FadeInView delay={entranceDelay(0)}>
           <Notice tone="warning" text={t('errors.code.session_expired')} />
+        </FadeInView>
+      ) : null}
+      {params.why ? (
+        <FadeInView delay={entranceDelay(0)}>
+          <Notice tone="warning" text={params.why} />
         </FadeInView>
       ) : null}
       {config?.adminOnly ? (
@@ -154,7 +176,10 @@ export default function LoginScreen() {
           <FormFailure
             failure={failure}
             onRetry={() => void (codeFirst ? codeLogin() : submit())}
-            actions={[failure.code === 'bad_login' || failure.code === 'bad_password' ? { label: t('auth.login.forgot'), icon: 'key-outline', onPress: () => router.push('/auth/reset') } : null]}
+            actions={[
+              failure.code === 'bad_login' || failure.code === 'bad_password' ? { label: t('auth.login.forgot'), icon: 'key-outline', onPress: () => router.push('/auth/reset') } : null,
+              newNumber ? { label: t('quick.createWithCode'), icon: 'logo-whatsapp', onPress: () => void codeLogin() } : null,
+            ]}
           />
         </FadeInView>
       ) : null}

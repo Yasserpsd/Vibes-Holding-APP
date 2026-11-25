@@ -109,6 +109,8 @@ export type AuthConfig = {
   phoneProofRequired?: boolean;
   /** M259: the server and the hub can sign a member in with a WhatsApp code alone; an older server sends nothing. */
   codeLogin?: boolean;
+  /** M272: the server answers the gate's one number field (`/api/auth/quick/start`); an older server sends nothing. */
+  quickEntry?: boolean;
   /** M262: the server takes a sign-up without a password (the number is proven here and the code sign-in works); an older server sends nothing. */
   passwordOptional?: boolean;
   /** M263: the server starts the account deletion with the code alone; an older server sends nothing and wants the password. */
@@ -129,10 +131,13 @@ export type RegisterInput = {
   name: string;
   country: string;
   phone: string;
-  email: string;
+  /** M272: left out by the quick sign-up where the hub stores a number-only account. */
+  email?: string;
   /** M262: left out where `passwordOptional` — the server then gives the account a random one. */
   password?: string;
   persona: Persona;
+  /** M272: the quick sign-up asked no category, so the first choice later is not a «change». */
+  personaDefaulted?: boolean;
   jobTitle: string;
   /** M32: another member's membership number; the hub checks and stores it. */
   inviteCode?: string;
@@ -172,6 +177,12 @@ export type PhoneFirstResult = { pending: false; phoneFirst: true; signupToken: 
 export type DeleteProof = { password: string } | { social: { provider: 'google' | 'apple'; token: string } } | { byCode: true };
 /** M212: the sign-up form's own fields, sent with the proof of a first Google/Apple sign-in. */
 export type SocialSignupProfile = { name: string; persona: Persona; jobTitle: string; inviteCode?: string };
+
+/**
+ * M272: the answer to the gate's number field. `signin`: the account's code is on the way. `signup`: no account yet —
+ * the code proves the number, then a short form creates it (`needsEmail`: an older hub still wants an address there).
+ */
+export type QuickStartResult = PhoneStepResult & ({ kind: 'signin' } | { kind: 'signup'; needsEmail: boolean });
 
 /** The code screen of a sign-in that stopped at the WhatsApp code (login and the Apple/Google buttons). */
 export function phoneStepPath(step: PhoneStepResult): string {
@@ -243,8 +254,10 @@ export const authApi = {
   totpDisable: (code: string) => apiRequest<{ ok: true }>('POST', '/api/me/totp/disable', { body: { code } }),
   // M126: `country` rides along when the member typed a phone number, so the server can build
   // the international digits for any country (the hub itself only understands Saudi local forms).
-  login: (login: string, password: string, country?: string) =>
-    apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}) }, token: null }),
+  // M272: `confirmNumber` = a code sign-in was refused this number a moment ago, so this sign-in proves it too.
+  login: (login: string, password: string, country?: string, confirmNumber?: boolean) =>
+    apiRequest<LoginResult>('POST', '/api/auth/login', { body: { login, password, ...(country ? { country } : {}), ...(confirmNumber ? { confirmNumber } : {}) }, token: null }),
+  quickStart: (phone: string, country: string) => apiRequest<QuickStartResult>('POST', '/api/auth/quick/start', { body: { phone, country }, token: null }),
   // M46: the provider's ID token; the server verifies it itself and signs the member in (or creates the account).
   social: (provider: 'google' | 'apple', token: string, name?: string) =>
     apiRequest<SignedInResult | TotpStepResult | PhoneStepResult | PhoneFirstResult>('POST', '/api/auth/social', { body: { provider, token, ...(name ? { name } : {}) }, token: null }),

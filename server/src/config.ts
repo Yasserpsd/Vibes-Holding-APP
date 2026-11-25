@@ -52,6 +52,9 @@ const envSchema = z.object({
   // op (plugin 2.31.0); `off` hides it at once. The codes one account may ask for in a day are capped.
   CODE_LOGIN: z.enum(['off', 'on']).default('on'),
   CODE_LOGIN_DAILY: z.coerce.number().int().min(1).max(20).default(3),
+  // M272: the hub opens a code sign-in only for a number its owner already proved on WhatsApp. `on` lets the code
+  // itself be that proof (what «نسيت كلمة المرور» on WhatsApp already trusts). The owner's call; needs hub 2.34.0.
+  CODE_LOGIN_UNPROVEN: z.enum(['off', 'on']).default('off'),
   // M211: sign-up codes leave before an account exists, so a hard daily ceiling guards the paid channel.
   PHONE_PROOF_DAILY_CAP: z.coerce.number().int().min(1).default(1500),
   // M203: the store reviewers sign in with no code (docs/STORES.md promises e-mail + password, no 2FA). Comma list.

@@ -142,6 +142,8 @@ export type HubResponse = {
   taken?: 0 | 1;
   /** `phone_login` with `check: 1` (M259): this number may sign in by code; whose account, and its language. */
   eligible?: 0 | 1;
+  /** `phone_check` since plugin 2.34.0 (M272): a proven sign-up may arrive without an e-mail. */
+  email_optional?: 0 | 1;
   contact_id?: number;
   lang?: string;
   /** `register` since plugin 2.7.2: the invite code's owner as the hub resolved and stored him (M32); 0 = no referral. */
