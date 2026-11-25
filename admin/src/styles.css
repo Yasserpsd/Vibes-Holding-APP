@@ -364,10 +364,50 @@ progress::-moz-progress-bar { background: var(--gold); }
 .member-count { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 0.85rem; }
 /* M31: poll options in the editor, and the live results bars on the posts list. */
 .poll-options { display: grid; gap: 8px; }
-.poll-results { display: grid; gap: 6px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-.poll-results .row-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 0.9rem; }
-.poll-results .bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.poll-results .bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
+/* M278: the poll ranked like a podium — chips on top, the leader in gold, shares large. */
+.poll-results { display: grid; gap: 8px; margin-top: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.015); }
+.poll-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2px; }
+.stat-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--black); color: var(--muted); font-size: 0.8rem; }
+.stat-chip.gold { border-color: var(--gold-line); color: var(--gold-bright); background: var(--gold-wash); }
+.poll-option { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--black); justify-items: start; }
+.poll-option.top { border-color: var(--gold); background: linear-gradient(180deg, var(--gold-wash), transparent 80%), var(--black); box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.12), 0 8px 24px rgba(201, 162, 39, 0.08); }
+.poll-option.none { opacity: 0.45; }
+.poll-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; }
+.poll-label { font-size: 0.95rem; line-height: 1.6; }
+.lead-tag { display: inline-block; margin-inline-end: 8px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--gold-line); color: var(--gold-bright); font-size: 0.72rem; line-height: 20px; vertical-align: 2px; }
+.poll-share { display: grid; justify-items: end; line-height: 1.1; }
+.poll-share b { font-size: 1.25rem; font-weight: 600; }
+.poll-option.top .poll-share b { font-size: 1.6rem; color: var(--gold-bright); }
+.poll-share small { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+.poll-results .bar { width: 100%; height: 10px; border-radius: 999px; background: #242424; overflow: hidden; }
+.poll-option.none .bar { height: 6px; }
+.poll-results .bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--gold-bright)); animation: bar-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: right; }
+@keyframes bar-grow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .poll-results .bar > span { animation: none; } }
+.names-pill { padding: 3px 12px; border-radius: 999px; border: 1px solid var(--gold-line); background: transparent; color: var(--gold-bright); font-size: 0.8rem; min-height: 0; }
+.names-pill:hover, .names-pill.on { background: var(--gold-wash); }
+/* Number tiles: opened, voted, WhatsApp; a tile's list unfolds full width under the row. */
+.stat-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat-tile { flex: 1 1 130px; min-width: 0; display: grid; gap: 2px; justify-items: start; text-align: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--black); color: var(--text); font: inherit; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.stat-tile:hover:not(:disabled), .stat-tile.on { border-color: var(--gold-line); background: var(--gold-wash); }
+.stat-tile:disabled { cursor: default; opacity: 1; }
+.stat-tile .tile-label { color: var(--muted); font-size: 0.8rem; }
+.stat-tile b { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+.stat-tile .tile-note { color: var(--muted); font-size: 0.75rem; }
+.stat-tile .mini { display: block; width: 100%; height: 4px; margin-top: 4px; border-radius: 2px; background: #242424; overflow: hidden; }
+.stat-tile .mini i { display: block; height: 100%; background: var(--gold); }
+.stat-tile .mini.wa i { background: var(--ok); }
+.stat-panel { order: 10; flex: 1 1 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.015); }
+/* Actions: the reminder leads, «حذف» hides behind «⋯». */
+.card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.card-actions .remind { border-color: var(--gold); color: var(--gold-bright); background: var(--gold-wash); }
+.more-menu { position: relative; margin-inline-start: auto; }
+.more-menu summary { list-style: none; cursor: pointer; padding: 6px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 1.2rem; line-height: 1.2; color: var(--muted); user-select: none; }
+.more-menu summary::-webkit-details-marker { display: none; }
+.more-menu[open] summary { border-color: var(--gold-line); color: var(--text); }
+.more-menu .menu { position: absolute; bottom: calc(100% + 6px); inset-inline-end: 0; z-index: 5; min-width: 160px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--raised); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); display: grid; }
+.more-menu .danger-item { border: 0; background: transparent; color: #ff8589; text-align: start; padding: 8px 10px; border-radius: 8px; }
+.more-menu .danger-item:hover { background: var(--danger-wash); }
 .video-preview { display: grid; gap: 8px; justify-items: start; }
 .video-preview video { display: block; width: 100%; max-height: 360px; border-radius: 8px; border: 1px solid var(--line); background: #000; }
 /* M33 «الإحصائيات»: the category donut. */

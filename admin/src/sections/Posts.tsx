@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { api, type Post, type PostAudience, type PostKind, type PostFollow, type PostFollowRow, type PostWhatsapp, type PostWhatsappRow } from '../api';
 import { formatDateTime, formatEventDate, formatNumber } from '../format';
@@ -62,34 +62,61 @@ function HubSync({ post }: { post: Post }) {
   return <Pill tone="danger">لم يصل للمواقع بعد · يُعاد عند التعديل التالي</Pill>;
 }
 
-/** M31: the poll's live numbers on its row — a bar per option, the leader filled fullest. */
+/** M31: the poll's live numbers on its card. M278: ranked, the leader in gold, shares large, names one tap away. */
 function PollResults({ post, picked = null, onPick }: { post: Post; picked?: string | null; onPick?: (optionId: string) => void }) {
   const results = post.pollResults;
   if (post.kind !== 'poll' || !results) return null;
   const total = results.totalVotes ?? 0;
+  const ranked = [...results.options].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
+  const best = ranked[0]?.votes ?? 0;
+  const left = results.closesAt && !results.closed ? timeLeft(results.closesAt) : null;
   return (
     <div className="poll-results">
-      {results.options.map((option) => {
+      <div className="poll-chips">
+        <span className="stat-chip gold">👥 المصوتون {formatNumber(total)}</span>
+        {left ? <span className="stat-chip gold">⏳ {left}</span> : null}
+        {results.closesAt ? <span className="stat-chip">{results.closed ? 'أُغلق' : 'يُغلق'} {formatEventDate(results.closesAt)}</span> : null}
+        {results.resultsVisible ? null : <span className="stat-chip">النتائج للوحة فقط</span>}
+      </div>
+      {ranked.map((option) => {
         const votes = option.votes ?? 0;
+        const share = total > 0 ? Math.round((votes / total) * 100) : 0;
+        const top = best > 0 && votes === best;
         return (
-          <div className="row-line" key={option.id}>
-            <span>{option.label}</span>
-            <span className="muted">
-              {formatNumber(votes)}{total > 0 ? ` · ${Math.round((votes / total) * 100)}%` : ''}
-              {/* M274: the names behind an option, one tap away (admins). */}
-              {onPick && votes > 0 ? <> · <button type="button" className="link" aria-pressed={picked === option.id} onClick={() => onPick(option.id)}>{picked === option.id ? 'إخفاء الأسماء' : 'عرض الأسماء'}</button></> : null}
-            </span>
-            <div className="bar"><span style={{ width: total > 0 ? `${(votes / total) * 100}%` : 0 }} /></div>
+          <div className={top ? 'poll-option top' : votes === 0 ? 'poll-option none' : 'poll-option'} key={option.id}>
+            <div className="poll-head">
+              <span className="poll-label" lang="ar">
+                {top ? <span className="lead-tag">★ الأعلى</span> : null}
+                {option.label}
+              </span>
+              <span className="poll-share">
+                <b>{share}%</b>
+                <small>{votes === 0 ? 'لا أصوات' : counted(votes, ['صوت واحد', 'صوتان', 'أصوات', 'صوتًا'])}</small>
+              </span>
+            </div>
+            <div className="bar"><span style={{ width: `${share}%` }} /></div>
+            {/* M274: the names behind an option, one tap away (admins). */}
+            {onPick && votes > 0 ? (
+              <button type="button" className={picked === option.id ? 'names-pill on' : 'names-pill'} aria-pressed={picked === option.id} onClick={() => onPick(option.id)}>
+                {picked === option.id ? 'إخفاء الأسماء' : `👥 ${votes === 1 ? 'اسم واحد' : votes === 2 ? 'اسمان' : `${formatNumber(votes)} ${votes % 100 >= 3 && votes % 100 <= 10 ? 'أسماء' : 'اسمًا'}`}`}
+              </button>
+            ) : null}
           </div>
         );
       })}
-      <span className="muted">
-        {`المصوتون: ${formatNumber(total)}`}
-        {results.closesAt ? ` · ${results.closed ? 'أُغلق' : 'يُغلق'} ${formatEventDate(results.closesAt)}` : ''}
-        {results.resultsVisible ? '' : ' · النتائج للوحة فقط'}
-      </span>
     </div>
   );
+}
+
+/** M278: «باقي …» while a poll closes within the week; null otherwise. A bare day lasts until it ends in Riyadh. */
+function timeLeft(closesAt: string, now = Date.now()): string | null {
+  const end = closesAt.length === 10 ? Date.parse(`${closesAt}T23:59:59+03:00`) : Date.parse(closesAt);
+  const ms = end - now;
+  if (!(ms > 0)) return null;
+  const days = Math.floor(ms / 86_400_000);
+  if (days >= 7) return null;
+  if (days === 0) return `باقي ${counted(Math.max(1, Math.round(ms / 3_600_000)), ['ساعة واحدة', 'ساعتان', 'ساعات', 'ساعة'])}`;
+  return `باقي ${counted(days, ['يوم واحد', 'يومان', 'أيام', 'يومًا'])}`;
 }
 
 /** Arabic counting: one, two, 3–10 (plural), 11 and over (singular accusative). */
@@ -110,7 +137,7 @@ const followState = (row: PostFollowRow): 'voted' | 'opened' | 'unopened' => (ro
  * audience — who voted and for what, who only opened, who has not opened — filters it, and a name opens the member's
  * sheet; an option of the poll opens the names behind it. A moderator sees the numbers only.
  */
-function Tracking({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
+function Tracking({ post, isAdmin, children }: { post: Post; isAdmin: boolean; children?: ReactNode }) {
   const { openMember } = useShell();
   const [view, setView] = useState<FollowView | null>(null);
   const [data, setData] = useState<PostFollow | null>(null);
@@ -120,7 +147,6 @@ function Tracking({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
   const tracked = post.status === 'published' && post.kind !== 'popup';
   const canFollow = isAdmin && tracked;
   const count = post.opened ?? 0;
-  const label = count === 0 ? 'لم يفتحها أي عضو بعد' : `فتحها ${counted(count, ['عضو واحد', 'عضوان', 'أعضاء', 'عضوًا'])}`;
   const show = async (next: FollowView | null) => {
     const wasClosed = view === null;
     setView(next);
@@ -148,31 +174,47 @@ function Tracking({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
       <span className="num">{formatNumber(number)}</span>
     </button>
   );
+  // M278: the follow-up opens from number tiles («فتحوا», «صوّتوا», then «واتساب» as `children`); the lists unfold under them.
+  const following = view !== null && view !== 'voted' && !view.startsWith('option:');
+  const votes = post.pollResults?.totalVotes ?? 0;
   return (
     <>
       <PollResults post={post} picked={view?.startsWith('option:') ? view.slice(7) : null} onPick={canFollow ? (optionId) => void show(view === `option:${optionId}` ? 'all' : `option:${optionId}`) : undefined} />
-      {!tracked ? null : !isAdmin ? <p className="muted">👁 {label}</p> : (
-        <div className="post-opens">
-          <button type="button" className="link" onClick={() => void show(view === null ? 'all' : null)} aria-expanded={view !== null}>
-            👁 {label} · {view !== null ? 'إخفاء المتابعة' : 'متابعة الأعضاء بالأسماء'}
+      {!tracked ? null : (
+        <div className="stat-row">
+          <button type="button" className={following ? 'stat-tile on' : 'stat-tile'} disabled={!canFollow} aria-expanded={canFollow ? following : undefined} onClick={() => void show(view === null ? 'all' : null)}>
+            <span className="tile-label">👁 فتحوا</span>
+            <b>{formatNumber(count)}</b>
+            <span className="tile-note">{!canFollow ? (count === 0 ? 'لم يفتحها أحد بعد' : 'عضو') : view !== null ? 'إخفاء المتابعة' : 'متابعة بالأسماء'}</span>
           </button>
-          {view !== null && error ? <p className="muted">{error}</p> : null}
-          {view !== null && !error && data === null ? <p className="muted">جارٍ التحميل…</p> : null}
-          {view !== null && data ? (
-            <>
-              <div className="chips" role="group" aria-label="تصفية المتابعة">
-                {chip('all', 'الكل', rows.length)}
-                {isPoll ? chip('voted', stateLabel.voted, total('voted')) : null}
-                {chip('opened', stateLabel.opened, total('opened'))}
-                {chip('unopened', stateLabel.unopened, total('unopened'))}
-              </div>
-              {isPoll ? (
-                <div className="chips" role="group" aria-label="حسب الاختيار">
-                  {data.options.map((option) => chip(`option:${option.id}`, option.label, rows.filter((row) => row.vote === option.id).length, true))}
-                </div>
-              ) : null}
-              {data.complete ? null : <p className="muted hint">تعذّرت قراءة سجل الأعضاء الآن، فقائمة «لم يفتح» قد تكون ناقصة. أعد المحاولة بعد قليل.</p>}
-              {shown.length === 0 ? <p className="muted">لا يوجد أحد في هذه القائمة.</p> : null}
+          {isPoll ? (
+            <button type="button" className={view === 'voted' ? 'stat-tile on' : 'stat-tile'} disabled={!canFollow} aria-expanded={canFollow ? view === 'voted' : undefined} onClick={() => void show(view === 'voted' ? null : 'voted')}>
+              <span className="tile-label">☑ صوّتوا</span>
+              <b>{formatNumber(votes)}</b>
+              <span className="tile-note">{count > 0 ? `${Math.min(100, Math.round((votes / count) * 100))}% ممن فتحوا` : 'لا أحد بعد'}</span>
+              <span className="mini"><i style={{ width: `${count > 0 ? Math.min(100, (votes / count) * 100) : 0}%` }} /></span>
+            </button>
+          ) : null}
+          {children}
+          {view !== null && canFollow ? (
+            <div className="stat-panel post-opens">
+              {error ? <p className="muted">{error}</p> : null}
+              {!error && data === null ? <p className="muted">جارٍ التحميل…</p> : null}
+              {data ? (
+                <>
+                  <div className="chips" role="group" aria-label="تصفية المتابعة">
+                    {chip('all', 'الكل', rows.length)}
+                    {isPoll ? chip('voted', stateLabel.voted, total('voted')) : null}
+                    {chip('opened', stateLabel.opened, total('opened'))}
+                    {chip('unopened', stateLabel.unopened, total('unopened'))}
+                  </div>
+                  {isPoll ? (
+                    <div className="chips" role="group" aria-label="حسب الاختيار">
+                      {data.options.map((option) => chip(`option:${option.id}`, option.label, rows.filter((row) => row.vote === option.id).length, true))}
+                    </div>
+                  ) : null}
+                  {data.complete ? null : <p className="muted hint">تعذّرت قراءة سجل الأعضاء الآن، فقائمة «لم يفتح» قد تكون ناقصة. أعد المحاولة بعد قليل.</p>}
+                  {shown.length === 0 ? <p className="muted">لا يوجد أحد في هذه القائمة.</p> : null}
               <ul className="list">
                 {shown.slice(0, limit).map((row) => (
                   <li key={row.contactId}>
@@ -193,6 +235,8 @@ function Tracking({ post, isAdmin }: { post: Post; isAdmin: boolean }) {
               </ul>
               {shown.length > limit ? <button type="button" className="link" onClick={() => setLimit(limit + FOLLOW_PAGE)}>عرض المزيد ({formatNumber(shown.length - limit)})</button> : null}
             </>
+          ) : null}
+            </div>
           ) : null}
         </div>
       )}
@@ -252,11 +296,17 @@ function WhatsappDelivery({ post }: { post: Post }) {
         : row.mailed
           ? 'لم تصل على واتساب، فأُرسلت إلى بريده الإلكتروني'
           : 'لم تصل على واتساب';
+  // M278: a number tile next to «فتحوا»; its list unfolds under the tiles.
   return (
-    <div className="post-opens">
-      <button type="button" className="link" onClick={() => void toggle()} aria-expanded={open}>
-        💬 {open ? 'إخفاء حالة واتساب' : 'عرض حالة واتساب'}
-      </button>
+    <>
+    <button type="button" className={open ? 'stat-tile on' : 'stat-tile'} aria-expanded={open} onClick={() => void toggle()}>
+      <span className="tile-label">💬 واتساب</span>
+      <b>{data && total > 0 ? formatNumber(data.delivered) : '—'}</b>
+      <span className="tile-note">{data === undefined ? 'عرض الحالة' : data && total > 0 ? `وصلت من ${formatNumber(total)}` : 'لا رسائل'}</span>
+      {data && total > 0 ? <span className="mini wa"><i style={{ width: `${(data.delivered / total) * 100}%` }} /></span> : null}
+    </button>
+    {open ? (
+    <div className="stat-panel post-opens">
       {open && error ? <p className="muted">{error}</p> : null}
       {open && !error && data === undefined ? <p className="muted">جارٍ التحميل…</p> : null}
       {open && !error && data !== undefined && total === 0 ? <p className="muted">لا توجد رسائل واتساب مسجلة لهذه الرسالة</p> : null}
@@ -310,6 +360,8 @@ function WhatsappDelivery({ post }: { post: Post }) {
         </>
       ) : null}
     </div>
+    ) : null}
+    </>
   );
 }
 
@@ -475,12 +527,17 @@ export function Posts({ onEditing, isAdmin }: { onEditing: (editing: boolean) =>
                 </p>
                 <BodyText post={post} />
                 <HubSync post={post} />
-                <Tracking post={post} isAdmin={isAdmin} />
-                {isAdmin ? <WhatsappDelivery post={post} /> : null}
-                <div className="actions">
-                  <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>تعديل</button>
-                  {post.kind === 'popup' ? null : <button type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published'}>إرسال تذكير</button>}
-                  <button className="danger" type="button" onClick={() => void remove(post)} disabled={busyId === post.id}>حذف</button>
+                <Tracking post={post} isAdmin={isAdmin}>{isAdmin ? <WhatsappDelivery post={post} /> : null}</Tracking>
+                {/* M278: the reminder leads, «تعديل» beside it, and «حذف» waits behind «⋯». */}
+                <div className="card-actions">
+                  {post.kind === 'popup' ? null : <button className="remind" type="button" onClick={() => void push(post)} disabled={busyId === post.id || post.status !== 'published'}>🔔 {post.kind === 'poll' ? 'تذكير من لم يصوّت' : 'تذكير من لم يفتح'}</button>}
+                  <button type="button" onClick={() => setEditing(post)} disabled={busyId === post.id}>✎ تعديل</button>
+                  <details className="more-menu">
+                    <summary aria-label="المزيد" title="المزيد">⋯</summary>
+                    <div className="menu">
+                      <button className="danger-item" type="button" onClick={(e) => { (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open'); void remove(post); }} disabled={busyId === post.id}>🗑 حذف</button>
+                    </div>
+                  </details>
                 </div>
               </li>
             ))}
