@@ -5,7 +5,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { AccountDeletionStore } from '../auth/deletion.js';
 import { RequestError } from '../auth/guard.js';
 import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
-import type { AuthService, Me } from '../auth/service.js';
+import type { AuthService, Me, Persona } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
 import type { Notifier } from '../mail/notify.js';
@@ -64,7 +64,7 @@ export type AuditEntry = {
   id: string;
   at: string;
   actor: { id: number; name: string; email: string };
-  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete';
+  action: 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete' | 'persona';
   contactId: number;
   params: Record<string, unknown>;
   note: string;
@@ -800,6 +800,17 @@ export class DashboardService {
       this.deps.auth.forget(contactId);
       this.bust('hub');
       return { ok: true as const, contact: result.contact };
+    });
+  }
+
+  /** M283: the dashboard changes a member's category (owner: members who picked «محايد» by mistake). */
+  setPersona(admin: AdminActor, contactId: number, input: { persona: Persona; note: string; requestId: string | null }) {
+    return this.write(admin, 'persona', contactId, { params: { persona: input.persona }, note: input.note, requestId: input.requestId }, async () => {
+      const applied = await this.deps.auth.applyPersonaForContact(contactId, input.persona);
+      if (!applied) throw new RequestError('member_session_gone', 'تعذّر تغيير الفئة: لا توجد جلسة مفتوحة لهذا العضو في التطبيق — اطلب منه فتح التطبيق وتسجيل الدخول ثم أعد المحاولة', 409);
+      this.deps.auth.forget(contactId);
+      this.bust('hub');
+      return { ok: true as const, persona: input.persona };
     });
   }
 

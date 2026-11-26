@@ -45,6 +45,8 @@ const grantSchema = z
   .object({ action: z.enum(['activate', 'extend', 'revoke']), days: z.number().int().min(1, 'عدد الأيام غير صحيح').max(3650, 'عدد الأيام غير صحيح').nullish(), note, confirm, requestId })
   .refine((body) => body.action === 'revoke' || typeof body.days === 'number', 'اكتب عدد الأيام');
 const roleSchema = z.object({ role: z.enum(['member', 'publisher']), note, confirm, requestId });
+// M283: the dashboard sets a member's category («محايد» chosen by mistake).
+const personaSchema = z.strictObject({ persona: z.enum(['neutral', 'entrepreneur', 'investor']), note, confirm, requestId });
 // M205 «عضوية شرفية»: on = give, off = take back. No days: it has no duration.
 const honorarySchema = z.strictObject({ on: z.boolean(), note, confirm, requestId });
 // M271: «عضوية شركاء النجاح» (the 360 days are the hub's, never sent). M275: a grant names its Projects Bank project.
@@ -307,6 +309,19 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       const body = parse(deleteSchema, request.body, reply);
       if (!body) return;
       return service.deleteAccount(admin, params.id, { note: body.note, tellMember: body.tellMember, requestId: body.requestId ?? null });
+    }),
+  );
+
+  app.post(
+    '/api/admin/accounts/:id/persona',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(idSchema, request.params, reply);
+      if (!params) return;
+      const body = parse(personaSchema, request.body, reply);
+      if (!body) return;
+      return service.setPersona(admin, params.id, { persona: body.persona, note: body.note, requestId: body.requestId ?? null });
     }),
   );
 

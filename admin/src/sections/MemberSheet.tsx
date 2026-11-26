@@ -439,6 +439,64 @@ function PrivateMessage({ account, open, setOpen }: { account: Account; open: bo
   );
 }
 
+const PERSONAS = [
+  { key: 'neutral', label: 'محايد' },
+  { key: 'entrepreneur', label: 'رائد أعمال' },
+  { key: 'investor', label: 'مستثمر' },
+] as const;
+type PersonaKey = (typeof PERSONAS)[number]['key'];
+
+/**
+ * M283 (owner, 2026-11-26: members who picked «محايد» by mistake could not change it): the admin picks the new
+ * category and nothing changes until «تأكيد التغيير». The server applies it through the member's open app session.
+ */
+function PersonaChange({ account, onStart, onChanged }: { account: Account; onStart: () => void; onChanged: (text: string) => void }) {
+  const current: PersonaKey = PERSONAS.some((entry) => entry.key === account.persona) ? (account.persona as PersonaKey) : 'neutral';
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<PersonaKey>(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = (key: PersonaKey) => PERSONAS.find((entry) => entry.key === key)?.label ?? key;
+  const save = async () => {
+    if (busy || picked === current) return;
+    onStart();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.setPersona(account.id, { persona: picked, note: '', requestId: newRequestId() });
+      setOpen(false);
+      onChanged(`تغيّرت الفئة إلى «${label(picked)}».`);
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!open) {
+    return (
+      <div className="actions">
+        <button type="button" onClick={() => { setPicked(current); setError(null); setOpen(true); }}>تغيير الفئة</button>
+      </div>
+    );
+  }
+  return (
+    <div className="stack">
+      <div className="chips" role="group" aria-label="الفئة الجديدة">
+        {PERSONAS.map((entry) => (
+          <button key={entry.key} type="button" className={picked === entry.key ? 'chip on' : 'chip'} aria-pressed={picked === entry.key} disabled={busy} onClick={() => setPicked(entry.key)}>
+            {PERSONA_ICON[entry.key]} {entry.label}
+          </button>
+        ))}
+      </div>
+      {error ? <p className="muted hint" role="alert">{error}</p> : null}
+      <div className="actions">
+        <button type="button" className="primary" disabled={busy || picked === current} onClick={() => void save()}>{busy ? 'جارٍ الحفظ…' : 'تأكيد التغيير'}</button>
+        <button type="button" disabled={busy} onClick={() => setOpen(false)}>إلغاء</button>
+      </div>
+    </div>
+  );
+}
+
 /** M279: the sensitive actions wait closed at the bottom of the sheet; the rest sit in the membership card. */
 const SENSITIVE: ActionKind[] = ['publisher', 'unpublisher', 'delete'];
 
@@ -536,6 +594,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         </div>
         {/* M116 (owner): the member's interests, right where he reads who this is. */}
         {detail.interests?.length ? <div className="pills">{detail.interests.map((label) => <Pill key={label} tone="muted">{label}</Pill>)}</div> : null}
+        {account.state !== 'lead' ? <PersonaChange key={account.persona} account={account} onStart={onStart} onChanged={onChanged} /> : null}
         <div className="quick-actions">
           {account.phone ? <a className="quick" href={`https://wa.me/${waDigits(account.phone)}`} target="_blank" rel="noreferrer"><span aria-hidden="true">💬</span>واتساب</a> : null}
           {account.phone ? <a className="quick" href={`tel:${account.phone}`}><span aria-hidden="true">📞</span>اتصال</a> : null}

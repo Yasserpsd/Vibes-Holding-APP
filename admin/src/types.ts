@@ -335,7 +335,7 @@ export type SuccessPartners = {
   projects: ProjectChoice[];
 };
 
-export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete';
+export type AuditAction = 'grant' | 'role' | 'pb_grant' | 'reply' | 'honorary' | 'partner' | 'partner_project' | 'delete' | 'persona';
 export type AuditEntry = {
   id: string;
   at: string;

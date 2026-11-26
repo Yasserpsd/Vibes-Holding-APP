@@ -1122,6 +1122,23 @@ export class AuthService {
     this.remember(uuid, contact);
   }
 
+  /**
+   * M283: the dashboard sets a member's category directly (members who picked «محايد» by mistake). The hub
+   * has no admin op for it, so the change goes through the member's own live app session, the latest first.
+   * False when no session of the member still works at the hub (signed out / expired).
+   */
+  async applyPersonaForContact(contactId: number, persona: Persona): Promise<boolean> {
+    for (const { record } of await this.deps.sessions.listSessions(contactId)) {
+      try {
+        await this.applyPersonaFor(record.uuid, persona);
+        return true;
+      } catch (error) {
+        if (error instanceof AuthError && error.code === 'persona_unsupported') throw error;
+      }
+    }
+    return false;
+  }
+
   async logout(token: string, session: SessionRecord): Promise<void> {
     this.meCache.delete(session.uuid);
     await this.deps.sessions.deleteSession(token);

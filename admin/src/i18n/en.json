@@ -1773,5 +1773,12 @@
  "باقي {0} ساعات": "{0} hours left",
  "باقي {0} ساعة": "{0} hours left",
  "باقي ساعة واحدة": "1 hour left",
- "باقي ساعتان": "2 hours left"
+ "باقي ساعتان": "2 hours left",
+ "تغيير الفئة": "Change category",
+ "الفئة الجديدة": "New category",
+ "تأكيد التغيير": "Confirm change",
+ "تغيّرت الفئة إلى «{0}».": "The category changed to “{0}”.",
+ "تغيير الفئة إلى «{0}»": "Category changed to “{0}”",
+ "تعذّر تغيير الفئة: لا توجد جلسة مفتوحة لهذا العضو في التطبيق — اطلب منه فتح التطبيق وتسجيل الدخول ثم أعد المحاولة": "The category could not be changed: this member has no open session in the app. Ask them to open the app and sign in, then try again.",
+ "تغيير الفئة غير متاح حاليًا، حاول لاحقًا": "Changing the category is not available right now. Try again later."
 }

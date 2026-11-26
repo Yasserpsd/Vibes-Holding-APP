@@ -727,6 +727,7 @@ export const api = {
   grant: (id: number, input: { action: GrantAction; days: number | null } & WriteMeta) =>
     call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/grant`, { action: input.action, ...(input.days !== null ? { days: input.days } : {}), note: input.note, requestId: input.requestId, confirm: true }),
   // M205 «عضوية شرفية»: given and taken back by the administration only; no days.
+  setPersona: (id: number, input: { persona: 'neutral' | 'entrepreneur' | 'investor' } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/persona`, { ...input, confirm: true }),
   deleteAccount: (id: number, input: { tellMember: boolean } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/delete`, { ...input, confirm: true }),
   honorary: (id: number, input: { on: boolean } & WriteMeta) => call<{ ok: true; already: boolean }>('POST', `/api/admin/accounts/${id}/honorary`, { ...input, confirm: true }),
   // M271 «عضوية شركاء النجاح»: the hub gives it for 360 days. M275: a grant names its Projects Bank project.

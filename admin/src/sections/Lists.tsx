@@ -565,6 +565,7 @@ export function Mail() {
 }
 
 const GRANTS: Record<string, string> = { activate: 'تفعيل عضوية', extend: 'تمديد عضوية', revoke: 'إلغاء عضوية' };
+const PERSONA_NAMES: Record<string, string> = { neutral: 'محايد', entrepreneur: 'رائد أعمال', investor: 'مستثمر' };
 
 /** What the entry did, in words, from the stored parameters. */
 function auditText(entry: AuditEntry): string {
@@ -579,6 +580,7 @@ function auditText(entry: AuditEntry): string {
   const project = typeof params.project === 'string' && params.project ? ` · ${params.project}` : '';
   if (entry.action === 'partner') return `${params.on === false ? 'سحب عضوية شركاء النجاح' : 'منح عضوية شركاء النجاح'}${project}`;
   if (entry.action === 'partner_project') return `ربط شريك نجاح بمشروع${project}`;
+  if (entry.action === 'persona') return `تغيير الفئة إلى «${PERSONA_NAMES[String(params.persona)] ?? String(params.persona)}»`;
   if (entry.action === 'role') return params.role === 'publisher' ? 'منح صلاحية النشر' : 'سحب صلاحية النشر';
   if (entry.action === 'pb_grant') {
     const amount = typeof params.amount === 'number' ? params.amount : 0;
