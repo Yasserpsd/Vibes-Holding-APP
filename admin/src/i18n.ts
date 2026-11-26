@@ -64,6 +64,40 @@ const patterns: Pattern[] = Object.keys(dict)
   .filter((pattern) => ARABIC.test(pattern.test.source))
   .sort((a, b) => b.weight - a.weight);
 
+/**
+ * M282: English the server translated for texts the dictionary lacks (names, members' answers, poll texts), kept in
+ * this browser so a page renders them in English at once on the next visit. Filled by `englishSweep.ts`.
+ */
+const LEARNED_KEY = 'admin.english.learned';
+const LEARNED_MAX = 4000;
+const learned = new Map<string, string>();
+try {
+  const saved = isEn ? (JSON.parse(localStorage.getItem(LEARNED_KEY) ?? '[]') as [string, string][]) : [];
+  for (const [ar, english] of saved) if (typeof ar === 'string' && typeof english === 'string') learned.set(ar, english);
+} catch {
+  // Blocked or broken storage: the sweep asks the server again.
+}
+
+/** M282: remembers server translations (core Arabic → English) for tx() and later visits. */
+export function learn(pairs: [string, string][]): void {
+  for (const [ar, english] of pairs) {
+    learned.delete(ar);
+    learned.set(ar, english);
+  }
+  while (learned.size > LEARNED_MAX) learned.delete(learned.keys().next().value as string);
+  cache.clear();
+  try {
+    localStorage.setItem(LEARNED_KEY, JSON.stringify([...learned]));
+  } catch {
+    // Full or blocked storage: this visit still has them in memory.
+  }
+}
+
+/** M282: the server's English for a core text, if this browser learned it. */
+export function learnedFor(core: string): string | undefined {
+  return learned.get(core);
+}
+
 const SEPARATORS = /(\s+·\s+|،\s+|\s+—\s+|\n+)/;
 const cache = new Map<string, string>();
 
@@ -81,6 +115,8 @@ function fromPattern(core: string): string | undefined {
 function translate(core: string): string | undefined {
   const exact = dict[core];
   if (exact !== undefined) return exact;
+  const known = learned.get(core);
+  if (known !== undefined) return known;
   const matched = fromPattern(core);
   if (matched !== undefined) return matched;
   // A line joined from parts («نُشر: … · صور: 3»): each part on its own.

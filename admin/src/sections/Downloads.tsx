@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 
 import { api } from '../api';
 import { formatDay, formatDays, formatNumber } from '../format';
+import { isEn, tx } from '../i18n';
 import type { Downloads as DownloadsData, HubStats, StoreDownloads } from '../types';
 import { Skeleton, useLoad, useShell } from '../ui';
 
@@ -68,6 +69,12 @@ function pending(name: string, store: StoreDownloads): { row: string; auto: bool
 
 /** What a store's number covers: from its first download (or the launch) to the last day the store has published. */
 function covers(store: StoreDownloads): string {
+  // M282: English mode gets the whole line in English (the joined Arabic slipped past the dictionary).
+  if (isEn) {
+    const span = store.since ? `from ${formatDay(store.since, 'short')}` : 'since launch';
+    const english = store.latest ? `Downloads ${span} to ${formatDay(store.latest, 'short')}` : `Downloads ${span}`;
+    return store.source === 'console' ? `${english} · from Play Console statistics` : english;
+  }
   const from = store.since ? `من ${formatDay(store.since, 'short')}` : 'منذ الإطلاق';
   // M233: days read from the Play Console statistics page (Google has issued no installs file yet) say where they come from.
   const origin = store.source === 'console' ? ' · من إحصاءات Play Console' : '';
@@ -245,7 +252,9 @@ function memberNotes(hub: HubStats | null): string[] {
   if (!hub) return [];
   const { members_honorary: honorary = 0, members_no_expiry: noExpiry = 0, members_partner: partner = 0 } = hub.totals;
   const parts = [partner > 0 ? `${formatNumber(partner)} بعضوية شركاء النجاح` : '', honorary > 0 ? `${formatNumber(honorary)} بعضوية شرفية` : '', noExpiry > honorary ? `${formatNumber(noExpiry - honorary)} بلا تاريخ انتهاء` : ''].filter(Boolean);
-  return parts.length ? [`منهم ${parts.join(' و')}`] : [];
+  if (!parts.length) return [];
+  // M282: each part in English and joined with «and» (the joined Arabic slipped past the dictionary).
+  return [isEn ? `Of whom ${parts.map(tx).join(' and ')}` : `منهم ${parts.join(' و')}`];
 }
 
 /**

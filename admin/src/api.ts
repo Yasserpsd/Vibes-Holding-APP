@@ -753,6 +753,8 @@ export const api = {
   /** `value: null` goes back to the block's own text. */
   saveContent: (input: { lang: WordingLang; block: string; path: string; value: string | null }) => call<{ ok: true; edit: WordingEdit | null }>('PUT', '/api/admin/content', input),
   strings: () => call<WordingList>('GET', '/api/admin/strings'),
+  /** M282: English for the Arabic texts a page still shows in English mode (names in Latin letters); cached on the server. */
+  english: (texts: string[]) => call<{ texts: string[] }>('POST', '/api/admin/english', { texts }),
   /** `value: null` goes back to the app's own text. */
   saveString: (input: { lang: WordingLang; key: string; value: string | null }) => call<{ ok: true; edit: WordingEdit | null }>('PUT', '/api/admin/strings', input),
   uploadsConfig: () => call<UploadConfig>('GET', '/api/admin/uploads/config'),

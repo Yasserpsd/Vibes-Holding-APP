@@ -1765,5 +1765,13 @@
  "🗑 حذف": "🗑 Delete",
  "{0} (النسخة الإنجليزية)": "{0} (English version)",
  "تظهر الصورة العربية نفسها": "The Arabic picture shows",
- "صورك الحقيقية موظفة في مكانها: بنرات الرئيسية المتحركة، صور العضوية، معرض المقر، وصور كل خدمة. الصورة التي عليها كتابة لها خانة ثانية للنسخة الإنجليزية.": "Your real photos, each in its place: the moving home banners, the membership pictures, the headquarters gallery and every service picture. A picture with writing on it has a second slot for the English version."
+ "صورك الحقيقية موظفة في مكانها: بنرات الرئيسية المتحركة، صور العضوية، معرض المقر، وصور كل خدمة. الصورة التي عليها كتابة لها خانة ثانية للنسخة الإنجليزية.": "Your real photos, each in its place: the moving home banners, the membership pictures, the headquarters gallery and every service picture. A picture with writing on it has a second slot for the English version.",
+ "باقي {0} أيام": "{0} days left",
+ "باقي {0} يومًا": "{0} days left",
+ "باقي يوم واحد": "1 day left",
+ "باقي يومان": "2 days left",
+ "باقي {0} ساعات": "{0} hours left",
+ "باقي {0} ساعة": "{0} hours left",
+ "باقي ساعة واحدة": "1 hour left",
+ "باقي ساعتان": "2 hours left"
 }

@@ -34,6 +34,7 @@ import { parseAudiences, SocialVerifier } from './auth/social.js';
 import { SessionStore } from './auth/sessions.js';
 import type { Config } from './config.js';
 import { appStringsRoutes } from './appStrings/routes.js';
+import { DASHBOARD_TRANSLATE_SYSTEM, dashboardEnglishRoutes } from './dashboardEnglish.js';
 import { cardRoutes } from './card/routes.js';
 import { walletFlags, walletRoutes } from './wallet/routes.js';
 import { CardService } from './card/service.js';
@@ -752,6 +753,14 @@ export async function buildApp({ config, kv, hub, pb, classifier, blurbs, fetchI
   await app.register(discountsRoutes, { service: discounts, auth });
   await app.register(contentRoutes, { kv, auth, notifier, sync, offers: golden, englishSweep, requests });
   await app.register(appStringsRoutes, { kv, auth, sync });
+  // M282: the dashboard's English mode leaves no Arabic word (names in Latin letters, texts translated, cached).
+  await app.register(dashboardEnglishRoutes, {
+    kv,
+    auth,
+    translator: config.OPENAI_API_KEY
+      ? new OpenAITranslator({ apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL, log: app.log, fetchImpl, system: DASHBOARD_TRANSLATE_SYSTEM })
+      : new OffTranslator(),
+  });
   await app.register(appVersionRoutes, { ...appVersionGate, auth });
   // M101: the e-mailed-code persona change (mock hub without SMTP uses the public test code).
   const personaChange = new PersonaChangeStore(kv, hubClient.mode === 'mock' && !mail.configured ? MOCK_CODE : null);
