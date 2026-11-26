@@ -36,6 +36,7 @@ const leadsSchema = z.object({ q, ltype: z.string().trim().max(40).default(''), 
 const threadsSchema = z.object({ q, filter: z.enum(['all', 'waiting', 'human', 'unread']).default('all'), ...paging });
 const threadSchema = z.object({ before: z.coerce.number().int().positive().optional() });
 const auditSchema = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
+const countryCodeSchema = z.object({ code: z.string().trim().toLowerCase().regex(/^([a-z]{2}|none)$/, 'رمز الدولة غير صحيح') });
 
 // Every write names what it does and carries `confirm: true`: a stray request never changes a membership.
 const confirm = z.literal(true, 'أكّد العملية أولًا');
@@ -111,6 +112,18 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
       const admin = await requireAdmin(request, reply);
       if (!admin) return;
       return service.countries(admin);
+    }),
+  );
+
+  // M284b: the accounts of one country (two-letter code, or `none` = without a phone).
+  app.get(
+    '/api/admin/countries/:code',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      const params = parse(countryCodeSchema, request.params, reply);
+      if (!params) return;
+      return service.countryAccounts(admin, params.code);
     }),
   );
 

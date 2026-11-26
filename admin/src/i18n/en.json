@@ -1803,5 +1803,12 @@
  "تشغيل الدوران": "Rotate",
  "عرض العالم": "Whole world",
  "أقل": "Fewer",
- "أكثر": "More"
+ "أكثر": "More",
+ "عرض المسجّلين ↓": "Show accounts ↓",
+ "عرض الحسابات بدون رقم": "Show the accounts without a phone",
+ "الأعضاء فقط": "Members only",
+ "إغلاق القائمة": "Close the list",
+ "ابحث بالاسم أو الرقم": "Search by name or number",
+ "عرض": "Show",
+ "لا توجد نتائج.": "No results."
 }

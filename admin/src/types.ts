@@ -301,6 +301,8 @@ export type Personas = { neutral: number; entrepreneur: number; investor: number
 /** M284 «خريطة الأعضاء» (mirrors server/src/dashboard/countries.ts): accounts by the country of their phone. */
 export type CountryCount = { code: string; name: string; nameEn: string; flag: string; dial: string; total: number; members: number };
 export type CountriesResult = { items: CountryCount[]; noPhone: number; unknown: number; total: number };
+/** M284b: one country's accounts (`none` = without a phone), newest first. */
+export type CountryAccounts = { code: string; items: AccountRow[] };
 export type AnalyticsResult = {
   days: AnalyticsDay[];
   personas: Personas | null;

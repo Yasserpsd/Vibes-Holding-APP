@@ -7,7 +7,8 @@ import { CODE_BY_NAME, CODE_BY_NUMERIC } from '../countryIso';
 import { formatNumber } from '../format';
 import { isEn } from '../i18n';
 import type { CountriesResult, CountryCount } from '../types';
-import { Async, SectionHead, useLoad } from '../ui';
+import { Async, Chips, SearchBox, SectionHead, useLoad } from '../ui';
+import { MemberRow } from './Members';
 import atlasUrl from 'world-atlas/countries-50m.json?url';
 
 /** M284 «خريطة الأعضاء» (owner, 2026-11-27): a 3D globe of the accounts by the country of their phone, a ranked chart below. */
@@ -83,6 +84,15 @@ function MapBody({ data }: { data: CountriesResult }) {
   const top = data.items[0];
   const selectedRow = data.items.find((row) => row.code === selected) ?? null;
   const rank = selectedRow ? data.items.indexOf(selectedRow) + 1 : 0;
+  // M284b: the country whose accounts are listed under the globe (`none` = the accounts without a phone).
+  const [listed, setListed] = useState<string | null>(null);
+  const listBox = useRef<HTMLDivElement>(null);
+  const toList = () => requestAnimationFrame(() => listBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  const choose = (code: string | null) => {
+    setSelected(code);
+    setListed(code);
+  };
+  const listedRow = data.items.find((row) => row.code === listed) ?? null;
 
   return (
     <div className="map-page">
@@ -93,10 +103,10 @@ function MapBody({ data }: { data: CountriesResult }) {
         <Tile label="بدون رقم جوال" value={formatNumber(data.noPhone + data.unknown)} />
       </div>
 
-      <GlobeView data={data} selected={selected} onSelect={setSelected}>
+      <GlobeView data={data} selected={selected} onSelect={choose}>
         {selectedRow ? (
           <div className="map-card">
-            <button type="button" className="map-card-close" onClick={() => setSelected(null)} aria-label="إغلاق">×</button>
+            <button type="button" className="map-card-close" onClick={() => choose(null)} aria-label="إغلاق">×</button>
             <span className="map-card-rank num">#{rank}</span>
             <strong className="map-card-name">{nameOf(selectedRow)}</strong>
             <bdi dir="ltr" className="map-dial num">+{selectedRow.dial}</bdi>
@@ -105,9 +115,18 @@ function MapBody({ data }: { data: CountriesResult }) {
               <span><b className="num">{formatNumber(selectedRow.members)}</b> عضو</span>
               <span><b className="num">{share(selectedRow.total, withPhone)}</b> من الإجمالي</span>
             </div>
+            <button type="button" className="map-card-list" onClick={toList}>
+              عرض المسجّلين ↓
+            </button>
           </div>
         ) : null}
       </GlobeView>
+
+      {listed ? (
+        <div ref={listBox} className="map-list-anchor">
+          <CountryList key={listed} code={listed} title={listedRow ? nameOf(listedRow) : 'بدون رقم جوال'} onClose={() => choose(null)} />
+        </div>
+      ) : null}
 
       <div className="card map-chart">
         <div className="map-chart-head">
@@ -118,7 +137,10 @@ function MapBody({ data }: { data: CountriesResult }) {
           <ol className="map-rows">
             {data.items.map((row, index) => (
               <li key={row.code}>
-                <button type="button" className={row.code === selected ? 'map-row on' : 'map-row'} onClick={() => setSelected(row.code)}>
+                <button type="button" className={row.code === selected ? 'map-row on' : 'map-row'} onClick={() => {
+                    choose(row.code);
+                    toList();
+                  }}>
                   <span className="map-row-rank num">{index + 1}</span>
                   <span className="map-row-name">
                     {nameOf(row)} <bdi dir="ltr" className="map-dial num">+{row.dial}</bdi>
@@ -137,10 +159,73 @@ function MapBody({ data }: { data: CountriesResult }) {
         )}
         {data.noPhone + data.unknown ? (
           <p className="muted map-foot">
-            {formatNumber(data.noPhone)} حساب بدون رقم جوال{data.unknown ? ` · ${formatNumber(data.unknown)} برقم لم نتعرّف على دولته` : ''} — لا تظهر على الخريطة.
+            {formatNumber(data.noPhone)} حساب بدون رقم جوال{data.unknown ? ` · ${formatNumber(data.unknown)} برقم لم نتعرّف على دولته` : ''} — لا تظهر على الخريطة.{' '}
+            {data.noPhone ? (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  choose(null);
+                  setListed('none');
+                  toList();
+                }}
+              >
+                عرض الحسابات بدون رقم
+              </button>
+            ) : null}
           </p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+type Only = 'all' | 'member';
+const ONLY: { value: Only; label: string }[] = [
+  { value: 'all', label: 'الكل' },
+  { value: 'member', label: 'الأعضاء فقط' },
+];
+
+/** M284b (owner: «ادوس علي الدولة اشوف كل المسجلين فيها»): the country's accounts, newest first; a tap opens the member sheet. */
+function CountryList({ code, title, onClose }: { code: string; title: string; onClose: () => void }) {
+  const state = useLoad(() => api.countryAccounts(code), [code]);
+  const [q, setQ] = useState('');
+  const [only, setOnly] = useState<Only>('all');
+  return (
+    <div className="card map-list">
+      <div className="map-list-head">
+        <div>
+          <span className="muted map-list-kicker">المسجّلون</span>
+          <h2>{title}</h2>
+        </div>
+        <button type="button" className="icon-button" onClick={onClose} aria-label="إغلاق القائمة">×</button>
+      </div>
+      <div className="map-list-tools">
+        <SearchBox value={q} onChange={setQ} placeholder="ابحث بالاسم أو الرقم" />
+        <Chips label="عرض" options={ONLY} value={only} onChange={setOnly} />
+      </div>
+      <Async state={state} rows={4}>
+        {(data) => {
+          const needle = q.trim().toLowerCase();
+          const rows = data.items.filter(
+            (account) => (only === 'all' || account.state === 'member') && (!needle || `${account.name} ${account.phone} ${account.email}`.toLowerCase().includes(needle)),
+          );
+          return (
+            <>
+              <p className="muted map-list-count">
+                <b className="num">{formatNumber(rows.length)}</b> من <b className="num">{formatNumber(data.items.length)}</b> حساب
+              </p>
+              {rows.length ? (
+                <ul className="member-list">
+                  {rows.map((account) => <MemberRow key={account.id} account={account} />)}
+                </ul>
+              ) : (
+                <p className="state-card empty">لا توجد نتائج.</p>
+              )}
+            </>
+          );
+        }}
+      </Async>
     </div>
   );
 }

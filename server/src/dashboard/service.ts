@@ -7,7 +7,7 @@ import { RequestError } from '../auth/guard.js';
 import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me, Persona } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
-import { countByCountry, type CountriesAnswer } from './countries.js';
+import { countByCountry, countryOfPhone, type CountriesAnswer } from './countries.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
 import type { Notifier } from '../mail/notify.js';
 import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
@@ -439,19 +439,32 @@ export class DashboardService {
     return counts;
   }
 
-  /** M284 «خريطة الأعضاء»: every registered account by the country of its phone (sweep like `newest`, counts only). */
-  async countries(admin: AdminActor): Promise<CountriesAnswer> {
+  /** M284: every registered account (sweep like the newest-first list, pending dropped, one row per id — M230). */
+  private async everyAccount(admin: AdminActor): Promise<HubAccount[]> {
     const all: HubAccount[] = [];
     for (let page = 1; page <= 200; page += 1) {
       const slice = await this.hub(admin, 'admin_accounts', { q: '', state: 'all', page, per_page: 100 });
       all.push(...slice.items.filter((account) => account.state !== 'pending'));
       if (!slice.items.length || page * 100 >= slice.total) break;
     }
-    // M230: an account that turns active while the pages are read can show twice; one row per account.
-    return countByCountry([...new Map(all.map((account) => [account.id, account])).values()]);
+    return [...new Map(all.map((account) => [account.id, account])).values()];
   }
 
-  hubPayments(admin: AdminActor, query:{ q: string; status: string; action: string; page: number; perPage: number }): Promise<HubResults['admin_payments']> {
+  /** M284 «خريطة الأعضاء»: every registered account by the country of its phone (counts only). */
+  async countries(admin: AdminActor): Promise<CountriesAnswer> {
+    return countByCountry(await this.everyAccount(admin));
+  }
+
+  /** M284b (owner: «ادوس علي الدولة اشوف كل المسجلين فيها»): the accounts of one country («none» = no phone), newest first. */
+  async countryAccounts(admin: AdminActor, code: string): Promise<{ code: string; items: (HubAccount & { pb: null })[] }> {
+    const items = (await this.everyAccount(admin))
+      .filter((account) => countryOfPhone(account.phone) === (code === 'none' ? '' : code))
+      .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id)
+      .map((account) => ({ ...account, pb: null }));
+    return { code, items };
+  }
+
+  hubPayments(admin: AdminActor, query: { q: string; status: string; action: string; page: number; perPage: number }): Promise<HubResults['admin_payments']> {
     return this.hub(admin, 'admin_payments', { q: query.q, status: query.status, action: query.action, page: query.page, per_page: query.perPage });
   }
 

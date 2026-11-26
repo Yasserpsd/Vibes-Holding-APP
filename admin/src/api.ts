@@ -1,4 +1,4 @@
-import type { AccountFilter, AccountsResult, EndsFilter, Personas, PersonaFilter, WaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, CountriesResult, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, SuccessPartners, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
+import type { AccountFilter, AccountsResult, EndsFilter, Personas, PersonaFilter, WaFilter, AnalyticsResult, AppPayment, AuditEntry, ContentList, CountriesResult, CountryAccounts, ContentValues, Downloads, GrantAction, Home, HubPayment, Lead, Listed, MailItem, MailStats, MemberDetail, NewsSourceRow, NewsSourcesResult, StorePurchase, SuccessPartners, Thread, ThreadDetail, ThreadFilter, Ticket, WordingEdit, WordingLang, WordingList, WriteMeta } from './types';
 
 // Public value: the TEST API. A production dashboard gets its URL from VITE_API_URL at build time.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api-test.vibesholdingsa.com';
@@ -715,6 +715,7 @@ export const api = {
   personas: (state: 'member' | 'all') => call<Personas>('GET', `/api/admin/personas?state=${state}`),
   // M284: accounts by the country of their phone (counts only).
   countries: () => call<CountriesResult>('GET', '/api/admin/countries'),
+  countryAccounts: (code: string) => call<CountryAccounts>('GET', `/api/admin/countries/${encodeURIComponent(code)}`),
   account: (id: number) => call<MemberDetail>('GET', `/api/admin/accounts/${id}`),
   hubPayments: (input: Paging & { status?: 'all' | 'ok' | 'failed'; action?: string }) =>
     call<Listed<HubPayment> & { sum_cents_ok: number }>('GET', `/api/admin/hub-payments${query({ ...paging(input), status: input.status, action: input.action })}`),

@@ -94,7 +94,8 @@ export function personaLabel(persona: string | null | undefined): string | null 
 /** M279: the category as a small emblem — on the list row and at the top of the member sheet. */
 export const PERSONA_ICON: Record<string, string> = { entrepreneur: '🚀', investor: '💼', neutral: '✦' };
 
-function Row({ account }: { account: AccountRow }) {
+/** M284b: also the rows of the members map country list. */
+export function MemberRow({ account }: { account: AccountRow }) {
   const { openMember } = useShell();
   const member = account.state === 'member';
   const persona = personaLabel(account.persona);
@@ -189,7 +190,7 @@ export function Members({ initial, stamp }: { initial: MembersView; stamp: numbe
           <>
             {data.pbError ? <ErrorCard error={{ code: data.pbError.code, message: `رصيد بنك المشاريع غير متاح الآن: ${data.pbError.message}` }} /> : null}
             <ul className="member-list">
-              {data.items.map((account) => <Row key={account.id} account={account} />)}
+              {data.items.map((account) => <MemberRow key={account.id} account={account} />)}
             </ul>
           </>
         )}
