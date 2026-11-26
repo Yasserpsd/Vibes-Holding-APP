@@ -4,7 +4,7 @@ import { api, newRequestId } from '../api';
 import { formatCents, formatDateTime, formatDay, formatDays, formatLooseDate, formatNumber, formatProjects } from '../format';
 import type { Account, GrantAction, MemberDetail, MemberEvent, ProjectRef } from '../types';
 import { Async, Chips, ErrorCard, Field, Intent, messageOf, Pill, sessionOver, Sheet, useLoad, useShell } from '../ui';
-import { dailyLeft, memberLeft, personaLabel, StatePill, WaPill } from './Members';
+import { dailyLeft, memberLeft, PERSONA_ICON, personaLabel, StatePill, WaPill } from './Members';
 import { LinkedProject, ProjectPicker, projectName } from './SuccessPartners';
 
 type ActionKind = GrantAction | 'pb' | 'publisher' | 'unpublisher' | 'honorary' | 'unhonorary' | 'partner' | 'partnerProject' | 'unpartner' | 'delete';
@@ -441,7 +441,6 @@ function PrivateMessage({ account, open, setOpen }: { account: Account; open: bo
 
 /** M279: the sensitive actions wait closed at the bottom of the sheet; the rest sit in the membership card. */
 const SENSITIVE: ActionKind[] = ['publisher', 'unpublisher', 'delete'];
-const PERSONA_ICON: Record<string, string> = { entrepreneur: '🚀', investor: '💼', neutral: '✦' };
 
 /** Whole days since a moment, never below zero. */
 const daysSince = (iso: string | null | undefined): number | null => (iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)) : null);

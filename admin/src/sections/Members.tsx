@@ -94,6 +94,9 @@ export function personaLabel(persona: string | null | undefined): string | null 
   return PERSONA_FILTERS.find((entry) => entry.value === persona && !['all', 'none', 'partners'].includes(entry.value))?.label ?? null;
 }
 
+/** M279: the category as a small emblem — on the list row and at the top of the member sheet. */
+export const PERSONA_ICON: Record<string, string> = { entrepreneur: '🚀', investor: '💼', neutral: '✦' };
+
 function Row({ account }: { account: AccountRow }) {
   const { openMember } = useShell();
   const member = account.state === 'member';
@@ -101,18 +104,21 @@ function Row({ account }: { account: AccountRow }) {
   return (
     <li>
       <button type="button" className="member-row" onClick={() => openMember(account.id)}>
-        <span className="member-top">
-          <strong>{account.name || account.email || `حساب رقم ${account.id}`}</strong>
+        {/* M280 (owner: «يكون ظاهر رقم الجوال مش ايميل»): one compact line — emblem, name with the number under it, the state pills. */}
+        <span className="member-line">
+          <span className="row-badge" aria-hidden="true">{PERSONA_ICON[account.persona] ?? '✦'}</span>
+          <span className="row-main">
+            <strong>{account.name || account.email || `حساب رقم ${account.id}`}</strong>
+            <span className="muted member-contact">
+              {account.phone ? <bdi dir="ltr" className="row-phone">{account.phone}</bdi> : account.email ? <bdi dir="ltr" className="row-email">{account.email}</bdi> : null}
+              <span>آخر نشاط {formatRelative(account.last_at ?? account.created_at)}</span>
+            </span>
+          </span>
           <span className="pills">
             {persona ? <Pill tone="muted">{persona}</Pill> : null}
             <StatePill account={account} />
             <WaPill account={account} />
           </span>
-        </span>
-        <span className="muted member-contact">
-          {account.email ? <bdi dir="ltr">{account.email}</bdi> : null}
-          {account.phone ? <bdi dir="ltr">{account.phone}</bdi> : null}
-          <span>آخر نشاط {formatRelative(account.last_at ?? account.created_at)}</span>
         </span>
         {/* M116 (owner's «الحتة التنظيمية»): what this account cares about, right on the row. */}
         {account.interests?.length ? (
