@@ -105,15 +105,39 @@ function MapBody({ data }: { data: CountriesResult }) {
 
       <GlobeView data={data} selected={selected} onSelect={choose}>
         {selectedRow ? (
-          <div className="map-card">
-            <button type="button" className="map-card-close" onClick={() => choose(null)} aria-label="إغلاق">×</button>
-            <span className="map-card-rank num">#{rank}</span>
-            <strong className="map-card-name">{nameOf(selectedRow)}</strong>
-            <bdi dir="ltr" className="map-dial num">+{selectedRow.dial}</bdi>
+          // M284c (owner: «يظهر الاسم بطريقة أفضل وأشيك»): a larger card — the name as the headline, three big numbers, the members bar.
+          <div className="map-card" key={selectedRow.code}>
+            <div className="map-card-top">
+              <span className="map-card-rank num">#{rank}</span>
+              <button type="button" className="map-card-close" onClick={() => choose(null)} aria-label="إغلاق">×</button>
+            </div>
+            <strong className="map-card-name">
+              <span className="map-card-star" aria-hidden="true">✦</span>
+              {nameOf(selectedRow)}
+              <span className="map-card-star" aria-hidden="true">✦</span>
+            </strong>
+            <bdi dir="ltr" className="map-dial map-card-dial num">+{selectedRow.dial}</bdi>
             <div className="map-card-stats">
-              <span><b className="num">{formatNumber(selectedRow.total)}</b> حساب</span>
-              <span><b className="num">{formatNumber(selectedRow.members)}</b> عضو</span>
-              <span><b className="num">{share(selectedRow.total, withPhone)}</b> من الإجمالي</span>
+              <span>
+                <b className="num">{formatNumber(selectedRow.total)}</b>
+                <i>حساب</i>
+              </span>
+              <span>
+                <b className="num">{formatNumber(selectedRow.members)}</b>
+                <i>عضو</i>
+              </span>
+              <span>
+                <b className="num">{share(selectedRow.total, withPhone)}</b>
+                <i>من الإجمالي</i>
+              </span>
+            </div>
+            <div className="map-card-meter">
+              <span className="map-card-track">
+                <span className="map-card-fill" style={{ inlineSize: `${selectedRow.total ? (selectedRow.members / selectedRow.total) * 100 : 0}%` }} />
+              </span>
+              <span className="muted">
+                الأعضاء <bdi dir="ltr" className="num"><b>{share(selectedRow.members, selectedRow.total)}</b></bdi>
+              </span>
             </div>
             <button type="button" className="map-card-list" onClick={toList}>
               عرض المسجّلين ↓
@@ -320,7 +344,17 @@ function GlobeView({ data, selected, onSelect, children }: { data: CountriesResu
           .labelAltitude((bar) => height((bar as Bar).t) + 0.004)
           .labelColor(() => '#fff6d6')
           .labelDotRadius(0)
-          .labelResolution(2);
+          .labelResolution(2)
+          // M284c: the chosen country's name floats above it (an HTML element, so Arabic shapes correctly).
+          .htmlLat('lat')
+          .htmlLng('lng')
+          .htmlAltitude('alt')
+          .htmlElement((spot) => {
+            const element = document.createElement('div');
+            element.className = 'gl-flag';
+            element.innerHTML = `<div class="gl-flag-inner" dir="auto"><span class="gl-flag-name">${esc((spot as { name: string }).name)}</span><span class="gl-flag-stem"></span></div>`;
+            return element;
+          });
 
         const material = world.globeMaterial() as unknown as { color?: { set: (c: string) => void }; emissive?: { set: (c: string) => void }; emissiveIntensity?: number; shininess?: number };
         material.color?.set('#0a1830');
@@ -379,15 +413,21 @@ function GlobeView({ data, selected, onSelect, children }: { data: CountriesResu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, hovered, selected, rows]);
 
-  // Fly to the chosen country.
+  // Fly to the chosen country, its name above it.
   useEffect(() => {
     const world = globe.current;
-    if (!world || !ready || !selected) return;
-    const spot = shapesRef.current.find((shape) => shape.code === selected)?.center;
+    if (!world || !ready) return;
+    const spot = selected ? shapesRef.current.find((shape) => shape.code === selected)?.center : undefined;
+    const row = selected ? rows.get(selected) : undefined;
+    world.htmlElementsData(spot && row ? [{ ...spot, name: nameOf(row), alt: height(level(row.total)) + 0.03 }] : []);
+    // The card sits on the start side (right in Arabic): slide the globe to the free side so the country is not under it.
+    const shift = spot && row ? Math.min(170, world.width() * 0.24) : 0;
+    world.globeOffset([isEn ? shift : -shift, 0]);
     if (!spot) return;
     world.controls().autoRotate = false;
     setSpinning(false);
     world.pointOfView({ lat: spot.lat, lng: spot.lng, altitude: 1.15 }, 1400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, selected]);
 
   const zoom = (factor: number) => {

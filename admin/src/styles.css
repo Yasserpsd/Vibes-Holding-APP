@@ -696,7 +696,7 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
     radial-gradient(1px 1px at 22% 46%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 66% 92%, #fff 50%, transparent 51%);
   background-size: 420px 420px; animation: map-twinkle 6s ease-in-out infinite alternate; }
 @keyframes map-twinkle { from { opacity: 0.45; } to { opacity: 0.9; } }
-.map-globe { position: absolute; inset: 0; cursor: grab; }
+.map-globe { position: absolute; inset: 0; cursor: grab; direction: ltr; }
 .map-globe:active { cursor: grabbing; }
 .map-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--gold-bright); font-size: 0.95rem; }
 .map-tools { position: absolute; inset-block-start: 12px; inset-inline-end: 12px; display: grid; gap: 6px; }
@@ -707,15 +707,6 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
   padding: 6px 10px; border-radius: 999px; background: rgba(10, 16, 28, 0.7); border: 1px solid var(--line); }
 .map-legend-bar { inline-size: 90px; block-size: 6px; border-radius: 6px; background: linear-gradient(to left, #ffe08a, #96701e); }
 [dir='ltr'] .map-legend-bar { background: linear-gradient(to right, #96701e, #ffe08a); }
-.map-card { position: absolute; inset-block-start: 12px; inset-inline-start: 12px; inline-size: min(260px, calc(100% - 80px)); display: grid; gap: 4px; padding: 14px 16px;
-  border-radius: 12px; border: 1px solid var(--gold-line); background: linear-gradient(180deg, rgba(30, 26, 12, 0.92), rgba(10, 14, 24, 0.92)); backdrop-filter: blur(8px);
-  box-shadow: var(--shadow); animation: map-pop 0.35s ease-out; }
-@keyframes map-pop { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
-.map-card-close { position: absolute; inset-block-start: 6px; inset-inline-end: 8px; background: none; border: 0; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
-.map-card-rank { color: var(--muted); font-size: 0.78rem; }
-.map-card-name { color: var(--gold-bright); font-size: 1.2rem; }
-.map-card-stats { display: grid; gap: 2px; margin-block-start: 6px; font-size: 0.88rem; color: var(--muted); }
-.map-card-stats b { color: var(--text); font-size: 1.05rem; margin-inline-end: 4px; }
 .map-dial { display: inline-block; font-size: 0.72rem; color: var(--gold); border: 1px solid var(--gold-line); border-radius: 999px; padding: 0 7px; line-height: 1.6; vertical-align: middle; }
 .map-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .map-chart-head .muted { font-size: 0.82rem; }
@@ -756,6 +747,42 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
 .map-list-tools .search { flex: 1 1 220px; }
 .map-list-count { margin: 0 0 6px; font-size: 0.85rem; }
 .map-list-count b { color: var(--text); }
-.map-card-list { margin-block-start: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--gold-line); background: var(--gold-wash); color: var(--gold-bright); font: inherit; font-size: 0.88rem; cursor: pointer; }
-.map-card-list:hover { background: rgba(201, 162, 39, 0.22); }
 .map-foot .link-button { background: none; border: 0; padding: 0; color: var(--gold-bright); font: inherit; text-decoration: underline; cursor: pointer; }
+/* M284c: the country card on the globe — larger, the name as the headline. */
+@keyframes map-pop { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes map-card-in { from { transform: translateY(-10px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes map-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.map-card { position: absolute; inset-block-start: 14px; inset-inline-start: 14px; inline-size: min(300px, calc(100% - 76px)); display: grid; justify-items: center; gap: 6px;
+  padding: 14px 18px 16px; border-radius: 18px; text-align: center; border: 1px solid rgba(226, 195, 92, 0.55);
+  background: radial-gradient(120% 70% at 50% 0%, rgba(201, 162, 39, 0.28), transparent 60%), linear-gradient(180deg, rgba(24, 20, 10, 0.94), rgba(8, 12, 22, 0.94));
+  backdrop-filter: blur(10px); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 224, 138, 0.06) inset, 0 0 40px rgba(201, 162, 39, 0.18);
+  animation: map-card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.map-card-top { inline-size: 100%; display: flex; align-items: center; justify-content: space-between; }
+.map-card-rank { font-size: 0.75rem; color: #0b0b0b; background: linear-gradient(180deg, #ffe08a, #c9a227); border-radius: 999px; padding: 1px 9px; font-weight: 700; }
+.map-card-close { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); inline-size: 28px; block-size: 28px; border-radius: 50%; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer; }
+.map-card-close:hover { color: var(--text); border-color: var(--gold-line); }
+.map-card-name { display: flex; align-items: center; gap: 10px; font-size: 1.9rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em;
+  background: linear-gradient(100deg, #b8901f 0%, #ffe9a8 35%, #fff6d6 50%, #ffe08a 65%, #b8901f 100%); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: map-shine 5s linear infinite; }
+.map-card-star { font-size: 0.8rem; color: var(--gold); -webkit-text-fill-color: var(--gold); }
+.map-card-dial { font-size: 0.8rem; padding: 0 10px; }
+.map-card-stats { inline-size: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block-start: 6px; padding-block-start: 10px; border-block-start: 1px solid rgba(226, 195, 92, 0.2); }
+.map-card-stats span { display: grid; gap: 0; }
+.map-card-stats span + span { border-inline-start: 1px solid rgba(226, 195, 92, 0.14); }
+.map-card-stats b { font-size: 1.55rem; font-weight: 700; color: #fff; line-height: 1.25; }
+.map-card-stats i { font-style: normal; font-size: 0.75rem; color: var(--muted); }
+.map-card-meter { inline-size: 100%; display: grid; gap: 4px; font-size: 0.78rem; }
+.map-card-meter b { color: var(--gold-bright); }
+.map-card-track { block-size: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.map-card-fill { display: block; block-size: 100%; border-radius: 6px; background: linear-gradient(to left, #ffe08a, #b8901f); box-shadow: 0 0 10px rgba(255, 214, 102, 0.5); transform-origin: right; animation: map-grow 0.8s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[dir='ltr'] .map-card-fill { background: linear-gradient(to right, #b8901f, #ffe08a); transform-origin: left; }
+.map-card-list { inline-size: 100%; margin-block-start: 4px; padding: 8px 12px; border-radius: 10px; border: 0; background: linear-gradient(180deg, #ffe08a, #c9a227); color: #0b0b0b; font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; box-shadow: 0 6px 18px rgba(201, 162, 39, 0.3); }
+.map-card-list:hover { filter: brightness(1.08); }
+@media (max-width: 560px) { .map-card-name { font-size: 1.5rem; } .map-card-stats b { font-size: 1.25rem; } }
+/* The country's name floating above it on the globe. */
+.gl-flag { pointer-events: none; font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif; }
+/* No animation: the globe re-shows the element every frame, which would restart it. */
+.gl-flag-inner { display: grid; justify-items: center; transform: translateY(-50%); }
+.gl-flag-name { white-space: nowrap; font-size: 1.35rem; font-weight: 700; color: #fff3c4; padding: 2px 14px; border-radius: 999px; background: rgba(10, 14, 24, 0.72);
+  border: 1px solid rgba(255, 224, 138, 0.7); text-shadow: 0 0 12px rgba(255, 214, 102, 0.9); box-shadow: 0 0 24px rgba(201, 162, 39, 0.45); }
+.gl-flag-stem { inline-size: 2px; block-size: 26px; background: linear-gradient(to bottom, rgba(255, 224, 138, 0.9), transparent); }
