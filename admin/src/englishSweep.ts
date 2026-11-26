@@ -17,6 +17,8 @@ const ATTRIBUTES = ['placeholder', 'title', 'aria-label', 'alt'] as const;
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT']);
 /** One request carries at most this many texts (the server's own limit). */
 const BATCH = 200;
+/** Longer texts are left as written (the server's own limit per text). */
+const MAX_LENGTH = 20_000;
 /** A text the server could not translate is asked again only after this pause. */
 const RETRY_MS = 60_000;
 const DEBOUNCE_MS = 120;
@@ -91,6 +93,7 @@ function run(): void {
   timer = undefined;
   const now = Date.now();
   const wanted = [...sweep(document.body)].filter((text) => {
+    if (text.length > MAX_LENGTH) return false;
     if (inflight.has(text)) return false;
     const failed = failedAt.get(text);
     return failed === undefined || now - failed > RETRY_MS;

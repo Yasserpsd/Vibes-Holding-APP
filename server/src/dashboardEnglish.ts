@@ -20,7 +20,7 @@ export const DASHBOARD_TRANSLATE_SYSTEM =
 
 /** How many texts and how long each, per call — a dashboard page shows a few hundred short texts at most. */
 const MAX_TEXTS = 200;
-const MAX_LENGTH = 4_000;
+const MAX_LENGTH = 20_000;
 
 const bodySchema = z.object({ texts: z.array(z.string().max(MAX_LENGTH)).max(MAX_TEXTS) });
 

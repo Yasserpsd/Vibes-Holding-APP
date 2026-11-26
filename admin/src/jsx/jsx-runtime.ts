@@ -35,7 +35,9 @@ export function localize(type: unknown, props: unknown): unknown {
   if (typeof type !== 'string' || SKIP.has(type) || !props || typeof props !== 'object') return props;
   const from = props as Props;
   // `lang="ar"` marks Arabic that is content, not interface: the app's own wording shown for editing.
-  if (from.lang === 'ar') return props;
+  // M282: `data-content` marks members' / the owner's own texts (posts, poll options): no word-by-word dictionary,
+  // the whole text is translated by `englishSweep.ts` instead.
+  if (from.lang === 'ar' || from['data-content'] !== undefined) return props;
   let next: Props | null = null;
   const set = (key: string, value: unknown) => {
     next ??= { ...from };

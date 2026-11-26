@@ -85,7 +85,7 @@ function PollResults({ post, picked = null, onPick }: { post: Post; picked?: str
         return (
           <div className={top ? 'poll-option top' : votes === 0 ? 'poll-option none' : 'poll-option'} key={option.id}>
             <div className="poll-head">
-              <span className="poll-label" lang="ar">
+              <span className="poll-label" data-content="" dir="auto">
                 {top ? <span className="lead-tag">★ الأعلى</span> : null}
                 {option.label}
               </span>
@@ -170,7 +170,7 @@ function Tracking({ post, isAdmin, children }: { post: Post; isAdmin: boolean; c
   const stateLabel = { voted: 'صوّت', opened: isPoll ? 'فتح ولم يصوّت' : 'فتح', unopened: 'لم يفتح' };
   const chip = (key: FollowView, text: string, number: number, long = false) => (
     <button key={key} type="button" className={`${view === key ? 'chip on' : 'chip'}${long ? ' long' : ''}`} aria-pressed={view === key} title={long ? text : undefined} onClick={() => void show(key)}>
-      <span lang={long ? 'ar' : undefined}>{text}</span>
+      <span data-content={long ? '' : undefined} dir={long ? 'auto' : undefined}>{text}</span>
       <span className="num">{formatNumber(number)}</span>
     </button>
   );
@@ -223,7 +223,7 @@ function Tracking({ post, isAdmin, children }: { post: Post; isAdmin: boolean; c
                         <strong>{row.name || `حساب رقم ${row.contactId}`}</strong>
                         <span className="muted">
                           {personaLabel(row.persona) || 'محايد'}
-                          {row.vote !== null ? <> · اختار: <span lang="ar">{optionLabel(row.vote)}</span></> : null}
+                          {row.vote !== null ? <> · اختار: <span data-content="" dir="auto">{optionLabel(row.vote)}</span></> : null}
                           {row.opened ? <> · فتحها {formatDateTime(row.opened.last)}</> : null}
                           {row.opened && row.opened.count > 1 ? ` · ${counted(row.opened.count, ['مرة واحدة', 'مرتان', 'مرات', 'مرة'])} (أول مرة ${formatDateTime(row.opened.first)})` : ''}
                         </span>
@@ -252,7 +252,7 @@ function BodyText({ post }: { post: Post }) {
   const long = text.length > 200 || text.split('\n').length > 3;
   return (
     <div className="post-body">
-      <p className={full || !long ? 'prose' : 'prose clamp'} lang="ar" dir="auto">{text}</p>
+      <p className={full || !long ? 'prose' : 'prose clamp'} data-content="" dir="auto">{text}</p>
       {long ? <button type="button" className="link" onClick={() => setFull(!full)}>{full ? 'إخفاء النص' : 'عرض النص كاملًا'}</button> : null}
     </div>
   );
