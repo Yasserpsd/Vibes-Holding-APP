@@ -53,7 +53,7 @@ function actionsFor(account: Account): ActionKind[] {
 
 function membershipActions(account: Account): ActionKind[] {
   // The hub refuses every grant and role change until the e-mail is confirmed: offering one ends in an error and a failed row in the audit log.
-  if (account.state === 'lead' || account.state === 'pending') return [];
+  if (account.state === 'lead') return [];
   // A membership with no end date has nothing to extend: the hub would start a dated period from today and so put an end to it.
   // M205: an honorary member has no days to add or cancel — only the honorary membership itself can be taken back.
   // M271: nor are there days to change under a Success Partners membership; one given membership at a time.
@@ -523,7 +523,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
           <div className="hero-name">
             <strong dir="auto">{account.name || account.email || `حساب رقم ${account.id}`}</strong>
             <span className="muted">
-              {[account.job_title, account.company, account.city].filter(Boolean).join(' · ') || (persona ?? 'بدون فئة')}
+              {[account.job_title, account.company, account.city].filter(Boolean).join(' · ') || (persona ?? 'محايد')}
               {since !== null ? ` · ${since === 0 ? 'انضم اليوم' : `عضو منذ ${formatDays(since, 'يومين')}`}` : ''}
             </span>
           </div>
@@ -576,7 +576,7 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
             {pb ? <Field label="تفاصيل رصيد بنك المشاريع">{`الأساسي ${formatNumber(pb.credits)} · المضاف ${formatNumber(pb.granted)} · المستخدم ${formatNumber(pb.used)}`}</Field> : null}
           </dl>
         ) : (
-          <p className="muted">{account.state === 'lead' ? 'عميل محتمل بلا حساب مؤكد بعد.' : account.state === 'pending' ? 'لم يؤكد بريده بعد.' : 'لم يشترك في العضوية بعد.'}</p>
+          <p className="muted">{account.state === 'lead' ? 'عميل محتمل بلا حساب مؤكد بعد.' : 'لم يشترك في العضوية بعد.'}</p>
         )}
         {detail.pbError ? <ErrorCard error={{ code: detail.pbError.code, message: `رصيد بنك المشاريع غير متاح الآن: ${detail.pbError.message}` }} /> : null}
         {account.partner && !detail.partnerProject ? <p className="warn">شريك النجاح هذا غير مرتبط بمشروع: اربطه من «ربط بمشروع».</p> : null}
@@ -588,7 +588,6 @@ function Body({ detail, done, onStart, onChanged }: { detail: MemberDetail; done
         ) : null}
         {buttons(mainActions)}
         {account.honorary ? <p className="muted hint">عضوية شرفية: مفتوحة بلا تجديد، ولا تتأثر بأي اشتراك من المتجر.</p> : account.partner ? <p className="muted hint">عضوية شركاء النجاح: 360 يومًا وتنتهي وحدها. أي اشتراك من المتجر تبقى أيامه محفوظة.</p> : openEnded(account) ? <p className="muted hint">عضوية بلا تاريخ انتهاء: لا تحتاج تمديدًا.</p> : null}
-        {account.state === 'pending' ? <p className="muted hint">الحساب لم يؤكد بريده بعد. تُتاح الإجراءات هنا بعد تأكيد البريد.</p> : null}
         {account.state === 'lead' ? <p className="muted hint">هذا عميل محتمل بلا حساب مؤكد بعد، فلا تُفعَّل له عضوية من هنا.</p> : null}
       </section>
 

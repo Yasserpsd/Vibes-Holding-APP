@@ -30,7 +30,8 @@ class OverlappingHub implements HubClient {
     const page = Number(body.page ?? 1);
     this.pages.push(page);
     const whole = (await this.inner.call(op, { ...body, page: 1, per_page: 100 })) as unknown as HubResults['admin_accounts'];
-    this.size = whole.items.length;
+    // M281: a sign-up still typing its code is in no dashboard list.
+    this.size = whole.items.filter((item: { state: string }) => item.state !== 'pending').length;
     const half = Math.ceil(whole.items.length / 2);
     const items = page === 1 ? whole.items.slice(0, half) : page === 2 ? whole.items.slice(half - 1) : [];
     // A total above one page makes the sweep ask for the second one.

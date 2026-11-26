@@ -95,7 +95,6 @@ function PersonasCard({ personas, error, onRetry }: { personas: Personas | null;
     { label: 'محايد', value: personas.neutral, tone: 'a' },
     { label: 'رائد أعمال', value: personas.entrepreneur, tone: 'b' },
     { label: 'مستثمر', value: personas.investor, tone: 'c' },
-    ...(personas.none > 0 ? [{ label: 'بدون فئة', value: personas.none, tone: 'd' as const }] : []),
   ];
   return (
     <section className="card" aria-labelledby="personas-title">

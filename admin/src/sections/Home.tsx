@@ -42,23 +42,20 @@ function Tiles({ hub }: { hub: HubStats }) {
   // Every card opens the members list already filtered to what its label says (the same chips, the same address).
   const open = (view: Partial<MembersView>) => () => openMembers(view);
   const { totals, expiring } = hub;
-  const withoutCategory = Math.max(0, totals.accounts - (totals.persona_neutral ?? 0) - (totals.persona_entrepreneur ?? 0) - (totals.persona_investor ?? 0));
   return (
     <div className="tiles">
       {/* M230: «المسجّلون» and «الأعضاء المشتركون» moved up into the first card's story, so they are not counted twice on one screen. */}
       {/* M112 (owner): how the accounts split across the three personas — needs hub 2.19.0+. */}
       {/* M231 (owner, 2026-11-12): the categories come first, named without the article, in the standing order
-          محايد ثم رائد أعمال ثم مستثمر ثم بدون فئة; «لم يدفع» closes the row. */}
+          محايد ثم رائد أعمال ثم مستثمر; «لم يدفع» closes the row. M281 (owner, 2026-11-26): no «بدون فئة» and no
+          «بانتظار تأكيد البريد» — an account without a category is «محايد» (the server folds it in). */}
       {totals.persona_investor !== undefined ? (
         <>
           <Tile label="محايد" value={totals.persona_neutral ?? 0} onOpen={open({ persona: 'neutral' })} />
           <Tile label="رائد أعمال" value={totals.persona_entrepreneur ?? 0} onOpen={open({ persona: 'entrepreneur' })} />
           <Tile label="مستثمر" value={totals.persona_investor ?? 0} tone="gold" onOpen={open({ persona: 'investor' })} />
-          {/* M230: the three above add up to the accounts that chose a category; this is the rest, so the sum is the registered number. */}
-          {withoutCategory > 0 ? <Tile label="بدون فئة" value={withoutCategory} onOpen={open({ persona: 'none' })} /> : null}
         </>
       ) : null}
-      <Tile label="بانتظار تأكيد البريد" value={totals.pending_email} onOpen={open({ state: 'pending' })} />
       <Tile label="تنتهي خلال 7 أيام" value={expiring.d7} tone={expiring.d7 > 0 ? 'alert' : undefined} onOpen={open({ ends: '7' })} />
       <Tile label="تنتهي خلال 30 يومًا" value={expiring.d30} onOpen={open({ ends: '30' })} />
       <Tile label="لم يدفع" value={totals.unpaid} onOpen={open({ state: 'unpaid' })} />

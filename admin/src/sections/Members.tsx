@@ -12,7 +12,6 @@ const PERSONA_FILTERS: { value: PersonaFilter; label: string }[] = [
   { value: 'neutral', label: 'محايد' },
   { value: 'entrepreneur', label: 'رائد أعمال' },
   { value: 'investor', label: 'مستثمر' },
-  { value: 'none', label: 'بدون فئة' },
   // M275 (owner, 2026-11-25): read from the membership, beside the category the member chose.
   { value: 'partners', label: 'شركاء النجاح' },
 ];
@@ -37,7 +36,6 @@ const FILTERS: { value: AccountFilter; label: string }[] = [
   { value: 'registered', label: 'الحسابات المسجّلة' },
   { value: 'member', label: 'أعضاء مشتركون' },
   { value: 'unpaid', label: 'لم يدفع' },
-  { value: 'pending', label: 'بانتظار تأكيد البريد' },
   { value: 'expired', label: 'انتهت عضويتهم' },
   { value: 'publisher', label: 'موديريتور' },
   { value: 'admin', label: 'الإدارة' },
@@ -47,7 +45,6 @@ const FILTERS: { value: AccountFilter; label: string }[] = [
 const STATES: Record<Account['state'], { label: string; tone: Tone }> = {
   member: { label: 'عضو مشترك', tone: 'gold' },
   unpaid: { label: 'لم يدفع', tone: 'muted' },
-  pending: { label: 'بانتظار تأكيد البريد', tone: 'muted' },
   expired: { label: 'انتهت العضوية', tone: 'danger' },
   lead: { label: 'عميل محتمل', tone: 'muted' },
 };
@@ -91,7 +88,7 @@ export function dailyLeft(account: Pick<Account, 'daily_left' | 'daily_limit'>):
 
 /** M116 (owner): the member's category, readable at a glance on the row and the sheet. */
 export function personaLabel(persona: string | null | undefined): string | null {
-  return PERSONA_FILTERS.find((entry) => entry.value === persona && !['all', 'none', 'partners'].includes(entry.value))?.label ?? null;
+  return PERSONA_FILTERS.find((entry) => entry.value === persona && !['all', 'partners'].includes(entry.value))?.label ?? null;
 }
 
 /** M279: the category as a small emblem — on the list row and at the top of the member sheet. */
@@ -179,7 +176,7 @@ export function Members({ initial, stamp }: { initial: MembersView; stamp: numbe
       <SuccessPartnersBlock stamp={stamp} />
       <div className="filters">
         <SearchBox value={text} onChange={setText} placeholder="ابحث بالاسم أو البريد أو الجوال" />
-        <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: entry.value === 'registered' ? (counts?.all !== undefined ? counts.all - (counts.pending ?? 0) : null) : (counts?.[entry.value] ?? null) }))} value={filter} onChange={setFilter} />
+        <Chips label="حالة الحساب" options={FILTERS.map((entry) => ({ ...entry, count: entry.value === 'registered' ? (counts?.all !== undefined ? counts.all : null) : (counts?.[entry.value] ?? null) }))} value={filter} onChange={setFilter} />
         <Chips label="الفئة" options={PERSONA_FILTERS.map((entry) => ({ ...entry, count: personaCount(entry.value) }))} value={persona} onChange={setPersona} />
         <Chips label="انتهاء العضوية" options={ENDS_FILTERS} value={ends} onChange={setEnds} />
         {/* M210: shown only when the hub answers the WhatsApp counts (2.28.4+). */}

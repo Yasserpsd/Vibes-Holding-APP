@@ -239,7 +239,7 @@ function knownWithoutAccount(login: string): string {
 export function profileMissingOf(contact: HubContact): ProfileMissing[] {
   const missing: ProfileMissing[] = [];
   if (!String(contact.phone ?? '').trim()) missing.push('phone');
-  if (!PERSONAS.some((item) => item.key === contact.persona)) missing.push('persona');
+  // M281 (owner, 2026-11-26: «اي شخص لم يحدد فئة يتحول اوتوماتيك محايد»): no account is asked for a category it lacks — it is «محايد».
   // M156 + M203 (owner, 2026-11-06: «رجع الوظيفة بس مهمة جدا بالنسبالي»).
   if (!String(contact.job_title ?? '').trim()) missing.push('jobTitle');
   // M156: an Apple-relay account must give a real address (only when the hub can store it, 2.26.0+).
@@ -352,7 +352,8 @@ function membershipOf(contact: HubContact): Membership {
 }
 
 export function toMe(contact: HubContact): Me {
-  const persona = PERSONAS.find((item) => item.key === contact.persona);
+  // M281: an account the hub still holds without a category is «محايد» (hub 2.35.0 writes the same).
+  const persona = PERSONAS.find((item) => item.key === contact.persona) ?? PERSONAS.find((item) => item.key === 'neutral');
   return {
     id: contact.id,
     inviteOpen: !contact.is_member && contact.referred_by === 0,

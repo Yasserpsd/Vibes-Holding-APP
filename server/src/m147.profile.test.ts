@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { profileMissingOf } from './auth/service.js';
+import { profileMissingOf, toMe } from './auth/service.js';
 import type { HubContact } from './hub/types.js';
 
 // M147 «أكمل ملفك»: the sign-in gate's list — a social-born account lands with name + e-mail only;
@@ -26,9 +26,10 @@ const base = {
   role: '',
 } as unknown as HubContact;
 
-test('m203: a Google-born account misses phone, الفئة and the job; the rest is asked later in the profile', () => {
-  assert.deepEqual(profileMissingOf(base), ['phone', 'persona', 'jobTitle']);
-  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['phone', 'persona', 'jobTitle']);
+// M281 (owner, 2026-11-26): an account without a category is «محايد», never asked for one.
+test('m203 + M281: a Google-born account misses phone and the job; the category is never missing', () => {
+  assert.deepEqual(profileMissingOf(base), ['phone', 'jobTitle']);
+  assert.deepEqual(profileMissingOf({ ...base, interests: '' }), ['phone', 'jobTitle']);
 });
 
 test('m203: phone, persona and job complete a profile, whatever else is empty', () => {
@@ -36,5 +37,6 @@ test('m203: phone, persona and job complete a profile, whatever else is empty', 
   assert.deepEqual(profileMissingOf(full), []);
   assert.deepEqual(profileMissingOf({ ...full, bio: 'قصيرة' }), []);
   assert.deepEqual(profileMissingOf({ ...full, member_type: 'company' }), []);
-  assert.deepEqual(profileMissingOf({ ...full, persona: 'king' }), ['persona']);
+  assert.deepEqual(profileMissingOf({ ...full, persona: 'king' }), []);
+  assert.equal(toMe({ ...full, persona: '' } as unknown as HubContact).persona, 'neutral');
 });

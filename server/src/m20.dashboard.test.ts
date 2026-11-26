@@ -164,8 +164,10 @@ test('home: hub stats with a zero-filled daily series, app payments, store, push
 test('accounts: states, search, counts, and the Projects Bank balance beside every active member through one call', async () => {
   const all = await get('/api/admin/accounts?per_page=100', adminToken);
   const body = all.json();
-  assert.ok(body.total >= 36 && body.items.every((item: { state: string }) => item.state !== 'lead'));
-  assert.deepEqual(Object.keys(body.counts).sort(), ['admin', 'all', 'expired', 'lead', 'member', 'pending', 'publisher', 'unpaid', 'wa_no', 'wa_yes']);
+  // M281: the total leaves out the sign-ups still typing their code, like the rows.
+  assert.ok(body.total >= 30 && body.total === body.items.length && body.items.every((item: { state: string }) => item.state !== 'lead'), JSON.stringify({ total: body.total, rows: body.items.length }));
+  assert.deepEqual(Object.keys(body.counts).sort(), ['admin', 'all', 'expired', 'lead', 'member', 'publisher', 'unpaid', 'wa_no', 'wa_yes']);
+  assert.ok(body.items.every((item: { state: string; persona: string }) => item.state !== 'pending' && ['neutral', 'entrepreneur', 'investor'].includes(item.persona)), 'M281: no pending row, no account without a category');
   assert.equal(body.pbError, null);
   for (const item of body.items as { state: string; pb: { left: number; used: number; granted: number } | null }[]) {
     if (item.state === 'member') assert.deepEqual(Object.keys(item.pb ?? {}), ['left', 'used', 'granted']);
@@ -179,7 +181,8 @@ test('accounts: states, search, counts, and the Projects Bank balance beside eve
   assert.equal((await get('/api/admin/accounts?state=nope', adminToken)).statusCode, 400);
   // M210 (hub 2.28.4): every row says whether its number is WhatsApp-proven; wa=yes|no filters, the two counts ignore the filter.
   assert.ok(body.items.every((item: { phone_verified?: number }) => item.phone_verified === 0 || item.phone_verified === 1));
-  assert.equal(body.counts.wa_yes + body.counts.wa_no, body.counts.all + body.counts.lead);
+  // M281: «الكل» leaves out the sign-ups still typing their code; the hub's WhatsApp counts still hold them.
+  assert.ok(body.counts.wa_yes + body.counts.wa_no >= body.counts.all + body.counts.lead);
   const proven = (await get('/api/admin/accounts?wa=yes&per_page=100', adminToken)).json();
   assert.ok(proven.items.every((item: { phone_verified?: number }) => item.phone_verified === 1));
   assert.equal(proven.counts.wa_yes, body.counts.wa_yes);
@@ -195,9 +198,10 @@ test('accounts: states, search, counts, and the Projects Bank balance beside eve
     assert.equal(rows.total, card, persona);
     assert.ok(rows.items.every((item: { persona: string }) => item.persona === persona));
   }
-  const noCategory = (await get('/api/admin/accounts?persona=none&per_page=100', adminToken)).json();
-  assert.equal(noCategory.total, homeTotals.totals.accounts - homeTotals.totals.persona_neutral - homeTotals.totals.persona_entrepreneur - homeTotals.totals.persona_investor);
-  assert.ok(noCategory.items.every((item: { persona: string; state: string }) => !['neutral', 'entrepreneur', 'investor'].includes(item.persona) && item.state !== 'pending' && item.state !== 'lead'));
+  // M281 (owner, 2026-11-26): no «بدون فئة» — the three cards add up to every account, and the old filter is gone.
+  assert.equal(homeTotals.totals.persona_neutral + homeTotals.totals.persona_entrepreneur + homeTotals.totals.persona_investor, homeTotals.totals.accounts);
+  assert.equal((await get('/api/admin/accounts?persona=none&per_page=100', adminToken)).statusCode, 400);
+  assert.equal((await get('/api/admin/accounts?state=pending&per_page=100', adminToken)).statusCode, 400);
   for (const [ends, card] of [['7', homeTotals.expiring.d7], ['30', homeTotals.expiring.d30]] as const) {
     const rows = (await get(`/api/admin/accounts?ends=${ends}&per_page=100`, adminToken)).json();
     assert.equal(rows.total, card, `ends ${ends}`);

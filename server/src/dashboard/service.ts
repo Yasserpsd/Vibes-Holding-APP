@@ -94,17 +94,49 @@ function atLeast(version: string | null, wanted: number[]): boolean {
 
 /**
  * The two narrowing filters of the members list, applied by the server because the hub has neither:
- * the category (`partners` = M275, a running Success Partners membership; `none` = a registered account that has not chosen one — pending and lead rows are not «accounts» yet,
- * the same rule as the home card) and the memberships ending within 7 / 30 days (dated paid ones, like the hub's expiring count).
+ * the category (`partners` = M275, a running Success Partners membership; pending and lead rows are not «accounts» yet, the same rule as the home card) and the memberships ending within 7 / 30 days (dated paid ones, like the hub's expiring count).
  */
+const CATEGORIES = ['neutral', 'entrepreneur', 'investor'];
+
+/**
+ * M281 (owner, 2026-11-26: «ألغي تماما بدون فئة دول وحولهم كلهم محايدين… وألغي تماما بدون فئة دي من كل محل»): an account
+ * the hub still holds without a category is «محايد» on every dashboard screen (hub 2.35.0 writes the same into its rows).
+ */
+export function withCategory<K extends keyof HubResults>(op: K, result: HubResults[K]): HubResults[K] {
+  const fill = (account: HubAccount): HubAccount => (account.state === 'lead' || CATEGORIES.includes(account.persona) ? account : { ...account, persona: 'neutral' });
+  if (op === 'admin_accounts') {
+    const list = result as HubResults['admin_accounts'];
+    return { ...list, items: list.items.map(fill) } as HubResults[K];
+  }
+  if (op === 'admin_member') {
+    const one = result as HubResults['admin_member'];
+    return { ...one, account: fill(one.account) } as HubResults[K];
+  }
+  if (op === 'admin_stats') {
+    const stats = result as HubResults['admin_stats'];
+    const totals = stats.totals;
+    if (totals.persona_investor === undefined) return result;
+    const rest = Math.max(0, totals.accounts - (totals.persona_neutral ?? 0) - (totals.persona_entrepreneur ?? 0) - totals.persona_investor);
+    return { ...stats, totals: { ...totals, persona_neutral: (totals.persona_neutral ?? 0) + rest } } as HubResults[K];
+  }
+  return result;
+}
+
+/** M281: the members list has no «بانتظار تأكيد البريد» view any more — and «الكل» counts what the list shows. */
+function withoutPending(counts: Record<string, number> | undefined): Record<string, number> {
+  const rest = { ...(counts ?? {}) };
+  if (typeof rest.all === 'number') rest.all = Math.max(0, rest.all - (rest.pending ?? 0));
+  delete rest.pending;
+  return rest;
+}
+
 export function accountMatches(account: HubAccount, persona = 'all', ends = 'all'): boolean {
   if (persona === 'partners') {
     if (!isPartner(account)) return false;
   } else if (persona !== 'all') {
     // A category belongs to a registered account: one still waiting for its e-mail (or a lead) is in no category row, as in no home card.
     if (account.state === 'pending' || account.state === 'lead') return false;
-    const chosen = ['neutral', 'entrepreneur', 'investor'].includes(account.persona);
-    if (persona === 'none' ? chosen : account.persona !== persona) return false;
+    if (account.persona !== persona) return false;
   }
   if (ends !== 'all') {
     const days = Number(ends);
@@ -171,7 +203,7 @@ export class DashboardService {
         const result = await hubCall(this.deps.hub, op, { ...body, uuid: admin.session.uuid });
         // M130: the hub just honoured this uuid as an admin — remember it for the nightly members export.
         this.rememberAdmin(admin.session.uuid);
-        return result;
+        return withCategory(op, result);
       } catch (error) {
         if (error instanceof HubError && error.code === 'hub_not_supported') throw new HubError('hub_not_supported', UPGRADE_HUB, 501);
         throw error;
@@ -267,7 +299,8 @@ export class DashboardService {
     // M275: every partner is a member to the hub, so the search for them never walks the whole registry.
     const wholeList = registered || query.state === 'all';
     const hubState = wholeList ? (query.persona === 'partners' ? 'member' : 'all') : query.state;
-    const kept = (account: HubAccount) => (!registered || account.state !== 'pending') && accountMatches(account, query.persona, query.ends);
+    // M281 (owner, 2026-11-26: «ألغي كمان بإنتظار تأكيد البريد»): a sign-up still typing its code is no account in any view.
+    const kept = (account: HubAccount) => account.state !== 'pending' && accountMatches(account, query.persona, query.ends);
     const narrowed = registered || (query.persona && query.persona !== 'all') || (query.ends && query.ends !== 'all');
     // M210 (hub 2.28.4): the WhatsApp filter is the hub's own; an older hub ignores the key and sends no wa counts.
     const wa = query.wa && query.wa !== 'all' ? { wa: query.wa } : {};
@@ -301,8 +334,13 @@ export class DashboardService {
       const start = (query.page - 1) * query.perPage;
       result = { ok: true, total: matched.length, page: query.page, per_page: query.perPage, items: matched.slice(start, start + query.perPage), counts };
     } else {
-      result = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage, ...wa });
+      const page = await this.hub(admin, 'admin_accounts', { q: query.q, state: query.state, page: query.page, per_page: query.perPage, ...wa });
+      const items = page.items.filter((account) => account.state !== 'pending');
+      // The hub's counts ignore the WhatsApp filter, so under it only the rows this page dropped come off the total.
+      const dropped = page.items.length - items.length;
+      result = { ...page, items, total: Math.max(0, page.total - (query.state === 'all' && !wa.wa ? (page.counts?.pending ?? 0) : dropped)) };
     }
+    result = { ...result, counts: withoutPending(result.counts) };
     const members = result.items.filter((account) => account.state === 'member');
     let balances: Record<string, PbBalanceLite> = {};
     let pbError: SectionError | null = null;
@@ -381,18 +419,19 @@ export class DashboardService {
   }
 
   /** M33/M86: accounts by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
-  async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; none: number; total: number; partners: number }> {
-    const counts = { neutral: 0, entrepreneur: 0, investor: 0, none: 0, total: 0, partners: 0 };
+  async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; total: number; partners: number }> {
+    const counts = { neutral: 0, entrepreneur: 0, investor: 0, total: 0, partners: 0 };
     for (let page = 1; page <= 10; page += 1) {
       const result = await this.hub(admin, 'admin_accounts', { q: '', state, page, per_page: 100 });
       for (const account of result.items) {
+        // M281: a sign-up still typing its code is no account (the list leaves it out too).
+        if (account.state === 'pending') continue;
         counts.total += 1;
         // M275: beside his category, not instead of it.
         if (isPartner(account)) counts.partners += 1;
-        // Same rule as the list's category filters (accountMatches): only registered accounts are counted in a category or in «none».
-        if (account.state === 'pending' || account.state === 'lead') continue;
+        // Same rule as the list's category filters (accountMatches): only registered accounts are counted in a category.
+        if (account.state === 'lead') continue;
         if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;
-        else counts.none += 1;
       }
       if (page * 100 >= result.total) break;
     }

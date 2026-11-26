@@ -191,7 +191,7 @@ function MemberPicker({ chosen, onChange }: { chosen: PostMember[]; onChange: (m
                 <li key={hit.id}>
                   <button type="button" disabled={added} onClick={() => add(hit)}>
                     <strong>{hit.name || hit.email}</strong>
-                    <span className="muted"> · {personaLabel(hit.persona) || 'بدون فئة'} · {hit.email}{added ? ' · تمت إضافته' : ''}</span>
+                    <span className="muted"> · {personaLabel(hit.persona) || 'محايد'} · {hit.email}{added ? ' · تمت إضافته' : ''}</span>
                   </button>
                 </li>
               );

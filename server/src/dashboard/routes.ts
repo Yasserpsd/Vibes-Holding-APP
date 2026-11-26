@@ -15,12 +15,12 @@ const idSchema = z.object({ id: z.coerce.number().int().positive() });
 const homeSchema = z.object({ days: z.coerce.number().int().min(7).max(180).default(30) });
 const accountsSchema = z.object({
   q,
-  // `registered` = the home's «الحسابات المسجّلة»: every confirmed account (`all` also holds those still waiting for their e-mail code).
-  state: z.enum(['all', 'registered', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
+  // `registered` = the home's «الحسابات المسجّلة»: every confirmed account. M281: no «بانتظار تأكيد البريد» view any more.
+  state: z.enum(['all', 'registered', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead']).default('all'),
   // M86 (owner): one tap filters the members by their category.
-  // `none` = «بدون فئة»: registered accounts that have not chosen a category.
+  // M281 (owner, 2026-11-26): no «بدون فئة» — an account without one is «محايد».
   // M275: `partners` = whoever holds the Success Partners membership.
-  persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor', 'none', 'partners']).default('all'),
+  persona: z.enum(['all', 'neutral', 'entrepreneur', 'investor', 'partners']).default('all'),
   // Memberships ending within 7 / 30 days — the home cards «تنتهي خلال 7 أيام / 30 يومًا» open exactly these.
   ends: z.enum(['all', '7', '30']).default('all'),
   // M210 (owner): WhatsApp-proven number or not (hub 2.28.4+; an older hub ignores it).

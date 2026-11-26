@@ -2,8 +2,8 @@ import type { AccountFilter, EndsFilter, MembersView, PersonaFilter, WaFilter } 
 
 export const DEFAULT_VIEW: MembersView = { state: 'all', persona: 'all', wa: 'all', ends: 'all' };
 
-const STATES: readonly AccountFilter[] = ['all', 'registered', 'pending', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead'];
-const PERSONAS: readonly PersonaFilter[] = ['all', 'neutral', 'entrepreneur', 'investor', 'none', 'partners'];
+const STATES: readonly AccountFilter[] = ['all', 'registered', 'unpaid', 'member', 'expired', 'admin', 'publisher', 'lead'];
+const PERSONAS: readonly PersonaFilter[] = ['all', 'neutral', 'entrepreneur', 'investor', 'partners'];
 const WAS: readonly WaFilter[] = ['all', 'yes', 'no'];
 const ENDS: readonly EndsFilter[] = ['all', '7', '30'];
 

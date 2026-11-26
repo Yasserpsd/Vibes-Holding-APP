@@ -5,11 +5,11 @@
 export type SectionError = { code: string; message: string };
 export type Listed<T> = { ok: true; total: number; page: number; per_page: number; items: T[] };
 
-export type AccountState = 'pending' | 'unpaid' | 'member' | 'expired' | 'lead';
+export type AccountState = 'unpaid' | 'member' | 'expired' | 'lead';
 /** The filters of the members list: the states plus the two roles and «all» (which leaves the leads out). */
-export type AccountFilter = 'all' | 'registered' | 'pending' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
-/** `none` = «بدون فئة»: a registered account that has not chosen a category. */
-export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor' | 'none' | 'partners';
+export type AccountFilter = 'all' | 'registered' | 'unpaid' | 'member' | 'expired' | 'admin' | 'publisher' | 'lead';
+/** M281 (owner, 2026-11-26): no «بدون فئة» — an account without a category is «محايد». */
+export type PersonaFilter = 'all' | 'neutral' | 'entrepreneur' | 'investor' | 'partners';
 /** Memberships ending within 7 / 30 days (paid, dated ones only — the same count as the home cards). */
 export type EndsFilter = 'all' | '7' | '30';
 /** Everything the members list is filtered by; it lives in the address (`#members?persona=investor`) so a reload and Back keep it. */
@@ -297,7 +297,7 @@ export type ContentList = { blocks: { key: string; label: string; count: number 
 export type AnalyticsEvents = { advisorMessages: number; pbUnlocks: number; newsReads: number };
 export type AnalyticsDay = { day: string; visitors: number; views: number; screens: Record<string, number>; events: AnalyticsEvents };
 /** `partners` (M275) counts the Success Partners beside their categories; absent on an older server. */
-export type Personas = { neutral: number; entrepreneur: number; investor: number; none: number; total: number; partners?: number };
+export type Personas = { neutral: number; entrepreneur: number; investor: number; total: number; partners?: number };
 export type AnalyticsResult = {
   days: AnalyticsDay[];
   personas: Personas | null;

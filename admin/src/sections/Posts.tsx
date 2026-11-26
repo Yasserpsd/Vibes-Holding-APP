@@ -222,7 +222,7 @@ function Tracking({ post, isAdmin, children }: { post: Post; isAdmin: boolean; c
                       <span className="list-main">
                         <strong>{row.name || `حساب رقم ${row.contactId}`}</strong>
                         <span className="muted">
-                          {personaLabel(row.persona) || 'بدون فئة'}
+                          {personaLabel(row.persona) || 'محايد'}
                           {row.vote !== null ? <> · اختار: <span lang="ar">{optionLabel(row.vote)}</span></> : null}
                           {row.opened ? <> · فتحها {formatDateTime(row.opened.last)}</> : null}
                           {row.opened && row.opened.count > 1 ? ` · ${counted(row.opened.count, ['مرة واحدة', 'مرتان', 'مرات', 'مرة'])} (أول مرة ${formatDateTime(row.opened.first)})` : ''}
