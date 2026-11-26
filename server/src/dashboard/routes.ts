@@ -104,6 +104,16 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
     }),
   );
 
+  // M284 «خريطة الأعضاء»: accounts per country (dialing code of the phone) — counts only, no phone leaves.
+  app.get(
+    '/api/admin/countries',
+    guard(async (request, reply) => {
+      const admin = await requireAdmin(request, reply);
+      if (!admin) return;
+      return service.countries(admin);
+    }),
+  );
+
   app.get(
     '/api/admin/accounts/:id',
     guard(async (request, reply) => {

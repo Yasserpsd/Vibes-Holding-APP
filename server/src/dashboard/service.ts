@@ -7,6 +7,7 @@ import { RequestError } from '../auth/guard.js';
 import { BACKUP_ADMIN_UUID_KEY } from '../backup/service.js';
 import type { AuthService, Me, Persona } from '../auth/service.js';
 import type { SessionRecord } from '../auth/sessions.js';
+import { countByCountry, type CountriesAnswer } from './countries.js';
 import { HubError, hubCall, type HubAccount, type HubBody, type HubClient, type HubResults } from '../hub/types.js';
 import type { Notifier } from '../mail/notify.js';
 import { HUB_HONORARY_VERSION, isHonorary, pbPeriodOf } from '../membership/honorary.js';
@@ -438,7 +439,19 @@ export class DashboardService {
     return counts;
   }
 
-  hubPayments(admin: AdminActor, query: { q: string; status: string; action: string; page: number; perPage: number }): Promise<HubResults['admin_payments']> {
+  /** M284 «خريطة الأعضاء»: every registered account by the country of its phone (sweep like `newest`, counts only). */
+  async countries(admin: AdminActor): Promise<CountriesAnswer> {
+    const all: HubAccount[] = [];
+    for (let page = 1; page <= 200; page += 1) {
+      const slice = await this.hub(admin, 'admin_accounts', { q: '', state: 'all', page, per_page: 100 });
+      all.push(...slice.items.filter((account) => account.state !== 'pending'));
+      if (!slice.items.length || page * 100 >= slice.total) break;
+    }
+    // M230: an account that turns active while the pages are read can show twice; one row per account.
+    return countByCountry([...new Map(all.map((account) => [account.id, account])).values()]);
+  }
+
+  hubPayments(admin: AdminActor, query:{ q: string; status: string; action: string; page: number; perPage: number }): Promise<HubResults['admin_payments']> {
     return this.hub(admin, 'admin_payments', { q: query.q, status: query.status, action: query.action, page: query.page, per_page: query.perPage });
   }
 

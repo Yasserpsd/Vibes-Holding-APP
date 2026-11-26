@@ -4,7 +4,7 @@ import { ApiError } from './api';
 import { formatNumber } from './format';
 import type { MembersView } from './types';
 
-export type SectionKey = 'home' | 'stats' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'signup' | 'ratings' | 'partners' | 'cards' | 'invites' | 'affiliates' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'requests' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion' | 'security';
+export type SectionKey = 'home' | 'stats' | 'map' | 'members' | 'payments' | 'paylinks' | 'discounts' | 'interests' | 'signup' | 'ratings' | 'partners' | 'cards' | 'invites' | 'affiliates' | 'inbox' | 'agenda' | 'people' | 'personas' | 'hq' | 'workshops' | 'forms' | 'requests' | 'tickets' | 'leads' | 'threads' | 'mail' | 'audit' | 'posts' | 'wording' | 'content' | 'news' | 'companion' | 'security';
 
 /** What every section gets from the shell: leaving on a dead session, a passing notice, and moving between sections. */
 export type Shell = {
@@ -75,6 +75,7 @@ export function useDebounced<T>(value: T, delay = 350): T {
 }
 
 const ICONS = {
+  map: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z',
   home: 'M3 10.5 12 3l9 7.5M5.5 9v11h13V9M9.5 20v-6h5v6',
   members: 'M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19M9.5 9.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM21 19v-1.5a4 4 0 0 0-3-3.85M15.5 3.2a3.25 3.25 0 0 1 0 6.3',
   payments: 'M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9ZM3 10h18M7 15h3',

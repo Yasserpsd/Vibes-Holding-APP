@@ -25,6 +25,7 @@ import { SignupIssues } from './sections/SignupIssues';
 import { Threads } from './sections/Threads';
 import { Content } from './sections/Content';
 import { News } from './sections/News';
+import { MembersMap } from './sections/MembersMap';
 import { Stats } from './sections/Stats';
 import { Wording } from './sections/Wording';
 import { parseView, viewQuery } from './membersView';
@@ -35,6 +36,8 @@ const SECTIONS: { key: SectionKey; label: string; icon: IconName }[] = [
   // M232 (owner): «أدوات التواصل» — the first thing after the home.
   { key: 'posts', label: 'أدوات التواصل', icon: 'posts' },
   { key: 'stats', label: 'الإحصائيات', icon: 'stats' },
+  // M284 (owner, 2026-11-27): the 3D globe of the accounts by country.
+  { key: 'map', label: 'خريطة الأعضاء', icon: 'map' },
   { key: 'members', label: 'الأعضاء', icon: 'members' },
   { key: 'payments', label: 'المدفوعات', icon: 'payments' },
   { key: 'paylinks', label: 'روابط الدفع', icon: 'paylinks' },
@@ -286,6 +289,7 @@ export function App() {
           <Boundary key={section} watch={route.thread}>
             {section === 'home' ? <Home stamp={stamp} /> : null}
             {section === 'stats' ? <Stats /> : null}
+            {section === 'map' ? <MembersMap /> : null}
             {section === 'members' ? <Members key={membersTurn} initial={parseView(route.filter)} stamp={stamp} /> : null}
             {section === 'payments' ? <Payments /> : null}
             {section === 'paylinks' ? <Paylinks /> : null}

@@ -298,6 +298,9 @@ export type AnalyticsEvents = { advisorMessages: number; pbUnlocks: number; news
 export type AnalyticsDay = { day: string; visitors: number; views: number; screens: Record<string, number>; events: AnalyticsEvents };
 /** `partners` (M275) counts the Success Partners beside their categories; absent on an older server. */
 export type Personas = { neutral: number; entrepreneur: number; investor: number; total: number; partners?: number };
+/** M284 «خريطة الأعضاء» (mirrors server/src/dashboard/countries.ts): accounts by the country of their phone. */
+export type CountryCount = { code: string; name: string; nameEn: string; flag: string; dial: string; total: number; members: number };
+export type CountriesResult = { items: CountryCount[]; noPhone: number; unknown: number; total: number };
 export type AnalyticsResult = {
   days: AnalyticsDay[];
   personas: Personas | null;
