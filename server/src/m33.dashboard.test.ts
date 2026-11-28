@@ -80,6 +80,32 @@ test('screen batches count views and unique visitors; bad names are dropped', as
   assert.ok(personas && personas.total >= 1, JSON.stringify(personas));
 });
 
+test('M285: app opens count, an opens-only batch is accepted, and active users are unique across days', async () => {
+  const before = (await get('/api/admin/analytics?days=30', adminToken)).json() as { days: { events: { appOpens: number } }[]; active: { today: number; week: number; month: number } };
+  const opensOnly = await send('POST', '/api/analytics/screens', { device: 'device-m285-cccc', screens: [], opens: 2 });
+  assert.equal(opensOnly.statusCode, 200, opensOnly.body);
+  // A full 60-screen queue (the app's own cap) is no longer refused.
+  const big = await send('POST', '/api/analytics/screens', { device: 'device-m285-cccc', screens: Array.from({ length: 60 }, () => 'card'), opens: 1 });
+  assert.equal(big.statusCode, 200, big.body);
+  const after = (await get('/api/admin/analytics?days=30', adminToken)).json() as typeof before & { accounts: { total: number } | null };
+  assert.equal(after.days.length, 30);
+  assert.equal(after.days.at(-1)!.events.appOpens, before.days.at(-1)!.events.appOpens + 3);
+  assert.equal(after.active.today, before.active.today + 1);
+  assert.ok(after.active.week >= after.active.today && after.active.month >= after.active.week, JSON.stringify(after.active));
+  assert.ok(after.accounts && after.accounts.total >= 1, JSON.stringify(after.accounts));
+});
+
+test('M285: active users count one person once over the week, and the week before separately', async () => {
+  const kv = new MemoryKV();
+  const service = new AnalyticsService({ kv, log: app.log });
+  const day = 86_400_000;
+  service.screens(['card'], 'c:1', Date.now() - 2 * day);
+  service.screens(['card'], 'c:1', Date.now());
+  service.screens(['card'], 'c:2', Date.now() - 9 * day);
+  const { active } = await service.overview(7);
+  assert.deepEqual(active, { today: 1, week: 1, prevWeek: 1, month: 2, prevMonth: 0, period: 1 });
+});
+
 test('a rejected device id never reaches the counters', async () => {
   const bad = await send('POST', '/api/analytics/screens', { device: 'x', screens: ['card'] });
   assert.equal(bad.statusCode, 400);

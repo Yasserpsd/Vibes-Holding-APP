@@ -11,7 +11,9 @@ export type AnalyticsRoutesOptions = { service: AnalyticsService; auth: AuthServ
 
 const screensSchema = z.object({
   device: z.string().trim().regex(/^[A-Za-z0-9-]{8,64}$/),
-  screens: z.array(z.string().trim().max(64)).min(1).max(40),
+  // M285: an M285 batch may carry only opens (the app came back on the screen already counted).
+  screens: z.array(z.string().trim().max(64)).max(80),
+  opens: z.number().int().min(0).max(20).optional(),
 });
 const daysSchema = z.object({ days: z.coerce.number().int().min(7).max(180).default(30) });
 
@@ -38,7 +40,8 @@ export const analyticsRoutes: FastifyPluginAsync<AnalyticsRoutesOptions> = async
       const body = parse(screensSchema, request.body, reply);
       if (!body) return;
       const who = await whoIs(request);
-      service.screens(body.screens.filter(isScreenName), who ? `c:${who.session.contactId}` : `d:${body.device}`);
+      if (body.screens.length === 0 && !body.opens) return { ok: true };
+      service.screens(body.screens.filter(isScreenName), who ? `c:${who.session.contactId}` : `d:${body.device}`, Date.now(), body.opens ?? 0);
       return { ok: true };
     }),
   );
@@ -51,9 +54,14 @@ export const analyticsRoutes: FastifyPluginAsync<AnalyticsRoutesOptions> = async
       const query = parse(daysSchema, request.query, reply);
       if (!query) return;
       const errors: { personas?: SectionError; pb?: SectionError } = {};
-      const [usage, personas, pbDays] = await Promise.all([
+      // M285: the club by category twice — every registered account, and the paying members alone.
+      const [usage, personas, accounts, pbDays] = await Promise.all([
         service.overview(query.days),
         dashboard.personas(admin).catch((error: unknown) => {
+          errors.personas = sectionError(error);
+          return null;
+        }),
+        dashboard.personas(admin, 'all').catch((error: unknown) => {
           errors.personas = sectionError(error);
           return null;
         }),
@@ -62,7 +70,7 @@ export const analyticsRoutes: FastifyPluginAsync<AnalyticsRoutesOptions> = async
           return null;
         }),
       ]);
-      return { days: usage.days, personas, pbDays, errors };
+      return { days: usage.days, active: usage.active, views: usage.views, opens: usage.opens, personas, accounts, pbDays, errors };
     }),
   );
 };

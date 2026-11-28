@@ -786,3 +786,41 @@ button.funnel-step:hover { border-color: rgba(231, 173, 63, 0.7); background: rg
 .gl-flag-name { white-space: nowrap; font-size: 1.35rem; font-weight: 700; color: #fff3c4; padding: 2px 14px; border-radius: 999px; background: rgba(10, 14, 24, 0.72);
   border: 1px solid rgba(255, 224, 138, 0.7); text-shadow: 0 0 12px rgba(255, 214, 102, 0.9); box-shadow: 0 0 24px rgba(201, 162, 39, 0.45); }
 .gl-flag-stem { inline-size: 2px; block-size: 26px; background: linear-gradient(to bottom, rgba(255, 224, 138, 0.9), transparent); }
+
+/* M285 «الإحصائيات» infographic: headline band, trend arrows, sparklines, weekdays, ranked screens, «وضع العرض». */
+.hero-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.hero-stat { position: relative; overflow: hidden; display: grid; gap: 4px; align-content: start; padding: 18px 18px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: radial-gradient(120% 90% at 100% 0%, rgba(201, 162, 39, 0.10), transparent 60%), linear-gradient(180deg, #1b1b1b, var(--panel)); min-width: 0; }
+.hero-stat.gold { border-color: var(--gold-line); background: radial-gradient(120% 100% at 100% 0%, rgba(226, 195, 92, 0.24), transparent 65%), linear-gradient(180deg, rgba(201, 162, 39, 0.14), var(--panel) 75%); }
+.hero-label { color: var(--muted); font-size: 0.85rem; }
+.hero-value { font-size: clamp(2rem, 3.4vw, 2.8rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: var(--text); }
+.hero-stat.gold .hero-value { color: var(--gold-bright); }
+.hero-note { color: var(--muted); font-size: 0.8rem; }
+.delta { display: inline-flex; gap: 4px; align-items: baseline; font-size: 0.82rem; font-weight: 600; }
+.delta.up { color: #5fd08a; }
+.delta.down { color: #ff8589; }
+.delta.flat { color: var(--muted); }
+.delta-note { color: var(--muted); font-weight: 400; }
+.spark { display: block; inline-size: 100%; block-size: 34px; margin-block-start: 6px; }
+.spark-line { fill: none; stroke: var(--gold); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.spark-fill { fill: rgba(201, 162, 39, 0.12); stroke: none; }
+.weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; block-size: 190px; }
+.weekday { display: grid; grid-template-rows: auto 1fr auto; gap: 6px; justify-items: center; block-size: 100%; min-width: 0; }
+.weekday-value { font-size: 0.85rem; color: var(--muted); }
+.weekday-bar { display: flex; align-items: flex-end; inline-size: 70%; max-inline-size: 38px; block-size: 100%; border-radius: 8px; background: rgba(255, 255, 255, 0.03); overflow: hidden; }
+.weekday-bar i { display: block; inline-size: 100%; border-radius: 8px; background: linear-gradient(180deg, #8a6d1f, #5a4714); transition: block-size 0.6s ease; }
+.weekday.top .weekday-bar i { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); }
+.weekday.top .weekday-value { color: var(--gold-bright); font-weight: 600; }
+.weekday-name { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rank-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 0; font-size: 0.9rem; }
+.rank { display: grid; place-items: center; inline-size: 26px; block-size: 26px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; }
+.rank.top { border-color: var(--gold-line); background: var(--gold-wash); color: var(--gold-bright); font-weight: 700; }
+.rank-body { display: grid; gap: 6px; min-width: 0; }
+.present-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.present-title { display: block; font-size: 1.6rem; color: var(--gold-bright); letter-spacing: 0.01em; }
+body.presenting .rail, body.presenting .tabbar { display: none !important; }
+body.presenting .app { display: block !important; }
+body.presenting .main { max-width: 1400px; padding: 28px 32px; }
+.stack.present .hero-value { font-size: clamp(2.4rem, 4vw, 3.4rem); }
+@media (prefers-reduced-motion: reduce) { .weekday-bar i { transition: none; } }
+@media (max-width: 520px) { .weekdays { gap: 4px; block-size: 160px; } .weekday-name { font-size: 0.68rem; } }

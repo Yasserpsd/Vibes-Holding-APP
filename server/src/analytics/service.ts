@@ -11,8 +11,16 @@ import type { KV } from '../store.js';
  * `d:<device>`) used only to count unique visitors — never who watched what (the store data-safety
  * forms of M8 say so). Counts sit in memory first and reach the store every few seconds.
  */
-export type EventKey = 'advisorMessages' | 'pbUnlocks' | 'newsReads';
-export const EVENT_KEYS: readonly EventKey[] = ['advisorMessages', 'pbUnlocks', 'newsReads'];
+export type EventKey = 'advisorMessages' | 'pbUnlocks' | 'newsReads' | 'appOpens';
+export const EVENT_KEYS: readonly EventKey[] = ['advisorMessages', 'pbUnlocks', 'newsReads', 'appOpens'];
+
+/**
+ * M285: unique people (members and guests) over rolling windows ending today, and the window before
+ * each one — counted from the per-day visitor keys, so a person opening on five days counts once.
+ */
+export type ActiveUsers = { today: number; week: number; prevWeek: number; month: number; prevMonth: number; period: number };
+/** M285: sums over the same rolling windows (screen views, app opens). */
+export type WindowSums = { week: number; prevWeek: number; month: number; prevMonth: number };
 
 export type AnalyticsDayDoc = {
   screens: Record<string, number>;
@@ -76,13 +84,17 @@ export class AnalyticsService {
     return pending;
   }
 
-  /** One screens batch from the app. Bad names are dropped quietly; the visitor counts once per day. */
-  screens(batch: string[], visitor: string, now = Date.now()): void {
+  /**
+   * One screens batch from the app. Bad names are dropped quietly; the visitor counts once per day.
+   * M285: `opens` = app launches and returns from the background carried by the batch (apps before M285 send none).
+   */
+  screens(batch: string[], visitor: string, now = Date.now(), opens = 0): void {
     const pending = this.day(now);
     for (const screen of batch) {
       if (!isScreenName(screen)) continue;
       pending.screens.set(screen, (pending.screens.get(screen) ?? 0) + 1);
     }
+    if (opens > 0) pending.events.set('appOpens', (pending.events.get('appOpens') ?? 0) + opens);
     pending.visitors.add(visitor);
   }
 
@@ -145,17 +157,45 @@ export class AnalyticsService {
   }
 
   /** The last `days` Riyadh days for the dashboard, oldest first, empty days included so charts keep their axis. */
-  async overview(days: number, now = Date.now()): Promise<{ days: AnalyticsDay[] }> {
+  async overview(days: number, now = Date.now()): Promise<{ days: AnalyticsDay[]; active: ActiveUsers; views: WindowSums; opens: WindowSums }> {
     await this.flush();
+    // M285: at least 60 days are read so «this month vs the month before» always has both windows.
+    const span = Math.max(days, 60);
     const out: AnalyticsDay[] = [];
-    for (let back = days - 1; back >= 0; back -= 1) {
+    const keys: string[][] = [];
+    const viewsByDay: number[] = [];
+    const opensByDay: number[] = [];
+    for (let back = span - 1; back >= 0; back -= 1) {
       const day = riyadhDay(now - back * 86_400_000);
       const doc = await this.deps.kv.get<AnalyticsDayDoc>(analyticsDayKey(day));
       const screens = doc?.screens ?? {};
-      const events = { advisorMessages: 0, pbUnlocks: 0, newsReads: 0, ...doc?.events };
+      const events = { advisorMessages: 0, pbUnlocks: 0, newsReads: 0, appOpens: 0, ...doc?.events };
       const views = Object.values(screens).reduce((sum, count) => sum + count, 0);
-      out.push({ day, visitors: Array.isArray(doc?.visitors) ? doc.visitors.length : 0, views, screens, events });
+      const visitors = Array.isArray(doc?.visitors) ? doc.visitors : [];
+      keys.push(visitors);
+      viewsByDay.push(views);
+      opensByDay.push(events.appOpens);
+      if (back < days) out.push({ day, visitors: visitors.length, views, screens, events });
     }
-    return { days: out };
+    // keys[last] is today; a window of n days ending `offset` days ago.
+    const unique = (n: number, offset = 0): number => {
+      const set = new Set<string>();
+      const end = keys.length - offset;
+      for (let index = Math.max(0, end - n); index < end; index += 1) for (const key of keys[index] ?? []) set.add(key);
+      return set.size;
+    };
+    const active: ActiveUsers = {
+      today: unique(1),
+      week: unique(7),
+      prevWeek: unique(7, 7),
+      month: unique(30),
+      prevMonth: unique(30, 30),
+      period: unique(days),
+    };
+    const sums = (series: number[]): WindowSums => {
+      const window = (n: number, offset = 0) => series.slice(Math.max(0, series.length - offset - n), series.length - offset).reduce((sum, value) => sum + value, 0);
+      return { week: window(7), prevWeek: window(7, 7), month: window(30), prevMonth: window(30, 30) };
+    };
+    return { days: out, active, views: sums(viewsByDay), opens: sums(opensByDay) };
   }
 }

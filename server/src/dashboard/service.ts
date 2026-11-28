@@ -422,8 +422,9 @@ export class DashboardService {
   /** M33/M86: accounts by category, counted from the hub's own list (rule 2; pages of 100, capped at 1000). */
   async personas(admin: AdminActor, state: 'member' | 'all' = 'member'): Promise<{ neutral: number; entrepreneur: number; investor: number; total: number; partners: number }> {
     const counts = { neutral: 0, entrepreneur: 0, investor: 0, total: 0, partners: 0 };
-    for (let page = 1; page <= 10; page += 1) {
+    for (let page = 1; page <= 200; page += 1) {
       const result = await this.hub(admin, 'admin_accounts', { q: '', state, page, per_page: 100 });
+      // M285: every account, not the first thousand (the «all» count reads the whole club).
       for (const account of result.items) {
         // M281: a sign-up still typing its code is no account (the list leaves it out too).
         if (account.state === 'pending') continue;
@@ -434,7 +435,7 @@ export class DashboardService {
         if (account.state === 'lead') continue;
         if (account.persona === 'neutral' || account.persona === 'entrepreneur' || account.persona === 'investor') counts[account.persona] += 1;
       }
-      if (page * 100 >= result.total) break;
+      if (!result.items.length || page * 100 >= result.total) break;
     }
     return counts;
   }

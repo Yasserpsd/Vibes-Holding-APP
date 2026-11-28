@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { api } from '../api';
 import { BarChart, Donut, type ChartPoint, type DonutSlice } from '../Chart';
 import { formatDay, formatMoney, formatNumber, LOCALE } from '../format';
 import type { AnalyticsDay, AnalyticsResult, Home as HomeData, Personas } from '../types';
 import { Async, Boundary, Chips, ErrorCard, SectionHead, useLoad } from '../ui';
+import { lastDays, StatsHero, TopScreensBoard, Weekdays } from './StatsShow';
 
 type Range = '30' | '90' | '180';
 const RANGES: { value: Range; label: string }[] = [
@@ -57,7 +58,6 @@ const SCREEN_LABELS: Record<string, string> = {
   'auth/verify': 'تأكيد البريد',
   'auth/reset': 'استعادة كلمة المرور',
 };
-const screenLabel = (screen: string): string => SCREEN_LABELS[screen] ?? screen;
 
 const monthFormat = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
@@ -88,7 +88,7 @@ function grouped(points: ChartPoint[], mode: Grouping): ChartPoint[] {
 type UsageMetric = 'visitors' | 'views' | 'advisor' | 'news' | 'unlocks';
 type ClubMetric = 'signups' | 'activations' | 'renewals' | 'hubPayments' | 'appPayments';
 
-function PersonasCard({ personas, error, onRetry }: { personas: Personas | null; error?: { code: string; message: string }; onRetry: () => void }) {
+function PersonasCard({ personas, error, onRetry, title, hint, center }: { personas: Personas | null; error?: { code: string; message: string }; onRetry: () => void; title: string; hint: string; center: string }) {
   if (!personas) return error ? <ErrorCard error={error} onRetry={onRetry} /> : null;
   // The club's order: محايد ثم رائد أعمال ثم مستثمر — the same names as the home cards and the members list's chips.
   const slices: DonutSlice[] = [
@@ -96,38 +96,12 @@ function PersonasCard({ personas, error, onRetry }: { personas: Personas | null;
     { label: 'رائد أعمال', value: personas.entrepreneur, tone: 'b' },
     { label: 'مستثمر', value: personas.investor, tone: 'c' },
   ];
+  const id = `personas-${center.length}`;
   return (
-    <section className="card" aria-labelledby="personas-title">
-      <h2 id="personas-title">الأعضاء المشتركون حسب الفئة</h2>
-      <Donut title="الأعضاء المشتركون حسب الفئة" slices={slices} centerLabel="عضو مشترك" />
-    </section>
-  );
-}
-
-function TopScreens({ days }: { days: AnalyticsDay[] }) {
-  const totals = new Map<string, number>();
-  for (const day of days) for (const [screen, count] of Object.entries(day.screens)) totals.set(screen, (totals.get(screen) ?? 0) + count);
-  const rows = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const most = Math.max(1, ...rows.map(([, count]) => count));
-  const all = [...totals.values()].reduce((sum, count) => sum + count, 0);
-  return (
-    <section className="card" aria-labelledby="screens-title">
-      <div className="row">
-        <h2 id="screens-title">أكثر الشاشات زيارة</h2>
-        <span className="muted num">كل المشاهدات: {formatNumber(all)}</span>
-      </div>
-      {rows.length === 0 ? <p className="muted">لا توجد مشاهدات بعد. تصل الأرقام من التطبيق بعد تحديث OTA القادم، أول ما يفتحه الأعضاء.</p> : null}
-      <ul className="list">
-        {rows.map(([screen, count]) => (
-          <li key={screen} className="meter-row">
-            <div className="row">
-              <span>{SCREEN_LABELS[screen] ? screenLabel(screen) : <bdi dir="ltr">{screen}</bdi>}</span>
-              <span className="num">{formatNumber(count)}</span>
-            </div>
-            <span className="meter" aria-hidden="true"><i style={{ inlineSize: `${(count / most) * 100}%` }} /></span>
-          </li>
-        ))}
-      </ul>
+    <section className="card" aria-labelledby={id}>
+      <h2 id={id}>{title}</h2>
+      <p className="muted hint">{hint}</p>
+      <Donut title={title} slices={slices} centerLabel={center} />
     </section>
   );
 }
@@ -219,10 +193,42 @@ function ClubCharts({ home, grouping, days }: { home: HomeData; grouping: Groupi
   );
 }
 
-/** M33: the live infographics — the club by category, and every daily number by day, week or month. */
+/** M285: «وضع العرض» — the page alone on the whole screen (no menus, no controls) for showing guests. */
+function usePresenting(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    document.body.classList.toggle('presenting', on);
+    if (!on) return;
+    const leave = () => {
+      if (!document.fullscreenElement) setOn(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOn(false);
+    };
+    document.addEventListener('fullscreenchange', leave);
+    window.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('fullscreenchange', leave);
+      window.removeEventListener('keydown', escape);
+      document.body.classList.remove('presenting');
+    };
+  }, [on]);
+  const set = (next: boolean) => {
+    setOn(next);
+    if (next) void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    else if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  };
+  return [on, set];
+}
+
+/**
+ * M33: the live infographics — the club by category, and every daily number by day, week or month.
+ * M285: the headline band, both category rings (all accounts, paying members), weekdays, «وضع العرض».
+ */
 export function Stats() {
   const [range, setRange] = useState<Range>('90');
   const [grouping, setGrouping] = useState<Grouping>('day');
+  const [presenting, setPresenting] = usePresenting();
   const state = useLoad(async () => {
     const [analytics, home] = await Promise.all([api.analytics(Number(range)), api.home(Number(range))]);
     return { analytics, home };
@@ -230,16 +236,40 @@ export function Stats() {
   const days = RANGES.find((entry) => entry.value === range)?.label ?? '';
   return (
     <>
-      <SectionHead title="الإحصائيات" hint="أرقام حية بتوقيت الرياض: من فتح التطبيق وماذا فتح، والعضويات والمدفوعات، بتجميع يومي أو أسبوعي أو شهري." onReload={state.reload} busy={state.loading}>
-        <Chips label="الفترة" options={RANGES} value={range} onChange={setRange} />
-        <Chips label="التجميع" options={GROUPINGS} value={grouping} onChange={setGrouping} />
-      </SectionHead>
+      {presenting ? (
+        <div className="present-head">
+          <div>
+            <strong className="present-title">Investors Club</strong>
+            <span className="muted">أرقام التطبيق الحية · {days}</span>
+          </div>
+          <button type="button" className="chip" onClick={() => setPresenting(false)}>إنهاء العرض</button>
+        </div>
+      ) : (
+        <SectionHead title="الإحصائيات" hint="أرقام حية بتوقيت الرياض: من فتح التطبيق وماذا فتح، والعضويات والمدفوعات، بتجميع يومي أو أسبوعي أو شهري." onReload={state.reload} busy={state.loading}>
+          <button type="button" className="chip on" onClick={() => setPresenting(true)}>وضع العرض</button>
+          <Chips label="الفترة" options={RANGES} value={range} onChange={setRange} />
+          <Chips label="التجميع" options={GROUPINGS} value={grouping} onChange={setGrouping} />
+        </SectionHead>
+      )}
       <Async state={state} rows={6}>
         {({ analytics, home }) => {
           const today = analytics.days.at(-1);
           const part = (block: ReactNode) => <Boundary watch={analytics}>{block}</Boundary>;
+          const { active, views, opens } = analytics;
+          const accounts = analytics.accounts ?? null;
+          const month = { label: 'عن الشهر السابق' };
+          // The same people the rings below count (registered accounts in a category), so the numbers always match.
+          const counted = (group: Personas) => group.neutral + group.entrepreneur + group.investor;
+          const hero = [
+            ...(accounts ? [{ key: 'accounts', label: 'الحسابات المسجّلة', value: counted(accounts), note: analytics.personas ? `منهم ${formatNumber(counted(analytics.personas))} عضو مشترك` : undefined, gold: true }] : []),
+            ...(active ? [{ key: 'month', label: 'النشطون خلال 30 يومًا', value: active.month, delta: { before: active.prevMonth, ...month }, spark: lastDays(analytics, 30, (day) => day.visitors) }] : []),
+            ...(active ? [{ key: 'week', label: 'النشطون خلال 7 أيام', value: active.week, delta: { before: active.prevWeek, label: 'عن الأسبوع السابق' }, spark: lastDays(analytics, 14, (day) => day.visitors) }] : []),
+            ...(views ? [{ key: 'views', label: 'المشاهدات خلال 30 يومًا', value: views.month, delta: { before: views.prevMonth, ...month }, spark: lastDays(analytics, 30, (day) => day.views) }] : []),
+            ...(opens && opens.month > 0 ? [{ key: 'opens', label: 'مرات فتح التطبيق خلال 30 يومًا', value: opens.month, delta: { before: opens.prevMonth, ...month }, spark: lastDays(analytics, 30, (day) => day.events.appOpens ?? 0) }] : []),
+          ];
           return (
-            <div className="stack">
+            <div className={`stack${presenting ? ' present' : ''}`}>
+              {hero.length ? part(<StatsHero items={hero} />) : null}
               {today ? part(
                 <div className="tiles">
                   <div className="tile gold">
@@ -261,11 +291,15 @@ export function Stats() {
                 </div>,
               ) : null}
               <div className="columns">
-                {part(<PersonasCard personas={analytics.personas} error={analytics.errors.personas} onRetry={state.reload} />)}
-                {part(<TopScreens days={analytics.days} />)}
+                {part(<PersonasCard personas={accounts} error={analytics.errors.personas} onRetry={state.reload} title="كل الحسابات حسب الفئة" hint="كل من سجّل في التطبيق، أعضاءً وغير أعضاء." center="حساب مسجّل" />)}
+                {part(<PersonasCard personas={analytics.personas} error={accounts ? undefined : analytics.errors.personas} onRetry={state.reload} title="الأعضاء المشتركون حسب الفئة" hint="أصحاب العضوية السنوية الفعّالة فقط." center="عضو مشترك" />)}
               </div>
-              {part(<UsageCharts data={analytics} grouping={grouping} />)}
-              {part(<ClubCharts home={home} grouping={grouping} days={days} />)}
+              <div className="columns">
+                {part(<TopScreensBoard days={analytics.days} label={(screen) => SCREEN_LABELS[screen] ?? null} />)}
+                {part(<Weekdays days={analytics.days} />)}
+              </div>
+              {presenting ? null : part(<UsageCharts data={analytics} grouping={grouping} />)}
+              {presenting ? null : part(<ClubCharts home={home} grouping={grouping} days={days} />)}
             </div>
           );
         }}

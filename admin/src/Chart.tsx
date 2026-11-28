@@ -196,7 +196,9 @@ export function Donut({ title, slices, centerLabel }: { title: string; slices: D
     offset -= length;
     return part;
   });
-  const percent = (value: number) => `${Math.round((value / Math.max(1, total)) * 100)}%`;
+  // M285: largest remainder, so the legend's percentages always add up to exactly 100%.
+  const shares = wholeShares(slices.map((slice) => slice.value));
+  const percent = (index: number) => `${shares[index] ?? 0}%`;
   return (
     <div className="donut" role="img" aria-label={`${title}: ${slices.map((slice) => `${slice.label} ${formatNumber(slice.value)}`).join('، ')}`}>
       <div className="donut-ring">
@@ -212,15 +214,31 @@ export function Donut({ title, slices, centerLabel }: { title: string; slices: D
         </div>
       </div>
       <ul className="donut-legend">
-        {slices.map((slice) => (
+        {slices.map((slice, index) => (
           <li key={slice.label}>
             <i className={`donut-dot ${slice.tone}`} aria-hidden="true" />
             <span className="donut-name">{slice.label}</span>
             <b className="num">{formatNumber(slice.value)}</b>
-            <span className="muted num">{total > 0 ? percent(slice.value) : '—'}</span>
+            <span className="muted num">{total > 0 ? percent(index) : '—'}</span>
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+/** M285: whole percentages that add up to 100 (largest remainder); all zeros stay zeros. */
+export function wholeShares(values: number[]): number[] {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return values.map(() => 0);
+  const raw = values.map((value) => (value / total) * 100);
+  const floors = raw.map(Math.floor);
+  let left = 100 - floors.reduce((sum, value) => sum + value, 0);
+  const order = raw.map((value, index) => ({ index, rest: value - Math.floor(value) })).sort((a, b) => b.rest - a.rest);
+  for (const { index } of order) {
+    if (left <= 0) break;
+    floors[index] = (floors[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return floors;
 }

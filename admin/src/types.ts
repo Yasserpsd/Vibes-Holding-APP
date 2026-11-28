@@ -294,7 +294,10 @@ export type ContentItem = { block: string; path: string; ar: string; en: string;
 export type ContentList = { blocks: { key: string; label: string; count: number }[]; items: ContentItem[]; edited: Record<WordingLang, number> };
 
 /** M33 «الإحصائيات» (mirrors server/src/analytics): one Riyadh day of usage, and the club by category. */
-export type AnalyticsEvents = { advisorMessages: number; pbUnlocks: number; newsReads: number };
+export type AnalyticsEvents = { advisorMessages: number; pbUnlocks: number; newsReads: number; appOpens?: number };
+/** M285: unique people over rolling windows ending today (a person counts once in a window). */
+export type ActiveUsers = { today: number; week: number; prevWeek: number; month: number; prevMonth: number; period: number };
+export type WindowSums = { week: number; prevWeek: number; month: number; prevMonth: number };
 export type AnalyticsDay = { day: string; visitors: number; views: number; screens: Record<string, number>; events: AnalyticsEvents };
 /** `partners` (M275) counts the Success Partners beside their categories; absent on an older server. */
 export type Personas = { neutral: number; entrepreneur: number; investor: number; total: number; partners?: number };
@@ -305,6 +308,12 @@ export type CountriesResult = { items: CountryCount[]; noPhone: number; unknown:
 export type CountryAccounts = { code: string; items: AccountRow[] };
 export type AnalyticsResult = {
   days: AnalyticsDay[];
+  /** M285 (absent on an older server). */
+  active?: ActiveUsers;
+  views?: WindowSums;
+  opens?: WindowSums;
+  /** M285: every registered account by category; `personas` stays the paying members. */
+  accounts?: Personas | null;
   personas: Personas | null;
   /** Projects Bank unlocks bucketed by day, from the bridge's own rows; null when the bridge is off. */
   pbDays: Record<string, number> | null;
