@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { wholeShares } from '../Chart';
+import { sharePercent } from '../Chart';
 import { formatNumber } from '../format';
 import type { AnalyticsDay, AnalyticsResult } from '../types';
 
@@ -133,7 +133,6 @@ export function TopScreensBoard({ days, label }: { days: AnalyticsDay[]; label: 
   const rest = named.slice(10).reduce((sum, [, count]) => sum + count, 0) + (totals.get('other') ?? 0);
   if (rest > 0) rows.push(['شاشات أخرى', rest]);
   const all = [...totals.values()].reduce((sum, count) => sum + count, 0);
-  const shares = wholeShares(rows.map(([, count]) => count));
   const most = Math.max(1, ...rows.map(([, count]) => count));
   return (
     <section className="card" aria-labelledby="screens-title">
@@ -150,7 +149,7 @@ export function TopScreensBoard({ days, label }: { days: AnalyticsDay[]; label: 
               <div className="row">
                 <span>{name}</span>
                 <span className="num">
-                  {formatNumber(count)} <span className="muted">· {formatNumber(shares[index])}%</span>
+                  {formatNumber(count)} <span className="muted">· {sharePercent(count, all)}</span>
                 </span>
               </div>
               <span className="meter" aria-hidden="true"><i style={{ inlineSize: `${(count / most) * 100}%` }} /></span>

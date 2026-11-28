@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
-import { formatDay, formatNumber } from './format';
+import { formatDay, formatNumber, LOCALE } from './format';
 
 /** One bar: a Riyadh day, or (M33) a week or month bucket carrying its own `label`. */
 export type ChartPoint = { day: string; value: number; label?: string; details?: { label: string; value: string }[] };
@@ -196,9 +196,7 @@ export function Donut({ title, slices, centerLabel }: { title: string; slices: D
     offset -= length;
     return part;
   });
-  // M285: largest remainder, so the legend's percentages always add up to exactly 100%.
-  const shares = wholeShares(slices.map((slice) => slice.value));
-  const percent = (index: number) => `${shares[index] ?? 0}%`;
+  const percent = (index: number) => sharePercent(slices[index]?.value ?? 0, total);
   return (
     <div className="donut" role="img" aria-label={`${title}: ${slices.map((slice) => `${slice.label} ${formatNumber(slice.value)}`).join('، ')}`}>
       <div className="donut-ring">
@@ -227,18 +225,12 @@ export function Donut({ title, slices, centerLabel }: { title: string; slices: D
   );
 }
 
-/** M285: whole percentages that add up to 100 (largest remainder); all zeros stay zeros. */
-export function wholeShares(values: number[]): number[] {
-  const total = values.reduce((sum, value) => sum + value, 0);
-  if (total <= 0) return values.map(() => 0);
-  const raw = values.map((value) => (value / total) * 100);
-  const floors = raw.map(Math.floor);
-  let left = 100 - floors.reduce((sum, value) => sum + value, 0);
-  const order = raw.map((value, index) => ({ index, rest: value - Math.floor(value) })).sort((a, b) => b.rest - a.rest);
-  for (const { index } of order) {
-    if (left <= 0) break;
-    floors[index] = (floors[index] ?? 0) + 1;
-    left -= 1;
-  }
-  return floors;
+/**
+ * M285: a share as the reader can check it — whole when exact (50%), otherwise one decimal (33.3%),
+ * never nudged to make a list add up to 100.
+ */
+const shareFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+export function sharePercent(value: number, total: number): string {
+  if (total <= 0) return '—';
+  return `${shareFormat.format(Math.round((value / total) * 1000) / 10)}%`;
 }
